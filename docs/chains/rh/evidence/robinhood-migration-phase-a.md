@@ -830,15 +830,18 @@ Additional mandatory cases from the validation plan include changed external
 fact invalidation, constructor/source drift changing the plan, transaction
 position not being resume identity, and cross-history writes failing
 ([negative matrix](../robinhood-deployment-validation-plan.md#L331-L369)).
-Ambiguous submission, exhausted retry, `None`/`"None"` handling, and false
-success remain mandatory for the later execution-hardening package; they are
-not Phase B execution tests. In particular, the hash-pinned validation plan
-places NEG-029,
-`test_ambiguous_submission_requires_review`, in
-`tests/deployment/test_execution_plan.py`
-([NEG-029 schedule](../robinhood-deployment-validation-plan.md#L361-L361)).
-Option C deliberately defers that named case and its placement to the later
-file-exact execution-hardening authorization. This is an explicit scheduling
+The current Phase B ambiguous-history case is
+`test_synthetic_h06_history_state_matrix` in
+`tests/deployment/test_execution_plan.py`; it exercises H-06's
+`HistoryState.AMBIGUOUS` and proves that the H-05 report remains blocked with
+`plan_hash=null`. Ambiguous submission, exhausted retry, `None`/`"None"`
+handling, and false success remain mandatory for the later
+execution-hardening package; they are not Phase B execution tests. In
+particular, the hash-pinned validation plan places the distinct NEG-029
+submission case, `test_ambiguous_submission_requires_review`, in that later
+package ([NEG-029 schedule](../robinhood-deployment-validation-plan.md#L361-L361)).
+Option C deliberately defers that submission case to the later file-exact
+execution-hardening authorization. This is an explicit scheduling
 reconciliation with the validation plan, not an omitted Phase B requirement.
 
 ## Cross-workstream ownership and overlap
@@ -1090,3 +1093,293 @@ All 18 reservations remain non-executable. The proposed Phase B can safely
 implement only the blocked planning and discovery boundary in six files. It
 cannot publish the namespace, create skeletons, enable migration execution, or
 clear H-03, H-04, S5, Track 8, H-06, H-08, or H-09 blockers.
+
+## Phase B Wave 2 implementation record
+
+This section records the separately authorized H-05 Phase B Wave 2 candidate.
+It does not revise or replace any Phase A byte above. The candidate remains
+unstaged and uncommitted and is ready only for independent Gate 1 review.
+
+### B.1 Authorized baseline and authority gate
+
+The implementation gate bound all local and remote identities before any
+candidate byte changed:
+
+| Identity | Verified value |
+| --- | --- |
+| authorized commit | `4b46f042eb6a2992417db5f9a701b4fa8c3eca3f` |
+| authorized tree | `fe1b4732688490e73198bd2471bb6aa097e4f465` |
+| local `rh` | authorized commit |
+| cached `origin/rh` | authorized commit |
+| credential-free live `origin/rh` | authorized commit |
+| owner signature | valid signature from fingerprint `625E97736545F6FDCAF1EF002BF641157E6D4240` |
+| integration worktree | clean before isolated-worktree creation |
+| isolated branch | `rh-track-7-h5-migration-plan-phase-b-wave2` |
+| isolated worktree | `/Users/wigglez/dev/ripe-protocol-track-7-h5-migration-plan-phase-b-wave2` |
+| isolated initial index/worktree | clean at the authorized commit and tree |
+
+The following integrated ancestors were rechecked from the authorized commit:
+
+- H-04 Group 2: `81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038`;
+- H-06 feature: `6005805554bf1616aaf98aedca3a15a6167de558`;
+- H-06 macOS qualification: `03a92e96c2f48e7fbe19fce8bbaac3b16633e59c`;
+- Track 8 M4: `a2d6b940c9b90d9ff1c78560ad61b2dd546f1760`.
+
+The integrated H-04 schema-v2 manifest/generator replacement is the authorized
+commit itself. Its lifecycle is exactly 20 approved genuine decisions, zero
+open genuine decisions, and retired/non-operative D-H04-19. Its manifest has
+61 pending-binding records under 14 exact schedules and 16 remaining
+generation-bearing blockers, so `DefaultsRobinhood.vy` remains absent and no
+renderable deployment artifact exists. The baseline movement consists of
+exactly the eight reviewed H-04 paths, has zero intersection with this H-05
+ceiling, and all eight files match the authorized commit byte-for-byte. The
+rebind consumed only those integrated Git bytes; it did not read or consume
+the former concurrent H-04 worktree.
+
+### B.2 Exact ceiling and candidate identities
+
+The actual candidate changes exactly the authorized six paths:
+
+1. `docs/chains/rh/evidence/robinhood-migration-phase-a.md`;
+2. `config/network_profiles.py`;
+3. `scripts/migrate.py`;
+4. `scripts/utils/migration_runner.py`;
+5. `tests/deployment/test_migration_discovery.py`;
+6. `tests/deployment/test_execution_plan.py`.
+
+No seventh file, dependency, lockfile, Base path, production contract, ABI,
+interface, H-06 source/test/schema, migration source, or history path changed.
+The five non-self-referential candidate source identities frozen before this
+evidence append are:
+
+| Path | SHA-256 | Git blob |
+| --- | --- | --- |
+| `config/network_profiles.py` | `e3d018d6790c145aade1ea3108f03eb6ef69eab2c676d54b8f978797b6bb325d` | `cb4002d72a6fc2571dbe3ae26e1cc20e112f082b` |
+| `scripts/migrate.py` | `f44a1c25a888734465401260f012caae9e0513ea2e594eb2f947bcca86c26873` | `14eb1cd8750f149600f167b24e8373d573a20643` |
+| `scripts/utils/migration_runner.py` | `a7d7fd63ab5e3648da59b9568430a7a43ef4a43ce64267fae4eac0cdc31b2efb` | `b273cfa5a4639dbb66d0969cbd858c47ef1b6826` |
+| `tests/deployment/test_migration_discovery.py` | `d056ba561cd594fe37fe2d5497179f56dca7ed6fdae9d08e97c850203bae1bac` | `0642b5b63a92c6bff2bd161af0a761207a940c42` |
+| `tests/deployment/test_execution_plan.py` | `2204adedbbe1bcfe625a3a63526a84fc588a9157fbb3f8a544b4e735475fdf1f` | `2f0963474901ce0c17b1c7a4e8007a7c121cc9b0` |
+
+The evidence file intentionally does not embed a claim about its own future
+candidate hash or blob. The final handoff binds all six identities externally.
+
+### B.3 Static five-profile policy and no-runtime CLI
+
+`Operation.MIGRATION_PLAN` is the ninth total operation. It leaves all eight
+pre-existing H-02 operation outcomes unchanged:
+
+| Profile | `MIGRATION_PLAN` outcome |
+| --- | --- |
+| `local` | unsupported |
+| `base-mainnet` | unsupported |
+| `base-sepolia` | unsupported |
+| `robinhood-testnet` | supported for static blocked planning only |
+| `robinhood-mainnet` | supported for static blocked planning only |
+
+The supported policy requires no RPC, runtime identity, repository runtime,
+account, signer, verifier, or write capability. Both Robinhood source and
+history states remain `PathState.PROPOSED`.
+
+The `--plan` route validates every legacy flag family and returns before
+legacy setup. The real-process tests prove the source-absent route never loads
+Boa, `config.BluePrint`, `scripts.utils.migration`, or H-06, never constructs
+`DeployArgs`, and cannot reach a fork, RPC, account, signer, transaction,
+simulation, submission, writer, migration import, or history promotion. It
+uses `/usr/bin/git` with a fixed minimal environment only to read the local
+HEAD/tree. It emits only the canonical blocked report.
+
+### B.4 Reservations, discovery, and report identities
+
+The 18 in-code reservations are present in the exact canonical order and with
+the exact authorized dispositions. They are typed data, not files or
+executable migrations. Their canonical digest is:
+
+```text
+9e8a36c1ed85ce9f27a2b1319a9e00078727380d0f4ba42f8d1920030e6cbd91
+```
+
+Discovery is flat, deterministic, import-free, and write-free. Tests reject
+duplicate numeric and semantic IDs; missing, extra, reordered, gapped, or
+mismatched reservations; non-ASCII/non-four-digit IDs; noncanonical
+filenames; aliases; recursion; symlinks; absolute and escaping paths; source
+and history collisions; cross-profile history; Base source, history, blob, and
+exact `Ledger` semantic input; untracked bytes; Git blob mismatches; and
+source hash mismatches. Migration modules containing top-level imports or
+raises are parsed without being executed.
+
+The H-05 report serializer implements the integer-only RFC 8785/JCS domain,
+including UTF-16 object-key ordering, canonical control escaping, rejection of
+floats and nonfinite numbers, self-hash omission, no hash-input LF, lowercase
+SHA-256 insertion, final canonicalization, and exactly one terminal LF.
+
+| Profile | `report_sha256` |
+| --- | --- |
+| `robinhood-mainnet` | `5a6721b4564f06a0a0117c0331c3cbcb1a1d1480be66b815ec57f89c70146a1b` |
+| `robinhood-testnet` | `acae2c42b2426c558b4cbae1351865e6826888d83a0ddaf9d47bf17dae8a6211` |
+
+The final canonical stdout byte identities, including exactly one terminal LF,
+are `8649a0866fe5d23f84a477c6e9e41c45e295ef9b4513f9717b97c64f624bca5d`
+for mainnet and
+`acec0fa880bddf5423e328b0266dd2eb5563bed87174197358e65bf287635d78`
+for testnet.
+
+The two reports differ only in profile ID, expected chain ID, history root,
+and the derived report hash. Both have `mode=dry-plan`, `status=blocked`,
+all 18 steps, `source_digest=null`, `prior_history_digest=null`, and
+`plan_hash=null`. Neither contains an RPC, endpoint, environment, account,
+signer, timestamp, host path, transaction, deployment argument, or production
+identity.
+
+### B.5 Current blockers and parked areas
+
+The current global blocker list is derived from the authorized baseline and is
+exactly:
+
+```text
+B-H04-PARAMS
+B-H05-PLAN
+B-H05-SOURCE-ABSENT
+B-H06-HISTORIES-ABSENT
+B-H08-PROOF
+B-H09-RELEASE
+B-LP-ARTIFACTS
+B-ORACLE-FREEZE
+B-S5-LEDGER
+B-SECOPS-HANDOFF
+```
+
+Integrated M4 removes historical `B-T8-M4`. The report does not revive
+`B-H03-R5-UNAPPROVED`, `B-H04-NOT-STARTED`,
+`B-S5-STAGE-B-NONCONTROLLING`, or
+`B-T8-M1-PHASE-B-UNAUTHORIZED`.
+
+`B-T8-M5` and `B-T8-FREEZE` occur only on step 0500;
+`B-REWARD-PROMOTION` only on step 0600; `B-PSM-SEQUENCE` only on step 0800;
+and `B-T1-CCIP` plus `B-T1-TOOLCHAIN` only on deferred step 1000. CCIP is not
+a global H-05 blocker. AAPL/Stock, M5, rewards, PSM, and CCIP remain parked as
+specified. This candidate introduces no zero-backing settlement,
+loss-allocation, or bad-debt policy.
+
+### B.6 H-06 ownership boundary and absent state
+
+When a separately authorized real source-backed semantic plan exists, the
+reader binding uses H-06's public `validate_semantic_plan`, `plan_sha256`, and
+`read_history` APIs. H-05 does not reproduce H-06 canonicalization,
+`plan_sha256`, history parsing, immutable publication, current promotion, or
+writer logic, and never substitutes `report_sha256` for `plan_sha256`.
+
+The synthetic history matrix covers `valid`, `absent-clean`, `incomplete`,
+`corrupt`, `stale`, `wrong-profile`, `wrong-chain`, `wrong-plan`, and
+`ambiguous`. Every state remains blocked and keeps Phase B `plan_hash=null`.
+History without a source-backed plan is unverifiable; missing or unverifiable
+history is never completion evidence.
+
+At the authorized baseline, these paths remain absent:
+
+```text
+migrations/robinhood/
+migration_history/robinhood-testnet/
+migration_history/robinhood-mainnet/
+```
+
+No current index, immutable record, attempt, lock, temporary operational file,
+deployment argument, transaction, or simulation was created.
+
+The Base inventory digest recipe is exact and independently reproducible from
+the repository root:
+
+1. enumerate only non-symlink regular files directly under the applicable
+   root, using top-level `*.py` for `migrations/base-mainnet` and top-level
+   `*.json` for `migration_history/base-mainnet/v1`;
+2. express every name as its repository-relative POSIX path and sort those
+   paths bytewise with `LC_ALL=C`;
+3. for every sorted file, serialize the lowercase file SHA-256, two ASCII
+   spaces, the repository-relative path, and one LF; and
+4. concatenate all records, including the final LF, and SHA-256 those bytes.
+
+The literal shell reproductions are:
+
+```sh
+find migrations/base-mainnet -mindepth 1 -maxdepth 1 -type f -name '*.py' -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256
+find migration_history/base-mainnet/v1 -mindepth 1 -maxdepth 1 -type f -name '*.json' -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256
+```
+
+The Base source inventory remains 62 files with aggregate digest
+`583ecb4317ffae58c512d006840cea7ac63a5c7886e582de881fe764e73f094c`.
+The Base history remains 58 files with aggregate digest
+`79267f031649ad08e314dc9f63645d4d09172120a1ab728161ea833ed2526a18`;
+all 58 parse and both paths remain byte-clean against HEAD.
+
+### B.7 Toolchain and validation
+
+Validation used the read-only Python environment at
+`/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312`, with a
+separate mode-`0700` HOME, Boa cache, pytest basetemp, Hypothesis directory,
+and external bytecode cache. `PYTHONDONTWRITEBYTECODE=1` and
+`-p no:cacheprovider` were used for pytest, with no `PYTHONPATH` or import-mode
+override. Relevant RPC/account/key variables were absent and the existing
+non-secret `ETHERSCAN_API_KEY=local-placeholder` harness value was used.
+
+| Toolchain control | Identity/result |
+| --- | --- |
+| Python executable SHA-256 | `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765` |
+| `requirements.txt` SHA-256 | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` |
+| canonicalized tuple-sort inventory | 93 distributions; `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92` |
+| `python -m pip check` | no broken requirements |
+
+| Validation gate | Result |
+| --- | --- |
+| H-05 discovery and execution-plan modules | 96 passed in 118.68 s |
+| all five profile outcomes and static no-reachability/JCS/history cases | included in the 96; all passed |
+| integrated H-04 manifest/generator and clock-profile modules | 111 passed in 32.18 s |
+| H-02 three-file suite and Base regression | 99 passed |
+| H-01 dependency gate | 45 passed |
+| S1 clock profiles | 57 passed |
+| S2 checker | `CLOCK_INVENTORY_OK`; production `99/94/17`, cadence candidates `590`, post-S5 digest `f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd` |
+| S2 inventory module | 130 passed in 59.02 s |
+| H-03 blueprint and omissions | 104 passed |
+| both H-06 modules | 148 passed |
+| combined H-01/H-02/S1/H-03/H-06 selection | 453 passed in 51.34 s |
+| S5 focused Ledger/Teller action-block gate | 45 passed in 64.39 s |
+| M4 complete four-file selection | 74 passed in 42.22 s |
+| M1/M2/M3 exact eight-file union | 442 passed in 145.38 s |
+| complete collection | 3,693 selected; 3,835 total; 142 deselected in 7.37 s |
+| complete serial repository suite | 3,693 passed; 142 deselected in 440.97 s; zero failures, selected skips, xfails, or warnings |
+| two processes in each of two clean checkouts | both profiles reproduced the exact stdout SHA-256 values in B.4 on all eight invocations |
+| changed Python compilation with external bytecode cache | passed |
+| all tracked JSON parsing | 116 files parsed |
+| `git diff --check` and untracked-file checks | passed |
+
+Every authoritative pytest command used the unchanged repository harness with
+loopback permission for its existing `free_port` fixture; no fixture override
+or review-only `conftest` was used. The environment contained only the
+established non-secret `ETHERSCAN_API_KEY=local-placeholder` harness value;
+external RPC, account, key, and signer variables were absent. No RPC,
+explorer, account, signer, transaction, migration, deployment, dependency
+change, retry, skip, or xfail was used.
+
+The integrated H-04 baseline collects 3,597 selected / 3,739 total / 142
+deselected. This candidate adds exactly 96 selected tests:
+3,597 + 96 = 3,693 selected and 3,739 + 96 = 3,835 total. The 142 controlling
+deselections are unchanged.
+
+### B.8 Continuing state and review boundary
+
+This candidate is deterministic discovery and blocked planning only. It is not
+`plan_ready`, executable, simulated, published, promoted, staged, committed,
+pushed, merged, deployed, configured, or released. No migration, manifest,
+history, transaction, or external state exists to reconcile or roll back.
+
+Rollback before any later publication is a reviewed restoration of exactly
+the six authorized paths to commit
+`4b46f042eb6a2992417db5f9a701b4fa8c3eca3f`, followed by the complete H-02,
+Base, H-05, and repository validation package. The two added test files are
+removed; the four tracked files are restored. The approved pre-rebind
+candidate is separately preserved in private mode-0700 material at
+`/private/tmp/h05-phase-b-rebind-rollback.c6WshS`. No history rewrite or
+onchain remediation is involved.
+
+The unstaged candidate is ready for independent Gate 1 review only. Gate 1
+does not authorize commit, push, merge, PR creation, namespace publication,
+migration execution, simulation, deployment, configuration, signing,
+broadcast, history creation, current promotion, or release.

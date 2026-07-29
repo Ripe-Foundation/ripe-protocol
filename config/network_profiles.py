@@ -30,6 +30,7 @@ class Operation(str, Enum):
     PROFILE_INSPECTION = "profile_inspection"
     LOCAL_RUNTIME = "local_runtime"
     REPOSITORY_READ = "repository_read"
+    MIGRATION_PLAN = "migration_plan"
     MIGRATION_FORK = "migration_fork"
     MIGRATION_LIVE = "migration_live"
     CONSOLE_EXPLORATION = "console_exploration"
@@ -321,6 +322,7 @@ _BASE_SEPOLIA_OPERATIONS = _operations(
 )
 
 _ROBINHOOD_OPERATIONS = _operations(
+    _policy(Operation.MIGRATION_PLAN, _SUPPORTED),
     _policy(
         Operation.REPOSITORY_READ, _BLOCKED, repository=True
     ),

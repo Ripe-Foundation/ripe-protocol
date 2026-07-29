@@ -1,11 +1,10 @@
 import os
+import sys
 from contextlib import ExitStack, contextmanager
+import importlib
 from pathlib import Path
 
-import boa
-import boa.deployments
 import click
-from boa.rpc import EthereumRPC
 
 from config.network_profiles import (
     NETWORK_PROFILE_IDS,
@@ -19,12 +18,36 @@ from config.network_profiles import (
     verify_chain_identity,
 )
 from scripts.utils import log
-from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import get_account, load_vyper_files
-from scripts.utils.migration_runner import MigrationError, MigrationRunner
+from scripts.utils.migration_runner import (
+    MigrationError,
+    MigrationPlanError,
+    MigrationRunner,
+    build_blocked_migration_report,
+    report_bytes,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class _LazyBoa:
+    """Keep Boa entirely outside the static plan process."""
+
+    def __init__(self):
+        self._module = None
+
+    def _load(self):
+        if self._module is None:
+            self._module = importlib.import_module("boa")
+            importlib.import_module("boa.deployments")
+        return self._module
+
+    def __getattr__(self, name):
+        return getattr(self._load(), name)
+
+
+boa = _LazyBoa()
 
 CLICK_PROMPTS = {
     "safe": {
@@ -85,6 +108,8 @@ def param_prompt(ctx, param, value):
     default_val = param_config.get("default")
     prompt = param_config.get("prompt")
     optional = param_config.get("optional", default_val is not None)
+    if ctx.params.get("plan") or "--plan" in sys.argv[1:]:
+        return value
     if value != default_val:
         return value
     if prompt is None or (not ctx.params.get("ask") and optional):
@@ -109,6 +134,8 @@ def param_prompt(ctx, param, value):
 
 
 def read_chain_id(rpc_url: str) -> int | str:
+    from boa.rpc import EthereumRPC
+
     return EthereumRPC(rpc_url).fetch("eth_chainId", [])
 
 
@@ -184,6 +211,41 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
     return expected_blueprint
 
 
+def _require_plan_flags(
+    profile,
+    *,
+    ask,
+    safe,
+    fork,
+    is_retry,
+    rpc,
+    single,
+    environment,
+    start_timestamp,
+    end_timestamp,
+    blueprint,
+    account,
+    ledger,
+) -> None:
+    history = profile.repository.history_dir
+    expected_environment = None if history is None else history.name
+    if (
+        ask
+        or safe
+        or fork
+        or is_retry
+        or rpc is not None
+        or single
+        or environment != expected_environment
+        or start_timestamp != "0"
+        or end_timestamp != "0"
+        or blueprint is not None
+        or account != CLICK_PROMPTS["account"]["default"]
+        or ledger != -1
+    ):
+        raise MigrationPlanError("H05_PLAN_FLAGS_INCOMPATIBLE")
+
+
 @click.command()
 @click.option(
     "--ask",
@@ -202,6 +264,15 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
     is_flag=True,
     default=False,
     help="Run the existing migration runner in exploration-only fork mode.",
+)
+@click.option(
+    "--plan",
+    is_flag=True,
+    default=False,
+    help=(
+        "Emit the deterministic blocked Robinhood migration plan without "
+        "RPC, account, execution, simulation, or repository writes."
+    ),
 )
 @click.option(
     "--rpc",
@@ -296,11 +367,36 @@ def cli(
     blueprint,
     account,
     ledger,
+    plan=False,
 ):
     """Run migrations through a validated, explicit network profile."""
-    del ask
     try:
         profile = get_profile(profile_id)
+        if plan:
+            require_operation(profile, Operation.MIGRATION_PLAN)
+            _require_plan_flags(
+                profile,
+                ask=ask,
+                safe=safe,
+                fork=fork,
+                is_retry=is_retry,
+                rpc=rpc,
+                single=single,
+                environment=environment,
+                start_timestamp=start_timestamp,
+                end_timestamp=end_timestamp,
+                blueprint=blueprint,
+                account=account,
+                ledger=ledger,
+            )
+            report = build_blocked_migration_report(
+                profile.identity.profile_id,
+                repository_root=ROOT,
+            )
+            click.echo(report_bytes(report).decode("utf-8"), nl=False)
+            return
+
+        del ask
         operation = (
             Operation.MIGRATION_FORK if fork else Operation.MIGRATION_LIVE
         )
@@ -332,8 +428,10 @@ def cli(
         paths = repository_paths(
             profile, operation, root=ROOT, identity=identity
         )
-    except NetworkProfileError as error:
+    except (MigrationPlanError, NetworkProfileError) as error:
         raise click.ClickException(str(error)) from None
+
+    from scripts.utils.deploy_args import DeployArgs
 
     deploy_args = DeployArgs(
         sender,
