@@ -50,8 +50,6 @@ from tests.deployment.test_manifest_schema import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PYTHON = Path(sys.executable)
-CURRENT_COMMIT = "4b46f042eb6a2992417db5f9a701b4fa8c3eca3f"
-CURRENT_TREE = "fe1b4732688490e73198bd2471bb6aa097e4f465"
 CURRENT_GLOBAL_BLOCKERS = [
     "B-H04-PARAMS",
     "B-H05-PLAN",
@@ -64,6 +62,31 @@ CURRENT_GLOBAL_BLOCKERS = [
     "B-S5-LEDGER",
     "B-SECOPS-HANDOFF",
 ]
+
+
+def _current_git_identity() -> tuple[str, str]:
+    identities = []
+    for revision in ("HEAD^{commit}", "HEAD^{tree}"):
+        result = subprocess.run(
+            ["/usr/bin/git", "rev-parse", "--verify", revision],
+            cwd=ROOT,
+            env={"LANG": "C", "LC_ALL": "C"},
+            capture_output=True,
+            check=True,
+            encoding="ascii",
+        )
+        assert result.stderr == ""
+        identities.append(result.stdout.strip())
+    return identities[0], identities[1]
+
+
+def _assert_current_report_git_identity(report) -> None:
+    current_commit, current_tree = _current_git_identity()
+    assert report["source_commit"] == current_commit
+    assert report["source_tree"] == current_tree
+    for identity in (report["source_commit"], report["source_tree"]):
+        assert len(identity) == 40
+        assert all(character in "0123456789abcdef" for character in identity)
 
 
 def _report(profile_id="robinhood-mainnet"):
@@ -211,8 +234,7 @@ def test_current_blocked_report_contract(
     assert report["expected_chain_id"] == chain_id
     assert report["source_root"] == "migrations/robinhood"
     assert report["history_root"] == history_root
-    assert report["source_commit"] == CURRENT_COMMIT
-    assert report["source_tree"] == CURRENT_TREE
+    _assert_current_report_git_identity(report)
     assert report["source_digest"] is None
     assert report["reservation_digest"] == RESERVATION_DIGEST
     assert report["prior_history_digest"] is None
@@ -220,6 +242,14 @@ def test_current_blocked_report_contract(
     assert report["blockers"] == CURRENT_GLOBAL_BLOCKERS
     assert len(report["steps"]) == 18
     assert report["report_sha256"] == report_sha256(report)
+
+
+@pytest.mark.parametrize("field", ("source_commit", "source_tree"))
+def test_independent_git_identity_rejects_wrong_production_report(field):
+    report = _report()
+    report[field] = "0" * 40
+    with pytest.raises(AssertionError):
+        _assert_current_report_git_identity(report)
 
 
 def test_profile_differences_are_limited_to_four_fields_and_hash():

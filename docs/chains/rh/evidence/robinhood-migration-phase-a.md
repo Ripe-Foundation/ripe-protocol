@@ -1383,3 +1383,123 @@ The unstaged candidate is ready for independent Gate 1 review only. Gate 1
 does not authorize commit, push, merge, PR creation, namespace publication,
 migration execution, simulation, deployment, configuration, signing,
 broadcast, history creation, current promotion, or release.
+
+## C. Post-publication current-identity correction
+
+This section is an append-only correction prepared after publication of the
+signed H-05 feature commit. Every prior evidence byte is preserved as an exact
+prefix: the prefix is 92,255 bytes and 1,385 lines, with SHA-256
+`64a28dac4662fc3adbae47cdcaa45ae9b94bc179ebd2291330162ce3ccddf703`
+and Git blob `32ed910305fc5cc4d8e8ab8db98137df2dcf47e1`.
+
+### C.1 Published-tree defect reproduction
+
+The published feature identity is:
+
+- commit `697b59d543206b3926d04eb9fa4e5cd117ccf358`;
+- tree `542560d813940c5daeaa69de8f03e51a3beb02c5`;
+- sole parent `4b46f042eb6a2992417db5f9a701b4fa8c3eca3f`; and
+- valid owner signature from fingerprint
+  `625E97736545F6FDCAF1EF002BF641157E6D4240`.
+
+`build_blocked_migration_report()` intentionally reads the current Git commit
+and tree. After publication it therefore reported the published commit and
+tree above, while `test_execution_plan.py` still compared those fields with
+the pre-publication baseline commit and tree. Both parameterized cases of
+`test_current_blocked_report_contract` failed at the stale commit comparison,
+before any correction byte was written.
+
+### C.2 Correct controlling invariant
+
+Embedding the eventual commit hash in a file inside that same commit is
+self-referential: creating the commit necessarily changes the identity being
+embedded. A hardcoded current commit or tree therefore cannot be a stable
+invariant across publication, a later correction commit, eventual
+fast-forward integration, or unrelated compatible commits.
+
+The controlling invariant is instead:
+
+1. the report identifies the actual current Git `HEAD^{commit}` and
+   `HEAD^{tree}`;
+2. a test-only oracle invokes `/usr/bin/git` directly under deterministic
+   `LANG=C` and `LC_ALL=C`;
+3. the oracle is independent of production `_git_identity` and compares both
+   report fields with Git plumbing;
+4. each identity is exactly 40 lowercase hexadecimal characters; and
+5. the H-05 `report_sha256` still recomputes over the complete current report.
+
+The correction also supplies negative cases proving that a wrong
+production-reported commit or tree fails the independent comparison. It does
+not weaken source identity binding and changes no production implementation.
+
+### C.3 Historical and frozen-commit report identities
+
+The exact report and stdout hashes in B.4 were candidate-time measurements at
+baseline commit `4b46f042eb6a2992417db5f9a701b4fa8c3eca3f`, tree
+`fe1b4732688490e73198bd2471bb6aa097e4f465`. They remain historical evidence;
+they are not current output after feature publication.
+
+For the frozen published commit and tree in C.1, the measurements before this
+correction were:
+
+| Profile | `report_sha256` | Canonical stdout SHA-256 |
+| --- | --- | --- |
+| `robinhood-mainnet` | `149c26a673348b21aa979134fc459b29c38e1670dff00729b8a41a49404f64a7` | `488aab1655b76b242a5c464dfc2179d8fac32b4e619023986e520d8aaed2802e` |
+| `robinhood-testnet` | `9d2813681b19f15b0ae3178897429c9709d43df73269adc9c9006209cebadb2e` | `c471525f19cbd14b7aa76edd16f59a671ceeb1d065ee87a79fbfcc55718a80b6` |
+
+These values are reproducible only while Git `HEAD` remains the exact frozen
+published identity. They are candidate-time measurements for this uncommitted
+correction state, not permanent current hashes. A later correction commit will
+move `HEAD` again. Every Gate review must recompute and bind the report bytes
+for its exact frozen commit and tree rather than carrying these values forward.
+
+### C.4 Scope and lifecycle boundary
+
+This correction changes only this evidence file and
+`tests/deployment/test_execution_plan.py`. It does not edit
+`scripts/utils/migration_runner.py` or any production source. The signed
+published commit remains unchanged and is not amended, rebased, force-pushed,
+deleted, or rewritten.
+
+The correction is not H-05 Gate 2 and grants no commit, push, PR, integration,
+migration, simulation, deployment, configuration, signing, broadcasting,
+semantic-plan production, H-06 successor, H-08, H-09, or external-state
+authority. It must remain unstaged and uncommitted until independent review.
+
+### C.5 Correction validation
+
+Validation used the unchanged Python 3.12 repository harness, private
+mode-0700 external HOME, Boa, Hypothesis, bytecode, and pytest basetemp
+directories, `PYTHONDONTWRITEBYTECODE=1`, and pytest's cache provider
+disabled. The established non-secret
+`ETHERSCAN_API_KEY=local-placeholder` harness value was the only endpoint-like
+environment value. Existing loopback permission was used for the repository's
+`free_port` fixture; no fixture override or review-only test source was added.
+No RPC, account, key, signer, transaction, migration, simulation, deployment,
+dependency mutation, retry, skip, or xfail was used.
+
+| Validation gate | Result |
+| --- | --- |
+| committed-tree defect reproduction | 2 collected; 2 failed at the stale `source_commit` assertion in 101.89 s, as expected before correction |
+| corrected current-report contract and wrong-commit/wrong-tree regressions | 4 passed in 28.86 s |
+| complete H-05 discovery and execution-plan modules | 98 passed in 43.57 s |
+| integrated H-04 manifest/generator and clock-profile modules | 111 passed in 33.68 s |
+| S2 inventory checker | `CLOCK_INVENTORY_OK`; production `99/94/17`, cadence candidates `590`, post-S5 digest `f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd` |
+| S2 complete inventory module | 130 passed in 56.89 s |
+| combined H-01/H-02/S1/H-03/H-06 selection | 453 passed in 54.27 s |
+| S5 focused Ledger/Teller action-block gate | 45 passed in 68.30 s |
+| M4 complete four-file selection | 74 passed in 44.18 s |
+| M1/M2/M3 exact eight-file union | 442 passed in 148.65 s |
+| two processes in each of two clean checkouts | both profiles reproduced the exact frozen-published-commit stdout SHA-256 values in C.3 on all eight invocations |
+| complete collection | 3,695 selected; 3,837 total; 142 deselected in 7.43 s |
+| complete serial repository suite | 3,695 passed; 142 deselected in 445.49 s; zero failures, selected skips, xfails, or warnings |
+| changed Python compilation with external bytecode cache | passed |
+| Markdown mechanics and append-only evidence prefix | passed |
+| `python -m pip check` | no broken requirements |
+| `git diff --check` and untracked-file whitespace checks | passed |
+
+The correction adds exactly two selected tests to the published feature
+baseline: 3,693 + 2 = 3,695 selected and 3,835 + 2 = 3,837 total. The 142
+controlling deselections are unchanged. The signed published commit remains
+the unmodified parent of this unstaged correction candidate; the candidate is
+ready only for independent exact-hash review of a later follow-up commit.
