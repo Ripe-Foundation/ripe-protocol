@@ -2405,3 +2405,139 @@ value remains typed `blocked`, exactly as before.
   of producing a signature);
 - staging, commit, push, merge, deployment, configuration, migration,
   RPC, signing, broadcasting, or external-state activity.
+
+## 17. Owner approval record — Group 2 proposal R2 (2026-07-28)
+
+This section is a bounded, append-only approval-provenance amendment. The
+complete evidence through Section 16 is preserved as an **exact byte prefix**
+of this file: bytes 1 through 176,874 are byte-identical to the pre-amendment
+evidence with SHA-256
+`73a94a8bf8d8635862c16648b943c6a4d8d401d1c5d99f6886952d811dd743d2`
+and Git blob `584580d501d291256b1b3b055a6dae31a0666a95`. That prefix is 2,407
+lines. No historical evidence, technical recommendation, inventory, matrix,
+schema, blocker, symbolic input, validation result, or prior approval byte was
+altered.
+
+### 17.1 Controlling proposal identity and supersession
+
+On **2026-07-28** the owner approved the complete corrected H-04 Group 2
+proposal R2 as the controlling owner direction, bound to this exact artifact:
+
+- file: `h04-group2-proposal-R2.md`;
+- SHA-256:
+  `05069136bf2bcbbd1a0dcc698fe84c31ba54cb1daaa9d4587e143fbc54f71e0e`;
+- size: 39,944 bytes;
+- length: 486 lines;
+- baseline `rh`:
+  `cca60bb85c772c977bb9fb62c1c6c5252c3a1438`;
+- baseline tree:
+  `161fb828f3bbf4cb12596a5dfaf6c9bf1e153381`.
+
+R2 supersedes the reviewed R1 proposal at SHA-256
+`e2f04ccb1e51d025a0e3d0cc06316333f1d5ade80227736fc5fe27b1fb571556`.
+R2 is controlling wherever it expands or clarifies R1; the abbreviated R1
+language is not approval authority in those places.
+
+### 17.2 Approvals recorded
+
+Exactly these eleven Group 2 decisions are **APPROVED**, with their complete
+values, statuses, classifications, risks, tests, invalidation conditions, and
+implementation treatment controlled by the exact R2 artifact in Section 17.1:
+
+- D-H04-03;
+- D-H04-04;
+- D-H04-05;
+- D-H04-06;
+- D-H04-07;
+- D-H04-08;
+- D-H04-09;
+- D-H04-10;
+- D-H04-11;
+- D-H04-13;
+- D-H04-14.
+
+No other decision is approved by this Group 2 record.
+
+### 17.3 Explicit owner acknowledgments
+
+This approval includes all of the following:
+
+1. The ten general capability flags retain the reviewed Base values and seed
+   `true` behind a paused Teller. Teller unpause remains a separately
+   controlled activation edge.
+2. The Base-derived 20,000 / 200,000 GREEN debt caps are retained. They remain
+   inert while every applicable asset has zero LTV, and any later LTV or Stock
+   activation remains separately owner-gated.
+3. The reviewed block-duration fields use the approved Robinhood `/6`
+   conversion where applicable. Seconds-domain fields and zero/absolute values
+   remain unconverted.
+4. D-H04-08 includes the complete R2 deployment-input enumeration:
+   SwitchboardAlpha stale-window immutable bounds of 300 / 604,800 seconds;
+   ChainlinkPrices `_defaultStaleTime` of 86,400 seconds; and the reviewed
+   shared AddressRegistry bounds policy, including its conservative increase
+   in the minimum wall-time bounds for some registries.
+5. The 86,400-second price-staleness ceiling is accepted despite having no
+   nominal heartbeat-delay margin. Late updates therefore fail closed until a
+   fresh price is available.
+6. The reviewed Base governance-vault and auction economics are accepted as
+   initial Robinhood defaults: 200% boost; 80% early-exit fee; 100% / 150%
+   weights; bad-debt freeze; 1% to 50% auction discount; zero auction delay;
+   and the reviewed Robinhood-converted auction duration.
+7. `increasePerDangerBlock=10` is retained. It remains inert while the
+   reviewed danger-producing source slot is empty. Registration of such a
+   source invalidates that inertness assumption and requires fresh review.
+8. Reward allocations remain zero and promotable through existing governed
+   setters.
+9. The inert bond representation and five of six reviewed HR values are
+   constructor-valid but cannot be reproduced through their current governed
+   setters. This existing Base seed/setter mismatch is accepted as recorded in
+   R2 and does not authorize bond or HR activation.
+10. The five reviewed asset tuples and the reviewed priority-list policy are
+    accepted exactly as R2 specifies. No blocked identity or value may be
+    represented with an invented address, placeholder, or zero substitution.
+11. Identity-bearing asset rows and stability-list entries must remain omitted
+    from generated Vyper until their identities are bound. The typed manifest
+    must retain their blocked/deferred provenance.
+12. `DefaultsRobinhood.vy` is not currently renderable or compilable as a
+    final deployment artifact because required identities, `trainingWheels`,
+    and `liteSigners` remain unresolved. The generator must fail closed rather
+    than substitute zero or placeholders.
+13. This approval does not select a zero-backing settlement or bad-debt
+    policy, does not activate AAPL/Stock, and does not change the separately
+    parked Deleverage or CCIP work.
+
+### 17.4 Decision lifecycle and exact status counts
+
+The existing Group 1 approvals for **D-H04-01, D-H04-02, D-H04-20, and
+D-H04-21 remain approved and unchanged**. Together with the eleven approvals
+in Section 17.2, the exact operative decision status is:
+
+- **15 approved:** D-H04-01 through D-H04-11, D-H04-13, D-H04-14,
+  D-H04-20, and D-H04-21;
+- **5 open:** exactly D-H04-12 and D-H04-15 through D-H04-18;
+- **1 retired and non-operative historical ID:** D-H04-19.
+
+Thus the twenty genuine owner decisions comprise exactly 15 approved and 5
+open decisions. D-H04-19 remains retired, is not counted among the twenty
+genuine decisions, and supplies no authority.
+
+Where Sections 11, 13, 14, or 16 describe the Group 2 decisions as open, that
+status presentation is superseded by this dated record only for the eleven
+decision IDs in Section 17.2. Their historical bodies remain evidence; the
+exact R2 artifact is the controlling approved direction. The five decisions
+listed as open above remain open exactly, with no inferred value.
+
+### 17.5 Scope and phase boundary
+
+This approval-provenance amendment does not:
+
+- begin or authorize H-04 Phase B;
+- modify or authorize modification of any source, generator, manifest, test,
+  migration, ABI, configuration, or second documentation file;
+- infer or bind any unresolved address, signer, role, oracle, feed, identity,
+  supply, PSM value, TrainingWheels binding, Stock activation value, or S5
+  binding;
+- close any H-03 or cross-track blocker;
+- authorize staging, commit, push, integration, merge, deployment,
+  configuration, migration, signing, transaction, activation, or external
+  state change.
