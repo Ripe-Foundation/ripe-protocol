@@ -483,7 +483,7 @@ def test_full_payoff_specific_assets_forgives_dust_after_real_collateral(
     assert main_log.debtToClear == pre_debt
 
 
-def test_full_payoff_specific_assets_excludes_underscore_earn_vault_caller(
+def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
     switchboard_alpha,
     deleverage,
     teller,
@@ -498,8 +498,7 @@ def test_full_payoff_specific_assets_excludes_underscore_earn_vault_caller(
     mock_undy_v2,
 ):
     """
-    Underscore earn-vault callers remain trusted, but they do not get the new
-    full-payoff buffer or dust behavior.
+    Caller classification must not suppress extras for an ordinary user.
     """
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
@@ -525,6 +524,7 @@ def test_full_payoff_specific_assets_excludes_underscore_earn_vault_caller(
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    expected_overage = min(10**15, pre_debt * 100 // 100_00)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     assets = [(3, bravo_token.address, pre_debt)]
@@ -538,11 +538,11 @@ def test_full_payoff_specific_assets_excludes_underscore_earn_vault_caller(
 
     assert repaid_amount == pre_debt
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
-    assert pre_bravo_vault - post_bravo_vault == pre_debt
-    assert transfer_log.usdValue == pre_debt
+    assert pre_bravo_vault - post_bravo_vault == pre_debt + expected_overage
+    assert transfer_log.usdValue == pre_debt + expected_overage
     assert main_log.targetRepayAmount == pre_debt
-    assert main_log.targetRepayAmountWithBuffer == pre_debt
-    assert main_log.collateralValueRepaid == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt + expected_overage
+    assert main_log.collateralValueRepaid == pre_debt + expected_overage
     assert main_log.debtToClear == pre_debt
 
 

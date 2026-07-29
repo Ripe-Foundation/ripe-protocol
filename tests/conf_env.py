@@ -15,7 +15,7 @@ FORKS = {
     "mainnet": {
         "rpc_url": f"https://eth-mainnet.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}",
         "etherscan_url": "https://api.etherscan.io/api",
-        "etherscan_api_key": os.environ["ETHERSCAN_API_KEY"],
+        "etherscan_api_key": os.environ.get("ETHERSCAN_API_KEY"),
         "block": 21552600,
         "anvil": True,
     },
@@ -23,7 +23,7 @@ FORKS = {
         "rpc_url": f"https://base-mainnet.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}",
         "block": 34471929,
         "etherscan_url": "https://api.etherscan.io/v2/api?chainid=8453",
-        "etherscan_api_key": os.environ["ETHERSCAN_API_KEY"],
+        "etherscan_api_key": os.environ.get("ETHERSCAN_API_KEY"),
         "anvil": True,
     }
 }
@@ -107,7 +107,9 @@ def set_etherscan(fork):
     api_key = config["etherscan_api_key"]
     uri = config["etherscan_url"]
 
-    boa.set_etherscan(api_key=api_key, uri=uri)
+    if fork in FORKS and not api_key:
+        pytest.fail("ETHERSCAN_API_KEY is required for remote fork tests")
+    boa.set_etherscan(api_key=api_key or "local-placeholder", uri=uri)
 
 
 @pytest.fixture(scope="session")

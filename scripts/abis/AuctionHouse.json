@@ -1645,6 +1645,10 @@
         "type": "address"
       },
       {
+        "name": "_preflightSafeConversion",
+        "type": "bool"
+      },
+      {
         "name": "_a",
         "type": "tuple",
         "components": [

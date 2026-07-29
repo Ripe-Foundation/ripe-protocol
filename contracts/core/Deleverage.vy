@@ -3,6 +3,9 @@
 
 # @version 0.4.3
 #pragma optimize codesize
+# At this source revision, the deployed runtime is 24,553 bytes including
+# Vyper's 96-byte immutables section: 23 bytes of EIP-170 headroom.
+# Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
 
@@ -58,7 +61,7 @@ interface Registry:
     def isValidAddr(_addr: address) -> bool: view
 
 interface AuctionHouse:
-    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _a: addys.Addys) -> (uint256, bool): nonpayable
+    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _preflightSafeConversion: bool, _a: addys.Addys) -> (uint256, bool): nonpayable
 
 interface UnderscoreVault:
     def convertToAssetsSafe(_shares: uint256) -> uint256: view
@@ -195,7 +198,7 @@ vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
 assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
 didHandleAsset: transient(HashMap[address, HashMap[uint256, HashMap[address, bool]]]) # user -> vaultId -> asset -> did handle
 didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> vaultId -> did handle
-underscoreVaultRegistry: transient(address)
+underscoreVaultRegistry: transient(HashMap[address, address])
 
 UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
@@ -262,11 +265,12 @@ def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    underscoreCallerType: uint256 = self._getUnderscoreCallerType(_caller, a.missionControl)
-    isTrusted: bool = addys._isValidRipeAddr(_caller) or underscoreCallerType != 0
+    isTrusted: bool = addys._isValidRipeAddr(_caller)
+    if not isTrusted:
+        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
     endaomentPsm: address = addys._getEndaomentPsmAddr()
     psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
-    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, underscoreCallerType == UNDERSCORE_EARN_VAULT_CALLER_TYPE, _targetRepayAmount, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, _targetRepayAmount, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
     assert repaidAmount != 0 # dev: cannot deleverage
     return repaidAmount
 
@@ -280,8 +284,9 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    underscoreCallerType: uint256 = self._getUnderscoreCallerType(_caller, a.missionControl)
-    isTrusted: bool = addys._isValidRipeAddr(_caller) or underscoreCallerType != 0
+    isTrusted: bool = addys._isValidRipeAddr(_caller)
+    if not isTrusted:
+        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
@@ -290,7 +295,7 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
     totalRepaidAmount: uint256 = 0
     numUsers: uint256 = 0
     for u: DeleverageUserRequest in _users:
-        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, isTrusted, underscoreCallerType == UNDERSCORE_EARN_VAULT_CALLER_TYPE, u.targetRepayAmount, config, endaoFunds, endaomentPsm, psmYieldPositionToken, a)
+        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, isTrusted, u.targetRepayAmount, config, endaoFunds, endaomentPsm, psmYieldPositionToken, a)
         if repaidAmount != 0:
             totalRepaidAmount += repaidAmount
             numUsers += 1
@@ -307,8 +312,9 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    underscoreCallerType: uint256 = self._getUnderscoreCallerType(_caller, a.missionControl)
-    isTrusted: bool = _user == _caller or addys._isValidRipeAddr(_caller) or underscoreCallerType != 0
+    isTrusted: bool = _user == _caller or addys._isValidRipeAddr(_caller)
+    if not isTrusted:
+        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
@@ -334,6 +340,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     maxTargetRepayAmount: uint256 = userDebt.amount
     targetRepayAmount: uint256 = 0
     effectiveBuffer: uint256 = 0
+    useFullPayoffExtras: bool = False
 
     # process each asset in the specified order
     for data: DeleverageAsset in _assets:
@@ -357,13 +364,21 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
         if targetRepayAmount != userDebt.amount:
             targetRepayAmount = unsafe_add(targetRepayAmount, min(unsafe_sub(userDebt.amount, targetRepayAmount), data.targetRepayAmount))
-            if underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount:
+            if targetRepayAmount == userDebt.amount:
+                # Owner-keyed full-payoff classification necessarily depends on
+                # the configured Underscore registry being healthy even when all
+                # payoff extras are zero. Governance can set that registry to
+                # zero to restore Ripe-only operation.
+                useFullPayoffExtras = self._getUnderscoreAddrType(_user, a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
+            if useFullPayoffExtras:
                 # Full-payoff intent lets the buffer exceed this asset's target.
                 # If this asset cannot fill it, the extra budget carries to later assets.
                 effectiveBuffer = self._getFullPayoffBuffer(userDebt.amount)
                 maxTargetRepayAmount = unsafe_add(maxTargetRepayAmount, effectiveBuffer)
                 repayForAsset = unsafe_add(repayForAsset, effectiveBuffer)
         remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, False, endaoFunds, endaomentPsm, psmYieldPositionToken, a)
+        # _handleSpecificAsset returns its budget unchanged or reduced, so the
+        # paired unsafe subtraction remains bounded by repayForAsset.
         paidAmountForAsset: uint256 = unsafe_sub(repayForAsset, remainingToRepayForAsset)
         maxTargetRepayAmount = unsafe_sub(maxTargetRepayAmount, paidAmountForAsset)
 
@@ -373,7 +388,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
 
     # Repay debt. This repeats the full-payoff check from the buffer branch above;
     # it relies on targetRepayAmount only moving up toward userDebt.amount in the loop.
-    debtToClear: uint256 = self._getDebtToClear(underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount, totalRepaidAmount, userDebt.amount)
+    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, totalRepaidAmount, userDebt.amount)
     hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, a)
 
     log DeleverageUser(
@@ -498,6 +513,7 @@ def swapCollateral(
         _withdrawAmount,
         msg.sender, # recipient is governance
         withdrawVaultAddr,
+        False,
         a,
     )
     assert withdrawnAmount != 0 # dev: no collateral withdrawn
@@ -543,9 +559,8 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
-    underscoreCallerType: uint256 = self._getUnderscoreCallerType(msg.sender, a.missionControl)
-    if underscoreCallerType == 0:
-        assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    if not addys._isValidRipeAddr(msg.sender):
+        assert self._getUnderscoreAddrType(msg.sender, a.missionControl, False) != 0 # dev: no perms
 
     # get current user state
     userDebt: UserDebt = empty(UserDebt)
@@ -641,7 +656,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
     psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
-    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, underscoreCallerType == UNDERSCORE_EARN_VAULT_CALLER_TYPE, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
     if repaidAmount != 0:
         self.lastDeleverageBlock[_user] = block.number
     return repaidAmount != 0
@@ -657,7 +672,6 @@ def _deleverageUser(
     _user: address,
     _caller: address,
     _isTrusted: bool,
-    _isUnderscoreEarnVaultCaller: bool,
     _targetRepayAmount: uint256,
     _config: GenLiqConfig,
     _endaoFunds: address,
@@ -671,7 +685,7 @@ def _deleverageUser(
     if not isTrusted and _user != _caller:
         delegation: cs.ActionDelegation = staticcall MissionControl(_a.missionControl).userDelegation(_user, _caller)
         isTrusted = delegation.canBorrow
-    
+
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
     bt: UserBorrowTerms = empty(UserBorrowTerms)
@@ -689,6 +703,8 @@ def _deleverageUser(
     if not isTrusted:
         if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
             return 0
+        # SwitchboardBravo rejects ltv > redemptionThreshold. This ordering is
+        # required for the cap below to remain conservative.
         targetLtv: uint256 = bt.lowestLtv
         ltvPaybackBuffer: uint256 = staticcall MissionControl(_a.missionControl).getLtvPaybackBuffer()
         if ltvPaybackBuffer != 0:
@@ -698,8 +714,15 @@ def _deleverageUser(
             return 0
         targetRepayAmount = min(targetRepayAmount, maxRepayableAmount)
 
-    # do extras if not an underscore earn vault caller and target debt amount is full debt
-    useFullPayoffExtras: bool = not _isUnderscoreEarnVaultCaller and targetRepayAmount == userDebt.amount
+    # Earn vault position owners must not have more collateral removed than debt,
+    # regardless of which trusted caller initiated the deleverage.
+    useFullPayoffExtras: bool = targetRepayAmount == userDebt.amount
+    if useFullPayoffExtras:
+        # Owner-keyed full-payoff classification necessarily depends on the
+        # configured Underscore registry being healthy even when all payoff
+        # extras are zero. Governance can set that registry to zero to restore
+        # Ripe-only operation.
+        useFullPayoffExtras = self._getUnderscoreAddrType(_user, _a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
 
     # get extra collateral if buffer params set (either usd value or bps over debt amount)
     effectiveBuffer: uint256 = 0
@@ -752,6 +775,9 @@ def _getDebtToClear(_useFullPayoffExtras: bool, _collateralValueRepaid: uint256,
     # while still removing floor-rounding dust within the configured caps.
     if _useFullPayoffExtras and _collateralValueRepaid != 0 and debtToClear < _debtAmount:
         dustRemaining: uint256 = unsafe_sub(_debtAmount, debtToClear)
+        # This is an explicit debt write-off: repayFromDept does not burn GREEN
+        # for the forgiven remainder. Deployment keeps both dust params at zero
+        # until governance approves the accounting policy.
         if dustRemaining <= self.deleverageDustThreshold and unsafe_mul(dustRemaining, HUNDRED_PERCENT) <= unsafe_mul(_debtAmount, self.deleverageDustBps):
             debtToClear = _debtAmount
     return debtToClear
@@ -1075,6 +1101,8 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
 
             # get asset LTV for weighted calculation
             debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
+            # Zero-LTV assets remain repayment liquidity even though they do not
+            # contribute borrowing capacity in CreditEngine collateral value.
             ltvSum += usdValue * debtTerms.ltv
 
     # calculate effective weighted LTV
@@ -1135,7 +1163,7 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
 def _canDeleverageUserDebtPosition(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
     if _redemptionThreshold == 0:
         return False
-    
+
     # check if collateral value is below (or equal) to redemption threshold
     redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
     return _collateralVal <= redemptionThreshold
@@ -1153,7 +1181,7 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool):
-    isUnderscoreBasicEarnVault: bool = self._isUnderscoreBasicEarnVault(_asset, _a.missionControl)
+    isUnderscoreBasicEarnVault: bool = self._getUnderscoreAddrType(_asset, _a.missionControl, True) != 0
     underlyingAsset: address = empty(address)
     if isUnderscoreBasicEarnVault:
         underlyingAsset = staticcall IERC4626(_asset).asset()
@@ -1166,7 +1194,7 @@ def _transferCollateral(
     # withdraw and transfer to recipient -- AuctionHouse has permissions to perform this
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
-    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, _a)
+    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, isUnderscoreBasicEarnVault, _a)
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
 
@@ -1186,8 +1214,10 @@ def _transferCollateral(
 
 
 @internal
-def _getUnderscoreCallerType(_addr: address, _mc: address) -> uint256:
-    # 0 = not underscore, 1 = underscore lego/other trusted caller, 2 = earn vault
+def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bool) -> uint256:
+    # Normal mode classifies callers/owners: 0 = not Underscore, 1 = lego or
+    # other trusted caller, 2 = earn vault. Basic-vault-only mode classifies an
+    # asset and returns only 0 or 2; it deliberately skips the lego-book lookup.
     # Writes the underscore vault registry to transient cache, so do not use from @view paths.
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
@@ -1195,8 +1225,12 @@ def _getUnderscoreCallerType(_addr: address, _mc: address) -> uint256:
 
     vaultRegistry: address = self._getUnderscoreVaultRegistry(underscore)
     if vaultRegistry != empty(address):
+        if _basicEarnVaultOnly:
+            return UNDERSCORE_EARN_VAULT_CALLER_TYPE if staticcall VaultRegistry(vaultRegistry).isBasicEarnVault(_addr) else 0
         if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
             return UNDERSCORE_EARN_VAULT_CALLER_TYPE
+    elif _basicEarnVaultOnly:
+        return 0
 
     # check if underscore lego
     undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
@@ -1206,23 +1240,12 @@ def _getUnderscoreCallerType(_addr: address, _mc: address) -> uint256:
 
 
 @internal
-def _isUnderscoreBasicEarnVault(_asset: address, _mc: address) -> bool:
-    underscoreRegistry: address = staticcall MissionControl(_mc).underscoreRegistry()
-    if underscoreRegistry == empty(address):
-        return False
-    vaultRegistry: address = self._getUnderscoreVaultRegistry(underscoreRegistry)
-    if vaultRegistry == empty(address):
-        return False
-    return staticcall VaultRegistry(vaultRegistry).isBasicEarnVault(_asset)
-
-
-@internal
 def _getUnderscoreVaultRegistry(_underscoreRegistry: address) -> address:
-    vaultRegistry: address = self.underscoreVaultRegistry
+    vaultRegistry: address = self.underscoreVaultRegistry[_underscoreRegistry]
     if vaultRegistry == empty(address):
         vaultRegistry = staticcall Registry(_underscoreRegistry).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
         if vaultRegistry != empty(address):
-            self.underscoreVaultRegistry = vaultRegistry
+            self.underscoreVaultRegistry[_underscoreRegistry] = vaultRegistry
     return vaultRegistry
 
 
@@ -1308,10 +1331,9 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
 
 # deleverage params
 
-# Param ceilings are enforced in SwitchboardDelta after deployment to preserve
-# Deleverage runtime bytecode size. Constructor args are validated above.
-# WARNING: future switchboards with access to these setters must enforce the same caps,
-# or unsafe math in deleverage flows can overflow under malicious values.
+# Constructor args are validated above. The four legacy setters remain
+# Switchboard-enforced to preserve runtime bytecode; the new full-payoff params
+# also enforce their unsafe-math ceilings here as defense in depth.
 
 
 @external
@@ -1352,12 +1374,16 @@ def setDeleverageFullPayoffParam(_param: uint256, _amount: uint256):
     assert not deptBasics.isPaused # dev: contract paused
     # _param values: 1=fullPayoffBuffer, 2=overageBps, 3=dustThreshold, 4=dustBps
     if _param == 1:
+        assert _amount <= MAX_DELEVERAGE_FULL_PAYOFF_BUFFER # dev: exceeds hard ceiling
         self.deleverageFullPayoffBuffer = _amount
     elif _param == 2:
+        assert _amount <= MAX_DELEVERAGE_OVERAGE_BPS # dev: exceeds hard ceiling
         self.deleverageOverageBps = _amount
     elif _param == 3:
+        assert _amount <= MAX_DELEVERAGE_DUST_THRESHOLD # dev: exceeds hard ceiling
         self.deleverageDustThreshold = _amount
     else:
         assert _param == 4 # dev: invalid param
+        assert _amount <= MAX_DELEVERAGE_DUST_BPS # dev: exceeds hard ceiling
         self.deleverageDustBps = _amount
     log DeleverageFullPayoffParamSet(param=_param, amount=_amount)

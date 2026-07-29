@@ -1,6 +1,6 @@
 import pytest
 import boa
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
@@ -87,6 +87,7 @@ def setup(
     yield
 
     mock_undy_v2.setAllAddressesAreVaults(True)
+    mock_undy_v2.setVaultCheckRevertAddress(ZERO_ADDRESS)
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
 
 
@@ -2297,10 +2298,11 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
 
 
-def test_phase2_underscore_earn_vault_dust_amount_safe_zero_reverts(
+def test_phase2_underscore_earn_vault_dust_amount_safe_zero_skips_before_withdrawal(
     ripe_hq,  # Ensures switchboard is registered
     switchboard,  # Ensures switchboard_alpha is registered
     teller,
+    credit_engine,
     simple_erc20_vault,
     bob,
     alpha_token,
@@ -2319,7 +2321,7 @@ def test_phase2_underscore_earn_vault_dust_amount_safe_zero_reverts(
 ):
     """
     Sample-size safe conversion can pass while a depleted dust position converts
-    to zero safely. That must revert instead of crediting fallback USD value.
+    to zero safely. The asset must be skipped before withdrawal.
     """
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
@@ -2380,11 +2382,138 @@ def test_phase2_underscore_earn_vault_dust_amount_safe_zero_reverts(
         priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
     )
 
-    with boa.reverts("zero safe underlying"):
+    with boa.reverts("cannot deleverage"):
         teller.deleverageUser(bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
+
+    # A healthy asset later in the same ordering must still be processed.
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[
+            (simple_erc20_vault, alpha_token_vault_with_safe_gap),
+            (simple_erc20_vault, alpha_token),
+        ],
+    )
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    repaid = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    assert repaid == target_repay
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt - target_repay
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
+    assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
+
+
+def test_phase2_dust_user_does_not_revert_later_healthy_batch_user(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    endaoment_funds,
+    switchboard_alpha,
+):
+    """A soft-skipped dust user must not atomically roll back a later user."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(9999)
+
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    setupDeleverage(
+        alice,
+        bravo_token,
+        bravo_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    assert alpha_token_vault_with_safe_gap.convertToAssetsSafe(1) == 0
+    performDeposit(bob, 1, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[
+            (simple_erc20_vault, alpha_token_vault_with_safe_gap),
+            (simple_erc20_vault, bravo_token),
+        ],
+    )
+
+    bob_pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    alice_pre_debt = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+    pre_bob_dust = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
+    pre_endaoment_dust = alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds)
+    target = 10 * EIGHTEEN_DECIMALS
+
+    total_repaid = teller.deleverageManyUsers(
+        [(bob, target), (alice, target)],
+        sender=switchboard_alpha.address,
+    )
+
+    assert total_repaid == target
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == bob_pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount == alice_pre_debt - target
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_bob_dust
+    assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_dust
 
 
 def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent(
@@ -2535,6 +2664,17 @@ def _assert_deleverage_user_amounts(
     assert deleverage_log.debtToClear == debt_to_clear
 
 
+def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
+    """Measure on-chain code, including the 96 bytes absent from compiler_data."""
+    deleverage_size = len(boa.env.get_code(deleverage.address))
+    auction_house_size = len(boa.env.get_code(auction_house.address))
+
+    assert deleverage_size == 24_553
+    assert auction_house_size == 24_389
+    assert deleverage_size <= 24_576
+    assert auction_house_size <= 24_576
+
+
 @pytest.mark.parametrize(
     "param_id,value,getter",
     [
@@ -2552,7 +2692,7 @@ def test_deleverage_full_payoff_cleanup_setters(
     value,
     getter,
 ):
-    """Full-payoff cleanup params live on Deleverage; Switchboard enforces caps."""
+    """New unsafe-math params retain caps in both Deleverage and Switchboard."""
     with boa.reverts("only switchboard allowed"):
         deleverage.setDeleverageFullPayoffParam(param_id, value, sender=bob)
 
@@ -2565,6 +2705,25 @@ def test_deleverage_full_payoff_cleanup_setters(
     assert logs[0].param == param_id
     assert logs[0].amount == value
     assert getattr(deleverage, getter)() == value
+
+
+@pytest.mark.parametrize(
+    "param_id,value",
+    [
+        (1, 10**18 + 1),
+        (2, 500 + 1),
+        (3, 10**16 + 1),
+        (4, 500 + 1),
+    ],
+)
+def test_deleverage_full_payoff_cleanup_setters_enforce_hard_ceilings(
+    deleverage,
+    switchboard_alpha,
+    param_id,
+    value,
+):
+    with boa.reverts("exceeds hard ceiling"):
+        deleverage.setDeleverageFullPayoffParam(param_id, value, sender=switchboard_alpha.address)
 
 
 @pytest.mark.parametrize("param_id", [0, 5])
@@ -3352,7 +3511,7 @@ def test_full_payoff_buffer_applies_to_admin_with_basic_underscore_collateral(
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_full_payoff_extras_disabled_for_underscore_earn_vault_caller(
+def test_full_payoff_extras_apply_for_ordinary_user_when_caller_is_earn_vault(
     ripe_hq,
     switchboard,
     teller,
@@ -3369,7 +3528,7 @@ def test_full_payoff_extras_disabled_for_underscore_earn_vault_caller(
     mock_undy_v2,
     switchboard_alpha,
 ):
-    """Any Underscore earn-vault caller keeps the old exact-debt collateral target."""
+    """Caller classification must not suppress extras for an ordinary user."""
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setEarnVault(alice, True)
@@ -3379,62 +3538,6 @@ def test_full_payoff_extras_disabled_for_underscore_earn_vault_caller(
     deleverage.setDeleverageFullPayoffParam(2, 100, sender=switchboard_alpha.address)
     deleverage.setDeleverageFullPayoffParam(3, 10**15, sender=switchboard_alpha.address)
     deleverage.setDeleverageFullPayoffParam(4, 100, sender=switchboard_alpha.address)
-
-    setupDeleverage(
-        bob,
-        alpha_token,
-        alpha_token_whale,
-        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
-        borrow_amount=500 * EIGHTEEN_DECIMALS,
-        get_sgreen=False,
-    )
-    setup_priority_configs(
-        priority_stab_assets=[],
-        priority_liq_assets=[(simple_erc20_vault, alpha_token)],
-    )
-
-    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
-
-    assert repaid_amount == pre_debt
-    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
-
-    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
-    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
-    assert transfer_log.usdValue == pre_debt
-    _assert_deleverage_user_amounts(deleverage_log, pre_debt, pre_debt, pre_debt, pre_debt)
-
-    mock_undy_v2.setAllAddressesAreVaults(True)
-
-
-def test_full_payoff_extras_apply_for_underscore_non_earn_caller(
-    ripe_hq,
-    switchboard,
-    teller,
-    credit_engine,
-    simple_erc20_vault,
-    bob,
-    alice,
-    alpha_token,
-    alpha_token_whale,
-    setupDeleverage,
-    setup_priority_configs,
-    mission_control,
-    deleverage,
-    mock_undy_v2,
-    switchboard_alpha,
-):
-    """Underscore non-earn callers stay trusted and still get full-payoff extras."""
-    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
-    mock_undy_v2.setAllAddressesAreVaults(False)
-    mock_undy_v2.setEarnVault(alice, False)
-    mock_undy_v2.setBasicEarnVault(alice, False)
-
-    deleverage.setDeleverageFullPayoffParam(1, 10**15, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(2, 100, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(3, 0, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(4, 0, sender=switchboard_alpha.address)
 
     setupDeleverage(
         bob,
@@ -3467,5 +3570,62 @@ def test_full_payoff_extras_apply_for_underscore_non_earn_caller(
         pre_debt + expected_overage,
         pre_debt,
     )
+
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_full_payoff_extras_disabled_for_earn_vault_user_when_caller_is_non_earn(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    alpha_token,
+    alpha_token_whale,
+    setupDeleverage,
+    setup_priority_configs,
+    mission_control,
+    deleverage,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """An earn-vault position owner suppresses extras regardless of caller type."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alice, False)
+    mock_undy_v2.setBasicEarnVault(alice, False)
+    mock_undy_v2.setEarnVault(bob, True)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+
+    deleverage.setDeleverageFullPayoffParam(1, 10**15, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(2, 100, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(3, 0, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(4, 0, sender=switchboard_alpha.address)
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token)],
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+
+    assert repaid_amount == pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+    assert transfer_log.usdValue == pre_debt
+    _assert_deleverage_user_amounts(deleverage_log, pre_debt, pre_debt, pre_debt, pre_debt)
 
     mock_undy_v2.setAllAddressesAreVaults(True)

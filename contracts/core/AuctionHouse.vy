@@ -84,6 +84,9 @@ interface VaultRegistry:
 interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
+interface UnderscoreVault:
+    def convertToAssetsSafe(_shares: uint256) -> uint256: view
+
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
     canBuyInAuctionAsset: bool
@@ -1187,9 +1190,17 @@ def withdrawTokensFromVault(
     _amount: uint256,
     _recipient: address,
     _vaultAddr: address,
+    _preflightSafeConversion: bool,
     _a: addys.Addys,
 ) -> (uint256, bool):
     assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
+    if _preflightSafeConversion:
+        # Use the balance the vault can debit, not the larger requested amount.
+        # If the vault still sends less and that smaller amount converts to zero,
+        # Deleverage's retained post-withdraw invariant assertion will revert.
+        withdrawableAmount: uint256 = min(_amount, staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset))
+        if staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
+            return 0, False
     return extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
 
 
