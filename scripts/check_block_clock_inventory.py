@@ -132,6 +132,67 @@ S5_RECONCILED_DIRECT_KEYS = S5_REVIEW_DIRECT_KEYS | {
         2,
     ),
 }
+REVIEWER_REMEDIATION_CADENCE_KEYS = {
+    (
+        "config/contract-artifact-expectations.json",
+        "<module>",
+        "block-default-key",
+        '"MIN_UNDERSCORE_SEND_INTERVAL":',
+        '"MIN_UNDERSCORE_SEND_INTERVAL": {',
+        1,
+    ),
+    (
+        "config/contract-artifact-expectations.json",
+        "<module>",
+        "reviewed-cadence-identifier",
+        "MIN_UNDERSCORE_SEND_INTERVAL",
+        '"MIN_UNDERSCORE_SEND_INTERVAL": {',
+        1,
+    ),
+    (
+        "config/contract-artifact-expectations.json",
+        "<module>",
+        "block-default-key",
+        '"underscoreSendInterval":',
+        '"underscoreSendInterval": {',
+        1,
+    ),
+    *{
+        (
+            "scripts/proposals/lootbox-deployment-profiles.json",
+            "<module>",
+            "block-default-key",
+            '"underscore_send_interval":',
+            '"underscore_send_interval": {',
+            ordinal,
+        )
+        for ordinal in (1, 2, 3)
+    },
+    (
+        "scripts/proposals/lootbox_deployment_profiles.py",
+        "<module>",
+        "block-default-key",
+        '"underscore_send_interval":',
+        '"underscore_send_interval": 0,',
+        1,
+    ),
+    (
+        "scripts/proposals/lootbox_deployment_profiles.py",
+        "<module>",
+        "block-default-key",
+        '"underscore_send_interval":',
+        '"underscore_send_interval": 43_200,',
+        1,
+    ),
+    (
+        "scripts/proposals/lootbox_deployment_profiles.py",
+        "<module>",
+        "block-default-key",
+        '"underscore_send_interval":',
+        '"underscore_send_interval": 0,',
+        2,
+    ),
+}
 S5_REVIEW_CADENCE_KEYS = {
     (
         "contracts/data/Ledger.vy",
@@ -936,7 +997,11 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
     legacy["cadenceCandidates"] = [
         record
         for record in legacy["cadenceCandidates"]
-        if _candidate_from_record(record) not in S5_RECONCILED_CADENCE_KEYS
+        if _candidate_from_record(record)
+        not in (
+            S5_RECONCILED_CADENCE_KEYS
+            | REVIEWER_REMEDIATION_CADENCE_KEYS
+        )
         and _record_fingerprint(record) not in exact_h04_records
     ]
     if exact_h04_sites:

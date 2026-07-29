@@ -235,3 +235,118 @@ def test_external_housekeeping_preserves_zero_address_victim(
         sender=deleverage.address,
     )
     assert ledger.lastTouch(ZERO_ADDRESS) == boa.env.evm.patch.block_number
+
+
+TRUSTED_DEPOSIT_ENCLOSING_FAILURE_SOURCE = """
+# @version 0.4.3
+
+interface Teller:
+    def depositFromTrusted(
+        _user: address,
+        _vaultId: uint256,
+        _asset: address,
+        _amount: uint256,
+        _lockDuration: uint256,
+    ) -> uint256: nonpayable
+    def performHousekeeping(
+        _isHigherRisk: bool,
+        _user: address,
+        _shouldUpdateDebt: bool,
+    ): nonpayable
+
+@external
+def depositHousekeepAndFail(
+    _teller: address,
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _amount: uint256,
+):
+    _: uint256 = extcall Teller(_teller).depositFromTrusted(
+        _user,
+        _vaultId,
+        _asset,
+        _amount,
+        0,
+    )
+    extcall Teller(_teller).performHousekeeping(False, _user, False)
+    raise "enclosing failure"
+"""
+
+
+def test_l1_trusted_deposit_does_not_arm_then_explicit_touch_and_enclosing_revert(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    credit_engine,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    vault_book,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    amount = 25 * 10**18
+    alpha_token.transfer(
+        credit_engine,
+        amount * 2,
+        sender=alpha_token_whale,
+    )
+    alpha_token.approve(
+        teller,
+        amount * 2,
+        sender=credit_engine.address,
+    )
+
+    assert (
+        teller.depositFromTrusted(
+            bob,
+            vault_id,
+            alpha_token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+        == amount
+    )
+    assert ledger.lastTouch(bob) == 0
+
+    teller.performHousekeeping(
+        False,
+        bob,
+        False,
+        sender=credit_engine.address,
+    )
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+
+    assert boa.env.lookup_contract(credit_engine.address) is credit_engine
+    try:
+        with boa.env.anchor():
+            producer = boa.loads(
+                TRUSTED_DEPOSIT_ENCLOSING_FAILURE_SOURCE,
+                name="l1_trusted_deposit_enclosing_failure",
+                override_address=credit_engine.address,
+            )
+            with boa.reverts("enclosing failure"):
+                producer.depositHousekeepAndFail(
+                    teller,
+                    alice,
+                    vault_id,
+                    alpha_token,
+                    amount,
+                )
+
+            assert ledger.lastTouch(alice) == 0
+            assert (
+                simple_erc20_vault.getTotalAmountForUser(alice, alpha_token)
+                == 0
+            )
+            assert alpha_token.balanceOf(credit_engine) == amount
+            assert alpha_token.balanceOf(simple_erc20_vault) == amount
+    finally:
+        boa.env.register_contract(credit_engine.address, credit_engine)
+    assert boa.env.lookup_contract(credit_engine.address) is credit_engine

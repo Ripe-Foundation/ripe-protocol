@@ -13223,6 +13223,159 @@
         "status": "reviewed",
         "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
       }
+    },
+    {
+      "path": "config/contract-artifact-expectations.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"MIN_UNDERSCORE_SEND_INTERVAL\":",
+      "normalizedSnippet": "\"MIN_UNDERSCORE_SEND_INTERVAL\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 488,
+      "classification": "config",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "config/contract-artifact-expectations.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "MIN_UNDERSCORE_SEND_INTERVAL",
+      "normalizedSnippet": "\"MIN_UNDERSCORE_SEND_INTERVAL\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 488,
+      "classification": "config",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "config/contract-artifact-expectations.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscoreSendInterval\":",
+      "normalizedSnippet": "\"underscoreSendInterval\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 578,
+      "classification": "config",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox-deployment-profiles.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 20,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox-deployment-profiles.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": {",
+      "ordinalInFunction": 2,
+      "reviewedLine": 41,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox-deployment-profiles.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": {",
+      "ordinalInFunction": 3,
+      "reviewedLine": 62,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox_deployment_profiles.py",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": 0,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 41,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox_deployment_profiles.py",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": 43_200,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 51,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/proposals/lootbox_deployment_profiles.py",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"underscore_send_interval\":",
+      "normalizedSnippet": "\"underscore_send_interval\": 0,",
+      "ordinalInFunction": 2,
+      "reviewedLine": 61,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
     }
   ],
   "secondsUnitCandidates": [

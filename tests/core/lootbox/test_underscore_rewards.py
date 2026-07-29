@@ -1326,3 +1326,136 @@ def test_set_undy_yield_bonus_amount_validation(
     lootbox.setUndyDepositRewardsAmount(1, sender=switchboard_alpha.address)  # Ensure other is non-zero
     lootbox.setUndyYieldBonusAmount(0, sender=switchboard_alpha.address)
     assert lootbox.undyYieldBonusAmount() == 0
+
+
+def _x2_enable_later(candidate, switchboard_alpha, amount):
+    candidate.setUnderscoreSendInterval(
+        7_200,
+        sender=switchboard_alpha.address,
+    )
+    candidate.setUndyDepositRewardsAmount(
+        amount,
+        sender=switchboard_alpha.address,
+    )
+    candidate.setUndyYieldBonusAmount(
+        amount,
+        sender=switchboard_alpha.address,
+    )
+    candidate.setHasUnderscoreRewards(
+        True,
+        sender=switchboard_alpha.address,
+    )
+
+
+def _x2_disabled_candidate(
+    lootbox_deployer,
+    ripe_hq,
+    governance,
+    setup_underscore_rewards,
+):
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        7_200,
+        0,
+        0,
+        0,
+    )
+    _replace_registered_lootbox(ripe_hq, candidate, governance)
+    setup_underscore_rewards(1_000 * EIGHTEEN_DECIMALS)
+    assert candidate.lastUnderscoreSend() == 0
+    return candidate
+
+
+def test_x2_later_enable_is_already_open_when_number_well_past_floor(
+    lootbox_deployer,
+    ripe_hq,
+    governance,
+    switchboard_alpha,
+    setup_underscore_rewards,
+):
+    candidate = _x2_disabled_candidate(
+        lootbox_deployer,
+        ripe_hq,
+        governance,
+        setup_underscore_rewards,
+    )
+    current = boa.env.evm.patch.block_number
+    target = max(20_000, current + 10_000)
+    boa.env.time_travel(blocks=target - current)
+    assert candidate.lastUnderscoreSend() == 0
+
+    amount = EIGHTEEN_DECIMALS
+    _x2_enable_later(candidate, switchboard_alpha, amount)
+    assert candidate.lastUnderscoreSend() == 0
+    assert candidate.distributeUnderscoreRewards(
+        sender=switchboard_alpha.address,
+    ) == (amount, amount)
+    assert candidate.lastUnderscoreSend() == target
+
+
+def test_x2_zero_last_send_uses_strict_floor_plus_one_boundary(
+    lootbox_deployer,
+    ripe_hq,
+    governance,
+    switchboard_alpha,
+    setup_underscore_rewards,
+):
+    candidate = _x2_disabled_candidate(
+        lootbox_deployer,
+        ripe_hq,
+        governance,
+        setup_underscore_rewards,
+    )
+    _x2_enable_later(
+        candidate,
+        switchboard_alpha,
+        EIGHTEEN_DECIMALS,
+    )
+    assert candidate.lastUnderscoreSend() == 0
+
+    boa.env.evm.patch.block_number = 7_200
+    with boa.reverts("too early"):
+        candidate.distributeUnderscoreRewards(
+            sender=switchboard_alpha.address,
+        )
+
+    boa.env.time_travel(blocks=1)
+    candidate.distributeUnderscoreRewards(
+        sender=switchboard_alpha.address,
+    )
+    assert candidate.lastUnderscoreSend() == 7_201
+
+
+def test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows(
+    lootbox,
+    switchboard_alpha,
+    setup_underscore_rewards,
+):
+    setup_underscore_rewards(1_000 * EIGHTEEN_DECIMALS)
+    boa.env.time_travel(blocks=43_201)
+    lootbox.distributeUnderscoreRewards(
+        sender=switchboard_alpha.address,
+    )
+    last_send = lootbox.lastUnderscoreSend()
+    assert last_send != 0
+
+    with boa.reverts("invalid interval"):
+        lootbox.setUnderscoreSendInterval(
+            MAX_UINT256,
+            sender=switchboard_alpha.address,
+        )
+    lootbox.setUnderscoreSendInterval(
+        MAX_UINT256 - 1,
+        sender=switchboard_alpha.address,
+    )
+    assert lootbox.underscoreSendInterval() == MAX_UINT256 - 1
+
+    # Vyper's checked-add revert has no stable reason string. Prove the only
+    # arithmetic expression reached by this configured gate is overflowing.
+    assert last_send + lootbox.underscoreSendInterval() > MAX_UINT256
+    with boa.reverts():
+        lootbox.distributeUnderscoreRewards(
+            sender=switchboard_alpha.address,
+        )
+    assert lootbox.lastUnderscoreSend() == last_send

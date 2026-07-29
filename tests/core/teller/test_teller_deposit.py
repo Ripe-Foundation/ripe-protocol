@@ -1,5 +1,7 @@
+import hashlib
 import subprocess
 import sys
+from pathlib import Path
 
 import boa
 import pytest
@@ -12,6 +14,10 @@ M1_ADVERSARIAL_TOKEN_SOURCE = """
 # @version 0.4.3
 
 from ethereum.ercs import IERC20
+
+BALANCE_MODE_CONSTANT_MAX: constant(uint256) = 7
+BALANCE_MODE_OFFSETTING_LIE: constant(uint256) = 8
+TRANSFER_MODE_EXACT_ALIAS: constant(uint256) = 8
 
 balances: HashMap[address, uint256]
 allowances: HashMap[address, HashMap[address, uint256]]
@@ -26,6 +32,7 @@ balance_target: public(address)
 callback_target: public(address)
 callback_data: public(Bytes[1024])
 callback_enabled: public(bool)
+callback_transfer_mode: public(uint256)
 
 @external
 def mint(_to: address, _amount: uint256):
@@ -53,6 +60,10 @@ def configure_callback(_target: address, _data: Bytes[1024], _enabled: bool):
     self.callback_target = _target
     self.callback_data = _data
     self.callback_enabled = _enabled
+
+@external
+def configure_callback_transfer_mode(_mode: uint256):
+    self.callback_transfer_mode = _mode
 
 @external
 def configure_underlying(_underlying: address):
@@ -119,8 +130,10 @@ def balanceOf(_holder: address) -> Bytes[65]:
             return concat(convert(self.balances[_holder], bytes32), b"x")
         if self.balance_mode == 6:
             return concat(convert(32, bytes32), convert(self.balances[_holder], bytes32))
-        if self.balance_mode == 7:
+        if self.balance_mode == BALANCE_MODE_CONSTANT_MAX:
             return slice(convert(max_value(uint256), bytes32), 0, 32)
+        if self.balance_mode == BALANCE_MODE_OFFSETTING_LIE:
+            return slice(convert(self.balances[_holder] + 1, bytes32), 0, 32)
     return slice(convert(self.balances[_holder], bytes32), 0, 32)
 
 @external
@@ -130,27 +143,30 @@ def approve(_spender: address, _amount: uint256) -> bool:
 
 @internal
 def _move(_from: address, _to: address, _amount: uint256) -> bool:
-    if self.transfer_mode == 6:
+    transferMode: uint256 = self.transfer_mode
+    if transferMode == 6:
         return False
-    if self.transfer_mode == 7:
+    if transferMode == 7:
         raise
 
     assert self.balances[_from] >= _amount
     self.balances[_from] -= _amount
 
     if self.callback_enabled:
+        self.callback_enabled = False
+        self.transfer_mode = self.callback_transfer_mode
         raw_call(self.callback_target, self.callback_data)
 
-    if self.transfer_mode == 0 or self.transfer_mode == 8:
+    if transferMode == 0 or transferMode == TRANSFER_MODE_EXACT_ALIAS:
         self.balances[_to] += _amount
-    elif self.transfer_mode == 2:
+    elif transferMode == 2:
         self.balances[_to] += _amount - 1
-    elif self.transfer_mode == 3:
+    elif transferMode == 3:
         self.balances[_to] += _amount * 99 // 100
-    elif self.transfer_mode == 4:
+    elif transferMode == 4:
         self.balances[_to] += _amount + 1
         self.total_supply += 1
-    elif self.transfer_mode == 5:
+    elif transferMode == 5:
         if self.balances[_to] != 0:
             self.balances[_to] -= 1
             self.total_supply -= 1
@@ -191,6 +207,7 @@ M1_ADVERSARIAL_VAULT_SOURCE = """
 
 import contracts.modules.Addys as addys
 from interfaces import Vault
+from ethereum.ercs import IERC20
 
 mode: public(uint256)
 callback_target: public(address)
@@ -201,6 +218,10 @@ def configure(_mode: uint256, _target: address, _data: Bytes[1024]):
     self.mode = _mode
     self.callback_target = _target
     self.callback_data = _data
+
+@external
+def approve_teller(_asset: address, _teller: address, _amount: uint256):
+    assert extcall IERC20(_asset).approve(_teller, _amount)
 
 @view
 @external
@@ -214,15 +235,17 @@ def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnD
 
 @internal
 def _deposit(_amount: uint256) -> uint256:
-    if self.mode == 4:
+    mode: uint256 = self.mode
+    if mode == 4:
         raise
-    if self.mode == 5:
+    if mode == 5:
+        self.mode = 0
         raw_call(self.callback_target, self.callback_data)
-    if self.mode == 1:
+    if mode == 1:
         return 0
-    if self.mode == 2:
+    if mode == 2:
         return _amount - 1
-    if self.mode == 3:
+    if mode == 3:
         return _amount + 1
     return _amount
 
@@ -244,6 +267,73 @@ def depositTokensWithLockDuration(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     return self._deposit(_amount)
+"""
+
+
+M1_PRICE_CALLBACK_SOURCE = """
+# @version 0.4.3
+
+from ethereum.ercs import IERC20
+
+callback_target: public(address)
+callback_data: public(Bytes[1024])
+callback_enabled: public(bool)
+
+@external
+def configure(_target: address, _data: Bytes[1024]):
+    self.callback_target = _target
+    self.callback_data = _data
+    self.callback_enabled = True
+
+@external
+def approve_teller(_asset: address, _teller: address, _amount: uint256):
+    assert extcall IERC20(_asset).approve(_teller, _amount)
+
+@external
+def addPriceSnapshot(_asset: address) -> bool:
+    if self.callback_enabled:
+        self.callback_enabled = False
+        raw_call(self.callback_target, self.callback_data)
+    return True
+"""
+
+
+M1_ROLLBACK_PROBE_SOURCE = """
+# @version 0.4.3
+
+from ethereum.ercs import IERC20
+
+@external
+def attemptThenRetry(
+    _asset: address,
+    _teller: address,
+    _firstCalldata: Bytes[1024],
+    _retryCalldata: Bytes[1024],
+    _allowance: uint256,
+) -> (bool, bool):
+    assert extcall IERC20(_asset).approve(_teller, _allowance)
+
+    firstSuccess: bool = False
+    firstResponse: Bytes[1] = b""
+    firstSuccess, firstResponse = raw_call(
+        _teller,
+        _firstCalldata,
+        max_outsize=1,
+        revert_on_failure=False,
+    )
+    assert not firstSuccess
+
+    retrySuccess: bool = False
+    retryResponse: Bytes[1] = b""
+    retrySuccess, retryResponse = raw_call(
+        _teller,
+        _retryCalldata,
+        max_outsize=1,
+        revert_on_failure=False,
+    )
+    assert retrySuccess
+
+    return firstSuccess, retrySuccess
 """
 
 
@@ -305,6 +395,69 @@ def _m1_replace_hq_address(ripe_hq, governance, registry_id, replacement):
         registry_id,
         sender=governance.address,
     )
+
+
+T1_MUTEX_REMOVAL_SHA256 = (
+    "fdb1e2de2fb0617ba0d250e6380ce62a88107dcded80d718ffd994206270a6fd"
+)
+
+
+def _t1_mutex_removal_mutant_source():
+    source = Path("contracts/core/Teller.vy").read_text()
+    removals = (
+        "receiptMeasurementActive: transient(bool)\n",
+        "    assert not self.receiptMeasurementActive\n",
+        "    self.receiptMeasurementActive = True\n",
+        "    self.receiptMeasurementActive = False\n",
+    )
+    for removal in removals:
+        assert source.count(removal) == 1
+        source = source.replace(removal, "", 1)
+    assert "receiptMeasurementActive" not in source
+    assert hashlib.sha256(source.encode()).hexdigest() == T1_MUTEX_REMOVAL_SHA256
+    return source
+
+
+def _t1_setup_mutex_sensitive_trusted_callback(
+    active_teller,
+    canonical_teller,
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    vault_book,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    if active_teller.address != canonical_teller.address:
+        _m1_replace_hq_address(ripe_hq, governance, 17, active_teller)
+    # HumanResources is not otherwise used in this scenario. Rebinding that
+    # test registry slot makes the callback token an authorized trusted
+    # producer without disturbing the real CreditEngine outer producer.
+    _m1_replace_hq_address(ripe_hq, governance, 15, token)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    nested_amount = 1
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    token.mint(credit_engine, amount)
+    token.approve(active_teller, amount, sender=credit_engine.address)
+    token.mint(token, nested_amount)
+    token.set_self_allowance(active_teller, nested_amount)
+    nested = active_teller.depositFromTrusted.prepare_calldata(
+        bob,
+        vault_id,
+        token,
+        nested_amount,
+        0,
+    )
+    token.configure_callback(active_teller, nested, True)
+    token.configure_callback_transfer_mode(0)
+    token.configure_transfer(2)
+    return token, amount, nested_amount, vault_id
 
 
 def test_teller_basic_deposit(
@@ -1570,6 +1723,333 @@ def test_m1_transfer_callback_reentrancy_reverts_and_mutex_recovers(
         sender=bob,
     )
     assert retry_amount == amount
+
+
+def test_t1_trusted_callback_is_blocked_by_receipt_measurement_mutex(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    token, amount, _, vault_id = _t1_setup_mutex_sensitive_trusted_callback(
+        teller,
+        teller,
+        ripe_hq,
+        governance,
+        credit_engine,
+        simple_erc20_vault,
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        vault_book,
+    )
+
+    with boa.reverts():
+        teller.depositFromTrusted(
+            bob,
+            vault_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+
+    assert token.balanceValue(credit_engine) == amount
+    assert token.balanceValue(simple_erc20_vault) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    # S2 baseline: the exact named scenario rejects with the reviewed source.
+    with boa.env.anchor():
+        token, amount, _, vault_id = _t1_setup_mutex_sensitive_trusted_callback(
+            teller,
+            teller,
+            ripe_hq,
+            governance,
+            credit_engine,
+            simple_erc20_vault,
+            bob,
+            setGeneralConfig,
+            setAssetConfig,
+            vault_book,
+        )
+        with boa.reverts():
+            teller.depositFromTrusted(
+                bob,
+                vault_id,
+                token,
+                amount,
+                0,
+                sender=credit_engine.address,
+            )
+
+    # S2 mutant: all four dedicated-mutex constructs are removed exactly once.
+    # The mutant compiles/deploys, reaches the same route, and incorrectly
+    # allows Q-1 outer receipt + one nested receipt to credit Q+1 nominal units.
+    with boa.env.anchor():
+        mutant = boa.loads(
+            _t1_mutex_removal_mutant_source(),
+            ripe_hq,
+            False,
+            name="t1_teller_without_receipt_mutex",
+            override_address=boa.env.generate_address(),
+        )
+        token, amount, nested_amount, vault_id = (
+            _t1_setup_mutex_sensitive_trusted_callback(
+                mutant,
+                teller,
+                ripe_hq,
+                governance,
+                credit_engine,
+                simple_erc20_vault,
+                bob,
+                setGeneralConfig,
+                setAssetConfig,
+                vault_book,
+            )
+        )
+
+        assert (
+            mutant.depositFromTrusted(
+                bob,
+                vault_id,
+                token,
+                amount,
+                0,
+                sender=credit_engine.address,
+            )
+            == amount
+        )
+        assert token.balanceValue(simple_erc20_vault) == amount
+        assert (
+            simple_erc20_vault.getTotalAmountForUser(bob, token)
+            == amount + nested_amount
+        )
+        assert ledger.getNumUserVaults(bob) == 1
+
+
+def test_t2_vault_callback_mode_five_is_blocked_after_custody_read(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    callback_vault = boa.loads(
+        M1_ADVERSARIAL_VAULT_SOURCE,
+        name="t2_callback_vault",
+        override_address=boa.env.generate_address(),
+    )
+    callback_vault_id = _m1_register_vault(
+        vault_book,
+        governance,
+        callback_vault,
+    )
+    ordinary_vault_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[callback_vault_id, ordinary_vault_id])
+    _m1_replace_hq_address(ripe_hq, governance, 15, callback_vault)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    nested_amount = 1
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    token.mint(callback_vault, nested_amount)
+    callback_vault.approve_teller(token, teller, nested_amount)
+    nested = teller.depositFromTrusted.prepare_calldata(
+        bob,
+        ordinary_vault_id,
+        token,
+        nested_amount,
+        0,
+    )
+    callback_vault.configure(5, teller, nested)
+
+    with boa.reverts():
+        teller.depositFromTrusted(
+            bob,
+            callback_vault_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+
+    assert token.balanceValue(credit_engine) == amount
+    assert token.balanceValue(callback_vault) == nested_amount
+    assert token.balanceValue(simple_erc20_vault) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_t3_failed_post_acquisition_call_rolls_back_transient_for_retry(
+    vault_book,
+    governance,
+    simple_erc20_vault,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    bad_vault = boa.loads(
+        M1_ADVERSARIAL_VAULT_SOURCE,
+        name="t3_bad_vault",
+        override_address=boa.env.generate_address(),
+    )
+    bad_vault_id = _m1_register_vault(vault_book, governance, bad_vault)
+    good_vault_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[bad_vault_id, good_vault_id])
+    bad_vault.configure(2, teller, b"")
+
+    probe = boa.loads(
+        M1_ROLLBACK_PROBE_SOURCE,
+        name="t3_rollback_probe",
+        override_address=boa.env.generate_address(),
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(probe, 2 * amount)
+    first = teller.deposit.prepare_calldata(
+        token,
+        amount,
+        probe,
+        bad_vault,
+    )
+    retry = teller.deposit.prepare_calldata(
+        token,
+        amount,
+        probe,
+        simple_erc20_vault,
+    )
+
+    assert probe.attemptThenRetry(
+        token,
+        teller,
+        first,
+        retry,
+        2 * amount,
+    ) == (False, True)
+    assert token.balanceValue(probe) == amount
+    assert token.balanceValue(bad_vault) == 0
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(probe, token) == amount
+
+
+def test_t4_offsetting_canonical_balance_lie_is_accepted_trust_boundary(
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(bob, amount)
+    token.mint(simple_erc20_vault, 1)
+    token.approve(teller, amount, sender=bob)
+    token.configure_transfer(2)
+    token.configure_balance(simple_erc20_vault, 0, 8, True)
+
+    assert (
+        teller.deposit(
+            token,
+            amount,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
+        == amount
+    )
+    # The transfer delivered Q-1; a prior one-unit donation plus a canonical
+    # post-read lie fabricated reported delta Q. This success is the accepted
+    # truthful-balance trust boundary, not supported token behavior.
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount
+
+
+def test_t5_post_clear_callback_starts_fresh_measurement_and_succeeds(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    callback_price_desk = boa.loads(
+        M1_PRICE_CALLBACK_SOURCE,
+        name="t5_callback_price_desk",
+        override_address=boa.env.generate_address(),
+    )
+    _m1_replace_hq_address(ripe_hq, governance, 7, callback_price_desk)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    nested_amount = 1
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    token.mint(callback_price_desk, nested_amount)
+    callback_price_desk.approve_teller(token, teller, nested_amount)
+    nested = teller.depositFromTrusted.prepare_calldata(
+        bob,
+        vault_id,
+        token,
+        nested_amount,
+        0,
+    )
+    callback_price_desk.configure(teller, nested)
+
+    assert (
+        teller.depositFromTrusted(
+            bob,
+            vault_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+        == amount
+    )
+    assert not callback_price_desk.callback_enabled()
+    assert token.balanceValue(simple_erc20_vault) == amount + nested_amount
+    assert (
+        simple_erc20_vault.getTotalAmountForUser(bob, token)
+        == amount + nested_amount
+    )
+    amounts = [log.amount for log in filter_logs(teller, "TellerDeposit")]
+    assert amounts == [nested_amount, amount]
 
 
 @pytest.mark.parametrize(

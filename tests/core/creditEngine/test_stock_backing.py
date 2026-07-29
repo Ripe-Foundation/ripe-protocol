@@ -1,3 +1,11 @@
+import hashlib
+import json
+import re
+import statistics
+import sys
+from importlib.metadata import distributions
+from pathlib import Path
+
 import boa
 import pytest
 
@@ -103,6 +111,67 @@ def getAddr(_regId: uint256) -> address:
 """
 
 
+C1_FAILING_TERMS_SOURCE = """
+# @version 0.4.3
+
+import interfaces.ConfigStructs as cs
+
+allowed_asset: immutable(address)
+terms: immutable(cs.DebtTerms)
+
+@deploy
+def __init__(_allowed_asset: address, _terms: cs.DebtTerms):
+    allowed_asset = _allowed_asset
+    terms = _terms
+
+@view
+@external
+def underscoreRegistry() -> address:
+    return empty(address)
+
+@view
+@external
+def getDebtTerms(_asset: address) -> cs.DebtTerms:
+    assert _asset == allowed_asset, "zero-position terms lookup"
+    return terms
+"""
+
+
+C2_POSITION_VAULT_SOURCE = """
+# @version 0.4.3
+
+asset: immutable(address)
+position_amount: immutable(uint256)
+position_count: immutable(uint256)
+
+@deploy
+def __init__(
+    _asset: address,
+    _position_amount: uint256,
+    _position_count: uint256,
+):
+    assert _position_count != 0 and _position_count <= 10
+    asset = _asset
+    position_amount = _position_amount
+    position_count = _position_count
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    return position_count + 1
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(
+    _user: address,
+    _index: uint256,
+) -> (address, uint256):
+    if _index == 0 or _index > position_count:
+        return empty(address), 0
+    return asset, position_amount
+"""
+
+
 def _m3_backing_observer(failure_kind, backing_value):
     observer = boa.env.generate_address()
     if failure_kind == "observed":
@@ -195,6 +264,55 @@ def _m3_install_guarded_price_desk(
         override_address=boa.env.generate_address(),
     )
     boa.env.set_code(price_desk.address, boa.env.get_code(guarded.address))
+
+
+def _c2_add_positions(
+    position_count,
+    position_amount,
+    user,
+    asset,
+    debt_terms,
+    vault_book,
+    governance,
+    setAssetConfig,
+    ledger,
+    teller,
+):
+    remaining = position_count
+    vault_ids = []
+    while remaining:
+        vault_positions = min(remaining, 10)
+        vault = boa.loads(
+            C2_POSITION_VAULT_SOURCE,
+            asset,
+            position_amount,
+            vault_positions,
+            name=f"c2_position_vault_{len(vault_ids) + 1}",
+            override_address=boa.env.generate_address(),
+        )
+        vault_id = _m3_register_vault(vault_book, governance, vault)
+        ledger.addVaultToUser(user, vault_id, sender=teller.address)
+        vault_ids.append(vault_id)
+        remaining -= vault_positions
+
+    setAssetConfig(
+        asset,
+        _vaultIds=vault_ids,
+        _debtTerms=debt_terms,
+    )
+    return vault_ids
+
+
+def _count_computation_calls(computation, address, selector):
+    expected = bytes.fromhex(str(address)[2:])
+    return sum(
+        child.msg.code_address == expected
+        and bytes(child.msg.data[:4]) == selector
+        for child in computation.children
+    ) + sum(
+        _count_computation_calls(child, address, selector)
+        for child in computation.children
+    )
 
 
 @pytest.mark.parametrize(
@@ -619,3 +737,255 @@ def test_zero_amount_containment_path_has_bounded_gas(
 
     assert 0 < unsafe_gas < 1_000_000
     assert unsafe_gas < safe_gas
+
+
+def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bob,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    vault_book,
+    governance,
+    ledger,
+    teller,
+    credit_engine,
+    price_desk,
+    mission_control,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=5_00,
+        _daowry=0,
+    )
+    setAssetConfig(alpha_token, _vaultIds=[3], _debtTerms=debt_terms)
+    safe_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        safe_amount,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    unsafe_vault, _ = _m3_containment_vault(
+        bravo_token,
+        nominal_amount=1,
+        failure_kind="observed",
+        backing_value=0,
+    )
+    unsafe_vault_id = _m3_register_vault(
+        vault_book,
+        governance,
+        unsafe_vault,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[unsafe_vault_id],
+        _debtTerms=debt_terms,
+    )
+
+    debt_amount = 25 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt_amount, bob, False, sender=bob) == debt_amount
+
+    expected = 49_500_000_000_000_000_000
+    before = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        3,
+        alpha_token,
+    )
+    assert before == expected
+
+    ledger.addVaultToUser(
+        bob,
+        unsafe_vault_id,
+        sender=teller.address,
+    )
+    _m3_install_guarded_price_desk(price_desk, bravo_token)
+
+    after = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        3,
+        alpha_token,
+    )
+    assert after == before == expected
+
+    failing_terms = boa.loads(
+        C1_FAILING_TERMS_SOURCE,
+        alpha_token,
+        debt_terms,
+        name="c1_failing_zero_position_terms",
+        override_address=boa.env.generate_address(),
+    )
+    boa.env.set_code(
+        mission_control.address,
+        boa.env.get_code(failing_terms.address),
+    )
+    with boa.reverts("zero-position terms lookup"):
+        credit_engine.getMaxWithdrawableForAsset(
+            bob,
+            3,
+            alpha_token,
+        )
+
+
+def test_c2_marginal_gas_protocol(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    vault_book,
+    governance,
+    ledger,
+    teller,
+    credit_engine,
+    price_desk,
+):
+    counts = (1, 2, 4, 8, 16, 50)
+    repetitions = 7
+    results = []
+    source_sha256 = hashlib.sha256(
+        Path("contracts/core/CreditEngine.vy").read_bytes()
+    ).hexdigest()
+    assert source_sha256 == (
+        "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d"
+    )
+    manifest_rows = sorted(
+        (
+            re.sub(
+                r"[-_.]+",
+                "-",
+                distribution.metadata["Name"],
+            ).lower(),
+            distribution.version,
+        )
+        for distribution in distributions()
+    )
+    manifest = "\n".join(
+        f"{name}=={version}" for name, version in manifest_rows
+    ) + "\n"
+    assert hashlib.sha256(manifest.encode()).hexdigest() == (
+        "9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92"
+    )
+    interpreter = Path(sys.executable).resolve()
+    assert str(interpreter) == (
+        "/Users/wigglez/dev/ripe-protocol-validation-envs/"
+        "rh-wave2-py312/bin/python"
+    )
+    assert hashlib.sha256(interpreter.read_bytes()).hexdigest() == (
+        "d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765"
+    )
+    assert hashlib.sha256(Path("requirements.txt").read_bytes()).hexdigest() == (
+        "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010"
+    )
+    protocol = Path(
+        "docs/chains/rh/hardening/creditengine-gas-measurements.md"
+    ).read_text()
+    assert "`1, 2, 4, 8, 16, 50`" in protocol
+    assert "followed by seven recorded top-level calls" in protocol
+    assert "`priced`" in protocol
+    assert "`zero-amount containment`" in protocol
+
+    for position_count in counts:
+        for comparison, position_amount in (
+            ("priced", EIGHTEEN_DECIMALS),
+            ("zero-amount containment", 0),
+        ):
+            with boa.env.anchor():
+                setGeneralConfig(
+                    _perUserMaxVaults=5,
+                    _perUserMaxAssetsPerVault=10,
+                )
+                setGeneralDebtConfig()
+                debt_terms = createDebtTerms(
+                    _ltv=50_00,
+                    _redemptionThreshold=60_00,
+                    _liqThreshold=70_00,
+                    _liqFee=10_00,
+                    _borrowRate=5_00,
+                    _daowry=0,
+                )
+                _c2_add_positions(
+                    position_count,
+                    position_amount,
+                    bob,
+                    alpha_token,
+                    debt_terms,
+                    vault_book,
+                    governance,
+                    setAssetConfig,
+                    ledger,
+                    teller,
+                )
+                mock_price_source.setPrice(
+                    alpha_token,
+                    EIGHTEEN_DECIMALS,
+                )
+
+                warm_up = credit_engine.getUserBorrowTerms(bob, True)
+                expected_value = position_count * position_amount
+                assert warm_up.collateralVal == expected_value
+                assert warm_up.totalMaxDebt == expected_value // 2
+                assert warm_up.debtTerms.ltv == 50_00
+
+                observations = []
+                price_calls = []
+                price_selector = bytes(
+                    price_desk.getUsdValue.prepare_calldata(
+                        alpha_token,
+                        0,
+                        True,
+                    )[:4]
+                )
+                for _ in range(repetitions):
+                    gas_before = boa.env.get_gas_used()
+                    terms = credit_engine.getUserBorrowTerms(bob, True)
+                    observations.append(
+                        boa.env.get_gas_used() - gas_before
+                    )
+                    price_calls.append(
+                        _count_computation_calls(
+                            credit_engine._computation,
+                            price_desk.address,
+                            price_selector,
+                        )
+                    )
+                    assert terms == warm_up
+
+                expected_price_calls = (
+                    position_count if position_amount != 0 else 0
+                )
+                assert price_calls == [expected_price_calls] * repetitions
+                assert all(observation > 0 for observation in observations)
+                results.append(
+                    {
+                        "comparison": comparison,
+                        "positions": position_count,
+                        "observations": observations,
+                        "median": int(statistics.median(observations)),
+                        "price_desk_calls": expected_price_calls,
+                    }
+                )
+
+    assert {
+        (result["positions"], result["comparison"])
+        for result in results
+    } == {
+        (count, comparison)
+        for count in counts
+        for comparison in ("priced", "zero-amount containment")
+    }
+    print("C2_GAS_RESULTS=" + json.dumps(results, sort_keys=True))

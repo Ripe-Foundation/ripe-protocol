@@ -121,7 +121,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=590" in result.output
+    assert "cadence_candidates=599" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
