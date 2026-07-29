@@ -1,7 +1,7 @@
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, set_full_payoff_params
 
 HUNDRED_PERCENT = 100_00
 SIX_DECIMALS = 10**6
@@ -1764,6 +1764,7 @@ def test_local_trust_checks_do_not_depend_on_underscore_registry_health(
 
 def test_full_payoff_owner_classification_depends_on_registry_health(
     switchboard_alpha,
+    deleverage,
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -1802,6 +1803,17 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
         sender=switchboard_alpha.address,
     )
     mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, True)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+    full_payoff_buffer = 10**15
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=full_payoff_buffer,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
     mock_undy_v2.setVaultCheckRevertAddress(bob)
 
     # The caller is locally trusted, but a full payoff still classifies the
@@ -1819,13 +1831,16 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == pre_collateral
 
-    # Governance's documented escape hatch removes the external dependency.
+    # Governance's documented escape hatch removes the external dependency,
+    # but also makes earn-vault owners indistinguishable from ordinary owners.
     mock_undy_v2.setVaultCheckRevertAddress(bob)
     mission_control.setUnderscoreRegistry(
         ZERO_ADDRESS,
         sender=switchboard_alpha.address,
     )
     assert teller.deleverageUser(bob, 0, sender=switchboard_alpha.address) > 0
+    deleverage_log = filter_logs(teller, "DeleverageUser")[0]
+    assert deleverage_log.targetRepayAmountWithBuffer == pre_debt + full_payoff_buffer
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
 
 

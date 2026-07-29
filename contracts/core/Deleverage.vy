@@ -368,7 +368,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
                 # Owner-keyed full-payoff classification necessarily depends on
                 # the configured Underscore registry being healthy even when all
                 # payoff extras are zero. Governance can set that registry to
-                # zero to restore Ripe-only operation.
+                # zero to restore Ripe-only operation only while extras stay off.
                 useFullPayoffExtras = self._getUnderscoreAddrType(_user, a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
             if useFullPayoffExtras:
                 # Full-payoff intent lets the buffer exceed this asset's target.
@@ -721,7 +721,7 @@ def _deleverageUser(
         # Owner-keyed full-payoff classification necessarily depends on the
         # configured Underscore registry being healthy even when all payoff
         # extras are zero. Governance can set that registry to zero to restore
-        # Ripe-only operation.
+        # Ripe-only operation only while extras stay off.
         useFullPayoffExtras = self._getUnderscoreAddrType(_user, _a.missionControl, False) != UNDERSCORE_EARN_VAULT_CALLER_TYPE
 
     # get extra collateral if buffer params set (either usd value or bps over debt amount)
@@ -1204,6 +1204,8 @@ def _transferCollateral(
         na: uint256 = 0
         cappedUnderlying: uint256 = 0
         na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
+        # AuctionHouse preflights BasicVault's known amount clamps; retain this
+        # as a consistency invariant for divergent vault or asset behavior.
         assert cappedUnderlying != 0 # dev: zero safe underlying
         usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
 
@@ -1221,6 +1223,8 @@ def _getUnderscoreAddrType(_addr: address, _mc: address, _basicEarnVaultOnly: bo
     # Writes the underscore vault registry to transient cache, so do not use from @view paths.
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
+        # The zero-registry escape hatch cannot identify earn-vault owners, so
+        # governance must keep full-payoff extras disabled while using it.
         return 0
 
     vaultRegistry: address = self._getUnderscoreVaultRegistry(underscore)

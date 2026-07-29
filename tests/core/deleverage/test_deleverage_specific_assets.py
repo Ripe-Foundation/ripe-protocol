@@ -1,23 +1,9 @@
 import pytest
 import boa
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import filter_logs, set_full_payoff_params
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
-
-
-def _set_full_payoff_params(
-    deleverage,
-    switchboard_alpha,
-    buffer_amount=0,
-    overage_bps=0,
-    dust_threshold=0,
-    dust_bps=0,
-):
-    deleverage.setDeleverageFullPayoffParam(1, buffer_amount, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(2, overage_bps, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(3, dust_threshold, sender=switchboard_alpha.address)
-    deleverage.setDeleverageFullPayoffParam(4, dust_bps, sender=switchboard_alpha.address)
 
 
 @pytest.fixture(autouse=True)
@@ -288,7 +274,7 @@ def test_partial_target_specific_assets_do_not_use_full_payoff_extras(
     """
     Enabled full-payoff params must not add buffer or forgive dust for partial targets.
     """
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
@@ -343,7 +329,7 @@ def test_full_payoff_single_specific_asset_uses_buffer(
     """
     full_payoff_buffer = 10**15
     full_payoff_overage_bps = 100
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=full_payoff_buffer,
@@ -404,7 +390,7 @@ def test_full_payoff_specific_assets_max_buffer_params_stay_bounded(
     """
     Specific-asset full payoff remains bounded when buffer params are at Switchboard caps.
     """
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**18,
@@ -459,7 +445,7 @@ def test_full_payoff_specific_assets_forgives_dust_after_real_collateral(
     Dust forgiveness applies to specific-assets full payoff only after nonzero
     collateral was consumed and both dust caps allow the remainder.
     """
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=1,
@@ -516,7 +502,7 @@ def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
@@ -557,6 +543,64 @@ def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
     assert main_log.debtToClear == pre_debt
 
 
+def test_full_payoff_specific_assets_disabled_for_earn_vault_user_when_caller_is_non_earn(
+    switchboard_alpha,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    bravo_token,
+    bravo_token_whale,
+    setupDeleverage,
+    mission_control,
+    mock_undy_v2,
+):
+    """An earn-vault position owner must not lose extra collateral, whoever calls."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, True)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+    setupDeleverage(
+        bob,
+        bravo_token,
+        bravo_token_whale,
+        deposit_amount=500 * EIGHTEEN_DECIMALS,
+        borrow_amount=300 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assets = [(3, bravo_token.address, pre_debt)]
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets,
+        bob,
+        sender=switchboard_alpha.address,
+    )
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
+    post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assert repaid_amount == pre_debt
+    assert pre_bravo_vault - post_bravo_vault == pre_debt
+    assert transfer_log.usdValue == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt
+    assert main_log.collateralValueRepaid == pre_debt
+    assert main_log.debtToClear == pre_debt
+
+
 def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset(
     switchboard_alpha,
     deleverage,
@@ -583,7 +627,7 @@ def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset
     """
     full_payoff_buffer = 10**15
     full_payoff_overage_bps = 100
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=full_payoff_buffer,
@@ -1230,7 +1274,7 @@ def test_full_payoff_specific_assets_all_skipped_still_reverts(
     """
     Full-payoff buffer cannot turn skipped/non-deleveragable assets into a debt clear.
     """
-    _set_full_payoff_params(
+    set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
