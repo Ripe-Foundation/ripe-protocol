@@ -1,7 +1,30 @@
+from hashlib import sha256
+from pathlib import Path
+
 import boa
 import pytest
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
+
+
+def test_m4_deleverage_source_abi_and_vault_interface_are_frozen():
+    """M4 adds proof only: consumer source, ABI, and shared interface stay exact."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    expected = {
+        "contracts/core/Deleverage.vy": (
+            "eb28c2d22a695c3148acfc00b54507d3b2f3e4462aeae119ba4183d09832815b"
+        ),
+        "scripts/abis/Deleverage.json": (
+            "0ba82a99c130e01149052add397299aeb6a40dcf1b65de98fa168feaf82553d3"
+        ),
+        "interfaces/Vault.vyi": (
+            "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+        ),
+    }
+
+    for path, expected_digest in expected.items():
+        assert sha256((repo_root / path).read_bytes()).hexdigest() == expected_digest
 
 
 @pytest.fixture

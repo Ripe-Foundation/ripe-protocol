@@ -1,9 +1,32 @@
+from hashlib import sha256
+from pathlib import Path
+
 import boa
 
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
+
+
+def test_m4_auction_house_source_abi_and_vault_interface_are_frozen():
+    """M4 adds proof only: consumer source, ABI, and shared interface stay exact."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    expected = {
+        "contracts/core/AuctionHouse.vy": (
+            "dc871e77efdf4320f98f5f4296dbe4c07689e434f9c4eae7c9ed971b85ee9cae"
+        ),
+        "scripts/abis/AuctionHouse.json": (
+            "0fb56f6674e4c6bc4d5124700c4cce9c6254b75afae4344136b3af39d21cae39"
+        ),
+        "interfaces/Vault.vyi": (
+            "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+        ),
+    }
+
+    for path, expected_digest in expected.items():
+        assert sha256((repo_root / path).read_bytes()).hexdigest() == expected_digest
 
 
 def test_ah_liquidation_auction_creation(
@@ -1908,4 +1931,3 @@ def test_ah_auction_balance_transfer_edge_cases(
     # Alice should have received all the transferred balance
     alice_final_balance = vault.userBalances(alice, alpha_token)
     assert alice_final_balance > final_alice_vault_balance
-    
