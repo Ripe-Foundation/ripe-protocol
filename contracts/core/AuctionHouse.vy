@@ -18,6 +18,9 @@
 
 # @version 0.4.3
 # pragma optimize codesize
+# At this source revision, the deployed runtime is 24,469 bytes including
+# Vyper's 96-byte immutables section: 107 bytes of EIP-170 headroom.
+# Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
 
@@ -1195,10 +1198,11 @@ def withdrawTokensFromVault(
 ) -> (uint256, bool):
     assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
     if _preflightSafeConversion:
-        # Use the balance the vault can debit, not the larger requested amount.
-        # If the vault still sends less and that smaller amount converts to zero,
-        # Deleverage's retained post-withdraw invariant assertion will revert.
+        # Mirror BasicVault's user-ledger and token-balance clamps before it
+        # mutates either state. Deleverage retains a post-withdraw consistency
+        # assertion for any vault or asset behavior outside these known bounds.
         withdrawableAmount: uint256 = min(_amount, staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset))
+        withdrawableAmount = min(withdrawableAmount, staticcall IERC20(_asset).balanceOf(_vaultAddr))
         if staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
             return 0, False
     return extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
