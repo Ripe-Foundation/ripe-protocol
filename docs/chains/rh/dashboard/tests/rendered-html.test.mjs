@@ -34,6 +34,42 @@ async function statusAndGenerated() {
   return { status: YAML.parse(statusText), generated: JSON.parse(generatedText) };
 }
 
+function assertRenderedStatusAuthority(text, publication) {
+  assert.match(
+    publication.status_authority_state,
+    /^(?:committed|uncommitted_candidate)$/,
+  );
+  assert.match(publication.status_file_sha256, /^[a-f0-9]{64}$/);
+  assert.ok(text.includes(publication.status_file_sha256));
+
+  if (publication.status_authority_state === "uncommitted_candidate") {
+    assert.equal(publication.status_authority_commit, null);
+    assert.match(
+      publication.status_authority_base_commit,
+      /^[a-f0-9]{40}$/,
+    );
+    assert.ok(text.includes("Status authority Uncommitted candidate"));
+    assert.ok(
+      text.includes(
+        `Base commit ${publication.status_authority_base_commit}`,
+      ),
+    );
+    assert.doesNotMatch(text, /Status authority [a-f0-9]{7,12}\b/i);
+    return;
+  }
+
+  assert.equal(publication.status_authority_state, "committed");
+  assert.match(publication.status_authority_commit, /^[a-f0-9]{40}$/);
+  assert.equal(publication.status_authority_base_commit, null);
+  assert.ok(
+    text.includes(
+      `Status authority ${publication.status_authority_commit}`,
+    ),
+  );
+  assert.doesNotMatch(text, /Status authority Uncommitted candidate/i);
+  assert.doesNotMatch(text, /\bBase commit [a-f0-9]{40}\b/i);
+}
+
 test("renders metadata and the exact current posture from status.yaml", async () => {
   const [response, { status, generated }] = await Promise.all([render(), statusAndGenerated()]);
   assert.equal(response.status, 200);
@@ -46,12 +82,7 @@ test("renders metadata and the exact current posture from status.yaml", async ()
   assert.ok(text.includes(status.snapshot.program_subject_commit.slice(0, 8)));
   assert.ok(text.includes(generated.snapshot.build_worktree_clean ? "Verified" : "Unverified"));
   assert.ok(text.includes("Status SHA-256"));
-  assert.equal(generated.publication.status_authority_state, "uncommitted_candidate");
-  assert.equal(generated.publication.status_authority_commit, null);
-  assert.ok(text.includes("Status authority Uncommitted candidate"));
-  assert.ok(text.includes(`Base commit ${generated.publication.status_authority_base_commit}`));
-  assert.ok(text.includes(generated.publication.status_file_sha256));
-  assert.doesNotMatch(text, /Status authority [a-f0-9]{7,12}\b/i);
+  assertRenderedStatusAuthority(text, generated.publication);
 });
 
 test("renders every lifecycle row and current count", async () => {

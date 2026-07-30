@@ -204,6 +204,71 @@ async function deriveRepositoryAuthorityExpectation() {
   };
 }
 
+async function deriveSubjectContainmentExpectation(
+  repository,
+  subjectCommit,
+) {
+  assert.match(subjectCommit, exactCommitPattern);
+  const [resolvedSubject, subjectTree, originCommit] = await Promise.all([
+    oracleGitText(repository, [
+      "rev-parse",
+      "--verify",
+      `${subjectCommit}^{commit}`,
+    ]),
+    oracleGitText(repository, [
+      "rev-parse",
+      "--verify",
+      `${subjectCommit}^{tree}`,
+    ]),
+    oracleGitText(repository, [
+      "rev-parse",
+      "--verify",
+      "refs/remotes/origin/rh^{commit}",
+    ]),
+  ]);
+  assert.equal(resolvedSubject, subjectCommit);
+  assert.match(subjectTree, exactObjectPattern);
+  assert.match(originCommit, exactCommitPattern);
+
+  let contained;
+  try {
+    await oracleGit(repository, [
+      "merge-base",
+      "--is-ancestor",
+      subjectCommit,
+      originCommit,
+    ]);
+    contained = true;
+  } catch (error) {
+    if (error.code !== 1) throw error;
+    contained = false;
+  }
+
+  if (!contained) {
+    return {
+      contained: false,
+      commitsAfterSubject: null,
+      originCommit,
+      subjectTree,
+    };
+  }
+
+  const countOutput = await oracleGitText(repository, [
+    "rev-list",
+    "--count",
+    `${subjectCommit}..${originCommit}`,
+  ]);
+  const commitsAfterSubject = Number.parseInt(countOutput, 10);
+  assert.ok(Number.isInteger(commitsAfterSubject));
+  assert.ok(commitsAfterSubject >= 0);
+  return {
+    contained: true,
+    commitsAfterSubject,
+    originCommit,
+    subjectTree,
+  };
+}
+
 async function withInheritedGitEnvironment(overrides, callback) {
   const prior = new Map(
     Object.keys(overrides).map((key) => [key, process.env[key]]),
@@ -244,6 +309,11 @@ async function commitStatusSource(repository, contents = "schema_version: 1\n") 
   return path;
 }
 
+async function commitEmpty(repository, message) {
+  await git(repository, ["commit", "--allow-empty", "-m", message]);
+  return await git(repository, ["rev-parse", "HEAD^{commit}"]);
+}
+
 async function assertUncommittedCandidate(repository, path) {
   const authority = await deriveStatusAuthority(repository, path);
   assert.equal(authority.state, "uncommitted_candidate");
@@ -278,15 +348,39 @@ async function load() {
   };
 }
 
-test("status.yaml is the sole current machine authority and binds current rh", async () => {
+test("status.yaml binds its reviewed subject within current rh history", async () => {
   const { status, generated } = await load();
-  const [{ stdout: commit }, { stdout: tree }, expectedAuthority] = await Promise.all([
-    execFileAsync("git", ["rev-parse", "origin/rh^{commit}"], { cwd: repositoryRoot }),
-    execFileAsync("git", ["rev-parse", "origin/rh^{tree}"], { cwd: repositoryRoot }),
+  const [expectedSubject, expectedAuthority] = await Promise.all([
+    deriveSubjectContainmentExpectation(
+      repositoryRoot,
+      status.snapshot.program_subject_commit,
+    ),
     deriveRepositoryAuthorityExpectation(),
   ]);
-  assert.equal(status.snapshot.program_subject_commit, commit.trim());
-  assert.equal(status.snapshot.program_subject_tree, tree.trim());
+  assert.equal(
+    status.snapshot.program_subject_tree,
+    expectedSubject.subjectTree,
+  );
+  assert.equal(
+    generated.snapshot.subject_in_origin_history,
+    expectedSubject.contained,
+  );
+  assert.equal(
+    generated.snapshot.origin_commits_after_subject,
+    expectedSubject.commitsAfterSubject,
+  );
+  assert.equal(
+    generated._generated.origin_rh_commit,
+    expectedSubject.originCommit,
+  );
+  assert.equal(
+    generated._generated.subject_in_origin_history,
+    expectedSubject.contained,
+  );
+  assert.equal(
+    generated._generated.origin_commits_after_subject,
+    expectedSubject.commitsAfterSubject,
+  );
   assert.equal(generated.publication.status_authority_state, expectedAuthority.state);
   assert.equal(generated.publication.status_authority_commit, expectedAuthority.authorityCommit);
   assert.equal(generated.publication.status_authority_base_commit, expectedAuthority.authorityBaseCommit);
@@ -295,6 +389,103 @@ test("status.yaml is the sole current machine authority and binds current rh", a
   assert.equal(generated._generated.source_sha256, expectedAuthority.sourceSha256);
   assert.equal(generated.snapshot.program_subject_commit, status.snapshot.program_subject_commit);
   assert.equal(generated.snapshot.program_subject_tree, status.snapshot.program_subject_tree);
+  if (expectedAuthority.authorityCommit !== null) {
+    assert.notEqual(
+      status.snapshot.program_subject_commit,
+      expectedAuthority.authorityCommit,
+    );
+  }
+});
+
+test("a subject equal to origin/rh is contained with zero later commits", async () => {
+  const repository = await createAuthorityRepository();
+  const subjectCommit = await git(repository, [
+    "rev-parse",
+    "HEAD^{commit}",
+  ]);
+
+  const expected = await deriveSubjectContainmentExpectation(
+    repository,
+    subjectCommit,
+  );
+  assert.equal(expected.contained, true);
+  assert.equal(expected.commitsAfterSubject, 0);
+  assert.equal(expected.originCommit, subjectCommit);
+});
+
+test("a subject three commits behind origin/rh has exact positive drift", async () => {
+  const repository = await createAuthorityRepository();
+  const subjectCommit = await git(repository, [
+    "rev-parse",
+    "HEAD^{commit}",
+  ]);
+  for (let index = 1; index <= 3; index += 1) {
+    await commitEmpty(repository, `Integrated descendant ${index}`);
+  }
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+
+  const expected = await deriveSubjectContainmentExpectation(
+    repository,
+    subjectCommit,
+  );
+  const independentCount = Number.parseInt(
+    await oracleGitText(repository, [
+      "rev-list",
+      "--count",
+      `${subjectCommit}..refs/remotes/origin/rh`,
+    ]),
+    10,
+  );
+  assert.equal(expected.contained, true);
+  assert.equal(expected.commitsAfterSubject, 3);
+  assert.equal(expected.commitsAfterSubject, independentCount);
+});
+
+test("a later clean descendant retains exact dynamically derived drift", async () => {
+  const repository = await createAuthorityRepository();
+  const subjectCommit = await git(repository, [
+    "rev-parse",
+    "HEAD^{commit}",
+  ]);
+  for (let index = 1; index <= 5; index += 1) {
+    await commitEmpty(repository, `Later clean descendant ${index}`);
+  }
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+
+  const expected = await deriveSubjectContainmentExpectation(
+    repository,
+    subjectCommit,
+  );
+  const independentCount = Number.parseInt(
+    await oracleGitText(repository, [
+      "rev-list",
+      "--count",
+      `${subjectCommit}..refs/remotes/origin/rh`,
+    ]),
+    10,
+  );
+  assert.equal(expected.contained, true);
+  assert.ok(expected.commitsAfterSubject > 0);
+  assert.equal(expected.commitsAfterSubject, independentCount);
+});
+
+test("a subject outside origin/rh history fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  await git(repository, ["switch", "-c", "reviewed-subject"]);
+  const subjectCommit = await commitEmpty(
+    repository,
+    "Forked reviewed subject",
+  );
+  await git(repository, ["switch", "rh"]);
+  await commitEmpty(repository, "Independent integrated history");
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+
+  const expected = await deriveSubjectContainmentExpectation(
+    repository,
+    subjectCommit,
+  );
+  assert.equal(expected.contained, false);
+  assert.equal(expected.commitsAfterSubject, null);
 });
 
 test("an untracked status source is an uncommitted candidate", async () => {
