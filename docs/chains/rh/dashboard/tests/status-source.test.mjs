@@ -1,0 +1,533 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import test from "node:test";
+import YAML from "yaml";
+
+import {
+  deriveStatusAuthority,
+  verifyProposedStatusAuthority,
+} from "../scripts/sync-status.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const dashboardRoot = resolve(here, "..");
+const repositoryRoot = resolve(dashboardRoot, "../../../..");
+const statusPath = resolve(dashboardRoot, "../status.yaml");
+const generatedPath = resolve(dashboardRoot, "app/status.generated.json");
+const handoffPath = resolve(dashboardRoot, "app/handoff/[slug]/handoff.generated.json");
+const parameterPath = resolve(repositoryRoot, "config/robinhood-parameters.json");
+const execFileAsync = promisify(execFile);
+const sanitizedTestGitEnvironment = {
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_OPTIONAL_LOCKS: "0",
+  LANG: "C",
+  LC_ALL: "C",
+  PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
+};
+
+async function git(repository, arguments_, options = {}) {
+  const { stdout } = await execFileAsync("git", arguments_, {
+    cwd: repository,
+    ...options,
+  });
+  return stdout.trim();
+}
+
+async function withInheritedGitEnvironment(overrides, callback) {
+  const prior = new Map(
+    Object.keys(overrides).map((key) => [key, process.env[key]]),
+  );
+  try {
+    for (const [key, value] of Object.entries(overrides)) {
+      process.env[key] = value;
+    }
+    return await callback();
+  } finally {
+    for (const [key, value] of prior) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+async function createAuthorityRepository() {
+  const repository = await mkdtemp(resolve(tmpdir(), "rh-status-authority-"));
+  await git(repository, ["init", "-b", "rh"]);
+  await git(repository, ["config", "user.name", "Status Authority Test"]);
+  await git(repository, ["config", "user.email", "status-authority@example.invalid"]);
+  await git(repository, ["config", "commit.gpgsign", "false"]);
+  await writeFile(resolve(repository, "README.md"), "test repository\n");
+  await git(repository, ["add", "README.md"]);
+  await git(repository, ["commit", "-m", "Initialize authority test repository"]);
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+  return repository;
+}
+
+async function commitStatusSource(repository, contents = "schema_version: 1\n") {
+  const path = resolve(repository, "docs/chains/rh/status.yaml");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, contents);
+  await git(repository, ["add", "docs/chains/rh/status.yaml"]);
+  await git(repository, ["commit", "-m", "Add status authority"]);
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+  return path;
+}
+
+async function assertUncommittedCandidate(repository, path) {
+  const authority = await deriveStatusAuthority(repository, path);
+  assert.equal(authority.state, "uncommitted_candidate");
+  assert.equal(authority.statusAuthorityCommit, null);
+  assert.equal(
+    authority.statusAuthorityBaseCommit,
+    await git(repository, ["rev-parse", "HEAD^{commit}"], {
+      env: sanitizedTestGitEnvironment,
+    }),
+  );
+  assert.equal(
+    authority.statusFileSha256,
+    createHash("sha256").update(await readFile(path)).digest("hex"),
+  );
+  assert.equal(authority.buildWorktreeClean, false);
+  return authority;
+}
+
+async function load() {
+  const [source, generated, handoff, parameterText] = await Promise.all([
+    readFile(statusPath, "utf8"),
+    readFile(generatedPath, "utf8"),
+    readFile(handoffPath, "utf8"),
+    readFile(parameterPath, "utf8"),
+  ]);
+  return {
+    source,
+    status: YAML.parse(source),
+    generated: JSON.parse(generated),
+    handoff: JSON.parse(handoff),
+    parameters: JSON.parse(parameterText),
+  };
+}
+
+test("status.yaml is the sole current machine authority and binds current rh", async () => {
+  const { source, status, generated } = await load();
+  const [{ stdout: commit }, { stdout: tree }, { stdout: head }] = await Promise.all([
+    execFileAsync("git", ["rev-parse", "origin/rh^{commit}"], { cwd: repositoryRoot }),
+    execFileAsync("git", ["rev-parse", "origin/rh^{tree}"], { cwd: repositoryRoot }),
+    execFileAsync("git", ["rev-parse", "HEAD^{commit}"], { cwd: repositoryRoot }),
+  ]);
+  const sourceHash = createHash("sha256").update(source).digest("hex");
+  assert.equal(status.snapshot.program_subject_commit, commit.trim());
+  assert.equal(status.snapshot.program_subject_tree, tree.trim());
+  assert.equal(generated.publication.status_authority_state, "uncommitted_candidate");
+  assert.equal(generated.publication.status_authority_commit, null);
+  assert.equal(generated.publication.status_authority_base_commit, head.trim());
+  assert.equal(generated.publication.status_file_sha256, sourceHash);
+  assert.equal(generated.snapshot.build_worktree_clean, false);
+  assert.equal(generated._generated.source_sha256, sourceHash);
+  assert.equal(generated.snapshot.program_subject_commit, status.snapshot.program_subject_commit);
+  assert.equal(generated.snapshot.program_subject_tree, status.snapshot.program_subject_tree);
+});
+
+test("an untracked status source is an uncommitted candidate", async () => {
+  const repository = await createAuthorityRepository();
+  const path = resolve(repository, "docs/chains/rh/status.yaml");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, "schema_version: untracked\n");
+
+  await assertUncommittedCandidate(repository, path);
+});
+
+test("a tracked but modified status source is an uncommitted candidate", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository);
+  await writeFile(path, "schema_version: modified\n");
+
+  const indexBlob = (await git(repository, [
+    "ls-files",
+    "--stage",
+    "--",
+    "docs/chains/rh/status.yaml",
+  ])).split(/\s+/)[1];
+  const sourceBlob = await git(repository, ["hash-object", path]);
+  assert.notEqual(sourceBlob, indexBlob);
+  await assertUncommittedCandidate(repository, path);
+});
+
+test("a staged status source is an uncommitted candidate", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository);
+  await writeFile(path, "schema_version: staged\n");
+  await git(repository, ["add", "docs/chains/rh/status.yaml"]);
+
+  const [indexBlob, headBlob] = await Promise.all([
+    git(repository, ["rev-parse", ":docs/chains/rh/status.yaml"]),
+    git(repository, ["rev-parse", "HEAD:docs/chains/rh/status.yaml"]),
+  ]);
+  assert.notEqual(indexBlob, headBlob);
+  await assertUncommittedCandidate(repository, path);
+});
+
+test("an unmerged status source fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: base\n");
+  await git(repository, ["switch", "-c", "other"]);
+  await writeFile(path, "state: other\n");
+  await git(repository, ["add", "docs/chains/rh/status.yaml"]);
+  await git(repository, ["commit", "-m", "Change status on other"]);
+  await git(repository, ["switch", "rh"]);
+  await writeFile(path, "state: rh\n");
+  await git(repository, ["add", "docs/chains/rh/status.yaml"]);
+  await git(repository, ["commit", "-m", "Change status on rh"]);
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+  await assert.rejects(
+    execFileAsync("git", ["merge", "--no-edit", "other"], { cwd: repository }),
+  );
+
+  await assert.rejects(
+    deriveStatusAuthority(repository, path),
+    /unmerged state/i,
+  );
+});
+
+test("assume-unchanged followed by modified bytes fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  await git(repository, [
+    "update-index",
+    "--assume-unchanged",
+    "docs/chains/rh/status.yaml",
+  ]);
+  await writeFile(path, "state: hidden modification\n");
+
+  await assert.rejects(
+    deriveStatusAuthority(repository, path),
+    /assume-unchanged/i,
+  );
+});
+
+test("skip-worktree followed by modified bytes fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  await git(repository, [
+    "update-index",
+    "--skip-worktree",
+    "docs/chains/rh/status.yaml",
+  ]);
+  await writeFile(path, "state: hidden modification\n");
+
+  await assert.rejects(
+    deriveStatusAuthority(repository, path),
+    /skip-worktree/i,
+  );
+});
+
+test("inherited GIT_WORK_TREE cannot hide modified source bytes", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const redirectedWorktree = await mkdtemp(
+    resolve(tmpdir(), "rh-status-worktree-redirect-"),
+  );
+  await mkdir(resolve(redirectedWorktree, "docs/chains/rh"), {
+    recursive: true,
+  });
+  await writeFile(resolve(redirectedWorktree, "README.md"), "test repository\n");
+  await writeFile(
+    resolve(redirectedWorktree, "docs/chains/rh/status.yaml"),
+    "state: committed\n",
+  );
+  await writeFile(path, "state: intended worktree modification\n");
+
+  await withInheritedGitEnvironment(
+    { GIT_WORK_TREE: redirectedWorktree },
+    async () => {
+      await assertUncommittedCandidate(repository, path);
+    },
+  );
+});
+
+test("inherited GIT_DIR cannot redirect status authority", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const redirectedRepository = await createAuthorityRepository();
+  await commitStatusSource(redirectedRepository, "state: committed\n");
+  const redirectedGitDirectory = await git(redirectedRepository, [
+    "rev-parse",
+    "--absolute-git-dir",
+  ]);
+  await writeFile(path, "state: intended repository modification\n");
+
+  await withInheritedGitEnvironment(
+    { GIT_DIR: redirectedGitDirectory },
+    async () => {
+      await assertUncommittedCandidate(repository, path);
+    },
+  );
+});
+
+test("inherited GIT_INDEX_FILE cannot substitute a hidden alternate index", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const alternateIndexDirectory = await mkdtemp(
+    resolve(tmpdir(), "rh-status-index-redirect-"),
+  );
+  const alternateIndex = resolve(alternateIndexDirectory, "index");
+  const alternateEnvironment = {
+    ...process.env,
+    GIT_INDEX_FILE: alternateIndex,
+  };
+  await git(repository, ["read-tree", "HEAD"], {
+    env: alternateEnvironment,
+  });
+  await git(
+    repository,
+    [
+      "update-index",
+      "--assume-unchanged",
+      "docs/chains/rh/status.yaml",
+    ],
+    { env: alternateEnvironment },
+  );
+  await writeFile(path, "state: intended index modification\n");
+
+  await withInheritedGitEnvironment(
+    { GIT_INDEX_FILE: alternateIndex },
+    async () => {
+      await assertUncommittedCandidate(repository, path);
+    },
+  );
+});
+
+test("inherited object and configuration redirects cannot alter Git authority", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const redirectedWorktree = await mkdtemp(
+    resolve(tmpdir(), "rh-status-config-redirect-"),
+  );
+  await mkdir(resolve(redirectedWorktree, "docs/chains/rh"), {
+    recursive: true,
+  });
+  await writeFile(resolve(redirectedWorktree, "README.md"), "test repository\n");
+  await writeFile(
+    resolve(redirectedWorktree, "docs/chains/rh/status.yaml"),
+    "state: committed\n",
+  );
+  await writeFile(path, "state: intended configuration modification\n");
+
+  await withInheritedGitEnvironment(
+    {
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: resolve(
+        redirectedWorktree,
+        "objects",
+      ),
+      GIT_CEILING_DIRECTORIES: "/",
+      GIT_COMMON_DIR: resolve(redirectedWorktree, "common"),
+      GIT_CONFIG: resolve(redirectedWorktree, "config"),
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_GLOBAL: resolve(redirectedWorktree, "global-config"),
+      GIT_CONFIG_KEY_0: "core.worktree",
+      GIT_CONFIG_SYSTEM: resolve(redirectedWorktree, "system-config"),
+      GIT_CONFIG_VALUE_0: redirectedWorktree,
+      GIT_OBJECT_DIRECTORY: resolve(redirectedWorktree, "objects"),
+      GIT_PREFIX: "redirected/",
+    },
+    async () => {
+      await assertUncommittedCandidate(repository, path);
+    },
+  );
+});
+
+test("repository-local worktree redirection fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const redirectedWorktree = await mkdtemp(
+    resolve(tmpdir(), "rh-status-local-redirect-"),
+  );
+  await git(repository, ["config", "core.worktree", redirectedWorktree]);
+
+  await assert.rejects(
+    deriveStatusAuthority(repository, path),
+    /does not match Git's reported worktree/i,
+  );
+});
+
+test("a clean committed status source resolves its real authority commit", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: committed\n");
+  const authorityCommit = await git(repository, ["rev-parse", "HEAD^{commit}"]);
+  await writeFile(resolve(repository, "README.md"), "unrelated later commit\n");
+  await git(repository, ["add", "README.md"]);
+  await git(repository, ["commit", "-m", "Add unrelated later commit"]);
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+  const currentHead = await git(repository, ["rev-parse", "HEAD^{commit}"]);
+
+  const authority = await deriveStatusAuthority(repository, path);
+  assert.equal(authority.state, "committed");
+  assert.equal(authority.statusAuthorityCommit, authorityCommit);
+  assert.notEqual(authority.statusAuthorityCommit, currentHead);
+  assert.match(authority.statusAuthorityCommit, /^[a-f0-9]{40}$/);
+  assert.equal(authority.statusAuthorityBaseCommit, null);
+  assert.equal(authority.statusFileSha256, createHash("sha256").update(await readFile(path)).digest("hex"));
+  assert.equal(authority.buildWorktreeClean, true);
+});
+
+test("a proposed authority commit with different source bytes fails closed", async () => {
+  const repository = await createAuthorityRepository();
+  const path = await commitStatusSource(repository, "state: first\n");
+  const firstCommit = await git(repository, ["rev-parse", "HEAD^{commit}"]);
+  await writeFile(path, "state: second\n");
+  await git(repository, ["add", "docs/chains/rh/status.yaml"]);
+  await git(repository, ["commit", "-m", "Replace status authority bytes"]);
+  await git(repository, ["update-ref", "refs/remotes/origin/rh", "HEAD"]);
+  const secondCommit = await git(repository, ["rev-parse", "HEAD^{commit}"]);
+  const sourceBytes = await readFile(path);
+
+  await assert.rejects(
+    verifyProposedStatusAuthority(
+      repository,
+      path,
+      sourceBytes,
+      firstCommit,
+    ),
+    /does not contain the exact source bytes/i,
+  );
+  const authority = await deriveStatusAuthority(repository, path);
+  assert.equal(authority.state, "committed");
+  assert.equal(authority.statusAuthorityCommit, secondCommit);
+});
+
+test("status authority has no manual environment, CLI, or YAML override", async () => {
+  const [script, source] = await Promise.all([
+    readFile(resolve(dashboardRoot, "scripts/sync-status.mjs"), "utf8"),
+    readFile(statusPath, "utf8"),
+  ]);
+  const status = YAML.parse(source);
+  assert.doesNotMatch(script, /process\.env/);
+  assert.doesNotMatch(script, /process\.argv\[(?:2|3|4|5)\]/);
+  assert.doesNotMatch(script, /\bSTATUS_AUTHORITY\b|--status-authority/);
+  assert.match(script, /env: sanitizedGitEnvironment\(\)/);
+  assert.match(script, /gitExecutable = "\/usr\/bin\/git"/);
+  for (const inheritedVariable of [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES",
+    "GIT_PREFIX",
+    "GIT_CONFIG",
+    "GIT_CONFIG_COUNT",
+  ]) {
+    assert.doesNotMatch(
+      script,
+      new RegExp(`process\\.env\\.${inheritedVariable}\\b`),
+    );
+  }
+  assert.equal(status.publication.status_authority_state, "build_derived");
+  assert.equal(status.publication.status_authority_commit, "build_derived");
+  assert.equal(status.publication.status_authority_base_commit, "build_derived");
+  assert.equal(status.publication.status_file_sha256, "build_derived");
+});
+
+test("two generations from identical candidate bytes are deterministic", async () => {
+  const paths = [generatedPath, handoffPath];
+  await execFileAsync(process.execPath, ["scripts/sync-status.mjs"], { cwd: dashboardRoot });
+  const first = await Promise.all(paths.map((path) => readFile(path)));
+  await execFileAsync(process.execPath, ["scripts/sync-status.mjs"], { cwd: dashboardRoot });
+  const second = await Promise.all(paths.map((path) => readFile(path)));
+  assert.deepEqual(second, first);
+});
+
+test("all declared current counts are derived and exact", async () => {
+  const { status, parameters, handoff } = await load();
+  const h04States = status.h04_decisions.rows.reduce((counts, row) => {
+    counts[row.state] = (counts[row.state] ?? 0) + 1;
+    return counts;
+  }, {});
+  assert.equal(status.counts.workstreams, status.workstreams.length);
+  assert.equal(status.counts.rh_d_decisions, status.decisions.length);
+  assert.equal(status.counts.h03_blockers, status.h03_blockers.length);
+  assert.equal(status.counts.h04_rows, status.h04_decisions.rows.length);
+  assert.equal(status.counts.h04_approved_operative, h04States.approved);
+  assert.equal(status.counts.h04_retired_non_operative, h04States.retired_non_operative);
+  assert.equal(status.counts.h04_open, h04States.open ?? 0);
+  assert.equal(status.counts.binding_schedules, parameters.binding_schedules.length);
+  assert.equal(status.counts.hard_gates, status.hard_gates.length);
+  assert.equal(status.counts.handoff_documents, Object.keys(handoff).length);
+  assert.equal(status.counts.parked_lanes, status.owner_priority_overlay.parked_lanes.length);
+  assert.equal(status.counts.live_actions, status.snapshot.live_actions_completed);
+});
+
+test("H-04 lifecycle and fail-closed readiness mirror the integrated manifest", async () => {
+  const { status, parameters } = await load();
+  const approved = parameters.decision_registry.filter((row) => row.status === "approved" && row.operative);
+  const retired = parameters.decision_registry.filter((row) => !row.operative);
+  assert.deepEqual(status.h04_decisions.approved_ids, approved.map((row) => row.id));
+  assert.deepEqual(status.h04_decisions.retired_ids, retired.map((row) => row.id));
+  assert.deepEqual(status.h04_decisions.open_ids, []);
+  assert.equal(status.h04_decisions.binding_schedule_count, parameters.binding_schedules.length);
+  assert.equal(status.h04_decisions.schema_v2_integrated, true);
+  assert.equal(status.h04_decisions.defaults_render_ready, false);
+  await assert.rejects(access(resolve(repositoryRoot, "contracts/config/DefaultsRobinhood.vy")));
+});
+
+test("the four deferred controls are explicit and absent from machine-facing parameters", async () => {
+  const { status, parameters } = await load();
+  const controls = status.post_freeze_reconciliation.deleverage_parameter_gap.controls;
+  assert.equal(controls.length, status.post_freeze_reconciliation.deleverage_parameter_gap.current_values.length);
+  assert.ok(status.post_freeze_reconciliation.deleverage_parameter_gap.current_values.every((value) => value === 0));
+  const parameterBytes = JSON.stringify(parameters);
+  for (const control of controls) assert.doesNotMatch(parameterBytes, new RegExp(control, "i"));
+  assert.equal(status.post_freeze_reconciliation.deleverage_parameter_gap.fixed_by_this_refresh, false);
+});
+
+test("decision namespace mirrors the canonical register", async () => {
+  const { status } = await load();
+  const register = await readFile(resolve(dashboardRoot, "../decision-register.md"), "utf8");
+  const canonical = [...register.matchAll(/^### (RH-D\d{3}) — (.+)$/gm)]
+    .map((match) => ({ id: match[1], title: match[2].trim() }));
+  assert.deepEqual(status.decisions.map(({ id, title }) => ({ id, title })), canonical);
+});
+
+test("generated handoff bytes exactly mirror the declared reading paths", async () => {
+  const { status, handoff } = await load();
+  const readingPaths = [...new Set(Object.values(status.reading_paths).flat()
+    .filter((value) => typeof value === "string" && value.startsWith("docs/")))];
+  assert.equal(readingPaths.length, status.counts.handoff_documents);
+  assert.deepEqual(Object.keys(handoff).sort(), readingPaths.map((path) => basename(path)).sort());
+  for (const path of readingPaths) {
+    assert.equal(handoff[basename(path)].source, path);
+    assert.deepEqual(Buffer.from(handoff[basename(path)].content, "utf8"), await readFile(resolve(repositoryRoot, path)));
+  }
+});
+
+test("generated JSON stays ignored and untracked", async () => {
+  for (const path of [
+    "docs/chains/rh/dashboard/app/status.generated.json",
+    "docs/chains/rh/dashboard/app/handoff/[slug]/handoff.generated.json",
+  ]) {
+    await execFileAsync("git", ["check-ignore", "-q", path], { cwd: repositoryRoot });
+    const { stdout } = await execFileAsync("git", ["ls-files", "--", path], { cwd: repositoryRoot });
+    assert.equal(stdout.trim(), "");
+  }
+});
+
+test("non-editable dashboard package and hosting sources match the overlay authority", async () => {
+  for (const path of [
+    "docs/chains/rh/dashboard/package.json",
+    "docs/chains/rh/dashboard/package-lock.json",
+    "docs/chains/rh/dashboard/.openai/hosting.json",
+  ]) {
+    const [{ stdout: authority }, local] = await Promise.all([
+      execFileAsync("git", ["show", `origin/codex/rh-owner-priority-overlay:${path}`], { cwd: repositoryRoot, encoding: "buffer" }),
+      readFile(resolve(repositoryRoot, path)),
+    ]);
+    assert.deepEqual(Buffer.from(authority), local);
+  }
+});
