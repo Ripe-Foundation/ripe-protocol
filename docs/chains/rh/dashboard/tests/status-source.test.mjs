@@ -18,10 +18,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = resolve(here, "..");
 const repositoryRoot = resolve(dashboardRoot, "../../../..");
 const statusPath = resolve(dashboardRoot, "../status.yaml");
+const statusRelativePath = "docs/chains/rh/status.yaml";
 const generatedPath = resolve(dashboardRoot, "app/status.generated.json");
 const handoffPath = resolve(dashboardRoot, "app/handoff/[slug]/handoff.generated.json");
 const parameterPath = resolve(repositoryRoot, "config/robinhood-parameters.json");
 const execFileAsync = promisify(execFile);
+const exactObjectPattern = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
+const exactCommitPattern = /^[a-f0-9]{40}$/;
 const sanitizedTestGitEnvironment = {
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
@@ -38,6 +41,167 @@ async function git(repository, arguments_, options = {}) {
     ...options,
   });
   return stdout.trim();
+}
+
+async function oracleGit(repository, arguments_, options = {}) {
+  return await execFileAsync("/usr/bin/git", arguments_, {
+    cwd: repository,
+    encoding: null,
+    env: sanitizedTestGitEnvironment,
+    ...options,
+  });
+}
+
+async function oracleGitText(repository, arguments_, options = {}) {
+  const { stdout } = await oracleGit(repository, arguments_, options);
+  return stdout.toString("utf8").trim();
+}
+
+async function deriveRepositoryAuthorityExpectation() {
+  const sourceBytes = await readFile(statusPath);
+  const sourceSha256 = createHash("sha256")
+    .update(sourceBytes)
+    .digest("hex");
+  const [
+    head,
+    objectFormat,
+    sourceBlob,
+    indexResult,
+    sourceStatus,
+    worktreeStatus,
+  ] =
+    await Promise.all([
+      oracleGitText(repositoryRoot, [
+        "rev-parse",
+        "--verify",
+        "HEAD^{commit}",
+      ]),
+      oracleGitText(repositoryRoot, [
+        "rev-parse",
+        "--show-object-format",
+      ]),
+      oracleGitText(repositoryRoot, [
+        "hash-object",
+        "--no-filters",
+        "--",
+        statusRelativePath,
+      ]),
+      oracleGit(repositoryRoot, [
+        "ls-files",
+        "--stage",
+        "-z",
+        "--",
+        statusRelativePath,
+      ]),
+      oracleGit(repositoryRoot, [
+        "status",
+        "--porcelain=v2",
+        "-z",
+        "--untracked-files=all",
+        "--",
+        statusRelativePath,
+      ]),
+      oracleGit(repositoryRoot, [
+        "status",
+        "--porcelain=v2",
+        "-z",
+        "--untracked-files=all",
+      ]),
+    ]);
+
+  assert.match(head, exactCommitPattern);
+  assert.match(objectFormat, /^sha(?:1|256)$/);
+  assert.match(sourceBlob, exactObjectPattern);
+  const expectedSourceBlob = createHash(objectFormat)
+    .update(Buffer.from(`blob ${sourceBytes.length}\0`))
+    .update(sourceBytes)
+    .digest("hex");
+  assert.equal(sourceBlob, expectedSourceBlob);
+
+  const indexEntries = indexResult.stdout
+    .toString("utf8")
+    .split("\0")
+    .filter(Boolean)
+    .map((record) => {
+      const match = record.match(
+        /^([0-7]{6}) ([a-f0-9]{40}(?:[a-f0-9]{24})?) ([0-3])\t([\s\S]+)$/,
+      );
+      assert.ok(match);
+      assert.equal(match[4], statusRelativePath);
+      return {
+        blob: match[2],
+        stage: Number.parseInt(match[3], 10),
+      };
+    });
+  assert.ok(indexEntries.every(({ stage }) => stage === 0));
+  assert.ok(indexEntries.length <= 1);
+
+  const indexEntry = indexEntries[0] ?? null;
+  const sourceTracked = indexEntry !== null;
+  const sourceModified = sourceStatus.stdout.length > 0;
+  const worktreeClean = worktreeStatus.stdout.length === 0;
+  let headBlob = null;
+  try {
+    headBlob = await oracleGitText(repositoryRoot, [
+      "rev-parse",
+      "--verify",
+      `HEAD:${statusRelativePath}`,
+    ]);
+    assert.match(headBlob, exactObjectPattern);
+  } catch (error) {
+    assert.equal(error.code, 128);
+  }
+
+  if (sourceTracked && !sourceModified && worktreeClean) {
+    assert.equal(indexEntry.blob, sourceBlob);
+    assert.equal(headBlob, sourceBlob);
+    const authorityCommit = await oracleGitText(repositoryRoot, [
+      "log",
+      "-1",
+      "--format=%H",
+      "--follow",
+      "--",
+      statusRelativePath,
+    ]);
+    assert.match(authorityCommit, exactCommitPattern);
+    const authorityBlob = await oracleGitText(repositoryRoot, [
+      "rev-parse",
+      "--verify",
+      `${authorityCommit}:${statusRelativePath}`,
+    ]);
+    assert.equal(authorityBlob, sourceBlob);
+    assert.deepEqual(
+      (await oracleGit(
+        repositoryRoot,
+        ["cat-file", "blob", authorityBlob],
+      )).stdout,
+      sourceBytes,
+    );
+    return {
+      state: "committed",
+      authorityCommit,
+      authorityBaseCommit: null,
+      sourceSha256,
+      buildWorktreeClean: true,
+    };
+  }
+
+  assert.equal(sourceModified, true);
+  assert.equal(worktreeClean, false);
+  if (sourceTracked) {
+    assert.ok(
+      sourceBlob !== indexEntry.blob || indexEntry.blob !== headBlob,
+    );
+  } else {
+    assert.equal(headBlob, null);
+  }
+  return {
+    state: "uncommitted_candidate",
+    authorityCommit: null,
+    authorityBaseCommit: head,
+    sourceSha256,
+    buildWorktreeClean: false,
+  };
 }
 
 async function withInheritedGitEnvironment(overrides, callback) {
@@ -115,21 +279,20 @@ async function load() {
 }
 
 test("status.yaml is the sole current machine authority and binds current rh", async () => {
-  const { source, status, generated } = await load();
-  const [{ stdout: commit }, { stdout: tree }, { stdout: head }] = await Promise.all([
+  const { status, generated } = await load();
+  const [{ stdout: commit }, { stdout: tree }, expectedAuthority] = await Promise.all([
     execFileAsync("git", ["rev-parse", "origin/rh^{commit}"], { cwd: repositoryRoot }),
     execFileAsync("git", ["rev-parse", "origin/rh^{tree}"], { cwd: repositoryRoot }),
-    execFileAsync("git", ["rev-parse", "HEAD^{commit}"], { cwd: repositoryRoot }),
+    deriveRepositoryAuthorityExpectation(),
   ]);
-  const sourceHash = createHash("sha256").update(source).digest("hex");
   assert.equal(status.snapshot.program_subject_commit, commit.trim());
   assert.equal(status.snapshot.program_subject_tree, tree.trim());
-  assert.equal(generated.publication.status_authority_state, "uncommitted_candidate");
-  assert.equal(generated.publication.status_authority_commit, null);
-  assert.equal(generated.publication.status_authority_base_commit, head.trim());
-  assert.equal(generated.publication.status_file_sha256, sourceHash);
-  assert.equal(generated.snapshot.build_worktree_clean, false);
-  assert.equal(generated._generated.source_sha256, sourceHash);
+  assert.equal(generated.publication.status_authority_state, expectedAuthority.state);
+  assert.equal(generated.publication.status_authority_commit, expectedAuthority.authorityCommit);
+  assert.equal(generated.publication.status_authority_base_commit, expectedAuthority.authorityBaseCommit);
+  assert.equal(generated.publication.status_file_sha256, expectedAuthority.sourceSha256);
+  assert.equal(generated.snapshot.build_worktree_clean, expectedAuthority.buildWorktreeClean);
+  assert.equal(generated._generated.source_sha256, expectedAuthority.sourceSha256);
   assert.equal(generated.snapshot.program_subject_commit, status.snapshot.program_subject_commit);
   assert.equal(generated.snapshot.program_subject_tree, status.snapshot.program_subject_tree);
 });
