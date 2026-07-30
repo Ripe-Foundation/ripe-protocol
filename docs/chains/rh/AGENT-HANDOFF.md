@@ -1,25 +1,28 @@
 # Robinhood deployment: cold-agent handoff
 
-**Current program subject:**
-`ad831669943ccfe7b9ed57454995dfce51630a66`  
-**Subject tree:** `3467f4a75aa37203d615407d5baf9c5fc9035639`  
+**Frozen protocol/pause subject:**
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`
+**Subject tree:** `a6a34a385b48819bbf66249d518d76da3806b033`
 **Current machine authority:** [`status.yaml`](status.yaml)
 **Private presentation mirror:** [Robinhood program status](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
-Corrected PR #61 is integrated into `rh`; upstream PR #61 remains independently
-open and unmerged as of the fresh live check. Nothing has been deployed,
-migrated, configured in production, activated, or released on Robinhood.
+Ready to begin deployment preparation. PR #61 is merged and closed on `master`,
+and its production contract changes are integrated into `rh`. Nothing has been
+deployed, migrated, configured in production, activated, or released on
+Robinhood.
 
 ## Mandatory bootstrap
 
 1. Start read-only. Verify local `rh`, cached `origin/rh`, and credential-free
    live `rh` before creating a worktree or editing.
 2. Read [`status.yaml`](status.yaml), [`START-HERE.md`](START-HERE.md),
+   [`deployment-owner-readiness.md`](deployment-owner-readiness.md),
    [`current-owner-priorities.md`](current-owner-priorities.md), and the exact
    assigned brief/evidence only.
 3. Treat historical commit, tree, test, machine, and fingerprint rows as
    evidence of their recorded checkpoint—not current facts—unless reverified.
-4. Keep implementation, review, integration, planning, deployment,
+4. Keep the frozen protocol baseline, documentation authority, signed feature
+   publication, `rh` integration, later descendants, planning, deployment,
    configuration, activation, and release as distinct lifecycle states.
 5. Never repair, clean, reset, restore, or overwrite unexpected state. Stop and
    report drift outside the authorized scope.
@@ -30,8 +33,8 @@ migrated, configured in production, activated, or released on Robinhood.
 - All 18 H-03 blockers remain open.
 - H-04 has 21 lifecycle rows: 20 approved operative, one retired
   non-operative (`D-H04-19`), zero open, plus 14 binding schedules.
-- Nine hard gates and nine dashboard handoff documents.
-- Two parked lanes and zero live actions.
+- Nine hard gates and ten dashboard handoff documents.
+- Four parked lanes and zero live actions.
 
 ## Current lifecycle facts
 
@@ -48,14 +51,26 @@ migrated, configured in production, activated, or released on Robinhood.
 - The historical S4 zero-cooldown decision remains closed.
 - CCIP and zero-backing settlement/bad-debt policy are deferred and
   nonblocking.
+- Sites account/workspace recovery and dashboard deployment are parked and
+  nonblocking.
 
 ## Four-control gap
 
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero
 and deferred. They lack Robinhood machine-facing parameter/planning
-representation. Record this as a blocker for a separately authorized future
-implementation track; do not fix it under documentation, validation, or
-deployment work.
+representation. Record this as a blocker for a separately authorized machine
+implementation track. The deployment owner owns its final disposition and
+binding, but must preserve zero values until separate approval.
+
+## Deployment-owner start
+
+The coworker owns the ten-step preparation sequence in
+[`deployment-owner-readiness.md`](deployment-owner-readiness.md), from final
+input and authority binding through deterministic artifacts, H-06 binding,
+rehearsal, SecOps, and the restricted-release packet. Smart-contract
+reassessment and Robinhood fork/external-integration qualification may proceed
+in parallel; they do not block preparation from starting, but relevant findings
+must be consumed before affected gates close.
 
 ## Current checked identities
 
@@ -74,7 +89,8 @@ Do not infer any address, role, signer, feed, cap, rate, cadence, allocation,
 artifact, runtime, parameter, plan row, account, RPC endpoint, activation
 value, or release authority. Do not substitute Base values or placeholders.
 H-05 plan construction is not execution; H-06 class qualification is not final
-operator binding; integration is not deployment.
+operator binding; ready to begin deployment preparation is not ready to deploy
+or authorization to deploy.
 
 ## Stop conditions
 
@@ -94,8 +110,8 @@ Stop before mutation if:
 
 ## Handoff contract
 
-Final reports must name the exact base/ref identities, changed paths, generated
-ignored outputs, validation results, historical-preservation proof, current
-counts/hashes/fingerprints, machine-facing gap, Sites visibility, residual
-risks, and the independent review boundary. Actual deployment remains outside
-the pause process.
+Final reports must name the exact base/ref identities, documentation
+publication lifecycle, changed paths, generated ignored outputs, validation
+results, historical-preservation proof, current counts/hashes/fingerprints,
+machine-facing gap, Sites visibility, residual risks, and the independent
+review boundary. No Sites action belongs in this handoff.

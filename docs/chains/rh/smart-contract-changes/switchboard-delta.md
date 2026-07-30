@@ -2,14 +2,16 @@
 
 ## Current disposition
 
-The corrected shared `SwitchboardDelta` source is integrated into `rh` at
-commit `ad831669943ccfe7b9ed57454995dfce51630a66`. Its four new Robinhood
-values remain zero and no action has been queued, executed, configured, or
-activated.
+The corrected shared `SwitchboardDelta` source entered `rh` at historical
+import ancestor `ad831669943ccfe7b9ed57454995dfce51630a66` and remains
+present at frozen protocol/pause baseline `ae0cb49…`. The older hash is not
+current branch authority. Its four new Robinhood values remain zero and no
+action has been queued, executed, configured, or activated.
 
 The controls currently lack Robinhood machine-facing parameter and planning
-representation. Closing that gap requires a separately authorized future
-implementation track; this rationale does not implement it.
+representation. The deployment owner owns final disposition and binding, but
+closing the gap requires a separately authorized machine implementation track;
+this rationale does not implement it.
 
 ## Four timelocked actions
 

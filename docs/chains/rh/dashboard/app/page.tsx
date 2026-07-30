@@ -1,6 +1,7 @@
 import statusJson from "./status.generated.json";
 import {
   deriveOriginDrift,
+  derivePublicationLifecycle,
   deriveSourceSnapshotSeal,
 } from "./status-view.mjs";
 
@@ -177,6 +178,25 @@ type OwnerPriorityOverlay = {
   preserved_boundaries: string[];
 };
 
+type DeploymentOwnerStep = {
+  order: number;
+  label: string;
+  owns: string;
+  output: string;
+  boundary: string;
+};
+
+type DeploymentOwner = {
+  readiness: string;
+  authority_boundary: string;
+  sequence: DeploymentOwnerStep[];
+  parallel_inputs: Array<{
+    name: string;
+    start_effect: string;
+    gate_effect: string;
+  }>;
+};
+
 type StatusData = {
   counts: {
     workstreams: number;
@@ -221,9 +241,17 @@ type StatusData = {
     status_authority_commit: string | null;
     status_authority_base_commit: string | null;
     status_file_sha256: string;
+    source_lifecycle:
+      | "candidate"
+      | "committed_feature"
+      | "integrated_rh"
+      | "later_descendant";
+    authority_in_origin_history: boolean | null;
+    origin_commits_after_authority: number | null;
   };
   dashboard_governance: DashboardGovernance;
   owner_priority_overlay: OwnerPriorityOverlay;
+  deployment_owner: DeploymentOwner;
   overall: {
     bottom_line: string;
     architecture: { status: MaturityState; note: string };
@@ -264,6 +292,9 @@ type StatusData = {
     status_authority_state: "committed" | "uncommitted_candidate";
     status_authority_commit: string | null;
     status_authority_base_commit: string | null;
+    source_lifecycle: string;
+    authority_in_origin_history: boolean | null;
+    origin_commits_after_authority: number | null;
   };
 };
 
@@ -421,6 +452,7 @@ export default function Home() {
   ).length;
   const sourceSnapshotSeal = deriveSourceSnapshotSeal(status.snapshot);
   const originDrift = deriveOriginDrift(status.snapshot);
+  const publicationLifecycle = derivePublicationLifecycle(status.publication);
   const statusIsCandidate =
     status.publication.status_authority_state === "uncommitted_candidate";
 
@@ -439,6 +471,7 @@ export default function Home() {
         <nav aria-label="Dashboard sections">
           <a href="#glossary">Terms</a>
           <a href="#maturity">Maturity</a>
+          <a href="#ownership">Ownership</a>
           <a href="#priorities">Priorities</a>
           <a href="#path">Critical path</a>
           <a href="#deadlines">Deadlines</a>
@@ -535,6 +568,10 @@ export default function Home() {
               <dd>{shortSha(status.publication.build_source_commit)}</dd>
             </div>
             <div>
+              <dt>Lifecycle</dt>
+              <dd>{publicationLifecycle.label}</dd>
+            </div>
+            <div>
               <dt>Status authority</dt>
               <dd>
                 {statusIsCandidate
@@ -585,6 +622,53 @@ export default function Home() {
         </article>
       </section>
 
+      <section className="section path-section" id="ownership">
+        <SectionHeading
+          eyebrow="Deployment-owner handoff"
+          title={status.deployment_owner.readiness}
+          copy={status.deployment_owner.authority_boundary}
+        />
+
+        <ol className="critical-path owner-sequence">
+          {status.deployment_owner.sequence.map((step, index) => (
+            <li key={step.order}>
+              <div className="path-index">
+                <span>{String(step.order).padStart(2, "0")}</span>
+                {index < status.deployment_owner.sequence.length - 1 && (
+                  <span className="path-line" aria-hidden="true" />
+                )}
+              </div>
+              <article>
+                <div className="path-card__top">
+                  <div>
+                    <h3>{step.label}</h3>
+                    <span className="internal-reference">Deployment owner</span>
+                  </div>
+                </div>
+                <p className="path-scope">{step.owns}</p>
+                <p className="path-impact">
+                  <strong>Required output:</strong> {step.output}
+                </p>
+                <p className="path-detail">
+                  <strong>Boundary:</strong> {step.boundary}
+                </p>
+              </article>
+            </li>
+          ))}
+        </ol>
+
+        <div className="governance-grid">
+          {status.deployment_owner.parallel_inputs.map((input) => (
+            <article key={input.name}>
+              <span className="governance-index">PARALLEL INPUT</span>
+              <h3>{input.name}</h3>
+              <p>{prettyState(input.start_effect)}</p>
+              <small>{input.gate_effect}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="section governance-section" id="priorities">
         <SectionHeading
           eyebrow="Current owner priorities"
@@ -628,7 +712,7 @@ export default function Home() {
       <section className="section governance-section" id="boundaries">
         <SectionHeading
           eyebrow="Current authority boundary"
-          title="Integrated software is not deployment authority."
+          title="Preparation is authorized; deployment is not."
           copy={status.snapshot.launch_readiness}
         />
         <div className="governance-grid">
@@ -1225,6 +1309,7 @@ export default function Home() {
           {statusIsCandidate && (
             <> · base {status.publication.status_authority_base_commit}</>
           )}{" "}
+          · lifecycle {publicationLifecycle.label}{" "}
           · status {status._generated.source_sha256}
         </p>
         <a href="#top">

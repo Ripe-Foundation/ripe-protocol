@@ -2,9 +2,10 @@
 
 ## Current disposition
 
-The corrected shared `AuctionHouse` source is integrated into `rh` at commit
-`ad831669943ccfe7b9ed57454995dfce51630a66`. It has not been deployed or
-activated on Robinhood.
+The corrected shared `AuctionHouse` source entered `rh` at historical import
+ancestor `ad831669943ccfe7b9ed57454995dfce51630a66` and remains present at
+frozen protocol/pause baseline `ae0cb49…`. The older hash is not current branch
+authority. The contract has not been deployed or activated on Robinhood.
 
 ## Why the change exists
 

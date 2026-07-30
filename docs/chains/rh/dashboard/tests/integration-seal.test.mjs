@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   deriveOriginDrift,
+  derivePublicationLifecycle,
   deriveSourceSnapshotSeal,
 } from "../app/status-view.mjs";
 
@@ -66,4 +67,22 @@ test("origin drift refuses a count without verified ancestry", () => {
   assert.equal(unknown.current, false);
   assert.equal(unknown.count, null);
   assert.equal(unknown.label, "Freshness unverified");
+});
+
+test("publication lifecycle renders all four authority states truthfully", () => {
+  const fixtures = [
+    ["candidate", "Uncommitted candidate", null],
+    ["committed_feature", "Committed feature", null],
+    ["integrated_rh", "Integrated into rh", 0],
+    ["later_descendant", "Later rh descendant", 2],
+  ];
+
+  for (const [source_lifecycle, label, origin_commits_after_authority] of fixtures) {
+    const result = derivePublicationLifecycle({
+      source_lifecycle,
+      origin_commits_after_authority,
+    });
+    assert.equal(result.state, source_lifecycle);
+    assert.equal(result.label, label);
+  }
 });

@@ -1,22 +1,30 @@
 # Robinhood deployment: start here
 
-**Currentness date:** 30 July 2026  
-**Protocol authority:** `rh` at
-`ad831669943ccfe7b9ed57454995dfce51630a66`  
-**Protocol tree:** `3467f4a75aa37203d615407d5baf9c5fc9035639`  
-**Sole current machine authority:** [`status.yaml`](status.yaml)  
+**Currentness date:** 30 July 2026
+**Frozen protocol/pause authority:** `rh` at
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`
+**Protocol tree:** `a6a34a385b48819bbf66249d518d76da3806b033`
+**Sole current machine authority:** [`status.yaml`](status.yaml)
 **Private presentation mirror:** [Robinhood program status](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
-Agents should pair this page with [`AGENT-HANDOFF.md`](AGENT-HANDOFF.md).
+Agents should pair this page with
+[`deployment-owner-readiness.md`](deployment-owner-readiness.md) and
+[`AGENT-HANDOFF.md`](AGENT-HANDOFF.md).
 The dashboard is generated from `status.yaml`; it is not a second status
 source. Repository documents remain the complete durable fallback.
 
 ## Bottom line
 
-**Corrected PR #61 is integrated into `rh`, but nothing is deployed or
-active.** Upstream PR #61 remains independently open and unmerged as of the
-fresh live check. No Robinhood migration history, migration execution,
-production configuration, activation, or release exists.
+**Ready to begin deployment preparation.** PR #61 is merged and closed on
+`master`; its production contract changes are integrated into `rh`. Nothing is
+deployed, configured, or active. No Robinhood migration has been executed, and
+no production configuration, activation, RPC, account, key, or signer action
+exists.
+
+The frozen protocol/pause baseline is `ae0cb49…`. The documentation-only
+handoff commit is a descendant whose authority is derived by the dashboard
+generator. Its publication does not integrate it into `rh`, and a later
+integrated `rh` tip or descendant requires independent reconciliation.
 
 The current ledger contains:
 
@@ -27,14 +35,15 @@ The current ledger contains:
   (`D-H04-19`), zero open;
 - 14 binding schedules;
 - nine hard gates;
-- nine dashboard handoff documents;
-- two parked lanes; and
+- ten dashboard handoff documents;
+- four parked lanes; and
 - zero live actions.
 
 ## What is integrated
 
 - Corrected PR #61: shared Deleverage, AuctionHouse, SwitchboardDelta,
-  artifacts, inventory, migrations, ABIs, and tests.
+  artifacts, inventory, ABIs, and tests. The import ancestor is
+  `ad831669…`; the current frozen baseline is `ae0cb49…`.
 - H-04 schema v2: typed parameter manifest, fail-closed generator, tests, and
   evidence.
 - H-05: deterministic, import-free predeployment planning and sealed blocked
@@ -48,8 +57,8 @@ The current ledger contains:
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero
 and deferred. The integrated contracts expose them, but Robinhood's
 machine-facing parameter and planning sources do not represent them. That gap
-must be handled by a separately authorized future implementation track. This
-documentation refresh does not fix it.
+belongs to the deployment owner, but machine implementation still requires
+separate authority. This documentation refresh does not fix it.
 
 Required identities, `TrainingWheels`, and `liteSigners` also remain unresolved.
 `DefaultsRobinhood.vy` is therefore absent and the generator remains
@@ -61,23 +70,24 @@ fail-closed. Do not substitute Base values, zero addresses, or placeholders.
   not reopened by PR #61.
 - CCIP is deferred indefinitely, disabled, and nonblocking.
 - Zero-backing settlement and bad-debt policy are deferred and nonblocking.
+- Sites account/workspace recovery is parked and nonblocking.
+- Dashboard deployment and access changes are parked and nonblocking.
 - Parking does not declare a technical residual safe, resolved, or approved.
 
-## Current critical path
+## Deployment-owner sequence
 
-1. Bind unresolved identities and separately authorize machine-facing
-   representation for the four Deleverage controls.
-2. Render and verify `DefaultsRobinhood.vy` only after every required binding
-   exists.
-3. Rebuild deterministic H-05 reports for release-candidate readiness; retain
-   typed blocked/non-executable rows and do not execute migrations.
-4. Bind H-06 to the final operator machine, selected volume, and frozen release
-   candidate.
-5. Complete H-07 artifact readiness, M5 disabled configuration, H-08/H-09
-   proof, SecOps, rehearsal, and release preparation.
+The complete ten-step ownership map is in
+[`deployment-owner-readiness.md`](deployment-owner-readiness.md). In short:
+bind final protocol inputs and authorities; dispose and represent the four
+zero-valued controls; generate Defaults only from complete approved inputs;
+finalize deterministic planning; bind H-06; freeze artifacts and offline
+verification; rehearse under later testnet authority; complete SecOps; and
+assemble the restricted-release packet and signer ceremony.
 
-Actual deployment remains outside the pause process. Testnet, production,
-configuration, activation, and release each require separate authority.
+Smart-contract reassessment and Robinhood fork/external-integration
+qualification do not block preparation from starting. Relevant findings must
+be consumed before affected gates close. Testnet, production, configuration,
+activation, and release each require separate authority.
 
 ## Current checked inventory
 
@@ -92,6 +102,8 @@ headroom.
 
 ## Read next
 
+- [`deployment-owner-readiness.md`](deployment-owner-readiness.md) for the
+  ordered ownership map and exact boundary.
 - [`current-owner-priorities.md`](current-owner-priorities.md) for active and
   parked work.
 - [`decision-register.md`](decision-register.md) for the 19 canonical RH-D

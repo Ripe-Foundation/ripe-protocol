@@ -2,13 +2,15 @@
 
 ## Current disposition
 
-The corrected shared `Deleverage` source is integrated into `rh` at commit
-`ad831669943ccfe7b9ed57454995dfce51630a66`. It has not been deployed or
-configured on Robinhood. The constructor controls `fullPayoffBuffer`,
+The corrected shared `Deleverage` source entered `rh` at historical import
+ancestor `ad831669943ccfe7b9ed57454995dfce51630a66` and remains present at
+frozen protocol/pause baseline `ae0cb49…`. The older hash is not current branch
+authority. It has not been deployed or configured on Robinhood. The constructor controls `fullPayoffBuffer`,
 `overageBps`, `dustThreshold`, and `dustBps`; all four Robinhood values remain
 zero and deferred. They currently have no Robinhood machine-facing parameter
-or planning representation. A separately authorized future implementation
-track must close that gap. This documentation page does not.
+or planning representation. The deployment owner owns final disposition and
+binding; a separately authorized machine implementation track must close the
+gap. This documentation page does not.
 
 The historical S4 `deleverageCooldown == 0` decision remains closed and was not
 reopened. `DefaultsRobinhood.vy` remains absent and fail-closed.

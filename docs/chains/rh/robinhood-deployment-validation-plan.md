@@ -1,13 +1,17 @@
 # Robinhood deployment validation plan
 
-> **30 July 2026 currentness overlay:** Validation must bind to corrected PR #61
-> integration commit `ad831669943ccfe7b9ed57454995dfce51630a66`. H-04 schema
-> v2 and H-05 deterministic blocked planning are integrated, but unresolved
-> bindings and the missing machine-facing representation of
+> **30 July 2026 currentness overlay:** Ready to begin deployment preparation.
+> Validation must bind to frozen protocol/pause baseline
+> `ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`. Historical PR #61 import
+> ancestor `ad831669…` is not present branch authority; PR #61 is merged and
+> closed. H-04 schema v2 and H-05 deterministic blocked planning are
+> integrated, but unresolved bindings and the missing machine representation of
 > `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` keep Defaults
 > and executable planning unready. H-06 is a class qualification only. No
-> migration history, live execution, deployment, configuration, activation, or
-> release has occurred.
+> Robinhood migration, live execution, deployment, configuration, activation,
+> RPC, account, key, signer, or release action has occurred. Smart-contract
+> reassessment and fork/external-integration qualification do not block
+> preparation from starting; affected gates must consume their findings.
 
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`

@@ -1,12 +1,12 @@
 # Robinhood deployment decision register
 
 **Snapshot date:** 30 July 2026
-**Program subject:** commit
-`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
-`3467f4a75aa37203d615407d5baf9c5fc9035639`
+**Frozen protocol/pause subject:** commit
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
+`a6a34a385b48819bbf66249d518d76da3806b033`
 **Current status authority:** [`status.yaml`](status.yaml)
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
-**Private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
+**Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
 This register is the canonical `RH-D` identifier and title namespace for
 controlling owner decisions and accepted risks. The `decisions` list in
@@ -15,14 +15,17 @@ exactly. This register does not replace the linked decision records, authorize
 a new phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
-Corrected PR #61 is integrated into `rh`; upstream PR #61 remains separately
-open and unmerged as of the fresh live check. No Robinhood deployment,
-migration execution or history, production configuration, activation, or
-release has occurred. The four corrected-PR controls remain zero and deferred
-and lack Robinhood machine-facing parameter/planning representation. That gap
-belongs to a separately authorized future implementation track. The S4
-zero-cooldown decision remains closed; CCIP and zero-backing policy work remain
-deferred and nonblocking.
+PR #61 is merged and closed at final head `7293cf87…` and `master` squash
+merge `91eda49…`; its production contract changes are integrated into `rh`.
+The historical import ancestor `ad831669…` is not the present branch authority.
+No Robinhood deployment, migration execution or history, production
+configuration, activation, RPC, account, key, signer, or release action has
+occurred. The four corrected-PR controls remain zero and deferred and lack
+Robinhood machine-facing parameter/planning representation. The deployment
+owner owns their final disposition and binding under a separately authorized
+machine implementation track. The S4 zero-cooldown decision remains closed.
+CCIP, zero-backing policy work, Sites recovery, and dashboard deployment remain
+parked and nonblocking.
 
 ## Program-level decisions
 
@@ -158,7 +161,9 @@ Source:
 corrected PR #61 source integrated without reopening S4.
 
 Use the corrected shared Deleverage, AuctionHouse, and SwitchboardDelta source
-integrated at `ad831669943ccfe7b9ed57454995dfce51630a66`; keep Robinhood
+introduced by historical import ancestor
+`ad831669943ccfe7b9ed57454995dfce51630a66` and retained at the frozen
+`ae0cb49…` baseline; keep Robinhood
 `deleverageCooldown` zero and omit Underscore. The four new payoff/dust controls
 also remain zero and deferred. Reopen S4 only before a nonzero cooldown, queued
 cooldown action, or Underscore inclusion. The separately tracked machine-facing
@@ -315,6 +320,11 @@ not a status, decision, implementation, integration, or deployment authority.
 The repository documents are the complete durable handoff and must remain
 sufficient if the site is unavailable.
 
+**Current overlay:** Sites account/workspace recovery, dashboard version
+creation, deployment, publication, and access changes are parked and
+nonblocking. The historical ratification above is preserved; it does not
+authorize a new Sites action.
+
 Access remains explicit-allowlist only. Move the site to a team-owned
 destination at the next natural republish after the team has adopted it, or
 immediately if anyone besides Mick needs publishing rights. Changing the
@@ -339,6 +349,7 @@ The following are explicitly not decided or authorized:
 - a live Stock Token probe sender, recipient, provenance path, signer, amount,
   gas ceiling, and transaction sequence;
 - final Robinhood addresses, roles, parameters, and manifests;
+- Sites account/workspace recovery, dashboard deployment, or access changes;
 - any testnet funding, signing, broadcast, deployment, or governance action;
 - any production deployment, configuration, activation, or role transfer; and
 - any claim that current dependency pins caused authoritative GitHub alert

@@ -4,6 +4,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import YAML from "yaml";
+import { derivePublicationLifecycle } from "../app/status-view.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = resolve(here, "..");
@@ -80,8 +81,21 @@ test("renders metadata and the exact current posture from status.yaml", async ()
   assert.ok(text.includes(status.snapshot.hero_emphasis));
   assert.ok(text.includes(status.snapshot.launch_readiness));
   assert.ok(text.includes(status.snapshot.program_subject_commit.slice(0, 8)));
+  assert.ok(
+    text.includes(derivePublicationLifecycle(generated.publication).label),
+  );
   assert.ok(text.includes(generated.snapshot.build_worktree_clean ? "Verified" : "Unverified"));
   assert.ok(text.includes("Status SHA-256"));
+  assert.ok(
+    text.includes(
+      "Corrected PR #61 integration does not authorize deployment, migration execution, configuration, activation, or release.",
+    ),
+  );
+  assert.ok(
+    text.includes(
+      "PR #61 is merged and closed on master; its production contract changes are integrated into rh.",
+    ),
+  );
   assertRenderedStatusAuthority(text, generated.publication);
 });
 
@@ -114,6 +128,23 @@ test("renders the data-derived critical path, hard gates, and parked lanes", asy
   }
   assert.ok(text.includes(`${status.owner_priority_overlay.parked_lanes.length} lanes are parked and nonblocking.`));
   for (const lane of status.owner_priority_overlay.parked_lanes) assert.ok(text.includes(lane.id));
+});
+
+test("renders the complete deployment-owner sequence and parallel inputs", async () => {
+  const [response, { status }] = await Promise.all([render(), statusAndGenerated()]);
+  const text = normalizeText(await response.text());
+  assert.ok(text.includes(status.deployment_owner.readiness));
+  assert.ok(text.includes(normalizeText(status.deployment_owner.authority_boundary)));
+  assert.equal(status.deployment_owner.sequence.length, 10);
+  for (const step of status.deployment_owner.sequence) {
+    for (const value of [step.label, step.owns, step.output, step.boundary]) {
+      assert.ok(text.includes(normalizeText(value)));
+    }
+  }
+  for (const input of status.deployment_owner.parallel_inputs) {
+    assert.ok(text.includes(input.name));
+    assert.ok(text.includes(input.gate_effect));
+  }
 });
 
 test("renders H-04 lifecycle and the four-control machine gap", async () => {

@@ -517,6 +517,48 @@ export async function deriveStatusAuthority(repository, statusSourcePath) {
   );
 }
 
+export function classifyPublicationLifecycle({
+  statusAuthorityState,
+  authorityInOriginHistory,
+  originCommitsAfterAuthority,
+}) {
+  if (statusAuthorityState === "uncommitted_candidate") {
+    if (
+      authorityInOriginHistory !== null ||
+      originCommitsAfterAuthority !== null
+    ) {
+      throw new Error(
+        "An uncommitted candidate cannot claim integrated authority ancestry",
+      );
+    }
+    return "candidate";
+  }
+
+  if (statusAuthorityState !== "committed") {
+    throw new Error("Unsupported status authority lifecycle state");
+  }
+
+  if (authorityInOriginHistory !== true) {
+    if (originCommitsAfterAuthority !== null) {
+      throw new Error(
+        "A feature outside origin/rh cannot claim later integrated commits",
+      );
+    }
+    return "committed_feature";
+  }
+
+  if (
+    !Number.isInteger(originCommitsAfterAuthority) ||
+    originCommitsAfterAuthority < 0
+  ) {
+    throw new Error("Integrated status authority requires an exact drift count");
+  }
+
+  return originCommitsAfterAuthority === 0
+    ? "integrated_rh"
+    : "later_descendant";
+}
+
 export async function generateDashboard() {
 
 const [source, decisionRegister] = await Promise.all([
@@ -551,6 +593,40 @@ for (const [kind, entries] of audienceCollections) {
           `${kind} ${entry.id ?? entry.order} requires a substantive ${field}`,
         );
       }
+    }
+  }
+}
+
+if (
+  parsed?.deployment_owner?.readiness !==
+    "Ready to begin deployment preparation." ||
+  !Array.isArray(parsed?.deployment_owner?.sequence) ||
+  parsed.deployment_owner.sequence.length !== 10 ||
+  !Array.isArray(parsed?.deployment_owner?.parallel_inputs) ||
+  parsed.deployment_owner.parallel_inputs.length !== 2
+) {
+  throw new Error(
+    "status.yaml requires the complete deployment-owner readiness handoff",
+  );
+}
+
+for (const [index, step] of parsed.deployment_owner.sequence.entries()) {
+  if (step.order !== index + 1) {
+    throw new Error("Deployment-owner sequence must be ordered from 1 through 10");
+  }
+  for (const field of ["label", "owns", "output", "boundary"]) {
+    if (typeof step[field] !== "string" || step[field].trim().length < 30) {
+      throw new Error(
+        `deployment-owner step ${step.order} requires a substantive ${field}`,
+      );
+    }
+  }
+}
+
+for (const input of parsed.deployment_owner.parallel_inputs) {
+  for (const field of ["name", "start_effect", "gate_effect"]) {
+    if (typeof input[field] !== "string" || input[field].trim().length < 12) {
+      throw new Error(`parallel input requires a substantive ${field}`);
     }
   }
 }
@@ -601,7 +677,10 @@ if (
   parsed.publication.status_authority_state !== "build_derived" ||
   parsed.publication.status_authority_commit !== "build_derived" ||
   parsed.publication.status_authority_base_commit !== "build_derived" ||
-  parsed.publication.status_file_sha256 !== "build_derived"
+  parsed.publication.status_file_sha256 !== "build_derived" ||
+  parsed.publication.source_lifecycle !== "build_derived" ||
+  parsed.publication.authority_in_origin_history !== "build_derived" ||
+  parsed.publication.origin_commits_after_authority !== "build_derived"
 ) {
   throw new Error(
     "snapshot trust and status authority fields must be declared build_derived, never hand-authored",
@@ -646,6 +725,42 @@ if (subjectInOriginHistory) {
   }
 }
 
+let authorityInOriginHistory = null;
+let originCommitsAfterAuthority = null;
+if (statusAuthorityState === "committed") {
+  const authorityAncestryResult = await runGit(
+    repositoryRoot,
+    [
+      "merge-base",
+      "--is-ancestor",
+      statusAuthorityCommit,
+      originCommit,
+    ],
+    "Could not verify whether the status authority is in origin/rh history",
+    { allowedExitCodes: [0, 1] },
+  );
+  authorityInOriginHistory = authorityAncestryResult.code === 0;
+
+  if (authorityInOriginHistory) {
+    const authorityDriftOutput = await gitOutput(
+      repositoryRoot,
+      [
+        "rev-list",
+        "--count",
+        `${statusAuthorityCommit}..${originCommit}`,
+      ],
+      "Could not derive origin/rh commits after the status authority",
+    );
+    originCommitsAfterAuthority = Number.parseInt(authorityDriftOutput, 10);
+  }
+}
+
+const sourceLifecycle = classifyPublicationLifecycle({
+  statusAuthorityState,
+  authorityInOriginHistory,
+  originCommitsAfterAuthority,
+});
+
 const generated = {
   ...parsed,
   snapshot: {
@@ -661,6 +776,9 @@ const generated = {
     status_authority_commit: statusAuthorityCommit,
     status_authority_base_commit: statusAuthorityBaseCommit,
     status_file_sha256: sourceHash,
+    source_lifecycle: sourceLifecycle,
+    authority_in_origin_history: authorityInOriginHistory,
+    origin_commits_after_authority: originCommitsAfterAuthority,
   },
   _generated: {
     source: "../status.yaml",
@@ -669,6 +787,9 @@ const generated = {
     status_authority_state: statusAuthorityState,
     status_authority_commit: statusAuthorityCommit,
     status_authority_base_commit: statusAuthorityBaseCommit,
+    source_lifecycle: sourceLifecycle,
+    authority_in_origin_history: authorityInOriginHistory,
+    origin_commits_after_authority: originCommitsAfterAuthority,
     origin_rh_commit: originCommit,
     subject_in_origin_history: subjectInOriginHistory,
     origin_commits_after_subject: originCommitsAfterSubject,

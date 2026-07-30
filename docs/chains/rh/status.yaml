@@ -1,26 +1,27 @@
-schema_version: 10
+schema_version: 11
 
 snapshot:
-  title: Robinhood foundation program status
+  title: Robinhood deployment-owner readiness
   as_of: 2026-07-30
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
-  program_subject_commit: ad831669943ccfe7b9ed57454995dfce51630a66
-  program_subject_tree: 3467f4a75aa37203d615407d5baf9c5fc9035639
+  program_subject_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
+  program_subject_tree: a6a34a385b48819bbf66249d518d76da3806b033
   subject_in_origin_history: build_derived
   origin_commits_after_subject: build_derived
   build_worktree_clean: build_derived
   reconciliation: >
-    This status is bound to the exact corrected PR #61 integration commit and
-    tree above. Historical evidence remains checkpoint evidence; this file is
-    the sole current machine-readable lifecycle authority.
-  posture: "Corrected PR #61 is integrated into rh, but nothing is deployed or active."
-  hero_lead: "Corrected PR #61 integrated."
-  hero_emphasis: Nothing is deployed or active.
-  launch_readiness: Stock is unreachable; testnet, production, activation, and release remain unauthorized.
+    This status is bound to the frozen protocol/pause baseline above.
+    Documentation authority and publication lifecycle are derived at build
+    time, never hardcoded. Historical evidence remains checkpoint evidence;
+    this file is the sole current machine-readable lifecycle authority.
+  posture: "Ready to begin deployment preparation. Nothing is deployed, configured, or active."
+  hero_lead: "Ready to begin deployment preparation."
+  hero_emphasis: Nothing is deployed, configured, or active.
+  launch_readiness: "Ready to begin deployment preparation."
   live_actions_completed: 0
-  status_owner: Robinhood integration owner
+  status_owner: Robinhood deployment owner
   freshness_rule: >
     Reconcile this file in the same commit whenever an integrated change closes,
     reopens, or materially changes a row, decision, blocker, residual, deadline,
@@ -36,15 +37,46 @@ counts:
   h04_open: 0
   binding_schedules: 14
   hard_gates: 9
-  handoff_documents: 9
-  parked_lanes: 2
+  handoff_documents: 10
+  parked_lanes: 4
   live_actions: 0
 
 post_freeze_reconciliation:
-  corrected_pr61_integration: ad831669943ccfe7b9ed57454995dfce51630a66
-  corrected_pr61_tree: 3467f4a75aa37203d615407d5baf9c5fc9035639
-  upstream_pr61_state: open_unmerged_at_last_live_check
-  upstream_pr61_head: 2c36e4aa06395d5075c348aab71d468fa099775f
+  frozen_protocol_pause_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
+  frozen_protocol_pause_tree: a6a34a385b48819bbf66249d518d76da3806b033
+  signed_pause_tag: rh-pause-2026-07-30
+  corrected_pr61_integration_ancestor: ad831669943ccfe7b9ed57454995dfce51630a66
+  corrected_pr61_integration_tree: 3467f4a75aa37203d615407d5baf9c5fc9035639
+  upstream_pr61_state: merged_closed
+  upstream_pr61_head: 7293cf87c3c5afb06c3aeac90ffb0cd0cd27e253
+  upstream_pr61_master_merge: 91eda49ccd34a25090582aff0695075c4c806011
+  production_blob_parity:
+    master_commit: 91eda49ccd34a25090582aff0695075c4c806011
+    rh_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
+    contracts:
+      contracts/core/Deleverage.vy: b43d373039b352d6eab240be714134764901b947
+      contracts/core/AuctionHouse.vy: 48cbbbca22c87e490ef0f88aae4f643ab5b87987
+      contracts/config/SwitchboardDelta.vy: 4e234df7626eb332836aceb5cbca2daaef2a0390
+  upstream_base_provenance_paths:
+    - migration_history/base-mainnet/v1/2026072800-manifest.json
+    - migration_history/base-mainnet/v1/2026072801-manifest.json
+    - migration_history/base-mainnet/v1/current-manifest.json
+    - migrations/base-mainnet/2026072800_DeleverageAuctionHouse.py
+    - migrations/base-mainnet/2026072801_RedeploySBDeltaForDeleverage.py
+  current_master_rh_pr_touched_path_differences:
+    - migration_history/base-mainnet/v1/2026072800-manifest.json
+    - migration_history/base-mainnet/v1/2026072801-manifest.json
+    - migration_history/base-mainnet/v1/current-manifest.json
+    - migrations/base-mainnet/2026072800_DeleverageAuctionHouse.py
+    - tests/conf_core.py
+  upstream_provenance_rule: >
+    The upstream change touched five Base-only migration and history paths.
+    At the current master and frozen rh comparison, four of those paths differ;
+    2026072801_RedeploySBDeltaForDeleverage.py is byte-identical, while
+    tests/conf_core.py differs because of independent rh branch evolution.
+    None is a production-contract parity failure or Robinhood migration
+    authority. Do not merge master or import Base history merely for parity;
+    Robinhood planning and history remain isolated.
   deployment_state: none
   migration_execution_state: none
   production_configuration_state: none
@@ -54,7 +86,7 @@ post_freeze_reconciliation:
     controls: [fullPayoffBuffer, overageBps, dustThreshold, dustBps]
     current_values: [0, 0, 0, 0]
     representation: absent_from_robinhood_machine_facing_parameter_and_planning_sources
-    disposition: separately_authorized_future_implementation_track
+    disposition: deployment_owner_binding_and_separately_authorized_machine_implementation
     fixed_by_this_refresh: false
   defaults_robinhood: absent_fail_closed
   s4_zero_cooldown_decision: closed_not_reopened
@@ -62,7 +94,7 @@ post_freeze_reconciliation:
 publication:
   dashboard_url: https://ripe-robinhood-status.mickhagen.chatgpt.site
   access_boundary: private_explicit_allowlist
-  refresh_state: production_publication_managed_by_sites
+  refresh_state: dashboard_publication_parked
   live_currentness: not_self_attested_by_source
   last_observed_access: owner_only
   last_observed_live_version: 5
@@ -72,6 +104,9 @@ publication:
   status_authority_commit: build_derived
   status_authority_base_commit: build_derived
   status_file_sha256: build_derived
+  source_lifecycle: build_derived
+  authority_in_origin_history: build_derived
+  origin_commits_after_authority: build_derived
   derivation: >
     Local builds derive the status lifecycle from Git and exact file bytes. A
     clean committed source records the commit that introduced its current bytes;
@@ -150,9 +185,10 @@ owner_priority_overlay:
     assignments. It does not rewrite historical evidence, close a technical
     blocker, change integrated source, or authorize deployment or release.
   active_focus: >
-    Close unresolved machine-facing parameter binding, defaults rendering,
-    deterministic plan readiness, intended-operator binding, rehearsal, and
-    release preparation from the exact integrated rh baseline.
+    The deployment owner may begin preparation now: bind final inputs, preserve
+    fail-closed machine gaps, build deterministic artifacts, qualify the
+    intended operator, rehearse, and prepare the release packet without
+    executing a migration or touching live state.
   parked_lanes:
     - id: PARK-CCIP
       subject: all CCIP workflows
@@ -174,20 +210,101 @@ owner_priority_overlay:
         bad-debt policy work. The parked residual is not an active blocker for
         current planning, parameter, tooling, or non-policy proof work.
       reopen_condition: Explicit owner instruction.
+    - id: PARK-SITES-RECOVERY
+      subject: Sites account and workspace recovery
+      state: parked_nonblocking
+      blocker_effect: nonblocking
+      instruction: >
+        Preserve the retained project identity and prior account-mismatch
+        evidence. Do not recover access, create a replacement project, or
+        change access while deployment preparation proceeds locally.
+      reopen_condition: Explicit owner instruction from the owning account or workspace.
+    - id: PARK-DASHBOARD-DEPLOYMENT
+      subject: dashboard deployment and access changes
+      state: parked_nonblocking
+      blocker_effect: nonblocking
+      instruction: >
+        Validate the dashboard locally only. Do not save a Sites version,
+        deploy, publish, or change access as part of deployment preparation.
+      reopen_condition: Separate dashboard publication authority after an exact committed source exists.
   preserved_boundaries:
     - Parking does not declare any residual safe, resolved, approved, or closed.
     - Parking does not authorize Stock reachability, configuration, activation, deployment, or release.
     - Historical evidence and blocker identifiers remain intact for later re-entry.
-    - Corrected PR #61 integration does not authorize deployment, migration execution, configuration, activation, or release.
+    - "Corrected PR #61 integration does not authorize deployment, migration execution, configuration, activation, or release."
+
+deployment_owner:
+  readiness: "Ready to begin deployment preparation."
+  authority_boundary: >
+    The coworker owns preparation, qualification, rehearsal, and packet
+    assembly. Testnet actions and eventual production deployment remain
+    separately authorized external-state phases.
+  sequence:
+    - order: 1
+      label: Bind final chain and protocol inputs
+      owns: Final Robinhood chain, token, asset, pool, contract-address, and approved parameter bindings.
+      output: A complete reviewed binding register with unresolved values still explicit.
+      boundary: Do not invent, substitute, configure, or activate a value.
+    - order: 2
+      label: Bind authorities and operators
+      owns: Governance, signer, role, TrainingWheels, lite-signer, emergency, and operator assignments.
+      output: A reviewed authority map and signer-ceremony input set.
+      boundary: No account, key, signer, RPC, role transfer, or live permission action.
+    - order: 3
+      label: Dispose and represent dormant Deleverage controls
+      owns: Final disposition and machine representation of fullPayoffBuffer, overageBps, dustThreshold, and dustBps.
+      output: Separately approved parameter and planning representation.
+      boundary: Preserve all four values at zero and deferred unless separately approved.
+    - order: 4
+      label: Generate final DefaultsRobinhood
+      owns: Deterministic DefaultsRobinhood generation after every approved identity and parameter exists.
+      output: Byte-deterministic generated defaults plus fail-closed and parity evidence.
+      boundary: DefaultsRobinhood.vy remains absent until the complete approved input set exists.
+    - order: 5
+      label: Finalize deterministic migration and release planning
+      owns: Executable deterministic migration and release planning.
+      output: Exact reviewed plans, assertions, stops, and isolated Robinhood history interfaces.
+      boundary: H-05 remains predeployment planning; no migration execution or history promotion.
+    - order: 6
+      label: Bind H-06 to the intended environment
+      owns: Final H-06 operator, machine, and volume binding.
+      output: Exact macOS/APFS operator and storage qualification for the frozen release candidate.
+      boundary: Candidate-class qualification is not final operational or release authority.
+    - order: 7
+      label: Freeze deterministic deployment artifacts
+      owns: Deterministic deployment artifacts and offline verification interfaces.
+      output: Exact bytecode, constructor, ABI, verifier, manifest, and offline proof package.
+      boundary: No live verification submission, RPC use, deployment, or configuration.
+    - order: 8
+      label: Rehearse on testnet and capture evidence
+      owns: Testnet rehearsal and evidence capture.
+      output: Reproducible rehearsal evidence, failure records, and post-state assertions.
+      boundary: Execute only under a later exact testnet authorization.
+    - order: 9
+      label: Complete security-operations readiness
+      owns: Monitoring, escalation, pause, emergency, incident, and accountable-operator readiness.
+      output: Approved SecOps handoff with tested kill and escalation procedures.
+      boundary: Readiness evidence does not transfer a role or activate the protocol.
+    - order: 10
+      label: Assemble and execute the restricted release
+      owns: Production packet, rollback and abort criteria, signer ceremony, and eventual deployment execution.
+      output: Independently reviewed release packet and, only later, an authorized deployment record.
+      boundary: Production execution requires separate exact authorization; this handoff grants none.
+  parallel_inputs:
+    - name: Smart-contract reassessment
+      start_effect: nonblocking_for_deployment_preparation
+      gate_effect: Consume relevant findings before any affected artifact, configuration, or release gate closes.
+    - name: Robinhood fork and external-integration qualification
+      start_effect: nonblocking_for_deployment_preparation
+      gate_effect: Consume relevant findings before affected rehearsal, external-integration, or release gates close.
 
 overall:
   bottom_line: >
-    Ripe now includes the corrected PR #61 Deleverage, AuctionHouse, and
-    SwitchboardDelta changes, H-04 schema-v2 parameters, deterministic H-05
-    blocked planning, M4 composed-route proof, and a qualified H-06 candidate
-    operator/storage class. Four Deleverage controls remain zero and lack
-    Robinhood machine-facing representation. This is predeployment
-    infrastructure and qualification, not deployment, activation, or release.
+    Ready to begin deployment preparation. The frozen protocol/pause baseline
+    includes corrected PR #61, H-04 schema-v2 parameters, deterministic H-05
+    blocked planning, M4 proof, and H-06 candidate-class qualification. Four
+    Deleverage controls remain zero and lack Robinhood machine-facing
+    representation. Nothing is deployed, configured, activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
   engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, and corrected PR #61 are integrated for their exact scopes."}
   launch_implementation: { status: partial, note: "Remaining work is parameter binding/default rendering, plan readiness, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CCIP and zero-backing policy follow-up are parked and nonblocking."}
@@ -206,7 +323,7 @@ s2_current_authority:
   historical_note: Historical 76-case checkpoints remain historical; no current 76-case or 84-case claim is valid.
 
 authorization_boundaries:
-  - Corrected PR #61 is integrated into rh; upstream PR #61 remains a separate open and unmerged lifecycle item.
+  - "PR #61 is merged and closed on master; its production contract changes are integrated into rh."
   - All CCIP workflows are parked and nonblocking until explicit owner reopening; CCIP remains disabled.
   - Zero-backing settlement and bad-debt policy work is parked and nonblocking for current work; integrated M2/M3 behavior remains unchanged.
   - Stock remains disabled and unreachable.
@@ -217,6 +334,7 @@ authorization_boundaries:
   - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation.
   - CCIP is disabled; examples are non-production and manual execution is recovery only.
   - No testnet or production action is authorized.
+  - Ready to begin deployment preparation does not mean ready to deploy or authorized to deploy.
   - No address, role, signer, feed, cap, rate, cadence, allocation, artifact, or activation value may be inferred from implementation.
   - Integration does not close H-05, H-08, H-09, SecOps, deployment, or release gates.
 
@@ -309,7 +427,7 @@ critical_path:
   - { order: 5, label: "Freeze configuration without activating Stock", internal_reference: "M5", plain_language_scope: "Register, configure, verify, and freeze the Stock route while retaining the disabled and unreachable posture.", why_it_matters: "Integrated M1-M4 proof does not select production values or authorize reachability.", detail: "Begin only after parameter, oracle, SecOps, deployment, and release prerequisites close.", state: "gated", owner_gate: "Track 8, H-04, oracle, SecOps, and release owners"}
   - { order: 6, label: "Complete verification and artifact readiness", internal_reference: "H-07", plain_language_scope: "Freeze exact verifier adapters, ABI exports, runtime artifacts, and offline proof inputs without live submission.", why_it_matters: "Rehearsal requires exact artifacts and reproducible checks rather than generated output trusted by convention.", detail: "Keep RPC, account, signer, deployment, and verification submission outside this predeployment phase.", state: "gated", owner_gate: "H-07, protocol, security, and independent reviewers"}
   - { order: 7, label: "Prove the deployed graph and adversarial installation story", internal_reference: "H-08 / H-09", plain_language_scope: "Verify topology, negative reachability, reproducibility, adversarial behavior, Base regressions, and clean installation.", why_it_matters: "Deployment is not trustworthy until independent checks prove both required connections and forbidden routes.", detail: "Implement after parameters, plan, artifacts, configuration, and fixtures are approved.", state: "not_started", owner_gate: "QA, security, deployment, and protocol owners"}
-  - { order: 8, label: "Complete SecOps handoff, rehearsal, and release gates", internal_reference: "SecOps / H-10 / H-11", plain_language_scope: "Freeze authorities, monitoring, signer policy, operational ownership, rehearsal evidence, and restricted-release approval.", why_it_matters: "Integrated software cannot operate safely without accountable authority transfer, monitoring, incident controls, and explicit approval.", detail: "Actual deployment remains outside the pause process; testnet, production, activation, and release each need separate authority.", state: "not_started", owner_gate: "SecOps, operations, governance, security, and release owner"}
+  - { order: 8, label: "Complete SecOps handoff, rehearsal, and release gates", internal_reference: "SecOps / H-10 / H-11", plain_language_scope: "Freeze authorities, monitoring, signer policy, operational ownership, rehearsal evidence, and restricted-release approval.", why_it_matters: "Integrated software cannot operate safely without accountable authority transfer, monitoring, incident controls, and explicit approval.", detail: "Deployment preparation may begin now; testnet, production, activation, and release each need separate authority.", state: "not_started", owner_gate: "SecOps, operations, governance, security, and release owner"}
 
 workstreams:
   - id: S1
@@ -770,10 +888,11 @@ hard_gates:
   - { id: G-PROD, label: "Authorize restricted production deployment and release", plain_language_scope: "Approve the exact production plan, authorities, artifacts, configuration, monitoring, activation, and release sequence.", why_it_matters: "Production affects real users and assets and has no implied authority from earlier phases.", state: "open", effect: "Blocks production deployment, migration, registration, role transfer, configuration, activation, and release."}
 
 reading_paths:
-  human_10_minute: [docs/chains/rh/START-HERE.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/status.yaml, docs/chains/rh/decision-register.md]
+  human_10_minute: [docs/chains/rh/START-HERE.md, docs/chains/rh/deployment-owner-readiness.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/status.yaml, docs/chains/rh/decision-register.md]
   human_45_minute: [docs/chains/rh-summary.md, docs/chains/rh/minimal-contract-change-reassessment.md, docs/chains/rh/robinhood-deployment-support-specification.md, docs/chains/rh/robinhood-deployment-validation-plan.md]
   agent_bootstrap:
     - docs/chains/rh/AGENT-HANDOFF.md
+    - docs/chains/rh/deployment-owner-readiness.md
     - docs/chains/rh/current-owner-priorities.md
     - docs/chains/rh/status.yaml
     - docs/chains/rh-summary.md

@@ -10,6 +10,7 @@ const rhDocs = resolve(here, "../..");
 const paths = {
   start: resolve(rhDocs, "START-HERE.md"),
   agent: resolve(rhDocs, "AGENT-HANDOFF.md"),
+  readiness: resolve(rhDocs, "deployment-owner-readiness.md"),
   priorities: resolve(rhDocs, "current-owner-priorities.md"),
   register: resolve(rhDocs, "decision-register.md"),
   summary: resolve(rhDocs, "../rh-summary.md"),
@@ -40,17 +41,29 @@ test("all local Markdown links in the durable handoff resolve", async () => {
 test("primary entrypoints bind the current subject and lifecycle facts", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
-  for (const document of [documents.start, documents.agent, documents.readme]) {
+  for (const document of [
+    documents.start,
+    documents.agent,
+    documents.readiness,
+    documents.readme,
+  ]) {
     assert.match(document, new RegExp(status.snapshot.program_subject_commit));
     assert.match(document, new RegExp(status.snapshot.program_subject_tree));
-    assert.match(document, /corrected PR #61.*integrated/is);
-    assert.match(document, /nothing (?:is|has been) deployed|no .*deployment/is);
+    assert.match(document, /PR #61.*integrated/is);
+    assert.match(document, /PR #61.*merged and closed/is);
+    assert.match(document, /Ready to begin deployment preparation\./);
+    assert.match(document, /nothing\s+(?:is|has been)\s+deployed|no .*deployment/is);
     assert.match(document, /DefaultsRobinhood\.vy.*absent.*fail-closed/is);
     assert.match(document, /H-05.*deterministic/is);
     assert.match(document, /H-06.*class|H-06.*operator\/storage/is);
   }
   for (const control of status.post_freeze_reconciliation.deleverage_parameter_gap.controls) {
-    for (const document of [documents.start, documents.agent, documents.readme]) {
+    for (const document of [
+      documents.start,
+      documents.agent,
+      documents.readiness,
+      documents.readme,
+    ]) {
       assert.match(document, new RegExp(control));
     }
   }
@@ -63,7 +76,15 @@ test("counts and current priority boundaries remain consistent", async () => {
   assert.equal((documents.priorities.match(/^### \d+\./gm) ?? []).length, status.counts.parked_lanes);
   assert.match(documents.priorities, /CCIP.*parked/is);
   assert.match(documents.priorities, /zero-backing settlement.*bad-debt policy.*parked/is);
-  assert.match(documents.priorities, /actual deployment is outside\s+the pause\s+process/i);
+  assert.match(
+    documents.priorities,
+    /does not authorize production-contract\s+edits.*testnet or production actions/is,
+  );
+  assert.match(documents.readiness, /Smart-contract reassessment/is);
+  assert.match(
+    documents.readiness,
+    /Robinhood fork and external-integration qualification/is,
+  );
   assert.match(documents.agent, new RegExp(`${status.counts.workstreams} workstreams`));
   assert.match(documents.agent, new RegExp(`${status.counts.rh_d_decisions}\\s+RH-D decisions`));
   assert.match(documents.agent, new RegExp(`All ${status.counts.h03_blockers} H-03 blockers remain open`));

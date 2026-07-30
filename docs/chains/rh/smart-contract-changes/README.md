@@ -1,11 +1,12 @@
 # Robinhood smart-contract change rationale
 
-**Current source snapshot:** `rh` commit
-`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
-`3467f4a75aa37203d615407d5baf9c5fc9035639` (30 July 2026).
-Corrected PR #61 is integrated; upstream PR #61 remains independently open and
-unmerged as of the fresh live check. No Robinhood deployment, migration
-execution, production configuration, activation, or release has occurred.
+**Current frozen source snapshot:** `rh` commit
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
+`a6a34a385b48819bbf66249d518d76da3806b033` (30 July 2026).
+PR #61 is merged and closed at final head `7293cf87…` and `master` squash merge
+`91eda49…`; its production contract changes are integrated into `rh`. No
+Robinhood deployment, migration execution, production configuration,
+activation, RPC, account, key, signer, or release action has occurred.
 
 > [!IMPORTANT]
 > **Draft explanatory synthesis.** This directory explains production source
@@ -45,8 +46,9 @@ Current rationale pages:
 - [`teller.md`](teller.md).
 
 The four Deleverage controls remain zero and deferred, but they currently lack
-Robinhood machine-facing parameter/planning representation. That gap requires a
-separately authorized future implementation track and is not fixed here.
+Robinhood machine-facing parameter/planning representation. The deployment
+owner owns their final disposition and binding; the machine change still
+requires separate authority and is not fixed here.
 `DefaultsRobinhood.vy` remains absent and fail-closed.
 
 ## Documentation standard
@@ -81,19 +83,28 @@ audit documents, not merely summaries of workstream completion.
 
 The following directions control this explanatory package:
 
-- Corrected PR #61 is integrated into `rh` at
-  `ad831669943ccfe7b9ed57454995dfce51630a66`. The Deleverage, AuctionHouse,
-  and SwitchboardDelta pages bind their current rationale to that integrated
-  source; integration does not imply deployment, configuration, activation,
-  or release.
+- Corrected PR #61 entered `rh` through historical integration ancestor
+  `ad831669943ccfe7b9ed57454995dfce51630a66` and is retained by frozen
+  baseline `ae0cb49…`. The Deleverage, AuctionHouse, and SwitchboardDelta pages
+  bind their rationale to that source; the older import hash is not current
+  branch authority, and integration does not imply deployment, configuration,
+  activation, or release.
 - CCIP workflows are owner-parked and outside the current work program.
 - Zero-backing settlement, loss allocation, and bad-debt policy are
   owner-parked for later analysis.
+- Sites account/workspace recovery and dashboard deployment are owner-parked.
 - Parked subjects are not current Wave 1 work items or blockers. Parking does
   not decide their eventual release disposition.
 - H-04 schema v2, H-05 deterministic blocked planning, H-06 candidate-class
   qualification, and M4 proof are integrated for their exact scopes. None is
   final operator, machine, volume, deployment, or release authority.
+
+The two Base migration scripts and three Base migration-history paths touched
+by the upstream work remain Base-only provenance outside Robinhood parity. At
+the current comparison, the three history paths and the first migration script
+differ; the second migration script is byte-identical. `tests/conf_core.py` is
+the fifth differing squash-touched path because of independent `rh` branch
+evolution. None justifies merging `master` into `rh` or importing Base history.
 
 ## Reviewed implementation snapshot
 

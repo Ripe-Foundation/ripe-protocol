@@ -12,8 +12,11 @@ authorize deployment, configuration, activation, or release.
 
 ## Active focus
 
-Current work may advance from corrected PR #61 integration commit
-`ad831669943ccfe7b9ed57454995dfce51630a66` on:
+Ready to begin deployment preparation from frozen protocol/pause baseline
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`. The corrected PR #61 import
+commit `ad831669943ccfe7b9ed57454995dfce51630a66` is a historical integration
+ancestor, not the present branch authority. The deployment owner may now
+advance:
 
 - unresolved H-04 parameter binding, deterministic Defaults rendering, and
   configuration readiness;
@@ -22,14 +25,18 @@ Current work may advance from corrected PR #61 integration commit
   `dustBps`, all of which remain zero and deferred;
 - H-05 release-candidate planning readiness without migration execution;
 - final H-06 operator machine/volume binding; and
-- remaining predeployment infrastructure, qualification, rehearsal, and
-  release preparation.
+- remaining predeployment infrastructure, qualification, rehearsal, SecOps,
+  release-packet, rollback/abort, and signer-ceremony preparation.
 
 H-04 schema v2 and H-05 blocked planning are already integrated; M4 proof is
 integrated. `DefaultsRobinhood.vy` remains absent and fail-closed. No
 deployment, migration execution or history, production configuration,
-activation, or release has occurred. Actual deployment is outside the pause
-process.
+activation, or release has occurred. Smart-contract reassessment and Robinhood
+fork/external-integration qualification are parallel inputs: they do not block
+preparation from starting, but affected gates must consume their findings.
+
+The ordered ownership map is
+[`deployment-owner-readiness.md`](deployment-owner-readiness.md).
 
 ## Parked lanes
 
@@ -58,6 +65,24 @@ The integrated M2/M3 source and regression behavior remain unchanged.
   deployment, or release.
 - Reopen the policy lane only after an explicit owner instruction.
 
+### 3. Sites account/workspace recovery is parked
+
+Retain the known Sites project provenance and prior account/workspace mismatch
+evidence.
+
+- Do not recover access, create a replacement project, or change access.
+- Do not treat Sites recovery as a deployment-preparation blocker.
+- Reopen only through explicit owner instruction from the owning account or
+  workspace.
+
+### 4. Dashboard deployment is parked
+
+The dashboard remains local-only in this handoff.
+
+- Do not create or save a Sites version.
+- Do not deploy, publish, or change dashboard access.
+- Local rendering and validation do not authorize a dashboard deployment.
+
 ## Blocker interpretation
 
 Historical blocker identifiers and technical evidence remain intact so future
@@ -71,13 +96,14 @@ That state means:
 - an explicit owner instruction is required before work resumes.
 
 Ordinary baseline reconciliation still applies after a future change is
-integrated into `rh`. Upstream PR #61 remains a separate open and unmerged
-lifecycle item; its state does not undo the corrected source already integrated
-into `rh`.
+integrated into `rh`. PR #61 is merged and closed at head `7293cf87…` and
+`master` squash merge `91eda49…`; its production contract changes are already
+integrated into `rh`.
 
 ## Non-authorization
 
-This directive authorizes only the documentation of current priorities. It does
-not authorize smart-contract edits, testnet or production actions, RPC or
+This directive authorizes deployment preparation within its separately
+controlled implementation lanes. It does not authorize production-contract
+edits, testnet or production actions, RPC or
 account access, signer selection, signing, broadcasting, migration execution,
 deployment, configuration, registration, activation, or release.

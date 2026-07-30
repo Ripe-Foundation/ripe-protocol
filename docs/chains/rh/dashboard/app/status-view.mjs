@@ -69,3 +69,52 @@ export function deriveOriginDrift(snapshot) {
       "This operating picture predates integrated changes. Reconcile status.yaml before trusting its workstream rows.",
   };
 }
+
+export function derivePublicationLifecycle(publication) {
+  const state = publication?.source_lifecycle;
+
+  if (state === "candidate") {
+    return {
+      state,
+      label: "Uncommitted candidate",
+      detail:
+        "The status bytes are a local candidate based on the recorded base commit.",
+    };
+  }
+
+  if (state === "committed_feature") {
+    return {
+      state,
+      label: "Committed feature",
+      detail:
+        "The status bytes have a commit authority, but that commit is not integrated into cached origin/rh.",
+    };
+  }
+
+  if (state === "integrated_rh") {
+    return {
+      state,
+      label: "Integrated into rh",
+      detail:
+        "The status authority is the exact cached origin/rh integration tip.",
+    };
+  }
+
+  if (state === "later_descendant") {
+    const count = publication?.origin_commits_after_authority;
+    return {
+      state,
+      label: "Later rh descendant",
+      detail: `${count} integrated ${
+        count === 1 ? "commit exists" : "commits exist"
+      } after the status authority; reconcile current claims before use.`,
+    };
+  }
+
+  return {
+    state: "unknown",
+    label: "Lifecycle unverified",
+    detail:
+      "The generated status does not provide a recognized publication lifecycle.",
+  };
+}

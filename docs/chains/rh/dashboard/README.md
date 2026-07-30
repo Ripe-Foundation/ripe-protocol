@@ -6,20 +6,21 @@ machine-readable authority. The dashboard must never become an independently
 maintained status source. Repository documents are the durable handoff and
 fallback.
 
-Current program subject:
-`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
-`3467f4a75aa37203d615407d5baf9c5fc9035639`.
+Frozen protocol/pause subject:
+`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
+`a6a34a385b48819bbf66249d518d76da3806b033`.
 
-Corrected PR #61 is integrated; upstream PR #61 remains independently open and
-unmerged as of the fresh live check. H-04 schema v2, H-05 deterministic blocked
-planning, M4 proof, and H-06 candidate-class qualification are integrated for
-their exact scopes. No Robinhood migration history, deployment, migration
-execution, production configuration, activation, or release exists.
+Ready to begin deployment preparation. PR #61 is merged and closed, and its
+production contract changes are integrated into `rh`. H-04 schema v2, H-05
+deterministic blocked planning, M4 proof, and H-06 candidate-class
+qualification are integrated for their exact scopes. No Robinhood migration,
+deployment, production configuration, activation, RPC, account, key, signer,
+or release action has occurred.
 
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero,
 deferred, and absent from machine-facing Robinhood parameter/planning sources.
-That gap is not fixed here. `DefaultsRobinhood.vy` remains absent and
-fail-closed. Actual deployment is outside the pause process.
+The deployment owner owns final disposition and binding; the gap is not fixed
+here. `DefaultsRobinhood.vy` remains absent and fail-closed.
 
 ## Authority and generated files
 
@@ -33,7 +34,10 @@ identities, and generates:
 
 Those generated files are validation output only. They are ignored and
 untracked; do not edit, stage, or commit them. `status.yaml` and the referenced
-Markdown documents are the source.
+Markdown documents are the source. The generator classifies an uncommitted
+candidate, committed feature, exact integrated `rh` authority, and later
+integrated descendant from Git; none of those identities is manually
+hardcoded.
 
 The page and authorized integrity tests must derive current subjects, counts,
 H-04 lifecycle, hard gates, parked lanes, handoff counts, and fingerprints from
@@ -58,10 +62,12 @@ attest protocol readiness.
 [`./.openai/hosting.json`](.openai/hosting.json) retains project ID
 `appgprj_6a66dcdcb9288191bc8eeef24335bb1c`. The dashboard is an optional
 private explicit-allowlist mirror. Publication requires an exact validated
-source commit and separate authority. This refresh does not create a project,
-save a version, deploy, or change access. Do not claim authenticated owner
-access unless it is verified under existing credentials.
+source commit and separate authority. Sites account/workspace recovery and
+dashboard deployment are parked. This refresh does not create or recover a
+project, save a version, deploy, publish, or change access. Do not claim
+authenticated owner access unless it is verified under existing credentials.
 
 The current owner priorities are in
-[`../current-owner-priorities.md`](../current-owner-priorities.md): CCIP and
-zero-backing settlement/bad-debt policy are the two parked, nonblocking lanes.
+[`../current-owner-priorities.md`](../current-owner-priorities.md): CCIP,
+zero-backing settlement/bad-debt policy, Sites recovery, and dashboard
+deployment are the four parked, nonblocking lanes.

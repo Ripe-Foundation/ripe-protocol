@@ -1,37 +1,50 @@
 # Robinhood Chain Technical Deployment Summary
 
-## 30 July 2026 post-freeze currentness
+## 30 July 2026 deployment-owner readiness
 
-Corrected PR #61 is integrated into `rh` at commit
-`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
-`3467f4a75aa37203d615407d5baf9c5fc9035639`. Upstream PR #61 remains
-independently open and unmerged as of the fresh live check. No Robinhood
-deployment, migration execution, production configuration, activation, or
-release has occurred.
+**Ready to begin deployment preparation.** The frozen protocol/pause baseline
+is `rh` commit `ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
+`a6a34a385b48819bbf66249d518d76da3806b033`, signed tag
+`rh-pause-2026-07-30`. PR #61 is merged and closed at final head
+`7293cf87c3c5afb06c3aeac90ffb0cd0cd27e253` and `master` squash merge
+`91eda49ccd34a25090582aff0695075c4c806011`. Its production contract changes
+are integrated into `rh`; `ad831669…` is the historical import ancestor, not
+the present branch authority.
+
+This handoff is a documentation-only descendant of the frozen baseline. Its
+exact documentation authority commit is derived after commit; feature
+publication does not integrate it into `rh`. No Robinhood deployment,
+migration execution, production configuration, activation, RPC, account, key,
+signer, or release action has occurred.
 
 H-04 schema v2 and H-05 deterministic blocked planning are integrated. All 20
 genuine H-04 decisions are approved and operative; `D-H04-19` is retired and
 non-operative; none are open. Four corrected-PR controls—`fullPayoffBuffer`,
 `overageBps`, `dustThreshold`, and `dustBps`—remain zero, deferred, and absent
-from Robinhood machine-facing parameter/planning representation. A separately
-authorized future implementation track must close that gap. This documentation
-refresh does not. `DefaultsRobinhood.vy` therefore remains absent and the
-generator remains fail-closed.
+from Robinhood machine-facing parameter/planning representation. The deployment
+owner owns final disposition and binding, but a separately authorized machine
+implementation track must close that gap. This documentation refresh does not.
+`DefaultsRobinhood.vy` therefore remains absent and the generator remains
+fail-closed.
 
 The historical S4 zero-`deleverageCooldown` decision remains closed and was
 not reopened. CCIP and zero-backing settlement/bad-debt policy remain deferred
 and nonblocking. H-06 qualifies only a candidate operator/storage class, not a
 final operator, machine, volume, deployment, or release. Remaining work is
 predeployment infrastructure, qualification, rehearsal, and release
-preparation; actual deployment is outside the pause process.
+preparation. Smart-contract reassessment and Robinhood fork/external-integration
+qualification are parallel, nonblocking inputs to start; affected gates must
+consume their findings before closing.
 
 > **Document role:** This is the stable architecture and launch checklist, not
 > the live progress authority. Start with
 > [`rh/START-HERE.md`](rh/START-HERE.md) and use
 > [`rh/status.yaml`](rh/status.yaml) for current workstream state, blockers,
 > branch observations, and next gates. The visual dashboard is generated from
-> that status ledger and is published privately at the
-> [deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site).
+> that status ledger. The prior private
+> [deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
+> is optional and not self-attesting; Sites recovery and dashboard deployment
+> are parked.
 
 **Prepared:** 23 July 2026
 
@@ -52,10 +65,11 @@ is being re-evaluated in
 **Current owner-priority overlay:** 30 July 2026 — the
 [`current-owner-priorities.md`](rh/current-owner-priorities.md) overlay removes
 CCIP workflows and zero-backing settlement or bad-debt policy work from the
-active queue. These two lanes are nonblocking until explicitly reopened.
-Corrected PR #61 is already integrated into `rh`; its upstream PR lifecycle
-remains separate. Historical architecture and checklist material below remains
-preserved and must not be mistaken for a current assignment.
+active queue and also parks Sites recovery and dashboard deployment. These four
+lanes are nonblocking until explicitly reopened. The ordered coworker handoff is
+[`deployment-owner-readiness.md`](rh/deployment-owner-readiness.md).
+Historical architecture and checklist material below remains preserved and
+must not be mistaken for a current assignment.
 
 A checked planning or evidence item means that decision or artifact was
 complete at the checklist reconciliation baseline. It does not imply that

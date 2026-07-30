@@ -10,6 +10,7 @@ import test from "node:test";
 import YAML from "yaml";
 
 import {
+  classifyPublicationLifecycle,
   deriveStatusAuthority,
   verifyProposedStatusAuthority,
 } from "../scripts/sync-status.mjs";
@@ -385,6 +386,16 @@ test("status.yaml binds its reviewed subject within current rh history", async (
   assert.equal(generated.publication.status_authority_commit, expectedAuthority.authorityCommit);
   assert.equal(generated.publication.status_authority_base_commit, expectedAuthority.authorityBaseCommit);
   assert.equal(generated.publication.status_file_sha256, expectedAuthority.sourceSha256);
+  assert.equal(
+    generated.publication.source_lifecycle,
+    classifyPublicationLifecycle({
+      statusAuthorityState: generated.publication.status_authority_state,
+      authorityInOriginHistory:
+        generated.publication.authority_in_origin_history,
+      originCommitsAfterAuthority:
+        generated.publication.origin_commits_after_authority,
+    }),
+  );
   assert.equal(generated.snapshot.build_worktree_clean, expectedAuthority.buildWorktreeClean);
   assert.equal(generated._generated.source_sha256, expectedAuthority.sourceSha256);
   assert.equal(generated.snapshot.program_subject_commit, status.snapshot.program_subject_commit);
@@ -467,6 +478,41 @@ test("a later clean descendant retains exact dynamically derived drift", async (
   assert.equal(expected.contained, true);
   assert.ok(expected.commitsAfterSubject > 0);
   assert.equal(expected.commitsAfterSubject, independentCount);
+});
+
+test("publication lifecycle distinguishes candidate, feature, integration, and descendant", () => {
+  assert.equal(
+    classifyPublicationLifecycle({
+      statusAuthorityState: "uncommitted_candidate",
+      authorityInOriginHistory: null,
+      originCommitsAfterAuthority: null,
+    }),
+    "candidate",
+  );
+  assert.equal(
+    classifyPublicationLifecycle({
+      statusAuthorityState: "committed",
+      authorityInOriginHistory: false,
+      originCommitsAfterAuthority: null,
+    }),
+    "committed_feature",
+  );
+  assert.equal(
+    classifyPublicationLifecycle({
+      statusAuthorityState: "committed",
+      authorityInOriginHistory: true,
+      originCommitsAfterAuthority: 0,
+    }),
+    "integrated_rh",
+  );
+  assert.equal(
+    classifyPublicationLifecycle({
+      statusAuthorityState: "committed",
+      authorityInOriginHistory: true,
+      originCommitsAfterAuthority: 3,
+    }),
+    "later_descendant",
+  );
 });
 
 test("a subject outside origin/rh history fails closed", async () => {
@@ -787,6 +833,9 @@ test("status authority has no manual environment, CLI, or YAML override", async 
   assert.equal(status.publication.status_authority_commit, "build_derived");
   assert.equal(status.publication.status_authority_base_commit, "build_derived");
   assert.equal(status.publication.status_file_sha256, "build_derived");
+  assert.equal(status.publication.source_lifecycle, "build_derived");
+  assert.equal(status.publication.authority_in_origin_history, "build_derived");
+  assert.equal(status.publication.origin_commits_after_authority, "build_derived");
 });
 
 test("two generations from identical candidate bytes are deterministic", async () => {
@@ -839,6 +888,57 @@ test("the four deferred controls are explicit and absent from machine-facing par
   const parameterBytes = JSON.stringify(parameters);
   for (const control of controls) assert.doesNotMatch(parameterBytes, new RegExp(control, "i"));
   assert.equal(status.post_freeze_reconciliation.deleverage_parameter_gap.fixed_by_this_refresh, false);
+});
+
+test("deployment-owner readiness, upstream merge, and Base-only boundaries are exact", async () => {
+  const { status } = await load();
+  assert.equal(
+    status.deployment_owner.readiness,
+    "Ready to begin deployment preparation.",
+  );
+  assert.equal(status.deployment_owner.sequence.length, 10);
+  assert.deepEqual(
+    status.deployment_owner.sequence.map(({ order }) => order),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  );
+  assert.equal(status.deployment_owner.parallel_inputs.length, 2);
+  assert.equal(
+    status.post_freeze_reconciliation.upstream_pr61_state,
+    "merged_closed",
+  );
+  assert.equal(
+    status.post_freeze_reconciliation.upstream_pr61_head,
+    "7293cf87c3c5afb06c3aeac90ffb0cd0cd27e253",
+  );
+  assert.equal(
+    status.post_freeze_reconciliation.upstream_pr61_master_merge,
+    "91eda49ccd34a25090582aff0695075c4c806011",
+  );
+  assert.equal(
+    status.post_freeze_reconciliation.upstream_base_provenance_paths.length,
+    5,
+  );
+  assert.deepEqual(
+    status.post_freeze_reconciliation
+      .current_master_rh_pr_touched_path_differences,
+    [
+      "migration_history/base-mainnet/v1/2026072800-manifest.json",
+      "migration_history/base-mainnet/v1/2026072801-manifest.json",
+      "migration_history/base-mainnet/v1/current-manifest.json",
+      "migrations/base-mainnet/2026072800_DeleverageAuctionHouse.py",
+      "tests/conf_core.py",
+    ],
+  );
+  assert.deepEqual(
+    Object.keys(
+      status.post_freeze_reconciliation.production_blob_parity.contracts,
+    ).sort(),
+    [
+      "contracts/config/SwitchboardDelta.vy",
+      "contracts/core/AuctionHouse.vy",
+      "contracts/core/Deleverage.vy",
+    ],
+  );
 });
 
 test("decision namespace mirrors the canonical register", async () => {

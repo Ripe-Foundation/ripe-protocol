@@ -1,7 +1,8 @@
 # GuardedErc20 consumer inventory
 
-> **30 July 2026 currentness:** The PR #61 candidate described below is now
-> integrated into `rh` at `ad831669943ccfe7b9ed57454995dfce51630a66`.
+> **30 July 2026 currentness:** The PR #61 candidate described below entered
+> `rh` at historical import ancestor `ad831669…` and is retained by frozen
+> protocol/pause baseline `ae0cb49…`.
 > AuctionHouse safe-conversion preflight and downstream Deleverage consistency
 > are part of the current reviewed source. This inventory is validation
 > evidence only; no Robinhood deployment, configuration, activation, or release
@@ -321,7 +322,8 @@ that replacing the shared backing predicate with `true` restores phantom
 amounts after a one-unit custody deficit
 ([mutation test](../../../../tests/vaults/test_guarded_erc20.py)).
 
-This inventory is source evidence only. Corrected PR #61 is now integrated at
-`ad831669943ccfe7b9ed57454995dfce51630a66`; that later integration does not
+This inventory is source evidence only. Corrected PR #61 entered `rh` at
+historical import ancestor `ad831669943ccfe7b9ed57454995dfce51630a66`; that
+later integration does not
 change this inventory's reviewed getter scope and does not authorize a
 deployment, registry assignment, asset configuration, or release.
