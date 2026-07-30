@@ -1176,3 +1176,18 @@ any nonzero cooldown proposal or queue action**.
 
 The S4 branch may be pushed for final integration review. Do not merge it into
 `rh` without the separate integration action.
+
+## 30 July 2026 append-only reconciliation note
+
+Corrected PR #61 is now integrated into `rh` at
+`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
+`3467f4a75aa37203d615407d5baf9c5fc9035639`. It adds separately bounded
+full-payoff, overage, and dust behavior, but it does **not** reopen this S4
+decision: Robinhood `deleverageCooldown` remains zero, and the original
+checkpoint conclusion above remains exact and controlling.
+
+`fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` also remain
+zero and deferred. Their absence from Robinhood machine-facing parameter and
+planning representation is recorded for a separately authorized future
+implementation track and is not corrected here. No migration execution,
+deployment, production configuration, activation, or release has occurred.

@@ -1163,3 +1163,18 @@ After Stage B, Stage C, and both reviewer gates, report:
 
 Do not edit or tick `docs/chains/rh-summary.md`. Source integration does not
 authorize deployment, activate a nonzero cooldown, or close later launch gates.
+
+## 30 July 2026 append-only reconciliation note
+
+Corrected PR #61 is integrated into `rh` at
+`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
+`3467f4a75aa37203d615407d5baf9c5fc9035639`. The integrated full-payoff,
+safe-conversion, and dust boundaries do not reopen the historical S4
+zero-cooldown decision or activate Stage B/Stage C from this brief.
+
+Robinhood `deleverageCooldown`, `fullPayoffBuffer`, `overageBps`,
+`dustThreshold`, and `dustBps` remain zero. The latter four controls lack
+machine-facing Robinhood parameter/planning representation; resolving that gap
+requires a separately authorized future implementation track. This append-only
+note changes none of the original conclusions above and grants no migration,
+deployment, configuration, activation, or release authority.

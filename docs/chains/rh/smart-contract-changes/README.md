@@ -1,5 +1,12 @@
 # Robinhood smart-contract change rationale
 
+**Current source snapshot:** `rh` commit
+`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
+`3467f4a75aa37203d615407d5baf9c5fc9035639` (30 July 2026).
+Corrected PR #61 is integrated; upstream PR #61 remains independently open and
+unmerged as of the fresh live check. No Robinhood deployment, migration
+execution, production configuration, activation, or release has occurred.
+
 > [!IMPORTANT]
 > **Draft explanatory synthesis.** This directory explains production source
 > changes present in the reviewed `rh` snapshot below. It is not controlling
@@ -21,6 +28,26 @@ changes carried by the Robinhood (`rh`) branch. It answers:
 The individual records intentionally use contract names and behavior as their
 primary structure. Historical workstream labels such as M1, M2, M3, S3, and S5
 appear only in provenance sections.
+
+Current rationale pages:
+
+- [`deleverage.md`](deleverage.md) — trusted full-payoff boundaries, collateral
+  and debt caps, bounded dust write-off, zero defaults, and seven-byte EIP-170
+  headroom;
+- [`auction-house.md`](auction-house.md) — safe conversion, clamps, soft-zero
+  behavior, batch isolation, and Deleverage consistency;
+- [`switchboard-delta.md`](switchboard-delta.md) — four timelocked actions,
+  hard ceilings, and unactivated zero configuration;
+- [`credit-engine.md`](credit-engine.md);
+- [`guarded-erc20.md`](guarded-erc20.md);
+- [`ledger.md`](ledger.md);
+- [`lootbox.md`](lootbox.md); and
+- [`teller.md`](teller.md).
+
+The four Deleverage controls remain zero and deferred, but they currently lack
+Robinhood machine-facing parameter/planning representation. That gap requires a
+separately authorized future implementation track and is not fixed here.
+`DefaultsRobinhood.vy` remains absent and fail-closed.
 
 ## Documentation standard
 
@@ -54,15 +81,19 @@ audit documents, not merely summaries of workstream completion.
 
 The following directions control this explanatory package:
 
-- The separate Deleverage updates branch or PR is outside this process. These
-  pages do not inspect it, depend on it, or treat it as a blocker.
+- Corrected PR #61 is integrated into `rh` at
+  `ad831669943ccfe7b9ed57454995dfce51630a66`. The Deleverage, AuctionHouse,
+  and SwitchboardDelta pages bind their current rationale to that integrated
+  source; integration does not imply deployment, configuration, activation,
+  or release.
 - CCIP workflows are owner-parked and outside the current work program.
 - Zero-backing settlement, loss allocation, and bad-debt policy are
   owner-parked for later analysis.
 - Parked subjects are not current Wave 1 work items or blockers. Parking does
   not decide their eventual release disposition.
-- Pending H-04, H-06 qualification, M4, or other feature work is not described
-  as integrated unless it is present in the exact reviewed snapshot.
+- H-04 schema v2, H-05 deterministic blocked planning, H-06 candidate-class
+  qualification, and M4 proof are integrated for their exact scopes. None is
+  final operator, machine, volume, deployment, or release authority.
 
 ## Reviewed implementation snapshot
 
@@ -157,9 +188,9 @@ An integrated source change is not proof that:
 Any later deployment or activation claim still requires the exact
 owner-approved configuration, artifact binding, applicable composed-route
 evidence, monitoring, and release authority. This statement does not reopen
-the parked settlement, loss-allocation, bad-debt, Deleverage-PR, or CCIP
-subjects. The Ledger and Lootbox records have their own deployment and
-live-version boundaries.
+the parked settlement, loss-allocation, bad-debt, or CCIP subjects. The
+Ledger and Lootbox records have their own deployment and live-version
+boundaries.
 
 ## Supporting contracts not treated as production components
 

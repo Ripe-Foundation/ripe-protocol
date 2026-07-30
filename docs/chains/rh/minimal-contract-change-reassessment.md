@@ -1,5 +1,14 @@
 # Robinhood Minimal Contract-Change Reassessment
 
+> **30 July 2026 reconciliation:** The historical minimum-change method and S4
+> zero-cooldown conclusion remain controlling. Corrected PR #61 was later
+> integrated at `ad831669943ccfe7b9ed57454995dfce51630a66` for distinct
+> full-payoff, dust, safe-conversion, and governance boundaries; this did not
+> reopen S4. `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps`
+> remain zero and lack Robinhood machine-facing representation. Nothing is
+> deployed, configured, active, or released, and the missing representation is
+> not fixed by this documentation refresh.
+
 **Status:** Owner directive recorded; S3 retained, S4 closed no-code, and S5
 direction selected; remaining contract-by-contract decisions pending
 

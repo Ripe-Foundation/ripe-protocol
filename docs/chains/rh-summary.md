@@ -1,5 +1,38 @@
 # Robinhood Chain Technical Deployment Summary
 
+## 30 July 2026 post-freeze currentness
+
+Corrected PR #61 is integrated into `rh` at commit
+`ad831669943ccfe7b9ed57454995dfce51630a66`, tree
+`3467f4a75aa37203d615407d5baf9c5fc9035639`. Upstream PR #61 remains
+independently open and unmerged as of the fresh live check. No Robinhood
+deployment, migration execution, production configuration, activation, or
+release has occurred.
+
+H-04 schema v2 and H-05 deterministic blocked planning are integrated. All 20
+genuine H-04 decisions are approved and operative; `D-H04-19` is retired and
+non-operative; none are open. Four corrected-PR controls—`fullPayoffBuffer`,
+`overageBps`, `dustThreshold`, and `dustBps`—remain zero, deferred, and absent
+from Robinhood machine-facing parameter/planning representation. A separately
+authorized future implementation track must close that gap. This documentation
+refresh does not. `DefaultsRobinhood.vy` therefore remains absent and the
+generator remains fail-closed.
+
+The historical S4 zero-`deleverageCooldown` decision remains closed and was
+not reopened. CCIP and zero-backing settlement/bad-debt policy remain deferred
+and nonblocking. H-06 qualifies only a candidate operator/storage class, not a
+final operator, machine, volume, deployment, or release. Remaining work is
+predeployment infrastructure, qualification, rehearsal, and release
+preparation; actual deployment is outside the pause process.
+
+> **Document role:** This is the stable architecture and launch checklist, not
+> the live progress authority. Start with
+> [`rh/START-HERE.md`](rh/START-HERE.md) and use
+> [`rh/status.yaml`](rh/status.yaml) for current workstream state, blockers,
+> branch observations, and next gates. The visual dashboard is generated from
+> that status ledger and is published privately at the
+> [deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site).
+
 **Prepared:** 23 July 2026
 
 **Ripe protocol baseline reviewed:** `91d846e8618fbaf3d8fb6770361b48d542d82a76`
@@ -8,11 +41,28 @@
 
 **Checklist reconciliation baseline:** `dd51c637f1462bede7529a53427bfb4327dbfb12` on 24 July 2026
 
+**Live-status separation added:** 26 July 2026. Checklist boxes below retain
+their last formal reconciliation state and must not be interpreted as a
+completion percentage.
+
 **Minimum-contract-change directive:** 24 July 2026 — implementation necessity
 is being re-evaluated in
 [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md)
 
-A checked planning or evidence item means that decision or artifact is complete at the reconciliation baseline. It does not imply that dependent implementation, deployment, activation, validation, or launch gates are complete unless the item itself says so. Any later reconciliation that closes or reopens an item must update the reconciliation baseline in the same commit.
+**Current owner-priority overlay:** 30 July 2026 — the
+[`current-owner-priorities.md`](rh/current-owner-priorities.md) overlay removes
+CCIP workflows and zero-backing settlement or bad-debt policy work from the
+active queue. These two lanes are nonblocking until explicitly reopened.
+Corrected PR #61 is already integrated into `rh`; its upstream PR lifecycle
+remains separate. Historical architecture and checklist material below remains
+preserved and must not be mistaken for a current assignment.
+
+A checked planning or evidence item means that decision or artifact was
+complete at the checklist reconciliation baseline. It does not imply that
+dependent implementation, deployment, activation, validation, or launch gates
+are complete unless the item itself says so. Current reconciliation belongs in
+[`rh/status.yaml`](rh/status.yaml); a later change that closes or reopens a
+checklist item must update that status ledger in the same commit.
 
 ## Purpose
 

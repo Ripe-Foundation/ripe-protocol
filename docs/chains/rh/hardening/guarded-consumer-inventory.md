@@ -1,5 +1,12 @@
 # GuardedErc20 consumer inventory
 
+> **30 July 2026 currentness:** The PR #61 candidate described below is now
+> integrated into `rh` at `ad831669943ccfe7b9ed57454995dfce51630a66`.
+> AuctionHouse safe-conversion preflight and downstream Deleverage consistency
+> are part of the current reviewed source. This inventory is validation
+> evidence only; no Robinhood deployment, configuration, activation, or release
+> has occurred.
+
 This is the G4 inventory rooted at baseline
 `a86650b187c523f27c92f05bfe959d06840025a6` and reconciled for the
 PR #61 Gate 1 candidate. It covers every `Vault`
@@ -314,6 +321,7 @@ that replacing the shared backing predicate with `true` restores phantom
 amounts after a one-unit custody deficit
 ([mutation test](../../../../tests/vaults/test_guarded_erc20.py)).
 
-This inventory is source evidence only. It does not claim that the separate
-owner-parked Deleverage branch/PR is integrated, and it does not authorize a
+This inventory is source evidence only. Corrected PR #61 is now integrated at
+`ad831669943ccfe7b9ed57454995dfce51630a66`; that later integration does not
+change this inventory's reviewed getter scope and does not authorize a
 deployment, registry assignment, asset configuration, or release.

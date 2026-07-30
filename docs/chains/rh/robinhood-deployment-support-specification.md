@@ -1,5 +1,15 @@
 # Robinhood deployment-support specification
 
+> **30 July 2026 currentness overlay:** Corrected PR #61, H-04 schema v2,
+> H-05 deterministic blocked planning, M4 proof, and the H-06 candidate
+> operator/storage class are integrated. No Robinhood migration history,
+> deployment, migration execution, production configuration, activation, or
+> release exists. Four Deleverage controls remain zero and lack machine-facing
+> parameter/planning representation; `DefaultsRobinhood.vy` remains absent and
+> fail-closed. Remaining work is predeployment infrastructure, qualification,
+> rehearsal, and release preparation. Actual deployment is outside the pause
+> process.
+
 - Status: Phases A–H completion draft for owner/reviewer scrutiny
 - Review status: independent checkpoint/completion findings incorporated; specification directions approved only where recorded
 - Scope completed: Phases A–H and Deliverables A–B at specification level

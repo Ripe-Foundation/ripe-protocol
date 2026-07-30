@@ -1,5 +1,15 @@
 # Robinhood Phase-0 component matrix
 
+> **30 July 2026 currentness overlay:** Corrected PR #61 is integrated into
+> `rh` at `ad831669943ccfe7b9ed57454995dfce51630a66`. The Phase-0 rows below
+> remain historical planning evidence, but `Deleverage`, `AuctionHouse`, and
+> `SwitchboardDelta` now use the corrected shared source. Robinhood keeps
+> `deleverageCooldown`, `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and
+> `dustBps` at zero. The latter four lack machine-facing parameter/planning
+> representation and require a separately authorized future track.
+> `DefaultsRobinhood.vy` remains absent and fail-closed. Nothing has been
+> deployed, configured, activated, or released.
+
 **Status:** Complete analysis; S3, S4, S5, and Stock Token launch-scope
 decisions are recorded; remaining recommendations and owner decisions are
 unapproved
@@ -92,7 +102,7 @@ evidence only; every launch address must be reverified from a dated primary sour
 | CM-011 | `SwitchboardAlpha` | `contracts/config/SwitchboardAlpha.vy` | General debt, vault and price parameters | Same setters/validators with RH values | reused unchanged | Yes | — |
 | CM-012 | `SwitchboardBravo` | `contracts/config/SwitchboardBravo.vy` | Auction parameters | Same with RH auction durations | reused unchanged | Yes | — |
 | CM-013 | `SwitchboardCharlie` | `contracts/config/SwitchboardCharlie.vy` | Rewards/Lootbox parameters | Same with RH emission rate/interval values | reused unchanged | Yes | — |
-| CM-014 | `SwitchboardDelta` | `contracts/config/SwitchboardDelta.vy` | Deleverage, bond and operational configuration | Same role; approved initial posture keeps Deleverage cooldown zero | reused unchanged | Yes | Duplicate cooldown cap is dormant at zero; any nonzero proposal/queue or separate HR-bound issue requires a later necessity decision |
+| CM-014 | `SwitchboardDelta` | `contracts/config/SwitchboardDelta.vy` | Deleverage, bond and operational configuration | Same role; corrected PR #61 adds four bounded timelocked Deleverage actions while all Robinhood values remain zero | corrected shared source integrated | Yes | Configuration is unactivated; four controls lack machine-facing Robinhood representation; any nonzero value or cooldown proposal requires separate authority |
 | CM-015 | `PriceDesk` | `contracts/registries/PriceDesk.vy` | Price-source routing | Local routing, initially Chainlink-focused | reused unchanged | Yes | — |
 | CM-016 | `ChainlinkPrices` | `contracts/priceSources/ChainlinkPrices.vy` | Chainlink feed adapter | Official Stock Token feeds and any approved USDG feed | reused unchanged | Yes | — |
 | CM-017 | `CurvePrices` | `contracts/priceSources/CurvePrices.vy` | Curve/Green reference pricing | No initial RH registration/deployment | disabled | Yes for Base | Curve is Base-only; block snapshot semantics are not suitable to enable accidentally |
@@ -122,7 +132,7 @@ evidence only; every launch address must be reverified from a dated primary sour
 | CM-041 | `UndyVaultPrices` | `contracts/priceSources/UndyVaultPrices.vy` | Underscore vault pricing | Omitted | disabled | Yes for Base | Underscore unsupported initially |
 | CM-042 | `Underscore Vault` | `migrations/base-mainnet/2025102200_UnderscoreVault.py`, current manifest | Base Underscore integration | Omitted | disabled | N/A external | Unsupported integration |
 | CM-043 | `CreditRedeem` | `contracts/core/CreditRedeem.vy` | Collateral redemption Department | May support other assets; Stock Token redemption flag must be false | reused unchanged | Yes | —; Stock Token disablement is asset configuration, not source modification |
-| CM-044 | `Deleverage` | `contracts/core/Deleverage.vy` | Withdrawal deleveraging and cooldown | Same role with owner/security-approved cooldown zero | reused unchanged | Yes | Initial launch accepts no pacing; portable nonzero cooldown is deferred and requires S4 reopening |
+| CM-044 | `Deleverage` | `contracts/core/Deleverage.vy` | Withdrawal deleveraging and cooldown | Same role with corrected full-payoff/dust boundaries and owner/security-approved cooldown zero | corrected shared source integrated | Yes | Runtime is 24,569 bytes with seven bytes EIP-170 headroom; all four new controls remain zero; a nonzero cooldown still requires S4 reopening |
 | CM-045 | `TellerUtils` | `contracts/core/TellerUtils.vy` | Teller helper/view logic | Same local helper | reused unchanged | Yes | — |
 | CM-046 | `SwitchboardEcho` | `contracts/config/SwitchboardEcho.vy` | Treasury, Endaoment, and PSM governance actions | Required and registered if PSM is deployed for later enable/tuning; configure no unsupported external paths | reused unchanged | Yes | — |
 | CM-047 | `EndaomentFunds` | `contracts/core/EndaomentFunds.vy` | Treasury fund custody/routing | Local custody/routing with Base-specific targets disabled | reused unchanged | Yes | — |

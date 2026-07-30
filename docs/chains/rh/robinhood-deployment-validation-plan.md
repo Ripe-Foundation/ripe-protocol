@@ -1,5 +1,14 @@
 # Robinhood deployment validation plan
 
+> **30 July 2026 currentness overlay:** Validation must bind to corrected PR #61
+> integration commit `ad831669943ccfe7b9ed57454995dfce51630a66`. H-04 schema
+> v2 and H-05 deterministic blocked planning are integrated, but unresolved
+> bindings and the missing machine-facing representation of
+> `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` keep Defaults
+> and executable planning unready. H-06 is a class qualification only. No
+> migration history, live execution, deployment, configuration, activation, or
+> release has occurred.
+
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`
 - Completion commit: recorded in the Track 7 handoff after final validation

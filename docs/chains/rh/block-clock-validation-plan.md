@@ -1,5 +1,14 @@
 # Block-clock validation plan
 
+> **30 July 2026 currentness overlay:** The direct checker is authoritative for
+> the corrected PR #61 integration and preserves 99 production occurrences, 94
+> lines, 17 files, historical fingerprint
+> `924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4`,
+> and current fingerprint
+> `07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122`.
+> The zero-cooldown S4 conclusion remains closed. This plan authorizes no
+> deployment, configuration, activation, or release.
+
 **Status:** Implementation-ready test plan; runtime and CI choices beyond the
 currently pinned stack remain owner-gated
 

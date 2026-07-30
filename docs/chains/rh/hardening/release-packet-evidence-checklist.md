@@ -1,5 +1,14 @@
 # RH release-packet evidence checklist
 
+> **30 July 2026 currentness:** Any future packet must bind corrected PR #61
+> integration commit `ad831669943ccfe7b9ed57454995dfce51630a66`, H-04 schema
+> v2, H-05 deterministic planning reports, and the final H-06 operator
+> machine/volume. It must fail closed while `DefaultsRobinhood.vy` is absent or
+> while `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` lack
+> machine-facing Robinhood parameter/planning representation. All four values
+> remain zero and deferred. No migration history, deployment, production
+> configuration, activation, or release exists.
+
 > **DRAFT — reusable offline checklist.** Completing this file does not approve,
 > sign, publish, deploy, configure, activate, or release anything. Adoption into
 > the actual release process is **UNRESOLVED — owner decision**.

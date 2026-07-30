@@ -1,5 +1,11 @@
 # Robinhood Manifest v2 macOS/APFS Operator Runbook
 
+> **30 July 2026 currentness overlay:** H-06 qualifies a candidate
+> operator/storage class only. It is not final operator, machine, volume,
+> migration, deployment, production publication, configuration, activation, or
+> release authorization. The future run must bind the frozen release candidate,
+> intended machine, and selected volume. No Robinhood migration history exists.
+
 ## Purpose and authority
 
 This runbook qualifies and operates the H-06 manifest-v2 filesystem protocol

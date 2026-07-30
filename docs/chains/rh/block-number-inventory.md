@@ -1,5 +1,15 @@
 # Robinhood Phase-0 block-number inventory
 
+> **30 July 2026 currentness overlay:** The checked inventory now reflects the
+> corrected PR #61 integration at
+> `ad831669943ccfe7b9ed57454995dfce51630a66`: 99 production occurrences, 94
+> lines, 17 files, historical S5 fingerprint
+> `924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4`,
+> and current post-S5 fingerprint
+> `07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122`.
+> The historical ledger below remains evidence; `status.yaml` is current
+> authority. Nothing is deployed or active.
+
 **Status:** Complete analysis; BN-002 and BN-025 directions are recorded;
 remaining recommendations and owner decisions are unapproved
 

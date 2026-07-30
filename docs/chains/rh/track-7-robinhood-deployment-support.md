@@ -1,5 +1,13 @@
 # Track 7: Robinhood Deployment-Support Specification
 
+> **30 July 2026 currentness overlay:** The specification below is historical
+> planning authority. Current `rh` integrates H-04 schema v2, H-05 deterministic
+> blocked planning, M4 proof, H-06 candidate-class qualification, and corrected
+> PR #61. Required identity bindings, Defaults rendering, four Deleverage
+> machine-parameter rows, final operator binding, rehearsal, and release
+> preparation remain. No live action or migration history exists; actual
+> deployment remains outside the pause process.
+
 **Status:** Draft for owner review; specification-only
 
 **Prepared:** 23 July 2026
