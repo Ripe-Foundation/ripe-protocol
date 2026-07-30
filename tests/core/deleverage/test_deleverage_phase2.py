@@ -2863,7 +2863,7 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     deleverage_size = len(boa.env.get_code(deleverage.address))
     auction_house_size = len(boa.env.get_code(auction_house.address))
 
-    # Measured at this revision: Deleverage 24,553 bytes (23 bytes headroom),
+    # Measured at this revision: Deleverage 24,569 bytes (7 bytes headroom),
     # AuctionHouse 24,469 bytes (107 bytes headroom).
     assert deleverage_size <= EIP170_LIMIT, (
         f"Deleverage runtime is {deleverage_size} bytes; "
@@ -3316,6 +3316,118 @@ def test_full_payoff_dust_forgiveness_respects_bps_cap_for_small_debt(
         pre_debt - 1,
         pre_debt - 1,
     )
+
+
+@pytest.mark.parametrize(
+    "dust_amount,should_forgive",
+    [
+        (5 * 10**15 - 1, True),
+        (5 * 10**15, True),
+        (5 * 10**15 + 1, False),
+    ],
+    ids=["below-relative-cap", "at-relative-cap", "above-relative-cap"],
+)
+def test_full_payoff_dust_forgiveness_relative_bps_boundary(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    endaoment_funds,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    deleverage,
+    switchboard_alpha,
+    dust_amount,
+    should_forgive,
+):
+    """Relative dust forgiveness includes the exact cap and excludes one wei above it."""
+    _configure_alpha_borrow_bravo_deleverage(
+        setAssetConfig,
+        createDebtTerms,
+        alpha_token,
+        bravo_token,
+    )
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        dust_threshold=10**16,
+        dust_bps=1,
+    )
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=50 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    relative_cap = pre_debt // 100_00
+    assert pre_debt == 50 * EIGHTEEN_DECIMALS
+    assert pre_debt % 100_00 == 0
+    assert relative_cap == 5 * 10**15
+    assert dust_amount < 10**16
+
+    collateral_to_consume = pre_debt - dust_amount
+    performDeposit(
+        bob,
+        collateral_to_consume,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, bravo_token)],
+    )
+
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    pre_endaoment = bravo_token.balanceOf(endaoment_funds)
+    expected_debt_to_clear = pre_debt if should_forgive else collateral_to_consume
+    expected_remaining_debt = 0 if should_forgive else dust_amount
+
+    repaid_amount = teller.deleverageUser(
+        bob,
+        0,
+        sender=switchboard_alpha.address,
+    )
+
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    post_collateral = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    post_endaoment = bravo_token.balanceOf(endaoment_funds)
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+
+    assert repaid_amount == expected_debt_to_clear
+    assert post_debt == expected_remaining_debt
+    assert pre_collateral - post_collateral == collateral_to_consume
+    assert post_collateral == 0
+    assert post_endaoment - pre_endaoment == collateral_to_consume
+
+    assert transfer_log.user == bob
+    assert transfer_log.vaultId == 3
+    assert transfer_log.asset == bravo_token.address
+    assert transfer_log.amountSent == collateral_to_consume
+    assert transfer_log.usdValue == collateral_to_consume
+    assert transfer_log.isDepleted is True
+
+    assert deleverage_log.user == bob
+    assert deleverage_log.caller == switchboard_alpha.address
+    assert deleverage_log.targetRepayAmount == pre_debt
+    assert deleverage_log.targetRepayAmountWithBuffer == pre_debt
+    assert deleverage_log.collateralValueRepaid == collateral_to_consume
+    assert deleverage_log.debtToClear == expected_debt_to_clear
+    assert deleverage_log.hasGoodDebtHealth is True
 
 
 @pytest.mark.parametrize("dust_threshold,dust_bps", [(0, 100), (1, 0)])

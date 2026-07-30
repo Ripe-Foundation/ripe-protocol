@@ -236,6 +236,123 @@ def test_trusted_caller_no_restrictions(
     _test(post_debt, 0)  # Full debt repaid
 
 
+@pytest.mark.parametrize(
+    "caller_is_trusted",
+    [False, True],
+    ids=["untrusted", "trusted"],
+)
+def test_exact_boundary_full_payoff_extras_require_trusted_caller(
+    ripe_hq,
+    switchboard,
+    switchboard_alpha,
+    deleverage,
+    credit_engine,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    performDeposit,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    mission_control,
+    endaoment_funds,
+    caller_is_trusted,
+):
+    """An exact-boundary untrusted cap must not activate full-payoff extras."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.setUnderscoreRegistry(
+        ZERO_ADDRESS,
+        sender=switchboard_alpha.address,
+    )
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    pre_debt, borrow_terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert pre_debt.amount == 100 * EIGHTEEN_DECIMALS
+    assert borrow_terms.collateralVal == 200 * EIGHTEEN_DECIMALS
+    assert borrow_terms.lowestLtv == 50_00
+    assert borrow_terms.debtTerms.redemptionThreshold == 50_00
+    assert mission_control.getLtvPaybackBuffer() == 0
+    assert deleverage.getMaxDeleverageAmount(bob) == pre_debt.amount
+    assert mission_control.underscoreRegistry() == ZERO_ADDRESS
+
+    caller = switchboard_alpha.address if caller_is_trusted else alice
+    is_ripe_trusted = ripe_hq.isValidAddr(caller) or switchboard.isSwitchboardAddr(caller)
+    assert is_ripe_trusted is caller_is_trusted
+    if not caller_is_trusted:
+        assert caller != bob
+        assert mission_control.userDelegation(bob, caller).canBorrow is False
+
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    pre_endaoment = alpha_token.balanceOf(endaoment_funds)
+    expected_extra = 10**15 if caller_is_trusted else 0
+    expected_collateral = pre_debt.amount + expected_extra
+
+    repaid_amount = teller.deleverageUser(bob, 0, sender=caller)
+
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    post_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    post_endaoment = alpha_token.balanceOf(endaoment_funds)
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+
+    assert repaid_amount == pre_debt.amount
+    assert post_debt == 0
+    assert pre_collateral - post_collateral == expected_collateral
+    assert post_endaoment - pre_endaoment == expected_collateral
+
+    assert transfer_log.user == bob
+    assert transfer_log.vaultId == 3
+    assert transfer_log.asset == alpha_token.address
+    assert transfer_log.amountSent == expected_collateral
+    assert transfer_log.usdValue == expected_collateral
+    assert transfer_log.isDepleted is False
+
+    assert deleverage_log.user == bob
+    assert deleverage_log.caller == caller
+    assert deleverage_log.targetRepayAmount == pre_debt.amount
+    assert deleverage_log.targetRepayAmountWithBuffer == expected_collateral
+    assert deleverage_log.collateralValueRepaid == expected_collateral
+    assert deleverage_log.debtToClear == pre_debt.amount
+    assert deleverage_log.hasGoodDebtHealth is True
+
+
 def test_user_self_deleverage_no_restrictions(
     switchboard_alpha,
     deleverage,

@@ -716,7 +716,7 @@ def _deleverageUser(
 
     # Earn vault position owners must not have more collateral removed than debt,
     # regardless of which trusted caller initiated the deleverage.
-    useFullPayoffExtras: bool = targetRepayAmount == userDebt.amount
+    useFullPayoffExtras: bool = isTrusted and targetRepayAmount == userDebt.amount
     if useFullPayoffExtras:
         # Owner-keyed full-payoff classification necessarily depends on the
         # configured Underscore registry being healthy even when all payoff
