@@ -413,6 +413,72 @@ def test_withdraw_cbbtc_with_sgreen_deleveragable(
     assert events[0].stabAsset == savings_green.address
 
 
+@pytest.mark.parametrize("is_earn_vault_owner", [False, True])
+def test_full_payoff_withdrawal_classifies_position_owner(
+    is_earn_vault_owner,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """Withdrawal payoff extras depend on the owner, not the trusted Teller caller."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, is_earn_vault_owner)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+
+    deleverage.setDeleverageFullPayoffParam(1, 10**15, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(2, 100, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(3, 0, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(4, 0, sender=switchboard_alpha.address)
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    performDeposit(
+        bob,
+        700 * SIX_DECIMALS,
+        charlie_token,
+        charlie_token_whale,
+        simple_erc20_vault,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert deleverage.deleverageForWithdrawal(
+        bob,
+        3,
+        alpha_token,
+        1_000 * EIGHTEEN_DECIMALS,
+        sender=teller.address,
+    )
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+
+    deleverage_log = filter_logs(deleverage, "DeleverageUser")[-1]
+    expected_buffer = 0 if is_earn_vault_owner else 10**15
+    assert deleverage_log.targetRepayAmount == pre_debt
+    assert deleverage_log.targetRepayAmountWithBuffer == pre_debt + expected_buffer
+
+
 def test_withdraw_cbbtc_with_mixed_usdc_and_sgreen(
     deleverage,
     teller,
@@ -2382,6 +2448,48 @@ def test_min_deleverage_bps_default_zero(deleverage):
     assert deleverage.minDeleverageBps() == 0
 
 
+def test_deleverage_constructor_uses_param_defaults(deploy_deleverage):
+    """Test that Deleverage constructor defaults initialize all deleverage params."""
+    fresh_deleverage = deploy_deleverage(
+        min_deleverage_bps=5_00,
+        deleverage_buffer=1_00,
+        deleverage_cooldown=123,
+        underscore_safe_spread_bps=150,
+        deleverage_full_payoff_buffer=10**15,
+        deleverage_overage_bps=100,
+        deleverage_dust_threshold=10**14,
+        deleverage_dust_bps=50,
+    )
+
+    assert fresh_deleverage.minDeleverageBps() == 5_00
+    assert fresh_deleverage.deleverageBuffer() == 1_00
+    assert fresh_deleverage.deleverageCooldown() == 123
+    assert fresh_deleverage.underscoreSafeSpreadBps() == 150
+    assert fresh_deleverage.deleverageFullPayoffBuffer() == 10**15
+    assert fresh_deleverage.deleverageOverageBps() == 100
+    assert fresh_deleverage.deleverageDustThreshold() == 10**14
+    assert fresh_deleverage.deleverageDustBps() == 50
+
+
+@pytest.mark.parametrize(
+    "kwargs,revert_msg",
+    [
+        ({"min_deleverage_bps": HUNDRED_PERCENT + 1}, "invalid bps"),
+        ({"deleverage_buffer": HUNDRED_PERCENT + 1}, "invalid bps"),
+        ({"deleverage_cooldown": 7_201}, "cooldown too large"),
+        ({"underscore_safe_spread_bps": 501}, "exceeds hard ceiling"),
+        ({"deleverage_full_payoff_buffer": 10**18 + 1}, "exceeds hard ceiling"),
+        ({"deleverage_overage_bps": 501}, "exceeds hard ceiling"),
+        ({"deleverage_dust_threshold": 10**16 + 1}, "exceeds hard ceiling"),
+        ({"deleverage_dust_bps": 501}, "exceeds hard ceiling"),
+    ],
+)
+def test_deleverage_constructor_rejects_params_above_caps(deploy_deleverage, kwargs, revert_msg):
+    """Constructor validates deploy-time params because setters rely on Switchboard caps."""
+    with boa.reverts(revert_msg):
+        deploy_deleverage(**kwargs)
+
+
 def test_set_min_deleverage_bps_from_switchboard(deleverage, switchboard_alpha):
     """Test that a registered switchboard can set minDeleverageBps"""
     deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
@@ -2400,14 +2508,10 @@ def test_set_min_deleverage_bps_rejects_non_switchboard(deleverage, bob):
         deleverage.setMinDeleverageBps(5_00, sender=bob)
 
 
-def test_set_min_deleverage_bps_rejects_over_hundred_percent(deleverage, switchboard_alpha):
-    """Test that minDeleverageBps cannot exceed HUNDRED_PERCENT"""
-    with boa.reverts("invalid bps"):
-        deleverage.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
-
-    # Exactly HUNDRED_PERCENT should be allowed
-    deleverage.setMinDeleverageBps(HUNDRED_PERCENT, sender=switchboard_alpha.address)
-    assert deleverage.minDeleverageBps() == HUNDRED_PERCENT
+def test_set_min_deleverage_bps_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap minDeleverageBps"""
+    deleverage.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
+    assert deleverage.minDeleverageBps() == HUNDRED_PERCENT + 1
 
 
 def test_set_min_deleverage_bps_to_zero_disables(deleverage, switchboard_alpha):
@@ -2983,14 +3087,10 @@ def test_set_deleverage_buffer_rejects_non_switchboard(deleverage, bob):
         deleverage.setDeleverageBuffer(1_00, sender=bob)
 
 
-def test_set_deleverage_buffer_rejects_over_hundred_percent(deleverage, switchboard_alpha):
-    """Test that deleverageBuffer cannot exceed HUNDRED_PERCENT"""
-    with boa.reverts("invalid bps"):
-        deleverage.setDeleverageBuffer(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
-
-    # Exactly HUNDRED_PERCENT should be allowed
-    deleverage.setDeleverageBuffer(HUNDRED_PERCENT, sender=switchboard_alpha.address)
-    assert deleverage.deleverageBuffer() == HUNDRED_PERCENT
+def test_set_deleverage_buffer_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap deleverageBuffer"""
+    deleverage.setDeleverageBuffer(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
+    assert deleverage.deleverageBuffer() == HUNDRED_PERCENT + 1
 
 
 def test_buffer_zero_means_no_buffer_applied(
@@ -3344,12 +3444,7 @@ def test_cooldown_zero_means_disabled(
     assert result2 == False
 
 
-def test_set_deleverage_cooldown_rejects_over_max(deleverage, switchboard_alpha):
-    """Test that setDeleverageCooldown rejects values over MAX_COOLDOWN_BLOCKS (7_200)"""
-    # Exactly at max should succeed
-    deleverage.setDeleverageCooldown(7_200, sender=switchboard_alpha.address)
-    assert deleverage.deleverageCooldown() == 7_200
-
-    # Over max should revert
-    with boa.reverts("cooldown too large"):
-        deleverage.setDeleverageCooldown(7_201, sender=switchboard_alpha.address)
+def test_set_deleverage_cooldown_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap deleverageCooldown"""
+    deleverage.setDeleverageCooldown(7_201, sender=switchboard_alpha.address)
+    assert deleverage.deleverageCooldown() == 7_201

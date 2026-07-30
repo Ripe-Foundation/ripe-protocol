@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 
+ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_SCHEMA_VERSION = 1
 EXPECTED_PRODUCTION_COUNTS = (99, 94, 17)
 EXPECTED_TIMESTAMP_COUNTS = (37, 37, 11)
@@ -29,6 +30,45 @@ EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
 TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
 HARDENING_REVIEW_COMMIT = "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
 H04_REVIEW_COMMIT = "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+PR61_REVIEW_COMMIT = "2c36e4aa06395d5075c348aab71d468fa099775f"
+PR61_PRODUCTION_SOURCE_SHA256 = {
+    "contracts/config/SwitchboardDelta.vy": (
+        "12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79"
+    ),
+    "contracts/core/AuctionHouse.vy": (
+        "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921"
+    ),
+    "contracts/core/Deleverage.vy": (
+        "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138"
+    ),
+}
+PR61_BASELINE_SOURCE_SHA256 = {
+    "contracts/config/SwitchboardDelta.vy": (
+        "2c76e1a2b985884adc2db1b419776eddf7bd6c355268dc527d573453421bfbe1"
+    ),
+    "contracts/core/AuctionHouse.vy": (
+        "dc871e77efdf4320f98f5f4296dbe4c07689e434f9c4eae7c9ed971b85ee9cae"
+    ),
+    "contracts/core/Deleverage.vy": (
+        "eb28c2d22a695c3148acfc00b54507d3b2f3e4462aeae119ba4183d09832815b"
+    ),
+}
+PR61_DIRECT_RECORD_COUNT = 8
+PR61_DIRECT_RECORDS_SHA256 = (
+    "36df35fbdf7b17da04f9f27191e411b3cb44a93df145906b90ca6fa887315d36"
+)
+PR61_CADENCE_RECORD_COUNT = 16
+PR61_CADENCE_RECORDS_SHA256 = (
+    "81e512c04a0c791a00138bd874b74470a0f805be3c23b83b49df85f522188f2e"
+)
+PR61_SECONDS_RECORD_COUNT = 11
+PR61_SECONDS_RECORDS_SHA256 = (
+    "a8ee8276a6059a7d0907d272d4cc08e13f2e777e0be8889ea85d0fd9b42466c4"
+)
+PR61_PATH_RECORD_COUNT = 3
+PR61_PATH_RECORDS_SHA256 = (
+    "67ff2a2167be043054d066e81329c8ee260d2e64a395dba55a57a727f009343e"
+)
 H04_CADENCE_RECORD_COUNT = 116
 H04_CADENCE_RECORDS_SHA256 = (
     "d0d0e3ca3ac472b1a709a9525e9ad38d5b76c5337b4e540c3ca10b7c0dcddf05"
@@ -90,6 +130,7 @@ EXPECTED_REVIEW_AUTHORITIES = {
 EXPECTED_REVIEW_PROVENANCE = {
     "track3ReviewCommit": TRACK3_REVIEW_COMMIT,
     "hardeningApprovalCommit": HARDENING_REVIEW_COMMIT,
+    "pr61ReviewCommit": PR61_REVIEW_COMMIT,
 }
 S5_REVIEW_ARTIFACT_SHA256 = (
     "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76"
@@ -113,7 +154,7 @@ M3_CREDIT_ENGINE_BASELINE_SHA256 = (
     "23129f8f6e87805bc47712d06f7ddf6c0de920866ad36ca78ee96e9c57ef96d8"
 )
 POST_S5_PRODUCTION_INVENTORY_SHA256 = (
-    "f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd"
+    "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
 )
 S5_REVIEW_DIRECT_KEYS = {
     ("contracts/data/Ledger.vy", "_getActionBlock", "block.number", 1),
@@ -193,6 +234,90 @@ REVIEWER_REMEDIATION_CADENCE_KEYS = {
         2,
     ),
 }
+REVIEWER_REMEDIATION_CADENCE_KEY_COUNT = 9
+REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256 = (
+    "0739c77da0d92999c241eb6b9e9a54dea4bac749a9a682afb4b3a4a0ca5a4251"
+)
+PR61_ARTIFACT_EXPECTATIONS_PATH = "config/contract-artifact-expectations.json"
+PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
+    "9f205beb9a1aadc2b4bab676d2c1e5277b576547a1e74e91818262f073815fe7"
+)
+PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT = 8
+PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256 = (
+    "ba0c2ed22b4a6647f89672ac55d945a2e4349350ce4bd343e3630a8294c21fbf"
+)
+PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORD_COUNT = 11
+PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256 = (
+    "29713297c33a355261fd2958e2140a1ec5623e511469d929ff5df61affe82948"
+)
+PR61_ARTIFACT_LAYOUT_METADATA_CADENCE_KEYS = frozenset(
+    {
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"lastDeleverageBlock":',
+            '"lastDeleverageBlock": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"timeLock":',
+            '"timeLock": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"MAX_ACTION_TIMELOCK":',
+            '"MAX_ACTION_TIMELOCK": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"MIN_ACTION_TIMELOCK":',
+            '"MIN_ACTION_TIMELOCK": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"govChangeTimeLock":',
+            '"govChangeTimeLock": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"timeLock":',
+            '"timeLock": {',
+            2,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"actionTimeLock":',
+            '"actionTimeLock": {',
+            1,
+        ),
+        (
+            PR61_ARTIFACT_EXPECTATIONS_PATH,
+            "<module>",
+            "block-default-key",
+            '"expiration":',
+            '"expiration": {',
+            1,
+        ),
+    }
+)
 S5_REVIEW_CADENCE_KEYS = {
     (
         "contracts/data/Ledger.vy",
@@ -911,6 +1036,483 @@ def _record_fingerprint(record: Mapping[str, Any]) -> str:
     return _records_fingerprint([record])
 
 
+PR61_CADENCE_PATHS = frozenset(
+    {
+        "contracts/config/SwitchboardDelta.vy",
+        "contracts/core/Deleverage.vy",
+        "scripts/abis/SwitchboardDelta.json",
+        "tests/config/test_switchboard_delta.py",
+    }
+)
+PR61_NEW_CONSTRUCTOR_CADENCE_KEY = (
+    "contracts/core/Deleverage.vy",
+    "__init__",
+    "block-unit-identifier",
+    "MAX_COOLDOWN_BLOCKS",
+    "assert _deleverageCooldown <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large",
+    1,
+)
+PR61_REMOVED_TEST_CADENCE_KEY = (
+    "tests/core/deleverage/test_deleverage_for_withdrawal.py",
+    "test_set_deleverage_cooldown_rejects_over_max",
+    "block-unit-identifier",
+    "MAX_COOLDOWN_BLOCKS",
+    '"""Test that setDeleverageCooldown rejects values over '
+    'MAX_COOLDOWN_BLOCKS (7_200)"""',
+    1,
+)
+PR61_DIRECT_BASELINE_LINES = {
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setStartEpochAtBlock",
+        "block.number",
+        1,
+    ): 915,
+    (
+        "contracts/core/AuctionHouse.vy",
+        "_createOrUpdateFungAuction",
+        "block.number",
+        1,
+    ): 917,
+    (
+        "contracts/core/AuctionHouse.vy",
+        "_buyFungibleAuction",
+        "block.number",
+        1,
+    ): 1100,
+    (
+        "contracts/core/AuctionHouse.vy",
+        "_buyFungibleAuction",
+        "block.number",
+        2,
+    ): 1100,
+    (
+        "contracts/core/AuctionHouse.vy",
+        "_buyFungibleAuction",
+        "block.number",
+        3,
+    ): 1119,
+    (
+        "contracts/core/Deleverage.vy",
+        "deleverageForWithdrawal",
+        "block.number",
+        1,
+    ): 520,
+    (
+        "contracts/core/Deleverage.vy",
+        "deleverageForWithdrawal",
+        "block.number",
+        2,
+    ): 520,
+    (
+        "contracts/core/Deleverage.vy",
+        "deleverageForWithdrawal",
+        "block.number",
+        3,
+    ): 583,
+}
+PR61_CADENCE_BASELINE_LINES = {
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        "restartDelayBlocks: uint256",
+        1,
+    ): 217,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "block-unit-identifier",
+        "MAX_COOLDOWN_BLOCKS",
+        "MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block",
+        1,
+    ): 447,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "cadence-comment",
+        "12s/block",
+        "MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block",
+        1,
+    ): 447,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setDeleverageCooldown",
+        "block-unit-identifier",
+        "MAX_COOLDOWN_BLOCKS",
+        "assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large",
+        1,
+    ): 605,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setRipeBondConfig",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        "restartDelayBlocks=_restartDelayBlocks,",
+        1,
+    ): 874,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setRipeBondConfig",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        "restartDelayBlocks=_restartDelayBlocks,",
+        2,
+    ): 885,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "executePendingAction",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        "config.restartDelayBlocks = p.restartDelayBlocks",
+        1,
+    ): 1288,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "executePendingAction",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        "config.restartDelayBlocks = p.restartDelayBlocks",
+        2,
+    ): 1288,
+    (
+        "contracts/core/Deleverage.vy",
+        "<module>",
+        "block-unit-identifier",
+        "MAX_COOLDOWN_BLOCKS",
+        "MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block",
+        1,
+    ): 195,
+    (
+        "contracts/core/Deleverage.vy",
+        "<module>",
+        "cadence-comment",
+        "12s/block",
+        "MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block",
+        1,
+    ): 195,
+    (
+        "scripts/abis/SwitchboardDelta.json",
+        "<module>",
+        "block-unit-identifier",
+        "restartDelayBlocks",
+        '"name": "restartDelayBlocks",',
+        2,
+    ): 2788,
+    (
+        "tests/config/test_switchboard_delta.py",
+        "test_set_deleverage_cooldown_rejects_over_max",
+        "block-unit-identifier",
+        "MAX_COOLDOWN_BLOCKS",
+        '"""Test that setDeleverageCooldown rejects values over '
+        'MAX_COOLDOWN_BLOCKS (7_200)"""',
+        1,
+    ): 2717,
+}
+PR61_SECONDS_BASELINE_LINES = {
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "DAY_IN_SECONDS",
+        "DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24",
+        1,
+    ): 451,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "DAY_IN_SECONDS",
+        "WEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS",
+        1,
+    ): 452,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "WEEK_IN_SECONDS",
+        "WEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS",
+        1,
+    ): 452,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "DAY_IN_SECONDS",
+        "MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS",
+        1,
+    ): 453,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "MONTH_IN_SECONDS",
+        "MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS",
+        1,
+    ): 453,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "DAY_IN_SECONDS",
+        "YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS",
+        1,
+    ): 454,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "<module>",
+        "seconds-unit-identifier",
+        "YEAR_IN_SECONDS",
+        "YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS",
+        1,
+    ): 454,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setMinCliffLength",
+        "seconds-unit-identifier",
+        "WEEK_IN_SECONDS",
+        "assert _minCliffLength > WEEK_IN_SECONDS # dev: invalid min cliff length",
+        1,
+    ): 674,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setMaxStartDelay",
+        "seconds-unit-identifier",
+        "MONTH_IN_SECONDS",
+        "assert _maxStartDelay <= 3 * MONTH_IN_SECONDS # dev: invalid max start delay",
+        1,
+    ): 686,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setVestingLengthBoundaries",
+        "seconds-unit-identifier",
+        "MONTH_IN_SECONDS",
+        "assert _minVestingLength > MONTH_IN_SECONDS # dev: invalid min vesting length",
+        1,
+    ): 699,
+    (
+        "contracts/config/SwitchboardDelta.vy",
+        "setVestingLengthBoundaries",
+        "seconds-unit-identifier",
+        "YEAR_IN_SECONDS",
+        "assert _maxVestingLength <= 5 * YEAR_IN_SECONDS # dev: invalid max vesting length",
+        1,
+    ): 700,
+}
+
+
+def _pr61_direct_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["directOccurrences"]
+        if str(record.get("path", "")) in PR61_PRODUCTION_SOURCE_SHA256
+    ]
+
+
+def _pr61_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if str(record.get("path", "")) in PR61_CADENCE_PATHS
+    ]
+
+
+def _pr61_seconds_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["secondsUnitCandidates"]
+        if str(record.get("path", ""))
+        == "contracts/config/SwitchboardDelta.vy"
+    ]
+
+
+def _pr61_path_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["vyperPathClassifications"]
+        if str(record.get("path", "")) in PR61_PRODUCTION_SOURCE_SHA256
+    ]
+
+
+def _is_exact_pr61_reconciliation(data: Mapping[str, Any]) -> bool:
+    direct_records = _pr61_direct_records(data)
+    cadence_records = _pr61_cadence_records(data)
+    seconds_records = _pr61_seconds_records(data)
+    path_records = _pr61_path_records(data)
+    removed_test_present = any(
+        _candidate_from_record(record) == PR61_REMOVED_TEST_CADENCE_KEY
+        for record in data["cadenceCandidates"]
+    )
+    return (
+        data.get("reviewProvenance") == EXPECTED_REVIEW_PROVENANCE
+        and len(direct_records) == PR61_DIRECT_RECORD_COUNT
+        and _records_fingerprint(direct_records)
+        == PR61_DIRECT_RECORDS_SHA256
+        and len(cadence_records) == PR61_CADENCE_RECORD_COUNT
+        and _records_fingerprint(cadence_records)
+        == PR61_CADENCE_RECORDS_SHA256
+        and len(seconds_records) == PR61_SECONDS_RECORD_COUNT
+        and _records_fingerprint(seconds_records)
+        == PR61_SECONDS_RECORDS_SHA256
+        and len(path_records) == PR61_PATH_RECORD_COUNT
+        and _records_fingerprint(path_records) == PR61_PATH_RECORDS_SHA256
+        and not removed_test_present
+    )
+
+
+def _pr61_artifact_layout_metadata_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if _candidate_from_record(record)
+        in PR61_ARTIFACT_LAYOUT_METADATA_CADENCE_KEYS
+    ]
+
+
+def _pr61_artifact_expectations_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if str(record.get("path", "")) == PR61_ARTIFACT_EXPECTATIONS_PATH
+    ]
+
+
+def _is_exact_reviewer_remediation_cadence_registry() -> bool:
+    return (
+        len(REVIEWER_REMEDIATION_CADENCE_KEYS)
+        == REVIEWER_REMEDIATION_CADENCE_KEY_COUNT
+        and _key_set_fingerprint(set(REVIEWER_REMEDIATION_CADENCE_KEYS))
+        == REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256
+    )
+
+
+def _is_exact_pr61_artifact_layout_metadata(
+    data: Mapping[str, Any],
+    root: Path = ROOT,
+) -> bool:
+    records = _pr61_artifact_layout_metadata_records(data)
+    path_records = _pr61_artifact_expectations_cadence_records(data)
+    artifact_path = root / PR61_ARTIFACT_EXPECTATIONS_PATH
+    try:
+        artifact_sha256 = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    except OSError:
+        return False
+    return (
+        _is_exact_pr61_reconciliation(data)
+        and _is_exact_reviewer_remediation_cadence_registry()
+        and artifact_sha256 == PR61_ARTIFACT_EXPECTATIONS_SHA256
+        and len(records) == PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT
+        and _records_fingerprint(records)
+        == PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256
+        and len(path_records)
+        == PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORD_COUNT
+        and _records_fingerprint(path_records)
+        == PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256
+    )
+
+
+def _pr61_baseline_setter_record() -> dict[str, Any]:
+    return {
+        "path": "contracts/core/Deleverage.vy",
+        "function": "setDeleverageCooldown",
+        "pattern": "block-unit-identifier",
+        "matchedText": "MAX_COOLDOWN_BLOCKS",
+        "normalizedSnippet": (
+            "assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large"
+        ),
+        "ordinalInFunction": 1,
+        "reviewedLine": 1227,
+        "classification": "production",
+        "semanticIds": [],
+        "reviewDomain": "cadence-surface",
+        "semanticReview": {
+            "owner": "protocol/security",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+def _pr61_removed_test_record() -> dict[str, Any]:
+    return {
+        "path": "tests/core/deleverage/test_deleverage_for_withdrawal.py",
+        "function": "test_set_deleverage_cooldown_rejects_over_max",
+        "pattern": "block-unit-identifier",
+        "matchedText": "MAX_COOLDOWN_BLOCKS",
+        "normalizedSnippet": (
+            '"""Test that setDeleverageCooldown rejects values over '
+            'MAX_COOLDOWN_BLOCKS (7_200)"""'
+        ),
+        "ordinalInFunction": 1,
+        "reviewedLine": 3348,
+        "classification": "test",
+        "semanticIds": [],
+        "reviewDomain": "cadence-surface",
+        "semanticReview": {
+            "owner": "protocol/security",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+def _restore_pr61_legacy_inventory(legacy: dict[str, Any]) -> None:
+    for record in legacy["directOccurrences"]:
+        baseline_line = PR61_DIRECT_BASELINE_LINES.get(_record_key(record))
+        if baseline_line is not None:
+            record["reviewedLine"] = baseline_line
+
+    restored_cadence: list[dict[str, Any]] = []
+    for record in legacy["cadenceCandidates"]:
+        key = _candidate_from_record(record)
+        if key == PR61_NEW_CONSTRUCTOR_CADENCE_KEY:
+            restored_cadence.append(_pr61_baseline_setter_record())
+            continue
+        baseline_line = PR61_CADENCE_BASELINE_LINES.get(key)
+        if baseline_line is not None:
+            record["reviewedLine"] = baseline_line
+        restored_cadence.append(record)
+    insert_at = next(
+        (
+            index
+            for index, record in enumerate(restored_cadence)
+            if str(record.get("path", ""))
+            == "tests/core/endaoment/test_endaoment_psm_config.py"
+        ),
+        len(restored_cadence),
+    )
+    restored_cadence.insert(insert_at, _pr61_removed_test_record())
+    legacy["cadenceCandidates"] = restored_cadence
+
+    for record in legacy["secondsUnitCandidates"]:
+        baseline_line = PR61_SECONDS_BASELINE_LINES.get(
+            _candidate_from_record(record)
+        )
+        if baseline_line is not None:
+            record["reviewedLine"] = baseline_line
+
+    for record in legacy["vyperPathClassifications"]:
+        path = str(record.get("path", ""))
+        if path in PR61_BASELINE_SOURCE_SHA256:
+            record["contentSha256"] = PR61_BASELINE_SOURCE_SHA256[path]
+            record["semanticReview"]["commit"] = HARDENING_REVIEW_COMMIT
+
+    legacy["reviewProvenance"].pop("pr61ReviewCommit", None)
+
+
 def _is_exact_h04_cadence_batch(data: Mapping[str, Any]) -> bool:
     records = _h04_cadence_records(data)
     sites = _h04_cad_sites(data)
@@ -983,11 +1585,30 @@ def _m3_baseline_credit_engine_record() -> dict[str, Any]:
     }
 
 
-def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
+def _s5_legacy_inventory_fingerprint(
+    data: Mapping[str, Any],
+    root: Path = ROOT,
+) -> str:
     exact_h04_records, exact_h04_sites = (
         _exact_reviewed_h04_record_fingerprints(data)
     )
+    exact_pr61_reconciliation = _is_exact_pr61_reconciliation(data)
+    exact_pr61_artifact_metadata = _is_exact_pr61_artifact_layout_metadata(
+        data, root
+    )
+    exact_reviewer_remediation_keys = (
+        REVIEWER_REMEDIATION_CADENCE_KEYS
+        if _is_exact_reviewer_remediation_cadence_registry()
+        else frozenset()
+    )
+    exact_pr61_artifact_metadata_keys = (
+        PR61_ARTIFACT_LAYOUT_METADATA_CADENCE_KEYS
+        if exact_pr61_artifact_metadata
+        else frozenset()
+    )
     legacy = copy.deepcopy(dict(data))
+    if exact_pr61_reconciliation:
+        _restore_pr61_legacy_inventory(legacy)
     legacy.pop("expectedProductionCounts", None)
     legacy["directOccurrences"] = [
         record
@@ -1000,7 +1621,8 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
         if _candidate_from_record(record)
         not in (
             S5_RECONCILED_CADENCE_KEYS
-            | REVIEWER_REMEDIATION_CADENCE_KEYS
+            | exact_reviewer_remediation_keys
+            | exact_pr61_artifact_metadata_keys
         )
         and _record_fingerprint(record) not in exact_h04_records
     ]
@@ -1137,8 +1759,9 @@ def _validate_s5_review_provenance(
 
 def _check_s5_legacy_inventory_fingerprint(
     data: Mapping[str, Any],
+    root: Path = ROOT,
 ) -> list[Finding]:
-    fingerprint = _s5_legacy_inventory_fingerprint(data)
+    fingerprint = _s5_legacy_inventory_fingerprint(data, root)
     if fingerprint == S5_LEGACY_INVENTORY_SHA256:
         return []
     return [
@@ -1288,7 +1911,10 @@ def _load_inventory(path: Path) -> tuple[dict[str, Any] | None, list[Finding]]:
     return data, []
 
 
-def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
+def _validate_schema(
+    data: Mapping[str, Any],
+    root: Path = ROOT,
+) -> list[Finding]:
     findings: list[Finding] = []
     version = data.get("schemaVersion")
     if version != EXPECTED_SCHEMA_VERSION:
@@ -1373,6 +1999,93 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                 ),
             )
         )
+    if not _is_exact_pr61_reconciliation(data):
+        pr61_direct = _pr61_direct_records(data)
+        pr61_cadence = _pr61_cadence_records(data)
+        pr61_seconds = _pr61_seconds_records(data)
+        pr61_paths = _pr61_path_records(data)
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PR61-RECONCILIATION",
+                domain="schema",
+                expected=(
+                    f"direct={PR61_DIRECT_RECORD_COUNT}/"
+                    f"{PR61_DIRECT_RECORDS_SHA256},"
+                    f"cadence={PR61_CADENCE_RECORD_COUNT}/"
+                    f"{PR61_CADENCE_RECORDS_SHA256},"
+                    f"seconds={PR61_SECONDS_RECORD_COUNT}/"
+                    f"{PR61_SECONDS_RECORDS_SHA256},"
+                    f"paths={PR61_PATH_RECORD_COUNT}/"
+                    f"{PR61_PATH_RECORDS_SHA256}"
+                ),
+                actual=(
+                    f"direct={len(pr61_direct)}/"
+                    f"{_records_fingerprint(pr61_direct)},"
+                    f"cadence={len(pr61_cadence)}/"
+                    f"{_records_fingerprint(pr61_cadence)},"
+                    f"seconds={len(pr61_seconds)}/"
+                    f"{_records_fingerprint(pr61_seconds)},"
+                    f"paths={len(pr61_paths)}/"
+                    f"{_records_fingerprint(pr61_paths)}"
+                ),
+                remediation=(
+                    "restore the exact PR #61 Gate 1 reconciliation batch; "
+                    "no adjacent record or future path inherits its authority"
+                ),
+            )
+        )
+    exact_pr61_artifact_metadata = (
+        _is_exact_pr61_artifact_layout_metadata(data, root)
+    )
+    if not exact_pr61_artifact_metadata:
+        metadata_records = _pr61_artifact_layout_metadata_records(data)
+        artifact_path_records = _pr61_artifact_expectations_cadence_records(
+            data
+        )
+        artifact_path = root / PR61_ARTIFACT_EXPECTATIONS_PATH
+        try:
+            artifact_sha256 = hashlib.sha256(
+                artifact_path.read_bytes()
+            ).hexdigest()
+        except OSError:
+            artifact_sha256 = "missing"
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PR61-ARTIFACT-METADATA",
+                domain="schema",
+                path=PR61_ARTIFACT_EXPECTATIONS_PATH,
+                expected=(
+                    f"records={PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT}/"
+                    f"{PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256},"
+                    f"path_records="
+                    f"{PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORD_COUNT}/"
+                    f"{PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256},"
+                    f"artifact={PR61_ARTIFACT_EXPECTATIONS_SHA256},"
+                    f"general_registry="
+                    f"{REVIEWER_REMEDIATION_CADENCE_KEY_COUNT}/"
+                    f"{REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256},"
+                    "pr61_reconciliation=exact"
+                ),
+                actual=(
+                    f"records={len(metadata_records)}/"
+                    f"{_records_fingerprint(metadata_records)},"
+                    f"path_records={len(artifact_path_records)}/"
+                    f"{_records_fingerprint(artifact_path_records)},"
+                    f"artifact={artifact_sha256},"
+                    f"general_registry="
+                    f"{len(REVIEWER_REMEDIATION_CADENCE_KEYS)}/"
+                    f"{_key_set_fingerprint(set(REVIEWER_REMEDIATION_CADENCE_KEYS))},"
+                    f"pr61_reconciliation="
+                    f"{'exact' if _is_exact_pr61_reconciliation(data) else 'drifted'}"
+                ),
+                remediation=(
+                    "restore the exact eight-record PR #61 artifact-layout "
+                    "metadata package, finalized artifact bytes, general "
+                    "remediation registry, and PR #61 provenance"
+                ),
+            )
+        )
+        findings.extend(_check_s5_legacy_inventory_fingerprint(data, root))
     expected_path_config = (
         EXPECTED_PRODUCTION_ROOTS,
         EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
@@ -1606,13 +2319,20 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
     ):
         for record in records:
             if isinstance(record, Mapping):
+                record_expected_commit = expected_commit
+                if (
+                    domain == "classification"
+                    and str(record.get("path", ""))
+                    in PR61_PRODUCTION_SOURCE_SHA256
+                ):
+                    record_expected_commit = PR61_REVIEW_COMMIT
                 _validate_semantic_review(
                     record,
                     domain,
                     str(record.get("id", _candidate_label(record))),
                     findings,
                     expected_owner,
-                    expected_commit,
+                    record_expected_commit,
                 )
     for record in data["cadenceCandidates"]:
         semantic_ids = _candidate_semantic_ids(record)
@@ -1624,7 +2344,12 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                 H04_REVIEW_COMMIT
                 if exact_h04_batch
                 and _is_h04_cadence_path(str(record.get("path", "")))
-                else HARDENING_REVIEW_COMMIT
+                else (
+                    PR61_REVIEW_COMMIT
+                    if _candidate_from_record(record)
+                    == PR61_NEW_CONSTRUCTOR_CADENCE_KEY
+                    else HARDENING_REVIEW_COMMIT
+                )
             )
         )
         _validate_semantic_review(
@@ -2205,7 +2930,7 @@ def check_repository(
     data, findings = _load_inventory(inventory)
     if data is None:
         return CheckResult(findings=findings, success_lines=[])
-    findings.extend(_validate_schema(data))
+    findings.extend(_validate_schema(data, root))
     if findings:
         return CheckResult(findings=findings, success_lines=[])
 
@@ -2399,7 +3124,7 @@ def check_repository(
         )
         for classification in ("mock", "testing", "test")
     }
-    findings.extend(_check_s5_legacy_inventory_fingerprint(data))
+    findings.extend(_check_s5_legacy_inventory_fingerprint(data, root))
     findings.extend(_check_post_s5_production_inventory_fingerprint(data))
     success_lines = [
         (

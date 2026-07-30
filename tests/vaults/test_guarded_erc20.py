@@ -1682,6 +1682,7 @@ def test_current_endaoment_endpoints_are_rejected_before_delivery(
                 40,
                 endpoint,
                 guarded_erc20_vault,
+                False,
                 auction_house.getAddys(),
                 sender=deleverage.address,
             )

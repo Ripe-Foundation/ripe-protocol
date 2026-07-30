@@ -13,10 +13,10 @@ def test_m4_deleverage_source_abi_and_vault_interface_are_frozen():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/Deleverage.vy": (
-            "eb28c2d22a695c3148acfc00b54507d3b2f3e4462aeae119ba4183d09832815b"
+            "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138"
         ),
         "scripts/abis/Deleverage.json": (
-            "0ba82a99c130e01149052add397299aeb6a40dcf1b65de98fa168feaf82553d3"
+            "d0480bf6b0d7d05c461b33b31dd0e85b48135fa66d850a4c8526e0d9fefaea8d"
         ),
         "interfaces/Vault.vyi": (
             "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"

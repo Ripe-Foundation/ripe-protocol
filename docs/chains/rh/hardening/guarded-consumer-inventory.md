@@ -1,7 +1,8 @@
 # GuardedErc20 consumer inventory
 
-This is the frozen G4 inventory at baseline
-`a86650b187c523f27c92f05bfe959d06840025a6`. It covers every `Vault`
+This is the G4 inventory rooted at baseline
+`a86650b187c523f27c92f05bfe959d06840025a6` and reconciled for the
+PR #61 Gate 1 candidate. It covers every `Vault`
 read in CreditEngine, AuctionHouse, CreditRedeem, the reviewed-baseline
 Deleverage source, Lootbox, and Teller whose result is an amount, a position
 discovery input, or a vault-capability input. The machine test verifies the
@@ -39,10 +40,10 @@ source review and test update.
   "schema": 1,
   "baseline": "a86650b187c523f27c92f05bfe959d06840025a6",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "dc871e77efdf4320f98f5f4296dbe4c07689e434f9c4eae7c9ed971b85ee9cae",
+    "contracts/core/AuctionHouse.vy": "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921",
     "contracts/core/CreditEngine.vy": "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d",
     "contracts/core/CreditRedeem.vy": "0567b9118868f7fc37a0e583580ab6c5cd1e85274747860a6394f1f1c4364c0e",
-    "contracts/core/Deleverage.vy": "eb28c2d22a695c3148acfc00b54507d3b2f3e4462aeae119ba4183d09832815b",
+    "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
     "contracts/core/Lootbox.vy": "669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65",
     "contracts/core/Teller.vy": "4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909"
   },
@@ -59,9 +60,9 @@ source review and test update.
   ],
   "rows": [
     {
-      "id": "AH-414",
+      "id": "AH-420",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 414,
+      "line": 420,
       "function": "_performLiquidationPhases",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -69,9 +70,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-496",
+      "id": "AH-502",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 496,
+      "line": 502,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -79,9 +80,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-510",
+      "id": "AH-516",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 510,
+      "line": 516,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -89,9 +90,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-645",
+      "id": "AH-651",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 645,
+      "line": 651,
       "function": "_swapWithSpecificStabPool",
       "getter": "isSupportedVaultAsset",
       "classification": "capability_discovery_nominal_allowed",
@@ -99,13 +100,23 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-886",
+      "id": "AH-892",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 886,
+      "line": 892,
       "function": "_canStartAuction",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Checks nominal position existence before consulting liquidation state.",
+      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+    },
+    {
+      "id": "AH-1204",
+      "path": "contracts/core/AuctionHouse.vy",
+      "line": 1204,
+      "function": "withdrawTokensFromVault",
+      "getter": "getTotalAmountForUser",
+      "classification": "value_backing_required",
+      "reason": "Clamps the Deleverage-requested withdrawal to the backing-aware user amount before safe conversion and mutation.",
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
@@ -149,9 +160,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-501",
+      "id": "DL-579",
       "path": "contracts/core/Deleverage.vy",
-      "line": 501,
+      "line": 579,
       "function": "deleverageForWithdrawal",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -159,9 +170,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-693",
+      "id": "DL-823",
       "path": "contracts/core/Deleverage.vy",
-      "line": 693,
+      "line": 823,
       "function": "_performDeleveragePhases",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -169,9 +180,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-768",
+      "id": "DL-898",
       "path": "contracts/core/Deleverage.vy",
-      "line": 768,
+      "line": 898,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -179,9 +190,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-781",
+      "id": "DL-911",
       "path": "contracts/core/Deleverage.vy",
-      "line": 781,
+      "line": 911,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -189,9 +200,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-943",
+      "id": "DL-1073",
       "path": "contracts/core/Deleverage.vy",
-      "line": 943,
+      "line": 1073,
       "function": "_getDeleverageInfo",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -199,9 +210,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-951",
+      "id": "DL-1081",
       "path": "contracts/core/Deleverage.vy",
-      "line": 951,
+      "line": 1081,
       "function": "_getDeleverageInfo",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -209,9 +220,9 @@ source review and test update.
       "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-956",
+      "id": "DL-1086",
       "path": "contracts/core/Deleverage.vy",
-      "line": 956,
+      "line": 1086,
       "function": "_getDeleverageInfo",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",

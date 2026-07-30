@@ -1,10 +1,18 @@
 import pytest
 import boa
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from conf_utils import filter_logs, set_full_payoff_params
 
 HUNDRED_PERCENT = 100_00
 SIX_DECIMALS = 10**6
 EIGHT_DECIMALS = 10**8
+
+
+@pytest.fixture(autouse=True)
+def reset_undy_v2_mock(mock_undy_v2):
+    yield
+    mock_undy_v2.setAllAddressesAreVaults(True)
+    mock_undy_v2.setVaultCheckRevertAddress(ZERO_ADDRESS)
 
 
 @pytest.fixture
@@ -226,6 +234,123 @@ def test_trusted_caller_no_restrictions(
     # For trusted caller, should deleverage full debt
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     _test(post_debt, 0)  # Full debt repaid
+
+
+@pytest.mark.parametrize(
+    "caller_is_trusted",
+    [False, True],
+    ids=["untrusted", "trusted"],
+)
+def test_exact_boundary_full_payoff_extras_require_trusted_caller(
+    ripe_hq,
+    switchboard,
+    switchboard_alpha,
+    deleverage,
+    credit_engine,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    performDeposit,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    mission_control,
+    endaoment_funds,
+    caller_is_trusted,
+):
+    """An exact-boundary untrusted cap must not activate full-payoff extras."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.setUnderscoreRegistry(
+        ZERO_ADDRESS,
+        sender=switchboard_alpha.address,
+    )
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    pre_debt, borrow_terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert pre_debt.amount == 100 * EIGHTEEN_DECIMALS
+    assert borrow_terms.collateralVal == 200 * EIGHTEEN_DECIMALS
+    assert borrow_terms.lowestLtv == 50_00
+    assert borrow_terms.debtTerms.redemptionThreshold == 50_00
+    assert mission_control.getLtvPaybackBuffer() == 0
+    assert deleverage.getMaxDeleverageAmount(bob) == pre_debt.amount
+    assert mission_control.underscoreRegistry() == ZERO_ADDRESS
+
+    caller = switchboard_alpha.address if caller_is_trusted else alice
+    is_ripe_trusted = ripe_hq.isValidAddr(caller) or switchboard.isSwitchboardAddr(caller)
+    assert is_ripe_trusted is caller_is_trusted
+    if not caller_is_trusted:
+        assert caller != bob
+        assert mission_control.userDelegation(bob, caller).canBorrow is False
+
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    pre_endaoment = alpha_token.balanceOf(endaoment_funds)
+    expected_extra = 10**15 if caller_is_trusted else 0
+    expected_collateral = pre_debt.amount + expected_extra
+
+    repaid_amount = teller.deleverageUser(bob, 0, sender=caller)
+
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    post_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    post_endaoment = alpha_token.balanceOf(endaoment_funds)
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+
+    assert repaid_amount == pre_debt.amount
+    assert post_debt == 0
+    assert pre_collateral - post_collateral == expected_collateral
+    assert post_endaoment - pre_endaoment == expected_collateral
+
+    assert transfer_log.user == bob
+    assert transfer_log.vaultId == 3
+    assert transfer_log.asset == alpha_token.address
+    assert transfer_log.amountSent == expected_collateral
+    assert transfer_log.usdValue == expected_collateral
+    assert transfer_log.isDepleted is False
+
+    assert deleverage_log.user == bob
+    assert deleverage_log.caller == caller
+    assert deleverage_log.targetRepayAmount == pre_debt.amount
+    assert deleverage_log.targetRepayAmountWithBuffer == expected_collateral
+    assert deleverage_log.collateralValueRepaid == expected_collateral
+    assert deleverage_log.debtToClear == pre_debt.amount
+    assert deleverage_log.hasGoodDebtHealth is True
 
 
 def test_user_self_deleverage_no_restrictions(
@@ -1644,11 +1769,26 @@ def test_deleverageManyUsers_trusted_no_caps(
     performDeposit,
     setup_redemption_zone,
     mock_price_source,
+    mission_control,
+    mock_undy_v2,
     _test,
 ):
     """
-    Test that trusted caller can fully deleverage all users in batch.
+    Test that batch payoff extras are classified per position owner.
     """
+    full_payoff_buffer = 10**15
+    full_payoff_overage_bps = 100
+    deleverage.setDeleverageFullPayoffParam(
+        1,
+        full_payoff_buffer,
+        sender=switchboard_alpha.address,
+    )
+    deleverage.setDeleverageFullPayoffParam(
+        2,
+        full_payoff_overage_bps,
+        sender=switchboard_alpha.address,
+    )
+
     # Setup both users in redemption zone
     initial_price, new_price = setup_redemption_zone(
         alpha_token, alpha_token_whale, bob,
@@ -1666,6 +1806,16 @@ def test_deleverageManyUsers_trusted_no_caps(
     # Drop price
     mock_price_source.setPrice(alpha_token, new_price)
 
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, True)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+    mock_undy_v2.setEarnVault(alice, False)
+    mock_undy_v2.setBasicEarnVault(alice, False)
+
+    bob_pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    alice_pre_debt = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+
     # Teller (trusted) batch deleverages
     users = [(bob, 0), (alice, 0)]
     total_repaid = teller.deleverageManyUsers(users, sender=switchboard_alpha.address)
@@ -1676,6 +1826,16 @@ def test_deleverageManyUsers_trusted_no_caps(
 
     _test(bob_debt, 0)
     _test(alice_debt, 0)
+    assert total_repaid == bob_pre_debt + alice_pre_debt
+
+    logs = filter_logs(teller, "DeleverageUser")[-2:]
+    logs_by_user = {log.user: log for log in logs}
+    expected_alice_overage = min(
+        full_payoff_buffer,
+        alice_pre_debt * full_payoff_overage_bps // HUNDRED_PERCENT,
+    )
+    assert logs_by_user[bob].targetRepayAmountWithBuffer == bob_pre_debt
+    assert logs_by_user[alice].targetRepayAmountWithBuffer == alice_pre_debt + expected_alice_overage
 
 
 ###############################################################################
@@ -1685,6 +1845,120 @@ def test_deleverageManyUsers_trusted_no_caps(
 # isBasicEarnVault() in _isUnderscoreEarnVaultWithRegistry(), breaking
 # permission checks for leveraged/amplified vaults.
 ###############################################################################
+
+
+def test_local_trust_checks_do_not_depend_on_underscore_registry_health(
+    ripe_hq,
+    switchboard,
+    switchboard_alpha,
+    teller,
+    deleverage,
+    credit_engine,
+    alpha_token,
+    bob,
+    mission_control,
+    mock_undy_v2,
+):
+    """Locally trusted Ripe callers must short-circuit Underscore permission checks."""
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert ripe_hq.isValidAddr(teller.address)
+    assert ripe_hq.isValidAddr(deleverage.address)
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setVaultCheckRevertAddress(teller.address)
+
+    with boa.reverts("cannot deleverage"):
+        teller.deleverageUser(bob, 1, sender=teller.address)
+
+    with boa.reverts("nobody deleveraged"):
+        teller.deleverageManyUsers([(bob, 1)], sender=teller.address)
+
+    assert teller.deleverageWithSpecificAssets([], bob, sender=teller.address) == 0
+    assert deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 1, sender=teller.address
+    ) is False
+
+
+def test_full_payoff_owner_classification_depends_on_registry_health(
+    switchboard_alpha,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    mission_control,
+    mock_undy_v2,
+    setupDeleverage,
+    setup_priority_configs,
+    setup_redemption_zone,
+):
+    """A broken registry blocks full-payoff classification and owner debt reads."""
+    setup_redemption_zone(
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        1_000 * EIGHTEEN_DECIMALS,
+        500 * EIGHTEEN_DECIMALS,
+    )
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        get_sgreen=False,
+    )
+    setup_priority_configs(
+        priority_liq_assets=[(simple_erc20_vault, alpha_token)]
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, True)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+    full_payoff_buffer = 10**15
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=full_payoff_buffer,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+    mock_undy_v2.setVaultCheckRevertAddress(bob)
+
+    # The caller is locally trusted, but a full payoff still classifies the
+    # position owner so earn-vault owners never pay full-payoff extras.
+    with boa.reverts("mock underscore vault check"):
+        teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+
+    # CreditEngine independently classifies Underscore owners on its read path,
+    # widening the configured registry's failure surface beyond Deleverage.
+    with boa.reverts("mock underscore vault check"):
+        credit_engine.getLatestUserDebtAndTerms(bob, False)
+
+    # Restore the mock before reading the unchanged position.
+    mock_undy_v2.setVaultCheckRevertAddress(ZERO_ADDRESS)
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == pre_collateral
+
+    # Governance's documented escape hatch removes the external dependency,
+    # but also makes earn-vault owners indistinguishable from ordinary owners.
+    mock_undy_v2.setVaultCheckRevertAddress(bob)
+    mission_control.setUnderscoreRegistry(
+        ZERO_ADDRESS,
+        sender=switchboard_alpha.address,
+    )
+    assert teller.deleverageUser(bob, 0, sender=switchboard_alpha.address) > 0
+    deleverage_log = filter_logs(teller, "DeleverageUser")[0]
+    assert deleverage_log.targetRepayAmountWithBuffer == pre_debt + full_payoff_buffer
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
 
 
 def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(

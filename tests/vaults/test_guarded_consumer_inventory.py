@@ -131,9 +131,10 @@ def test_guarded_consumer_inventory_enforces_amount_policy():
         if row["classification"] == "value_backing_required"
     }
     assert required_paths == {
+        ("contracts/core/AuctionHouse.vy", 1204),
         ("contracts/core/CreditEngine.vy", 729),
         ("contracts/core/CreditEngine.vy", 1252),
-        ("contracts/core/Deleverage.vy", 501),
-        ("contracts/core/Deleverage.vy", 956),
+        ("contracts/core/Deleverage.vy", 579),
+        ("contracts/core/Deleverage.vy", 1086),
         ("contracts/core/Teller.vy", 381),
     }

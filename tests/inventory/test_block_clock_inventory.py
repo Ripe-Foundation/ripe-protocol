@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -16,6 +17,9 @@ from scripts import check_block_clock_inventory as checker
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_RELATIVE = Path("config/block-clock-inventory.json")
 SCRIPT_RELATIVE = Path("scripts/check_block_clock_inventory.py")
+ARTIFACT_EXPECTATIONS_RELATIVE = Path(
+    "config/contract-artifact-expectations.json"
+)
 IMPLEMENTATION_RECORD_RELATIVE = Path(
     "docs/chains/rh/ledger-guard-implementation-record.md"
 )
@@ -74,6 +78,14 @@ def _assert_failure(
     return result
 
 
+def _assert_pr61_artifact_metadata_failure(root: Path) -> checker.CheckResult:
+    result = checker.check_repository(root)
+    assert not result.ok, result.output
+    assert "INV-SCHEMA-PR61-ARTIFACT-METADATA" in _codes(result), result.output
+    assert "INV-SCHEMA-S5-LEGACY-FINGERPRINT" in _codes(result), result.output
+    return result
+
+
 @pytest.fixture(scope="session")
 def approved_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     template = tmp_path_factory.mktemp("clock-inventory-template") / "repo"
@@ -121,7 +133,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=599" in result.output
+    assert "cadence_candidates=606" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
@@ -134,7 +146,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=177" in result.output
+    assert "test=176" in result.output
 
 
 def test_h04_exact_batch_preserves_both_frozen_fingerprints(
@@ -169,6 +181,246 @@ def test_h04_exact_batch_preserves_both_frozen_fingerprints(
     )
 
 
+def test_pr61_exact_batch_preserves_the_frozen_legacy_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    batches = (
+        (
+            checker._pr61_direct_records(inventory),
+            checker.PR61_DIRECT_RECORD_COUNT,
+            checker.PR61_DIRECT_RECORDS_SHA256,
+        ),
+        (
+            checker._pr61_cadence_records(inventory),
+            checker.PR61_CADENCE_RECORD_COUNT,
+            checker.PR61_CADENCE_RECORDS_SHA256,
+        ),
+        (
+            checker._pr61_seconds_records(inventory),
+            checker.PR61_SECONDS_RECORD_COUNT,
+            checker.PR61_SECONDS_RECORDS_SHA256,
+        ),
+        (
+            checker._pr61_path_records(inventory),
+            checker.PR61_PATH_RECORD_COUNT,
+            checker.PR61_PATH_RECORDS_SHA256,
+        ),
+    )
+    assert checker._is_exact_pr61_reconciliation(inventory)
+    for records, expected_count, expected_fingerprint in batches:
+        assert len(records) == expected_count
+        assert checker._records_fingerprint(records) == expected_fingerprint
+    assert (
+        inventory["reviewProvenance"]["pr61ReviewCommit"]
+        == checker.PR61_REVIEW_COMMIT
+    )
+    assert checker._s5_legacy_inventory_fingerprint(inventory) == (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert checker._post_s5_production_inventory_fingerprint(inventory) == (
+        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_pr61_exact_artifact_layout_metadata_package_preserves_authority(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = checker._pr61_artifact_layout_metadata_records(inventory)
+    path_records = checker._pr61_artifact_expectations_cadence_records(
+        inventory
+    )
+
+    assert checker._is_exact_pr61_artifact_layout_metadata(
+        inventory, fixture_repo
+    )
+    assert len(records) == checker.PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT == 8
+    assert checker._records_fingerprint(records) == (
+        checker.PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256
+    )
+    assert len(path_records) == (
+        checker.PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORD_COUNT
+    ) == 11
+    assert checker._records_fingerprint(path_records) == (
+        checker.PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256
+    )
+    artifact_bytes = (fixture_repo / ARTIFACT_EXPECTATIONS_RELATIVE).read_bytes()
+    assert hashlib.sha256(artifact_bytes).hexdigest() == (
+        checker.PR61_ARTIFACT_EXPECTATIONS_SHA256
+    )
+    assert checker._s5_legacy_inventory_fingerprint(
+        inventory, fixture_repo
+    ) == checker.S5_LEGACY_INVENTORY_SHA256
+    assert checker._post_s5_production_inventory_fingerprint(inventory) == (
+        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_every_field_of_every_pr61_artifact_metadata_record_is_bound(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    field_mutations = (
+        (("path",), "config/future-artifact-expectations.json"),
+        (("function",), "future_group"),
+        (("pattern",), "cadence-comment"),
+        (("matchedText",), '"futureDelay":'),
+        (("normalizedSnippet",), '"futureDelay": {'),
+        (("ordinalInFunction",), 99),
+        (("reviewedLine",), 99),
+        (("classification",), "tooling"),
+        (("semanticIds",), ["CAD-001"]),
+        (("reviewDomain",), "future-surface"),
+        (("semanticReview", "owner"), "engineering/tooling"),
+        (("semanticReview", "status"), "ignored"),
+        (("semanticReview", "commit"), "0" * 40),
+    )
+
+    for record_index in range(
+        checker.PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT
+    ):
+        for field_path, replacement in field_mutations:
+            mutated = copy.deepcopy(inventory)
+            record = checker._pr61_artifact_layout_metadata_records(mutated)[
+                record_index
+            ]
+            target = record
+            for key in field_path[:-1]:
+                target = target[key]
+            target[field_path[-1]] = replacement
+            assert not checker._is_exact_pr61_artifact_layout_metadata(
+                mutated, fixture_repo
+            )
+            assert checker._s5_legacy_inventory_fingerprint(
+                mutated, fixture_repo
+            ) != checker.S5_LEGACY_INVENTORY_SHA256
+
+
+def test_pr61_artifact_metadata_tuple_drift_reports_legacy_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    checker._pr61_artifact_layout_metadata_records(inventory)[0][
+        "reviewedLine"
+    ] += 1
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_artifact_metadata_record_removal_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    removed = checker._pr61_artifact_layout_metadata_records(inventory)[3]
+    inventory["cadenceCandidates"].remove(removed)
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_artifact_metadata_ninth_lookalike_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    future = copy.deepcopy(
+        checker._pr61_artifact_layout_metadata_records(inventory)[0]
+    )
+    future["matchedText"] = '"futureDelay":'
+    future["normalizedSnippet"] = '"futureDelay": {'
+    future["reviewedLine"] = 1200
+    inventory["cadenceCandidates"].append(future)
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_artifact_metadata_reordering_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = checker._pr61_artifact_layout_metadata_records(inventory)
+    first_index = inventory["cadenceCandidates"].index(records[0])
+    second_index = inventory["cadenceCandidates"].index(records[1])
+    inventory["cadenceCandidates"][first_index] = records[1]
+    inventory["cadenceCandidates"][second_index] = records[0]
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_artifact_expectations_byte_drift_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    _append(fixture_repo / ARTIFACT_EXPECTATIONS_RELATIVE, "\n")
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_artifact_metadata_provenance_drift_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["reviewProvenance"]["pr61ReviewCommit"] = "0" * 40
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_general_remediation_registry_expansion_cannot_escape_legacy_authority(
+    fixture_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    future_key = (
+        "config/future-artifact-expectations.json",
+        "<module>",
+        "block-default-key",
+        '"futureDelay":',
+        '"futureDelay": {',
+        1,
+    )
+    monkeypatch.setattr(
+        checker,
+        "REVIEWER_REMEDIATION_CADENCE_KEYS",
+        checker.REVIEWER_REMEDIATION_CADENCE_KEYS | {future_key},
+    )
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_pr61_direct_tuple_drift_fails_closed(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    checker._pr61_direct_records(inventory)[0]["reviewedLine"] += 1
+    assert not checker._is_exact_pr61_reconciliation(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PR61-RECONCILIATION")
+
+
+def test_pr61_path_provenance_drift_fails_closed(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    checker._pr61_path_records(inventory)[0]["semanticReview"]["commit"] = (
+        checker.HARDENING_REVIEW_COMMIT
+    )
+    assert not checker._is_exact_pr61_reconciliation(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PR61-RECONCILIATION")
+
+
+def test_pr61_removed_test_record_gains_no_authority(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["cadenceCandidates"].append(
+        checker._pr61_removed_test_record()
+    )
+    assert not checker._is_exact_pr61_reconciliation(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PR61-RECONCILIATION")
+
+
 def test_h04_absent_contract_has_no_production_admission(
     fixture_repo: Path,
 ) -> None:
@@ -178,7 +430,7 @@ def test_h04_absent_contract_has_no_production_admission(
         record["path"] for record in inventory["vyperPathClassifications"]
     }
     assert checker.POST_S5_PRODUCTION_INVENTORY_SHA256 == (
-        "f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd"
+        "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
@@ -1612,6 +1864,10 @@ def test_schema_documents_naming_and_historical_boundaries(
     assert (
         inventory["reviewProvenance"]["hardeningApprovalCommit"]
         == checker.HARDENING_REVIEW_COMMIT
+    )
+    assert (
+        inventory["reviewProvenance"]["pr61ReviewCommit"]
+        == checker.PR61_REVIEW_COMMIT
     )
     assert not any(
         record.get("semanticId") == "REVIEWED-CADENCE-SURFACE"
