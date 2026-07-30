@@ -18,6 +18,7 @@ _isUserWallet: public(bool)
 _earnVaults: public(HashMap[address, bool])
 _basicEarnVaults: public(HashMap[address, bool])
 _allAddressesAreVaults: public(bool)
+_vaultCheckRevertAddress: public(address)
 
 
 @deploy
@@ -64,6 +65,7 @@ def setUseThisLegoId(_legoId: uint256):
 @view
 @external
 def isEarnVault(_vaultAddr: address) -> bool:
+    assert _vaultAddr != self._vaultCheckRevertAddress # dev: mock underscore vault check
     if self._allAddressesAreVaults:
         return True
     return self._earnVaults[_vaultAddr]
@@ -72,6 +74,7 @@ def isEarnVault(_vaultAddr: address) -> bool:
 @view
 @external
 def isBasicEarnVault(_vaultAddr: address) -> bool:
+    assert _vaultAddr != self._vaultCheckRevertAddress # dev: mock underscore vault check
     if self._allAddressesAreVaults:
         return True
     return self._basicEarnVaults[_vaultAddr]
@@ -92,6 +95,11 @@ def setBasicEarnVault(_vaultAddr: address, _isVault: bool):
 @external
 def setAllAddressesAreVaults(_allAreVaults: bool):
     self._allAddressesAreVaults = _allAreVaults
+
+
+@external
+def setVaultCheckRevertAddress(_addr: address):
+    self._vaultCheckRevertAddress = _addr
 
 
 #############

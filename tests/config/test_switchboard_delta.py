@@ -2604,6 +2604,113 @@ def test_set_deleverage_buffer_cancel_pending(switchboard_delta, deleverage, gov
     assert deleverage.deleverageBuffer() == 0
 
 
+#################################################
+# Deleverage Full Payoff Dust Cleanup Settings  #
+#################################################
+
+@pytest.mark.parametrize(
+    "setter,value",
+    [
+        ("setDeleverageFullPayoffBuffer", 10**15),
+        ("setDeleverageOverageBps", 100),
+        ("setDeleverageDustThreshold", 10**15),
+        ("setDeleverageDustBps", 100),
+    ],
+)
+def test_set_deleverage_full_payoff_cleanup_permissions(switchboard_delta, governance, bob, setter, value):
+    """Test that only governance can initiate full-payoff cleanup config changes."""
+    with boa.reverts("no perms"):
+        getattr(switchboard_delta, setter)(value, sender=bob)
+
+    aid = getattr(switchboard_delta, setter)(value, sender=governance.address)
+    assert aid > 0
+
+
+@pytest.mark.parametrize(
+    "setter,pending_getter,pending_event,field_name,max_value",
+    [
+        ("setDeleverageFullPayoffBuffer", "pendingDeleverageFullPayoffBuffer", "PendingDeleverageFullPayoffBufferChange", "usdAmount", 10**18),
+        ("setDeleverageOverageBps", "pendingDeleverageOverageBps", "PendingDeleverageOverageBpsChange", "bps", 500),
+        ("setDeleverageDustThreshold", "pendingDeleverageDustThreshold", "PendingDeleverageDustThresholdChange", "usdAmount", 10**16),
+        ("setDeleverageDustBps", "pendingDeleverageDustBps", "PendingDeleverageDustBpsChange", "bps", 500),
+    ],
+)
+def test_set_deleverage_full_payoff_cleanup_validation_and_pending_state(
+    switchboard_delta,
+    governance,
+    setter,
+    pending_getter,
+    pending_event,
+    field_name,
+    max_value,
+):
+    """Test hard caps, zero allowance, pending storage, and pending events."""
+    with boa.reverts("exceeds hard ceiling"):
+        getattr(switchboard_delta, setter)(max_value + 1, sender=governance.address)
+
+    zero_aid = getattr(switchboard_delta, setter)(0, sender=governance.address)
+    assert zero_aid > 0
+    assert getattr(switchboard_delta, pending_getter)(zero_aid) == 0
+
+    aid = getattr(switchboard_delta, setter)(max_value, sender=governance.address)
+    logs = filter_logs(switchboard_delta, pending_event)
+    assert aid > 0
+    assert getattr(switchboard_delta, pending_getter)(aid) == max_value
+    assert switchboard_delta.hasPendingAction(aid)
+
+    assert getattr(logs[-1], field_name) == max_value
+    assert logs[-1].actionId == aid
+    assert logs[-1].confirmationBlock > 0
+
+
+def test_set_deleverage_full_payoff_cleanup_success_and_execute(
+    switchboard_delta,
+    deleverage,
+    governance,
+):
+    """Test all new full-payoff cleanup params execute through timelock into Deleverage."""
+    actions = [
+        (switchboard_delta.setDeleverageFullPayoffBuffer(10**15, sender=governance.address), "deleverageFullPayoffBuffer", "DeleverageFullPayoffBufferSet", "usdAmount", 10**15),
+        (switchboard_delta.setDeleverageOverageBps(100, sender=governance.address), "deleverageOverageBps", "DeleverageOverageBpsSet", "bps", 100),
+        (switchboard_delta.setDeleverageDustThreshold(10**15, sender=governance.address), "deleverageDustThreshold", "DeleverageDustThresholdSet", "usdAmount", 10**15),
+        (switchboard_delta.setDeleverageDustBps(100, sender=governance.address), "deleverageDustBps", "DeleverageDustBpsSet", "bps", 100),
+    ]
+
+    for aid, _, _, _, _ in actions:
+        assert not switchboard_delta.executePendingAction(aid, sender=governance.address)
+
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    for aid, getter_name, event_name, field_name, value in actions:
+        assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+        execution_logs = [e for e in filter_logs(switchboard_delta, event_name) if e.address == switchboard_delta.address]
+        assert getattr(execution_logs[-1], field_name) == value
+        assert getattr(deleverage, getter_name)() == value
+        assert switchboard_delta.actionType(aid) == 0
+        assert not switchboard_delta.hasPendingAction(aid)
+
+
+def test_set_deleverage_full_payoff_cleanup_cancel_pending(
+    switchboard_delta,
+    governance,
+):
+    """Cancelled new cleanup actions clear action type and timelock state."""
+    aid = switchboard_delta.setDeleverageDustThreshold(10**15, sender=governance.address)
+    assert switchboard_delta.hasPendingAction(aid)
+    assert switchboard_delta.pendingDeleverageDustThreshold(aid) == 10**15
+
+    assert switchboard_delta.cancelPendingAction(aid, sender=governance.address)
+    assert switchboard_delta.actionType(aid) == 0
+    assert switchboard_delta.pendingDeleverageDustThreshold(aid) == 10**15
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert not switchboard_delta.executePendingAction(aid, sender=governance.address)
+
+    aid2 = switchboard_delta.setDeleverageDustThreshold(10**15, sender=governance.address)
+    assert aid2 > aid
+
+
 #########################################
 # Deleverage Cooldown Tests
 #########################################

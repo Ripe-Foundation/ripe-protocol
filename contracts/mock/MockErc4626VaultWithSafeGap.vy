@@ -19,6 +19,7 @@ balanceOf: public(HashMap[address, uint256])
 totalSupply: public(uint256)
 allowance: public(HashMap[address, HashMap[address, uint256]])
 safeDiscountBps: public(uint256)
+zeroSafeConversionOnTransfer: public(bool)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00
 
@@ -34,6 +35,11 @@ def __init__(_asset: address, _safeDiscountBps: uint256):
 def setSafeDiscountBps(_safeDiscountBps: uint256):
     assert _safeDiscountBps <= HUNDRED_PERCENT  # dev: invalid safe discount
     self.safeDiscountBps = _safeDiscountBps
+
+
+@external
+def setZeroSafeConversionOnTransfer(_shouldZero: bool):
+    self.zeroSafeConversionOnTransfer = _shouldZero
 
 
 @external
@@ -123,6 +129,8 @@ def _amountToShares(_amount: uint256) -> uint256:
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
+    if self.zeroSafeConversionOnTransfer:
+        self.safeDiscountBps = HUNDRED_PERCENT
     self.balanceOf[msg.sender] -= _value
     self.balanceOf[_to] += _value
     log Transfer(sender=msg.sender, receiver=_to, value=_value)

@@ -79,15 +79,32 @@ def deploy_deleverage(ripe_hq):
     Deploy a fresh Deleverage contract.
     Used to work around titanoboa's transient storage bug by getting clean storage.
     """
-    def deploy():
+    def deploy(
+        min_deleverage_bps=0,
+        deleverage_buffer=0,
+        deleverage_cooldown=0,
+        underscore_safe_spread_bps=100,
+        # Match the deployment migrations; feature tests opt in explicitly.
+        deleverage_full_payoff_buffer=0,
+        deleverage_overage_bps=0,
+        deleverage_dust_threshold=0,
+        deleverage_dust_bps=0,
+    ):
         # Load and deploy fresh Deleverage contract
         with open("contracts/core/Deleverage.vy", "r") as f:
             source_code = f.read()
 
-        # Deploy with same constructor arg as original
         fresh_deleverage = boa.loads(
             source_code,
-            ripe_hq.address  # Only needs RipeHq address
+            ripe_hq.address,
+            min_deleverage_bps,
+            deleverage_buffer,
+            deleverage_cooldown,
+            underscore_safe_spread_bps,
+            deleverage_full_payoff_buffer,
+            deleverage_overage_bps,
+            deleverage_dust_threshold,
+            deleverage_dust_bps,
         )
 
         return fresh_deleverage

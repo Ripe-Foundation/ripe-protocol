@@ -18,7 +18,17 @@
         "indexed": false
       },
       {
-        "name": "repaidAmount",
+        "name": "targetRepayAmountWithBuffer",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "collateralValueRepaid",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "debtToClear",
         "type": "uint256",
         "indexed": false
       },
@@ -173,6 +183,71 @@
       {
         "name": "hasGoodDebtHealth",
         "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "MinDeleverageBpsSet",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DeleverageBufferSet",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DeleverageCooldownSet",
+    "inputs": [
+      {
+        "name": "blocks",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UnderscoreSafeSpreadBpsSet",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DeleverageFullPayoffParamSet",
+    "inputs": [
+      {
+        "name": "param",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
         "indexed": false
       }
     ],
@@ -997,11 +1072,220 @@
   },
   {
     "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setMinDeleverageBps",
+    "inputs": [
+      {
+        "name": "_bps",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDeleverageBuffer",
+    "inputs": [
+      {
+        "name": "_bps",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDeleverageCooldown",
+    "inputs": [
+      {
+        "name": "_blocks",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUnderscoreSafeSpreadBps",
+    "inputs": [
+      {
+        "name": "_bps",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDeleverageFullPayoffParam",
+    "inputs": [
+      {
+        "name": "_param",
+        "type": "uint256"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "lastDeleverageBlock",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minDeleverageBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageBuffer",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageCooldown",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "underscoreSafeSpreadBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageFullPayoffBuffer",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageOverageBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageDustThreshold",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "deleverageDustBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
       {
         "name": "_ripeHq",
         "type": "address"
+      },
+      {
+        "name": "_minDeleverageBps",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageBuffer",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageCooldown",
+        "type": "uint256"
+      },
+      {
+        "name": "_underscoreSafeSpreadBps",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageFullPayoffBuffer",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageOverageBps",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageDustThreshold",
+        "type": "uint256"
+      },
+      {
+        "name": "_deleverageDustBps",
+        "type": "uint256"
       }
     ],
     "outputs": []

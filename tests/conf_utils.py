@@ -6,6 +6,20 @@ def filter_logs(contract, event_name, _strict=False):
     return [e for e in contract.get_logs(strict=_strict) if type(e).__name__ == event_name]
 
 
+def set_full_payoff_params(
+    deleverage,
+    switchboard_alpha,
+    buffer_amount=0,
+    overage_bps=0,
+    dust_threshold=0,
+    dust_bps=0,
+):
+    deleverage.setDeleverageFullPayoffParam(1, buffer_amount, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(2, overage_bps, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(3, dust_threshold, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(4, dust_bps, sender=switchboard_alpha.address)
+
+
 @pytest.fixture(scope="session")
 def _test():
     def _test(_expectedValue, _actualValue, _buffer=50):

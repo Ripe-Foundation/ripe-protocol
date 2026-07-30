@@ -53,6 +53,7 @@ interface HrContributor:
 
 interface Deleverage:
     def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
+    def setDeleverageFullPayoffParam(_param: uint256, _amount: uint256): nonpayable
     def setUnderscoreSafeSpreadBps(_bps: uint256): nonpayable
     def setDeleverageCooldown(_blocks: uint256): nonpayable
     def setMinDeleverageBps(_bps: uint256): nonpayable
@@ -115,6 +116,10 @@ flag ActionType:
     DELEVERAGE_BUFFER
     DELEVERAGE_COOLDOWN
     DELEVERAGE_UNDERSCORE_SAFE_SPREAD
+    DELEVERAGE_FULL_PAYOFF_BUFFER
+    DELEVERAGE_OVERAGE_BPS
+    DELEVERAGE_DUST_THRESHOLD
+    DELEVERAGE_DUST_BPS
 
 struct DeleverageUserRequest:
     user: address
@@ -408,6 +413,38 @@ event PendingUnderscoreSafeSpreadBpsChange:
 event UnderscoreSafeSpreadBpsSet:
     bps: uint256
 
+event PendingDeleverageFullPayoffBufferChange:
+    usdAmount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event DeleverageFullPayoffBufferSet:
+    usdAmount: uint256
+
+event PendingDeleverageOverageBpsChange:
+    bps: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event DeleverageOverageBpsSet:
+    bps: uint256
+
+event PendingDeleverageDustThresholdChange:
+    usdAmount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event DeleverageDustThresholdSet:
+    usdAmount: uint256
+
+event PendingDeleverageDustBpsChange:
+    bps: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event DeleverageDustBpsSet:
+    bps: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -428,6 +465,10 @@ pendingMinDeleverageBps: public(HashMap[uint256, uint256]) # aid -> bps
 pendingDeleverageBuffer: public(HashMap[uint256, uint256]) # aid -> bps
 pendingDeleverageCooldown: public(HashMap[uint256, uint256]) # aid -> blocks
 pendingUnderscoreSafeSpreadBps: public(HashMap[uint256, uint256]) # aid -> bps
+pendingDeleverageFullPayoffBuffer: public(HashMap[uint256, uint256]) # aid -> amount
+pendingDeleverageOverageBps: public(HashMap[uint256, uint256]) # aid -> bps
+pendingDeleverageDustThreshold: public(HashMap[uint256, uint256]) # aid -> amount
+pendingDeleverageDustBps: public(HashMap[uint256, uint256]) # aid -> bps
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
 TELLER_ID: constant(uint256) = 17
@@ -446,6 +487,10 @@ MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
 MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling
+MAX_DELEVERAGE_FULL_PAYOFF_BUFFER: constant(uint256) = 10 ** 18
+MAX_DELEVERAGE_DUST_THRESHOLD: constant(uint256) = 10 ** 16
+MAX_DELEVERAGE_OVERAGE_BPS: constant(uint256) = 500 # 5% hard ceiling
+MAX_DELEVERAGE_DUST_BPS: constant(uint256) = 500 # 5% hard ceiling
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
@@ -589,6 +634,86 @@ def setDeleverageBuffer(_bps: uint256) -> uint256:
     self.pendingDeleverageBuffer[aid] = _bps
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingDeleverageBufferChange(
+        bps=_bps,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set deleverage full payoff buffer
+
+
+@external
+def setDeleverageFullPayoffBuffer(_usdAmount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _usdAmount <= MAX_DELEVERAGE_FULL_PAYOFF_BUFFER # dev: exceeds hard ceiling
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_FULL_PAYOFF_BUFFER
+    self.pendingDeleverageFullPayoffBuffer[aid] = _usdAmount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeleverageFullPayoffBufferChange(
+        usdAmount=_usdAmount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set deleverage overage bps
+
+
+@external
+def setDeleverageOverageBps(_bps: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _bps <= MAX_DELEVERAGE_OVERAGE_BPS # dev: exceeds hard ceiling
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_OVERAGE_BPS
+    self.pendingDeleverageOverageBps[aid] = _bps
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeleverageOverageBpsChange(
+        bps=_bps,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set deleverage dust threshold
+
+
+@external
+def setDeleverageDustThreshold(_usdAmount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _usdAmount <= MAX_DELEVERAGE_DUST_THRESHOLD # dev: exceeds hard ceiling
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_DUST_THRESHOLD
+    self.pendingDeleverageDustThreshold[aid] = _usdAmount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeleverageDustThresholdChange(
+        usdAmount=_usdAmount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set deleverage dust bps
+
+
+@external
+def setDeleverageDustBps(_bps: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _bps <= MAX_DELEVERAGE_DUST_BPS # dev: exceeds hard ceiling
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_DUST_BPS
+    self.pendingDeleverageDustBps[aid] = _bps
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeleverageDustBpsChange(
         bps=_bps,
         confirmationBlock=confirmationBlock,
         actionId=aid,
@@ -1372,6 +1497,26 @@ def executePendingAction(_aid: uint256) -> bool:
         bps: uint256 = self.pendingDeleverageBuffer[_aid]
         extcall Deleverage(self._getDeleverageAddr()).setDeleverageBuffer(bps)
         log DeleverageBufferSet(bps=bps)
+
+    elif actionType == ActionType.DELEVERAGE_FULL_PAYOFF_BUFFER:
+        usdAmount: uint256 = self.pendingDeleverageFullPayoffBuffer[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setDeleverageFullPayoffParam(1, usdAmount)
+        log DeleverageFullPayoffBufferSet(usdAmount=usdAmount)
+
+    elif actionType == ActionType.DELEVERAGE_OVERAGE_BPS:
+        bps: uint256 = self.pendingDeleverageOverageBps[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setDeleverageFullPayoffParam(2, bps)
+        log DeleverageOverageBpsSet(bps=bps)
+
+    elif actionType == ActionType.DELEVERAGE_DUST_THRESHOLD:
+        usdAmount: uint256 = self.pendingDeleverageDustThreshold[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setDeleverageFullPayoffParam(3, usdAmount)
+        log DeleverageDustThresholdSet(usdAmount=usdAmount)
+
+    elif actionType == ActionType.DELEVERAGE_DUST_BPS:
+        bps: uint256 = self.pendingDeleverageDustBps[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setDeleverageFullPayoffParam(4, bps)
+        log DeleverageDustBpsSet(bps=bps)
 
     elif actionType == ActionType.DELEVERAGE_COOLDOWN:
         blocks: uint256 = self.pendingDeleverageCooldown[_aid]
