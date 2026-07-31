@@ -21,20 +21,38 @@ H-04 schema v2 and H-05 deterministic blocked planning are integrated. All 20
 genuine H-04 decisions are approved and operative; `D-H04-19` is retired and
 non-operative; none are open. Four corrected-PR controls—`fullPayoffBuffer`,
 `overageBps`, `dustThreshold`, and `dustBps`—remain zero, deferred, and absent
-from Robinhood machine-facing parameter/planning representation. The deployment
-owner owns final disposition and binding, but a separately authorized machine
-implementation track must close that gap. This documentation refresh does not.
-`DefaultsRobinhood.vy` therefore remains absent and the generator remains
-fail-closed.
+from Robinhood machine-facing parameter/planning representation. Every
+Deleverage task, including representation and size/headroom work, is now
+deferred and nonblocking until explicitly reopened. The unresolved identities,
+`TrainingWheels`, and `liteSigners` still keep `DefaultsRobinhood.vy` absent and
+the generator fail-closed.
 
 The historical S4 zero-`deleverageCooldown` decision remains closed and was
-not reopened. CCIP and zero-backing settlement/bad-debt policy remain deferred
-and nonblocking. H-06 qualifies only a candidate operator/storage class, not a
-final operator, machine, volume, deployment, or release. Remaining work is
-predeployment infrastructure, qualification, rehearsal, and release
-preparation. Smart-contract reassessment and Robinhood fork/external-integration
-qualification are parallel, nonblocking inputs to start; affected gates must
-consume their findings before closing.
+not reopened. CreditEngine zero-backing reassessment, Uniswap TWAP
+implementation, CCIP, Sites recovery, dashboard publication, and live
+deployment remain deferred or separately unauthorized. H-06 qualifies only a
+candidate operator/storage class, not a final operator, machine, volume,
+deployment, or release. Remaining work is predeployment infrastructure,
+qualification, rehearsal, and release preparation.
+
+## 30 July 2026 reassessment and qualification disposition
+
+The consolidated
+[`reassessment-and-qualification-synthesis.md`](rh/reassessment-and-qualification-synthesis.md)
+is the current coordination entry point for eight byte-identical source
+reports. It records one program package, not eight implementation trains.
+
+The accepted architecture preserves the current Ledger and Teller designs,
+keeps GuardedErc20 separate and Stock-specific, launches Profile 1 with
+Chainlink as the sole PSM oracle authority, deploys no Uniswap price-source
+contract at launch, and moves GREEN/USDG plus both LP-token admissions to
+Profile 2. RIPE/WETH V2 is at most an externally held launch-liquidity canary.
+The PSM posture is disabled, allowlisted, canary-first, and redemption-first.
+
+H-09 owns explicit opt-in read-only archive-fork qualification with network
+disabled by default. H-10 separately owns live rehearsal. No deployment,
+migration execution, production configuration, activation, or release has
+occurred or is authorized by the synthesis.
 
 > **Document role:** This is the stable architecture and launch checklist, not
 > the live progress authority. Start with
@@ -64,9 +82,10 @@ is being re-evaluated in
 
 **Current owner-priority overlay:** 30 July 2026 — the
 [`current-owner-priorities.md`](rh/current-owner-priorities.md) overlay removes
-CCIP workflows and zero-backing settlement or bad-debt policy work from the
-active queue and also parks Sites recovery and dashboard deployment. These four
-lanes are nonblocking until explicitly reopened. The ordered coworker handoff is
+CCIP workflows, CreditEngine zero-backing reassessment, every Deleverage task,
+and Uniswap TWAP implementation from the active queue and also parks Sites
+recovery and dashboard deployment. These six lanes are nonblocking until
+explicitly reopened. The ordered coworker handoff is
 [`deployment-owner-readiness.md`](rh/deployment-owner-readiness.md).
 Historical architecture and checklist material below remains preserved and
 must not be mistaken for a current assignment.

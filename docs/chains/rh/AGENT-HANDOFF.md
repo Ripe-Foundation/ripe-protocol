@@ -16,6 +16,7 @@ Robinhood.
 1. Start read-only. Verify local `rh`, cached `origin/rh`, and credential-free
    live `rh` before creating a worktree or editing.
 2. Read [`status.yaml`](status.yaml), [`START-HERE.md`](START-HERE.md),
+   [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),
    [`deployment-owner-readiness.md`](deployment-owner-readiness.md),
    [`current-owner-priorities.md`](current-owner-priorities.md), and the exact
    assigned brief/evidence only.
@@ -29,12 +30,12 @@ Robinhood.
 
 ## Current counts
 
-- 28 workstreams and 19 RH-D decisions.
+- 28 workstreams and 20 RH-D decisions.
 - All 18 H-03 blockers remain open.
 - H-04 has 21 lifecycle rows: 20 approved operative, one retired
   non-operative (`D-H04-19`), zero open, plus 14 binding schedules.
-- Nine hard gates and ten dashboard handoff documents.
-- Four parked lanes and zero live actions.
+- Nine hard gates and eleven dashboard handoff documents.
+- Six parked lanes and zero live actions.
 
 ## Current lifecycle facts
 
@@ -48,29 +49,37 @@ Robinhood.
   remain open.
 - M4 composed-route proof is integrated. M5 configuration/freeze, H-07-H-11,
   SecOps, rehearsal, and release preparation remain.
+- The eight reassessment/qualification reports are consolidated as one program
+  package. Ledger and Teller remain unchanged; GuardedErc20 remains separate
+  and Stock-specific; launch is Profile 1 with Chainlink authority; GREEN/USDG
+  and both LP admissions are Profile 2.
+- H-09 owns network-disabled-by-default, explicit opt-in read-only archive-fork
+  qualification. H-10 owns live rehearsal and every real transaction,
+  signer/account, or persistent external artifact.
 - The historical S4 zero-cooldown decision remains closed.
-- CCIP and zero-backing settlement/bad-debt policy are deferred and
-  nonblocking.
+- Every Deleverage task, CreditEngine zero-backing reassessment, Uniswap TWAP
+  implementation, CCIP, and zero-backing settlement/bad-debt policy are
+  deferred and nonblocking.
 - Sites account/workspace recovery and dashboard deployment are parked and
   nonblocking.
 
-## Four-control gap
+## Deferred Deleverage record
 
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero
-and deferred. They lack Robinhood machine-facing parameter/planning
-representation. Record this as a blocker for a separately authorized machine
-implementation track. The deployment owner owns its final disposition and
-binding, but must preserve zero values until separate approval.
+and lack Robinhood machine-facing parameter/planning representation. Preserve
+that fact, but do not open representation, configuration, test, fork,
+documentation, size/headroom, deployment, or operational work while every
+Deleverage task is deferred. Reopening requires an explicit owner instruction.
 
 ## Deployment-owner start
 
 The coworker owns the ten-step preparation sequence in
 [`deployment-owner-readiness.md`](deployment-owner-readiness.md), from final
 input and authority binding through deterministic artifacts, H-06 binding,
-rehearsal, SecOps, and the restricted-release packet. Smart-contract
-reassessment and Robinhood fork/external-integration qualification may proceed
-in parallel; they do not block preparation from starting, but relevant findings
-must be consumed before affected gates close.
+rehearsal, SecOps, and the restricted-release packet. Its earlier
+Deleverage-control step is superseded for current prioritization by the
+explicit deferral above. The consolidated reassessment and qualification
+findings must be consumed before affected gates close.
 
 ## Current checked identities
 
@@ -105,13 +114,12 @@ Stop before mutation if:
 - a dependency, contract, ABI, interface, configuration, defaults, migration,
   manifest, deployment, activation, release, RPC, account, or signer change is
   needed; or
-- the four-control machine gap would need implementation without separate
-  authority.
+- a Deleverage task would need to be opened without explicit owner reopening.
 
 ## Handoff contract
 
 Final reports must name the exact base/ref identities, documentation
 publication lifecycle, changed paths, generated ignored outputs, validation
 results, historical-preservation proof, current counts/hashes/fingerprints,
-machine-facing gap, Sites visibility, residual risks, and the independent
+deferred Deleverage record, Sites visibility, residual risks, and the independent
 review boundary. No Sites action belongs in this handoff.

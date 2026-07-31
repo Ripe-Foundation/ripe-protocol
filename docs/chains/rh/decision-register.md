@@ -21,11 +21,13 @@ The historical import ancestor `ad831669…` is not the present branch authority
 No Robinhood deployment, migration execution or history, production
 configuration, activation, RPC, account, key, signer, or release action has
 occurred. The four corrected-PR controls remain zero and deferred and lack
-Robinhood machine-facing parameter/planning representation. The deployment
-owner owns their final disposition and binding under a separately authorized
-machine implementation track. The S4 zero-cooldown decision remains closed.
-CCIP, zero-backing policy work, Sites recovery, and dashboard deployment remain
-parked and nonblocking.
+Robinhood machine-facing parameter/planning representation. Every Deleverage
+task is parked, and no Deleverage implementation track is open. The current
+six parked lanes match the canonical [`status.yaml`](status.yaml) inventory
+exactly: CCIP; CreditEngine zero-backing reassessment and policy; every
+Deleverage task; Uniswap TWAP implementation; Sites recovery; and dashboard
+deployment. The S4 zero-cooldown decision remains closed. All six lanes are
+nonblocking until explicitly reopened.
 
 ## Program-level decisions
 
@@ -234,8 +236,9 @@ projection, not an independent source of values.
 All genuine decisions are approved, and the integrated manifest carries 14
 binding schedules. Required identities, `TrainingWheels`, and `liteSigners`
 remain unresolved, so `DefaultsRobinhood.vy` is absent and the generator fails
-closed. The corrected PR #61 four-control machine representation gap remains a
-separate future implementation track.
+closed. The corrected PR #61 four-control machine representation gap remains
+preserved, but every Deleverage task is parked and no implementation track is
+open until explicit owner reopening.
 
 Source:
 [`track-6-s6-track-7-h4-defaults-parameters.md`](track-6-s6-track-7-h4-defaults-parameters.md).
@@ -330,6 +333,39 @@ destination at the next natural republish after the team has adopted it, or
 immediately if anyone besides Mick needs publishing rights. Changing the
 hosting destination must not change the authority hierarchy.
 
+## Reassessment and qualification disposition
+
+### RH-D020 — Consolidated Profile 1 launch and Profile 2 follow-on
+
+**Status:** Approved and controlling for current program sequencing.
+
+The eight-report reassessment and qualification corpus is one consolidated
+program package. The controlling disposition is:
+
+- preserve current Ledger and Teller architecture;
+- keep GuardedErc20 separate and Stock-specific;
+- launch Profile 1 with Chainlink as oracle authority, no Uniswap price-source
+  contract, no Curve registration, and neither LP token admitted;
+- treat RIPE/WETH V2 only as an optional externally held liquidity canary;
+- move GREEN/USDG and both LP admissions to Profile 2;
+- keep the PSM disabled, allowlisted, canary-first, redemption-first, and
+  separately activated;
+- keep H-09 network-disabled by default with explicit opt-in read-only
+  archive-fork qualification; and
+- keep H-10 as the separate live-rehearsal lane.
+
+CreditEngine zero-backing reassessment, every Deleverage task including
+size/headroom work, Uniswap TWAP implementation, CCIP, Sites recovery, and live
+deployment are deferred or separately unauthorized. Future work is grouped
+into the large packages defined by
+[`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),
+not eight report-specific trains.
+
+This decision records architecture and sequencing only. It does not authorize
+contract, interface, ABI, migration, configuration, generator, test, RPC,
+account, signer, deployment, activation, Sites, publication, or external-state
+work.
+
 ## Dated security obligations
 
 The two retained and operative H-01 dependency-security exceptions
@@ -349,6 +385,11 @@ The following are explicitly not decided or authorized:
 - a live Stock Token probe sender, recipient, provenance path, signer, amount,
   gas ceiling, and transaction sequence;
 - final Robinhood addresses, roles, parameters, and manifests;
+- exact archive-fork pin/provider/engine, token/proxy/layout, oracle/sequencer,
+  pool/custody, and H-07/H-08/H-09 interface packets;
+- final PSM production economics, reserve coverage, authorities, and activation
+  ceremony;
+- every Profile 2 stage promotion and both LP-token admissions;
 - Sites account/workspace recovery, dashboard deployment, or access changes;
 - any testnet funding, signing, broadcast, deployment, or governance action;
 - any production deployment, configuration, activation, or role transfer; and

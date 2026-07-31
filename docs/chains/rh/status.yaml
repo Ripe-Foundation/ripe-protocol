@@ -1,4 +1,4 @@
-schema_version: 11
+schema_version: 12
 
 snapshot:
   title: Robinhood deployment-owner readiness
@@ -16,10 +16,10 @@ snapshot:
     Documentation authority and publication lifecycle are derived at build
     time, never hardcoded. Historical evidence remains checkpoint evidence;
     this file is the sole current machine-readable lifecycle authority.
-  posture: "Ready to begin deployment preparation. Nothing is deployed, configured, or active."
+  posture: "Reassessment and qualification are consolidated for Profile 1 preparation. Nothing is deployed, configured, or active."
   hero_lead: "Ready to begin deployment preparation."
   hero_emphasis: Nothing is deployed, configured, or active.
-  launch_readiness: "Ready to begin deployment preparation."
+  launch_readiness: "Ready to begin Profile 1 deployment preparation under the consolidated deferrals and external-input gates."
   live_actions_completed: 0
   status_owner: Robinhood deployment owner
   freshness_rule: >
@@ -29,7 +29,7 @@ snapshot:
 
 counts:
   workstreams: 28
-  rh_d_decisions: 19
+  rh_d_decisions: 20
   h03_blockers: 18
   h04_rows: 21
   h04_approved_operative: 20
@@ -37,8 +37,8 @@ counts:
   h04_open: 0
   binding_schedules: 14
   hard_gates: 9
-  handoff_documents: 10
-  parked_lanes: 4
+  handoff_documents: 11
+  parked_lanes: 6
   live_actions: 0
 
 post_freeze_reconciliation:
@@ -86,7 +86,8 @@ post_freeze_reconciliation:
     controls: [fullPayoffBuffer, overageBps, dustThreshold, dustBps]
     current_values: [0, 0, 0, 0]
     representation: absent_from_robinhood_machine_facing_parameter_and_planning_sources
-    disposition: deployment_owner_binding_and_separately_authorized_machine_implementation
+    disposition: deferred_nonblocking_with_every_deleverage_task
+    reopen_condition: explicit_owner_instruction
     fixed_by_this_refresh: false
   defaults_robinhood: absent_fail_closed
   s4_zero_cooldown_decision: closed_not_reopened
@@ -166,7 +167,7 @@ dashboard_governance:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: RH-D001 through RH-D019 must match this register exactly and cannot be silently closed.
+  mirror_contract: RH-D001 through RH-D020 must match this register exactly and cannot be silently closed.
 
 document_roles:
   - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
@@ -175,7 +176,58 @@ document_roles:
   - { file: docs/chains/rh/AGENT-HANDOFF.md, role: "Cold-agent bootstrap and authority contract."}
   - { file: docs/chains/rh/decision-register.md, role: "Canonical RH-D namespace and accepted-risk index."}
   - { file: docs/chains/rh-summary.md, role: "Stable architecture and launch checklist; not live status authority."}
+  - { file: docs/chains/rh/reassessment-and-qualification-synthesis.md, role: "Current consolidated architecture, Profile 1/Profile 2, deferral, package, and external-input authority."}
   - { file: docs/chains/rh/evidence/, role: "Historical hash-bound evidence; lifecycle openings may be superseded."}
+
+reassessment_and_qualification:
+  source_reports: 8
+  package_shape: one_consolidated_program_package
+  accepted_architecture:
+    ledger: preserve_current_shared_architecture
+    teller: preserve_current_strict_balance_measurement
+    guarded_erc20: preserve_separate_stock_specific_vault
+    launch_profile: Profile_1
+    launch_oracle_authority: Chainlink
+    uniswap_launch_price_source: none
+    ripe_weth_v2: optional_externally_held_liquidity_canary_only
+    green_usdg: Profile_2
+    launch_lp_admissions: none
+    psm: disabled_allowlisted_canary_first_redemption_first
+    h09: opt_in_read_only_archive_fork_network_disabled_by_default
+    h10: live_rehearsal_and_external_state
+  profile_2:
+    state: staged_follow_on
+    stages: [P2-A observation, P2-B unregistered inspection, P2-C source registration, P2-D dynamic rates, P2-E stabilizer]
+    curve_prices: unchanged
+    lp_admissions: [RIPE/WETH LP, GREEN/USDG LP]
+    promotion_rule: Each stage and each LP admission requires separate acceptance and activation authority.
+  deferred:
+    - CreditEngine zero-backing reassessment
+    - Every Deleverage task including parameter representation, tests, fork scenarios, documentation, and size/headroom work
+    - Uniswap TWAP implementation
+    - CCIP
+    - Sites recovery and dashboard publication
+    - Live deployment, migration execution, production configuration, activation, and release
+  future_packages:
+    - Shared-contract release-gate evidence for unchanged Ledger, Teller, and GuardedErc20
+    - Immutable external-input and H-07/H-08 artifact closure
+    - H-09 safe-default and opt-in archive-fork qualification
+    - Profile 1 deployment preparation and PSM canary
+    - Profile 2 staged market integration
+    - H-10 live rehearsal and operational release preparation
+  external_input_classes:
+    - Signed per-profile pin, provider, engine, and clock packet
+    - Canonical token, proxy, implementation, layout, behavior, and deterministic Ripe-token artifact packet
+    - Chainlink feed, round, stale-policy, sequencer, monitoring, and recovery packet
+    - Curve and Uniswap pool, liquidity, custody, slippage, withdrawal, and incident packet
+    - PSM economics, reserve coverage, roles, actors, SavingsGreen, and activation packet
+    - Final H-07, H-08, and H-09 APIs, ceilings, stop codes, evidence contract, and verdict vocabulary
+  current_lifecycle:
+    deployment: none
+    migration_execution: none
+    production_configuration: none
+    activation: none
+    release: none
 
 owner_priority_overlay:
   effective_at: "2026-07-30"
@@ -185,10 +237,11 @@ owner_priority_overlay:
     assignments. It does not rewrite historical evidence, close a technical
     blocker, change integrated source, or authorize deployment or release.
   active_focus: >
-    The deployment owner may begin preparation now: bind final inputs, preserve
-    fail-closed machine gaps, build deterministic artifacts, qualify the
-    intended operator, rehearse, and prepare the release packet without
-    executing a migration or touching live state.
+    The deployment owner may begin Profile 1 preparation now: bind final
+    non-Deleverage inputs, preserve fail-closed unresolved state, build
+    deterministic artifacts, qualify the intended operator, and prepare later
+    rehearsal and release packets without executing a migration or touching
+    live state.
   parked_lanes:
     - id: PARK-CCIP
       subject: all CCIP workflows
@@ -201,15 +254,37 @@ owner_priority_overlay:
         active dependency or blocker for current non-CCIP work.
       reopen_condition: Explicit owner instruction.
     - id: PARK-ZERO-BACKING-POLICY
-      subject: zero-backing settlement and bad-debt policy
+      subject: CreditEngine zero-backing reassessment, settlement, and bad-debt policy
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >
         Preserve the integrated M2/M3 source and regression behavior, but do
-        not design, remediate, review, or schedule zero-backing settlement or
-        bad-debt policy work. The parked residual is not an active blocker for
-        current planning, parameter, tooling, or non-policy proof work.
+        not reassess CreditEngine zero backing or design, remediate, review, or
+        schedule zero-backing settlement or bad-debt policy work. The parked
+        residual is not an active blocker for current planning, parameter,
+        tooling, or non-policy proof work.
       reopen_condition: Explicit owner instruction.
+    - id: PARK-DELEVERAGE
+      subject: every Deleverage task
+      state: parked_nonblocking
+      blocker_effect: nonblocking
+      instruction: >
+        Preserve the historical zero-cooldown decision, integrated PR #61
+        bytes, and four zero-valued controls. Do not perform contract,
+        interface, ABI, parameter, configuration, test, fork, documentation,
+        size/headroom, deployment, or operational work. Do not implement the
+        provisional H-09 Deleverage path.
+      reopen_condition: Explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
+    - id: PARK-UNISWAP-TWAP
+      subject: Uniswap TWAP implementation
+      state: parked_nonblocking
+      blocker_effect: nonblocking
+      instruction: >
+        Do not implement a V2 cumulative-price adapter, checkpoint service,
+        PriceDesk registration, or Chainlink fallback. An optional externally
+        held RIPE/WETH V2 liquidity canary remains operational preparation, not
+        protocol oracle authority.
+      reopen_condition: Approved security-relevant RIPE-price consumer plus separate owner, risk, security, custody, and exposure decisions.
     - id: PARK-SITES-RECOVERY
       subject: Sites account and workspace recovery
       state: parked_nonblocking
@@ -232,6 +307,7 @@ owner_priority_overlay:
     - Parking does not authorize Stock reachability, configuration, activation, deployment, or release.
     - Historical evidence and blocker identifiers remain intact for later re-entry.
     - "Corrected PR #61 integration does not authorize deployment, migration execution, configuration, activation, or release."
+    - The provisional 33-path H-09 census ceiling is planning-only and must be resealed without a Deleverage lane unless that parked work is explicitly reopened.
 
 deployment_owner:
   readiness: "Ready to begin deployment preparation."
@@ -251,10 +327,10 @@ deployment_owner:
       output: A reviewed authority map and signer-ceremony input set.
       boundary: No account, key, signer, RPC, role transfer, or live permission action.
     - order: 3
-      label: Dispose and represent dormant Deleverage controls
-      owns: Final disposition and machine representation of fullPayoffBuffer, overageBps, dustThreshold, and dustBps.
-      output: Separately approved parameter and planning representation.
-      boundary: Preserve all four values at zero and deferred unless separately approved.
+      label: Honor consolidated scope and deferrals
+      owns: Keep Profile 1 preparation inside the synthesis and exclude every deferred lane.
+      output: A dependency register that leaves CreditEngine zero-backing, Deleverage, Uniswap TWAP, CCIP, Sites, and live execution unopened.
+      boundary: Preserve the four Deleverage values at zero without creating representation or size/headroom work.
     - order: 4
       label: Generate final DefaultsRobinhood
       owns: Deterministic DefaultsRobinhood generation after every approved identity and parameter exists.
@@ -291,23 +367,24 @@ deployment_owner:
       output: Independently reviewed release packet and, only later, an authorized deployment record.
       boundary: Production execution requires separate exact authorization; this handoff grants none.
   parallel_inputs:
-    - name: Smart-contract reassessment
-      start_effect: nonblocking_for_deployment_preparation
-      gate_effect: Consume relevant findings before any affected artifact, configuration, or release gate closes.
-    - name: Robinhood fork and external-integration qualification
-      start_effect: nonblocking_for_deployment_preparation
-      gate_effect: Consume relevant findings before affected rehearsal, external-integration, or release gates close.
+    - name: Consolidated smart-contract reassessment corpus
+      start_effect: integrated_documentation_input
+      gate_effect: Consume the synthesis's Ledger, Teller, GuardedErc20, and Uniswap conclusions before affected work closes.
+    - name: Consolidated fork and external-integration qualification corpus
+      start_effect: integrated_documentation_input
+      gate_effect: Consume the synthesis's Profile 1/Profile 2, PSM, network, oracle, H-09/H-10, and external-input gates before affected work closes.
 
 overall:
   bottom_line: >
-    Ready to begin deployment preparation. The frozen protocol/pause baseline
-    includes corrected PR #61, H-04 schema-v2 parameters, deterministic H-05
-    blocked planning, M4 proof, and H-06 candidate-class qualification. Four
-    Deleverage controls remain zero and lack Robinhood machine-facing
-    representation. Nothing is deployed, configured, activated, or released.
+    Ready to begin Profile 1 deployment preparation under the consolidated
+    reassessment and qualification disposition. Ledger and Teller remain
+    unchanged, GuardedErc20 remains separate and Stock-specific, Chainlink
+    remains launch authority, and Profile 2 owns GREEN/USDG plus both LP
+    admissions. Every Deleverage task is deferred. Nothing is deployed,
+    configured, activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
   engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, and corrected PR #61 are integrated for their exact scopes."}
-  launch_implementation: { status: partial, note: "Remaining work is parameter binding/default rendering, plan readiness, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CCIP and zero-backing policy follow-up are parked and nonblocking."}
+  launch_implementation: { status: partial, note: "Remaining Profile 1 work is non-Deleverage parameter binding/default rendering, plan readiness, final operator binding, H-07-H-11, M5, PSM canary preparation, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap TWAP, CCIP, and Sites are parked and nonblocking."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
   production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
 
@@ -331,12 +408,15 @@ authorization_boundaries:
   - H-05 deterministic predeployment planning is integrated; migration execution remains unauthorized and no Robinhood migration history exists.
   - H-06 qualifies a candidate operator/storage class only; final operator, machine, volume, deployment, and release authorization remain open.
   - M4 composed-route evidence is integrated; M5 configuration, freeze, and activation remain outstanding.
-  - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation.
+  - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation; every Deleverage task is parked and nonblocking.
+  - Launch is Profile 1 with Chainlink authority, no Uniswap price-source contract, no Curve registration, and neither LP token admitted.
+  - GREEN/USDG, both LP admissions, Curve source use, dynamic rates, Teller snapshots, and Endaoment stabilization belong to separately promoted Profile 2 stages.
+  - H-09 is network-disabled by default and owns explicit opt-in read-only archive-fork qualification; H-10 separately owns live rehearsal.
   - CCIP is disabled; examples are non-production and manual execution is recovery only.
   - No testnet or production action is authorized.
   - Ready to begin deployment preparation does not mean ready to deploy or authorized to deploy.
   - No address, role, signer, feed, cap, rate, cadence, allocation, artifact, or activation value may be inferred from implementation.
-  - Integration does not close H-05, H-08, H-09, SecOps, deployment, or release gates.
+  - Documentation synthesis does not close H-05, H-07, H-08, H-09, H-10, SecOps, deployment, configuration, activation, or release gates.
 
 accepted_residuals:
   - { id: AR-H01-PYTEST, state: "accepted_until_expiry", statement: "pytest 8.4.2 remains under private-runner and private-basetemp controls through its review and expiry."}
@@ -355,7 +435,8 @@ h04_decisions:
   approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21]
   open_ids: []
   retired_ids: [D-H04-19]
-  unresolved_binding_classes: [identity-bearing parameters, TrainingWheels, liteSigners, four Deleverage controls]
+  unresolved_binding_classes: [identity-bearing parameters, TrainingWheels, liteSigners]
+  deferred_nonblocking_class: [four Deleverage controls and every related task]
   binding_schedule_count: 14
   implementation_file_surface:
     - contracts/config/DefaultsRobinhood.vy
@@ -389,7 +470,7 @@ h04_decisions:
 
 h03_blockers:
   - { id: B-S5-LEDGER, state: "open", implementation_predicate: "satisfied", remaining: "Downstream binding, deployment proof, activation, monitoring, and release remain open."}
-  - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "Schema v2 is integrated, but unresolved identity bindings, Defaults rendering, configuration readiness, and the four Deleverage-control representation gap remain."}
+  - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "Schema v2 is integrated, but unresolved non-Deleverage identity bindings, Defaults rendering, and configuration readiness remain; every Deleverage task is parked and nonblocking."}
   - { id: B-H05-PLAN, state: "open", implementation_predicate: "satisfied", remaining: "Deterministic blocked reports are integrated; unresolved bindings prevent an executable plan, and migration execution remains unauthorized."}
   - { id: B-T8-M1, state: "open", implementation_predicate: "satisfied", remaining: "M1 and M4 proof are integrated; deployment binding and activation remain open."}
   - { id: B-T8-M2, state: "open", implementation_predicate: "satisfied", remaining: "M2 and M4 proof are integrated; registry placement, deployment proof, and activation remain open."}
@@ -398,7 +479,7 @@ h03_blockers:
   - { id: B-T8-M5, state: "open", implementation_predicate: "not_satisfied", remaining: "Configuration, freeze, release evidence, deployment, and activation are unapproved."}
   - { id: B-T8-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "AAPL identity, feed, caps, vault identity, and configuration hashes require final revalidation."}
   - { id: B-ORACLE-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "Feed runtime, decimals, heartbeat, failure evidence, and LP oracle selection are not frozen."}
-  - { id: B-LP-ARTIFACTS, state: "open", implementation_predicate: "not_satisfied", remaining: "Launch LP artifacts, creation venue, runtime, and composed proof are absent."}
+  - { id: B-LP-ARTIFACTS, state: "open", implementation_predicate: "not_satisfied", remaining: "Profile 2 LP artifacts, custody, valuation-route exclusions, and composed proof remain unbound. Neither LP token is admitted at launch; GREEN/USDG and both LP-token admissions belong to Profile 2; RIPE/WETH V2 is only an externally held launch-liquidity canary candidate. These requirements gate Profile 2 activation, not launch."}
   - { id: B-PSM-SEQUENCE, state: "open", implementation_predicate: "not_satisfied", remaining: "PSM runtime, disabled posture, ordered activation, re-verification, and mint activation proof are absent."}
   - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "Rewards remain disabled; validation, monitoring, kill procedure, and approval are absent."}
   - { id: B-T1-CCIP, state: "open", implementation_predicate: "not_satisfied", remaining: "Historical technical gaps remain recorded, but CCIP is owner-parked and nonblocking for current non-CCIP work until explicitly reopened."}
@@ -420,14 +501,14 @@ glossary:
   - { term: Stage C, meaning: "Post-Gate-1 checked inventory and planning-document reconciliation; it is not implementation validation."}
 
 critical_path:
-  - { order: 1, label: "Bind unresolved machine-facing parameters", internal_reference: "H-04 binding readiness", plain_language_scope: "Bind every unresolved identity and add separately authorized representation for the four zero-valued Deleverage controls.", why_it_matters: "Approved decisions do not make Defaults or plans executable when required machine inputs are absent.", detail: "Keep DefaultsRobinhood absent and fail-closed until every required binding and the four-control representation gap are resolved under separate authority.", state: "gated", owner_gate: "H-04, Deleverage, protocol security, and independent reviewers"}
+  - { order: 1, label: "Bind unresolved Profile 1 machine inputs", internal_reference: "H-04 binding readiness", plain_language_scope: "Bind every unresolved non-Deleverage identity while preserving all consolidated deferrals.", why_it_matters: "Approved decisions do not make Defaults or plans executable when required machine inputs are absent.", detail: "Keep DefaultsRobinhood absent and fail-closed until every in-scope required binding is resolved; do not open Deleverage representation or size/headroom work.", state: "gated", owner_gate: "H-04, protocol security, and independent reviewers"}
   - { order: 2, label: "Render and verify Robinhood defaults", internal_reference: "H-04 / S6", plain_language_scope: "Render the deterministic compatible DefaultsRobinhood projection only from fully bound approved authority.", why_it_matters: "Defaults must remain a projection of approved values, never a placeholder source or a copy of Base.", detail: "Require a successful fail-closed-to-renderable transition, deterministic bytes, parity checks, and configuration-readiness review.", state: "gated", owner_gate: "H-04 owner and independent reviewers"}
   - { order: 3, label: "Promote deterministic planning to release-candidate readiness", internal_reference: "H-05 planning", plain_language_scope: "Rebuild deterministic reports after binding while preserving blocked, omitted, assertion-only, and executable distinctions.", why_it_matters: "Integrated planning code must not turn absent values or reservations into transactions.", detail: "No Robinhood migration history exists; plan execution remains a later separately authorized gate.", state: "gated", owner_gate: "H-05, protocol, security, and release reviewers"}
   - { order: 4, label: "Bind the final manifest operator and storage", internal_reference: "H-06 qualification", plain_language_scope: "Bind the qualified macOS/APFS class to the intended operator machine, selected volume, and frozen release candidate.", why_it_matters: "Candidate class qualification is not final machine, volume, publication, deployment, or release authorization.", detail: "Preserve the case-sensitive history residual and keep Linux unsupported and fail-closed.", state: "gated", owner_gate: "H-06 operations, security, and release reviewers"}
   - { order: 5, label: "Freeze configuration without activating Stock", internal_reference: "M5", plain_language_scope: "Register, configure, verify, and freeze the Stock route while retaining the disabled and unreachable posture.", why_it_matters: "Integrated M1-M4 proof does not select production values or authorize reachability.", detail: "Begin only after parameter, oracle, SecOps, deployment, and release prerequisites close.", state: "gated", owner_gate: "Track 8, H-04, oracle, SecOps, and release owners"}
   - { order: 6, label: "Complete verification and artifact readiness", internal_reference: "H-07", plain_language_scope: "Freeze exact verifier adapters, ABI exports, runtime artifacts, and offline proof inputs without live submission.", why_it_matters: "Rehearsal requires exact artifacts and reproducible checks rather than generated output trusted by convention.", detail: "Keep RPC, account, signer, deployment, and verification submission outside this predeployment phase.", state: "gated", owner_gate: "H-07, protocol, security, and independent reviewers"}
-  - { order: 7, label: "Prove the deployed graph and adversarial installation story", internal_reference: "H-08 / H-09", plain_language_scope: "Verify topology, negative reachability, reproducibility, adversarial behavior, Base regressions, and clean installation.", why_it_matters: "Deployment is not trustworthy until independent checks prove both required connections and forbidden routes.", detail: "Implement after parameters, plan, artifacts, configuration, and fixtures are approved.", state: "not_started", owner_gate: "QA, security, deployment, and protocol owners"}
-  - { order: 8, label: "Complete SecOps handoff, rehearsal, and release gates", internal_reference: "SecOps / H-10 / H-11", plain_language_scope: "Freeze authorities, monitoring, signer policy, operational ownership, rehearsal evidence, and restricted-release approval.", why_it_matters: "Integrated software cannot operate safely without accountable authority transfer, monitoring, incident controls, and explicit approval.", detail: "Deployment preparation may begin now; testnet, production, activation, and release each need separate authority.", state: "not_started", owner_gate: "SecOps, operations, governance, security, and release owner"}
+  - { order: 7, label: "Prove topology and archive-fork behavior", internal_reference: "H-08 / H-09", plain_language_scope: "Verify topology, negative reachability, reproducibility, adversarial behavior, safe-default collection, opt-in read-only archive qualification, and clean teardown/replay.", why_it_matters: "Deployment is not trustworthy until independent checks prove both required connections and forbidden routes against exact identities.", detail: "H-09 remains network-disabled by default; reseal its ceiling without Deleverage unless explicitly reopened.", state: "not_started", owner_gate: "QA, security, deployment, H-09, and protocol owners"}
+  - { order: 8, label: "Complete SecOps handoff, H-10 rehearsal, and release gates", internal_reference: "SecOps / H-10 / H-11", plain_language_scope: "Freeze authorities, monitoring, signer policy, operational ownership, live-rehearsal evidence, and restricted-release approval.", why_it_matters: "Integrated software cannot operate safely without accountable authority transfer, monitoring, incident controls, and explicit approval.", detail: "H-09 read-only qualification grants no H-10 authority; testnet, production, activation, and release each need separate exact authority.", state: "not_started", owner_gate: "SecOps, operations, governance, security, and release owner"}
 
 workstreams:
   - id: S1
@@ -485,10 +566,10 @@ workstreams:
     integration_state: integrated
     review_state: "PR #61 corrected and integrated; S4 conclusion preserved"
     owner_decision_state: zero cooldown approved; not reopened
-    remaining_blockers: [H-04 zero-value binding, four-control machine representation, and H-08 omission proof.]
+    remaining_blockers: [All future Deleverage work is owner-parked and nonblocking.]
     deployment_release_state: not deployed on Robinhood
-    exact_next_action: Carry the explicit cooldown zero and four deferred control zeros through future binding and proof without reopening S4.
-    authority: Integrated corrected source plus the preserved S4 security decision.
+    exact_next_action: Preserve the explicit cooldown zero, four control zeros, integrated bytes, and historical evidence; perform no Deleverage task until explicit reopening.
+    authority: Integrated corrected source, preserved S4 security decision, and consolidated Deleverage deferral.
     docs: [{ label: S4 decision, path: docs/chains/rh/deleverage-cooldown-security-decision.md }]
   - id: S5
     name: Portable Ledger action-block identity
@@ -515,7 +596,7 @@ workstreams:
     integration_state: integrated
     review_state: reviewed and integrated for exact schema-v2 scope
     owner_decision_state: 20 approved operative; 1 retired non-operative; 0 open
-    remaining_blockers: [Identity bindings, TrainingWheels, liteSigners, four-control machine representation, B-H04-PARAMS.]
+    remaining_blockers: [Identity bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
     deployment_release_state: no defaults deployed or active
     exact_next_action: Keep DefaultsRobinhood absent until all bindings and machine-facing inputs make rendering deterministic and complete.
     authority: Integrated H-04 schema-v2 manifest, generator, tests, evidence, and binding schedules.
@@ -568,16 +649,16 @@ workstreams:
   - id: H-04
     name: Defaults and parameter decisions
     group: Launch configuration
-    plain_language_scope: Bind unresolved identities and render approved launch parameters without inventing placeholders or missing new controls.
-    why_it_matters: Schema approval is not configuration readiness while required identities and machine-facing parameter rows are absent.
+    plain_language_scope: Bind unresolved in-scope identities and render approved launch parameters without inventing placeholders or reopening parked Deleverage work.
+    why_it_matters: Schema approval is not configuration readiness while required non-Deleverage identities and machine-facing parameter rows are absent.
     current_phase: schema-v2 package integrated; binding and rendering gated
     implementation_state: parameter manifest and fail-closed generator integrated
     integration_state: integrated
     review_state: reviewed and integrated for exact schema-v2 scope
     owner_decision_state: 20 approved operative, 1 retired non-operative, 0 open
-    remaining_blockers: [Identity-bearing bindings, TrainingWheels, liteSigners, four-control machine representation, B-H04-PARAMS.]
+    remaining_blockers: [Identity-bearing bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
     deployment_release_state: no configuration generated, deployed, or active
-    exact_next_action: Keep DefaultsRobinhood absent until all bindings and the separately authorized four-control representation close deterministically.
+    exact_next_action: Keep DefaultsRobinhood absent until all in-scope bindings close deterministically; do not open Deleverage representation work.
     authority: Integrated H-04 schema-v2 manifest, generator, tests, evidence, and 14 binding schedules.
     docs: [{ label: H-04 evidence, path: docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md }]
   - id: H-05
@@ -590,7 +671,7 @@ workstreams:
     integration_state: integrated
     review_state: reviewed and corrected for dynamic Git identity
     owner_decision_state: planning implementation approved; migration execution not approved
-    remaining_blockers: [H-04 bindings, four-control machine representation, B-H05-PLAN, exact execution authority.]
+    remaining_blockers: [In-scope H-04 bindings, B-H05-PLAN, exact execution authority; four-control representation is parked and nonblocking.]
     deployment_release_state: no migration history, plan execution, or deployment
     exact_next_action: Rebuild deterministic reports after bindings; preserve plan_hash null and do not create history or execute migrations.
     authority: Integrated H-05 evidence, MIGRATION_PLAN operation, runner, and deterministic report tests.
@@ -643,22 +724,22 @@ workstreams:
   - id: H-09
     name: Clean deployment and adversarial suite
     group: Deployment verification
-    plain_language_scope: Rebuild from empty state and prove reproducibility, adversarial behavior, negative invariants, and Base regressions.
-    why_it_matters: Manual repair or fixture-specific success cannot establish a reproducible safe release candidate.
-    current_phase: specified; implementation not started
+    plain_language_scope: Own network-disabled safe-default validation and explicit opt-in read-only Robinhood archive-fork qualification in disposable runtimes.
+    why_it_matters: Manual repair, accidental network access, or fixture-specific success cannot establish a reproducible safe release candidate.
+    current_phase: architecture approved; dependencies and implementation open
     implementation_state: not started
     integration_state: not integrated
-    review_state: specification reviewed only
-    owner_decision_state: implementation unapproved
-    remaining_blockers: [H-01 through H-08, configuration readiness, B-H09-RELEASE.]
+    review_state: consolidated architecture reviewed; provisional 33-path ceiling requires reseal
+    owner_decision_state: network-disabled default and opt-in read-only ownership approved; implementation and execution unapproved
+    remaining_blockers: [Exact pin/provider/engine, external identities, H-05/H-06/H-07/H-08 APIs, final H-09 ceiling/nodes/stops/evidence vocabulary, configuration readiness, B-H09-RELEASE.]
     deployment_release_state: no clean-deployment or release proof
-    exact_next_action: Begin only after every upstream artifact and configuration source is frozen.
-    authority: Integrated support specification and validation plan.
-    docs: [{ label: Validation plan, path: docs/chains/rh/robinhood-deployment-validation-plan.md }]
+    exact_next_action: Close owner APIs and external packets, then reseal the H-09 ledger without a Deleverage lane unless explicitly reopened; ordinary execution remains network-disabled.
+    authority: Integrated support specification and consolidated fork-suite architecture.
+    docs: [{ label: Fork census, path: docs/chains/rh/qualification/fork-suite-coverage-census.md }, { label: Synthesis, path: docs/chains/rh/reassessment-and-qualification-synthesis.md }]
   - id: H-10
     name: Testnet deployment and soak
     group: Live rehearsal
-    plain_language_scope: Rehearse the approved stack, governance, PSM, lifecycle, and monitoring on testnet under an exact plan.
+    plain_language_scope: Own every live testnet transaction, external signer/account, persistent rehearsal artifact, deployed rehearsal state, and operational execution under an exact plan.
     why_it_matters: Operational and authority failures must surface before production signing, funding, or activation.
     current_phase: specified; live phase unopened
     implementation_state: runbook and live harness not started
@@ -667,8 +748,8 @@ workstreams:
     owner_decision_state: testnet action unauthorized
     remaining_blockers: [H-01 through H-09, exact values, signers, provider, funds, operations approval.]
     deployment_release_state: no testnet deployment or soak
-    exact_next_action: Wait for fresh authority naming the plan, network, accounts, funds, and stops.
-    authority: Specification only.
+    exact_next_action: Wait for accepted H-09 evidence and fresh authority naming the plan, network, endpoints, accounts, signers, funds, commands, evidence, and stops.
+    authority: Specification and consolidated H-09/H-10 ownership boundary only.
     docs: [{ label: Support specification, path: docs/chains/rh/robinhood-deployment-support-specification.md }]
   - id: H-11
     name: Production rehearsal and restricted release
@@ -755,9 +836,9 @@ workstreams:
     integration_state: integrated
     review_state: reviewed and integrated
     owner_decision_state: containment design approved for this scope
-    remaining_blockers: [M5 remains a separate gate; zero-backing settlement and bad-debt policy follow-up is parked and nonblocking for current work.]
+    remaining_blockers: [M5 remains a separate gate; CreditEngine zero-backing reassessment, settlement, and bad-debt policy follow-up are parked and nonblocking.]
     deployment_release_state: does not activate Stock
-    exact_next_action: Preserve integrated source and regression behavior; do no settlement or bad-debt policy work until explicit owner reopening.
+    exact_next_action: Preserve integrated source and regression behavior; do no CreditEngine zero-backing reassessment, settlement, or bad-debt policy work until explicit owner reopening.
     authority: Integrated M3 source, tests, evidence, and inventory admission.
     docs: [{ label: Stock comparison, path: docs/chains/rh/stock-token-vault-comparison.md }]
   - id: M4
@@ -785,7 +866,7 @@ workstreams:
     integration_state: not integrated
     review_state: not started
     owner_decision_state: values, freeze, and activation unapproved
-    remaining_blockers: [H-04 binding, four-control representation, oracle freeze, SecOps, H-08, H-09, deployment, release.]
+    remaining_blockers: [Non-Deleverage H-04 binding, oracle freeze, SecOps, H-08, H-09, deployment, release.]
     deployment_release_state: Stock remains disabled and unreachable
     exact_next_action: Keep Stock unreachable; begin only after parameter readiness and every named gate closes.
     authority: M0 boundary and H-03 blocker graph.
@@ -862,15 +943,16 @@ decisions:
   - { id: RH-D008, title: "CCIP complete or disabled", status: "approved_disabled_gates_open", summary: "CCIP remains disabled unless every production, support, gas, testnet, operations, and promotion gate closes.", source: "docs/chains/rh/track-8-m0-owner-decision-packet.md"}
   - { id: RH-D009, title: "USDG price path", status: "price_path_approved_activation_gated", summary: "Use the shared official feed path; PSM deployment and activation remain separate gates.", source: "docs/chains/rh/usdg-psm-decision.md"}
   - { id: RH-D010, title: "Lootbox immutable floor", status: "approved_reviewed_integrated", summary: "Base uses 43,200 and Robinhood 7,200 with strict greater-than behavior.", source: "docs/chains/rh/lootbox-floor-implementation-record.md"}
-  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated", summary: "Use corrected shared source while zero cooldown remains closed; four new controls stay zero and require future machine representation.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
+  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
   - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; concrete values and all 18 blockers remain open.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
-  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "schema_v2_integrated_bindings_open", summary: "Twenty decisions are approved and operative, one ID is retired, none are open; unresolved bindings and the four-control gap keep Defaults fail-closed.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
+  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "schema_v2_integrated_bindings_open", summary: "Twenty decisions are approved and operative, one ID is retired, none are open; unresolved in-scope identities, TrainingWheels, and liteSigners keep Defaults fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
   - { id: RH-D016, title: "Shared migration source, isolated histories", status: "deterministic_planning_integrated_execution_unauthorized", summary: "Deterministic blocked planning is integrated; no Robinhood history exists and execution remains unauthorized.", source: "docs/chains/rh/evidence/robinhood-migration-phase-a.md"}
   - { id: RH-D017, title: "Immutable manifest and evidence chain", status: "candidate_class_qualified_final_binding_open", summary: "H-06 qualifies a macOS/APFS operator/storage class only; final machine/volume, deployment, promotion, and release remain unauthorized.", source: "docs/chains/rh/evidence/robinhood-manifest-macos-release-qualification.md"}
   - { id: RH-D018, title: "Dashboard tooling is separate from launch dependencies", status: "approved_current_handoff", summary: "Dashboard tooling remains outside H-01 and cannot affect its disposition.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D019, title: "Private dashboard is a temporary presentation mirror", status: "approved_temporary", summary: "The private mirror is optional; repository documents remain complete authority and fallback.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
+  - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_controlling", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture; launch Profile 1 with Chainlink, no launch DEX oracle or LP admission, stage GREEN/USDG and both LPs in Profile 2, and preserve H-09/H-10 lifecycle separation.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
@@ -878,8 +960,8 @@ deadlines:
 
 hard_gates:
   - { id: G-M5, label: "Freeze Stock configuration without activation", plain_language_scope: "Bind AAPL identity, oracle, vault, caps, routes, assertions, monitoring, and a disabled configuration package.", why_it_matters: "Integrated M1-M4 proof does not choose production values or make Stock reachable safely.", state: "open", effect: "Blocks Stock reachability, deployment, activation, and release; parked policy work remains nonblocking."}
-  - { id: G-H04-BINDING, label: "Resolve parameter binding and rendering readiness", plain_language_scope: "Bind identities, TrainingWheels, liteSigners, and every required machine input before Defaults generation or configuration use.", why_it_matters: "Twenty approved decisions and an integrated schema do not make unresolved inputs deployable.", state: "open", effect: "Blocks DefaultsRobinhood rendering, H-05 release-candidate planning, configuration, deployment, and release."}
-  - { id: G-DELEVERAGE-PARAMS, label: "Represent four deferred Deleverage controls", plain_language_scope: "Add separately authorized machine-facing parameter and planning representation for fullPayoffBuffer, overageBps, dustThreshold, and dustBps while retaining zero values.", why_it_matters: "The integrated contracts expose the controls, but current Robinhood parameter and planning sources cannot bind or attest them.", state: "open", effect: "Blocks complete Defaults, plan, configuration, and release readiness; this documentation refresh does not fix the gap."}
+  - { id: G-H04-BINDING, label: "Resolve parameter binding and rendering readiness", plain_language_scope: "Bind in-scope identities, TrainingWheels, liteSigners, and required non-Deleverage machine inputs before Defaults generation or configuration use.", why_it_matters: "Twenty approved decisions and an integrated schema do not make unresolved inputs deployable.", state: "open", effect: "Blocks DefaultsRobinhood rendering, H-05 release-candidate planning, configuration, deployment, and release."}
+  - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero without opening representation, configuration, test, fork, documentation, or size/headroom work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred every Deleverage task rather than authorizing a machine implementation.", state: "parked_nonblocking", effect: "Does not block current non-Deleverage Profile 1 preparation; explicit owner reopening is required before any Deleverage work."}
   - { id: G-H05-READINESS, label: "Promote deterministic planning after bindings", plain_language_scope: "Rebuild the integrated deterministic reports only after required bindings exist, preserving typed blocked and non-executable rows.", why_it_matters: "Planning code must not turn missing inputs or reservations into transactions.", state: "open", effect: "Blocks an executable release-candidate plan and later deployment evidence; migration execution remains separately unauthorized."}
   - { id: G-H06-OPS, label: "Qualify intended manifest operator and storage", plain_language_scope: "Repeat exact macOS/APFS qualification for the intended operator, device, filesystem, and runbook.", why_it_matters: "Integrated implementation evidence is not operational publication or release qualification.", state: "open", effect: "Blocks operational publication, deployment evidence, and release."}
   - { id: G-T1-CCIP, label: "CCIP workflow parked by owner", plain_language_scope: "Preserve historical support, tooling, role, gas, testnet, operations, and promotion gaps without doing new CCIP work.", why_it_matters: "Parking prevents bridge work from consuming or blocking the current non-CCIP program while CCIP remains disabled.", state: "parked_nonblocking", effect: "Does not block current non-CCIP work; CCIP remains disabled until explicitly reopened."}
@@ -888,10 +970,11 @@ hard_gates:
   - { id: G-PROD, label: "Authorize restricted production deployment and release", plain_language_scope: "Approve the exact production plan, authorities, artifacts, configuration, monitoring, activation, and release sequence.", why_it_matters: "Production affects real users and assets and has no implied authority from earlier phases.", state: "open", effect: "Blocks production deployment, migration, registration, role transfer, configuration, activation, and release."}
 
 reading_paths:
-  human_10_minute: [docs/chains/rh/START-HERE.md, docs/chains/rh/deployment-owner-readiness.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/status.yaml, docs/chains/rh/decision-register.md]
+  human_10_minute: [docs/chains/rh/START-HERE.md, docs/chains/rh/reassessment-and-qualification-synthesis.md, docs/chains/rh/deployment-owner-readiness.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/status.yaml, docs/chains/rh/decision-register.md]
   human_45_minute: [docs/chains/rh-summary.md, docs/chains/rh/minimal-contract-change-reassessment.md, docs/chains/rh/robinhood-deployment-support-specification.md, docs/chains/rh/robinhood-deployment-validation-plan.md]
   agent_bootstrap:
     - docs/chains/rh/AGENT-HANDOFF.md
+    - docs/chains/rh/reassessment-and-qualification-synthesis.md
     - docs/chains/rh/deployment-owner-readiness.md
     - docs/chains/rh/current-owner-priorities.md
     - docs/chains/rh/status.yaml

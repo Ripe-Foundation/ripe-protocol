@@ -21,6 +21,12 @@ deployed, configured, or active. No Robinhood migration has been executed, and
 no production configuration, activation, RPC, account, key, or signer action
 exists.
 
+The eight-report reassessment and qualification corpus is now reconciled in
+[`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md).
+It is one program package, not eight implementation trains. Its architecture,
+launch/Profile 2 split, deferrals, external-input gates, and future package
+boundaries must be consumed before affected gates close.
+
 The frozen protocol/pause baseline is `ae0cb49…`. The documentation-only
 handoff commit is a descendant whose authority is derived by the dashboard
 generator. Its publication does not integrate it into `rh`, and a later
@@ -29,14 +35,14 @@ integrated `rh` tip or descendant requires independent reconciliation.
 The current ledger contains:
 
 - 28 workstreams;
-- 19 RH-D decisions;
+- 20 RH-D decisions;
 - 18 open H-03 blockers;
 - 21 H-04 rows: 20 approved and operative, one retired and non-operative
   (`D-H04-19`), zero open;
 - 14 binding schedules;
 - nine hard gates;
-- ten dashboard handoff documents;
-- four parked lanes; and
+- eleven dashboard handoff documents;
+- six parked lanes; and
 - zero live actions.
 
 ## What is integrated
@@ -52,13 +58,14 @@ The current ledger contains:
   operator, machine, volume, deployment, or release authorization.
 - M1-M4 Stock containment and composed-route proof.
 
-## The four-control machine gap
+## Deferred Deleverage record
 
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero
-and deferred. The integrated contracts expose them, but Robinhood's
-machine-facing parameter and planning sources do not represent them. That gap
-belongs to the deployment owner, but machine implementation still requires
-separate authority. This documentation refresh does not fix it.
+and absent from Robinhood's machine-facing parameter and planning sources.
+Every Deleverage task—including representation, configuration, fork scenarios,
+documentation refresh, and bytecode size/headroom work—is deferred and
+nonblocking until explicitly reopened. Do not create a machine implementation
+task from the preserved gap.
 
 Required identities, `TrainingWheels`, and `liteSigners` also remain unresolved.
 `DefaultsRobinhood.vy` is therefore absent and the generator remains
@@ -68,6 +75,10 @@ fail-closed. Do not substitute Base values, zero addresses, or placeholders.
 
 - The historical S4 `deleverageCooldown == 0` decision remains closed and was
   not reopened by PR #61.
+- Every Deleverage task is deferred and nonblocking.
+- CreditEngine zero-backing reassessment is deferred and nonblocking.
+- Uniswap TWAP implementation is deferred; no Uniswap price-source contract is
+  a launch requirement.
 - CCIP is deferred indefinitely, disabled, and nonblocking.
 - Zero-backing settlement and bad-debt policy are deferred and nonblocking.
 - Sites account/workspace recovery is parked and nonblocking.
@@ -79,15 +90,16 @@ fail-closed. Do not substitute Base values, zero addresses, or placeholders.
 The complete ten-step ownership map is in
 [`deployment-owner-readiness.md`](deployment-owner-readiness.md). In short:
 bind final protocol inputs and authorities; dispose and represent the four
-zero-valued controls; generate Defaults only from complete approved inputs;
-finalize deterministic planning; bind H-06; freeze artifacts and offline
-verification; rehearse under later testnet authority; complete SecOps; and
-assemble the restricted-release packet and signer ceremony.
+zero-valued controls only if Deleverage is explicitly reopened; generate
+Defaults only from complete approved inputs; finalize deterministic planning;
+bind H-06; freeze artifacts and offline verification; rehearse under later
+testnet authority; complete SecOps; and assemble the restricted-release packet
+and signer ceremony.
 
-Smart-contract reassessment and Robinhood fork/external-integration
-qualification do not block preparation from starting. Relevant findings must
-be consumed before affected gates close. Testnet, production, configuration,
-activation, and release each require separate authority.
+The reassessment/qualification findings are now consolidated. H-09 owns
+network-disabled-by-default, opt-in read-only archive-fork qualification; H-10
+owns live rehearsal. Testnet, production, configuration, activation, and
+release each require separate authority.
 
 ## Current checked inventory
 
@@ -104,9 +116,12 @@ headroom.
 
 - [`deployment-owner-readiness.md`](deployment-owner-readiness.md) for the
   ordered ownership map and exact boundary.
+- [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md)
+  for the accepted architecture, launch/Profile 2 split, deferrals, external
+  inputs, and future package boundaries.
 - [`current-owner-priorities.md`](current-owner-priorities.md) for active and
   parked work.
-- [`decision-register.md`](decision-register.md) for the 19 canonical RH-D
+- [`decision-register.md`](decision-register.md) for the 20 canonical RH-D
   decisions.
 - [`../rh-summary.md`](../rh-summary.md) for stable architecture and the launch
   checklist.
