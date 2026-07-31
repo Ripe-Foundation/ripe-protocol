@@ -24,6 +24,10 @@ from config.robinhood_blueprint import (
     get_symbolic_input,
     validate_blueprint,
 )
+from scripts.utils.deployment_assertions import (
+    blueprint_policy,
+    blueprint_registry_map as registry_map,
+)
 
 
 ASSERTION_IDS = {
@@ -68,14 +72,6 @@ def relation_map(blueprint=ROBINHOOD_BLUEPRINT):
         relation.relation_id: (component.component_id, relation)
         for component in blueprint.components
         for relation in component.relations
-    }
-
-
-def registry_map(blueprint=ROBINHOOD_BLUEPRINT):
-    return {
-        (item.domain, item.registry_id): item
-        for component in blueprint.components
-        for item in component.registry_expectations
     }
 
 
@@ -317,6 +313,7 @@ def test_unsupported_oracle_unreachable():
         for component_id in oracle_components
     )
     topology = registry_map()
+    policy = blueprint_policy()
     assert [
         topology[(RegistryDomain.PRICE_DESK, value)].semantic_name
         for value in range(2, 6)
@@ -326,6 +323,9 @@ def test_unsupported_oracle_unreachable():
         is Disposition.OMITTED
         for value in range(2, 6)
     )
+    assert {
+        key for key in policy.reserved_registries if key[0] == "price_desk"
+    } == {("price_desk", value) for value in range(2, 6)}
 
 
 def test_ccip_capability_withheld_until_complete():

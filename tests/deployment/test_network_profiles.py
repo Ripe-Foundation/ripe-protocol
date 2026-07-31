@@ -472,6 +472,76 @@ def test_invalid_chain_id_response_fails_with_sanitized_typed_error():
         )
 
 
+@pytest.mark.parametrize(
+    ("profile_id", "observed_chain_id"),
+    (
+        ("robinhood-mainnet", 46630),
+        ("robinhood-testnet", 4663),
+        ("robinhood-mainnet", 8453),
+        ("robinhood-testnet", 84532),
+    ),
+)
+def test_robinhood_cross_network_and_wrong_chain_identities_fail_closed(
+    profile_id,
+    observed_chain_id,
+):
+    profile = get_profile(profile_id)
+    operation = Operation.CONSOLE_EXPLORATION
+    rpc = resolve_rpc_reference(
+        profile,
+        operation,
+        {},
+        "https://rpc.invalid.example",
+    )
+    with pytest.raises(NetworkProfileError, match="H02_CHAIN_ID_MISMATCH"):
+        verify_chain_identity(
+            profile,
+            operation,
+            rpc,
+            lambda value: observed_chain_id,
+        )
+
+
+@pytest.mark.parametrize("observed_chain_id", (0, -1, "0x0", "", True, None))
+def test_robinhood_zero_and_malformed_chain_identities_fail_closed(
+    observed_chain_id,
+):
+    profile = get_profile("robinhood-mainnet")
+    operation = Operation.CONSOLE_EXPLORATION
+    rpc = resolve_rpc_reference(
+        profile,
+        operation,
+        {},
+        "https://rpc.invalid.example",
+    )
+    with pytest.raises(NetworkProfileError, match="H02_CHAIN_ID_INVALID"):
+        verify_chain_identity(
+            profile,
+            operation,
+            rpc,
+            lambda value: observed_chain_id,
+        )
+
+
+def test_robinhood_rpc_reference_cannot_cross_profiles():
+    mainnet = get_profile("robinhood-mainnet")
+    testnet = get_profile("robinhood-testnet")
+    operation = Operation.CONSOLE_EXPLORATION
+    testnet_rpc = resolve_rpc_reference(
+        testnet,
+        operation,
+        {},
+        "https://rpc.invalid.example",
+    )
+    with pytest.raises(NetworkProfileError, match="H02_OPERATION_INVALID"):
+        verify_chain_identity(
+            mainnet,
+            operation,
+            testnet_rpc,
+            lambda value: pytest.fail("reader must not run"),
+        )
+
+
 def test_local_runtime_requires_explicit_chain_id():
     local = get_profile("local")
     with pytest.raises(

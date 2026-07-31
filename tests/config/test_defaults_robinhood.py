@@ -21,22 +21,22 @@ MANIFEST_PATH = REPOSITORY / "config/robinhood-parameters.json"
 REAL_OUTPUT = REPOSITORY / "contracts/config/DefaultsRobinhood.vy"
 EXPECTED_GENERATION_BLOCKERS = (
     "Defaults.ripeGovVaultConfigs[RIPE].asset",
-    "Defaults.ripeGovVaultConfigs[RIPE_WETH_LP].asset",
     "Defaults.trainingWheels",
     "Defaults.assetConfigs[GREEN].asset",
     "Defaults.assetConfigs[RIPE].asset",
     "Defaults.assetConfigs[SGREEN].asset",
-    "Defaults.assetConfigs[GREEN_USDG_LP].asset",
-    "Defaults.assetConfigs[GREEN_USDG_LP].config.perUserDepositLimit",
-    "Defaults.assetConfigs[GREEN_USDG_LP].config.globalDepositLimit",
-    "Defaults.assetConfigs[GREEN_USDG_LP].config.minDepositBalance",
-    "Defaults.assetConfigs[RIPE_WETH_LP].asset",
-    "Defaults.assetConfigs[RIPE_WETH_LP].config.perUserDepositLimit",
-    "Defaults.assetConfigs[RIPE_WETH_LP].config.globalDepositLimit",
-    "Defaults.assetConfigs[RIPE_WETH_LP].config.minDepositBalance",
-    "Defaults.priorityStabVaults[0].asset",
     "Defaults.priorityStabVaults[1].asset",
 )
+# This ten-line block deliberately preserves reviewed cadence line anchors.
+# Profile 1 excludes the RIPE/WETH governance-vault identity.
+# Profile 1 excludes both GREEN/USDG and RIPE/WETH asset identities.
+# Profile 1 excludes both LP deposit-limit and minimum-balance bindings.
+# Profile 1 excludes the RIPE/WETH stability-vault identity.
+# Profile 2 owns both later LP admissions under separate activation authority.
+# Authority: docs/chains/rh/reassessment-and-qualification-synthesis.md.
+# The complete manifest schema is retained for later Profile 2 authority.
+# Deferred rows are not unresolved Profile 1 generation paths.
+# Closure tests below prove they cannot reach the Profile 1 render.
 
 
 def _load_generator():
@@ -69,10 +69,10 @@ def _synthetic_manifest(manifest):
     bound = copy.deepcopy(manifest)
     address_by_symbol = {
         "[RIPE]": "0x1111111111111111111111111111111111111101",
-        "[RIPE_WETH_LP]": "0x1111111111111111111111111111111111111102",
+        # Profile 2 LP rows deliberately have no synthetic address binding.
         "[GREEN]": "0x1111111111111111111111111111111111111103",
         "[SGREEN]": "0x1111111111111111111111111111111111111104",
-        "[GREEN_USDG_LP]": "0x1111111111111111111111111111111111111105",
+        # Keep deferred LP identities unreachable from Profile 1 rendering.
     }
     next_address = 0x1200
     required = set(GENERATOR.required_generation_paths())
@@ -391,7 +391,7 @@ def test_real_manifest_fails_closed_without_creating_output_or_temporary_file(
     assert set(REAL_OUTPUT.parent.iterdir()) == before
 
 
-def test_exact_sixteen_generation_bearers_are_blocked_deterministically(
+def test_exact_profile1_generation_bearers_are_blocked_deterministically(
     manifest,
 ):
     records = _lookup(manifest)
@@ -401,7 +401,7 @@ def test_exact_sixteen_generation_bearers_are_blocked_deterministically(
         if records[path]["status"] in {"blocked", "unresolved"}
     )
     assert blocked == EXPECTED_GENERATION_BLOCKERS
-    assert len(blocked) == 16
+    assert len(blocked) == 6
     assert all(records[path]["value"]["kind"] == "typed_null" for path in blocked)
     assert "Defaults.liteSigners[0]" not in GENERATOR.required_generation_paths()
 
@@ -476,8 +476,8 @@ def test_synthetic_render_is_byte_identical_across_repeated_runs(manifest):
     assert hashlib.sha256(first.encode()).hexdigest() == hashlib.sha256(
         second.encode()
     ).hexdigest()
-    assert "DefaultsBase" not in first
-    assert "DefaultsLocal" not in first
+    assert all(marker not in first for marker in ("DefaultsBase", "DefaultsLocal"))
+    assert all(marker not in first for marker in ("GREEN_USDG_LP", "RIPE_WETH_LP"))
     assert (
         "def liteSigners() -> DynArray[address, 10]:\n"
         "    return []\n"
@@ -924,3 +924,152 @@ def test_closed_schema_and_cross_record_rejections(manifest, mutation, code):
         records[0], records[1] = records[1], records[0]
         records[0]["id"], records[1]["id"] = records[1]["id"], records[0]["id"]
     _assert_code(candidate, code)
+
+
+@pytest.mark.parametrize(
+    ("path", "raw", "code"),
+    (
+        (
+            "Deployment.DP-03.deleverage.futureValue",
+            None,
+            "H04_DELEVERAGE_REPRESENTATION",
+        ),
+        (
+            "Deployment.DP-03.fullPayoffBuffer",
+            None,
+            "H04_DELEVERAGE_REPRESENTATION",
+        ),
+        (
+            "Deployment.DP-03.payoff.overageBps",
+            None,
+            "H04_DELEVERAGE_REPRESENTATION",
+        ),
+        (
+            "Deployment.DP-03.dust.dustThreshold",
+            None,
+            "H04_DELEVERAGE_REPRESENTATION",
+        ),
+        (
+            "Deployment.DP-03.dust.dustBps",
+            None,
+            "H04_DELEVERAGE_REPRESENTATION",
+        ),
+        (
+            "Deployment.DP-03.fullPayoffBuffer",
+            10**15,
+            "H04_BASE_DELEVERAGE_VALUE",
+        ),
+        (
+            "Deployment.DP-03.payoff.overageBps",
+            100,
+            "H04_BASE_DELEVERAGE_VALUE",
+        ),
+    ),
+)
+def test_deleverage_representation_and_base_values_fail_closed(
+    manifest,
+    path,
+    raw,
+    code,
+):
+    candidate = _mutated(manifest)
+    record = candidate["parameters"][-1]
+    record["destination"]["path"] = path
+    if raw is not None:
+        record["value"]["raw"] = raw
+        record["conversion"] = {"kind": "identity"}
+    _assert_code(candidate, code)
+
+
+def test_profile1_render_projection_is_exact_and_schema_bounded(manifest):
+    assert GENERATOR.PROFILE1_GOV_ROWS == ("RIPE",)
+    assert GENERATOR.PROFILE1_ASSET_ROWS == ("GREEN", "RIPE", "SGREEN")
+    assert GENERATOR.PROFILE1_STAB_VAULT_INDEXES == (1,)
+    assert set(GENERATOR.PROFILE1_GOV_ROWS) <= set(GENERATOR.GOV_ROWS)
+    assert set(GENERATOR.PROFILE1_ASSET_ROWS) <= set(GENERATOR.ASSET_ROWS)
+    canonical = set(GENERATOR.canonical_default_paths())
+    required = set(GENERATOR.required_generation_paths())
+    deferred = {
+        path
+        for path in canonical
+        if "[GREEN_USDG_LP]" in path
+        or "[RIPE_WETH_LP]" in path
+        or path.startswith("Defaults.priorityStabVaults[0].")
+    }
+    records = _lookup(manifest)
+    assert len(deferred) == 72
+    assert hashlib.sha256(
+        ("\n".join(sorted(deferred)) + "\n").encode()
+    ).hexdigest() == (
+        "1b1fa2c5f0b4626b05bdb86eeb7b713ca9487e53fa3880ff1707647a6355aa98"
+    )
+    assert deferred.isdisjoint(required)
+    assert sum(records[path]["status"] == "approved" for path in deferred) == 18
+    assert sum(records[path]["status"] == "disabled" for path in deferred) == 44
+    assert sum(records[path]["status"] == "blocked" for path in deferred) == 10
+    assert all(
+        records[path]["value"]["kind"] == "concrete"
+        for path in deferred
+        if records[path]["status"] == "approved"
+    )
+    rendered = GENERATOR.render_defaults(_synthetic_manifest(manifest))
+    assert "GREEN_USDG_LP" not in rendered
+    assert "RIPE_WETH_LP" not in rendered
+
+
+def test_profile1_projection_authority_is_current_and_hash_bound():
+    authority = REPOSITORY / GENERATOR.PROFILE1_AUTHORITY_PATH
+    current = authority.read_bytes()
+    introduced = subprocess.run(
+        [
+            "/usr/bin/git",
+            "show",
+            (
+                f"{GENERATOR.PROFILE1_AUTHORITY_COMMIT}:"
+                f"{GENERATOR.PROFILE1_AUTHORITY_PATH}"
+            ),
+        ],
+        cwd=REPOSITORY,
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert hashlib.sha256(current).hexdigest() == (
+        GENERATOR.PROFILE1_AUTHORITY_SHA256
+    )
+    assert introduced == current
+
+
+def test_blocked_typed_null_deleverage_name_uses_normal_command_contract(
+    manifest,
+    tmp_path,
+):
+    candidate = _mutated(manifest)
+    record = next(
+        item for item in candidate["parameters"] if item["id"] == "P-H04-393"
+    )
+    assert record["status"] == "blocked"
+    assert record["value"]["kind"] == "typed_null"
+    assert "raw" not in record["value"]
+    record["destination"]["path"] = "Deployment.DP-14.lp.dustThreshold"
+
+    repository = tmp_path / "repo"
+    script = repository / "scripts/params/generate_robinhood_defaults.py"
+    manifest_path = repository / "config/robinhood-parameters.json"
+    output = repository / "contracts/config/DefaultsRobinhood.vy"
+    script.parent.mkdir(parents=True)
+    manifest_path.parent.mkdir(parents=True)
+    output.parent.mkdir(parents=True)
+    script.write_bytes(GENERATOR_PATH.read_bytes())
+    manifest_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert result.stdout == "H04_BLOCKED: H04_DELEVERAGE_REPRESENTATION\n"
+    assert result.stderr == ""
+    assert not output.exists()

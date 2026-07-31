@@ -13496,6 +13496,26 @@
         "status": "reviewed",
         "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
       }
+    },
+    {
+      "path": "tests/deployment/test_robinhood_omissions.py",
+      "function": "test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "numBlocksPerInterval",
+      "normalizedSnippet": "\"numBlocksPerInterval\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 667,
+      "classification": "test",
+      "semanticIds": [
+        "BN-027",
+        "BN-028"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "059b4aa0809c8df28250dc47e3abfe7836f0938c"
+      }
     }
   ],
   "secondsUnitCandidates": [

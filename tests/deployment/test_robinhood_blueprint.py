@@ -39,6 +39,8 @@ from config.robinhood_blueprint import (
     SurfaceKind,
     SurfaceRecord,
     SymbolicInput,
+    AuthorityClass,
+    _validate_symbolic_authority_classes,
     get_blocker,
     get_component,
     get_promotion,
@@ -312,6 +314,7 @@ def test_frozen_slotted_records_have_exact_approved_fields():
         SymbolicInput: (
             "field_id",
             "semantic_class",
+            "authority_class",
             "consumers",
             "primary_owner_id",
             "co_owner_ids",
@@ -525,6 +528,7 @@ def test_symbolic_inputs_are_value_free_owned_gated_and_bidirectional():
     for item in ROBINHOOD_BLUEPRINT.symbolic_inputs:
         assert item.consumers
         assert item.primary_owner_id.startswith("OWN-")
+        assert item.authority_class in AuthorityClass
         assert item.deadline_gate
         assert item.status in Disposition
         assert not hasattr(item, "value")
@@ -534,6 +538,94 @@ def test_symbolic_inputs_are_value_free_owned_gated_and_bidirectional():
         "I-AAPL-TOKEN",
         "I-ASSET-CONFIG-STOCK",
     }
+
+
+def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
+    expected = {
+        "I-GREEN": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-GREEN-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+        "I-GREEN-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+        "I-RIPE": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-RIPE-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+        "I-RIPE-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+        "I-SGREEN": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-SGREEN-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+        "I-SGREEN-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+        "I-GOV-HANDOFF": AuthorityClass.OWNER_SELECTED,
+        "I-CLOCK-PARAMS": AuthorityClass.REPOSITORY_APPROVED,
+        "I-LEDGER-BLOCK-SOURCE": AuthorityClass.REPOSITORY_APPROVED,
+        "I-LEDGER-DEFAULTS": AuthorityClass.REPOSITORY_APPROVED,
+        "I-RH-DEFAULTS": AuthorityClass.REPOSITORY_APPROVED,
+        "I-TRAINING-WHEELS": AuthorityClass.OWNER_SELECTED,
+        "I-CHAINLINK-CORE": (
+            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        ),
+        "I-CHAINLINK-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+        "I-AAPL-TOKEN": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+        "I-AAPL-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+        "I-AAPL-RISK": AuthorityClass.OWNER_SELECTED,
+        "I-STOCK-VAULT-SLOT": AuthorityClass.OWNER_SELECTED,
+        "I-STOCK-VAULT-ARTIFACT": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-TELLER-INITIAL-PAUSE": AuthorityClass.OWNER_SELECTED,
+        "I-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+        "I-USDG-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+        "I-WETH": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+        "I-GREEN-USDG-LP": AuthorityClass.OWNER_SELECTED,
+        "I-RIPE-WETH-LP": (
+            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        ),
+        "I-PSM-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-ECHO-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+        "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+        "I-ASSET-CONFIG-STOCK": AuthorityClass.OWNER_SELECTED,
+        "I-STABILITY-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
+        "I-RIPE-GOV-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
+        "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+        "I-AUCTION-CREDIT-STOCK": AuthorityClass.OWNER_SELECTED,
+        "I-ENDAOMENT-NATIVE-METADATA": (
+            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        ),
+        "I-LOOTBOX-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-REWARDS-PROMOTION": AuthorityClass.OWNER_SELECTED,
+        "I-BOND-ROOM-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-BOND-BOOSTER-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-HR-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+        "I-CCIP-ARTIFACTS": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-CCIP-REGISTRATION": AuthorityClass.OWNER_SELECTED,
+        "I-MIGRATION-PLAN": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
+        "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
+    }
+    actual = {
+        item.field_id: item.authority_class
+        for item in ROBINHOOD_BLUEPRINT.symbolic_inputs
+    }
+    assert actual == expected
+    assert Counter(actual.values()) == {
+        AuthorityClass.REPOSITORY_APPROVED: 9,
+        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 8,
+        AuthorityClass.OWNER_SELECTED: 23,
+        AuthorityClass.DEPLOYMENT_PRODUCED: 8,
+    }
+    for field_id in ("I-WETH", "I-USDG", "I-CHAINLINK-CORE"):
+        item = get_symbolic_input(field_id)
+        assert (
+            item.authority_class
+            is AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        )
+        assert item.status is Disposition.REQUIRED
+        assert item.blocker_ids
+        assert item.semantic_class.startswith("symbolic ")
+        assert not hasattr(item, "value")
+    assert (
+        get_symbolic_input("I-LEDGER-BLOCK-SOURCE").authority_class
+        is AuthorityClass.REPOSITORY_APPROVED
+    )
+    assert (
+        get_symbolic_input("I-TELLER-INITIAL-PAUSE").authority_class
+        is AuthorityClass.OWNER_SELECTED
+    )
 
 
 def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
@@ -1028,3 +1120,35 @@ def test_validation_is_deterministic_and_does_not_mutate_singleton():
     validate_blueprint()
     validate_blueprint(ROBINHOOD_BLUEPRINT)
     assert repr(ROBINHOOD_BLUEPRINT) == before
+
+
+def test_symbolic_authority_class_mutations_fail_closed():
+    exact = {
+        item.field_id: item.authority_class
+        for item in ROBINHOOD_BLUEPRINT.symbolic_inputs
+    }
+    missing = dict(exact)
+    missing.pop("I-GREEN")
+    unknown = {**exact, "I-UNKNOWN": AuthorityClass.OWNER_SELECTED}
+    incorrect = {**exact, "I-GREEN": AuthorityClass.OWNER_SELECTED}
+    promotional = {
+        **exact,
+        "I-WETH": "externally_verified_canonical_fact",
+    }
+
+    for candidate in (missing, unknown, promotional):
+        with pytest.raises(
+            RobinhoodBlueprintError,
+            match="H03_SYMBOLIC_FIELD",
+        ):
+            _validate_symbolic_authority_classes(candidate)
+
+    _validate_symbolic_authority_classes(incorrect)
+    incorrect_blueprint = replace(
+        ROBINHOOD_BLUEPRINT,
+        symbolic_inputs=tuple(
+            replace(item, authority_class=incorrect[item.field_id])
+            for item in ROBINHOOD_BLUEPRINT.symbolic_inputs
+        ),
+    )
+    assert_code("H03_SYMBOLIC_FIELD", incorrect_blueprint)

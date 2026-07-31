@@ -756,6 +756,7 @@ ASSET_FIELDS = (
     "config.isNft",
 )
 GOV_ROWS = ("RIPE", "RIPE_WETH_LP")
+PROFILE1_GOV_ROWS = ("RIPE",)  # Bound by PROFILE1_AUTHORITY_PATH below.
 ASSET_ROWS = (
     "AAPL",
     "GREEN",
@@ -765,13 +766,12 @@ ASSET_ROWS = (
     "GREEN_USDG_LP",
     "RIPE_WETH_LP",
 )
-RENDERED_ASSET_ROWS = (
+PROFILE1_ASSET_ROWS = (
     "GREEN",
     "RIPE",
     "SGREEN",
-    "GREEN_USDG_LP",
-    "RIPE_WETH_LP",
 )
+PROFILE1_STAB_VAULT_INDEXES = (1,)
 
 FORBIDDEN_BASE_ADDRESSES = {
     "0x02981db1a99a14912b204437e7a2e02679b57668",
@@ -1226,6 +1226,40 @@ def _validate_record(record: Mapping[str, Any]) -> None:
             raise ManifestError(f"H04_{field.upper()}")
 
 
+PROFILE1_AUTHORITY_PATH = (
+    "docs/chains/rh/reassessment-and-qualification-synthesis.md"
+)
+PROFILE1_AUTHORITY_COMMIT = "621eb52fe8ded61dcb679c96fb071249764e4570"
+PROFILE1_AUTHORITY_SHA256 = (
+    "5caac39339bdead1d6f15bd197556762d9bc4bcefe9b24960ea6c6fb8173c4ad"
+)
+CANONICAL_DELEVERAGE_DESTINATIONS = frozenset(
+    ("Deployment.DP-03.deleverage.deleverageCooldown",)
+)
+FORBIDDEN_DELEVERAGE_FIELD_NAMES = (
+    "fullPayoffBuffer",
+    "overageBps",
+    "dustThreshold",
+    "dustBps",
+)
+FORBIDDEN_BASE_DELEVERAGE_VALUES = {
+    "fullpayoffbuffer": 10**15,
+    "overagebps": 100,
+}
+
+
+def _forbidden_deleverage_field(path: str) -> str | None:
+    lowered = path.casefold()
+    for field in FORBIDDEN_DELEVERAGE_FIELD_NAMES:
+        normalized = field.casefold()
+        if re.search(
+            rf"(?<![a-z0-9_]){re.escape(normalized)}(?![a-z0-9_])",
+            lowered,
+        ):
+            return normalized
+    return None
+
+
 def binding_schedules_digest(schedules: Sequence[Mapping[str, Any]]) -> str:
     encoded = (
         json.dumps(schedules, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1405,6 +1439,26 @@ def validate_manifest(
 
     _validate_policy_transitions(lookup_by_id)
     destinations = [record["destination"]["path"] for record in parameters]
+    for record in parameters:
+        path = record["destination"]["path"]
+        forbidden_field = _forbidden_deleverage_field(path)
+        if forbidden_field is None:
+            continue
+        forbidden_base_value = FORBIDDEN_BASE_DELEVERAGE_VALUES.get(
+            forbidden_field
+        )
+        if (
+            forbidden_base_value is not None
+            and record["value"].get("raw") == forbidden_base_value
+        ):
+            raise ManifestError("H04_BASE_DELEVERAGE_VALUE")
+        raise ManifestError("H04_DELEVERAGE_REPRESENTATION")
+    if any(
+        "deleverage" in path.casefold()
+        and path not in CANONICAL_DELEVERAGE_DESTINATIONS
+        for path in destinations
+    ):
+        raise ManifestError("H04_DELEVERAGE_REPRESENTATION")
     if len(destinations) != len(set(destinations)):
         raise ManifestError("H04_DUPLICATE_DESTINATION")
     expected_defaults = canonical_default_paths()
@@ -1511,7 +1565,10 @@ def required_generation_paths() -> tuple[str, ...]:
         for path in canonical_default_paths()
         if "[AAPL]" not in path
         and "[USDG]" not in path
+        and "[GREEN_USDG_LP]" not in path
+        and "[RIPE_WETH_LP]" not in path
         and "priorityLiqAssetVaults" not in path
+        and "priorityStabVaults[0]" not in path
         and path != "Defaults.liteSigners[0]"
     )
     return tuple(paths)
@@ -1637,7 +1694,7 @@ def render_defaults(manifest: Mapping[str, Any]) -> str:
         )
 
     gov_entries = []
-    for row in GOV_ROWS:
+    for row in PROFILE1_GOV_ROWS:
         prefix = f"Defaults.ripeGovVaultConfigs[{row}]"
         lock = _struct(
             "LockTerms",
@@ -1702,7 +1759,7 @@ def render_defaults(manifest: Mapping[str, Any]) -> str:
         )
 
     asset_entries = []
-    for row in RENDERED_ASSET_ROWS:
+    for row in PROFILE1_ASSET_ROWS:
         prefix = f"Defaults.assetConfigs[{row}]"
         debt = _struct(
             "DebtTerms",
@@ -1760,7 +1817,7 @@ def render_defaults(manifest: Mapping[str, Any]) -> str:
         )
     )
     stab_entries = []
-    for index in (0, 1):
+    for index in PROFILE1_STAB_VAULT_INDEXES:
         prefix = f"Defaults.priorityStabVaults[{index}]"
         stab_entries.append(
             _struct(

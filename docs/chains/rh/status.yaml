@@ -201,6 +201,7 @@ reassessment_and_qualification:
     curve_prices: unchanged
     lp_admissions: [RIPE/WETH LP, GREEN/USDG LP]
     promotion_rule: Each stage and each LP admission requires separate acceptance and activation authority.
+    profile1_projection_exclusion: All 72 LP/stability paths, including already approved leaf values, are excluded from Profile 1 and retained solely for separately authorized Profile 2 stages.
   deferred:
     - CreditEngine zero-backing reassessment
     - Every Deleverage task including parameter representation, tests, fork scenarios, documentation, and size/headroom work

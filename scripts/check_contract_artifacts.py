@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import cbor2
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
@@ -41,6 +43,12 @@ class CompiledContract:
     code_layout: Mapping[str, Any]
 
 
+@dataclass(frozen=True)
+class CreationBinding:
+    executable_prefix: bytes
+    compiler_metadata: bytes
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -56,6 +64,55 @@ def _canonical_json_bytes(value: Any) -> bytes:
 
 def _json_sha256(value: Any) -> str:
     return _sha256(_canonical_json_bytes(value))
+
+
+def _creation_binding(
+    creation: bytes,
+    *,
+    integrity: str,
+    runtime_template: bytes,
+) -> CreationBinding:
+    """Split metadata-bearing Vyper initcode; fail closed for other formats."""
+    if len(creation) < 3:
+        raise ArtifactCheckError("creation artifact is too short for Vyper metadata")
+
+    metadata_size = int.from_bytes(creation[-2:], "big")
+    if metadata_size < 3 or metadata_size >= len(creation):
+        raise ArtifactCheckError(
+            f"invalid Vyper compiler metadata size: {metadata_size}"
+        )
+
+    executable_prefix = creation[:-metadata_size]
+    compiler_metadata = creation[-metadata_size:]
+    encoded_metadata = compiler_metadata[:-2]
+    try:
+        decoded = cbor2.loads(encoded_metadata)
+    except cbor2.CBORDecodeError as exc:
+        raise ArtifactCheckError("invalid Vyper compiler metadata CBOR") from exc
+
+    if cbor2.dumps(decoded) != encoded_metadata:
+        raise ArtifactCheckError("non-canonical Vyper compiler metadata CBOR")
+    if not isinstance(decoded, (list, tuple)) or len(decoded) != 5:
+        raise ArtifactCheckError("unexpected Vyper compiler metadata shape")
+
+    embedded_integrity = decoded[0]
+    if not isinstance(embedded_integrity, bytes) or len(embedded_integrity) != 32:
+        raise ArtifactCheckError(
+            "unexpected Vyper compiler metadata integrity field"
+        )
+    if embedded_integrity.hex() != integrity:
+        raise ArtifactCheckError(
+            "Vyper compiler metadata integrity does not bind compiler inputs"
+        )
+    if decoded[1] != len(runtime_template):
+        raise ArtifactCheckError(
+            "Vyper compiler metadata runtime length does not bind runtime template"
+        )
+
+    return CreationBinding(
+        executable_prefix=executable_prefix,
+        compiler_metadata=compiler_metadata,
+    )
 
 
 def _run(command: Sequence[str], *, cwd: Path = ROOT) -> str:
@@ -195,6 +252,11 @@ def _check_contract(
     _assert_equal(name, "compiler_settings", compiled.settings, expected["compiler_settings"])
 
     artifacts = expected["artifacts"]
+    creation_binding = _creation_binding(
+        compiled.creation,
+        integrity=compiled.integrity,
+        runtime_template=compiled.runtime_template,
+    )
     _assert_equal(name, "creation_size", len(compiled.creation), artifacts["creation_size"])
     _assert_equal(
         name, "creation_sha256", _sha256(compiled.creation), artifacts["creation_sha256"]
@@ -293,6 +355,10 @@ def _check_contract(
         runtime_label += " (not a deployed-runtime identity; constructor immutables)"
     return (
         f"{name}: creation={len(compiled.creation)} "
+        f"executable-prefix={len(creation_binding.executable_prefix)}/"
+        f"{_sha256(creation_binding.executable_prefix)} "
+        f"compiler-metadata={len(creation_binding.compiler_metadata)}/"
+        f"{_sha256(creation_binding.compiler_metadata)} "
         f"{runtime_label}={len(compiled.runtime_template)} "
         f"headroom={headroom} optimize={compiled.effective_optimization} "
         f"integrity={compiled.integrity}"

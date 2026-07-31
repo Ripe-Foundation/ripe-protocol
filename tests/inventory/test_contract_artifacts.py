@@ -38,6 +38,56 @@ DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_469, "headroom": 107},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
+CREATION_BINDING_FACTS = {
+    "AuctionHouse": {
+        "prefix_size": 24_497,
+        "prefix_sha256": "dcd9dc89c963925e01679613aa03e1ab2229063c9b2e6446b1a3c91976476a45",
+        "metadata_size": 59,
+        "metadata_sha256": "f9c98ba80dfb11b6352093908bcf8ba4fc99ab1e4a4372488ef5dea4024a7b0e",
+    },
+    "CreditEngine": {
+        "prefix_size": 24_266,
+        "prefix_sha256": "5e27e6db4d007533d5d3c38dc50acb79209a53bd44962dfa69b5195bff0ff736",
+        "metadata_size": 70,
+        "metadata_sha256": "0677fbc6cf3571701c7f82afa6fb521df7beaadea383c945e871bda1338b5132",
+    },
+    "Deleverage": {
+        "prefix_size": 24_833,
+        "prefix_sha256": "26ff82b5e245dbcc146adc36452a4352581c81d04820d95194fe58611d49e219",
+        "metadata_size": 61,
+        "metadata_sha256": "0e52a5555be52eda112bd98d8a9a6ddf439f00837b49eb27a5aa8363065273ac",
+    },
+    "GuardedErc20": {
+        "prefix_size": 10_635,
+        "prefix_sha256": "fc362fc65e3f5fb4cc2a5e8e5715580aa16f699f0af72f7567fc308eeb1a9c2d",
+        "metadata_size": 56,
+        "metadata_sha256": "1c2dced73bd886916233eaacbe6ed0399c6ca87c6a7e309cc7feb131bb133a90",
+    },
+    "Ledger": {
+        "prefix_size": 13_674,
+        "prefix_sha256": "51d9b8ad87d7ac50b58c8004a623f067ddfa26b9d7c84e4ff1de3c459dd29fce",
+        "metadata_size": 56,
+        "metadata_sha256": "3d532fe4ad921b1c38182671d4f0dc502eddf4870e58da828cb0d7c963dcc28f",
+    },
+    "Lootbox": {
+        "prefix_size": 21_848,
+        "prefix_sha256": "53dac6ede2946eaf838c64e845b963cce61fcda37112be966ce977febc454d70",
+        "metadata_size": 63,
+        "metadata_sha256": "9ece9d291e68621d380f08bc035c2e47b4004fe9606faa7831987ca6de361c00",
+    },
+    "SwitchboardDelta": {
+        "prefix_size": 24_305,
+        "prefix_sha256": "5d7e5a00144259460b75b0e623b3371b05e122c4491423f42c6ca7e49ae6fe4f",
+        "metadata_size": 84,
+        "metadata_sha256": "cc1bcadb5528be3f406a18544734a3a08de07719ec230abf79ff988ac1428f18",
+    },
+    "Teller": {
+        "prefix_size": 24_295,
+        "prefix_sha256": "0c6cffa7d91b251a741cfca71db077d21d96947cd2295e819b4756dc8e3b64eb",
+        "metadata_size": 92,
+        "metadata_sha256": "7b68fed219ab8fe328e064e4edc044d0d6d0dcfdcda397977826e660c095ec4a",
+    },
+}
 
 
 def _run_checker(*args: str) -> subprocess.CompletedProcess[str]:
@@ -131,6 +181,97 @@ def test_constructor_bound_deployed_runtime_facts_are_not_template_headroom():
             artifacts["runtime_template_size"],
             artifacts["eip170_headroom"],
         ) != (deployed["size"], deployed["headroom"])
+
+
+def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
+    contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
+    metadata_sizes = {facts["metadata_size"] for facts in CREATION_BINDING_FACTS.values()}
+
+    assert len(metadata_sizes) > 1
+    assert set(CREATION_BINDING_FACTS) == REQUIRED_CONTRACTS
+    vyper = artifact_checker._vyper_path()
+    for name, facts in CREATION_BINDING_FACTS.items():
+        record = contracts[name]
+        compiled = artifact_checker._compile(ROOT / record["source_path"], vyper)
+        binding = artifact_checker._creation_binding(
+            compiled.creation,
+            integrity=compiled.integrity,
+            runtime_template=compiled.runtime_template,
+        )
+        assert (
+            len(binding.executable_prefix) + len(binding.compiler_metadata)
+            == record["artifacts"]["creation_size"]
+        )
+        assert len(binding.executable_prefix) == facts["prefix_size"]
+        assert artifact_checker._sha256(binding.executable_prefix) == (
+            facts["prefix_sha256"]
+        )
+        assert len(binding.compiler_metadata) == facts["metadata_size"]
+        assert artifact_checker._sha256(binding.compiler_metadata) == (
+            facts["metadata_sha256"]
+        )
+
+
+def test_compiler_metadata_integrity_must_bind_compiler_inputs():
+    vyper = artifact_checker._vyper_path()
+    compiled = artifact_checker._compile(
+        ROOT / "contracts" / "core" / "Teller.vy",
+        vyper,
+    )
+
+    with pytest.raises(
+        artifact_checker.ArtifactCheckError,
+        match="metadata integrity does not bind compiler inputs",
+    ):
+        artifact_checker._creation_binding(
+            compiled.creation,
+            integrity="00" * 32,
+            runtime_template=compiled.runtime_template,
+        )
+
+
+def test_prefix_or_metadata_byte_tampering_breaks_the_frozen_creation_binding():
+    vyper = artifact_checker._vyper_path()
+    compiled = artifact_checker._compile(
+        ROOT / "contracts" / "core" / "Teller.vy",
+        vyper,
+    )
+    expected = json.loads(EXPECTATIONS.read_text())["contracts"]["Teller"]
+    binding = artifact_checker._creation_binding(
+        compiled.creation,
+        integrity=compiled.integrity,
+        runtime_template=compiled.runtime_template,
+    )
+
+    tampered_prefix = bytearray(compiled.creation)
+    tampered_prefix[0] ^= 1
+    tampered_prefix_binding = artifact_checker._creation_binding(
+        bytes(tampered_prefix),
+        integrity=compiled.integrity,
+        runtime_template=compiled.runtime_template,
+    )
+    assert artifact_checker._sha256(bytes(tampered_prefix)) != (
+        expected["artifacts"]["creation_sha256"]
+    )
+    assert artifact_checker._sha256(
+        tampered_prefix_binding.executable_prefix
+    ) != CREATION_BINDING_FACTS["Teller"]["prefix_sha256"]
+    assert artifact_checker._sha256(tampered_prefix_binding.compiler_metadata) == (
+        CREATION_BINDING_FACTS["Teller"]["metadata_sha256"]
+    )
+
+    tampered_metadata = bytearray(compiled.creation)
+    metadata_start = len(tampered_metadata) - len(binding.compiler_metadata)
+    tampered_metadata[metadata_start + 3] ^= 1
+    with pytest.raises(
+        artifact_checker.ArtifactCheckError,
+        match="metadata integrity does not bind compiler inputs",
+    ):
+        artifact_checker._creation_binding(
+            bytes(tampered_metadata),
+            integrity=compiled.integrity,
+            runtime_template=compiled.runtime_template,
+        )
 
 
 @pytest.mark.parametrize(

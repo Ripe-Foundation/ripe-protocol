@@ -80,6 +80,15 @@ class SourceClass(str, Enum):
     EXTERNAL_ARTIFACT = "external_artifact"
 
 
+class AuthorityClass(str, Enum):
+    REPOSITORY_APPROVED = "repository_approved"
+    EXTERNALLY_VERIFIABLE_CANONICAL_FACT = (
+        "externally_verifiable_canonical_fact"
+    )
+    OWNER_SELECTED = "owner_selected"
+    DEPLOYMENT_PRODUCED = "deployment_produced"
+
+
 class RegistryDomain(str, Enum):
     RIPE_HQ = "ripe_hq"
     VAULT_BOOK = "vault_book"
@@ -117,6 +126,7 @@ class SourcePathRecord:
 class SymbolicInput:
     field_id: str
     semantic_class: str
+    authority_class: AuthorityClass
     consumers: tuple[str, ...]
     primary_owner_id: str
     co_owner_ids: tuple[str, ...]
@@ -519,7 +529,8 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'blocked',
   ('B-H04-PARAMS', 'B-H05-PLAN')),
  ('I-CHAINLINK-CORE',
-  'native/BTC sentinel metadata, feeds, decimals, and adapter constructor classes',
+  'symbolic required closure for official feed identities, proxy, implementation, admin, runtime, '
+  'decimals, and adapter constructor inputs',
   ('CM-015', 'CM-016'),
   'OWN-ORACLE',
   ('OWN-H04', 'OWN-H05'),
@@ -575,7 +586,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'blocked',
   ('B-T8-M2', 'B-H05-PLAN')),
  ('I-USDG',
-  'symbolic canonical USDG identity',
+  'symbolic USDG proxy, implementation, admin, runtime, and token-metadata identity',
   ('CM-016', 'CM-024', 'CM-048'),
   'OWN-T8',
   ('OWN-H05', 'OWN-ORACLE'),
@@ -607,7 +618,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'required',
   ('B-H04-PARAMS',)),
  ('I-WETH',
-  'symbolic Robinhood WETH constituent identity',
+  'symbolic Robinhood WETH proxy, implementation, admin, runtime, and token-metadata identity',
   ('CM-024', 'CM-031'),
   'OWN-H04',
   ('OWN-H05', 'OWN-ORACLE'),
@@ -5141,10 +5152,76 @@ _BLOCKERS = tuple(
     Blocker(blocker_id, primary, co_owners, summary, deadline)
     for blocker_id, primary, co_owners, summary, deadline in _BLOCKER_ROWS
 )
+
+
+def _validate_symbolic_authority_classes(
+    mapping: Mapping[str, object],
+    expected_ids: frozenset[str] = frozenset(row[0] for row in _SYMBOLIC_ROWS),
+) -> None:
+    if set(mapping) != expected_ids or any(
+        not isinstance(value, AuthorityClass) for value in mapping.values()
+    ):
+        raise RobinhoodBlueprintError("H03_SYMBOLIC_FIELD")
+
+
+_SYMBOLIC_AUTHORITY_CLASSES = {
+    "I-GREEN": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-GREEN-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+    "I-GREEN-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+    "I-RIPE": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-RIPE-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+    "I-RIPE-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+    "I-SGREEN": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-SGREEN-INITIAL-SUPPLY": AuthorityClass.OWNER_SELECTED,
+    "I-SGREEN-INITIAL-SUPPLY-RECIPIENT": AuthorityClass.OWNER_SELECTED,
+    "I-GOV-HANDOFF": AuthorityClass.OWNER_SELECTED,
+    "I-CLOCK-PARAMS": AuthorityClass.REPOSITORY_APPROVED,
+    "I-LEDGER-BLOCK-SOURCE": AuthorityClass.REPOSITORY_APPROVED,
+    "I-LEDGER-DEFAULTS": AuthorityClass.REPOSITORY_APPROVED,
+    "I-RH-DEFAULTS": AuthorityClass.REPOSITORY_APPROVED,
+    "I-TRAINING-WHEELS": AuthorityClass.OWNER_SELECTED,
+    "I-CHAINLINK-CORE": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-CHAINLINK-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+    "I-AAPL-TOKEN": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-AAPL-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-AAPL-RISK": AuthorityClass.OWNER_SELECTED,
+    "I-STOCK-VAULT-SLOT": AuthorityClass.OWNER_SELECTED,
+    "I-STOCK-VAULT-ARTIFACT": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-TELLER-INITIAL-PAUSE": AuthorityClass.OWNER_SELECTED,
+    "I-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-USDG-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-WETH": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-GREEN-USDG-LP": AuthorityClass.OWNER_SELECTED,
+    "I-RIPE-WETH-LP": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-PSM-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-ECHO-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+    "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+    "I-ASSET-CONFIG-STOCK": AuthorityClass.OWNER_SELECTED,
+    "I-STABILITY-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
+    "I-RIPE-GOV-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
+    "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+    "I-AUCTION-CREDIT-STOCK": AuthorityClass.OWNER_SELECTED,
+    "I-ENDAOMENT-NATIVE-METADATA": (
+        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+    ),
+    "I-LOOTBOX-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-REWARDS-PROMOTION": AuthorityClass.OWNER_SELECTED,
+    "I-BOND-ROOM-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-BOND-BOOSTER-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-HR-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
+    "I-CCIP-ARTIFACTS": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-CCIP-REGISTRATION": AuthorityClass.OWNER_SELECTED,
+    "I-MIGRATION-PLAN": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
+    "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
+}
+_validate_symbolic_authority_classes(_SYMBOLIC_AUTHORITY_CLASSES)
 _SYMBOLIC_INPUTS = tuple(
     SymbolicInput(
         field_id,
         semantic_class,
+        _SYMBOLIC_AUTHORITY_CLASSES[field_id],
         consumers,
         primary,
         co_owners,
@@ -5394,6 +5471,7 @@ del (
     _surfaces,
     _relations,
     _registries,
+    _SYMBOLIC_AUTHORITY_CLASSES,
 )
 
 
@@ -5492,6 +5570,11 @@ def validate_blueprint(
 
     symbolic_ids = tuple(item.field_id for item in blueprint.symbolic_inputs)
     if len(symbolic_ids) != 48 or len(set(symbolic_ids)) != 48:
+        _fail("H03_SYMBOLIC_FIELD")
+    if any(
+        not isinstance(item.authority_class, AuthorityClass)
+        for item in blueprint.symbolic_inputs
+    ):
         _fail("H03_SYMBOLIC_FIELD")
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
     if len(blocker_ids) != 18 or len(set(blocker_ids)) != 18:

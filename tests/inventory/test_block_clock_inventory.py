@@ -133,7 +133,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=606" in result.output
+    assert "cadence_candidates=607" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
@@ -146,7 +146,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=176" in result.output
+    assert "test=177" in result.output
 
 
 def test_h04_exact_batch_preserves_both_frozen_fingerprints(
@@ -380,6 +380,122 @@ def test_general_remediation_registry_expansion_cannot_escape_legacy_authority(
         checker.REVIEWER_REMEDIATION_CADENCE_KEYS | {future_key},
     )
     _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_profile1_configuration_registry_append_is_exact_and_preserves_s5(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = checker._profile1_configuration_cadence_records(inventory)
+    old_registry = checker.REVIEWER_REMEDIATION_CADENCE_KEYS - {
+        checker.PROFILE1_CONFIGURATION_CADENCE_KEY
+    }
+
+    assert len(old_registry) == 9
+    assert checker._key_set_fingerprint(old_registry) == (
+        "0739c77da0d92999c241eb6b9e9a54dea4bac749a9a682afb4b3a4a0ca5a4251"
+    )
+    assert len(checker.REVIEWER_REMEDIATION_CADENCE_KEYS) == 10
+    assert checker._key_set_fingerprint(
+        checker.REVIEWER_REMEDIATION_CADENCE_KEYS
+    ) == (
+        "cb64d7b0dbd1d8e278b83b248ec7c457137a24a16aa7247cc2deab9fa9b5c4df"
+    )
+    assert checker.REVIEWER_REMEDIATION_CADENCE_KEYS - old_registry == {
+        checker.PROFILE1_CONFIGURATION_CADENCE_KEY
+    }
+    assert len(records) == checker.PROFILE1_CONFIGURATION_CADENCE_RECORD_COUNT
+    assert checker._records_fingerprint(records) == (
+        checker.PROFILE1_CONFIGURATION_CADENCE_RECORDS_SHA256
+    )
+    assert records[0]["classification"] == "test"
+    assert records[0]["semanticIds"] == ["BN-027", "BN-028"]
+    assert records[0]["semanticReview"]["commit"] == (
+        checker.PROFILE1_CONFIGURATION_PROVENANCE_COMMIT
+    )
+    assert checker._is_exact_reviewer_remediation_cadence_registry(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) == (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_path", "replacement"),
+    (
+        (("path",), "tests/deployment/test_future_omissions.py"),
+        (("function",), "test_future_profile1_safety_envelope"),
+        (("pattern",), "block-default-key"),
+        (("matchedText",), "futureCadence"),
+        (("normalizedSnippet",), '"futureCadence",'),
+        (("ordinalInFunction",), 2),
+        (("reviewedLine",), 668),
+        (("classification",), "support"),
+        (("semanticIds",), ["BN-027"]),
+        (("reviewDomain",), "future-domain"),
+        (("semanticReview", "owner"), "engineering/tooling"),
+        (("semanticReview", "status"), "pending"),
+        (("semanticReview", "commit"), checker.HARDENING_REVIEW_COMMIT),
+    ),
+)
+def test_profile1_configuration_record_drift_fails_closed(
+    fixture_repo: Path,
+    field_path: tuple[str, ...],
+    replacement: object,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = checker._profile1_configuration_cadence_records(inventory)[0]
+    target = record
+    for field in field_path[:-1]:
+        target = target[field]
+    target[field_path[-1]] = replacement
+
+    assert not checker._is_exact_reviewer_remediation_cadence_registry(
+        inventory
+    )
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_profile1_configuration_record_removal_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = checker._profile1_configuration_cadence_records(inventory)[0]
+    inventory["cadenceCandidates"].remove(record)
+
+    assert not checker._is_exact_reviewer_remediation_cadence_registry(
+        inventory
+    )
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_profile1_configuration_record_duplication_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = checker._profile1_configuration_cadence_records(inventory)[0]
+    inventory["cadenceCandidates"].append(copy.deepcopy(record))
+
+    assert not checker._is_exact_reviewer_remediation_cadence_registry(
+        inventory
+    )
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_pr61_artifact_metadata_failure(fixture_repo)
+
+
+def test_real_repository_inventory_is_complete() -> None:
+    result = checker.check_repository(REPOSITORY_ROOT)
+    assert result.ok, result.output
 
 
 def test_pr61_direct_tuple_drift_fails_closed(fixture_repo: Path) -> None:

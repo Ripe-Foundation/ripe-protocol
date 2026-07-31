@@ -30,6 +30,9 @@ EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
 TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
 HARDENING_REVIEW_COMMIT = "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
 H04_REVIEW_COMMIT = "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+PROFILE1_CONFIGURATION_PROVENANCE_COMMIT = (
+    "059b4aa0809c8df28250dc47e3abfe7836f0938c"
+)
 PR61_REVIEW_COMMIT = "2c36e4aa06395d5075c348aab71d468fa099775f"
 PR61_PRODUCTION_SOURCE_SHA256 = {
     "contracts/config/SwitchboardDelta.vy": (
@@ -173,7 +176,20 @@ S5_RECONCILED_DIRECT_KEYS = S5_REVIEW_DIRECT_KEYS | {
         2,
     ),
 }
+PROFILE1_CONFIGURATION_CADENCE_KEY = (
+    "tests/deployment/test_robinhood_omissions.py",
+    "test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed",
+    "reviewed-cadence-identifier",
+    "numBlocksPerInterval",
+    '"numBlocksPerInterval",',
+    1,
+)
+PROFILE1_CONFIGURATION_CADENCE_RECORD_COUNT = 1
+PROFILE1_CONFIGURATION_CADENCE_RECORDS_SHA256 = (
+    "28b77bf87ae472e6ac504d806b678d0010b9ec9b53f8b3820a387ce946e93091"
+)
 REVIEWER_REMEDIATION_CADENCE_KEYS = {
+    PROFILE1_CONFIGURATION_CADENCE_KEY,
     (
         "config/contract-artifact-expectations.json",
         "<module>",
@@ -234,9 +250,9 @@ REVIEWER_REMEDIATION_CADENCE_KEYS = {
         2,
     ),
 }
-REVIEWER_REMEDIATION_CADENCE_KEY_COUNT = 9
+REVIEWER_REMEDIATION_CADENCE_KEY_COUNT = 10
 REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256 = (
-    "0739c77da0d92999c241eb6b9e9a54dea4bac749a9a682afb4b3a4a0ca5a4251"
+    "cb64d7b0dbd1d8e278b83b248ec7c457137a24a16aa7247cc2deab9fa9b5c4df"
 )
 PR61_ARTIFACT_EXPECTATIONS_PATH = "config/contract-artifact-expectations.json"
 PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
@@ -1390,12 +1406,30 @@ def _pr61_artifact_expectations_cadence_records(
     ]
 
 
-def _is_exact_reviewer_remediation_cadence_registry() -> bool:
+def _profile1_configuration_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if _candidate_from_record(record)
+        == PROFILE1_CONFIGURATION_CADENCE_KEY
+    ]
+
+
+def _is_exact_reviewer_remediation_cadence_registry(
+    data: Mapping[str, Any],
+) -> bool:
+    profile1_records = _profile1_configuration_cadence_records(data)
     return (
         len(REVIEWER_REMEDIATION_CADENCE_KEYS)
         == REVIEWER_REMEDIATION_CADENCE_KEY_COUNT
         and _key_set_fingerprint(set(REVIEWER_REMEDIATION_CADENCE_KEYS))
         == REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256
+        and len(profile1_records)
+        == PROFILE1_CONFIGURATION_CADENCE_RECORD_COUNT
+        and _records_fingerprint(profile1_records)
+        == PROFILE1_CONFIGURATION_CADENCE_RECORDS_SHA256
     )
 
 
@@ -1412,7 +1446,7 @@ def _is_exact_pr61_artifact_layout_metadata(
         return False
     return (
         _is_exact_pr61_reconciliation(data)
-        and _is_exact_reviewer_remediation_cadence_registry()
+        and _is_exact_reviewer_remediation_cadence_registry(data)
         and artifact_sha256 == PR61_ARTIFACT_EXPECTATIONS_SHA256
         and len(records) == PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT
         and _records_fingerprint(records)
@@ -1598,7 +1632,7 @@ def _s5_legacy_inventory_fingerprint(
     )
     exact_reviewer_remediation_keys = (
         REVIEWER_REMEDIATION_CADENCE_KEYS
-        if _is_exact_reviewer_remediation_cadence_registry()
+        if _is_exact_reviewer_remediation_cadence_registry(data)
         else frozenset()
     )
     exact_pr61_artifact_metadata_keys = (
@@ -1977,6 +2011,9 @@ def _validate_schema(
     h04_records = _h04_cadence_records(data)
     h04_sites = _h04_cad_sites(data)
     exact_h04_batch = _is_exact_h04_cadence_batch(data)
+    exact_reviewer_remediation_registry = (
+        _is_exact_reviewer_remediation_cadence_registry(data)
+    )
     if not exact_h04_batch:
         findings.append(
             Finding(
@@ -2341,14 +2378,20 @@ def _validate_schema(
             TRACK3_REVIEW_COMMIT
             if "CAD-001" in semantic_ids
             else (
-                H04_REVIEW_COMMIT
-                if exact_h04_batch
-                and _is_h04_cadence_path(str(record.get("path", "")))
+                PROFILE1_CONFIGURATION_PROVENANCE_COMMIT
+                if _candidate_from_record(record)
+                == PROFILE1_CONFIGURATION_CADENCE_KEY
+                and exact_reviewer_remediation_registry
                 else (
-                    PR61_REVIEW_COMMIT
-                    if _candidate_from_record(record)
-                    == PR61_NEW_CONSTRUCTOR_CADENCE_KEY
-                    else HARDENING_REVIEW_COMMIT
+                    H04_REVIEW_COMMIT
+                    if exact_h04_batch
+                    and _is_h04_cadence_path(str(record.get("path", "")))
+                    else (
+                        PR61_REVIEW_COMMIT
+                        if _candidate_from_record(record)
+                        == PR61_NEW_CONSTRUCTOR_CADENCE_KEY
+                        else HARDENING_REVIEW_COMMIT
+                    )
                 )
             )
         )
