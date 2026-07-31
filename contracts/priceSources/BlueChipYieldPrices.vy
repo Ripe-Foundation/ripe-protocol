@@ -52,6 +52,12 @@ interface CompoundV3Registry:
 interface MorphoRegistry:
     def isMetaMorpho(_vault: address) -> bool: view
 
+# Morpho Vaults V2 are a separate architecture from MetaMorpho with a separate
+# factory: membership is `isVaultV2`, not `isMetaMorpho`. The share token is
+# still ERC-4626, so only the membership check and underlying lookup differ.
+interface MorphoV2Factory:
+    def isVaultV2(_vault: address) -> bool: view
+
 interface AaveToken:
     def UNDERLYING_ASSET_ADDRESS() -> address: view
 
@@ -66,6 +72,8 @@ flag Protocol:
     FLUID
     AAVE_V3
     COMPOUND_V3
+    MORPHO_V2 # appended: flag members are bit positions, so this must stay last
+              # to avoid renumbering the values already stored in price configs
 
 struct PriceConfig:
     protocol: Protocol
@@ -176,6 +184,7 @@ MAX_MARKETS: constant(uint256) = 50
 
 # registries
 MORPHO_ADDRS: public(immutable(address[2]))
+MORPHO_V2_ADDR: public(immutable(address))
 EULER_ADDRS: public(immutable(address[2]))
 FLUID_ADDR: public(immutable(address))
 COMPOUND_V3_ADDR: public(immutable(address))
@@ -195,6 +204,7 @@ def __init__(
     _compoundV3Addr: address,
     _moonwellAddr: address,
     _aaveV3Addr: address,
+    _morphoV2Addr: address,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -203,6 +213,7 @@ def __init__(
 
     # factories / registries
     MORPHO_ADDRS = _morphoAddrs
+    MORPHO_V2_ADDR = _morphoV2Addr
     EULER_ADDRS = _eulerAddrs
     FLUID_ADDR = _fluidAddr
     COMPOUND_V3_ADDR = _compoundV3Addr
@@ -262,7 +273,7 @@ def _getPrice(
 
     # erc4626 vaults
     price: uint256 = 0
-    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.MORPHO_V2 or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
         price = self._getErc4626Price(_asset, _config, weightedPricePerShare, underlyingPrice)
 
     # moonwell
@@ -450,6 +461,9 @@ def _getPriceConfig(
     underlyingAsset: address = empty(address)
     if _protocol == Protocol.MORPHO:
         underlyingAsset = self._getMorphoUnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.MORPHO_V2:
+        underlyingAsset = self._getMorphoV2UnderlyingAsset(_asset)
 
     elif _protocol == Protocol.EULER:
         underlyingAsset = self._getEulerUnderlyingAsset(_asset)
@@ -830,7 +844,7 @@ def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
     pricePerShare: uint256 = 0
 
     # erc4626 vaults
-    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.MORPHO_V2 or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
         pricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
 
     # moonwell
@@ -898,6 +912,19 @@ def _getCurrentErc4626PricePerShare(_asset: address, _decimals: uint256) -> uint
 @internal
 def _getMorphoUnderlyingAsset(_asset: address) -> address:
     if not staticcall MorphoRegistry(MORPHO_ADDRS[0]).isMetaMorpho(_asset) and not staticcall MorphoRegistry(MORPHO_ADDRS[1]).isMetaMorpho(_asset):
+        return empty(address)
+    return staticcall IERC4626(_asset).asset()
+
+
+#############
+# Morpho V2 #
+#############
+
+
+@view
+@internal
+def _getMorphoV2UnderlyingAsset(_asset: address) -> address:
+    if not staticcall MorphoV2Factory(MORPHO_V2_ADDR).isVaultV2(_asset):
         return empty(address)
     return staticcall IERC4626(_asset).asset()
 

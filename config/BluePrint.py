@@ -1,3 +1,6 @@
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+
 ADDYS = {
     "base": {
         "RIPE_WETH_POOL": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
@@ -23,6 +26,9 @@ ADDYS = {
         # morpho
         "MORPHO_FACTORY": "0xFf62A7c278C62eD665133147129245053Bbf5918",
         "MORPHO_FACTORY_LEGACY": "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101",
+        # Morpho Vaults V2 factory. Zero until a Base deployment is verified --
+        # this fails closed, so no Protocol.MORPHO_V2 asset can be registered.
+        "MORPHO_V2_FACTORY": ZERO_ADDRESS,
         # euler
         "EULER_EVAULT_FACTORY": "0x7F321498A801A191a93C840750ed637149dDf8D0",
         "EULER_EARN_FACTORY": "0x72bbDB652F2AEC9056115644EfCcDd1986F51f15",
@@ -39,6 +45,69 @@ ADDYS = {
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
         # governance
         "GOVERNANCE": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+    },
+    "robinhood": {
+        # curve
+        "CURVE_ADDRESS_PROVIDER": "",
+        "CURVE_STABLE_FACTORY": "",
+        "CURVE_CRYPTO_FACTORY": "",
+        # default chainlink feeds
+        "CHAINLINK_ETH_USD": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
+        "CHAINLINK_BTC_USD": "0xa2c5184bF03d373Dc9dE4876eb4Bce595B460251",
+        "CHAINLINK_USDG_USD": "0x61B7e5650328764B076A108EFF5fa7282a1B9aD2",
+
+        # important tokens / representations
+        #
+        # Verified on Blockscout: name "WETH", symbol WETH, 18 decimals, ERC-20.
+        # NOT the OP-Stack predeploy 0x4200...0006 -- Robinhood is an Arbitrum
+        # L2 and nothing is deployed at that address. Must stay equal to
+        # CORE_TOKENS["robinhood"]["WETH"] and the WETH asset config in
+        # DefaultsRobinHood.vy, since Endaoment and ChainlinkPrices bind here.
+        "WETH": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "BTC": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+        # morpho
+        #
+        # Robinhood runs Morpho Vaults V2, not MetaMorpho. The launch collateral
+        # 0xBeEff033... is a `VaultV2` created by `VaultV2Factory`, verified on
+        # Blockscout; membership is `isVaultV2`, not `isMetaMorpho`. So the
+        # MetaMorpho slots are empty here and BlueChipYieldPrices prices that
+        # asset through Protocol.MORPHO_V2 instead.
+        #
+        # Zero fails closed: registering a Protocol.MORPHO asset reverts on the
+        # static call rather than pricing against a foreign-chain factory.
+        "MORPHO_FACTORY": ZERO_ADDRESS,
+        "MORPHO_FACTORY_LEGACY": ZERO_ADDRESS,
+        "MORPHO_V2_FACTORY": "0x0FBad98595b0186dA120E41f77C102beb49f803c",
+        # Protocols with no confirmed Robinhood deployment. BlueChipYieldPrices
+        # only touches each registry on its own protocol branch, so zero here
+        # fails closed: registering an asset of that protocol reverts instead of
+        # silently pricing against a foreign-chain address.
+        "EULER_EVAULT_FACTORY": ZERO_ADDRESS,
+        "EULER_EARN_FACTORY": ZERO_ADDRESS,
+        "FLUID_RESOLVER": ZERO_ADDRESS,
+        "COMPOUND_V3_CONFIGURATOR": ZERO_ADDRESS,
+        "MOONWELL_COMPTROLLER": ZERO_ADDRESS,
+        "AAVE_V3_ADDRESS_PROVIDER": ZERO_ADDRESS,
+        # oracles -- Pyth and Stork are not part of the minimum configuration
+        "PYTH_NETWORK": ZERO_ADDRESS,
+        "STORK_NETWORK": ZERO_ADDRESS,
+        # governance
+        #
+        # Intentionally the same address as Base: the same Safe, already
+        # deployed on Robinhood. Not a copy-paste of a foreign-chain address.
+        #
+        # LocalGov.finishRipeHqSetup asserts `_newGov.is_contract`, so 2003 fails
+        # closed if that Safe is ever missing on the target chain -- but it
+        # cannot detect a *different* contract sitting at the address. Confirm
+        # code exists and the owners/threshold match Base before running 2003.
+        "GOVERNANCE": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        # ledger action-block source -- ArbSys precompile (P-H04-309).
+        # Robinhood is an Arbitrum L2: EVM `block.number` is the L1 ancestor
+        # estimate and repeats across child blocks, so Ledger's same-execution
+        # -block guard reads the child height from this precompile instead.
+        # Use ZERO_ADDRESS to select native `block.number` mode.
+        "ARB_SYS": "0x0000000000000000000000000000000000000064",
     },
     "local": {
         # important tokens / representations
@@ -72,6 +141,83 @@ PARAMS = {
         # vault book (blocks)
         "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 12 hours on Base
         "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
+    },
+    # Robinhood Chain -- Arbitrum L2, chain id 4663.
+    #
+    # CLOCK: every "blocks" value below is denominated in EVM `block.number`,
+    # which on an Arbitrum L2 is the *L1 ancestor estimate* (~12s), NOT the
+    # ~100ms child-block cadence. Values come from the approved H-04 package
+    # (config/robinhood-parameters.json), which converts Base counts as
+    # ceil(base_blocks / 6). Cross-check any new value against that file.
+    "robinhood": {
+        # ripe hq - gov changes (blocks) -- P-H04-315/316 (LocalGov)
+        "RIPE_HQ_MIN_GOV_TIMELOCK": 7_200,  # 1 day on RH
+        "RIPE_HQ_MAX_GOV_TIMELOCK": 50_400,  # 7 days on RH
+        # ripe hq - registry changes (blocks) -- P-H04-318/319 (RipeHq)
+        "RIPE_HQ_MIN_REG_TIMELOCK": 3_600,  # 12 hours on RH
+        "RIPE_HQ_MAX_REG_TIMELOCK": 50_400,  # 7 days on RH
+        # tokens (green / ripe) -- P-H04-312/313 (TokenHq)
+        "MIN_HQ_CHANGE_TIMELOCK": 7_200,  # 1 day on RH
+        "MAX_HQ_CHANGE_TIMELOCK": 50_400,  # 7 days on RH
+        # switchboard -- P-H04-321/322 (Alpha; Bravo/Charlie/Delta/Echo match)
+        "MIN_SWITCHBOARD_CHANGE_TIMELOCK": 600,  # 2 hours on RH
+        "MAX_SWITCHBOARD_CHANGE_TIMELOCK": 50_400,  # 7 days on RH
+        # price desk (timestamps, not blocks!) -- P-H04-404/405
+        "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
+        "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 7,  # 7 days
+        # price desk (blocks) -- P-H04-341/342 (Chainlink adapter timelocks)
+        "PRICE_DESK_MIN_REG_TIMELOCK": 600,  # 2 hours on RH
+        "PRICE_DESK_MAX_REG_TIMELOCK": 50_400,  # 7 days on RH
+        # vault book (blocks) -- same basis as price desk
+        "VAULT_BOOK_MIN_REG_TIMELOCK": 600,  # 2 hours on RH
+        "VAULT_BOOK_MAX_REG_TIMELOCK": 50_400,  # 7 days on RH
+        # human resources (blocks) -- P-H04-345/346
+        "HR_MIN_CONFIG_TIMELOCK": 7_200,  # 1 day on RH
+        "HR_MAX_CONFIG_TIMELOCK": 50_400,  # 7 days on RH
+        # chainlink default feed staleness (seconds) -- P-H04-406
+        "CHAINLINK_DEFAULT_STALE_TIME": 60 * 60 * 24,  # 24 hours
+        # lootbox -- P-H04-306/307; Underscore is absent on RH, so the send
+        # interval and both Underscore reward amounts stay disabled at zero.
+        "LOOTBOX_MIN_UNDERSCORE_SEND_INTERVAL": 7_200,
+        "LOOTBOX_UNDERSCORE_SEND_INTERVAL": 0,
+        "LOOTBOX_UNDY_DEPOSIT_REWARDS_AMOUNT": 0,
+        "LOOTBOX_UNDY_YIELD_BONUS_AMOUNT": 0,
+        # bond booster -- P-H04-426/427/428
+        "BOND_BOOSTER_MAX_BOOST_RATIO": 200_00,
+        "BOND_BOOSTER_MAX_UNITS": 25_000,
+        "BOND_BOOSTER_MIN_LOCK_DURATION": 1_296_000,
+        # teller -- P-H04-421: launches paused
+        "TELLER_SHOULD_PAUSE": True,
+        # deleverage -- P-H04-308 approves cooldown 0 and the four corrected-PR
+        # controls (full payoff buffer, overage, dust threshold, dust bps) are
+        # deferred at zero per the documented four-control gap. minDeleverageBps,
+        # deleverageBuffer and underscoreSafeSpreadBps have NO approved RH value;
+        # these mirror the Base deployment and need owner sign-off before a live
+        # run. Underscore is absent on RH, so the safe spread is inert.
+        "DELEVERAGE_MIN_BPS": 50_00,
+        "DELEVERAGE_BUFFER": 5_00,
+        "DELEVERAGE_COOLDOWN": 0,
+        "DELEVERAGE_UNDERSCORE_SAFE_SPREAD_BPS": 0,
+        "DELEVERAGE_FULL_PAYOFF_BUFFER": 0,
+        "DELEVERAGE_OVERAGE_BPS": 0,
+        "DELEVERAGE_DUST_THRESHOLD": 0,
+        "DELEVERAGE_DUST_BPS": 0,
+        # endaoment psm -- deployed disabled (P-H04-355/356 canMint/canRedeem
+        # false in the constructor). Fees and caps are blocked on B-H04-PSM;
+        # the constructor rejects a zero cap, so these are non-zero scaffolding
+        # values that are inert while canMint/canRedeem are false.
+        "PSM_NUM_BLOCKS_PER_INTERVAL": 7_200,  # 1 day on RH
+        "PSM_MINT_FEE": 0,
+        "PSM_MAX_INTERVAL_MINT": 100_000 * 10**18,
+        "PSM_REDEEM_FEE": 0,
+        "PSM_MAX_INTERVAL_REDEEM": 100_000 * 10**18,
+        # psm yield -- P-H04-359/360: disabled, no yield position
+        "PSM_YIELD_LEGO_ID": 0,
+        "PSM_YIELD_VAULT_TOKEN": "0x0000000000000000000000000000000000000000",
+        # initial token supply -- P-H04-415/417/419 all approve zero
+        "GREEN_INITIAL_SUPPLY": 0,
+        "RIPE_INITIAL_SUPPLY": 0,
+        "SAVINGS_GREEN_INITIAL_SUPPLY": 0,
     },
     "local": {
         # ripe hq - gov changes (blocks)
@@ -126,6 +272,10 @@ CORE_TOKENS = {
         "USOL": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
         "CBDOGE": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
     },
+    "robinhood": {
+        "USDG": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "WETH": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    }
 }
 
 
@@ -151,6 +301,9 @@ CURVE_PARAMS = {
         "RIPE_POOL_MA_EXP_TIME": 600,
         "RIPE_POOL_INIT_PRICE": 10 ** 13,
     },
+    # No Curve deployment is part of the Robinhood minimum configuration. The
+    # key must exist because BluePrint.__init__ indexes every dict by blueprint.
+    "robinhood": {},
 }
 
 
@@ -241,5 +394,11 @@ YIELD_TOKENS = {
         "UNDY_GHO": "0x78De8bd82035593e140e0f6567A019db3d716B74",
         "UNDY_CBETH": "0xe9EA27C1c67F12D04cb4694F8618AE8Bdb278E50",
         "UNDY_USDS": "0x04e77BC5885c82d68f523d1deE2e8b88c3036784",
+    },
+    # Underscore is absent on Robinhood and no yield integration is part of the
+    # minimum configuration. Key must exist -- see CURVE_PARAMS note above.
+    "robinhood": {
+        # SteakHouse USDG (Morpho) -- the collateral in DefaultsRobinHood
+        "MORPHO_STEAKHOUSE_USDG": "0xBeEff033F34C046626B8D0A041844C5d1A5409dd",
     },
 }
