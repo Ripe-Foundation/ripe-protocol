@@ -1260,7 +1260,7 @@ def test_every_committed_base_json_parses_without_rewrite():
         ).hexdigest()
         for path in sorted(BASE_HISTORY.glob("*.json"))
     }
-    assert len(before) == 58
+    assert len(before) == 60
     for relative in before:
         parsed = json.loads((ROOT / relative).read_bytes())
         assert set(parsed) == {"contracts"}

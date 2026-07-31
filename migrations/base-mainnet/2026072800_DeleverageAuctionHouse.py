@@ -24,8 +24,8 @@ def migrate(migration: Migration):
         current_deleverage.deleverageBuffer(),
         current_deleverage.deleverageCooldown(),
         current_deleverage.underscoreSafeSpreadBps(),
-        0,  # full-payoff buffer: disabled pending governance policy approval
-        0,  # overage bps: disabled pending governance policy approval
+        10**15,  # full-payoff buffer
+        100,  # overage bps
         0,  # dust threshold: disabled pending governance policy approval
         0,  # dust bps: disabled pending governance policy approval
     )
