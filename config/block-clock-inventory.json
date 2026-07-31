@@ -24,6 +24,82 @@
     "hardeningApprovalCommit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e",
     "pr61ReviewCommit": "2c36e4aa06395d5075c348aab71d468fa099775f"
   },
+  "currentBindings": {
+    "schemaVersion": 1,
+    "currentStateSha256": "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441",
+    "sourcePaths": [
+      {
+        "path": "contracts/mock/MockMorphoV2Factory.vy",
+        "classification": "mock",
+        "historicalContentSha256": null,
+        "currentContentSha256": "d4afb38408b542ef123ba5df453de8ed8a871116e85f916be983c934a0f4da60"
+      },
+      {
+        "path": "contracts/mock/MockMorphoV2Vault.vy",
+        "classification": "mock",
+        "historicalContentSha256": null,
+        "currentContentSha256": "d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac"
+      },
+      {
+        "path": "contracts/mock/MockYieldRegistry.vy",
+        "classification": "mock",
+        "historicalContentSha256": "8c416252720cf6329dd739e445174458f86c5d47dd52ccc31e4cdde4a879a3a0",
+        "currentContentSha256": "b645e1bc1f9fdb036da47a508f54dac43e000b362463e095ddb434b358de7c5d"
+      },
+      {
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "classification": "production",
+        "historicalContentSha256": "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56",
+        "currentContentSha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+      }
+    ],
+    "timestampLines": [
+      {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_addPriceSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 787,
+        "currentLine": 914,
+        "currentLineText": "    if config.lastSnapshot.lastUpdate == block.timestamp:",
+        "currentLineSha256": "30c571ae6e9ac9dc525f53ca3d264eaee4ad0e30a8929d0df113ecb42f495ae3"
+      },
+      {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_addPriceSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 2,
+        "historicalReviewedLine": 791,
+        "currentLine": 922,
+        "currentLineText": "        if not didAdd or nextSnapshotAt > block.timestamp:",
+        "currentLineSha256": "79164ed349a9ccb009cbc82ebc610255a02514ebacc2f8582bce5ffd12da51d9"
+      },
+      {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_getLatestSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 848,
+        "currentLine": 960,
+        "currentLineText": "    currentTimestamp: uint256 = block.timestamp",
+        "currentLineSha256": "65ce5080501ffbf935fe37b404bdfb79352808b02a346518e3fd6324216c42a6"
+      },
+      {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_getWeightedPrice",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 750,
+        "currentLine": 868,
+        "currentLineText": "            if block.timestamp > staleAt:",
+        "currentLineSha256": "9d3d995977312a61f6a54cde9bc61e19ccdc4d13b32aa06d5fde76125c52c174"
+      }
+    ]
+  },
   "productionRoots": [
     "contracts"
   ],

@@ -107,6 +107,10 @@ def approved_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
             for record in inventory.get(collection, [])
             if "path" in record
         )
+    relative_paths.update(
+        str(record["path"])
+        for record in inventory["currentBindings"]["sourcePaths"]
+    )
     for relative in sorted(relative_paths):
         source = REPOSITORY_ROOT / relative
         destination = template / relative
@@ -138,6 +142,11 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
     assert "vyper_paths=95" in result.output
+    assert "current_bindings=4/4" in result.output
+    assert (
+        "current_state_sha256=" + checker.CURRENT_BINDINGS_STATE_SHA256
+        in result.output
+    )
     assert "post_s5_production_records=59" in result.output
     assert (
         "post_s5_production_sha256="
@@ -147,6 +156,155 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
     assert "test=177" in result.output
+
+
+def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    bindings = inventory["currentBindings"]
+
+    assert set(bindings) == {
+        "schemaVersion",
+        "currentStateSha256",
+        "sourcePaths",
+        "timestampLines",
+    }
+    assert bindings["schemaVersion"] == checker.CURRENT_BINDINGS_SCHEMA_VERSION
+    assert bindings["sourcePaths"] == list(
+        checker.EXPECTED_CURRENT_SOURCE_BINDINGS
+    )
+    assert bindings["timestampLines"] == list(
+        checker.EXPECTED_CURRENT_TIMESTAMP_BINDINGS
+    )
+    assert len({record["path"] for record in bindings["sourcePaths"]}) == 4
+    assert len(
+        {
+            checker._current_binding_timestamp_key(record)
+            for record in bindings["timestampLines"]
+        }
+    ) == 4
+    assert checker.CURRENT_BINDINGS_STATE_SHA256 == (
+        "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441"
+    )
+    assert checker._current_bindings_fingerprint(bindings) == (
+        checker.CURRENT_BINDINGS_STATE_SHA256
+    )
+
+    without_current = copy.deepcopy(inventory)
+    without_current.pop("currentBindings")
+    assert checker._s5_legacy_inventory_fingerprint(inventory, fixture_repo) == (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert checker._s5_legacy_inventory_fingerprint(
+        without_current, fixture_repo
+    ) == checker.S5_LEGACY_INVENTORY_SHA256
+    assert checker._post_s5_production_inventory_fingerprint(inventory) == (
+        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+
+    for record in bindings["sourcePaths"]:
+        actual = hashlib.sha256(
+            (fixture_repo / record["path"]).read_bytes()
+        ).hexdigest()
+        assert actual == record["currentContentSha256"]
+    for record in bindings["timestampLines"]:
+        raw_line = (fixture_repo / record["path"]).read_bytes().splitlines(
+            keepends=True
+        )[record["currentLine"] - 1]
+        assert hashlib.sha256(raw_line).hexdigest() == record[
+            "currentLineSha256"
+        ]
+        assert raw_line.decode().removesuffix("\n") == record["currentLineText"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["addition", "removal", "mutation", "duplication", "reordering"],
+)
+@pytest.mark.parametrize("collection", ["sourcePaths", "timestampLines"])
+def test_current_bindings_structural_drift_fails_closed(
+    fixture_repo: Path,
+    mutation: str,
+    collection: str,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    bindings = inventory["currentBindings"]
+    records = bindings[collection]
+    if mutation == "addition":
+        added = copy.deepcopy(records[0])
+        if collection == "sourcePaths":
+            added["path"] = "contracts/mock/UnexpectedMorphoV2.vy"
+        else:
+            added["function"] = "_unexpectedTimestamp"
+        records.append(added)
+    elif mutation == "removal":
+        records.pop()
+    elif mutation == "mutation":
+        if collection == "sourcePaths":
+            records[0]["currentContentSha256"] = "0" * 64
+        else:
+            records[0]["currentLineText"] += "  # mutation"
+    elif mutation == "duplication":
+        records.append(copy.deepcopy(records[0]))
+    else:
+        records[0], records[1] = records[1], records[0]
+
+    # Repinning the inventory field alone cannot acquire checker authority.
+    bindings["currentStateSha256"] = checker._current_bindings_fingerprint(
+        bindings
+    )
+    _write_inventory(fixture_repo, inventory)
+    result = _assert_failure(
+        fixture_repo, "INV-SCHEMA-CURRENT-BINDINGS-FINGERPRINT"
+    )
+    assert "INV-SCHEMA-CURRENT-BINDINGS" in _codes(result)
+    if mutation == "duplication":
+        assert "INV-SCHEMA-CURRENT-BINDINGS-DUPLICATE" in _codes(result)
+
+
+def test_current_binding_source_drift_fails_closed(fixture_repo: Path) -> None:
+    path = fixture_repo / "contracts/mock/MockMorphoV2Factory.vy"
+    _append(path, "\n# source drift\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-CURRENT-SOURCE-HASH",
+        path="contracts/mock/MockMorphoV2Factory.vy",
+    )
+
+
+def test_current_binding_line_move_fails_closed(fixture_repo: Path) -> None:
+    binding = _load_inventory(fixture_repo)["currentBindings"][
+        "timestampLines"
+    ][0]
+    path = fixture_repo / binding["path"]
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines.insert(binding["currentLine"] - 1, "\n")
+    path.write_text("".join(lines), encoding="utf-8")
+    _assert_failure(
+        fixture_repo,
+        "INV-CURRENT-TIMESTAMP-LINE",
+        path=binding["path"],
+    )
+
+
+def test_current_binding_line_content_drift_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    binding = _load_inventory(fixture_repo)["currentBindings"][
+        "timestampLines"
+    ][0]
+    path = fixture_repo / binding["path"]
+    _replace_once(
+        path,
+        binding["currentLineText"],
+        binding["currentLineText"] + "  # drift",
+    )
+    _assert_failure(
+        fixture_repo,
+        "INV-CURRENT-TIMESTAMP-LINE",
+        path=binding["path"],
+    )
 
 
 def test_h04_exact_batch_preserves_both_frozen_fingerprints(

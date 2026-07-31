@@ -159,6 +159,106 @@ M3_CREDIT_ENGINE_BASELINE_SHA256 = (
 POST_S5_PRODUCTION_INVENTORY_SHA256 = (
     "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
 )
+CURRENT_BINDINGS_SCHEMA_VERSION = 1
+CURRENT_BINDINGS_STATE_SHA256 = (
+    "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441"
+)
+EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
+    {
+        "path": "contracts/mock/MockMorphoV2Factory.vy",
+        "classification": "mock",
+        "historicalContentSha256": None,
+        "currentContentSha256": (
+            "d4afb38408b542ef123ba5df453de8ed8a871116e85f916be983c934a0f4da60"
+        ),
+    },
+    {
+        "path": "contracts/mock/MockMorphoV2Vault.vy",
+        "classification": "mock",
+        "historicalContentSha256": None,
+        "currentContentSha256": (
+            "d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac"
+        ),
+    },
+    {
+        "path": "contracts/mock/MockYieldRegistry.vy",
+        "classification": "mock",
+        "historicalContentSha256": (
+            "8c416252720cf6329dd739e445174458f86c5d47dd52ccc31e4cdde4a879a3a0"
+        ),
+        "currentContentSha256": (
+            "b645e1bc1f9fdb036da47a508f54dac43e000b362463e095ddb434b358de7c5d"
+        ),
+    },
+    {
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "classification": "production",
+        "historicalContentSha256": (
+            "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
+        ),
+        "currentContentSha256": (
+            "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+        ),
+    },
+)
+EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
+    {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_addPriceSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 787,
+        "currentLine": 914,
+        "currentLineText": (
+            "    if config.lastSnapshot.lastUpdate == block.timestamp:"
+        ),
+        "currentLineSha256": (
+            "30c571ae6e9ac9dc525f53ca3d264eaee4ad0e30a8929d0df113ecb42f495ae3"
+        ),
+    },
+    {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_addPriceSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 2,
+        "historicalReviewedLine": 791,
+        "currentLine": 922,
+        "currentLineText": (
+            "        if not didAdd or nextSnapshotAt > block.timestamp:"
+        ),
+        "currentLineSha256": (
+            "79164ed349a9ccb009cbc82ebc610255a02514ebacc2f8582bce5ffd12da51d9"
+        ),
+    },
+    {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_getLatestSnapshot",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 848,
+        "currentLine": 960,
+        "currentLineText": "    currentTimestamp: uint256 = block.timestamp",
+        "currentLineSha256": (
+            "65ce5080501ffbf935fe37b404bdfb79352808b02a346518e3fd6324216c42a6"
+        ),
+    },
+    {
+        "id": "TS-004",
+        "path": "contracts/priceSources/BlueChipYieldPrices.vy",
+        "function": "_getWeightedPrice",
+        "normalizedExpression": "block.timestamp",
+        "ordinalInFunction": 1,
+        "historicalReviewedLine": 750,
+        "currentLine": 868,
+        "currentLineText": "            if block.timestamp > staleAt:",
+        "currentLineSha256": (
+            "9d3d995977312a61f6a54cde9bc61e19ccdc4d13b32aa06d5fde76125c52c174"
+        ),
+    },
+)
 S5_REVIEW_DIRECT_KEYS = {
     ("contracts/data/Ledger.vy", "_getActionBlock", "block.number", 1),
 }
@@ -1643,6 +1743,9 @@ def _s5_legacy_inventory_fingerprint(
     legacy = copy.deepcopy(dict(data))
     if exact_pr61_reconciliation:
         _restore_pr61_legacy_inventory(legacy)
+    # currentBindings is an additive live-source identity layer. It is never
+    # part of the immutable historical serialization or its fingerprint.
+    legacy.pop("currentBindings", None)
     legacy.pop("expectedProductionCounts", None)
     legacy["directOccurrences"] = [
         record
@@ -1943,6 +2046,308 @@ def _load_inventory(path: Path) -> tuple[dict[str, Any] | None, list[Finding]]:
             )
         ]
     return data, []
+
+
+def _current_binding_timestamp_key(
+    record: Mapping[str, Any],
+) -> tuple[str, str, str, int]:
+    try:
+        ordinal = int(record.get("ordinalInFunction", 0))
+    except (TypeError, ValueError):
+        ordinal = 0
+    return (
+        str(record.get("path", "")),
+        str(record.get("function", "")),
+        str(record.get("normalizedExpression", "")),
+        ordinal,
+    )
+
+
+def _current_bindings_payload(bindings: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "schemaVersion": bindings.get("schemaVersion"),
+        "sourcePaths": bindings.get("sourcePaths"),
+        "timestampLines": bindings.get("timestampLines"),
+    }
+
+
+def _current_bindings_fingerprint(bindings: Mapping[str, Any]) -> str:
+    encoded = (
+        json.dumps(
+            _current_bindings_payload(bindings),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _validate_current_bindings(
+    data: Mapping[str, Any], root: Path
+) -> list[Finding]:
+    findings: list[Finding] = []
+    bindings = data.get("currentBindings")
+    if not isinstance(bindings, Mapping):
+        return [
+            Finding(
+                code="INV-SCHEMA-CURRENT-BINDINGS",
+                domain="schema",
+                expected="exact-currentBindings-object",
+                actual=type(bindings).__name__,
+            )
+        ]
+
+    expected_keys = {
+        "schemaVersion",
+        "currentStateSha256",
+        "sourcePaths",
+        "timestampLines",
+    }
+    source_bindings = bindings.get("sourcePaths")
+    timestamp_bindings = bindings.get("timestampLines")
+    valid_shape = (
+        set(bindings) == expected_keys
+        and bindings.get("schemaVersion") == CURRENT_BINDINGS_SCHEMA_VERSION
+        and isinstance(source_bindings, list)
+        and all(isinstance(record, Mapping) for record in source_bindings)
+        and isinstance(timestamp_bindings, list)
+        and all(isinstance(record, Mapping) for record in timestamp_bindings)
+    )
+    if not valid_shape:
+        return [
+            Finding(
+                code="INV-SCHEMA-CURRENT-BINDINGS",
+                domain="schema",
+                expected="schema=1+exact-keys+source-list+timestamp-list",
+                actual="malformed",
+            )
+        ]
+
+    current_fingerprint = _current_bindings_fingerprint(bindings)
+    recorded_fingerprint = bindings.get("currentStateSha256")
+    if (
+        recorded_fingerprint != CURRENT_BINDINGS_STATE_SHA256
+        or current_fingerprint != CURRENT_BINDINGS_STATE_SHA256
+    ):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-CURRENT-BINDINGS-FINGERPRINT",
+                domain="schema",
+                expected=CURRENT_BINDINGS_STATE_SHA256,
+                actual=(
+                    f"recorded={recorded_fingerprint},"
+                    f"computed={current_fingerprint}"
+                ),
+            )
+        )
+
+    if (
+        source_bindings != list(EXPECTED_CURRENT_SOURCE_BINDINGS)
+        or timestamp_bindings != list(EXPECTED_CURRENT_TIMESTAMP_BINDINGS)
+    ):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-CURRENT-BINDINGS",
+                domain="schema",
+                expected="ordered-source=4+ordered-timestamp=4",
+                actual=(
+                    f"source={len(source_bindings)},"
+                    f"timestamp={len(timestamp_bindings)}"
+                ),
+                remediation=(
+                    "restore the exact eight current bindings; no adjacent "
+                    "path or timestamp inherits this authority"
+                ),
+            )
+        )
+
+    source_keys = [str(record.get("path", "")) for record in source_bindings]
+    timestamp_keys = [
+        _current_binding_timestamp_key(record)
+        for record in timestamp_bindings
+    ]
+    if (
+        len(source_keys) != len(set(source_keys))
+        or len(timestamp_keys) != len(set(timestamp_keys))
+    ):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-CURRENT-BINDINGS-DUPLICATE",
+                domain="schema",
+                expected="unique-source=4+unique-timestamp=4",
+                actual=(
+                    f"source={len(set(source_keys))},"
+                    f"timestamp={len(set(timestamp_keys))}"
+                ),
+            )
+        )
+
+    historical_paths: dict[str, list[Mapping[str, Any]]] = {}
+    for record in data["vyperPathClassifications"]:
+        historical_paths.setdefault(str(record.get("path", "")), []).append(record)
+
+    for binding in EXPECTED_CURRENT_SOURCE_BINDINGS:
+        path = str(binding["path"])
+        classification = str(binding["classification"])
+        historical_sha256 = binding["historicalContentSha256"]
+        historical_records = historical_paths.get(path, [])
+        historical_ok = (
+            not historical_records
+            if historical_sha256 is None
+            else len(historical_records) == 1
+            and historical_records[0].get("classification") == classification
+            and historical_records[0].get("contentSha256") == historical_sha256
+        )
+        if not historical_ok:
+            findings.append(
+                Finding(
+                    code="INV-CURRENT-HISTORICAL-SOURCE",
+                    domain="classification",
+                    path=path,
+                    expected=str(historical_sha256),
+                    actual=json.dumps(historical_records, sort_keys=True),
+                )
+            )
+
+        source = root / path
+        try:
+            actual_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+        except OSError:
+            actual_sha256 = "missing"
+        if actual_sha256 != binding["currentContentSha256"]:
+            findings.append(
+                Finding(
+                    code="INV-CURRENT-SOURCE-HASH",
+                    domain="classification",
+                    path=path,
+                    expected=str(binding["currentContentSha256"]),
+                    actual=actual_sha256,
+                )
+            )
+        actual_classification = classify_path(
+            path,
+            EXPECTED_PRODUCTION_ROOTS,
+            EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
+        )
+        if actual_classification != classification:
+            findings.append(
+                Finding(
+                    code="INV-CURRENT-SOURCE-CLASSIFICATION",
+                    domain="classification",
+                    path=path,
+                    expected=classification,
+                    actual=actual_classification,
+                )
+            )
+
+    historical_timestamps: dict[
+        tuple[str, str, str, int], list[Mapping[str, Any]]
+    ] = {}
+    for record in data["timestampContext"]:
+        historical_timestamps.setdefault(_record_key(record), []).append(record)
+    occurrence_cache: dict[str, dict[tuple[str, str, str, int], Occurrence]] = {}
+
+    for binding in EXPECTED_CURRENT_TIMESTAMP_BINDINGS:
+        key = _current_binding_timestamp_key(binding)
+        historical_records = historical_timestamps.get(key, [])
+        historical_ok = (
+            len(historical_records) == 1
+            and historical_records[0].get("id") == binding["id"]
+            and historical_records[0].get("reviewedLine")
+            == binding["historicalReviewedLine"]
+        )
+        if not historical_ok:
+            findings.append(
+                Finding(
+                    code="INV-CURRENT-HISTORICAL-TIMESTAMP",
+                    domain="timestamp",
+                    path=key[0],
+                    function=key[1],
+                    expected=str(binding["historicalReviewedLine"]),
+                    actual=json.dumps(historical_records, sort_keys=True),
+                )
+            )
+
+        source = root / key[0]
+        try:
+            lines = source.read_bytes().splitlines(keepends=True)
+            current_line = int(binding["currentLine"])
+            raw_line = lines[current_line - 1]
+            line_sha256 = hashlib.sha256(raw_line).hexdigest()
+            line_text = raw_line.decode("utf-8")
+            if line_text.endswith("\n"):
+                line_text = line_text[:-1]
+            if line_text.endswith("\r"):
+                line_text = line_text[:-1]
+        except (OSError, IndexError, UnicodeDecodeError, ValueError):
+            current_line = int(binding["currentLine"])
+            line_sha256 = "missing"
+            line_text = "missing"
+
+        if key[0] not in occurrence_cache:
+            try:
+                occurrences = _scan_expression_files(
+                    root, [source], TIMESTAMP_PATTERN
+                )
+            except OSError:
+                occurrences = []
+            occurrence_cache[key[0]] = {
+                occurrence.key: occurrence for occurrence in occurrences
+            }
+        occurrence = occurrence_cache[key[0]].get(key)
+        if (
+            line_sha256 != binding["currentLineSha256"]
+            or line_text != binding["currentLineText"]
+            or occurrence is None
+            or occurrence.line != current_line
+        ):
+            findings.append(
+                Finding(
+                    code="INV-CURRENT-TIMESTAMP-LINE",
+                    domain="timestamp",
+                    path=key[0],
+                    function=key[1],
+                    line=current_line,
+                    candidate=str(binding["id"]),
+                    expected=(
+                        f"line={binding['currentLine']},"
+                        f"sha256={binding['currentLineSha256']},"
+                        f"text={json.dumps(binding['currentLineText'])}"
+                    ),
+                    actual=(
+                        f"line={occurrence.line if occurrence else 'missing'},"
+                        f"sha256={line_sha256},text={json.dumps(line_text)}"
+                    ),
+                )
+            )
+    return findings
+
+
+def _current_source_binding_records(
+    data: Mapping[str, Any],
+) -> Sequence[Mapping[str, Any]]:
+    return data["currentBindings"]["sourcePaths"]
+
+
+def _timestamp_records_for_current_state(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    bindings = {
+        _current_binding_timestamp_key(record): record
+        for record in data["currentBindings"]["timestampLines"]
+    }
+    current_records: list[Mapping[str, Any]] = []
+    for historical in data["timestampContext"]:
+        current = dict(historical)
+        binding = bindings.get(_record_key(historical))
+        if binding is not None:
+            current["reviewedLine"] = binding["currentLine"]
+            current["reviewedSnippet"] = _normalize_whitespace(
+                str(binding["currentLineText"])
+            )
+        current_records.append(current)
+    return current_records
 
 
 def _validate_schema(
@@ -2554,6 +2959,7 @@ def _validate_schema(
                     actual=f"{classification}:{content_hash}",
                 )
             )
+    findings.extend(_validate_current_bindings(data, root))
     return findings
 
 
@@ -2579,6 +2985,7 @@ def _current_vyper_classifications(
 def _check_path_classifications(
     root: Path,
     records: Sequence[Mapping[str, Any]],
+    current_records: Sequence[Mapping[str, Any]],
     production_roots: Sequence[str],
     excluded_production_globs: Sequence[str],
 ) -> list[Finding]:
@@ -2590,6 +2997,13 @@ def _check_path_classifications(
         }
         for record in records
     }
+    for record in current_records:
+        path = str(record.get("path"))
+        if path not in expected:
+            expected[path] = {
+                "classification": str(record.get("classification")),
+                "contentSha256": str(record.get("currentContentSha256")),
+            }
     actual = _current_vyper_classifications(
         root, production_roots, excluded_production_globs
     )
@@ -2985,6 +3399,7 @@ def check_repository(
         _check_path_classifications(
             root,
             data["vyperPathClassifications"],
+            _current_source_binding_records(data),
             production_roots,
             excluded_production_globs,
         )
@@ -3079,7 +3494,7 @@ def check_repository(
     findings.extend(
         _compare_occurrences(
             timestamp_actual,
-            data["timestampContext"],
+            _timestamp_records_for_current_state(data),
             "timestamp",
             "INV-TIMESTAMP-NEW",
             "INV-TIMESTAMP-MISSING",
@@ -3185,6 +3600,8 @@ def check_repository(
             f"timestamp_occurrences={timestamp_counts[0]} "
             f"mixed_clock_functions={len(actual_mixed)} "
             f"vyper_paths={len(data['vyperPathClassifications'])} "
+            "current_bindings=4/4 "
+            f"current_state_sha256={CURRENT_BINDINGS_STATE_SHA256} "
             "post_s5_production_records="
             f"{sum(record.get('classification') == 'production' for record in data['vyperPathClassifications'])} "
             "post_s5_production_sha256="
