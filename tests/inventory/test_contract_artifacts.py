@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts import check_contract_artifacts as artifact_checker
+
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts" / "check_contract_artifacts.py"
@@ -71,6 +73,37 @@ def test_frozen_contract_artifacts_are_current():
         "not a deployed-runtime identity; constructor immutables" in line
         for line in contract_lines
     )
+
+
+def test_guarded_and_simple_canonical_selectors_and_layout_match():
+    vyper = artifact_checker._vyper_path()
+    guarded = artifact_checker._compile(
+        ROOT / "contracts" / "vaults" / "GuardedErc20.vy",
+        vyper,
+    )
+    simple = artifact_checker._compile(
+        ROOT / "contracts" / "vaults" / "SimpleErc20.vy",
+        vyper,
+    )
+
+    assert guarded.method_identifiers == simple.method_identifiers
+    assert len(guarded.method_identifiers) == 34
+    assert guarded.storage_layout == simple.storage_layout
+    assert guarded.transient_storage_layout == simple.transient_storage_layout
+    assert guarded.code_layout == simple.code_layout
+
+    guarded_functions = [
+        entry for entry in guarded.abi if entry.get("type") == "function"
+    ]
+    simple_functions = [
+        entry for entry in simple.abi if entry.get("type") == "function"
+    ]
+    assert guarded_functions == simple_functions
+    assert [
+        entry for entry in guarded.abi if entry.get("type") == "constructor"
+    ] == [
+        entry for entry in simple.abi if entry.get("type") == "constructor"
+    ]
 
 
 @pytest.mark.parametrize("contract", NEW_CONTRACT_SOURCES)

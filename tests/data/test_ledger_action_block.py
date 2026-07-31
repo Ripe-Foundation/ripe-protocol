@@ -483,7 +483,7 @@ def test_l2_both_check_and_update_last_touch_selectors_share_teller_gated_body(
 
 L3A_KILLING_TESTS = {
     "typed_call": (
-        "test_arb_sys_constructor_fails_closed_when_call_or_decode_is_invalid"
+        "test_l3a_typed_call_mutant_accepts_every_oversized_constructor_case"
     ),
     "truncation": (
         "test_arb_sys_constructor_fails_closed_when_call_or_decode_is_invalid"
@@ -534,19 +534,71 @@ def test_l3a_mutant_source_identities_are_frozen(kind, expected_sha256):
     )
 
 
-def test_l3a_typed_call_mutant_fails_oversized_constructor_case(
+@pytest.mark.parametrize(
+    "failure",
+    ("oversized_33", "oversized_64", "oversized_gt_64"),
+)
+def test_l3a_typed_call_mutant_accepts_every_oversized_constructor_case(
     ripe_hq_deploy,
     defaults,
+    failure,
 ):
-    _install_arb_sys_failure("oversized_64")
+    _install_arb_sys_failure(failure)
     mutant = _deploy_ledger_source(
         _l3a_mutant_source("typed_call"),
         ripe_hq_deploy,
         defaults,
         ARB_SYS,
-        "l3a_typed_call_ledger",
+        f"l3a_typed_call_ledger_{failure}",
     )
     assert mutant.ACTION_BLOCK_SOURCE() == ARB_SYS
+
+
+@pytest.mark.parametrize(
+    ("action_block", "should_check", "should_succeed"),
+    (
+        pytest.param(0, False, True, id="zero-low-risk-writes-zero"),
+        pytest.param(0, True, False, id="zero-high-risk-equals-empty-state"),
+        pytest.param(
+            2**256 - 1,
+            True,
+            True,
+            id="max-word-is-a-valid-identity",
+        ),
+    ),
+)
+def test_exact_but_false_words_define_identity_not_chain_truth(
+    ripe_hq_deploy,
+    defaults,
+    teller,
+    alice,
+    action_block,
+    should_check,
+    should_succeed,
+):
+    _install_arb_sys(action_block)
+    ledger = _deploy_ledger(
+        ripe_hq_deploy,
+        defaults,
+        ARB_SYS,
+        name=f"false_word_ledger_{action_block}_{should_check}",
+    )
+
+    if should_succeed:
+        ledger.checkAndUpdateLastTouch(
+            alice,
+            should_check,
+            sender=teller.address,
+        )
+        assert ledger.lastTouch(alice) == action_block
+    else:
+        with boa.reverts():
+            ledger.checkAndUpdateLastTouch(
+                alice,
+                should_check,
+                sender=teller.address,
+            )
+        assert ledger.lastTouch(alice) == 0
 
 
 def test_l3a_truncation_mutant_fails_oversized_constructor_case(

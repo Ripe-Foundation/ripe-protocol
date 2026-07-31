@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -50,6 +52,7 @@ ASSERTION_IDS = {
     "NEG-H03-TELLER-EXACT-RECEIPT",
     "NEG-H03-USDG-ROUTE",
 }
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def surface_map(blueprint=ROBINHOOD_BLUEPRINT):
@@ -630,6 +633,135 @@ def test_psm_green_mint_capability_is_last():
             "S-048-HQ-GREEN-CAP",
             assertion_ids=("NEG-018",),
         ),
+    )
+
+
+def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
+    manifest = json.loads(
+        (ROOT / "config" / "robinhood-parameters.json").read_text()
+    )
+    records = {
+        record["destination"]["path"]: record
+        for record in manifest["parameters"]
+    }
+    surfaces = surface_map()
+    topology = registry_map()
+
+    assert records["Deployment.DP-18.roles.liteSigners"]["value"]["raw"] == "[]"
+    assert records["Defaults.underscoreRegistry"]["value"]["raw"] == (
+        "empty(address)"
+    )
+    assert records["Deployment.DP-07.psm.constructor.canMint"]["value"]["raw"] is (
+        False
+    )
+    assert records[
+        "Deployment.DP-07.psm.constructor.canRedeem"
+    ]["value"]["raw"] is False
+    assert all(
+        records[f"Deployment.DP-08.psm.{field}"]["status"] == "blocked"
+        for field in (
+            "mintFee",
+            "redeemFee",
+            "maxMintPerInterval",
+            "maxRedeemPerInterval",
+            "numBlocksPerInterval",
+            "allowlists",
+            "reserveFunding",
+        )
+    )
+    assert records[
+        "Defaults.assetConfigs[GREEN_USDG_LP].config.debtTerms.ltv"
+    ]["value"]["raw"] == 0
+    assert records[
+        "Defaults.assetConfigs[RIPE_WETH_LP].config.debtTerms.ltv"
+    ]["value"]["raw"] == 0
+    assert records["Defaults.assetConfigs[AAPL].asset"]["status"] == "omitted"
+
+    assert surfaces["S-048-MINT"].disposition is Disposition.DISABLED
+    assert surfaces["S-048-REDEEM"].disposition is Disposition.DISABLED
+    assert surfaces["S-048-ACTIVATION"].disposition is Disposition.BLOCKED
+    assert surfaces["S-024-LP-BORROW"].disposition is Disposition.OMITTED
+    assert surfaces["S-024-LP-ZERO-LTV"].disposition is Disposition.BLOCKED
+    assert topology[(RegistryDomain.PRICE_DESK, 1)].semantic_name == "Chainlink"
+    assert topology[(RegistryDomain.PRICE_DESK, 1)].disposition is (
+        Disposition.REQUIRED
+    )
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].semantic_name == "Curve"
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is (
+        Disposition.OMITTED
+    )
+    assert not (ROOT / "contracts" / "config" / "DefaultsRobinhood.vy").exists()
+
+
+def test_psm_lite_pause_and_reserve_transfer_authority_is_explicitly_coupled():
+    echo = (ROOT / "contracts" / "config" / "SwitchboardEcho.vy").read_text()
+    charlie = (
+        ROOT / "contracts" / "config" / "SwitchboardCharlie.vy"
+    ).read_text()
+
+    assert (
+        "def transferUsdcToEndaomentFundsInPsm(_amount: uint256) -> uint256:\n"
+        "    assert self._hasPermsForLiteAction(msg.sender, True)"
+    ) in echo
+    assert (
+        "def pause(_contractAddr: address, _shouldPause: bool) -> bool:\n"
+        "    assert self._hasPermsForLiteAction(msg.sender, _shouldPause)"
+    ) in charlie
+    assert (
+        "return staticcall mc.canPerformLiteAction(_caller)"
+    ) in echo
+    assert (
+        "return staticcall MissionControl("
+        "self._getMissionControlAddr()).canPerformLiteAction(_caller)"
+    ) in charlie
+
+
+def test_psm_reserve_graph_has_no_lp_or_dex_liquidity_capital_edge():
+    psm = get_component("CM-048")
+    component_names = {
+        component.component_id: component.name
+        for component in ROBINHOOD_BLUEPRINT.components
+    }
+    targets = {
+        relation.target_component_id: component_names[
+            relation.target_component_id
+        ]
+        for relation in psm.relations
+    }
+
+    assert "CM-047" in targets
+    assert targets["CM-047"] == "EndaomentFunds"
+    assert all(
+        "uniswap" not in name.lower()
+        and "curve" not in name.lower()
+        and "liquidity" not in name.lower()
+        for name in targets.values()
+    )
+    assert all(
+        "liquidity" not in relation.basis.lower()
+        for relation in psm.relations
+    )
+
+
+def test_stock_activation_stays_parked_without_the_atomic_guarded_tuple():
+    manifest = json.loads(
+        (ROOT / "config" / "robinhood-parameters.json").read_text()
+    )
+    records = {
+        record["destination"]["path"]: record
+        for record in manifest["parameters"]
+    }
+    surfaces = surface_map()
+
+    assert records["Defaults.assetConfigs[AAPL].asset"]["status"] == "omitted"
+    assert surfaces["S-022-STOCK-SWAP"].disposition is Disposition.DISABLED
+    assert surfaces["S-033-STOCK-REWARD"].disposition is Disposition.DISABLED
+    assert surfaces["S-024-STOCK-USE"].disposition is Disposition.BLOCKED
+    assert all(
+        surface.disposition is not Disposition.REQUIRED
+        for surface in surfaces.values()
+        if "Stock" in surface.semantic_meaning
+        or "AAPL" in surface.semantic_meaning
     )
 
 

@@ -350,3 +350,33 @@ def test_l1_trusted_deposit_does_not_arm_then_explicit_touch_and_enclosing_rever
     finally:
         boa.env.register_contract(credit_engine.address, credit_engine)
     assert boa.env.lookup_contract(credit_engine.address) is credit_engine
+
+
+def test_initial_robinhood_underscore_omission_cannot_create_exemption(
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    deleverage,
+    alice,
+):
+    assert mission_control.underscoreRegistry() == ZERO_ADDRESS
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+
+    teller.performHousekeeping(
+        True,
+        alice,
+        False,
+        sender=deleverage.address,
+    )
+    with boa.reverts():
+        teller.performHousekeeping(
+            True,
+            alice,
+            False,
+            sender=deleverage.address,
+        )
+    assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number

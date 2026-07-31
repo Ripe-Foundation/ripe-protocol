@@ -640,6 +640,31 @@ def test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal(
     assert guarded_erc20_vault.getTotalAmountForVault(guarded_token) == amount
 
 
+def test_deficit_preserves_position_and_reward_getter_asymmetry(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    bob,
+):
+    amount = 100
+    _credit(guarded_erc20_vault, guarded_token, bob, amount, teller, deploy3r)
+    guarded_token.adminBurn(guarded_erc20_vault, 1, sender=deploy3r)
+
+    assert guarded_erc20_vault.getTotalAmountForUser(bob, guarded_token) == 0
+    assert guarded_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        guarded_token.address,
+        0,
+    )
+    assert guarded_erc20_vault.getTotalAmountForVault(guarded_token) == amount
+    assert guarded_erc20_vault.getUserLootBoxShare(bob, guarded_token) == amount
+    assert guarded_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+        guarded_token.address,
+        True,
+    )
+    assert guarded_erc20_vault.doesUserHaveBalance(bob, guarded_token)
+
+
 def test_true_empty_and_zero_nominal_index_returns_empty_zero(
     guarded_erc20_vault,
     guarded_token,
@@ -874,6 +899,87 @@ def test_external_withdrawal_preserves_surplus_without_assigning_it(
     assert guarded_token.balanceOf(alice) == 100
     assert guarded_token.balanceOf(guarded_erc20_vault) == 13
     assert guarded_erc20_vault.totalBalances(guarded_token) == 0
+
+
+def test_over_request_is_bounded_by_nominal_and_never_spends_surplus(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    bob,
+    alice,
+):
+    surplus = 13
+    nominal = 100
+    guarded_token.mint(guarded_erc20_vault, surplus, sender=deploy3r)
+    _credit(
+        guarded_erc20_vault,
+        guarded_token,
+        bob,
+        nominal,
+        teller,
+        deploy3r,
+    )
+
+    assert guarded_erc20_vault.withdrawTokensFromVault(
+        bob,
+        guarded_token,
+        MAX_UINT256,
+        alice,
+        sender=teller.address,
+    ) == (nominal, True)
+    assert guarded_token.balanceOf(alice) == nominal
+    assert guarded_token.balanceOf(guarded_erc20_vault) == surplus
+    assert guarded_erc20_vault.totalBalances(guarded_token) == 0
+
+
+@pytest.mark.parametrize(
+    ("operation", "reason"),
+    (
+        pytest.param("deposit", "only Teller allowed", id="deposit"),
+        pytest.param("withdraw", "not allowed", id="withdraw"),
+        pytest.param("transfer", "not allowed", id="internal-transfer"),
+    ),
+)
+def test_authorization_reverts_before_unknown_balance_observation(
+    operation,
+    reason,
+    guarded_erc20_vault,
+    adversarial_token,
+    alice,
+    bob,
+):
+    adversarial_token.configure_balance(
+        guarded_erc20_vault,
+        1,
+        0,
+        False,
+    )
+
+    with boa.reverts(reason):
+        if operation == "deposit":
+            guarded_erc20_vault.depositTokensInVault(
+                bob,
+                adversarial_token,
+                1,
+                sender=alice,
+            )
+        elif operation == "withdraw":
+            guarded_erc20_vault.withdrawTokensFromVault(
+                bob,
+                adversarial_token,
+                1,
+                alice,
+                sender=alice,
+            )
+        else:
+            guarded_erc20_vault.transferBalanceWithinVault(
+                adversarial_token,
+                bob,
+                alice,
+                1,
+                sender=alice,
+            )
 
 
 @pytest.mark.parametrize(
@@ -1800,6 +1906,61 @@ def test_g2_registered_zero_liability_asset_cannot_be_recovered(
             sender=switchboard_alpha.address,
         )
     assert guarded_token.balanceOf(guarded_erc20_vault) == 7
+
+
+def test_registered_surplus_becomes_recoverable_only_after_explicit_cleanup(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    switchboard_alpha,
+    bob,
+    alice,
+):
+    nominal = 100
+    surplus = 7
+    _credit(
+        guarded_erc20_vault,
+        guarded_token,
+        bob,
+        nominal,
+        teller,
+        deploy3r,
+    )
+    guarded_token.mint(guarded_erc20_vault, surplus, sender=deploy3r)
+    assert guarded_erc20_vault.withdrawTokensFromVault(
+        bob,
+        guarded_token,
+        nominal,
+        alice,
+        sender=teller.address,
+    ) == (nominal, True)
+
+    assert guarded_erc20_vault.totalBalances(guarded_token) == 0
+    assert guarded_erc20_vault.isSupportedVaultAsset(guarded_token)
+    with boa.reverts("invalid recovery"):
+        guarded_erc20_vault.recoverFunds(
+            alice,
+            guarded_token,
+            sender=switchboard_alpha.address,
+        )
+
+    assert guarded_erc20_vault.deregisterVaultAsset(
+        guarded_token,
+        sender=switchboard_alpha.address,
+    )
+    assert not guarded_erc20_vault.isSupportedVaultAsset(guarded_token)
+    guarded_erc20_vault.recoverFunds(
+        alice,
+        guarded_token,
+        sender=switchboard_alpha.address,
+    )
+    assert guarded_token.balanceOf(guarded_erc20_vault) == 0
+    assert guarded_token.balanceOf(alice) == nominal + surplus
+    event = filter_logs(guarded_erc20_vault, "VaultFundsRecovered")[-1]
+    assert event.asset == guarded_token.address
+    assert event.recipient == alice
+    assert event.balance == surplus
 
 
 def test_g2_nonzero_liability_asset_cannot_be_recovered(

@@ -33,6 +33,9 @@ callback_target: public(address)
 callback_data: public(Bytes[1024])
 callback_enabled: public(bool)
 callback_transfer_mode: public(uint256)
+callback_catches_rejection: public(bool)
+callback_was_attempted: public(bool)
+callback_succeeded: public(bool)
 
 @external
 def mint(_to: address, _amount: uint256):
@@ -60,6 +63,10 @@ def configure_callback(_target: address, _data: Bytes[1024], _enabled: bool):
     self.callback_target = _target
     self.callback_data = _data
     self.callback_enabled = _enabled
+
+@external
+def configure_callback_rejection_policy(_should_catch: bool):
+    self.callback_catches_rejection = _should_catch
 
 @external
 def configure_callback_transfer_mode(_mode: uint256):
@@ -142,10 +149,10 @@ def approve(_spender: address, _amount: uint256) -> bool:
     return True
 
 @internal
-def _move(_from: address, _to: address, _amount: uint256) -> bool:
+def _move(_from: address, _to: address, _amount: uint256) -> (bool, uint256):
     transferMode: uint256 = self.transfer_mode
     if transferMode == 6:
-        return False
+        return False, transferMode
     if transferMode == 7:
         raise
 
@@ -155,9 +162,21 @@ def _move(_from: address, _to: address, _amount: uint256) -> bool:
     if self.callback_enabled:
         self.callback_enabled = False
         self.transfer_mode = self.callback_transfer_mode
-        raw_call(self.callback_target, self.callback_data)
+        self.callback_was_attempted = True
+        if self.callback_catches_rejection:
+            success: bool = False
+            response: Bytes[1] = b""
+            success, response = raw_call(
+                self.callback_target,
+                self.callback_data,
+                max_outsize=1,
+                revert_on_failure=False,
+            )
+            self.callback_succeeded = success
+        else:
+            raw_call(self.callback_target, self.callback_data)
 
-    if transferMode == 0 or transferMode == TRANSFER_MODE_EXACT_ALIAS:
+    if transferMode in [0, TRANSFER_MODE_EXACT_ALIAS, 9, 10, 11, 12]:
         self.balances[_to] += _amount
     elif transferMode == 2:
         self.balances[_to] += _amount - 1
@@ -173,19 +192,39 @@ def _move(_from: address, _to: address, _amount: uint256) -> bool:
 
     if self.change_balance_mode_on_transfer:
         self.balance_mode = self.post_balance_mode
-    return True
+    return True, transferMode
 
 @external
-def transfer(_to: address, _amount: uint256) -> bool:
-    return self._move(msg.sender, _to, _amount)
+@raw_return
+def transfer(_to: address, _amount: uint256) -> Bytes[33]:
+    success: bool = False
+    mode: uint256 = 0
+    success, mode = self._move(msg.sender, _to, _amount)
+    if mode == 9:
+        return b""
+    if mode == 10:
+        return b"\x01"
+    if mode == 11:
+        return concat(convert(success, bytes32), b"x")
+    return slice(convert(success, bytes32), 0, 32)
 
 @external
-def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
+@raw_return
+def transferFrom(_from: address, _to: address, _amount: uint256) -> Bytes[33]:
     allowed: uint256 = self.allowances[_from][msg.sender]
     assert allowed >= _amount
     if allowed != max_value(uint256):
         self.allowances[_from][msg.sender] = allowed - _amount
-    return self._move(_from, _to, _amount)
+    success: bool = False
+    mode: uint256 = 0
+    success, mode = self._move(_from, _to, _amount)
+    if mode == 9:
+        return b""
+    if mode == 10:
+        return b"\x01"
+    if mode == 11:
+        return concat(convert(success, bytes32), b"x")
+    return slice(convert(success, bytes32), 0, 32)
 
 @external
 def deposit(_assets: uint256, _receiver: address) -> uint256:
@@ -270,6 +309,69 @@ def depositTokensWithLockDuration(
 """
 
 
+CALLER_SENSITIVE_BALANCE_TOKEN_SOURCE = """
+# @version 0.4.3
+
+balances: HashMap[address, uint256]
+allowances: HashMap[address, HashMap[address, uint256]]
+vault_caller: public(address)
+vault_mode: public(uint256)
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balances[_to] += _amount
+
+@external
+def configure_vault_observation(_vault: address, _mode: uint256):
+    self.vault_caller = _vault
+    self.vault_mode = _mode
+
+@view
+@external
+@raw_return
+def balanceOf(_holder: address) -> Bytes[65]:
+    value: uint256 = self.balances[_holder]
+    if msg.sender == self.vault_caller:
+        if self.vault_mode == 1:
+            if value != 0:
+                value -= 1
+            return slice(convert(value, bytes32), 0, 32)
+        if self.vault_mode == 2:
+            return concat(convert(value, bytes32), b"x")
+        if self.vault_mode == 3:
+            return concat(convert(value, bytes32), convert(0, bytes32))
+    return slice(convert(value, bytes32), 0, 32)
+
+@view
+@external
+def balanceValue(_holder: address) -> uint256:
+    return self.balances[_holder]
+
+@view
+@external
+def decimals() -> uint256:
+    return 18
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowances[msg.sender][_spender] = _amount
+    return True
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self.balances[msg.sender] -= _amount
+    self.balances[_to] += _amount
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
+    self.allowances[_from][msg.sender] -= _amount
+    self.balances[_from] -= _amount
+    self.balances[_to] += _amount
+    return True
+"""
+
+
 M1_PRICE_CALLBACK_SOURCE = """
 # @version 0.4.3
 
@@ -341,6 +443,14 @@ def _m1_token():
     return boa.loads(
         M1_ADVERSARIAL_TOKEN_SOURCE,
         name="m1_adversarial_token",
+        override_address=boa.env.generate_address(),
+    )
+
+
+def _caller_sensitive_balance_token():
+    return boa.loads(
+        CALLER_SENSITIVE_BALANCE_TOKEN_SOURCE,
+        name="caller_sensitive_balance_token",
         override_address=boa.env.generate_address(),
     )
 
@@ -2365,6 +2475,557 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert savings_green.balanceOf(credit_redeem) == 0
     assert savings_green.allowance(credit_redeem, teller) == 0
     assert filter_logs(teller, "TellerDeposit") == []
+
+
+@pytest.mark.parametrize(
+    "vault_fixture",
+    (
+        "simple_erc20_vault",
+        "rebase_erc20_vault",
+        "stability_pool",
+        "ripe_gov_vault",
+    ),
+)
+def test_predeployment_every_canonical_vault_deposit_rejects_non_teller(
+    request,
+    vault_fixture,
+    ripe_hq_deploy,
+    alpha_token,
+    alice,
+    bob,
+):
+    vault = request.getfixturevalue(vault_fixture)
+    with boa.reverts("only Teller allowed"):
+        vault.depositTokensInVault(
+            bob,
+            alpha_token,
+            1,
+            sender=alice,
+        )
+
+    guarded = boa.load(
+        "contracts/vaults/GuardedErc20.vy",
+        ripe_hq_deploy,
+        name=f"authorization_guarded_{vault_fixture}",
+        override_address=boa.env.generate_address(),
+    )
+    with boa.reverts("only Teller allowed"):
+        guarded.depositTokensInVault(
+            bob,
+            alpha_token,
+            1,
+            sender=alice,
+        )
+
+
+def test_predeployment_valid_ripe_lock_route_preserves_direct_clamp_boundary(
+    ripe_gov_vault,
+    switchboard_alpha,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    mission_control,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    _m1_configure_gov_asset(
+        token,
+        mission_control,
+        switchboard_alpha,
+        setAssetConfig,
+    )
+    requested = 100 * EIGHTEEN_DECIMALS
+    available = requested - 1
+    token.mint(ripe_gov_vault, available)
+
+    returned = ripe_gov_vault.depositTokensWithLockDuration(
+        bob,
+        token,
+        requested,
+        500,
+        sender=switchboard_alpha.address,
+    )
+
+    assert returned == available
+    assert ripe_gov_vault.getTotalAmountForUser(bob, token) == available
+    assert ledger.getNumUserVaults(bob) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+@pytest.mark.parametrize(
+    ("vault_fixture", "vault_id"),
+    (
+        pytest.param("simple_erc20_vault", 3, id="basic"),
+        pytest.param("rebase_erc20_vault", 4, id="shares"),
+        pytest.param("stability_pool", 1, id="stab"),
+    ),
+)
+def test_predeployment_legacy_clamp_is_closed_by_teller_equality_and_rollback(
+    request,
+    vault_fixture,
+    vault_id,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    mock_price_source,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    vault = request.getfixturevalue(vault_fixture)
+    token = _caller_sensitive_balance_token()
+    setAssetConfig(token, _vaultIds=[vault_id])
+    mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.configure_vault_observation(vault, 1)
+
+    # Direct authorized vault entry records the legacy typed clamp itself.
+    with boa.env.anchor():
+        token.mint(vault, amount)
+        assert vault.depositTokensInVault(
+            bob,
+            token,
+            amount,
+            sender=teller.address,
+        ) == amount - 1
+        assert vault.getTotalAmountForUser(bob, token) != 0
+
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+    with boa.reverts():
+        teller.deposit(token, amount, bob, vault, sender=bob)
+
+    assert token.balanceValue(bob) == amount
+    assert token.balanceValue(vault) == 0
+    assert vault.getTotalAmountForUser(bob, token) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+@pytest.mark.parametrize(
+    "vault_mode",
+    (
+        pytest.param(2, id="typed-vault-accepts-33-bytes"),
+        pytest.param(3, id="typed-vault-accepts-64-bytes"),
+    ),
+)
+def test_predeployment_typed_vault_balance_accepts_trailing_data(
+    vault_mode,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    token = _caller_sensitive_balance_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.configure_vault_observation(simple_erc20_vault, vault_mode)
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+
+    assert teller.deposit(
+        token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert token.balanceValue(bob) == 0
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount
+
+
+@pytest.mark.parametrize(
+    ("balance_mode", "expected"),
+    (
+        pytest.param(5, 100 * EIGHTEEN_DECIMALS, id="typed-source-cap-accepts-33-bytes"),
+        pytest.param(6, 32, id="dynamic-shaped-source-decodes-offset-word"),
+    ),
+)
+def test_predeployment_typed_source_balance_return_policy(
+    balance_mode,
+    expected,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+    token.configure_balance(bob, balance_mode, 0, False)
+
+    assert teller.deposit(
+        token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == expected
+    assert token.balanceValue(bob) == amount - expected
+    assert token.balanceValue(simple_erc20_vault) == expected
+
+
+def test_predeployment_eoa_asset_fails_at_typed_source_cap_without_effects(
+    simple_erc20_vault,
+    alice,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    setAssetConfig(alice)
+
+    with boa.reverts():
+        teller.deposit(
+            alice,
+            1,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
+
+    assert ledger.getNumUserVaults(bob) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alice) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_predeployment_caught_nested_rejection_preserves_exact_outer_receipt(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    token, amount, _, vault_id = _t1_setup_mutex_sensitive_trusted_callback(
+        teller,
+        teller,
+        ripe_hq,
+        governance,
+        credit_engine,
+        simple_erc20_vault,
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        vault_book,
+    )
+    token.configure_transfer(0)
+    token.configure_callback_rejection_policy(True)
+
+    assert teller.depositFromTrusted(
+        bob,
+        vault_id,
+        token,
+        amount,
+        0,
+        sender=credit_engine.address,
+    ) == amount
+
+    assert token.callback_was_attempted()
+    assert not token.callback_succeeded()
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount
+    assert ledger.getNumUserVaults(bob) == 1
+    assert [log.amount for log in filter_logs(teller, "TellerDeposit")] == [
+        amount
+    ]
+
+    token.mint(credit_engine, 1)
+    token.approve(teller, 1, sender=credit_engine.address)
+    assert teller.depositFromTrusted(
+        bob,
+        vault_id,
+        token,
+        1,
+        0,
+        sender=credit_engine.address,
+    ) == 1
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount + 1
+
+
+@pytest.mark.parametrize(
+    "vault_kind",
+    ("simple", "rebase", "stability", "governance", "guarded"),
+)
+@pytest.mark.parametrize(
+    ("transfer_mode", "recipient_numerator", "recipient_offset"),
+    (
+        pytest.param(0, 100, 0, id="exact"),
+        pytest.param(1, 0, 0, id="burn"),
+        pytest.param(3, 99, 0, id="fee"),
+        pytest.param(4, 100, 1, id="reflection"),
+        pytest.param(6, 0, 0, id="false-return"),
+        pytest.param(7, 0, 0, id="revert"),
+        pytest.param(9, 100, 0, id="no-return"),
+        pytest.param(10, 0, 0, id="malformed-short-return"),
+        pytest.param(11, 100, 0, id="trailing-return"),
+        pytest.param(12, 100, 0, id="callback"),
+    ),
+)
+def test_predeployment_withdrawal_responsibility_matrix(
+    vault_kind,
+    transfer_mode,
+    recipient_numerator,
+    recipient_offset,
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    stability_pool,
+    ripe_gov_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+    teller,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    vaults = {
+        "simple": (simple_erc20_vault, 3),
+        "rebase": (rebase_erc20_vault, 4),
+        "stability": (stability_pool, 1),
+        "governance": (ripe_gov_vault, 2),
+    }
+    if vault_kind == "guarded":
+        vault = boa.load(
+            "contracts/vaults/GuardedErc20.vy",
+            ripe_hq_deploy,
+            name=f"withdrawal_matrix_guarded_{transfer_mode}",
+            override_address=boa.env.generate_address(),
+        )
+        vault_id = _m1_register_vault(vault_book, governance, vault)
+    else:
+        vault, vault_id = vaults[vault_kind]
+
+    if vault_kind == "governance":
+        mission_control.setRipeGovVaultConfig(
+            token,
+            100_00,
+            False,
+            (100, 1000, 200_00, True, 10_00),
+            sender=switchboard_alpha.address,
+        )
+    setAssetConfig(token, _vaultIds=[vault_id])
+    mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(vault, amount)
+    assert vault.depositTokensInVault(
+        bob,
+        token,
+        amount,
+        sender=teller.address,
+    ) == amount
+    if vault_kind == "governance":
+        boa.env.time_travel(blocks=1001)
+
+    token.configure_transfer(transfer_mode)
+    if transfer_mode == 12:
+        token.configure_callback(
+            token,
+            token.configure_transfer.prepare_calldata(0),
+            True,
+        )
+
+    guarded_rejects_shape_or_delivery = (
+        vault_kind == "guarded"
+        and transfer_mode in (1, 3, 4, 11)
+    )
+    universally_rejected = transfer_mode in (6, 7, 10)
+    should_revert = guarded_rejects_shape_or_delivery or universally_rejected
+
+    if should_revert:
+        with boa.reverts():
+            teller.withdraw(
+                token,
+                amount,
+                bob,
+                vault,
+                vault_id,
+                sender=bob,
+            )
+        assert token.balanceValue(vault) == amount
+        assert token.balanceValue(bob) == 0
+        assert vault.getTotalAmountForUser(bob, token) == amount
+        assert filter_logs(teller, "TellerWithdrawal") == []
+        return
+
+    assert teller.withdraw(
+        token,
+        amount,
+        bob,
+        vault,
+        vault_id,
+        sender=bob,
+    ) == amount
+    expected_recipient = (
+        amount * recipient_numerator // 100 + recipient_offset
+    )
+    assert token.balanceValue(vault) == 0
+    assert token.balanceValue(bob) == expected_recipient
+    assert vault.getTotalAmountForUser(bob, token) == 0
+    assert filter_logs(teller, "TellerWithdrawal")[0].amount == amount
+    if transfer_mode == 12:
+        assert token.callback_was_attempted()
+        assert token.transfer_mode() == 0
+
+
+@pytest.mark.parametrize("outer_route", ("governance", "trusted"))
+@pytest.mark.parametrize(
+    ("nested_action", "nested_succeeds"),
+    (
+        pytest.param("guarded-withdrawal", True, id="guarded-withdrawal"),
+        pytest.param("rebalance", False, id="rebalance"),
+        pytest.param("redemption", False, id="redemption"),
+        pytest.param("liquidation", True, id="liquidation"),
+    ),
+)
+def test_predeployment_undecorated_route_reentrancy_cross_product(
+    outer_route,
+    nested_action,
+    nested_succeeds,
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    ripe_gov_vault,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    guarded = boa.load(
+        "contracts/vaults/GuardedErc20.vy",
+        ripe_hq_deploy,
+        name=f"reentrancy_guarded_{outer_route}_{nested_action}",
+        override_address=boa.env.generate_address(),
+    )
+    guarded_id = _m1_register_vault(
+        vault_book,
+        governance,
+        guarded,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+
+    if outer_route == "governance":
+        mission_control.setRipeGovVaultConfig(
+            token,
+            100_00,
+            False,
+            (100, 1000, 200_00, True, 10_00),
+            sender=switchboard_alpha.address,
+        )
+        outer_vault = ripe_gov_vault
+        outer_id = 2
+    else:
+        outer_vault = simple_erc20_vault
+        outer_id = simple_id
+    setAssetConfig(token, _vaultIds=[outer_id, guarded_id])
+
+    user = token.address
+    guarded_position = 10
+    token.mint(guarded, guarded_position)
+    assert guarded.depositTokensInVault(
+        user,
+        token,
+        guarded_position,
+        sender=teller.address,
+    ) == guarded_position
+
+    if nested_action == "guarded-withdrawal":
+        nested = teller.withdraw.prepare_calldata(
+            token,
+            1,
+            user,
+            guarded,
+            guarded_id,
+        )
+    elif nested_action == "rebalance":
+        nested = teller.rebalance.prepare_calldata(
+            token,
+            simple_id,
+            token,
+            guarded_id,
+            1,
+            1,
+            user,
+        )
+    elif nested_action == "redemption":
+        nested = teller.redeemCollateral.prepare_calldata(
+            user,
+            guarded_id,
+            token,
+            1,
+            False,
+            False,
+            True,
+            user,
+        )
+    else:
+        nested = teller.liquidateUser.prepare_calldata(user, True)
+
+    token.configure_callback(teller, nested, True)
+    token.configure_callback_rejection_policy(True)
+    token.configure_transfer(0)
+    amount = 100 * EIGHTEEN_DECIMALS
+
+    if outer_route == "governance":
+        token.mint(token, amount + 1)
+        token.set_self_allowance(teller, amount)
+        assert teller.depositIntoGovVault(
+            token,
+            amount,
+            500,
+            user,
+            sender=user,
+        ) == amount
+    else:
+        token.mint(token, 1)
+        token.mint(credit_engine, amount)
+        token.approve(teller, amount, sender=credit_engine.address)
+        assert teller.depositFromTrusted(
+            user,
+            outer_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        ) == amount
+
+    assert token.callback_was_attempted()
+    assert token.callback_succeeded() is nested_succeeds
+    assert token.balanceValue(outer_vault) == amount
+    assert outer_vault.getTotalAmountForUser(user, token) == amount
+    nested_withdrawal_succeeds = (
+        nested_action == "guarded-withdrawal" and nested_succeeds
+    )
+    expected_guarded = guarded_position - int(nested_withdrawal_succeeds)
+    assert guarded.getTotalAmountForUser(user, token) == expected_guarded
+    assert token.balanceValue(guarded) == expected_guarded
+    assert token.balanceValue(token) == 1 + int(nested_withdrawal_succeeds)
 
 
 def test_m1_teller_runtime_size_dual_guard():
