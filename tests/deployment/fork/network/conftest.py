@@ -4,8 +4,8 @@ import pytest
 
 
 @pytest.fixture
-def observed_facts(fork_framework, parse_envelope):
-    owner = parse_envelope().owner
+def observed_facts(fork_framework, accepted_preflight):
+    owner = accepted_preflight.envelope.owner
     return fork_framework.ObservedForkFacts(
         chain_id=owner.expected_chain_id,
         block_number=owner.pin.number,

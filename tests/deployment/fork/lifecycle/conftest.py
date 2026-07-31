@@ -4,15 +4,18 @@ import pytest
 
 
 @pytest.fixture
-def evidence_value():
+def evidence_value(accepted_preflight):
+    envelope = accepted_preflight.envelope
     return {
         "assertion_ids": ["assertion-a", "assertion-b"],
-        "endpoint_fingerprint_sha256": "12" * 32,
-        "input_envelope_sha256": "34" * 32,
+        "endpoint_fingerprint_sha256": (
+            envelope.owner.endpoint.fingerprint_sha256
+        ),
+        "input_envelope_sha256": envelope.sha256,
         "observed_fork_facts": {
-            "block_hash": "0x" + "56" * 32,
-            "block_number": 123,
-            "chain_id": 46630,
+            "block_hash": envelope.owner.pin.block_hash,
+            "block_number": envelope.owner.pin.number,
+            "chain_id": envelope.owner.expected_chain_id,
         },
         "ordered_rpc_methods": ["eth_chainId", "eth_getBlockByHash"],
         "read_only": True,

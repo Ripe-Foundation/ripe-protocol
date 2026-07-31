@@ -3,8 +3,10 @@ from __future__ import annotations
 import pytest
 
 
-def test_only_explicit_read_only_rpc_methods_are_permitted(fork_framework):
-    methods = tuple(sorted(fork_framework.READ_ONLY_RPC_METHODS))
+def test_only_accepted_owner_read_only_rpc_methods_are_permitted(
+    fork_framework, accepted_preflight
+):
+    methods = accepted_preflight.envelope.owner.rpc_methods
     assert fork_framework.validate_rpc_inventory(methods) == methods
 
 

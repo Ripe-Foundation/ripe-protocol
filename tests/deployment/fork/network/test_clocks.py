@@ -3,13 +3,16 @@ from __future__ import annotations
 import pytest
 
 
-def test_exact_clock_observation_is_accepted(fork_framework):
+def test_exact_clock_observation_is_bound_to_accepted_pin(
+    fork_framework, accepted_preflight
+):
+    pin = accepted_preflight.envelope.owner.pin
     expected = {
-        "rpc_child_number": 100,
-        "rpc_l1_number": 90,
-        "evm_number": 100,
-        "timestamp": 1_800_000_000,
-        "arbsys_number": 100,
+        "rpc_child_number": pin.number,
+        "rpc_l1_number": pin.number - 1,
+        "evm_number": pin.number,
+        "timestamp": pin.timestamp,
+        "arbsys_number": pin.number,
     }
     fork_framework.validate_clock_observation(**expected, expected=expected)
 
@@ -24,13 +27,16 @@ def test_exact_clock_observation_is_accepted(fork_framework):
         "arbsys_number",
     ),
 )
-def test_each_clock_divergence_fails_closed(fork_framework, field):
+def test_each_clock_divergence_fails_closed(
+    fork_framework, accepted_preflight, field
+):
+    pin = accepted_preflight.envelope.owner.pin
     expected = {
-        "rpc_child_number": 100,
-        "rpc_l1_number": 90,
-        "evm_number": 100,
-        "timestamp": 1_800_000_000,
-        "arbsys_number": 100,
+        "rpc_child_number": pin.number,
+        "rpc_l1_number": pin.number - 1,
+        "evm_number": pin.number,
+        "timestamp": pin.timestamp,
+        "arbsys_number": pin.number,
     }
     observed = dict(expected)
     observed[field] += 1

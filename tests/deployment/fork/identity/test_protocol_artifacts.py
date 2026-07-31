@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 
 import pytest
 
@@ -15,11 +16,18 @@ def test_identity_manifest_digest_profile_and_chain_bind(
     candidate["owner_inputs"]["identity_manifest_sha256"] = manifest.sha256
     envelope = fork_framework.parse_input_envelope(
         fork_framework.canonical_json_bytes(candidate),
-        now=__import__("datetime").datetime(
-            2029, 1, 1, tzinfo=__import__("datetime").timezone.utc
-        ),
+        now=datetime(2029, 1, 1, tzinfo=timezone.utc),
     )
     fork_framework.bind_identity_manifest(envelope, manifest)
+
+
+def test_accepted_preflight_binds_required_sequencer_artifact(
+    fork_framework, accepted_preflight
+):
+    feed = fork_framework.require_owner_identity_kind(
+        accepted_preflight.identity_manifest, "sequencer-uptime-feed"
+    )
+    assert feed.authority == "owner-supplied"
 
 
 def test_identity_manifest_digest_mismatch_fails_closed(
@@ -44,9 +52,7 @@ def test_identity_manifest_profile_mismatch_fails_closed(
     candidate["owner_inputs"]["identity_manifest_sha256"] = manifest.sha256
     envelope = fork_framework.parse_input_envelope(
         fork_framework.canonical_json_bytes(candidate),
-        now=__import__("datetime").datetime(
-            2029, 1, 1, tzinfo=__import__("datetime").timezone.utc
-        ),
+        now=datetime(2029, 1, 1, tzinfo=timezone.utc),
     )
     with pytest.raises(
         fork_framework.ForkFrameworkError,

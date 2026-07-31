@@ -39,10 +39,10 @@ def test_credentials_never_enter_evidence(
 
 
 def test_replay_identity_is_stable_and_input_bound(
-    fork_framework, evidence_value
+    fork_framework, evidence_value, accepted_preflight
 ):
-    envelope = "12" * 32
-    identities = "34" * 32
+    envelope = accepted_preflight.envelope.sha256
+    identities = accepted_preflight.identity_manifest.sha256
     nodes = fork_framework.ordered_node_digest(("a", "b"))
     first = fork_framework.replay_identity(
         envelope_sha256=envelope,

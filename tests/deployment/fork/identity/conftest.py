@@ -12,6 +12,16 @@ def identity_manifest_value(digest):
             {
                 "address": "0x1111111111111111111111111111111111111111",
                 "authority": "owner-supplied",
+                "identity_id": "synthetic-sequencer-feed",
+                "implementation_address": None,
+                "kind": "sequencer-uptime-feed",
+                "provenance_sha256": digest,
+                "proxy_address": None,
+                "runtime_code_sha256": digest,
+            },
+            {
+                "address": "0x2222222222222222222222222222222222222222",
+                "authority": "owner-supplied",
                 "identity_id": "synthetic-token-fixture",
                 "implementation_address": None,
                 "kind": "token",

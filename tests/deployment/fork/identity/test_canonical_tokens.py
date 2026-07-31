@@ -14,6 +14,18 @@ def test_owner_identity_manifest_parses_without_observed_facts(
     assert manifest.identities[0].authority == "owner-supplied"
 
 
+def test_accepted_preflight_exposes_owner_token_identity(
+    accepted_preflight,
+):
+    tokens = tuple(
+        identity
+        for identity in accepted_preflight.identity_manifest.identities
+        if identity.kind == "token"
+    )
+    assert len(tokens) == 1
+    assert tokens[0].authority == "owner-supplied"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     (

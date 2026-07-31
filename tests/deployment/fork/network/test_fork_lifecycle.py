@@ -68,6 +68,17 @@ def test_runtime_creation_and_destruction_are_deterministic(
     assert len(created) == 2
 
 
+def test_runtime_spec_is_bound_to_accepted_preflight_replay(
+    fork_framework, synthetic_disposable_runtime, accepted_preflight
+):
+    spec = synthetic_disposable_runtime.spec
+    owner = accepted_preflight.envelope.owner
+    assert spec.chain_id == owner.expected_chain_id
+    assert spec.block_number == owner.pin.number
+    assert spec.block_hash == owner.pin.block_hash
+    assert len(spec.replay_identity) == 64
+
+
 def test_runtime_residue_fails_closed(fork_framework, tmp_path):
     controller = runtime(
         fork_framework, tmp_path, lambda spec, path: FakeProcess()
@@ -151,13 +162,14 @@ def test_impersonation_and_mutation_are_local_fork_only(
     broadcast,
     expected,
 ):
-    call = lambda: fork_framework.validate_local_fork_action(
-        action,
-        disposable_runtime_active=active,
-        targets_local_fork=local,
-        requests_real_signer=real_signer,
-        requests_broadcast=broadcast,
-    )
+    def call():
+        fork_framework.validate_local_fork_action(
+            action,
+            disposable_runtime_active=active,
+            targets_local_fork=local,
+            requests_real_signer=real_signer,
+            requests_broadcast=broadcast,
+        )
     if expected is None:
         call()
     else:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -159,6 +160,73 @@ def test_repository_observed_facts_are_separate_and_clean(
         )
 
 
+@pytest.mark.parametrize(
+    ("owner_value", "observed_value"),
+    (
+        (True, 1),
+        (False, 0),
+        (7, 7.0),
+        ({"nested": [True]}, {"nested": [1]}),
+    ),
+)
+def test_owner_output_comparison_is_recursively_type_strict(
+    fork_framework, owner_value, observed_value
+):
+    with pytest.raises(
+        fork_framework.ForkFrameworkError, match="H09_STRICT_MISMATCH"
+    ):
+        fork_framework.consume_owner_output(
+            {"value": owner_value},
+            {"value": observed_value},
+            required_fields=("value",),
+            code="H09_STRICT",
+        )
+
+
+@pytest.mark.parametrize(
+    ("required_fields", "owner", "observed", "code"),
+    (
+        ((), {}, {}, "H09_OWNER_REQUIREMENTS"),
+        (
+            ("b", "a"),
+            {"a": 1, "b": 2},
+            {"a": 1, "b": 2},
+            "H09_OWNER_REQUIREMENTS",
+        ),
+        (("a",), {"a": 1, "extra": 2}, {"a": 1}, "H09_OWNER_OWNER_FIELDS"),
+        (("a",), {"a": 1}, {"a": 1, "extra": 2}, "H09_OWNER_OBSERVED_FIELDS"),
+    ),
+)
+def test_owner_output_requirements_and_fields_fail_closed(
+    fork_framework, required_fields, owner, observed, code
+):
+    with pytest.raises(fork_framework.ForkFrameworkError, match=code):
+        fork_framework.consume_owner_output(
+            owner,
+            observed,
+            required_fields=required_fields,
+            code="H09_OWNER",
+        )
+
+
+def test_owner_binding_requirements_and_missing_name_fail_closed(
+    fork_framework, parse_envelope
+):
+    envelope = parse_envelope()
+    with pytest.raises(
+        fork_framework.ForkFrameworkError,
+        match="H09_OWNER_BINDING_REQUIREMENTS",
+    ):
+        fork_framework.require_owner_bindings(envelope, ())
+    with pytest.raises(
+        fork_framework.ForkFrameworkError,
+        match="H09_OWNER_BINDING_MISSING",
+    ):
+        fork_framework.require_owner_bindings(
+            envelope, ("synthetic-missing-binding",)
+        )
+
+
 def test_forbidden_environment_and_alias_drift_fail_closed(fork_framework):
     with pytest.raises(
         fork_framework.ForkFrameworkError,
@@ -186,9 +254,9 @@ def _identity_value(digest):
             {
                 "address": "0x1111111111111111111111111111111111111111",
                 "authority": "owner-supplied",
-                "identity_id": "synthetic-token-fixture",
+                "identity_id": "synthetic-sequencer-feed",
                 "implementation_address": None,
-                "kind": "token",
+                "kind": "sequencer-uptime-feed",
                 "provenance_sha256": digest,
                 "proxy_address": None,
                 "runtime_code_sha256": digest,
@@ -210,9 +278,9 @@ def test_explicit_preflight_binds_all_local_inputs_before_endpoint_use(
     identity_path = tmp_path / "identity.json"
     identity_path.write_bytes(identity_data)
     candidate = copy.deepcopy(envelope_value)
-    candidate["owner_inputs"]["identity_manifest_sha256"] = (
-        __import__("hashlib").sha256(identity_data).hexdigest()
-    )
+    candidate["owner_inputs"]["identity_manifest_sha256"] = hashlib.sha256(
+        identity_data
+    ).hexdigest()
     candidate["owner_inputs"]["endpoint"]["fingerprint_sha256"] = (
         fork_framework.endpoint_fingerprint(raw_endpoint)
     )
@@ -247,9 +315,9 @@ def test_preflight_rejects_repository_drift_before_parsing_endpoint(
     identity_path = tmp_path / "identity.json"
     identity_path.write_bytes(identity_data)
     candidate = copy.deepcopy(envelope_value)
-    candidate["owner_inputs"]["identity_manifest_sha256"] = (
-        __import__("hashlib").sha256(identity_data).hexdigest()
-    )
+    candidate["owner_inputs"]["identity_manifest_sha256"] = hashlib.sha256(
+        identity_data
+    ).hexdigest()
     envelope_path = tmp_path / "envelope.json"
     envelope_path.write_bytes(
         fork_framework.canonical_json_bytes(candidate)
@@ -269,5 +337,37 @@ def test_preflight_rejects_repository_drift_before_parsing_endpoint(
             observed_commit=candidate["repository_authority"]["commit"],
             observed_tree=candidate["repository_authority"]["tree"],
             changed_paths=("candidate-change",),
+            now=datetime(2029, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_opt_in_preflight_with_complete_local_files_requires_endpoint(
+    fork_framework, envelope_value, digest, tmp_path: Path
+):
+    identity_data = fork_framework.canonical_json_bytes(
+        _identity_value(digest)
+    )
+    identity_path = tmp_path / "identity.json"
+    identity_path.write_bytes(identity_data)
+    candidate = copy.deepcopy(envelope_value)
+    candidate["owner_inputs"]["identity_manifest_sha256"] = hashlib.sha256(
+        identity_data
+    ).hexdigest()
+    envelope_path = tmp_path / "envelope.json"
+    envelope_path.write_bytes(
+        fork_framework.canonical_json_bytes(candidate)
+    )
+    environment = {
+        "RIPE_RH_FORK_MODE": "read-only-archive-fork",
+        "RIPE_RH_FORK_MANIFEST": str(envelope_path),
+        "RIPE_RH_FORK_IDENTITY_MANIFEST": str(identity_path),
+    }
+    with pytest.raises(
+        fork_framework.ForkFrameworkError, match="H09_ENDPOINT_MISSING"
+    ):
+        fork_framework.preflight_from_environment(
+            environment,
+            observed_commit=candidate["repository_authority"]["commit"],
+            observed_tree=candidate["repository_authority"]["tree"],
             now=datetime(2029, 1, 1, tzinfo=timezone.utc),
         )

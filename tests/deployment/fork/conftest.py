@@ -6,11 +6,12 @@ import re
 import shutil
 import socket
 import stat
+import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -39,9 +40,25 @@ IMPLEMENTED_PATH_LEDGER = (
     "tests/deployment/fork/conftest.py",
     "tests/deployment/fork/identity/conftest.py",
     "tests/deployment/fork/identity/test_canonical_tokens.py",
+    "tests/deployment/fork/identity/test_chainlink.py",
     "tests/deployment/fork/identity/test_protocol_artifacts.py",
+    "tests/deployment/fork/identity/test_sequencer.py",
+    "tests/deployment/fork/identity/test_token_metadata_returns.py",
+    "tests/deployment/fork/identity/test_token_permit_controls.py",
+    "tests/deployment/fork/identity/test_usdg_overlay.py",
     "tests/deployment/fork/lifecycle/conftest.py",
+    "tests/deployment/fork/lifecycle/test_core_lifecycle.py",
+    "tests/deployment/fork/lifecycle/test_liquidation_auction_house.py",
     "tests/deployment/fork/lifecycle/test_replay_evidence_rollback.py",
+    "tests/deployment/fork/lifecycle/test_roles_governance.py",
+    "tests/deployment/fork/markets/conftest.py",
+    "tests/deployment/fork/markets/test_curve_artifact_pool.py",
+    "tests/deployment/fork/markets/test_dynamic_rate.py",
+    "tests/deployment/fork/markets/test_pricedesk_profiles.py",
+    "tests/deployment/fork/markets/test_psm_staging.py",
+    "tests/deployment/fork/markets/test_teller_snapshots.py",
+    "tests/deployment/fork/markets/test_uniswap_deployment_pool.py",
+    "tests/deployment/fork/markets/test_uniswap_liquidity_swaps.py",
     "tests/deployment/fork/network/conftest.py",
     "tests/deployment/fork/network/test_clocks.py",
     "tests/deployment/fork/network/test_fork_lifecycle.py",
@@ -53,6 +70,50 @@ IMPLEMENTED_PATH_LEDGER = (
     "tests/deployment/fork/offline/test_process_isolation.py",
 )
 
+RESULT_VOCABULARY = frozenset(
+    {
+        "qualifying",
+        "supporting",
+        "blocked",
+        "deselected-safe-default",
+    }
+)
+ACCEPTED_INPUT_REQUIREMENTS = MappingProxyType(
+    {
+        "endpoint": (
+            "OWNER_RH_ARCHIVE_*:envelope-named-read-only-archive-endpoint"
+        ),
+        "envelope": (
+            "RIPE_RH_FORK_MANIFEST:complete-accepted-h09-envelope"
+        ),
+        "identity_manifest": (
+            "RIPE_RH_FORK_IDENTITY_MANIFEST:"
+            "complete-accepted-owner-identities"
+        ),
+        "sequencer_feed": (
+            "sequencer_uptime_feed:accepted-owner-authority"
+        ),
+    }
+)
+RECEIPT_KEYS = frozenset(
+    {
+        "endpoint_alias",
+        "envelope_sha256",
+        "error_codes",
+        "identity_manifest_sha256",
+        "invalid_inputs",
+        "missing_inputs",
+        "status",
+    }
+)
+CLASSIFICATION_SCHEMA = "h09-node-classification-v1"
+CLASSIFICATION_OUT_OPTION = "--rh-classification-out"
+SAFE_DEFAULT_DESELECTION_REASON = (
+    "H-09 safe default: archive qualification node deselected; set "
+    f"{MODE_ENV}={READ_ONLY_OPT_IN} only with complete accepted owner inputs"
+)
+NODE_CLASSIFICATION_STASH = pytest.StashKey[dict[str, str]]()
+DESELECTED_NODE_IDS_STASH = pytest.StashKey[tuple[str, ...]]()
 READ_ONLY_RPC_METHODS = frozenset(
     {
         "eth_call",
@@ -274,6 +335,28 @@ class RuntimeDestructionProof:
     storage_disposed: bool
 
 
+class SyntheticRuntimeProcess:
+    """Offline process double for runtime lifecycle contracts."""
+
+    next_pid = 20_000
+
+    def __init__(self) -> None:
+        type(self).next_pid += 1
+        self.pid = type(self).next_pid
+        self.returncode: int | None = None
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.returncode = 0
+
+    def wait(self, timeout: float | None = None) -> int:
+        if timeout != 10 or self.returncode != 0:
+            _fail("H09_SYNTHETIC_RUNTIME_WAIT")
+        return self.returncode
+
+
 class DisposableForkRuntime:
     def __init__(
         self,
@@ -305,7 +388,8 @@ class DisposableForkRuntime:
                 }
             )
         ).hexdigest()
-        self.runtime_dir = self.external_root / f"runtime-{self.runtime_id[:20]}"
+        directory_name = f"runtime-{self.runtime_id[:20]}"
+        self.runtime_dir = self.external_root / directory_name
         self._process: RuntimeProcess | None = None
 
     def create(self) -> RuntimeProcess:
@@ -514,7 +598,9 @@ def parse_input_envelope(
         frozenset({"commit", "tree", "suite_path_ceiling"}),
         "H09_REPOSITORY_KEYS",
     )
-    commit = _require_string(repository_value["commit"], "H09_REPOSITORY_COMMIT")
+    commit = _require_string(
+        repository_value["commit"], "H09_REPOSITORY_COMMIT"
+    )
     tree = _require_string(repository_value["tree"], "H09_REPOSITORY_TREE")
     if not _HEX40.fullmatch(commit):
         _fail("H09_REPOSITORY_COMMIT")
@@ -840,6 +926,21 @@ def bind_identity_manifest(
         _fail("H09_IDENTITY_MANIFEST_CHAIN_MISMATCH")
 
 
+def require_owner_identity_kind(
+    manifest: CanonicalIdentityManifest, kind: str
+) -> CanonicalIdentity:
+    """Return the sole accepted owner identity of ``kind`` or fail closed."""
+    wanted = _require_string(kind, "H09_IDENTITY_KIND_REQUIRED")
+    matches = tuple(
+        item for item in manifest.identities if item.kind == wanted
+    )
+    if not matches:
+        _fail("H09_SEQUENCER_AUTHORITY_MISSING")
+    if len(matches) != 1:
+        _fail("H09_SEQUENCER_AUTHORITY_AMBIGUOUS")
+    return matches[0]
+
+
 def qualification_mode(environment: Mapping[str, str]) -> str:
     value = environment.get(MODE_ENV)
     if value in (None, "", DISABLED_MODE):
@@ -941,6 +1042,7 @@ def preflight_from_environment(
         )
     )
     bind_identity_manifest(envelope, identity_manifest)
+    require_owner_identity_kind(identity_manifest, "sequencer-uptime-feed")
     validate_repository_authority(
         envelope.repository,
         observed_commit=observed_commit,
@@ -1077,6 +1179,370 @@ def validate_local_fork_action(
         _fail("H09_LOCAL_ACTION_SCOPE")
 
 
+def consume_owner_output(
+    owner_output: Mapping[str, Any],
+    observed_output: Mapping[str, Any],
+    *,
+    required_fields: Sequence[str],
+    code: str,
+) -> Mapping[str, Any]:
+    """Compare caller-selected owner output without supplying defaults."""
+    fields = tuple(required_fields)
+    if not fields or fields != tuple(sorted(set(fields))):
+        _fail(f"{code}_REQUIREMENTS")
+    expected = frozenset(fields)
+    if frozenset(owner_output) != expected:
+        _fail(f"{code}_OWNER_FIELDS")
+    if frozenset(observed_output) != expected:
+        _fail(f"{code}_OBSERVED_FIELDS")
+    if any(owner_output[name] is None for name in fields):
+        _fail(f"{code}_OWNER_VALUE_MISSING")
+    if any(
+        not _strictly_equal(owner_output[name], observed_output[name])
+        for name in fields
+    ):
+        _fail(f"{code}_MISMATCH")
+    return {name: observed_output[name] for name in fields}
+
+
+def _strictly_equal(expected: Any, observed: Any) -> bool:
+    """Compare recursively without Python's bool/int or int/float coercions."""
+    if type(expected) is not type(observed):
+        return False
+    if isinstance(expected, dict):
+        return (
+            tuple(expected) == tuple(observed)
+            and all(
+                _strictly_equal(expected[key], observed[key])
+                for key in expected
+            )
+        )
+    if isinstance(expected, (list, tuple)):
+        return len(expected) == len(observed) and all(
+            _strictly_equal(left, right)
+            for left, right in zip(expected, observed, strict=True)
+        )
+    return expected == observed
+
+
+def require_owner_bindings(
+    envelope: QualificationEnvelope, names: Sequence[str]
+) -> Mapping[str, Mapping[str, str]]:
+    requested = tuple(names)
+    if not requested or requested != tuple(sorted(set(requested))):
+        _fail("H09_OWNER_BINDING_REQUIREMENTS")
+    missing = [
+        name for name in requested if name not in envelope.owner.bindings
+    ]
+    if missing:
+        _fail("H09_OWNER_BINDING_MISSING")
+    return {name: envelope.owner.bindings[name] for name in requested}
+
+
+def constant_product_amount_out(
+    amount_in: int,
+    reserve_in: int,
+    reserve_out: int,
+    *,
+    fee_numerator: int,
+    fee_denominator: int,
+) -> int:
+    values = (
+        amount_in,
+        reserve_in,
+        reserve_out,
+        fee_numerator,
+        fee_denominator,
+    )
+    if any(
+        not isinstance(value, int) or isinstance(value, bool) or value <= 0
+        for value in values
+    ):
+        _fail("H09_SWAP_INPUT")
+    if fee_numerator >= fee_denominator:
+        _fail("H09_SWAP_FEE")
+    net = amount_in * (fee_denominator - fee_numerator)
+    return net * reserve_out // (reserve_in * fee_denominator + net)
+
+
+def conservative_fee(amount: int, fee_bps: int) -> int:
+    if (
+        not isinstance(amount, int)
+        or isinstance(amount, bool)
+        or amount <= 0
+        or not isinstance(fee_bps, int)
+        or isinstance(fee_bps, bool)
+        or fee_bps < 0
+        or fee_bps > 10_000
+    ):
+        _fail("H09_FEE_INPUT")
+    return (amount * fee_bps + 9_999) // 10_000
+
+
+def validate_token_return(value: Any, *, empty_allowed: bool) -> None:
+    if value is True:
+        return
+    if empty_allowed and value == b"":
+        return
+    _fail("H09_TOKEN_RETURN")
+
+
+def validate_chainlink_observation(
+    *,
+    answer: int,
+    decimals: int,
+    round_id: int,
+    updated_at: int,
+    observed_at: int,
+    stale_after: int,
+) -> None:
+    positive = (answer, round_id, updated_at, observed_at, stale_after)
+    if any(
+        not isinstance(value, int) or isinstance(value, bool) or value <= 0
+        for value in positive
+    ):
+        _fail("H09_CHAINLINK_VALUE")
+    if (
+        not isinstance(decimals, int)
+        or isinstance(decimals, bool)
+        or decimals < 0
+        or decimals > 36
+    ):
+        _fail("H09_CHAINLINK_DECIMALS")
+    if observed_at < updated_at:
+        _fail("H09_CHAINLINK_FUTURE_UPDATE")
+    if observed_at - updated_at > stale_after:
+        _fail("H09_CHAINLINK_STALE")
+
+
+def ordered_token_pair(first: str, second: str) -> tuple[str, str]:
+    left = _validate_address(first, "H09_PAIR_TOKEN")
+    right = _validate_address(second, "H09_PAIR_TOKEN")
+    if left.lower() == right.lower():
+        _fail("H09_PAIR_DUPLICATE")
+    return tuple(sorted((left, right), key=lambda value: int(value, 16)))
+
+
+def observe_repository_authority(
+    repository_root: Path = REPOSITORY_ROOT,
+) -> Mapping[str, Any]:
+    git_path = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
+    executable = shutil.which("git", path=git_path)
+    if executable is None:
+        _fail("H09_REPOSITORY_GIT_NOT_FOUND")
+    environment = {
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "PATH": git_path,
+    }
+    for name in ("DEVELOPER_DIR", "HOME", "TMPDIR"):
+        if os.environ.get(name):
+            environment[name] = os.environ[name]
+
+    def git(*arguments: str) -> bytes:
+        try:
+            return subprocess.run(
+                (executable, "-C", str(repository_root), *arguments),
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=environment,
+            ).stdout
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise ForkFrameworkError(
+                "H09_REPOSITORY_OBSERVATION_FAILED"
+            ) from error
+
+    try:
+        identities = git("rev-parse", "HEAD", "HEAD^{tree}")
+        identity_lines = identities.decode("ascii").splitlines()
+    except UnicodeDecodeError as error:
+        raise ForkFrameworkError("H09_REPOSITORY_IDENTITY_OUTPUT") from error
+    if (
+        len(identity_lines) != 2
+        or not all(_HEX40.fullmatch(value) for value in identity_lines)
+    ):
+        _fail("H09_REPOSITORY_IDENTITY_OUTPUT")
+    commit, tree = identity_lines
+
+    def paths(*arguments: str) -> tuple[str, ...]:
+        try:
+            decoded = tuple(
+                value.decode("utf-8")
+                for value in git(*arguments).split(b"\0")
+                if value
+            )
+        except UnicodeDecodeError as error:
+            raise ForkFrameworkError("H09_REPOSITORY_PATH_OUTPUT") from error
+        return tuple(sorted(set(decoded)))
+
+    staged = paths("diff", "--cached", "--name-only", "-z")
+    unstaged = paths("diff", "--name-only", "-z")
+    untracked = paths("ls-files", "--others", "--exclude-standard", "-z")
+    ignored = paths(
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "-z",
+    )
+    return {
+        "changed_paths": tuple(sorted(set(unstaged) | set(untracked))),
+        "commit": commit,
+        "ignored_paths": ignored,
+        "staged_paths": staged,
+        "tree": tree,
+    }
+
+
+def _receipt(
+    *,
+    status: str,
+    error_codes: Sequence[str] = (),
+    missing_inputs: Sequence[str] = (),
+    invalid_inputs: Sequence[str] = (),
+    endpoint_alias: str | None = None,
+    envelope_sha256: str | None = None,
+    identity_manifest_sha256: str | None = None,
+) -> Mapping[str, Any]:
+    receipt = {
+        "endpoint_alias": endpoint_alias,
+        "envelope_sha256": envelope_sha256,
+        "error_codes": list(error_codes),
+        "identity_manifest_sha256": identity_manifest_sha256,
+        "invalid_inputs": sorted(invalid_inputs),
+        "missing_inputs": sorted(missing_inputs),
+        "status": status,
+    }
+    if frozenset(receipt) != RECEIPT_KEYS:
+        _fail("H09_RECEIPT_KEYS")
+    return receipt
+
+
+def qualification_preflight_receipt(
+    environment: Mapping[str, str],
+    *,
+    repository_observation: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any]:
+    missing: list[str] = []
+    errors: list[str] = []
+    if environment.get(MODE_ENV) != READ_ONLY_OPT_IN:
+        errors.append("H09_OPT_IN_REQUIRED")
+    if not environment.get(MANIFEST_ENV):
+        missing.append(ACCEPTED_INPUT_REQUIREMENTS["envelope"])
+    if not environment.get(IDENTITY_MANIFEST_ENV):
+        missing.append(ACCEPTED_INPUT_REQUIREMENTS["identity_manifest"])
+    aliases = sorted(
+        name
+        for name, value in environment.items()
+        if name.startswith("OWNER_RH_ARCHIVE_") and value
+    )
+    if len(aliases) != 1:
+        missing.append(ACCEPTED_INPUT_REQUIREMENTS["endpoint"])
+    if missing or errors:
+        if missing:
+            errors.append("H09_ACCEPTED_INPUTS_MISSING")
+        return _receipt(
+            status="blocked",
+            error_codes=errors,
+            missing_inputs=missing,
+        )
+    try:
+        observation = (
+            observe_repository_authority()
+            if repository_observation is None
+            else repository_observation
+        )
+        result = preflight_from_environment(
+            environment,
+            observed_commit=observation["commit"],
+            observed_tree=observation["tree"],
+            changed_paths=observation["changed_paths"],
+            staged_paths=observation["staged_paths"],
+            ignored_paths=observation["ignored_paths"],
+        )
+    except ForkFrameworkError as error:
+        if error.code in {
+            "H09_SEQUENCER_AUTHORITY_MISSING",
+            "H09_SEQUENCER_AUTHORITY_AMBIGUOUS",
+        }:
+            return _receipt(
+                status="blocked",
+                error_codes=(error.code,),
+                missing_inputs=(
+                    ACCEPTED_INPUT_REQUIREMENTS["sequencer_feed"],
+                ),
+            )
+        return _receipt(
+            status="blocked",
+            error_codes=(error.code,),
+            invalid_inputs=(f"preflight:{error.code}",),
+        )
+    return _receipt(
+        status="qualifying",
+        endpoint_alias=result.endpoint.alias,
+        envelope_sha256=result.envelope.sha256,
+        identity_manifest_sha256=result.identity_manifest.sha256,
+    )
+
+
+def classify_collected_node(
+    *,
+    mode: str,
+    archive_required: bool,
+    explicit: str | None = None,
+) -> str:
+    if archive_required and explicit is not None:
+        _fail("H09_NODE_CLASSIFICATION_CONTRADICTION")
+    if explicit is not None:
+        if explicit not in RESULT_VOCABULARY:
+            _fail("H09_NODE_CLASSIFICATION")
+        return explicit
+    if archive_required:
+        return (
+            "qualifying"
+            if mode == READ_ONLY_OPT_IN
+            else "deselected-safe-default"
+        )
+    return "supporting"
+
+
+def node_classification_bytes(
+    mapping: Mapping[str, str],
+    *,
+    deselected_node_ids: Sequence[str] = (),
+    mode: str = DISABLED_MODE,
+) -> bytes:
+    if not mapping or tuple(mapping) != tuple(sorted(mapping)):
+        _fail("H09_NODE_CLASSIFICATION_ORDER")
+    if any(value not in RESULT_VOCABULARY for value in mapping.values()):
+        _fail("H09_NODE_CLASSIFICATION")
+    deselected = tuple(deselected_node_ids)
+    if deselected != tuple(sorted(set(deselected))):
+        _fail("H09_NODE_DESELECTION_ORDER")
+    if any(
+        mapping.get(node_id) != "deselected-safe-default"
+        for node_id in deselected
+    ):
+        _fail("H09_NODE_DESELECTION_CLASSIFICATION")
+    if mode not in {DISABLED_MODE, READ_ONLY_OPT_IN}:
+        _fail("H09_MODE_INVALID")
+    node_ids = tuple(mapping)
+    return canonical_json_bytes(
+        {
+            "artifact_kind": "h09_node_classification",
+            "deselected_node_ids": list(deselected),
+            "mapping": dict(mapping),
+            "mode": mode,
+            "node_count": len(mapping),
+            "ordered_node_sha256": ordered_node_digest(node_ids),
+            "result_vocabulary": sorted(RESULT_VOCABULARY),
+            "schema_version": CLASSIFICATION_SCHEMA,
+        }
+    )
+
+
 def _assert_secret_free(value: Any, *, path: tuple[str, ...] = ()) -> None:
     if isinstance(value, dict):
         for key, item in value.items():
@@ -1143,11 +1609,28 @@ def replay_identity(
     ).hexdigest()
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        CLASSIFICATION_OUT_OPTION,
+        action="store",
+        default=None,
+        metavar="ABSOLUTE_PATH",
+        help=(
+            "write the canonical H-09 node classification artifact outside "
+            "the repository"
+        ),
+    )
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "rh_archive_fork: requires explicit read-only Robinhood archive-fork "
         "opt-in and a complete owner input envelope",
+    )
+    config.addinivalue_line(
+        "markers",
+        "rh_classification(value): explicit H-09 node classification",
     )
 
 
@@ -1155,14 +1638,76 @@ def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     mode = qualification_mode(os.environ)
-    if mode == READ_ONLY_OPT_IN:
-        return
-    skip = pytest.mark.skip(
-        reason="H-09 archive-fork execution requires explicit read-only opt-in"
-    )
+    mapping: dict[str, str] = {}
+    deselected: list[pytest.Item] = []
     for item in items:
-        if item.get_closest_marker("rh_archive_fork") is not None:
-            item.add_marker(skip)
+        if not item.nodeid.startswith("tests/deployment/fork/"):
+            continue
+        archive_required = (
+            item.get_closest_marker("rh_archive_fork") is not None
+        )
+        marker = item.get_closest_marker("rh_classification")
+        if marker is not None and (
+            len(marker.args) != 1 or marker.kwargs
+        ):
+            raise pytest.UsageError(
+                "H09_NODE_CLASSIFICATION_MARKER_ARGUMENTS"
+            )
+        explicit = None if marker is None else marker.args[0]
+        mapping[item.nodeid] = classify_collected_node(
+            mode=mode,
+            archive_required=archive_required,
+            explicit=explicit,
+        )
+        if archive_required and mode != READ_ONLY_OPT_IN:
+            deselected.append(item)
+    canonical_mapping = dict(sorted(mapping.items()))
+    deselected_node_ids = tuple(sorted(item.nodeid for item in deselected))
+    config.stash[NODE_CLASSIFICATION_STASH] = canonical_mapping
+    config.stash[DESELECTED_NODE_IDS_STASH] = deselected_node_ids
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = [item for item in items if item not in deselected]
+
+
+def pytest_report_collectionfinish(
+    config: pytest.Config,
+    start_path: Path,
+    items: Sequence[pytest.Item],
+) -> str | None:
+    deselected = config.stash.get(DESELECTED_NODE_IDS_STASH, ())
+    if not deselected:
+        return None
+    return (
+        f"{SAFE_DEFAULT_DESELECTION_REASON}; "
+        f"deselected={','.join(deselected)}"
+    )
+
+
+def pytest_sessionfinish(
+    session: pytest.Session, exitstatus: int
+) -> None:
+    destination_value = session.config.getoption(CLASSIFICATION_OUT_OPTION)
+    if destination_value is None:
+        return
+    destination = Path(destination_value)
+    if not destination.is_absolute() or destination.exists():
+        _fail("H09_CLASSIFICATION_DESTINATION")
+    validate_external_root(destination.parent)
+    mapping = session.config.stash.get(NODE_CLASSIFICATION_STASH, {})
+    deselected = session.config.stash.get(DESELECTED_NODE_IDS_STASH, ())
+    data = node_classification_bytes(
+        mapping,
+        deselected_node_ids=deselected,
+        mode=qualification_mode(os.environ),
+    )
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(data)
+        os.replace(temporary, destination)
+    except OSError as error:
+        raise ForkFrameworkError("H09_CLASSIFICATION_WRITE") from error
 
 
 @pytest.fixture(scope="session")
@@ -1267,6 +1812,122 @@ def envelope_value(
 
 
 @pytest.fixture
+def accepted_preflight_inputs(
+    envelope_value: dict[str, Any],
+    digest: str,
+    tmp_path: Path,
+) -> SimpleNamespace:
+    """Build synthetic bytes that exercise accepted owner schemas."""
+    identity_value = {
+        "artifact_kind": "rh_canonical_identity_manifest",
+        "chain_id": 46630,
+        "identities": [
+            {
+                "address": "0x1111111111111111111111111111111111111111",
+                "authority": "owner-supplied",
+                "identity_id": "synthetic-sequencer-feed",
+                "implementation_address": None,
+                "kind": "sequencer-uptime-feed",
+                "provenance_sha256": digest,
+                "proxy_address": None,
+                "runtime_code_sha256": digest,
+            },
+            {
+                "address": "0x2222222222222222222222222222222222222222",
+                "authority": "owner-supplied",
+                "identity_id": "synthetic-token-fixture",
+                "implementation_address": None,
+                "kind": "token",
+                "provenance_sha256": digest,
+                "proxy_address": None,
+                "runtime_code_sha256": digest,
+            },
+        ],
+        "owner_approval_sha256": digest,
+        "profile": "robinhood-testnet",
+        "schema_version": IDENTITY_SCHEMA,
+    }
+    identity_bytes = canonical_json_bytes(identity_value)
+    identity_path = tmp_path / "synthetic-owner-identities.json"
+    identity_path.write_bytes(identity_bytes)
+    endpoint = "https://synthetic-archive.invalid/private"
+    envelope_value["owner_inputs"]["identity_manifest_sha256"] = (
+        hashlib.sha256(identity_bytes).hexdigest()
+    )
+    envelope_value["owner_inputs"]["endpoint"]["fingerprint_sha256"] = (
+        endpoint_fingerprint(endpoint)
+    )
+    envelope_path = tmp_path / "synthetic-owner-envelope.json"
+    envelope_path.write_bytes(canonical_json_bytes(envelope_value))
+    environment = {
+        IDENTITY_MANIFEST_ENV: str(identity_path),
+        MANIFEST_ENV: str(envelope_path),
+        MODE_ENV: READ_ONLY_OPT_IN,
+        "OWNER_RH_ARCHIVE_TEST": endpoint,
+    }
+    observation = {
+        "changed_paths": (),
+        "commit": envelope_value["repository_authority"]["commit"],
+        "ignored_paths": (),
+        "staged_paths": (),
+        "tree": envelope_value["repository_authority"]["tree"],
+    }
+    return SimpleNamespace(
+        environment=environment,
+        envelope_value=envelope_value,
+        identity_value=identity_value,
+        observation=observation,
+    )
+
+
+@pytest.fixture
+def accepted_preflight(
+    accepted_preflight_inputs: SimpleNamespace,
+) -> PreflightResult:
+    observation = accepted_preflight_inputs.observation
+    return preflight_from_environment(
+        accepted_preflight_inputs.environment,
+        observed_commit=observation["commit"],
+        observed_tree=observation["tree"],
+        changed_paths=observation["changed_paths"],
+        staged_paths=observation["staged_paths"],
+        ignored_paths=observation["ignored_paths"],
+        now=datetime(2029, 1, 1, tzinfo=timezone.utc),
+    )
+
+
+@pytest.fixture
+def synthetic_disposable_runtime(
+    fork_framework: SimpleNamespace,
+    accepted_preflight: PreflightResult,
+    tmp_path: Path,
+) -> DisposableForkRuntime:
+    os.chmod(tmp_path, 0o700)
+    envelope = accepted_preflight.envelope
+    manifest = accepted_preflight.identity_manifest
+    nodes = ordered_node_digest(("synthetic-offline-runtime-case",))
+    replay = replay_identity(
+        envelope_sha256=envelope.sha256,
+        identity_manifest_sha256=manifest.sha256,
+        ordered_node_sha256=nodes,
+    )
+    spec = ForkRuntimeSpec(
+        replay_identity=replay,
+        engine_name=envelope.owner.fork_engine["name"],
+        engine_version=envelope.owner.fork_engine["version"],
+        chain_id=envelope.owner.expected_chain_id,
+        block_number=envelope.owner.pin.number,
+        block_hash=envelope.owner.pin.block_hash,
+    )
+    return DisposableForkRuntime(
+        external_root=tmp_path,
+        repository_root=fork_framework.REPOSITORY_ROOT,
+        spec=spec,
+        process_factory=lambda spec, path: SyntheticRuntimeProcess(),
+    )
+
+
+@pytest.fixture
 def parse_envelope(
     fork_framework: SimpleNamespace, envelope_value: dict[str, Any]
 ) -> Callable[..., QualificationEnvelope]:
@@ -1282,8 +1943,13 @@ def parse_envelope(
 
 
 @pytest.fixture(autouse=True)
-def safe_default_network_block(monkeypatch: pytest.MonkeyPatch) -> None:
-    if qualification_mode(os.environ) == READ_ONLY_OPT_IN:
+def safe_default_network_block(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    archive_node = (
+        request.node.get_closest_marker("rh_archive_fork") is not None
+    )
+    if archive_node and qualification_mode(os.environ) == READ_ONLY_OPT_IN:
         return
 
     def blocked(*args: Any, **kwargs: Any) -> None:
