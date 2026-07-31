@@ -41,6 +41,22 @@ LIQUIDATION_AFTER_TOTAL_LOSS_CASES = (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_boa_storage_diagnostics():
+    """Avoid Boa repr crashes from stale address/type trace metadata."""
+
+    # These are diagnostic dictionaries, not EVM state. Keep the workaround
+    # local because the proper shared fixture in tests/conftest.py is outside
+    # this candidate's explicit authorization.
+    assert isinstance(boa.env.sstore_trace, dict)
+    assert isinstance(boa.env.sha3_trace, dict)
+    boa.env.sstore_trace.clear()
+    boa.env.sha3_trace.clear()
+    yield
+    boa.env.sstore_trace.clear()
+    boa.env.sha3_trace.clear()
+
+
 @pytest.fixture
 def stock_token(deploy3r):
     return boa.load(

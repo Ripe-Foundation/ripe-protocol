@@ -1,8 +1,43 @@
-import pytest
+import hashlib
+from pathlib import Path
+
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
 from conf_utils import filter_logs
+
+
+AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
+    "6fe58c7c34b0320905033b9e17ee4933a4b0a745d091d0f6a329ae5842eb7d7e"
+)
+# AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
+# Its reserved address stays outside Boa's generated-address sequence, whose
+# reuse can retain stale diagnostic type metadata across automatic anchors.
+AH_BATCH_USER_CACHE_MUTANT_ADDRESS = (
+    "0x00000000000000000000000000000000C0DE0004"
+)
+
+
+def _ah_batch_user_cache_mutant_source():
+    source = Path("contracts/core/AuctionHouse.vy").read_text()
+    replacements = (
+        (
+            "    if self.didHandleVaultId[_liqUser][_vaultId]:\n",
+            "    if self.didHandleVaultId[empty(address)][_vaultId]:\n",
+        ),
+        (
+            "    self.didHandleVaultId[_liqUser][_vaultId] = True\n",
+            "    self.didHandleVaultId[empty(address)][_vaultId] = True\n",
+        ),
+    )
+    for original, mutant in replacements:
+        assert source.count(original) == 1
+        source = source.replace(original, mutant, 1)
+    assert hashlib.sha256(source.encode()).hexdigest() == (
+        AH_BATCH_USER_CACHE_MUTANT_SHA256
+    )
+    return source
 
 
 @pytest.fixture(scope="module")
@@ -2086,6 +2121,95 @@ def test_ah_liquidate_many_users_batch_liquidation(
     assert alice_debt_after.inLiquidation
     assert sally_debt_after.amount == 0  # Sally still has no debt
     assert not sally_debt_after.inLiquidation
+
+
+def test_ah_batch_user_cache_isolation_mutant_skips_second_user(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    ledger,
+    ripe_hq,
+    ripe_hq_deploy,
+    governance,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _ltv=70_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    for user in (bob, alice):
+        performDeposit(
+            user,
+            100 * EIGHTEEN_DECIMALS,
+            alpha_token,
+            alpha_token_whale,
+        )
+        teller.borrow(
+            60 * EIGHTEEN_DECIMALS,
+            user,
+            False,
+            sender=user,
+        )
+    mock_price_source.setPrice(
+        alpha_token,
+        70 * EIGHTEEN_DECIMALS // 100,
+    )
+    vault_id = 3
+    assert credit_engine.canLiquidateUser(bob)
+    assert credit_engine.canLiquidateUser(alice)
+
+    with boa.env.anchor():
+        teller.liquidateManyUsers([bob, alice], False, sender=sally)
+        assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+        assert ledger.hasFungibleAuction(alice, vault_id, alpha_token)
+
+    mutant = boa.loads(
+        _ah_batch_user_cache_mutant_source(),
+        ripe_hq_deploy,
+        name="ah_batch_shared_user_cache_mutant",
+        override_address=AH_BATCH_USER_CACHE_MUTANT_ADDRESS,
+    )
+    assert ripe_hq.startAddressUpdateToRegistry(
+        9,
+        mutant,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        9,
+        sender=governance.address,
+    )
+
+    teller.liquidateManyUsers([bob, alice], False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert not ledger.hasFungibleAuction(alice, vault_id, alpha_token)
+    assert [log.user for log in filter_logs(teller, "LiquidateUser")] == [
+        bob,
+        alice,
+    ]
+    assert len(filter_logs(teller, "FungibleAuctionUpdated")) == 1
 
 
 def test_ah_calc_amount_of_debt_to_repay_during_liq(

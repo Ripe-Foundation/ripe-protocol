@@ -841,3 +841,229 @@ def test_guarded_batch_later_deficit_rolls_back_every_earlier_row(
         alice,
         vault_id,
     ) == before
+
+
+def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createAuctionParams,
+    createDebtTerms,
+    performDeposit,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    sally,
+    teller,
+    auction_house,
+    credit_engine,
+    mock_price_source,
+    ledger,
+    mission_control,
+    stability_pool,
+    endaoment_funds,
+    endaoment_psm,
+    guarded_erc20_vault,
+    simple_erc20_vault,
+    vault_book,
+    governance,
+    switchboard_alpha,
+):
+    stock_token = boa.load(
+        "contracts/mock/MockStockTokenControls.vy",
+        deploy3r,
+        18,
+        name="auction_only_stock_token",
+    )
+    guarded_id = _register_guarded_vault(
+        vault_book,
+        governance,
+        guarded_erc20_vault,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    amount = 100 * EIGHTEEN_DECIMALS
+
+    # Reachability control: the same Stock model must actually arrive in the
+    # Stability pool when that route is enabled and its backing is healthy.
+    with boa.env.anchor():
+        setGeneralConfig()
+        setGeneralDebtConfig(_ltvPaybackBuffer=0)
+        control_terms = createDebtTerms(
+            _ltv=50_00,
+            _redemptionThreshold=60_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        )
+        setAssetConfig(
+            stock_token,
+            _vaultIds=[guarded_id],
+            _debtTerms=control_terms,
+            _shouldBurnAsPayment=False,
+            _shouldTransferToEndaoment=False,
+            _shouldSwapInStabPools=True,
+            _shouldAuctionInstantly=False,
+        )
+        stab_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+        setAssetConfig(
+            green_token,
+            _vaultIds=[stab_id],
+            _debtTerms=stab_terms,
+            _shouldBurnAsPayment=True,
+        )
+        mission_control.setPriorityStabVaults(
+            [(stab_id, green_token)],
+            sender=switchboard_alpha.address,
+        )
+        mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+        mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+        green_token.transfer(sally, amount, sender=whale)
+        green_token.approve(teller, amount, sender=sally)
+        teller.deposit(
+            green_token,
+            amount,
+            sally,
+            stability_pool,
+            0,
+            sender=sally,
+        )
+        stock_token.mint(bob, amount, sender=deploy3r)
+        stock_token.approve(teller, amount, sender=bob)
+        assert teller.deposit(
+            stock_token,
+            amount,
+            bob,
+            guarded_erc20_vault,
+            sender=bob,
+        ) == amount
+        teller.borrow(40 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+        mock_price_source.setPrice(
+            stock_token,
+            40 * EIGHTEEN_DECIMALS // 100,
+        )
+        assert credit_engine.canLiquidateUser(bob)
+        assert not auction_house.canStartAuction(
+            bob,
+            guarded_id,
+            stock_token,
+        )
+
+        teller.liquidateUser(bob, False, sender=sally)
+
+        control_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
+        assert len(control_logs) == 1
+        assert control_logs[0].liqAsset == stock_token.address
+        assert control_logs[0].collateralAmountOut > 0
+        assert stock_token.balanceOf(stability_pool) == (
+            control_logs[0].collateralAmountOut
+        )
+        assert not ledger.hasFungibleAuction(
+            bob,
+            guarded_id,
+            stock_token,
+        )
+
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _genAuctionParams=createAuctionParams(
+            _startDiscount=0,
+            _maxDiscount=0,
+        ),
+    )
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        stock_token,
+        _vaultIds=[guarded_id],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[simple_id],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    for token in (stock_token, bravo_token, green_token):
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+
+    stock_token.mint(bob, amount, sender=deploy3r)
+    stock_token.approve(teller, amount, sender=bob)
+    assert teller.deposit(
+        stock_token,
+        amount,
+        bob,
+        guarded_erc20_vault,
+        sender=bob,
+    ) == amount
+    performDeposit(
+        bob,
+        amount,
+        bravo_token,
+        bravo_token_whale,
+        simple_erc20_vault,
+    )
+    teller.borrow(80 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    stock_token.adminBurn(
+        guarded_erc20_vault,
+        1,
+        sender=deploy3r,
+    )
+
+    liq_config = mission_control.getAssetLiqConfig(stock_token)
+    assert not liq_config.shouldSwapInStabPools
+    assert not liq_config.shouldTransferToEndaoment
+    assert liq_config.shouldAuctionInstantly
+    assert credit_engine.canLiquidateUser(bob)
+    assert not auction_house.canStartAuction(
+        bob,
+        guarded_id,
+        stock_token,
+    )
+    assert not auction_house.canStartAuction(
+        bob,
+        simple_id,
+        bravo_token,
+    )
+
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert ledger.hasFungibleAuction(bob, guarded_id, stock_token)
+    assert ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    assert auction_house.canStartAuction(
+        bob,
+        guarded_id,
+        stock_token,
+    )
+    assert auction_house.canStartAuction(
+        bob,
+        simple_id,
+        bravo_token,
+    )
+    assert not auction_house.canStartAuction(
+        bob,
+        999_999,
+        stock_token,
+    )
+    assert stock_token.balanceOf(guarded_erc20_vault) == amount - 1
+    assert bravo_token.balanceOf(simple_erc20_vault) == amount
+    assert stock_token.balanceOf(stability_pool) == 0
+    assert stock_token.balanceOf(endaoment_funds) == 0
+    assert stock_token.balanceOf(endaoment_psm) == 0
+    assert filter_logs(teller, "CollateralSwappedWithStabPool") == []

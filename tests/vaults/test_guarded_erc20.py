@@ -463,7 +463,28 @@ G1_MUTATIONS = {
         ),
         "description": "replace the shared backing-aware view predicate with true",
     },
+    "withdrawal_request_bound": {
+        "needle": (
+            "    withdrawalAmount, isDepleted = "
+            "vaultData._reduceBalanceOnWithdrawal("
+            "_user, _asset, _amount, True)\n"
+        ),
+        "replacement": (
+            "    withdrawalAmount, isDepleted = "
+            "vaultData._reduceBalanceOnWithdrawal("
+            "_user, _asset, max_value(uint256), True)\n"
+        ),
+        "sha256": (
+            "14443395477bb0ef97819dc4b5cebb595"
+            "dd76b27df729822db03327e029857a5"
+        ),
+        "description": "bypass the caller-request bound before withdrawal",
+    },
 }
+# Reserved addresses avoid perturbing Boa's generated-address sequence and the
+# stale diagnostic type metadata that can survive its automatic test anchors.
+G1_BOUND_MUTANT_ADDRESS = "0x00000000000000000000000000000000C0DE0002"
+G1_CROSS_VAULT_PEER_ADDRESS = "0x00000000000000000000000000000000C0DE0003"
 
 
 def _g1_mutant_source(mutation_name):
@@ -480,12 +501,14 @@ def _g1_mutant_source(mutation_name):
     return source
 
 
-def _g1_mutant(mutation_name, ripe_hq_deploy):
+def _g1_mutant(mutation_name, ripe_hq_deploy, override_address=None):
+    if override_address is None:
+        override_address = boa.env.generate_address()
     return boa.loads(
         _g1_mutant_source(mutation_name),
         ripe_hq_deploy,
         name=f"guarded_g1_{mutation_name}",
-        override_address=boa.env.generate_address(),
+        override_address=override_address,
     )
 
 
@@ -931,6 +954,163 @@ def test_over_request_is_bounded_by_nominal_and_never_spends_surplus(
     assert guarded_token.balanceOf(alice) == nominal
     assert guarded_token.balanceOf(guarded_erc20_vault) == surplus
     assert guarded_erc20_vault.totalBalances(guarded_token) == 0
+
+
+def test_g1_withdrawal_request_bound_mutant_drains_full_position(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    ripe_hq_deploy,
+    bob,
+    alice,
+):
+    with boa.env.anchor():
+        _credit(
+            guarded_erc20_vault,
+            guarded_token,
+            bob,
+            100,
+            teller,
+            deploy3r,
+        )
+        assert guarded_erc20_vault.withdrawTokensFromVault(
+            bob,
+            guarded_token,
+            40,
+            alice,
+            sender=teller.address,
+        ) == (40, False)
+        assert guarded_erc20_vault.userBalances(bob, guarded_token) == 60
+
+    with boa.env.anchor():
+        mutant = _g1_mutant(
+            "withdrawal_request_bound",
+            ripe_hq_deploy,
+            G1_BOUND_MUTANT_ADDRESS,
+        )
+        _credit(mutant, guarded_token, bob, 100, teller, deploy3r)
+        assert mutant.withdrawTokensFromVault(
+            bob,
+            guarded_token,
+            40,
+            alice,
+            sender=teller.address,
+        ) == (100, True)
+        assert mutant.userBalances(bob, guarded_token) == 0
+        assert guarded_token.balanceOf(alice) == 100
+
+
+def test_guarded_deficit_is_isolated_from_second_vault(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    ripe_hq_deploy,
+    bob,
+    alice,
+):
+    second_vault = boa.load(
+        "contracts/vaults/GuardedErc20.vy",
+        ripe_hq_deploy,
+        name="guarded_cross_vault_peer",
+        override_address=G1_CROSS_VAULT_PEER_ADDRESS,
+    )
+    _credit(
+        guarded_erc20_vault,
+        guarded_token,
+        bob,
+        100,
+        teller,
+        deploy3r,
+    )
+    _credit(second_vault, guarded_token, bob, 100, teller, deploy3r)
+    guarded_token.adminBurn(
+        guarded_erc20_vault,
+        1,
+        sender=deploy3r,
+    )
+
+    with boa.reverts("insufficient vault backing"):
+        guarded_erc20_vault.withdrawTokensFromVault(
+            bob,
+            guarded_token,
+            40,
+            alice,
+            sender=teller.address,
+        )
+
+    assert second_vault.withdrawTokensFromVault(
+        bob,
+        guarded_token,
+        40,
+        alice,
+        sender=teller.address,
+    ) == (40, False)
+    assert guarded_erc20_vault.userBalances(bob, guarded_token) == 100
+    assert guarded_token.balanceOf(guarded_erc20_vault) == 99
+    assert second_vault.userBalances(bob, guarded_token) == 60
+    assert guarded_token.balanceOf(second_vault) == 60
+    assert guarded_token.balanceOf(alice) == 40
+
+
+def test_guarded_failed_user_withdrawal_preserves_peer_state_and_retry(
+    guarded_erc20_vault,
+    guarded_token,
+    deploy3r,
+    teller,
+    bob,
+    alice,
+    charlie,
+):
+    _credit(
+        guarded_erc20_vault,
+        guarded_token,
+        bob,
+        100,
+        teller,
+        deploy3r,
+    )
+    _credit(
+        guarded_erc20_vault,
+        guarded_token,
+        alice,
+        60,
+        teller,
+        deploy3r,
+    )
+    guarded_token.adminBurn(
+        guarded_erc20_vault,
+        1,
+        sender=deploy3r,
+    )
+
+    with boa.reverts("insufficient vault backing"):
+        guarded_erc20_vault.withdrawTokensFromVault(
+            bob,
+            guarded_token,
+            40,
+            charlie,
+            sender=teller.address,
+        )
+
+    assert guarded_erc20_vault.userBalances(bob, guarded_token) == 100
+    assert guarded_erc20_vault.userBalances(alice, guarded_token) == 60
+    assert guarded_erc20_vault.totalBalances(guarded_token) == 160
+    assert guarded_token.balanceOf(charlie) == 0
+
+    guarded_token.mint(guarded_erc20_vault, 1, sender=deploy3r)
+    assert guarded_erc20_vault.withdrawTokensFromVault(
+        alice,
+        guarded_token,
+        40,
+        charlie,
+        sender=teller.address,
+    ) == (40, False)
+    assert guarded_erc20_vault.userBalances(bob, guarded_token) == 100
+    assert guarded_erc20_vault.userBalances(alice, guarded_token) == 20
+    assert guarded_erc20_vault.totalBalances(guarded_token) == 120
+    assert guarded_token.balanceOf(charlie) == 40
 
 
 @pytest.mark.parametrize(

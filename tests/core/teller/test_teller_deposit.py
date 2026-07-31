@@ -510,6 +510,15 @@ def _m1_replace_hq_address(ripe_hq, governance, registry_id, replacement):
 T1_MUTEX_REMOVAL_SHA256 = (
     "fdb1e2de2fb0617ba0d250e6380ce62a88107dcded80d718ffd994206270a6fd"
 )
+T6_RECEIPT_EQUALITY_BYPASS_SHA256 = (
+    "63e9433c0408b1b8e9f88e3991136bea34a17b6cf234dfc3e454e6915b9ad2ef"
+)
+# Keep source-mutant registrations outside Boa's generated-address sequence.
+# Auto-anchored tests can reuse generated addresses while Boa retains diagnostic
+# type metadata for the prior contract registered at that address.
+T6_RECEIPT_EQUALITY_MUTANT_ADDRESS = (
+    "0x00000000000000000000000000000000C0DE0001"
+)
 
 
 def _t1_mutex_removal_mutant_source():
@@ -525,6 +534,25 @@ def _t1_mutex_removal_mutant_source():
         source = source.replace(removal, "", 1)
     assert "receiptMeasurementActive" not in source
     assert hashlib.sha256(source.encode()).hexdigest() == T1_MUTEX_REMOVAL_SHA256
+    return source
+
+
+def _t6_receipt_equality_bypass_mutant_source():
+    source = Path("contracts/core/Teller.vy").read_text()
+    equality = (
+        "        assert extcall Vault(vaultAddr).depositTokensInVault("
+        "_user, _asset, amount, _a) == amount\n"
+    )
+    bypass = (
+        "        extcall Vault(vaultAddr).depositTokensInVault("
+        "_user, _asset, amount, _a)\n"
+    )
+    assert source.count(equality) == 1
+    source = source.replace(equality, bypass, 1)
+    assert equality not in source
+    assert hashlib.sha256(source.encode()).hexdigest() == (
+        T6_RECEIPT_EQUALITY_BYPASS_SHA256
+    )
     return source
 
 
@@ -1641,6 +1669,71 @@ def test_m1_vault_result_mismatch_reverts_exact_transfer(
         teller.deposit(token, amount, bob, vault, sender=bob)
 
     _m1_assert_no_deposit_effects(teller, ledger, vault, token, bob, amount)
+
+
+def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
+    ripe_hq,
+    governance,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    mock_price_source,
+    teller,
+    ledger,
+):
+    def setup(active_teller):
+        setGeneralConfig()
+        token = _caller_sensitive_balance_token()
+        vault = simple_erc20_vault
+        vault_id = 3
+        setAssetConfig(token, _vaultIds=[vault_id])
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+        token.configure_vault_observation(vault, 1)
+        amount = 100 * EIGHTEEN_DECIMALS
+        token.mint(bob, amount)
+        token.approve(active_teller, amount, sender=bob)
+        return token, vault, vault_id, amount
+
+    with boa.env.anchor():
+        token, vault, _, amount = setup(teller)
+        # Teller's equality assert has no dev reason. The succeeding SHA-pinned
+        # mutant branch below isolates this bare revert to that exact guard.
+        with boa.reverts():
+            teller.deposit(token, amount, bob, vault, sender=bob)
+        _m1_assert_no_deposit_effects(
+            teller,
+            ledger,
+            vault,
+            token,
+            bob,
+            amount,
+        )
+
+    with boa.env.anchor():
+        mutant = boa.loads(
+            _t6_receipt_equality_bypass_mutant_source(),
+            ripe_hq,
+            False,
+            name="t6_teller_without_receipt_equality",
+            override_address=T6_RECEIPT_EQUALITY_MUTANT_ADDRESS,
+        )
+        _m1_replace_hq_address(ripe_hq, governance, 17, mutant)
+        token, vault, vault_id, amount = setup(mutant)
+
+        assert mutant.deposit(
+            token,
+            amount,
+            bob,
+            vault,
+            sender=bob,
+        ) == amount
+        assert token.balanceValue(vault) == amount
+        assert vault.getTotalAmountForUser(bob, token) == amount - 1
+        assert ledger.isParticipatingInVault(bob, vault_id)
+        assert [log.amount for log in filter_logs(mutant, "TellerDeposit")] == [
+            amount
+        ]
 
 
 def test_m1_lock_duration_vault_mismatch_reverts_atomically(
