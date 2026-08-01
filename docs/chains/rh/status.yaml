@@ -238,7 +238,7 @@ reassessment_and_qualification:
   deferred:
     - CreditEngine zero-backing reassessment
     - Every Deleverage task including parameter representation, tests, fork scenarios, documentation, and size/headroom work
-    - Uniswap TWAP implementation
+    - Uniswap TWAP registration, configuration, admission, deployment, and activation; archival prototype source is present only for research and monitoring
     - CCIP
     - Sites recovery and dashboard publication
     - Live deployment, migration execution, production configuration, activation, and release
@@ -310,14 +310,21 @@ owner_priority_overlay:
         provisional H-09 Deleverage path.
       reopen_condition: Explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
     - id: PARK-UNISWAP-TWAP
-      subject: Uniswap TWAP implementation
+      subject: Uniswap TWAP admission and activation
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >
-        Do not implement a V2 cumulative-price adapter, checkpoint service,
-        PriceDesk registration, or Chainlink fallback. An optional externally
-        held RIPE/WETH V2 liquidity canary remains operational preparation, not
-        protocol oracle authority.
+        The archival RobinhoodUniswapV2RipePrices research/monitoring prototype
+        source is present in the repository but remains unregistered,
+        unconfigured, non-admitted, undeployed, unactivated, and unavailable
+        for protocol accounting. Do not add a checkpoint service, PriceDesk
+        registration, Chainlink fallback, pool address, liquidity amount,
+        funding or custody authority, migration, deployment-plan dependency,
+        configuration, admission, deployment, or activation. No Uniswap launch
+        price source is required; Profile 1 and PriceDesk priority source IDs
+        [1, 3] remain unchanged. An optional externally held RIPE/WETH V2
+        liquidity canary remains operational preparation, not protocol oracle
+        authority.
       reopen_condition: Approved security-relevant RIPE-price consumer plus separate owner, risk, security, custody, and exposure decisions.
     - id: PARK-SITES-RECOVERY
       subject: Sites account and workspace recovery

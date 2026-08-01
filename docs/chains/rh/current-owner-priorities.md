@@ -45,8 +45,9 @@ The sole canonical deployment-owner handoff is
 - Preserve the current Ledger and Teller contracts and their reviewed
   measurement/clock boundaries.
 - Keep GuardedErc20 separate and Stock-specific.
-- Launch Profile 1 with Chainlink as oracle authority, no Uniswap price-source
-  contract, no Curve registration, and neither LP token admitted.
+- Launch Profile 1 with Chainlink at PriceDesk slot 1 and BlueChipYield at slot
+  3, no Uniswap launch price source, no Curve registration, and neither LP
+  token admitted. Priority source IDs remain `[1, 3]`.
 - Treat RIPE/WETH V2 only as an optional externally held liquidity canary.
 - Move GREEN/USDG and both LP admissions to Profile 2.
 - Keep the PSM disabled, allowlisted, canary-first, and redemption-first until
@@ -98,16 +99,23 @@ the four zero-valued controls.
   resealed.
 - Reopen only through explicit owner instruction.
 
-### 4. Uniswap TWAP implementation is parked
+### 4. Uniswap TWAP admission and activation are parked
 
-No Uniswap price-source contract is required at launch.
+The archival `RobinhoodUniswapV2RipePrices` research/monitoring prototype
+source is present in the repository. It is not registered, configured,
+admitted, deployed, or activated and is unavailable for protocol accounting.
+No Uniswap launch price source is required; Profile 1 behavior and PriceDesk
+priority source IDs `[1, 3]` remain unchanged.
 
-- Do not implement the research-only V2 cumulative-price TWAP, checkpoint
-  service, PriceDesk registration, or Chainlink fallback.
+- Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
+  pool address, liquidity amount, funding or custody authority, migration,
+  deployment-plan dependency, configuration, admission, deployment, or
+  activation.
 - An optional externally held RIPE/WETH V2 liquidity canary is operational
   preparation, not protocol oracle authority.
-- Reopen TWAP work only after an approved security-relevant RIPE-price consumer
-  and separate owner, risk, security, custody, and exposure decisions exist.
+- Reopen work beyond archival prototype maintenance only after an approved
+  security-relevant RIPE-price consumer and separate owner, risk, security,
+  custody, and exposure decisions exist.
 
 ### 5. Sites account/workspace recovery is parked
 

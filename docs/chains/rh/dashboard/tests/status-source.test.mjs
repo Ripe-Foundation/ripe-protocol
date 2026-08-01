@@ -976,15 +976,22 @@ test("generated JSON stays ignored and untracked", async () => {
 });
 
 test("non-editable dashboard package and hosting sources match the overlay authority", async () => {
-  for (const path of [
-    "docs/chains/rh/dashboard/package.json",
-    "docs/chains/rh/dashboard/package-lock.json",
-    "docs/chains/rh/dashboard/.openai/hosting.json",
+  for (const [path, expectedSha256] of [
+    [
+      "docs/chains/rh/dashboard/package.json",
+      "c37112d84586971da76c5e4e7fa8a3bcc9caa32bbc3ed28915e73d7bf7f58295",
+    ],
+    [
+      "docs/chains/rh/dashboard/package-lock.json",
+      "7d5572ae2bea667824a0f302ff782e6b0c13b8b9f97c5b0fce6cd14319421695",
+    ],
+    [
+      "docs/chains/rh/dashboard/.openai/hosting.json",
+      "9ccfdab2f03d743ef25155ebad1e9ddd3e10f18432569d86980bd031f70f24a5",
+    ],
   ]) {
-    const [{ stdout: authority }, local] = await Promise.all([
-      execFileAsync("git", ["show", `origin/codex/rh-owner-priority-overlay:${path}`], { cwd: repositoryRoot, encoding: "buffer" }),
-      readFile(resolve(repositoryRoot, path)),
-    ]);
-    assert.deepEqual(Buffer.from(authority), local);
+    const local = await readFile(resolve(repositoryRoot, path));
+    const actualSha256 = createHash("sha256").update(local).digest("hex");
+    assert.equal(actualSha256, expectedSha256, `${path} exact-byte SHA-256 drift`);
   }
 });

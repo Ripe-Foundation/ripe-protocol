@@ -128,6 +128,29 @@ EXCLUDED_CCIP_EXAMPLE_SHA256 = (
 EXCLUDED_EXAMPLE_CONTENT_HASHES = {
     EXCLUDED_CCIP_EXAMPLE_PATH: EXCLUDED_CCIP_EXAMPLE_SHA256,
 }
+# Optional archival prototype sources are outside the admitted protocol clock
+# inventory. Exact reviewed bytes may be present without becoming a launch
+# dependency; any byte drift is rediscovered and fails closed as a new path.
+OPTIONAL_ARCHIVAL_VYPER_SHA256 = {
+    "contracts/mock/MockUniswapV2Factory.vy": (
+        "ff4ba203e8e18d11a5738ef68a7f8fa9d677c2817e0f06a683c10c05e0ef83c5"
+    ),
+    "contracts/mock/MockUniswapV2FlashBorrower.vy": (
+        "39b2e4b0e8eebe55175d71465ba33d8430528f0fa221c0b27c3b0f44012d6d84"
+    ),
+    "contracts/mock/MockUniswapV2Pair.vy": (
+        "7c6bc92970be39fa8118c4000379b722bcb87592779c6cb3b45df1f5cab76350"
+    ),
+    "contracts/mock/MockUniswapV2QuotePriceDesk.vy": (
+        "12d2046240189462486f7b2925228b31f369f83c7f4827faf4857b3de59a4d1f"
+    ),
+    "contracts/mock/MockUniswapV2Token.vy": (
+        "0e109020f202db31e7a09c6e473b95aad39901f98acbf439fa11aeecacf0b588"
+    ),
+    "contracts/priceSources/RobinhoodUniswapV2RipePrices.vy": (
+        "56a6685442d8730922205f8fcd2893b542e12b7d5d0e1384bcc2f065b945b485"
+    ),
+}
 EXPECTED_INTERFACE_ROOTS = ["interfaces"]
 EXPECTED_CADENCE_ROOTS = [
     "contracts",
@@ -937,6 +960,17 @@ def classify_path(
     if path.startswith("scripts/"):
         return "tooling"
     return "other"
+
+
+def _has_exact_optional_archival_bytes(root: Path, relative: str) -> bool:
+    expected = OPTIONAL_ARCHIVAL_VYPER_SHA256.get(relative)
+    if expected is None:
+        return False
+    try:
+        actual = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    except OSError:
+        return False
+    return actual == expected
 
 
 def _iter_files(root: Path, relative_roots: Iterable[str]) -> list[Path]:
@@ -3261,6 +3295,8 @@ def _current_vyper_classifications(
         if path.suffix not in VYPER_SUFFIXES:
             continue
         relative = path.relative_to(root).as_posix()
+        if _has_exact_optional_archival_bytes(root, relative):
+            continue
         records[relative] = {
             "classification": classify_path(
                 relative, production_roots, excluded_production_globs
@@ -3432,6 +3468,8 @@ def _production_vyper_files(
         if path.suffix not in VYPER_SUFFIXES:
             continue
         relative = path.relative_to(root).as_posix()
+        if _has_exact_optional_archival_bytes(root, relative):
+            continue
         classification = classify_path(
             relative, production_roots, excluded_production_globs
         )

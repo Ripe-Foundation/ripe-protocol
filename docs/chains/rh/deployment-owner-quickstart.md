@@ -8,9 +8,14 @@ activation, release, or Sites actions.
 
 ## Current baseline and lifecycle
 
-Bind all preparation to `rh` commit
-`e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`.
+Work from the current `rh` tip after confirming parity among local `rh`, cached
+`origin/rh`, and credential-free live `rh`.
+
+Commit `e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e`, is the integrated
+configuration-source subject. It must remain an ancestor of current `rh`, but
+it is not the checkout target. Approved descendants do not invalidate its
+configuration-source authority.
 
 Repository configuration is prepared and consistent; production/onchain
 configuration has not occurred.
@@ -194,8 +199,8 @@ shared `migrations/robinhood/` source to produce deterministic plans for both
 environments:
 
 ```sh
-python scripts/migrate.py --profile robinhood-testnet --plan
-python scripts/migrate.py --profile robinhood-mainnet --plan
+python -m scripts.migrate --profile robinhood-testnet --plan
+python -m scripts.migrate --profile robinhood-mainnet --plan
 ```
 
 Until the migration source and required bindings are ready, a typed blocked
@@ -244,6 +249,36 @@ artifact hashes, target profile, account/signer backend, operator, permitted
 commands/actions, stop rules, and evidence destination. Deployment, migration,
 role transfer, production/onchain configuration, activation, and release stay
 separate lifecycle events and must be reported separately.
+
+## What to do with draft PR #66
+
+Do not rebase, merge, cherry-pick, or continue implementation directly from
+PR #66 or `rh-deploy`. It remains useful as historical deployment-design input,
+not current implementation authority; its configuration and Morpho changes are
+already superseded by stronger implementations on current `rh`.
+
+Its incompatible assumptions include `DefaultsRobinHood.vy` instead of the
+authoritative `DefaultsRobinhood.vy`, five Defaults constructor arguments
+instead of the current eight bindings, BlueChipYield in PriceDesk slot 2 and
+priority IDs `[1,2,3]` instead of slot 3 and `[1,3]`, an obsolete
+Robinhood-mainnet-only migration namespace/order, a custom runner and history
+workflow that bypass the deterministic planner, unresolved identities treated
+as usable,
+and currently deferred or excluded Deleverage, Curve/LP, PSM activation, and
+CCIP work.
+
+Deployment agents must branch freshly from the parity-verified current `rh`
+tip and consume current `config/BluePrint.py` and
+`contracts/config/DefaultsRobinhood.vy`. Re-author useful PR #66 migration
+intent under shared `migrations/robinhood/`, the current reserved ordering,
+`python -m scripts.migrate`, and the current artifact, topology, and
+post-deployment assertion interfaces.
+
+Until required bindings close, deterministic typed-blocked plans are correct.
+Do not create migration history, use the old custom runner, access RPC or
+signers, or substitute placeholders merely to make a blocked plan executable.
+The eventual replacement should be a narrow H-05 migration-source, plan, and
+assertion PR authored from current `rh`.
 
 ## Stop conditions and prohibited substitutions
 
