@@ -1,467 +1,53 @@
 #!/usr/bin/env python3
-"""Validate the canonical Robinhood parameter manifest and render defaults.
+"""Synchronize the derived Robinhood parameter ledger from readable sources.
 
-The committed manifest is deliberately blocked until every generation-bearing
-identity and value is approved.  Consequently the real command validates the
-whole manifest and then fails without creating output.  Rendering is exposed
-for fully-bound synthetic test fixtures only.
-
-This module is standard-library-only.  Importing it performs no environment,
-filesystem, clock, provider, account, RPC, or network access.
+The only human-edited value authorities are config/BluePrint.py for deployment
+inputs and contracts/config/DefaultsRobinhood.vy for Defaults-interface values.
+This command never renders or overwrites Vyper source and never uses RPC.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 from collections import Counter
 import hashlib
+import importlib
 import json
 import os
-import re
-import tempfile
 from pathlib import Path
+import re
+import sys
+import tempfile
 from typing import Any, Mapping, Sequence
 
 
-SCHEMA_VERSION = "h04-robinhood-parameters-v2"
-BASELINE_COMMIT = "a86650b187c523f27c92f05bfe959d06840025a6"
-BASELINE_TREE = "cb640ed3d8e7074cc6fb78ac118a4d45566ba421"
-PHASE_A_SHA256 = (
-    "8281011aaa4bc3c9edcc5d183d86a9f510d727e63318b53e4e6c5684c9d7be2e"
-)
-R2_SHA256 = "05069136bf2bcbbd1a0dcc698fe84c31ba54cb1daaa9d4587e143fbc54f71e0e"
-R2_REPOSITORY_PATH = "review-archives/h04/h04-group2-proposal-R2.md"
-H04_REVIEW_COMMIT = "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-OWNER_APPROVAL_SHA256 = (
-    "0c031e44d3f68a1620cab2abd2f4407442ecd9fb1615d903f2195a690165795f"
-)
-OWNER_APPROVAL_DATE = "2026-07-29"
-OWNER_POLICY_APPROVAL = {
-    "status": "approved",
-    "date": OWNER_APPROVAL_DATE,
-    "provenance": (
-        "Owner approval 2026-07-29; exact authorization bytes SHA-256 "
-        + OWNER_APPROVAL_SHA256
-    ),
+SCHEMA_VERSION = "h04-robinhood-parameters-v4-derived-ledger"
+LEGACY_SCHEMA_VERSION = "h04-robinhood-parameters-v3-profile1-pr66"
+LAUNCH_INPUT_COMMIT = "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+MORPHO_AUTHORITY_COMMIT = "33ad0f3c08bf6dc88f6569c622886d264d6e2868"
+
+ROOT = Path(__file__).resolve().parents[2]
+LEDGER_PATH = ROOT / "config" / "robinhood-parameters.json"
+BLUEPRINT_PATH = ROOT / "config" / "BluePrint.py"
+DEFAULTS_PATH = ROOT / "contracts" / "config" / "DefaultsRobinhood.vy"
+
+TOP_LEVEL_KEYS = {
+    "schema_version",
+    "baseline",
+    "decision_registry",
+    "binding_schedules",
+    "parameters",
 }
-
-DECISION_KEYS = ("id", "status", "operative")
-BINDING_SCHEDULE_KEYS = (
-    "id",
-    "records",
-    "owner",
-    "reviewer_class",
-    "classification",
-    "lifecycle_phase",
-    "prerequisite",
-    "closure_artifacts",
-    "invalidation",
-)
-
-
-def _record_ids(*numbers: int) -> list[str]:
-    return [f"P-H04-{number:03d}" for number in numbers]
-
-
-EXPECTED_DECISION_REGISTRY = [
-    {
-        "id": f"D-H04-{number:02d}",
-        "status": "approved",
-        "operative": True,
-    }
-    for number in range(1, 19)
-] + [
-    {
-        "id": "D-H04-19",
-        "status": "retired_non_operative",
-        "operative": False,
-    },
-] + [
-    {
-        "id": f"D-H04-{number:02d}",
-        "status": "approved",
-        "operative": True,
-    }
-    for number in (20, 21)
-]
-
-EXPECTED_BINDING_SCHEDULES = [
-    {
-        "id": "BS-H04-CORE-TOKEN-IDENTITIES-RC",
-        "records": _record_ids(56, 112, 143, 174, 303),
-        "owner": "OWN-H05",
-        "reviewer_class": "protocol",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before Defaults render and H-05 plan freeze",
-        "closure_artifacts": [
-            "exact Robinhood GREEN, RIPE and sGREEN addresses",
-            "source, runtime, ABI and compiler identities",
-            "token metadata",
-            "RipeHq and plan placement",
-            "cross-record equality",
-            "H-05 typed plan and H-06 binding",
-            "no Base address",
-        ],
-        "invalidation": [
-            "token artifact",
-            "constructor",
-            "metadata",
-            "registry",
-            "chain",
-            "plan change",
-        ],
-    },
-    {
-        "id": "BS-H04-LP-ARTIFACTS-RC",
-        "records": _record_ids(
-            64,
-            236,
-            240,
-            241,
-            242,
-            267,
-            271,
-            272,
-            273,
-            301,
-            393,
-            394,
-            395,
-            396,
-        ),
-        "owner": "OWN-H04",
-        "reviewer_class": "protocol with mandatory oracle co-review",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before launch plan closes",
-        "closure_artifacts": [
-            "exact LP token and pool addresses",
-            "constituents",
-            "decimals",
-            "deposit limits",
-            "oracle/feed artifacts",
-            "price-source placement",
-            "pool evidence",
-            "cross-record equality and H-05/H-06 binding",
-        ],
-        "invalidation": [
-            "LP",
-            "pool",
-            "constituent",
-            "decimals",
-            "oracle",
-            "feed",
-            "limits",
-            "plan drift",
-        ],
-    },
-    {
-        "id": "BS-H04-TRAINING-WHEELS-OP",
-        "records": _record_ids(79, 413, 414),
-        "owner": "OWN-H04 with OWN-SECOPS",
-        "reviewer_class": "security",
-        "classification": "operator_deployment",
-        "lifecycle_phase": "operator/deployment",
-        "prerequisite": "before testnet",
-        "closure_artifacts": [
-            "fresh contract source/runtime/ABI/compiler hashes",
-            "exact address",
-            "default-deny proof",
-            "exact allowlist",
-            "governance handoff",
-            "deployer relinquishment",
-            "P079/P413 equality",
-        ],
-        "invalidation": [
-            "code",
-            "address",
-            "allowlist",
-            "governance",
-            "handoff drift",
-        ],
-    },
-    {
-        "id": "BS-H04-GOVERNANCE-ROLES-OP",
-        "records": _record_ids(409, 410, 411),
-        "owner": "OWN-SECOPS",
-        "reviewer_class": "security",
-        "classification": "operator_deployment",
-        "lifecycle_phase": "operator/deployment",
-        "prerequisite": "before testnet/production handoff",
-        "closure_artifacts": [
-            "exact governance, Safe and guardian addresses",
-            "Safe owners and threshold",
-            "custody and response policy",
-            "role matrix",
-            "handoff receipts",
-            "deployer-authority loss",
-        ],
-        "invalidation": [
-            "address",
-            "threshold",
-            "membership",
-            "custody",
-            "scope",
-            "handoff drift",
-        ],
-    },
-    {
-        "id": "BS-H04-PSM-PARAMETERS-RC",
-        "records": _record_ids(361, 362, 363, 364, 365, 367),
-        "owner": "OWN-H04",
-        "reviewer_class": "risk with protocol/security review",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before PSM staging",
-        "closure_artifacts": [
-            "exact fees",
-            "mint/redeem capacities",
-            "interval",
-            "reserve amount",
-            "source and custody",
-            "units and risk rationale",
-            "disabled-capability proof",
-            "no activation",
-        ],
-        "invalidation": [
-            "reserve",
-            "decimals",
-            "risk",
-            "fee",
-            "interval",
-            "custody",
-            "PSM-source drift",
-        ],
-    },
-    {
-        "id": "BS-H04-PSM-ALLOWLIST-OP",
-        "records": _record_ids(366),
-        "owner": "OWN-SECOPS",
-        "reviewer_class": "security",
-        "classification": "operator_deployment",
-        "lifecycle_phase": "operator/deployment",
-        "prerequisite": "before PSM staging",
-        "closure_artifacts": [
-            "exact address collection and membership purpose",
-            "default-deny proof",
-            "custody/monitoring",
-            "no Base or placeholder address",
-        ],
-        "invalidation": [
-            "membership",
-            "custody",
-            "role",
-            "PSM-policy drift",
-        ],
-    },
-    {
-        "id": "BS-H04-PSM-SEQUENCE-OP",
-        "records": _record_ids(370),
-        "owner": "OWN-H05",
-        "reviewer_class": "deployment",
-        "classification": "operator_deployment",
-        "lifecycle_phase": "operator/deployment",
-        "prerequisite": "before pre-activation configuration",
-        "closure_artifacts": [
-            "exact typed H-05 plan",
-            "order and hash",
-            "dependency and postcondition assertions",
-            "PSM remains disabled",
-            "H-06 binding",
-            "separate execution authority",
-        ],
-        "invalidation": [
-            "plan",
-            "order",
-            "dependency",
-            "artifact",
-            "disabled-postcondition drift",
-        ],
-    },
-    {
-        "id": "BS-H04-SUPPLY-RECIPIENTS-OP",
-        "records": _record_ids(416, 418, 420),
-        "owner": "OWN-SECOPS",
-        "reviewer_class": "security",
-        "classification": "operator_deployment",
-        "lifecycle_phase": "operator/deployment",
-        "prerequisite": "before H-05 execution",
-        "closure_artifacts": [
-            "exact constructor address inputs",
-            "custody rationale",
-            "H-05 plan binding",
-            "zero-address rejection",
-            "proof paired quantities are exactly zero",
-        ],
-        "invalidation": [
-            "recipient",
-            "custody",
-            "constructor",
-            "amount",
-            "plan drift",
-        ],
-    },
-    {
-        "id": "BS-H04-ENDAOMENT-METADATA-RC",
-        "records": _record_ids(422, 423, 424, 425),
-        "owner": "OWN-H04",
-        "reviewer_class": "protocol",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before Endaoment deployment",
-        "closure_artifacts": [
-            "chain-specific WETH address and code identity",
-            "native name, symbol and decimals",
-            "authoritative chain evidence",
-            "H-05/H-06 binding",
-        ],
-        "invalidation": [
-            "chain",
-            "WETH",
-            "metadata",
-            "artifact",
-            "plan drift",
-        ],
-    },
-    {
-        "id": "BS-H04-STOCK-ACTIVATION-PARKED",
-        "records": _record_ids(*range(371, 382), *range(383, 389)),
-        "owner": "OWN-T8",
-        "reviewer_class": (
-            "track8 with mandatory oracle/risk/security review if reopened"
-        ),
-        "classification": "parked",
-        "lifecycle_phase": "separately parked future work",
-        "prerequisite": "no deadline",
-        "closure_artifacts": [
-            "cannot close under current authority",
-            "reopening requires a new owner decision",
-            "exact M2-M5 artifacts",
-            (
-                "AAPL identity/feed/decimals/P8/caps/vault/risk/auction/routes"
-            ),
-            "composed proofs",
-            (
-                "separate treatment of parked settlement, loss and bad-debt "
-                "questions"
-            ),
-        ],
-        "invalidation": [
-            "Track 8",
-            "oracle",
-            "risk",
-            "token",
-            "vault",
-            "settlement",
-            "policy change",
-        ],
-    },
-    {
-        "id": "BS-H04-S5-DEFAULTS-BIND-RC",
-        "records": _record_ids(310),
-        "owner": "OWN-S5",
-        "reviewer_class": "protocol with security/H-05/H-06 review",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before CM-008 enters H-05",
-        "closure_artifacts": [
-            "one exact future DefaultsRobinhood address shared by Ledger and MissionControl",
-            "manifest/source/ABI/compiler/creation/runtime hashes",
-            "exact Ledger 0x64/no-fallback proof",
-            "H-05 plan and H-06 manifest hashes",
-        ],
-        "invalidation": [
-            "Defaults",
-            "Ledger",
-            "ABI",
-            "compiler",
-            "address",
-            "0x64 semantic",
-            "plan",
-            "manifest drift",
-        ],
-    },
-    {
-        "id": "BS-H04-STABILITY-PLAN-RC",
-        "records": _record_ids(390),
-        "owner": "OWN-H05",
-        "reviewer_class": "protocol",
-        "classification": "release_candidate",
-        "lifecycle_phase": "release candidate",
-        "prerequisite": "before H-05 plan freeze",
-        "closure_artifacts": [
-            "exact specialStabPoolId or separately approved absence",
-            "registry topology",
-            "stability-plan assertions",
-            "H-05/H-06 binding",
-        ],
-        "invalidation": [
-            "vault",
-            "registry",
-            "stability",
-            "plan drift",
-        ],
-    },
-    {
-        "id": "BS-H04-REWARDS-PROMOTION-RC",
-        "records": _record_ids(399),
-        "owner": "OWN-REWARDS",
-        "reviewer_class": "rewards with security review",
-        "classification": "release_candidate",
-        "lifecycle_phase": "separately reviewed release candidate",
-        "prerequisite": "within the seven-day reward promotion",
-        "closure_artifacts": [
-            "exact promotion values",
-            "allocation conservation",
-            "artifacts",
-            "execution plan",
-            "monitoring",
-            "separate activation approval",
-        ],
-        "invalidation": [
-            "reward economics",
-            "token",
-            "plan",
-            "promotion-window drift",
-        ],
-    },
-    {
-        "id": "BS-H04-CCIP-PARKED",
-        "records": _record_ids(403),
-        "owner": "OWN-T1",
-        "reviewer_class": "security",
-        "classification": "parked",
-        "lifecycle_phase": "separately parked future work",
-        "prerequisite": "no deadline",
-        "closure_artifacts": [
-            "cannot close under current authority",
-            "explicit CCIP reopening",
-            "supported release/toolchain",
-            "exact artifacts",
-            "roles",
-            "peers",
-            "limits",
-            "registration",
-            "security review",
-            "separate activation authority",
-        ],
-        "invalidation": [
-            "CCIP release",
-            "toolchain",
-            "router",
-            "peer",
-            "role",
-            "limit",
-            "directive change",
-        ],
-    },
-]
-BINDING_SCHEDULES_SHA256 = (
-    "f6605710bb6a3f7274d66bfcbb8104fdd21f9a78cf043736474a2f5a6e14e167"
-)
-
-RECORD_KEYS = (
+BASELINE_KEYS = {
+    "commit",
+    "tree",
+    "branch",
+    "phase_a_evidence_sha256",
+    "controlling_r2_path",
+    "controlling_r2_sha256",
+}
+RECORD_KEYS = {
     "id",
     "h03_ref",
     "destination",
@@ -478,173 +64,10 @@ RECORD_KEYS = (
     "zero_semantics",
     "base_comparison",
     "conversion",
-    "generated_repr",
     "consumers",
     "invalidation",
-)
-TOP_KEYS = (
-    "schema_version",
-    "baseline",
-    "decision_registry",
-    "binding_schedules",
-    "parameters",
-)
-BASELINE_KEYS = (
-    "commit",
-    "tree",
-    "branch",
-    "phase_a_evidence_sha256",
-    "controlling_r2_path",
-    "controlling_r2_sha256",
-)
-DESTINATION_KEYS = ("kind", "path")
-SOURCE_KEYS = ("citation", "commit")
-OWNER_KEYS = ("kind", "id")
-
-STATUS_VALUE_KINDS = {
-    "approved": {"concrete"},
-    "disabled": {"concrete"},
-    "omitted": {"typed_null"},
-    "blocked": {"typed_null"},
-    "unresolved": {"typed_null"},
-    "derived": {"derived"},
-    "inherited": {"inherited"},
-    "not_applicable": {"typed_null"},
 }
-DESTINATION_KINDS = {"defaults_field", "deployment_input", "assertion"}
-UNIT_KINDS = {
-    "blocks",
-    "seconds",
-    "basis_points",
-    "token_base_units",
-    "percentage_allocation",
-    "boolean",
-    "address",
-    "registry_id",
-    "hash",
-    "count",
-    "rate_per_block_1e6",
-}
-REVIEWER_CLASSES = {
-    "protocol",
-    "risk",
-    "security",
-    "deployment",
-    "oracle",
-    "rewards",
-    "track8",
-    "evidence",
-}
-LAUNCH_PHASES = {
-    "deployed initial value",
-    "pre-activation configuration",
-    "atomic Stock activation",
-    "within-seven-day separately reviewed CCIP promotion",
-    "within-seven-day separately reviewed reward activation",
-    "post-launch release",
-    "omitted",
-    "blocked",
-}
-ZERO_KINDS = {
-    "not_zero",
-    "legitimate_zero",
-    "legitimate_false",
-    "legitimate_empty",
-    "not_applicable",
-}
-BASE_COMPARISON_KINDS = {
-    "same",
-    "converted",
-    "different_approved",
-    "not_applicable",
-    "blocked_no_inheritance",
-}
-CONVERSION_KINDS = {
-    "identity",
-    "ceil_base_blocks_div_6",
-    "seconds_unchanged",
-    "formula",
-    "not_applicable",
-}
-BLOCKERS = {
-    "B-H04-PARAMS",
-    "B-H04-ROLES",
-    "B-H04-SUPPLY",
-    "B-H04-STOCK",
-    "B-H04-LP",
-    "B-H04-ORACLE",
-    "B-H04-PSM",
-    "B-H04-PSM-SEQ",
-    "B-H04-S5-BIND",
-    "B-H04-PLAN-BINDINGS",
-    "B-H04-REWARD-PROMO",
-    "B-H04-CCIP",
-}
-
-EXPECTED_CANONICAL_COUNTS = {
-    "status": {
-        "approved": 152,
-        "disabled": 150,
-        "omitted": 34,
-        "blocked": 60,
-        "derived": 1,
-        "not_applicable": 31,
-    },
-    "approval": {
-        "approved": 367,
-        "pending_binding": 61,
-    },
-}
-
-EXPECTED_OPERATIVE_BLOCKERS = {
-    **{
-        f"P-H04-{number:03d}": ["B-H04-PSM"]
-        for number in range(361, 368)
-    },
-    "P-H04-370": ["B-H04-PSM-SEQ"],
-    **{
-        f"P-H04-{number:03d}": ["B-H04-ROLES"]
-        for number in (56, 79, 409, 410, 411, 413, 414, 416, 418, 420)
-    },
-    "P-H04-064": ["B-H04-LP", "B-H04-ORACLE"],
-    **{
-        f"P-H04-{number:03d}": ["B-H04-PLAN-BINDINGS"]
-        for number in (112, 143, 174, 303)
-    },
-    **{
-        f"P-H04-{number:03d}": [
-            "B-H04-SUPPLY",
-            "B-H04-PLAN-BINDINGS",
-        ]
-        for number in range(422, 426)
-    },
-    **{
-        f"P-H04-{number:03d}": ["B-H04-STOCK"]
-        for number in (*range(371, 382), *range(383, 389))
-    },
-    "P-H04-310": ["B-H04-S5-BIND"],
-    **{
-        f"P-H04-{number:03d}": ["B-H04-LP", "B-H04-ORACLE"]
-        for number in (
-            236,
-            240,
-            241,
-            242,
-            267,
-            271,
-            272,
-            273,
-            301,
-            393,
-            394,
-            395,
-            396,
-        )
-    },
-    "P-H04-390": ["B-H04-PARAMS", "B-H04-PLAN-BINDINGS"],
-    "P-H04-399": ["B-H04-REWARD-PROMO"],
-    "P-H04-403": ["B-H04-CCIP"],
-}
+LEGACY_RECORD_KEYS = RECORD_KEYS | {"generated_repr"}
 
 GEN_CONFIG_FIELDS = (
     "perUserMaxVaults",
@@ -756,85 +179,72 @@ ASSET_FIELDS = (
     "config.isNft",
 )
 GOV_ROWS = ("RIPE", "RIPE_WETH_LP")
-PROFILE1_GOV_ROWS = ("RIPE",)  # Bound by PROFILE1_AUTHORITY_PATH below.
+ACTIVE_GOV_ROWS = ("RIPE",)
 ASSET_ROWS = (
-    "AAPL",
+    "STEAKHOUSE_USDG",
     "GREEN",
     "RIPE",
     "SGREEN",
-    "USDG",
+    "WETH",
     "GREEN_USDG_LP",
     "RIPE_WETH_LP",
 )
-PROFILE1_ASSET_ROWS = (
-    "GREEN",
+ACTIVE_ASSET_ROWS = (
+    "STEAKHOUSE_USDG",
+    "WETH",
     "RIPE",
     "SGREEN",
+    "GREEN",
 )
-PROFILE1_STAB_VAULT_INDEXES = (1,)
+OMITTED_GOV_ROWS = ("RIPE_WETH_LP",)
+OMITTED_ASSET_ROWS = ("GREEN_USDG_LP", "RIPE_WETH_LP")
 
-FORBIDDEN_BASE_ADDRESSES = {
-    "0x02981db1a99a14912b204437e7a2e02679b57668",
-    "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b",
-    "0x1c419aef78b44f30d8f3dfa2ab13d3538466dc48",
-    "0x1cb8dab80f19fc5aca06c2552aecd79015008ea8",
-    "0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2",
-    "0x2255b0006a3da38aa184e0f9d5e056c2d0448065",
-    "0x2a0a59d6b975828e781ecac125dba40d7ee5ddc0",
-    "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22",
-    "0x3fb0fc9d3ddd543ad1b748ed2286a022f4638493",
-    "0x4200000000000000000000000000000000000006",
-    "0x44cf3c4f000dfd76a35d03298049d37be688d6f9",
-    "0x4965578d80e54b5ebe3bb5d7b1b3e0425559c1d1",
-    "0x4ed4e862860bed51a9570b96d89af5e1b0efefed",
-    "0x6f5ef229d7f07183bf91df68702d01e9bda37ca2",
-    "0x765824ad2ed0ecb70ecc25b0cf285832b335d6a9",
-    "0x7fcd174e80f264448ebee8c88a7c4476aaf58ea6",
-    "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
-    "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
-    "0x96f1a7ce331f40afe866f3b707c223e377661087",
-    "0x9b8df6e244526ab5f6e6400d331db28c8fdddb55",
-    "0xa88594d404727625a9437c3f886c7643872296ae",
-    "0xaa0f13488ce069a7b5a099457c753a7cfbe04d36",
-    "0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf",
-    "0xb33852cfd0c22647aac501a6af59bc4210a686bf",
-    "0xcb17c9db87b595717c857a08468793f5bab6445f",
-    "0xcb585250f852c6c6bf90434ab21a00f02833a4af",
-    "0xcbada732173e39521cdbe8bf59a6dc85a9fc7b8c",
-    "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
-    "0xcbd06e5a2b0c65597161de254aa074e489deb510",
-    "0xd1eac76497d06cf15475a5e3984d5bc03de7c707",
-    "0xd6c283655b42fa0eb2685f7ab819784f071459dc",
-}
+ASSERTION_DESTINATION_PATHS = (
+    "Deployment.DP-01.lootbox.minUnderscoreSendInterval",
+    "Deployment.DP-02.lootbox.underscoreSendInterval",
+    "Deployment.DP-03.deleverage.deleverageCooldown",
+    "Deployment.DP-04.ledger.actionBlockSourceSemantic",
+    "Deployment.DP-06.timelocks.minimumExpirationHeadroom",
+    "Deployment.DP-09.psm.redemptionFirstOrder",
+    "Deployment.DP-09.psm.greenMintLastOrder",
+    "Deployment.DP-10.aapl.capFormula",
+    "Deployment.DP-11.stock.enabledVaultCount",
+    "Deployment.DP-12.launchGraph.assetCount",
+    "Deployment.DP-13.stock.excludedFromStabilityPool",
+    "Deployment.DP-14.lp.ltv",
+)
+
+CONSTRUCTOR_ABI_NAMES = (
+    "_contribTemplate",
+    "_trainingWheels",
+    "_ripeToken",
+    "_greenToken",
+    "_sgreenToken",
+    "_usdgToken",
+    "_wethToken",
+    "_steakhouseUsdgVault",
+)
+CONSTRUCTOR_BLUEPRINT_KEYS = (
+    "CONTRIBUTOR_TEMPLATE",
+    "TRAINING_WHEELS",
+    "RIPE_TOKEN",
+    "GREEN_TOKEN",
+    "SGREEN_TOKEN",
+    "USDG",
+    "WETH",
+    "STEAKHOUSE_USDG_VAULT",
+)
 
 
 class ManifestError(ValueError):
-    """A stable fail-closed manifest or rendering error."""
+    """Stable fail-closed configuration diagnostic."""
 
 
-def convert_base_blocks(base_blocks: int) -> int:
-    """Convert approved nonzero Base block counts to Robinhood block counts."""
-    if type(base_blocks) is not int or base_blocks < 0:
-        raise ManifestError("H04_BLOCK_CONVERSION_INPUT")
-    if base_blocks == 0:
-        return 0
-    return max(1, (base_blocks + 5) // 6)
-
-
-def _expect_keys(value: Mapping[str, Any], keys: Sequence[str], code: str) -> None:
-    if set(value) != set(keys):
-        raise ManifestError(code)
-
-
-def _reject_null(value: Any) -> None:
-    if value is None:
-        raise ManifestError("H04_NULL_FORBIDDEN")
-    if isinstance(value, Mapping):
-        for nested in value.values():
-            _reject_null(nested)
-    elif isinstance(value, list):
-        for nested in value:
-            _reject_null(nested)
+def _expect_keys(value: Mapping[str, Any], keys: set[str], code: str) -> None:
+    if set(value) != keys:
+        extra = sorted(set(value) - keys)
+        missing = sorted(keys - set(value))
+        raise ManifestError(f"{code}:extra={extra}:missing={missing}")
 
 
 def _reject_sensitive_or_placeholder_text(value: Any) -> None:
@@ -850,17 +260,12 @@ def _reject_sensitive_or_placeholder_text(value: Any) -> None:
             "localhost",
             "http://",
             "https://",
-            "rpc",
             "api_key",
             "private_key",
             "mnemonic",
         )
         if any(token in lowered for token in forbidden):
             raise ManifestError("H04_FORBIDDEN_TEXT")
-        if re.fullmatch(r"0x0{40}", lowered):
-            raise ManifestError("H04_ZERO_ADDRESS_LITERAL")
-        if lowered in FORBIDDEN_BASE_ADDRESSES:
-            raise ManifestError("H04_BASE_ADDRESS_LEAK")
     elif isinstance(value, Mapping):
         for nested in value.values():
             _reject_sensitive_or_placeholder_text(nested)
@@ -906,58 +311,16 @@ def canonical_default_paths() -> tuple[str, ...]:
         (
             "Defaults.priorityLiqAssetVaults[0].vaultId",
             "Defaults.priorityLiqAssetVaults[0].asset",
+            "Defaults.priorityLiqAssetVaults[1].vaultId",
+            "Defaults.priorityLiqAssetVaults[1].asset",
             "Defaults.priorityStabVaults[0].vaultId",
             "Defaults.priorityStabVaults[0].asset",
-            "Defaults.priorityStabVaults[1].vaultId",
-            "Defaults.priorityStabVaults[1].asset",
-            "Defaults.priorityPriceSourceIds[0]",
+            "Defaults.priorityPriceSourceIds",
             "Defaults.liteSigners[0]",
         )
     )
-    return tuple(paths)
-
-
-def canonical_default_templates() -> tuple[str, ...]:
-    paths: list[str] = []
-    paths.extend(f"Defaults.genConfig.{field}" for field in GEN_CONFIG_FIELDS)
-    paths.extend(f"Defaults.genDebtConfig.{field}" for field in GEN_DEBT_FIELDS)
-    paths.extend(
-        f"Defaults.genDebtConfig.genAuctionParams.{field}"
-        for field in AUCTION_FIELDS
-    )
-    paths.extend(
-        (
-            "Defaults.ripeAvailForRewards",
-            "Defaults.ripeAvailForHr",
-            "Defaults.ripeAvailForBonds",
-        )
-    )
-    paths.extend(f"Defaults.ripeBondConfig.{field}" for field in BOND_FIELDS)
-    paths.extend(f"Defaults.rewardsConfig.{field}" for field in REWARD_FIELDS)
-    paths.extend(
-        f"Defaults.ripeGovVaultConfigs[*].{field}" for field in GOV_FIELDS
-    )
-    paths.extend(f"Defaults.hrConfig.{field}" for field in HR_FIELDS)
-    paths.extend(
-        (
-            "Defaults.underscoreRegistry",
-            "Defaults.trainingWheels",
-            "Defaults.shouldCheckLastTouch",
-        )
-    )
-    paths.extend(f"Defaults.assetConfigs[*].{field}" for field in ASSET_FIELDS)
-    paths.extend(
-        (
-            "Defaults.priorityLiqAssetVaults[*].vaultId",
-            "Defaults.priorityLiqAssetVaults[*].asset",
-            "Defaults.priorityStabVaults[*].vaultId",
-            "Defaults.priorityStabVaults[*].asset",
-            "Defaults.priorityPriceSourceIds[*]",
-            "Defaults.liteSigners[*]",
-        )
-    )
-    if len(paths) != 109 or len(set(paths)) != 109:
-        raise ManifestError("H04_INTERNAL_109_CENSUS")
+    if len(paths) != 305 or len(set(paths)) != 305:
+        raise ManifestError("H04_INTERNAL_DEFAULT_PATH_CENSUS")
     return tuple(paths)
 
 
@@ -983,956 +346,751 @@ def default_selectors() -> tuple[str, ...]:
     )
 
 
-def _validate_value(value: Mapping[str, Any]) -> str:
+def _validate_value(value: Mapping[str, Any]) -> None:
     kind = value.get("kind")
-    if kind == "concrete":
-        _expect_keys(value, ("kind", "raw"), "H04_VALUE_KEYS")
-        raw = value["raw"]
-        if type(raw) not in (bool, int, str):
-            raise ManifestError("H04_CONCRETE_TYPE")
-        if type(raw) is int and raw < 0:
-            raise ManifestError("H04_NEGATIVE_VALUE")
-    elif kind == "typed_null":
-        _expect_keys(value, ("kind", "reason"), "H04_VALUE_KEYS")
-        if not isinstance(value["reason"], str) or not value["reason"]:
-            raise ManifestError("H04_TYPED_NULL_REASON")
-    elif kind == "derived":
-        _expect_keys(value, ("kind", "formula", "inputs"), "H04_VALUE_KEYS")
-        if not isinstance(value["formula"], str) or not value["formula"]:
-            raise ManifestError("H04_DERIVED_FORMULA")
-        if not isinstance(value["inputs"], list) or not value["inputs"]:
-            raise ManifestError("H04_DERIVED_INPUTS")
-    elif kind == "inherited":
-        _expect_keys(value, ("kind", "inherited_from"), "H04_VALUE_KEYS")
-        if not isinstance(value["inherited_from"], str):
-            raise ManifestError("H04_INHERITED_SOURCE")
-    else:
+    keys = {
+        "concrete": {"kind", "raw"},
+        "external_fact": {"kind", "raw"},
+        "symbolic_binding": {"kind", "name"},
+        "omitted": {"kind", "profile"},
+        "typed_null": {"kind", "reason"},
+        "derived": {"kind", "formula", "inputs"},
+        "inherited": {"kind", "inherited_from"},
+    }.get(str(kind))
+    if keys is None:
         raise ManifestError("H04_VALUE_KIND")
-    return str(kind)
+    _expect_keys(value, keys, "H04_VALUE_KEYS")
 
 
-def _validate_unit(unit: Mapping[str, Any]) -> None:
-    kind = unit.get("kind")
-    if kind not in UNIT_KINDS:
-        raise ManifestError("H04_UNIT_KIND")
-    if kind in {"basis_points", "percentage_allocation"}:
-        _expect_keys(unit, ("kind", "denominator"), "H04_UNIT_KEYS")
-        if unit["denominator"] != 10_000:
-            raise ManifestError("H04_BPS_DENOMINATOR")
-    elif kind == "rate_per_block_1e6":
-        _expect_keys(unit, ("kind", "denominator"), "H04_UNIT_KEYS")
-        if unit["denominator"] != 1_000_000:
-            raise ManifestError("H04_RATE_DENOMINATOR")
-    else:
-        _expect_keys(unit, ("kind",), "H04_UNIT_KEYS")
-
-
-def _validate_approval(approval: Mapping[str, Any], status: str) -> None:
-    approval_status = approval.get("status")
-    if approval_status == "approved":
-        keys = tuple(approval)
-        if set(keys) not in (
-            {"status", "date", "provenance"},
-            {"status", "date", "provenance", "schedule_id"},
-        ):
-            raise ManifestError("H04_APPROVAL_KEYS")
-        if status in {"blocked", "unresolved"}:
-            raise ManifestError("H04_BLOCKED_APPROVAL")
-        if not re.fullmatch(r"20\d\d-\d\d-\d\d", str(approval["date"])):
-            raise ManifestError("H04_APPROVAL_DATE")
-        if "schedule_id" in approval and not isinstance(
-            approval["schedule_id"], str
-        ):
-            raise ManifestError("H04_SCHEDULE_ID")
-    elif approval_status == "pending_binding":
-        _expect_keys(
-            approval,
-            ("status", "schedule_id"),
-            "H04_APPROVAL_KEYS",
+def _validate_assertion_path_census(paths: Sequence[str]) -> None:
+    counts = Counter(paths)
+    missing = sorted(set(ASSERTION_DESTINATION_PATHS) - set(paths))
+    extra = sorted(set(paths) - set(ASSERTION_DESTINATION_PATHS))
+    duplicates = sorted(path for path, count in counts.items() if count != 1)
+    if tuple(paths) != ASSERTION_DESTINATION_PATHS:
+        raise ManifestError(
+            "H04_ASSERTION_PATH_CENSUS:"
+            f"missing={missing}:extra={extra}:duplicates={duplicates}"
         )
-        if status not in {"blocked", "unresolved", "derived", "inherited"}:
-            raise ManifestError("H04_PENDING_BINDING_APPROVAL")
-        if not isinstance(approval["schedule_id"], str):
-            raise ManifestError("H04_SCHEDULE_ID")
-    else:
-        raise ManifestError("H04_APPROVAL_STATUS")
 
 
-def _validate_generated_repr(
-    generated: Mapping[str, Any],
-    destination_kind: str,
-    status: str,
-) -> None:
-    kind = generated.get("kind")
-    if kind == "vyper":
-        _expect_keys(generated, ("kind", "repr"), "H04_GENERATED_KEYS")
-        if destination_kind != "defaults_field":
-            raise ManifestError("H04_NONDEFAULT_GENERATED")
-        if status in {"blocked", "unresolved", "not_applicable", "omitted"}:
-            raise ManifestError("H04_UNRESOLVED_GENERATED")
-        if not isinstance(generated["repr"], str) or not generated["repr"]:
-            raise ManifestError("H04_GENERATED_REPR")
-    elif kind == "not_generated":
-        _expect_keys(generated, ("kind", "reason"), "H04_GENERATED_KEYS")
-        if not isinstance(generated["reason"], str) or not generated["reason"]:
-            raise ManifestError("H04_NOT_GENERATED_REASON")
-    else:
-        raise ManifestError("H04_GENERATED_KIND")
-
-
-def _validate_record(record: Mapping[str, Any]) -> None:
-    _expect_keys(record, RECORD_KEYS, "H04_RECORD_KEYS")
-    if not re.fullmatch(r"P-H04-\d{3}", str(record["id"])):
-        raise ManifestError("H04_RECORD_ID")
-    if not re.fullmatch(r"CM-0(?:[0-5]\d|60)", str(record["h03_ref"])):
-        raise ManifestError("H04_H03_REFERENCE")
-
-    destination = record["destination"]
-    if not isinstance(destination, Mapping):
-        raise ManifestError("H04_DESTINATION_TYPE")
-    _expect_keys(destination, DESTINATION_KEYS, "H04_DESTINATION_KEYS")
-    destination_kind = destination["kind"]
-    if destination_kind not in DESTINATION_KINDS:
-        raise ManifestError("H04_DESTINATION_KIND")
-    if not isinstance(destination["path"], str) or not destination["path"]:
-        raise ManifestError("H04_DESTINATION_PATH")
-
-    if not isinstance(record["description"], str) or not record["description"]:
-        raise ManifestError("H04_DESCRIPTION")
-    if not isinstance(record["value"], Mapping):
-        raise ManifestError("H04_VALUE_TYPE")
-    value_kind = _validate_value(record["value"])
-    status = record["status"]
-    if status not in STATUS_VALUE_KINDS:
-        raise ManifestError("H04_STATUS")
-    if value_kind not in STATUS_VALUE_KINDS[status]:
-        raise ManifestError("H04_STATUS_VALUE_KIND")
-
-    if not isinstance(record["unit"], Mapping):
-        raise ManifestError("H04_UNIT_TYPE")
-    _validate_unit(record["unit"])
-
-    source = record["source"]
-    if not isinstance(source, Mapping):
-        raise ManifestError("H04_SOURCE_TYPE")
-    _expect_keys(source, SOURCE_KEYS, "H04_SOURCE_KEYS")
-    if not isinstance(source["citation"], str) or not source["citation"]:
-        raise ManifestError("H04_SOURCE_CITATION")
-    if not re.fullmatch(r"[0-9a-f]{40}", str(source["commit"])):
-        raise ManifestError("H04_SOURCE_COMMIT")
-
-    owner = record["owner"]
-    if not isinstance(owner, Mapping):
-        raise ManifestError("H04_OWNER_TYPE")
-    _expect_keys(owner, OWNER_KEYS, "H04_OWNER_KEYS")
-    if owner["kind"] not in {"decision", "workstream"}:
-        raise ManifestError("H04_OWNER_KIND")
-    if not isinstance(owner["id"], str) or not owner["id"]:
-        raise ManifestError("H04_OWNER_ID")
-    if record["reviewer_class"] not in REVIEWER_CLASSES:
-        raise ManifestError("H04_REVIEWER_CLASS")
-    if not isinstance(record["approval"], Mapping):
-        raise ManifestError("H04_APPROVAL_TYPE")
-    _validate_approval(record["approval"], status)
-    if record["launch_phase"] not in LAUNCH_PHASES:
-        raise ManifestError("H04_LAUNCH_PHASE")
-    if not isinstance(record["blockers"], list):
-        raise ManifestError("H04_BLOCKERS_TYPE")
-    if len(record["blockers"]) != len(set(record["blockers"])):
-        raise ManifestError("H04_DUPLICATE_BLOCKER")
-    if any(blocker not in BLOCKERS for blocker in record["blockers"]):
-        raise ManifestError("H04_UNKNOWN_BLOCKER")
-    if status in {"blocked", "unresolved"} and not record["blockers"]:
-        raise ManifestError("H04_MISSING_BLOCKER")
-    zero = record["zero_semantics"]
-    if not isinstance(zero, Mapping):
-        raise ManifestError("H04_ZERO_TYPE")
-    _expect_keys(zero, ("kind", "explanation"), "H04_ZERO_KEYS")
-    if zero["kind"] not in ZERO_KINDS or not zero["explanation"]:
-        raise ManifestError("H04_ZERO_SEMANTICS")
-    raw = record["value"].get("raw")
-    if raw == 0 and type(raw) is int and zero["kind"] != "legitimate_zero":
-        raise ManifestError("H04_ZERO_UNTYPED")
-    if raw is False and zero["kind"] != "legitimate_false":
-        raise ManifestError("H04_FALSE_UNTYPED")
-    if (
-        raw == "[]"
-        and record["id"] == "P-H04-412"
-        and zero["kind"] != "legitimate_empty"
-    ):
-        raise ManifestError("H04_EMPTY_UNTYPED")
-    if raw not in (0, False) and zero["kind"] in {
-        "legitimate_zero",
-        "legitimate_false",
-        "legitimate_empty",
-    }:
-        if (
-            raw != "empty(address)"
-            and raw != "[]"
-            and not (
-                raw == "[]"
-                and zero["kind"] == "legitimate_empty"
-            )
-        ):
-            raise ManifestError("H04_ZERO_SEMANTICS_MISMATCH")
-
-    comparison = record["base_comparison"]
-    if not isinstance(comparison, Mapping):
-        raise ManifestError("H04_BASE_COMPARISON_TYPE")
-    _expect_keys(
-        comparison,
-        ("kind", "detail"),
-        "H04_BASE_COMPARISON_KEYS",
-    )
-    if comparison["kind"] not in BASE_COMPARISON_KINDS:
-        raise ManifestError("H04_BASE_COMPARISON")
-    conversion = record["conversion"]
-    if not isinstance(conversion, Mapping):
-        raise ManifestError("H04_CONVERSION_TYPE")
-    kind = conversion.get("kind")
-    if kind not in CONVERSION_KINDS:
-        raise ManifestError("H04_CONVERSION_KIND")
-    if kind == "ceil_base_blocks_div_6":
-        _expect_keys(
-            conversion,
-            ("kind", "base_blocks", "rh_blocks"),
-            "H04_CONVERSION_KEYS",
-        )
-        if convert_base_blocks(conversion["base_blocks"]) != conversion["rh_blocks"]:
-            raise ManifestError("H04_BLOCK_CONVERSION")
-        if record["unit"]["kind"] != "blocks":
-            raise ManifestError("H04_BLOCK_CONVERSION_DOMAIN")
-    elif kind == "formula":
-        _expect_keys(conversion, ("kind", "formula"), "H04_CONVERSION_KEYS")
-    else:
-        _expect_keys(conversion, ("kind",), "H04_CONVERSION_KEYS")
-    if record["unit"]["kind"] == "seconds" and kind != "seconds_unchanged":
-        raise ManifestError("H04_SECONDS_CONVERSION")
-    if record["unit"]["kind"] == "rate_per_block_1e6" and kind != "identity":
-        raise ManifestError("H04_DANGER_SLOPE_CONVERSION")
-
-    generated = record["generated_repr"]
-    if not isinstance(generated, Mapping):
-        raise ManifestError("H04_GENERATED_TYPE")
-    _validate_generated_repr(generated, destination_kind, status)
-    for field in ("consumers", "invalidation"):
-        value = record[field]
-        if (
-            not isinstance(value, list)
-            or not value
-            or not all(isinstance(item, str) and item for item in value)
-            or len(value) != len(set(value))
-        ):
-            raise ManifestError(f"H04_{field.upper()}")
-
-
-PROFILE1_AUTHORITY_PATH = (
-    "docs/chains/rh/reassessment-and-qualification-synthesis.md"
-)
-PROFILE1_AUTHORITY_COMMIT = "621eb52fe8ded61dcb679c96fb071249764e4570"
-PROFILE1_AUTHORITY_SHA256 = (
-    "5caac39339bdead1d6f15bd197556762d9bc4bcefe9b24960ea6c6fb8173c4ad"
-)
-CANONICAL_DELEVERAGE_DESTINATIONS = frozenset(
-    ("Deployment.DP-03.deleverage.deleverageCooldown",)
-)
-FORBIDDEN_DELEVERAGE_FIELD_NAMES = (
-    "fullPayoffBuffer",
-    "overageBps",
-    "dustThreshold",
-    "dustBps",
-)
-FORBIDDEN_BASE_DELEVERAGE_VALUES = {
-    "fullpayoffbuffer": 10**15,
-    "overagebps": 100,
-}
-
-
-def _forbidden_deleverage_field(path: str) -> str | None:
-    lowered = path.casefold()
-    for field in FORBIDDEN_DELEVERAGE_FIELD_NAMES:
-        normalized = field.casefold()
-        if re.search(
-            rf"(?<![a-z0-9_]){re.escape(normalized)}(?![a-z0-9_])",
-            lowered,
-        ):
-            return normalized
-    return None
-
-
-def binding_schedules_digest(schedules: Sequence[Mapping[str, Any]]) -> str:
-    encoded = (
-        json.dumps(schedules, sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _validate_decision_registry(registry: Any) -> None:
-    if not isinstance(registry, list):
-        raise ManifestError("H04_DECISION_REGISTRY_TYPE")
-    for decision in registry:
-        if not isinstance(decision, Mapping):
-            raise ManifestError("H04_DECISION_REGISTRY_RECORD")
-        _expect_keys(decision, DECISION_KEYS, "H04_DECISION_REGISTRY_KEYS")
-    if registry != EXPECTED_DECISION_REGISTRY:
-        raise ManifestError("H04_DECISION_LIFECYCLE")
-    ids = [decision["id"] for decision in registry]
-    if len(ids) != len(set(ids)):
-        raise ManifestError("H04_DUPLICATE_DECISION")
-
-
-def _validate_binding_schedules(schedules: Any) -> dict[str, str]:
-    if not isinstance(schedules, list):
-        raise ManifestError("H04_BINDING_SCHEDULES_TYPE")
-    for schedule in schedules:
-        if not isinstance(schedule, Mapping):
-            raise ManifestError("H04_BINDING_SCHEDULE_RECORD")
-        _expect_keys(
-            schedule,
-            BINDING_SCHEDULE_KEYS,
-            "H04_BINDING_SCHEDULE_KEYS",
-        )
-    ownership: dict[str, str] = {}
-    schedule_ids: set[str] = set()
-    for schedule in schedules:
-        schedule_id = str(schedule["id"])
-        if schedule_id in schedule_ids:
-            raise ManifestError("H04_DUPLICATE_SCHEDULE_ID")
-        schedule_ids.add(schedule_id)
-        records = schedule["records"]
-        if (
-            not isinstance(records, list)
-            or not records
-            or len(records) != len(set(records))
-        ):
-            raise ManifestError("H04_SCHEDULE_RECORD_SET")
-        for record_id in records:
-            if not isinstance(record_id, str) or not re.fullmatch(
-                r"P-H04-\d{3}", record_id
-            ):
-                raise ManifestError("H04_SCHEDULE_RECORD_ID")
-            if record_id in ownership:
-                raise ManifestError("H04_DUPLICATE_SCHEDULE_OWNERSHIP")
-            ownership[record_id] = schedule_id
-    if len(schedules) != 14 or len(ownership) != 61:
-        raise ManifestError("H04_BINDING_SCHEDULE_CENSUS")
-    if schedules != EXPECTED_BINDING_SCHEDULES:
-        raise ManifestError("H04_BINDING_SCHEDULE_SEMANTICS")
-    if binding_schedules_digest(schedules) != BINDING_SCHEDULES_SHA256:
-        raise ManifestError("H04_BINDING_SCHEDULE_DIGEST")
-    return ownership
-
-
-def _validate_policy_transitions(lookup_by_id: Mapping[str, Mapping[str, Any]]) -> None:
-    lite = lookup_by_id["P-H04-305"]
-    if (
-        lite["status"] != "omitted"
-        or lite["value"]["kind"] != "typed_null"
-        or lite["blockers"]
-        or lite["approval"] != OWNER_POLICY_APPROVAL
-        or lite["owner"] != {"kind": "decision", "id": "D-H04-15"}
-    ):
-        raise ManifestError("H04_LITE_SIGNER_POLICY")
-
-    deployment_signers = lookup_by_id["P-H04-412"]
-    if (
-        deployment_signers["status"] != "approved"
-        or deployment_signers["value"] != {"kind": "concrete", "raw": "[]"}
-        or deployment_signers["unit"] != {"kind": "address"}
-        or deployment_signers["zero_semantics"]["kind"] != "legitimate_empty"
-        or deployment_signers["blockers"]
-        or deployment_signers["approval"] != OWNER_POLICY_APPROVAL
-        or deployment_signers["owner"]
-        != {"kind": "decision", "id": "D-H04-15"}
-    ):
-        raise ManifestError("H04_LITE_SIGNER_CROSS_BOUNDARY")
-
-    for record_id in ("P-H04-415", "P-H04-417", "P-H04-419"):
-        record = lookup_by_id[record_id]
-        if (
-            record["status"] != "approved"
-            or record["value"] != {"kind": "concrete", "raw": 0}
-            or record["zero_semantics"]["kind"] != "legitimate_zero"
-            or record["blockers"]
-            or record["approval"] != OWNER_POLICY_APPROVAL
-            or record["owner"] != {"kind": "decision", "id": "D-H04-16"}
-        ):
-            raise ManifestError("H04_NO_PREMINT_POLICY")
-
-    for number in range(81, 112):
-        record = lookup_by_id[f"P-H04-{number:03d}"]
-        if (
-            record["status"] != "omitted"
-            or record["value"]["kind"] != "typed_null"
-            or record["blockers"]
-            or record["approval"] != OWNER_POLICY_APPROVAL
-            or record["owner"] != {"kind": "decision", "id": "D-H04-17"}
-            or record["launch_phase"] != "omitted"
-        ):
-            raise ManifestError("H04_STOCK_LAUNCH_OMISSION")
-
-
-def validate_manifest(
-    manifest: Mapping[str, Any],
-    *,
-    require_canonical_state: bool = True,
-) -> Mapping[str, Any]:
-    """Validate the entire closed schema and all cross-record invariants."""
-    _reject_null(manifest)
-    _expect_keys(manifest, TOP_KEYS, "H04_TOP_KEYS")
-    if manifest["schema_version"] != SCHEMA_VERSION:
-        raise ManifestError("H04_SCHEMA_VERSION")
-    baseline = manifest["baseline"]
+def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
+    _expect_keys(ledger, TOP_LEVEL_KEYS, "H04_TOP_KEYS")
+    schema = ledger.get("schema_version")
+    allowed = {SCHEMA_VERSION}
+    if allow_legacy:
+        allowed.add(LEGACY_SCHEMA_VERSION)
+    if schema not in allowed:
+        raise ManifestError(f"H04_SCHEMA_VERSION:{schema}")
+    baseline = ledger.get("baseline")
     if not isinstance(baseline, Mapping):
         raise ManifestError("H04_BASELINE_TYPE")
     _expect_keys(baseline, BASELINE_KEYS, "H04_BASELINE_KEYS")
-    expected_baseline = {
-        "commit": BASELINE_COMMIT,
-        "tree": BASELINE_TREE,
-        "branch": "rh",
-        "phase_a_evidence_sha256": PHASE_A_SHA256,
-        "controlling_r2_path": R2_REPOSITORY_PATH,
-        "controlling_r2_sha256": R2_SHA256,
+
+    registry = ledger.get("decision_registry")
+    if not isinstance(registry, list) or len(registry) != 22:
+        raise ManifestError("H04_DECISION_REGISTRY_CENSUS")
+    for entry in registry:
+        if not isinstance(entry, Mapping):
+            raise ManifestError("H04_DECISION_TYPE")
+        _expect_keys(entry, {"id", "status", "operative"}, "H04_DECISION_KEYS")
+
+    schedules = ledger.get("binding_schedules")
+    schedule_keys = {
+        "id",
+        "records",
+        "owner",
+        "reviewer_class",
+        "classification",
+        "lifecycle_phase",
+        "prerequisite",
+        "closure_artifacts",
+        "invalidation",
     }
-    if dict(baseline) != expected_baseline:
-        raise ManifestError("H04_BASELINE_IDENTITY")
-    _reject_sensitive_or_placeholder_text(baseline)
-    _validate_decision_registry(manifest["decision_registry"])
-    schedule_ownership = _validate_binding_schedules(
-        manifest["binding_schedules"]
+    if not isinstance(schedules, list) or len(schedules) != 14:
+        raise ManifestError("H04_BINDING_SCHEDULE_CENSUS")
+    for entry in schedules:
+        if not isinstance(entry, Mapping):
+            raise ManifestError("H04_SCHEDULE_TYPE")
+        _expect_keys(entry, schedule_keys, "H04_SCHEDULE_KEYS")
+
+    parameters = ledger.get("parameters")
+    if not isinstance(parameters, list) or len(parameters) != 436:
+        raise ManifestError("H04_PARAMETER_CENSUS")
+    expected_record_keys = (
+        LEGACY_RECORD_KEYS if schema == LEGACY_SCHEMA_VERSION else RECORD_KEYS
     )
-    parameters = manifest["parameters"]
-    if not isinstance(parameters, list) or not parameters:
-        raise ManifestError("H04_PARAMETERS")
-    _reject_sensitive_or_placeholder_text(parameters)
+    ids: list[str] = []
+    destinations: list[str] = []
     for record in parameters:
         if not isinstance(record, Mapping):
             raise ManifestError("H04_RECORD_TYPE")
-        _validate_record(record)
-    ids = [record["id"] for record in parameters]
-    expected_ids = [f"P-H04-{index:03d}" for index in range(1, len(ids) + 1)]
-    if ids != expected_ids:
-        raise ManifestError("H04_ID_ORDER")
-    lookup_by_id = {record["id"]: record for record in parameters}
-    if set(schedule_ownership) - set(lookup_by_id):
-        raise ManifestError("H04_UNKNOWN_SCHEDULE_RECORD")
-
-    referenced_ownership: dict[str, str] = {}
-    for record in parameters:
-        approval = record["approval"]
-        schedule_id = approval.get("schedule_id")
-        if schedule_id is None:
-            if record["id"] in schedule_ownership:
-                raise ManifestError("H04_MISSING_SCHEDULE_OWNERSHIP")
-            continue
-        if schedule_id not in {
-            schedule["id"] for schedule in manifest["binding_schedules"]
-        }:
-            raise ManifestError("H04_UNKNOWN_SCHEDULE_ID")
-        if schedule_ownership.get(record["id"]) != schedule_id:
-            raise ManifestError("H04_SCHEDULE_REVERSE_REFERENCE")
-        if record["id"] in referenced_ownership:
-            raise ManifestError("H04_DUPLICATE_SCHEDULE_OWNERSHIP")
-        referenced_ownership[record["id"]] = str(schedule_id)
-    if referenced_ownership != schedule_ownership:
-        raise ManifestError("H04_MISSING_SCHEDULE_REVERSE_REFERENCE")
-
-    _validate_policy_transitions(lookup_by_id)
-    destinations = [record["destination"]["path"] for record in parameters]
-    for record in parameters:
-        path = record["destination"]["path"]
-        forbidden_field = _forbidden_deleverage_field(path)
-        if forbidden_field is None:
-            continue
-        forbidden_base_value = FORBIDDEN_BASE_DELEVERAGE_VALUES.get(
-            forbidden_field
-        )
-        if (
-            forbidden_base_value is not None
-            and record["value"].get("raw") == forbidden_base_value
+        _expect_keys(record, expected_record_keys, "H04_RECORD_KEYS")
+        ids.append(str(record["id"]))
+        destination = record["destination"]
+        _expect_keys(destination, {"kind", "path"}, "H04_DESTINATION_KEYS")
+        destinations.append(str(destination["path"]))
+        _validate_value(record["value"])
+        _reject_sensitive_or_placeholder_text(record["value"])
+        unit = record["unit"]
+        if set(unit) not in ({"kind"}, {"kind", "denominator"}):
+            raise ManifestError("H04_UNIT_KEYS")
+        _expect_keys(record["source"], {"citation", "commit"}, "H04_SOURCE_KEYS")
+        _expect_keys(record["owner"], {"kind", "id"}, "H04_OWNER_KEYS")
+        approval_keys = set(record["approval"])
+        if approval_keys not in (
+            {"status", "date", "provenance"},
+            {"status", "date", "provenance", "schedule_id"},
+            {"status", "schedule_id"},
         ):
-            raise ManifestError("H04_BASE_DELEVERAGE_VALUE")
-        raise ManifestError("H04_DELEVERAGE_REPRESENTATION")
-    if any(
-        "deleverage" in path.casefold()
-        and path not in CANONICAL_DELEVERAGE_DESTINATIONS
-        for path in destinations
-    ):
-        raise ManifestError("H04_DELEVERAGE_REPRESENTATION")
-    if len(destinations) != len(set(destinations)):
-        raise ManifestError("H04_DUPLICATE_DESTINATION")
-    expected_defaults = canonical_default_paths()
-    actual_defaults = tuple(
-        record["destination"]["path"]
-        for record in parameters
-        if record["destination"]["kind"] == "defaults_field"
-    )
-    if actual_defaults != expected_defaults:
-        raise ManifestError("H04_DEFAULT_ORDER_OR_CENSUS")
-    deployment_rows = [
-        record
-        for record in parameters
-        if record["destination"]["kind"] != "defaults_field"
-    ]
-    covered_dp = {
-        match.group(1)
-        for record in deployment_rows
-        if (
-            match := re.match(
-                r"Deployment\.(DP-(?:0[1-9]|1[0-9]|2[0-2]))(?:\.|$)",
-                record["destination"]["path"],
-            )
+            raise ManifestError("H04_APPROVAL_KEYS")
+        _expect_keys(
+            record["zero_semantics"],
+            {"kind", "explanation"},
+            "H04_ZERO_KEYS",
         )
-    }
-    if covered_dp != {f"DP-{index:02d}" for index in range(1, 23)}:
-        raise ManifestError("H04_DP_CENSUS")
-    if require_canonical_state:
-        status_counts = dict(Counter(record["status"] for record in parameters))
-        approval_counts = dict(
-            Counter(record["approval"]["status"] for record in parameters)
+        _expect_keys(
+            record["base_comparison"],
+            {"kind", "detail"},
+            "H04_BASE_COMPARISON_KEYS",
         )
-        if status_counts != EXPECTED_CANONICAL_COUNTS["status"]:
-            raise ManifestError("H04_STATUS_CENSUS")
-        if approval_counts != EXPECTED_CANONICAL_COUNTS["approval"]:
-            raise ManifestError("H04_APPROVAL_CENSUS")
-        for record_id, blockers in EXPECTED_OPERATIVE_BLOCKERS.items():
-            if lookup_by_id[record_id]["blockers"] != blockers:
-                raise ManifestError("H04_OPERATIVE_BLOCKER_BINDING")
-        if any(
-            blocker.startswith("D-H04-")
+        conversion_keys = set(record["conversion"])
+        if conversion_keys not in (
+            {"kind"},
+            {"kind", "formula"},
+            {"kind", "base_blocks", "rh_blocks"},
+        ):
+            raise ManifestError("H04_CONVERSION_KEYS")
+        for field in ("blockers", "consumers", "invalidation"):
+            if not isinstance(record[field], list):
+                raise ManifestError(f"H04_{field.upper()}_TYPE")
+    if len(set(ids)) != 436 or ids != [f"P-H04-{i:03d}" for i in range(1, 437)]:
+        raise ManifestError("H04_PARAMETER_IDS")
+    _validate_assertion_path_census(
+        [
+            str(record["destination"]["path"])
             for record in parameters
-            for blocker in record["blockers"]
-        ):
-            raise ManifestError("H04_DECISION_AS_OPERATIVE_BLOCKER")
-
-    normalized = {
-        re.sub(r"\[[^]]+\]", "[*]", path) for path in actual_defaults
-    }
-    if normalized != set(canonical_default_templates()):
-        raise ManifestError("H04_109_PARITY")
-    selectors = {
-        path.split(".", 2)[1].split("[", 1)[0] for path in actual_defaults
-    }
-    if selectors != set(default_selectors()) or len(selectors) != 17:
-        raise ManifestError("H04_17_SELECTOR_PARITY")
-
-    lookup = {
-        record["destination"]["path"]: record for record in parameters
-    }
-    allocations = (
-        "borrowersAlloc",
-        "stakersAlloc",
-        "votersAlloc",
-        "genDepositorsAlloc",
+            if record["destination"]["kind"] == "assertion"
+        ]
     )
-    reward_values = [
-        lookup[f"Defaults.rewardsConfig.{field}"]["value"]["raw"]
-        for field in allocations
-    ]
-    if any(value != 0 for value in reward_values):
-        if sum(reward_values) != 10_000:
-            raise ManifestError("H04_REWARD_ALLOCATION")
-    for field in allocations:
-        record = lookup[f"Defaults.rewardsConfig.{field}"]
-        if record["status"] != "disabled" or record["zero_semantics"]["kind"] != (
-            "legitimate_zero"
-        ):
-            raise ManifestError("H04_REWARD_DISABLED_ZERO")
-    return manifest
+    if len(set(destinations)) != 436:
+        raise ManifestError("H04_DUPLICATE_DESTINATION")
 
 
-def load_manifest(path: Path) -> Mapping[str, Any]:
-    data = path.read_bytes()
+def load_ledger(path: Path = LEDGER_PATH, *, allow_legacy: bool = False) -> Mapping[str, Any]:
     try:
-        parsed = json.loads(data)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ManifestError("H04_JSON") from exc
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ManifestError(f"H04_JSON:{exc}") from exc
     if not isinstance(parsed, Mapping):
         raise ManifestError("H04_TOP_TYPE")
-    return validate_manifest(parsed)
+    _validate_shape(parsed, allow_legacy=allow_legacy)
+    return parsed
 
 
-def _record_map(manifest: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
-    return {
-        record["destination"]["path"]: record
-        for record in manifest["parameters"]
+def _blueprint_module() -> Any:
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    module = importlib.import_module("config.BluePrint")
+    if set(module.ROBINHOOD_DEPLOYMENT_INPUTS) != {
+        record["destination"]["path"]
+        for record in load_ledger(allow_legacy=True)["parameters"]
+        if record["destination"]["kind"] == "deployment_input"
+    }:
+        raise ManifestError("H04_BLUEPRINT_DEPLOYMENT_INPUT_CENSUS")
+    if tuple(key for _, key in module.ROBINHOOD_DEFAULTS_CONSTRUCTOR) != CONSTRUCTOR_BLUEPRINT_KEYS:
+        raise ManifestError("H04_CONSTRUCTOR_BINDING_ORDER")
+    return module
+
+
+def _field(value: Any, dotted: str) -> Any:
+    for name in dotted.split("."):
+        value = getattr(value, name)
+    return value
+
+
+def _ledger_leaf(value: Any, sentinel_bindings: Mapping[str, Any]) -> Mapping[str, Any]:
+    if type(value).__name__ == "Address":
+        text = str(value)
+        lowered = text.lower()
+        if lowered in sentinel_bindings:
+            binding = sentinel_bindings[lowered]
+            if type(binding).__name__ == "SymbolicBinding":
+                return {"kind": "symbolic_binding", "name": binding.semantic_name}
+            if not isinstance(binding, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{40}", binding):
+                raise ManifestError("H04_CONSTRUCTOR_ADDRESS_BINDING")
+            return {"kind": "external_fact", "raw": binding}
+        if lowered == "0x" + "0" * 40:
+            return {"kind": "concrete", "raw": "empty(address)"}
+        raise ManifestError(f"H04_DEFAULTS_NONCONSTRUCTOR_ADDRESS:{text}")
+    if isinstance(value, list):
+        normalized: list[Any] = []
+        for item in value:
+            leaf = _ledger_leaf(item, sentinel_bindings)
+            if leaf["kind"] != "concrete":
+                raise ManifestError("H04_NESTED_ADDRESS_LIST")
+            normalized.append(leaf["raw"])
+        return {"kind": "concrete", "raw": normalized}
+    if type(value) not in (bool, int, str):
+        raise ManifestError(f"H04_RUNTIME_VALUE_TYPE:{type(value).__name__}")
+    return {"kind": "concrete", "raw": value}
+
+
+def _add_fields(
+    values: dict[str, Mapping[str, Any]],
+    prefix: str,
+    result: Any,
+    fields: Sequence[str],
+    sentinel_bindings: Mapping[str, Any],
+) -> None:
+    for field in fields:
+        path = f"{prefix}.{field}"
+        if path in values:
+            raise ManifestError(f"H04_DUPLICATE_SOURCE_PATH:{path}")
+        values[path] = _ledger_leaf(_field(result, field), sentinel_bindings)
+
+
+def _extract_defaults_values_in_active_env(
+    boa_module: Any,
+    defaults_path: Path,
+    sentinels: Sequence[str],
+    selected: Any,
+    sentinel_bindings: Mapping[str, Any],
+) -> dict[str, Mapping[str, Any]]:
+    contract = boa_module.load(str(defaults_path), *sentinels)
+    constructor = next(
+        (entry for entry in contract.abi if entry.get("type") == "constructor"),
+        None,
+    )
+    abi_names = tuple(item["name"] for item in constructor["inputs"]) if constructor else ()
+    if abi_names != CONSTRUCTOR_ABI_NAMES:
+        raise ManifestError(f"H04_CONSTRUCTOR_ABI:{abi_names}")
+
+    values: dict[str, Mapping[str, Any]] = {}
+    gen = contract.genConfig()
+    _add_fields(values, "Defaults.genConfig", gen, GEN_CONFIG_FIELDS, sentinel_bindings)
+    debt = contract.genDebtConfig()
+    _add_fields(values, "Defaults.genDebtConfig", debt, GEN_DEBT_FIELDS, sentinel_bindings)
+    _add_fields(
+        values,
+        "Defaults.genDebtConfig.genAuctionParams",
+        debt.genAuctionParams,
+        AUCTION_FIELDS,
+        sentinel_bindings,
+    )
+    for selector in ("ripeAvailForRewards", "ripeAvailForHr", "ripeAvailForBonds"):
+        values[f"Defaults.{selector}"] = _ledger_leaf(
+            getattr(contract, selector)(), sentinel_bindings
+        )
+    _add_fields(
+        values,
+        "Defaults.ripeBondConfig",
+        contract.ripeBondConfig(),
+        BOND_FIELDS,
+        sentinel_bindings,
+    )
+    _add_fields(
+        values,
+        "Defaults.rewardsConfig",
+        contract.rewardsConfig(),
+        REWARD_FIELDS,
+        sentinel_bindings,
+    )
+
+    gov_row_by_key = {"RIPE_TOKEN": "RIPE"}
+    sentinel_key = {
+        sentinel.lower(): key
+        for sentinel, (_, key) in zip(
+            sentinels, selected.ROBINHOOD_DEFAULTS_CONSTRUCTOR, strict=True
+        )
+    }
+    gov_results = contract.ripeGovVaultConfigs()
+    if len(gov_results) != 1:
+        raise ManifestError("H04_ACTIVE_GOV_ROW_CENSUS")
+    for entry in gov_results:
+        key = sentinel_key.get(str(entry.asset).lower())
+        row = gov_row_by_key.get(str(key))
+        if row is None:
+            raise ManifestError("H04_GOV_ROW_IDENTITY")
+        _add_fields(
+            values,
+            f"Defaults.ripeGovVaultConfigs[{row}]",
+            entry,
+            GOV_FIELDS,
+            sentinel_bindings,
+        )
+
+    _add_fields(values, "Defaults.hrConfig", contract.hrConfig(), HR_FIELDS, sentinel_bindings)
+    for selector in ("underscoreRegistry", "trainingWheels", "shouldCheckLastTouch"):
+        values[f"Defaults.{selector}"] = _ledger_leaf(
+            getattr(contract, selector)(), sentinel_bindings
+        )
+
+    asset_row_by_key = {
+        "STEAKHOUSE_USDG_VAULT": "STEAKHOUSE_USDG",
+        "WETH": "WETH",
+        "RIPE_TOKEN": "RIPE",
+        "SGREEN_TOKEN": "SGREEN",
+        "GREEN_TOKEN": "GREEN",
+    }
+    asset_results = contract.assetConfigs()
+    if len(asset_results) != 5:
+        raise ManifestError("H04_ACTIVE_ASSET_ROW_CENSUS")
+    seen_rows: set[str] = set()
+    for entry in asset_results:
+        key = sentinel_key.get(str(entry.asset).lower())
+        row = asset_row_by_key.get(str(key))
+        if row is None or row in seen_rows:
+            raise ManifestError("H04_ASSET_ROW_IDENTITY")
+        seen_rows.add(row)
+        _add_fields(
+            values,
+            f"Defaults.assetConfigs[{row}]",
+            entry,
+            ASSET_FIELDS,
+            sentinel_bindings,
+        )
+    if seen_rows != set(ACTIVE_ASSET_ROWS):
+        raise ManifestError("H04_ACTIVE_ASSET_ROWS")
+
+    liquidations = contract.priorityLiqAssetVaults()
+    if len(liquidations) != 2:
+        raise ManifestError("H04_PRIORITY_LIQ_CENSUS")
+    for index, entry in enumerate(liquidations):
+        _add_fields(
+            values,
+            f"Defaults.priorityLiqAssetVaults[{index}]",
+            entry,
+            ("vaultId", "asset"),
+            sentinel_bindings,
+        )
+    stability = contract.priorityStabVaults()
+    if len(stability) != 1:
+        raise ManifestError("H04_PRIORITY_STAB_CENSUS")
+    _add_fields(
+        values,
+        "Defaults.priorityStabVaults[0]",
+        stability[0],
+        ("vaultId", "asset"),
+        sentinel_bindings,
+    )
+    values["Defaults.priorityPriceSourceIds"] = _ledger_leaf(
+        contract.priorityPriceSourceIds(), sentinel_bindings
+    )
+    values["Defaults.liteSigners[0]"] = _ledger_leaf(
+        contract.liteSigners(), sentinel_bindings
+    )
+
+    for row in OMITTED_GOV_ROWS:
+        for field in GOV_FIELDS:
+            values[f"Defaults.ripeGovVaultConfigs[{row}].{field}"] = {
+                "kind": "omitted",
+                "profile": "Profile 2",
+            }
+    for row in OMITTED_ASSET_ROWS:
+        for field in ASSET_FIELDS:
+            values[f"Defaults.assetConfigs[{row}].{field}"] = {
+                "kind": "omitted",
+                "profile": "Profile 2",
+            }
+    if set(values) != set(canonical_default_paths()):
+        missing = sorted(set(canonical_default_paths()) - set(values))
+        extra = sorted(set(values) - set(canonical_default_paths()))
+        raise ManifestError(f"H04_DEFAULT_SOURCE_COVERAGE:missing={missing}:extra={extra}")
+    return values
+
+
+def extract_defaults_values(
+    defaults_path: Path = DEFAULTS_PATH,
+    blueprint: Any | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    if not defaults_path.is_file():
+        raise ManifestError("H04_DEFAULTS_MISSING")
+    robinhood_names = [
+        entry.name
+        for entry in defaults_path.parent.iterdir()
+        if entry.name.lower() == "defaultsrobinhood.vy"
+    ]
+    if robinhood_names != ["DefaultsRobinhood.vy"]:
+        raise ManifestError("H04_DEFAULTS_FILENAME_COLLISION")
+    source = defaults_path.read_text(encoding="utf-8")
+    nonzero_literals = [
+        item
+        for item in re.findall(r"0x[0-9A-Fa-f]{40}", source)
+        if item.lower() != "0x" + "0" * 40
+    ]
+    if nonzero_literals:
+        raise ManifestError(f"H04_DEFAULTS_ADDRESS_LITERAL:{nonzero_literals[0]}")
+
+    selected = blueprint or _blueprint_module()
+    if len(selected.ROBINHOOD_DEFAULTS_CONSTRUCTOR) != 8:
+        raise ManifestError("H04_CONSTRUCTOR_BINDING_CENSUS")
+    sentinels = tuple(f"0x{index:040x}" for index in range(1, 9))
+    if len(set(sentinels)) != 8:
+        raise ManifestError("H04_SENTINEL_DISTINCTNESS")
+    sentinel_bindings = {
+        sentinel.lower(): selected.ROBINHOOD_ADDRESSES[key]
+        for sentinel, (_, key) in zip(
+            sentinels, selected.ROBINHOOD_DEFAULTS_CONSTRUCTOR, strict=True
+        )
     }
 
+    try:
+        import vyper
+        if vyper.__version__ != "0.4.3":
+            raise ManifestError(f"H04_VYPER_VERSION:{vyper.__version__}")
+        import boa
+        import boa.interpret as boa_interpret
+        from boa.environment import Env
 
-def required_generation_paths() -> tuple[str, ...]:
-    paths = list(
-        path
-        for path in canonical_default_paths()
-        if "[AAPL]" not in path
-        and "[USDG]" not in path
-        and "[GREEN_USDG_LP]" not in path
-        and "[RIPE_WETH_LP]" not in path
-        and "priorityLiqAssetVaults" not in path
-        and "priorityStabVaults[0]" not in path
-        and path != "Defaults.liteSigners[0]"
-    )
-    return tuple(paths)
-
-
-def _repr(lookup: Mapping[str, Mapping[str, Any]], path: str) -> str:
-    record = lookup[path]
-    if record["status"] in {"blocked", "unresolved"}:
-        raise ManifestError(f"H04_UNRESOLVED_GENERATION:{path}")
-    generated = record["generated_repr"]
-    if generated["kind"] != "vyper":
-        raise ManifestError(f"H04_MISSING_GENERATED_REPR:{path}")
-    return str(generated["repr"])
-
-
-def _struct(name: str, fields: Sequence[tuple[str, str]], indent: int = 8) -> str:
-    del indent
-    inner = ", ".join(f"{key}={value}" for key, value in fields)
-    return f"cs.{name}({inner})"
-
-
-def _auction(
-    lookup: Mapping[str, Mapping[str, Any]], prefix: str, indent: int
-) -> str:
-    return _struct(
-        "AuctionParams",
-        [(field, _repr(lookup, f"{prefix}.{field}")) for field in AUCTION_FIELDS],
-        indent,
-    )
-
-
-def render_defaults(manifest: Mapping[str, Any]) -> str:
-    """Render a fully bound, already validated synthetic manifest."""
-    validate_manifest(manifest, require_canonical_state=False)
-    lookup = _record_map(manifest)
-    for path in required_generation_paths():
-        record = lookup[path]
-        if record["status"] in {"blocked", "unresolved"}:
-            raise ManifestError(f"H04_UNRESOLVED_GENERATION:{path}")
-
-    lines = [
-        "# @version 0.4.3",
-        "",
-        '"""Generated only from the reviewed Robinhood parameter manifest."""',
-        "",
-        "import interfaces.ConfigStructs as cs",
-        "",
-    ]
-
-    gen_config = _struct(
-        "GenConfig",
-        [
-            (field, _repr(lookup, f"Defaults.genConfig.{field}"))
-            for field in GEN_CONFIG_FIELDS
-        ],
-    )
-    lines.extend(
-        (
-            "@view",
-            "@external",
-            "def genConfig() -> cs.GenConfig:",
-            f"    return {gen_config}",
-            "",
-        )
-    )
-    debt_fields = [
-        (field, _repr(lookup, f"Defaults.genDebtConfig.{field}"))
-        for field in GEN_DEBT_FIELDS
-    ]
-    debt_fields.append(
-        (
-            "genAuctionParams",
-            _auction(
-                lookup,
-                "Defaults.genDebtConfig.genAuctionParams",
-                12,
-            ),
-        )
-    )
-    lines.extend(
-        (
-            "@view",
-            "@external",
-            "def genDebtConfig() -> cs.GenDebtConfig:",
-            f"    return {_struct('GenDebtConfig', debt_fields)}",
-            "",
-        )
-    )
-    for selector in (
-        "ripeAvailForRewards",
-        "ripeAvailForHr",
-        "ripeAvailForBonds",
-    ):
-        lines.extend(
-            (
-                "@view",
-                "@external",
-                f"def {selector}() -> uint256:",
-                f"    return {_repr(lookup, f'Defaults.{selector}')}",
-                "",
-            )
-        )
-    for selector, struct_name, fields in (
-        ("ripeBondConfig", "RipeBondConfig", BOND_FIELDS),
-        ("rewardsConfig", "RipeRewardsConfig", REWARD_FIELDS),
-        ("hrConfig", "HrConfig", HR_FIELDS),
-    ):
-        rendered = _struct(
-            struct_name,
-            [
-                (field, _repr(lookup, f"Defaults.{selector}.{field}"))
-                for field in fields
-            ],
-        )
-        lines.extend(
-            (
-                "@view",
-                "@external",
-                f"def {selector}() -> cs.{struct_name}:",
-                f"    return {rendered}",
-                "",
-            )
-        )
-
-    gov_entries = []
-    for row in PROFILE1_GOV_ROWS:
-        prefix = f"Defaults.ripeGovVaultConfigs[{row}]"
-        lock = _struct(
-            "LockTerms",
-            [
-                (
-                    field,
-                    _repr(lookup, f"{prefix}.config.lockTerms.{field}"),
+        previous_env = boa.env
+        previous_cache = boa_interpret._disk_cache
+        with tempfile.TemporaryDirectory(prefix="rh-defaults-normalize-") as cache:
+            os.chmod(cache, 0o700)
+            environment_scope = None
+            try:
+                boa_interpret.set_cache_dir(Path(cache) / "boa")
+                environment_scope = boa.set_env(Env())
+                return _extract_defaults_values_in_active_env(
+                    boa,
+                    defaults_path,
+                    sentinels,
+                    selected,
+                    sentinel_bindings,
                 )
-                for field in LOCK_FIELDS
-            ],
-            16,
-        )
-        config = _struct(
-            "RipeGovVaultConfig",
-            (
-                ("lockTerms", lock),
-                (
-                    "assetWeight",
-                    _repr(lookup, f"{prefix}.config.assetWeight"),
-                ),
-                (
-                    "shouldFreezeWhenBadDebt",
-                    _repr(lookup, f"{prefix}.config.shouldFreezeWhenBadDebt"),
-                ),
-            ),
-            12,
-        )
-        gov_entries.append(
-            _struct(
-                "RipeGovVaultConfigEntry",
-                (
-                    ("asset", _repr(lookup, f"{prefix}.asset")),
-                    ("config", config),
-                ),
-                8,
-            )
-        )
-    lines.extend(
-        (
-            "@view",
-            "@external",
-            "def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:",
-            "    return [",
-            *[f"        {entry}," for entry in gov_entries],
-            "    ]",
-            "",
-        )
-    )
-    for selector, return_type in (
-        ("underscoreRegistry", "address"),
-        ("trainingWheels", "address"),
-        ("shouldCheckLastTouch", "bool"),
-    ):
-        lines.extend(
-            (
-                "@view",
-                "@external",
-                f"def {selector}() -> {return_type}:",
-                f"    return {_repr(lookup, f'Defaults.{selector}')}",
-                "",
-            )
-        )
-
-    asset_entries = []
-    for row in PROFILE1_ASSET_ROWS:
-        prefix = f"Defaults.assetConfigs[{row}]"
-        debt = _struct(
-            "DebtTerms",
-            [
-                (
-                    field,
-                    _repr(lookup, f"{prefix}.config.debtTerms.{field}"),
-                )
-                for field in DEBT_TERM_FIELDS
-            ],
-            16,
-        )
-        auction = _auction(
-            lookup,
-            f"{prefix}.config.customAuctionParams",
-            16,
-        )
-        config_fields: list[tuple[str, str]] = []
-        for field in ASSET_FIELDS[1:]:
-            if field.startswith("config.debtTerms."):
-                if field.endswith(".ltv"):
-                    config_fields.append(("debtTerms", debt))
-                continue
-            if field.startswith("config.customAuctionParams."):
-                if field.endswith(".hasParams"):
-                    config_fields.append(("customAuctionParams", auction))
-                continue
-            name = field.removeprefix("config.")
-            config_fields.append((name, _repr(lookup, f"{prefix}.{field}")))
-        config = _struct("AssetConfig", config_fields, 12)
-        asset_entries.append(
-            _struct(
-                "AssetConfigEntry",
-                (
-                    ("asset", _repr(lookup, f"{prefix}.asset")),
-                    ("config", config),
-                ),
-                8,
-            )
-        )
-    lines.extend(
-        (
-            "@view",
-            "@external",
-            "def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:",
-            "    return [",
-            *[f"        {entry}," for entry in asset_entries],
-            "    ]",
-            "",
-            "@view",
-            "@external",
-            "def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:",
-            "    return []",
-            "",
-        )
-    )
-    stab_entries = []
-    for index in PROFILE1_STAB_VAULT_INDEXES:
-        prefix = f"Defaults.priorityStabVaults[{index}]"
-        stab_entries.append(
-            _struct(
-                "VaultLite",
-                (
-                    ("vaultId", _repr(lookup, f"{prefix}.vaultId")),
-                    ("asset", _repr(lookup, f"{prefix}.asset")),
-                ),
-                8,
-            )
-        )
-    lines.extend(
-        (
-            "@view",
-            "@external",
-            "def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:",
-            "    return [",
-            *[f"        {entry}," for entry in stab_entries],
-            "    ]",
-            "",
-            "@view",
-            "@external",
-            "def priorityPriceSourceIds() -> DynArray[uint256, 10]:",
-            "    return ["
-            + _repr(lookup, "Defaults.priorityPriceSourceIds[0]")
-            + "]",
-            "",
-            "@view",
-            "@external",
-            "def liteSigners() -> DynArray[address, 10]:",
-            "    return []",
-            "",
-        )
-    )
-    rendered = "\n".join(lines)
-    lowered = rendered.lower()
-    if "defaultsbase" in lowered or "defaultslocal" in lowered:
-        raise ManifestError("H04_BASE_LOCAL_NAME_LEAK")
-    if any(address in lowered for address in FORBIDDEN_BASE_ADDRESSES):
-        raise ManifestError("H04_BASE_ADDRESS_LEAK")
-    return rendered
+            finally:
+                if environment_scope is not None:
+                    environment_scope.__exit__(None, None, None)
+                # Restore the exact caller cache object before TemporaryDirectory
+                # removes the scoped cache tree.
+                boa_interpret._disk_cache = previous_cache
+    except ManifestError:
+        raise
+    except Exception as exc:
+        raise ManifestError(f"H04_DEFAULTS_COMPILE:{type(exc).__name__}:{exc}") from exc
 
 
-def atomic_replace_output(
-    rendered: str,
-    output: Path,
+def extract_deployment_values(
+    defaults_values: Mapping[str, Mapping[str, Any]],
+    blueprint: Any | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    selected = blueprint or _blueprint_module()
+    values: dict[str, Mapping[str, Any]] = {}
+    for path, record in selected.ROBINHOOD_DEPLOYMENT_INPUTS.items():
+        value = record.value
+        kind = type(value).__name__
+        if kind == "SourceReference":
+            if value.path not in defaults_values:
+                raise ManifestError(f"H04_SOURCE_REFERENCE:{path}:{value.path}")
+            normalized = copy.deepcopy(defaults_values[value.path])
+        elif kind == "SymbolicBinding":
+            normalized = {"kind": "symbolic_binding", "name": value.semantic_name}
+        elif value == selected.ZERO_ADDRESS:
+            normalized = {"kind": "concrete", "raw": "empty(address)"}
+        elif isinstance(value, str) and re.fullmatch(r"0x[0-9A-Fa-f]{40}", value):
+            normalized = {"kind": "external_fact", "raw": value}
+        elif type(value) in (bool, int, str) or isinstance(value, list):
+            normalized = {"kind": "concrete", "raw": copy.deepcopy(value)}
+        else:
+            raise ManifestError(f"H04_BLUEPRINT_VALUE_TYPE:{path}:{kind}")
+        _reject_sensitive_or_placeholder_text(normalized)
+        values[path] = normalized
+    if len(values) != 119:
+        raise ManifestError("H04_DEPLOYMENT_SOURCE_CENSUS")
+    return values
+
+
+def derive_assertion_values(
+    defaults_values: Mapping[str, Mapping[str, Any]],
+    blueprint: Any | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    selected = blueprint or _blueprint_module()
+    invariants = selected.ROBINHOOD_ASSERTION_INVARIANTS
+    expected_invariant_keys = {
+        "deleverage_launch_cooldown",
+        "timelock_base_headroom_blocks",
+        "base_blocks_per_robinhood_block",
+        "psm_activation_sequence",
+        "aapl_cap_formula",
+        "aapl_cap_inputs",
+        "stock_enabled_vaults",
+        "stock_excluded_from_stability_pool",
+        "profile_2_lp_ltv",
+    }
+    if set(invariants) != expected_invariant_keys:
+        raise ManifestError("H04_ASSERTION_INVARIANT_CENSUS")
+
+    underscore = defaults_values["Defaults.underscoreRegistry"]
+    if underscore != {"kind": "concrete", "raw": "empty(address)"}:
+        raise ManifestError("H04_ASSERTION_UNDERSCORE_SEMANTIC")
+
+    arb_sys = selected.ROBINHOOD_ADDRESSES["ARB_SYS"]
+    if not isinstance(arb_sys, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{40}", arb_sys):
+        raise ManifestError("H04_ASSERTION_ARB_SYS")
+
+    ratio = invariants["base_blocks_per_robinhood_block"]
+    base_headroom = invariants["timelock_base_headroom_blocks"]
+    if type(ratio) is not int or ratio <= 0 or type(base_headroom) is not int:
+        raise ManifestError("H04_ASSERTION_TIMELOCK_FORMULA")
+
+    sequence = tuple(invariants["psm_activation_sequence"])
+    if len(sequence) != len(set(sequence)) or {
+        "redemption",
+        "green_mint",
+    } - set(sequence):
+        raise ManifestError("H04_ASSERTION_PSM_SEQUENCE")
+
+    active_asset_rows = {
+        row
+        for row in ASSET_ROWS
+        if defaults_values[f"Defaults.assetConfigs[{row}].asset"]["kind"]
+        != "omitted"
+    }
+    if active_asset_rows != set(ACTIVE_ASSET_ROWS):
+        raise ManifestError("H04_ASSERTION_ACTIVE_ASSETS")
+
+    values: dict[str, Mapping[str, Any]] = {
+        "Deployment.DP-01.lootbox.minUnderscoreSendInterval": {
+            "kind": "concrete",
+            "raw": selected.ROBINHOOD_CHAIN["blocks_per_minute"] * 60 * 24,
+        },
+        "Deployment.DP-02.lootbox.underscoreSendInterval": {
+            "kind": "concrete",
+            "raw": 0,
+        },
+        "Deployment.DP-03.deleverage.deleverageCooldown": {
+            "kind": "concrete",
+            "raw": invariants["deleverage_launch_cooldown"],
+        },
+        "Deployment.DP-04.ledger.actionBlockSourceSemantic": {
+            "kind": "concrete",
+            "raw": hex(int(arb_sys, 16)),
+        },
+        "Deployment.DP-06.timelocks.minimumExpirationHeadroom": {
+            "kind": "concrete",
+            "raw": (base_headroom + ratio - 1) // ratio,
+        },
+        "Deployment.DP-09.psm.redemptionFirstOrder": {
+            "kind": "concrete",
+            "raw": sequence.index("redemption") + 1,
+        },
+        "Deployment.DP-09.psm.greenMintLastOrder": {
+            "kind": "concrete",
+            "raw": sequence.index("green_mint") + 1,
+        },
+        "Deployment.DP-10.aapl.capFormula": {
+            "kind": "derived",
+            "formula": invariants["aapl_cap_formula"],
+            "inputs": list(invariants["aapl_cap_inputs"]),
+        },
+        "Deployment.DP-11.stock.enabledVaultCount": {
+            "kind": "concrete",
+            "raw": len(tuple(invariants["stock_enabled_vaults"])),
+        },
+        "Deployment.DP-12.launchGraph.assetCount": {
+            "kind": "concrete",
+            "raw": len(active_asset_rows),
+        },
+        "Deployment.DP-13.stock.excludedFromStabilityPool": {
+            "kind": "concrete",
+            "raw": invariants["stock_excluded_from_stability_pool"],
+        },
+        "Deployment.DP-14.lp.ltv": {
+            "kind": "concrete",
+            "raw": invariants["profile_2_lp_ltv"],
+        },
+    }
+    _validate_assertion_path_census(tuple(values))
+    for value in values.values():
+        _validate_value(value)
+    return values
+
+
+def _validate_census(ledger: Mapping[str, Any]) -> None:
+    records = ledger["parameters"]
+    by_kind = Counter(record["destination"]["kind"] for record in records)
+    if by_kind != Counter(defaults_field=305, deployment_input=119, assertion=12):
+        raise ManifestError(f"H04_PARTITION:{dict(by_kind)}")
+    defaults = [record for record in records if record["destination"]["kind"] == "defaults_field"]
+    statuses = Counter(record["status"] for record in defaults)
+    if statuses != Counter(approved=223, external_fact=5, blocked=7, omitted=70):
+        raise ManifestError(f"H04_DEFAULT_STATUS_PARTITION:{dict(statuses)}")
+    active_leaves = [
+        record
+        for record in defaults
+        if record["destination"]["path"].startswith("Defaults.assetConfigs[")
+        and record["status"] != "omitted"
+    ]
+    active_rows = {
+        record["destination"]["path"].split("[", 1)[1].split("]", 1)[0]
+        for record in active_leaves
+    }
+    if len(active_leaves) != 155 or active_rows != set(ACTIVE_ASSET_ROWS):
+        raise ManifestError("H04_ACTIVE_ASSET_PARTITION")
+
+
+def derive_ledger(
+    tracked: Mapping[str, Any],
     *,
-    canonical_output: Path,
-) -> None:
-    """Atomically replace only the caller-declared canonical output."""
-    if output.resolve() != canonical_output.resolve():
-        raise ManifestError("H04_NONCANONICAL_TARGET")
-    if output.name in {"DefaultsBase.vy", "DefaultsLocal.vy"}:
-        raise ManifestError("H04_FORBIDDEN_TARGET")
-    if output.name != "DefaultsRobinhood.vy":
-        raise ManifestError("H04_NONCANONICAL_TARGET")
-    output.parent.mkdir(parents=True, exist_ok=True)
+    defaults_path: Path = DEFAULTS_PATH,
+    blueprint: Any | None = None,
+) -> dict[str, Any]:
+    _validate_shape(tracked, allow_legacy=True)
+    expected = copy.deepcopy(tracked)
+    expected["schema_version"] = SCHEMA_VERSION
+    for record in expected["parameters"]:
+        record.pop("generated_repr", None)
+
+    selected = blueprint or _blueprint_module()
+    deployment_paths = {
+        record["destination"]["path"]
+        for record in tracked["parameters"]
+        if record["destination"]["kind"] == "deployment_input"
+    }
+    if set(selected.ROBINHOOD_DEPLOYMENT_INPUTS) != deployment_paths:
+        raise ManifestError("H04_BLUEPRINT_DEPLOYMENT_INPUT_CENSUS")
+    defaults_values = extract_defaults_values(defaults_path, blueprint=selected)
+    deployment_values = extract_deployment_values(defaults_values, blueprint=selected)
+    assertion_values = derive_assertion_values(defaults_values, blueprint=selected)
+    for record in expected["parameters"]:
+        destination = record["destination"]
+        path = destination["path"]
+        if destination["kind"] == "defaults_field":
+            record["value"] = copy.deepcopy(defaults_values[path])
+        elif destination["kind"] == "deployment_input":
+            source_input = selected.ROBINHOOD_DEPLOYMENT_INPUTS[path]
+            if record["status"] != source_input.disposition:
+                raise ManifestError(
+                    f"H04_DISPOSITION_DRIFT:{path}:ledger={record['status']}:blueprint={source_input.disposition}"
+                )
+            record["value"] = copy.deepcopy(deployment_values[path])
+        elif destination["kind"] == "assertion":
+            record["value"] = copy.deepcopy(assertion_values[path])
+    _validate_shape(expected, allow_legacy=False)
+    _validate_census(expected)
+    return expected
+
+
+def canonical_json(ledger: Mapping[str, Any]) -> bytes:
+    return (json.dumps(ledger, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def ledger_sha256(ledger: Mapping[str, Any]) -> str:
+    return hashlib.sha256(canonical_json(ledger)).hexdigest()
+
+
+def _first_difference(actual: Any, expected: Any, path: str = "$") -> str | None:
+    if type(actual) is not type(expected):
+        return f"{path}:type:{type(actual).__name__}!={type(expected).__name__}"
+    if isinstance(actual, Mapping):
+        if set(actual) != set(expected):
+            return f"{path}:keys:{sorted(actual)}!={sorted(expected)}"
+        for key in expected:
+            difference = _first_difference(actual[key], expected[key], f"{path}.{key}")
+            if difference:
+                return difference
+        return None
+    if isinstance(actual, list):
+        if len(actual) != len(expected):
+            return f"{path}:length:{len(actual)}!={len(expected)}"
+        for index, (left, right) in enumerate(zip(actual, expected, strict=True)):
+            difference = _first_difference(left, right, f"{path}[{index}]")
+            if difference:
+                return difference
+        return None
+    if actual != expected:
+        return f"{path}:{actual!r}!={expected!r}"
+    return None
+
+
+def deployment_readiness(blueprint: Any | None = None) -> tuple[bool, tuple[str, ...]]:
+    selected = blueprint or _blueprint_module()
+    blockers: set[str] = set()
+    for name, value in selected.ROBINHOOD_ADDRESSES.items():
+        status = selected.ROBINHOOD_ADDRESS_STATUS[name]
+        if type(value).__name__ == "SymbolicBinding" or status.endswith("unresolved"):
+            blockers.add(f"address:{name}:unresolved")
+        if status.endswith("unverified"):
+            blockers.add(f"address:{name}:unverified")
+    for path, record in selected.ROBINHOOD_DEPLOYMENT_INPUTS.items():
+        if type(record.value).__name__ == "SymbolicBinding":
+            blockers.add(f"input:{path}:unresolved")
+    return (not blockers, tuple(sorted(blockers)))
+
+
+def atomic_write_ledger(path: Path, data: bytes) -> None:
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="\n",
-            prefix=".DefaultsRobinhood.",
+            mode="wb",
+            prefix=".robinhood-parameters.",
             suffix=".tmp",
-            dir=output.parent,
+            dir=path.parent,
             delete=False,
         ) as handle:
             temporary = Path(handle.name)
-            handle.write(rendered)
+            handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, output)
+        os.replace(temporary, path)
         temporary = None
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
 
 
-def _repository_paths() -> tuple[Path, Path]:
-    repository = Path(__file__).resolve().parents[2]
-    return (
-        repository / "config" / "robinhood-parameters.json",
-        repository / "contracts" / "config" / "DefaultsRobinhood.vy",
+def sync_ledger(path: Path = LEDGER_PATH) -> str:
+    tracked = load_ledger(path, allow_legacy=True)
+    expected = derive_ledger(tracked)
+    data = canonical_json(expected)
+    atomic_write_ledger(path, data)
+    return hashlib.sha256(data).hexdigest()
+
+
+def check_ledger(
+    path: Path = LEDGER_PATH,
+    *,
+    defaults_path: Path = DEFAULTS_PATH,
+    blueprint: Any | None = None,
+) -> str:
+    tracked = load_ledger(path)
+    expected = derive_ledger(
+        tracked,
+        defaults_path=defaults_path,
+        blueprint=blueprint,
     )
+    actual_data = path.read_bytes()
+    expected_data = canonical_json(expected)
+    if actual_data != expected_data:
+        difference = _first_difference(tracked, expected) or "$:noncanonical-bytes"
+        raise ManifestError(f"H04_LEDGER_DRIFT:{difference}")
+    return hashlib.sha256(expected_data).hexdigest()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate and render canonical Robinhood defaults"
+        description="Synchronize the derived Robinhood parameter ledger"
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="validate deterministically without writing",
+        help="compile sources and compare the derived ledger without repository writes",
     )
     args = parser.parse_args(argv)
-    manifest_path, output_path = _repository_paths()
     try:
-        if args.check and output_path.exists():
-            raise ManifestError("H04_STALE_DEFAULTS_ROBINHOOD")
-        manifest = load_manifest(manifest_path)
-        rendered = render_defaults(manifest)
         if args.check:
-            print("H04_OK")
-            return 0
-        atomic_replace_output(
-            rendered,
-            output_path,
-            canonical_output=output_path,
-        )
-        print("H04_WRITTEN")
+            identity = check_ledger()
+            ready, blockers = deployment_readiness()
+            print(
+                f"H04_OK sha256={identity} configuration_consistent=true "
+                f"deployment_ready={str(ready).lower()} blockers={len(blockers)}"
+            )
+        else:
+            identity = sync_ledger()
+            print(f"H04_SYNCED sha256={identity}")
         return 0
     except ManifestError as exc:
-        print(f"H04_BLOCKED: {exc}")
+        print(f"H04_ERROR: {exc}")
         return 2
 
 

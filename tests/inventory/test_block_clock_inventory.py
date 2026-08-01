@@ -132,30 +132,30 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert not (fixture_repo / ".git").exists()
     result = checker.check_repository(fixture_repo)
     assert result.ok, result.output
-    assert "production_occurrences=99" in result.output
-    assert "production_lines=94" in result.output
-    assert "production_files=17" in result.output
+    assert "production_occurrences=102" in result.output
+    assert "production_lines=97" in result.output
+    assert "production_files=18" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=607" in result.output
+    assert "cadence_candidates=612" in result.output
     assert "timestamp_ids=11" in result.output
-    assert "seconds_unit_candidates=58" in result.output
+    assert "seconds_unit_candidates=70" in result.output
     assert "mixed_clock_functions=4" in result.output
-    assert "vyper_paths=95" in result.output
+    assert "vyper_paths=96" in result.output
     assert "current_bindings=4/4" in result.output
     assert (
         "current_state_sha256=" + checker.CURRENT_BINDINGS_STATE_SHA256
         in result.output
     )
-    assert "post_s5_production_records=59" in result.output
+    assert "post_s5_production_records=60" in result.output
     assert (
         "post_s5_production_sha256="
-        + checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        + checker.CURRENT_PRODUCTION_INVENTORY_SHA256
         in result.output
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=177" in result.output
+    assert "test=172" in result.output
 
 
 def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
@@ -200,7 +200,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
         without_current, fixture_repo
     ) == checker.S5_LEGACY_INVENTORY_SHA256
     assert checker._post_s5_production_inventory_fingerprint(inventory) == (
-        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
 
     for record in bindings["sourcePaths"]:
@@ -307,35 +307,57 @@ def test_current_binding_line_content_drift_fails_closed(
     )
 
 
-def test_h04_exact_batch_preserves_both_frozen_fingerprints(
+def test_source_authority_batch_preserves_historical_fingerprints(
     fixture_repo: Path,
 ) -> None:
     inventory = _load_inventory(fixture_repo)
-    records = checker._h04_cadence_records(inventory)
-    sites = checker._h04_cad_sites(inventory)
-    assert checker._is_exact_h04_cadence_batch(inventory)
-    assert len(records) == checker.H04_CADENCE_RECORD_COUNT == 116
-    assert checker._records_fingerprint(records) == (
-        checker.H04_CADENCE_RECORDS_SHA256
+    batches = (
+        (
+            checker._source_authority_direct_records(inventory),
+            checker.SOURCE_AUTHORITY_DIRECT_RECORD_COUNT,
+            checker.SOURCE_AUTHORITY_DIRECT_RECORDS_SHA256,
+        ),
+        (
+            checker._source_authority_cadence_records(inventory),
+            checker.SOURCE_AUTHORITY_CADENCE_RECORD_COUNT,
+            checker.SOURCE_AUTHORITY_CADENCE_RECORDS_SHA256,
+        ),
+        (
+            checker._source_authority_seconds_records(inventory),
+            checker.SOURCE_AUTHORITY_SECONDS_RECORD_COUNT,
+            checker.SOURCE_AUTHORITY_SECONDS_RECORDS_SHA256,
+        ),
+        (
+            checker._source_authority_path_records(inventory),
+            checker.SOURCE_AUTHORITY_PATH_RECORD_COUNT,
+            checker.SOURCE_AUTHORITY_PATH_RECORDS_SHA256,
+        ),
+        (
+            checker._source_authority_cad_sites(inventory),
+            checker.SOURCE_AUTHORITY_CAD_SITE_COUNT,
+            checker.SOURCE_AUTHORITY_CAD_SITES_SHA256,
+        ),
     )
+    assert checker._is_exact_source_authority_batch(inventory)
+    for records, expected_count, expected_fingerprint in batches:
+        assert len(records) == expected_count
+        assert checker._records_fingerprint(records) == expected_fingerprint
+    # The replaced JSON-first H-04 identities remain immutable historical facts.
+    assert checker.H04_CADENCE_RECORD_COUNT == 116
     assert checker.H04_CADENCE_RECORDS_SHA256 == (
         "d0d0e3ca3ac472b1a709a9525e9ad38d5b76c5337b4e540c3ca10b7c0dcddf05"
     )
-    assert len(sites) == checker.H04_CAD_SITE_COUNT == 6
-    assert checker._records_fingerprint(sites) == checker.H04_CAD_SITES_SHA256
+    assert checker.H04_CAD_SITE_COUNT == 6
     assert checker.H04_CAD_SITES_SHA256 == (
         "8ffb9dd92c225d4cacea6827194bf3b42eb5cb2efaf6729f6aa1f083503f42ee"
     )
-    exact_records, exact_sites = (
-        checker._exact_reviewed_h04_record_fingerprints(inventory)
-    )
-    assert len(exact_records) == 116
-    assert len(exact_sites) == 6
+    exact = checker._exact_source_authority_record_fingerprints(inventory)
+    assert tuple(map(len, exact)) == (3, 121, 12, 1, 5)
     assert checker._s5_legacy_inventory_fingerprint(inventory) == (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
     assert checker._post_s5_production_inventory_fingerprint(inventory) == (
-        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
 
 
@@ -377,7 +399,7 @@ def test_pr61_exact_batch_preserves_the_frozen_legacy_fingerprint(
         checker.S5_LEGACY_INVENTORY_SHA256
     )
     assert checker._post_s5_production_inventory_fingerprint(inventory) == (
-        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
 
 
@@ -403,15 +425,24 @@ def test_pr61_exact_artifact_layout_metadata_package_preserves_authority(
     assert checker._records_fingerprint(path_records) == (
         checker.PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256
     )
-    artifact_bytes = (fixture_repo / ARTIFACT_EXPECTATIONS_RELATIVE).read_bytes()
+    artifact_path = fixture_repo / ARTIFACT_EXPECTATIONS_RELATIVE
+    artifact_bytes = artifact_path.read_bytes()
     assert hashlib.sha256(artifact_bytes).hexdigest() == (
+        checker.CURRENT_ARTIFACT_EXPECTATIONS_SHA256
+    )
+    legacy_artifact = json.loads(artifact_bytes)
+    legacy_artifact["contracts"].pop("DefaultsRobinhood")
+    legacy_bytes = (
+        json.dumps(legacy_artifact, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    assert hashlib.sha256(legacy_bytes).hexdigest() == (
         checker.PR61_ARTIFACT_EXPECTATIONS_SHA256
     )
     assert checker._s5_legacy_inventory_fingerprint(
         inventory, fixture_repo
     ) == checker.S5_LEGACY_INVENTORY_SHA256
     assert checker._post_s5_production_inventory_fingerprint(inventory) == (
-        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
 
 
@@ -695,16 +726,24 @@ def test_pr61_removed_test_record_gains_no_authority(
     _assert_failure(fixture_repo, "INV-SCHEMA-PR61-RECONCILIATION")
 
 
-def test_h04_absent_contract_has_no_production_admission(
+def test_source_authoritative_defaults_has_exact_production_admission(
     fixture_repo: Path,
 ) -> None:
     inventory = _load_inventory(fixture_repo)
-    assert not (fixture_repo / H04_CONTRACT_RELATIVE).exists()
-    assert H04_CONTRACT_RELATIVE not in {
-        record["path"] for record in inventory["vyperPathClassifications"]
-    }
+    source = fixture_repo / H04_CONTRACT_RELATIVE
+    assert source.is_file()
+    record = next(
+        record
+        for record in inventory["vyperPathClassifications"]
+        if record["path"] == H04_CONTRACT_RELATIVE
+    )
+    assert record["classification"] == "production"
+    assert record["contentSha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
     assert checker.POST_S5_PRODUCTION_INVENTORY_SHA256 == (
         "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
+    )
+    assert checker.CURRENT_PRODUCTION_INVENTORY_SHA256 == (
+        "a1f264788bf1189f554cd7a4952fada353c1d39afb02b032d6dfd145ae902ecb"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
@@ -737,19 +776,19 @@ def test_h04_record_tuple_drift_never_inherits_legacy_exclusion(
     inventory = _load_inventory(fixture_repo)
     record = next(
         item
-        for item in checker._h04_cadence_records(inventory)
+        for item in checker._source_authority_cadence_records(inventory)
         if "CAD-001" not in item["semanticIds"]
     )
     if field.startswith("semanticReview."):
         record["semanticReview"][field.split(".", 1)[1]] = replacement
     else:
         record[field] = replacement
-    assert not checker._is_exact_h04_cadence_batch(inventory)
+    assert not checker._is_exact_source_authority_batch(inventory)
     assert checker._s5_legacy_inventory_fingerprint(inventory) != (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
-    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+    _assert_failure(fixture_repo, "INV-SCHEMA-SOURCE-AUTHORITY-BATCH")
 
 
 @pytest.mark.parametrize(
@@ -773,13 +812,13 @@ def test_h04_cad_mirror_metadata_drift_is_not_excluded(
     replacement: object,
 ) -> None:
     inventory = _load_inventory(fixture_repo)
-    checker._h04_cad_sites(inventory)[0][field] = replacement
-    assert not checker._is_exact_h04_cadence_batch(inventory)
+    checker._source_authority_cad_sites(inventory)[0][field] = replacement
+    assert not checker._is_exact_source_authority_batch(inventory)
     assert checker._s5_legacy_inventory_fingerprint(inventory) != (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
-    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+    _assert_failure(fixture_repo, "INV-SCHEMA-SOURCE-AUTHORITY-BATCH")
 
 
 @pytest.mark.parametrize(
@@ -818,7 +857,7 @@ def test_h04_cad_parent_authority_drift_never_inherits_legacy_exclusion(
         if record["id"] == "CAD-001"
     )
     parent["semanticReview"][field] = replacement
-    assert checker._is_exact_h04_cadence_batch(inventory)
+    assert checker._is_exact_source_authority_batch(inventory)
     assert checker._s5_legacy_inventory_fingerprint(inventory) != (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
@@ -832,20 +871,18 @@ def test_extending_exact_h04_record_set_gains_no_exclusion_authority(
     inventory = _load_inventory(fixture_repo)
     inventory["cadenceCandidates"].append(
         json.loads(
-            json.dumps(checker._h04_cadence_records(inventory)[0])
+            json.dumps(checker._source_authority_cadence_records(inventory)[0])
         )
     )
-    assert not checker._is_exact_h04_cadence_batch(inventory)
-    exact_records, exact_sites = (
-        checker._exact_reviewed_h04_record_fingerprints(inventory)
-    )
-    assert exact_records == frozenset()
-    assert exact_sites == frozenset()
+    assert not checker._is_exact_source_authority_batch(inventory)
+    assert checker._exact_source_authority_record_fingerprints(inventory) == (
+        frozenset(),
+    ) * 5
     assert checker._s5_legacy_inventory_fingerprint(inventory) != (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
-    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+    _assert_failure(fixture_repo, "INV-SCHEMA-SOURCE-AUTHORITY-BATCH")
 
 
 def test_h04_source_content_drift_is_new_cadence(fixture_repo: Path) -> None:
@@ -926,16 +963,16 @@ def test_extending_h04_path_predicate_does_not_gain_exclusion_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inventory = _load_inventory(fixture_repo)
-    extra = dict(checker._h04_cadence_records(inventory)[0])
+    extra = dict(checker._source_authority_cadence_records(inventory)[0])
     extra["path"] = "scripts/params/h04_future.py"
     inventory["cadenceCandidates"].append(extra)
-    original = checker._is_h04_cadence_path
     monkeypatch.setattr(
         checker,
-        "_is_h04_cadence_path",
-        lambda path: original(path) or path == "scripts/params/h04_future.py",
+        "SOURCE_AUTHORITY_CADENCE_PATHS",
+        checker.SOURCE_AUTHORITY_CADENCE_PATHS
+        | {"scripts/params/h04_future.py"},
     )
-    assert not checker._is_exact_h04_cadence_batch(inventory)
+    assert not checker._is_exact_source_authority_batch(inventory)
     assert checker._s5_legacy_inventory_fingerprint(inventory) != (
         checker.S5_LEGACY_INVENTORY_SHA256
     )
@@ -1005,7 +1042,7 @@ def test_s5_review_artifact_scope_and_legacy_commits_are_exact(
     )
     assert (
         checker._post_s5_production_inventory_fingerprint(inventory)
-        == checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        == checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
 
 
@@ -1110,7 +1147,7 @@ def test_future_production_admission_requires_new_controlling_fingerprint(
     )
     assert (
         checker._post_s5_production_inventory_fingerprint(inventory)
-        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        != checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
     _assert_failure(
@@ -1196,7 +1233,7 @@ def test_m3_review_owner_drift_disables_legacy_substitution(
     )
     assert (
         checker._post_s5_production_inventory_fingerprint(inventory)
-        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        != checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
     _assert_failure(
@@ -1295,7 +1332,7 @@ def test_m3_future_admission_requires_new_controlling_fingerprint(
     )
     assert (
         checker._post_s5_production_inventory_fingerprint(inventory)
-        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        != checker.CURRENT_PRODUCTION_INVENTORY_SHA256
     )
     _write_inventory(fixture_repo, inventory)
     _assert_failure(
@@ -1654,8 +1691,8 @@ def test_cad_001_site_set_divergence_reports_fingerprints(
         for item in result.findings
         if item.code == "INV-SCHEMA-CAD-SITES"
     )
-    assert finding.expected.startswith("count=33,sha256=")
-    assert finding.actual.startswith("count=33,sha256=")
+    assert finding.expected.startswith("count=32,sha256=")
+    assert finding.actual.startswith("count=32,sha256=")
     assert finding.expected != finding.actual
 
 
@@ -1955,8 +1992,8 @@ def test_ccip_reference_example_is_excluded_and_content_pinned(
     assert checker.TIMESTAMP_PATTERN.search(source.read_text(encoding="utf-8"))
     result = checker.check_repository(fixture_repo)
     assert result.ok, result.output
-    assert "production_occurrences=99" in result.output
-    assert "production_files=17" in result.output
+    assert "production_occurrences=102" in result.output
+    assert "production_files=18" in result.output
 
 
 def test_excluded_example_content_drift_fails_closed(

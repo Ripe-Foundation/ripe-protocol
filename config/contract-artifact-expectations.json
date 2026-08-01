@@ -1226,6 +1226,123 @@
         }
       },
       "transitive_compiler_input_integrity": "1d734c3c0507c8508fa8d7fcfac8aa7dff850f9f0bd167b28d22129986f97fdd"
+    },
+    "DefaultsRobinhood": {
+      "abi": {
+        "canonical_sha256": "a2b3232606060b9b296666a2cfbc6a328c2b92897ac6e1dcf9f82920a449bddb",
+        "committed_file_sha256": "e52c77dd6fff40e8b0234eb4d6e91aa659fba9e5a96b2c76c3899923b27cc016",
+        "committed_path": "scripts/abis/DefaultsRobinhood.json"
+      },
+      "artifacts": {
+        "creation_sha256": "7b893594d1b32f8fd1b1434e586b2e241da483cefd2f1efe26b41d53c8be7763",
+        "creation_size": 2995,
+        "eip170_headroom": 21889,
+        "runtime_template_sha256": "aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99",
+        "runtime_template_size": 2687
+      },
+      "code_layout": {
+        "CONTRIB_TEMPLATE": {
+          "length": 32,
+          "offset": 0,
+          "type": "address"
+        },
+        "GREEN_TOKEN": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
+        },
+        "RIPE_TOKEN": {
+          "length": 32,
+          "offset": 64,
+          "type": "address"
+        },
+        "SGREEN_TOKEN": {
+          "length": 32,
+          "offset": 128,
+          "type": "address"
+        },
+        "STEAKHOUSE_USDG_VAULT": {
+          "length": 32,
+          "offset": 224,
+          "type": "address"
+        },
+        "TRAINING_WHEELS": {
+          "length": 32,
+          "offset": 32,
+          "type": "address"
+        },
+        "USDG_TOKEN": {
+          "length": 32,
+          "offset": 160,
+          "type": "address"
+        },
+        "WETH_TOKEN": {
+          "length": 32,
+          "offset": 192,
+          "type": "address"
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_contribTemplate",
+              "type": "address"
+            },
+            {
+              "name": "_trainingWheels",
+              "type": "address"
+            },
+            {
+              "name": "_ripeToken",
+              "type": "address"
+            },
+            {
+              "name": "_greenToken",
+              "type": "address"
+            },
+            {
+              "name": "_sgreenToken",
+              "type": "address"
+            },
+            {
+              "name": "_usdgToken",
+              "type": "address"
+            },
+            {
+              "name": "_wethToken",
+              "type": "address"
+            },
+            {
+              "name": "_steakhouseUsdgVault",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "count": 0
+      },
+      "selectors": {
+        "canonical_sha256": "47a9316a506fe7fc4d50d878451f93bd629152c603a110085e06fbf0c7a3e28a",
+        "count": 17
+      },
+      "source_git_blob": "77f6521ee0bf60186997c00c07d1af943c52fd59",
+      "source_path": "contracts/config/DefaultsRobinhood.vy",
+      "source_sha256": "ad2b0db5a3fed9e2cc37e7234f81fb74928536107d79e51d0b2dea949f722200",
+      "storage_layout": {},
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "1fd4655792900157077dfdaa8b4cae2d735fea162f11bf7c8f3cc1aaca7223e0"
     }
   },
   "schema_version": 1

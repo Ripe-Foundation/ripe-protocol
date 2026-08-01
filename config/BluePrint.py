@@ -243,3 +243,469 @@ YIELD_TOKENS = {
         "UNDY_USDS": "0x04e77BC5885c82d68f523d1deE2e8b88c3036784",
     },
 }
+
+
+# Robinhood Profile 1 source authority
+#
+# Human-controlled addresses, topology, constructor inputs, clocks, and all
+# non-Defaults deployment inputs live here. Defaults-interface values live only
+# in contracts/config/DefaultsRobinhood.vy. The JSON ledger is derived evidence.
+
+from dataclasses import dataclass
+from typing import Any
+
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+
+@dataclass(frozen=True)
+class SymbolicBinding:
+    semantic_name: str
+
+
+@dataclass(frozen=True)
+class SourceReference:
+    path: str
+
+
+@dataclass(frozen=True)
+class RobinhoodInput:
+    value: Any
+    disposition: str
+
+
+@dataclass(frozen=True)
+class RobinhoodComponentSelection:
+    component_id: str
+    semantic_name: str
+    deployment_disposition: str
+    selection_state: str
+
+
+@dataclass(frozen=True)
+class RobinhoodRegistrySelection:
+    domain: str
+    registry_id: int
+    semantic_name: str
+    id_authority: str
+    component_id: str
+    disposition: str
+    selection_state: str
+
+
+# Selected external facts remain deployment-readiness blocked until their
+# separately retained verification metadata is closed.
+ROBINHOOD_USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"
+ROBINHOOD_STEAKHOUSE_USDG_VAULT = "0xBeEff033F34C046626B8D0A041844C5d1A5409dd"
+ROBINHOOD_GOVERNANCE = "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
+ROBINHOOD_CHAINLINK_ETH_USD = "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9"
+ROBINHOOD_CHAINLINK_BTC_USD = "0xa2c5184bF03d373Dc9dE4876eb4Bce595B460251"
+ROBINHOOD_CHAINLINK_USDG_USD = "0x61B7e5650328764B076A108EFF5fa7282a1B9aD2"
+ROBINHOOD_MORPHO_V2_FACTORY = "0x0FBad98595b0186dA120E41f77C102beb49f803c"
+ROBINHOOD_NATIVE_ETH_SENTINEL = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+ROBINHOOD_BTC_SENTINEL = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+ROBINHOOD_ARB_SYS = "0x0000000000000000000000000000000000000064"
+
+ROBINHOOD_ADDRESSES = {
+    # Deployment-produced: symbolic until the deployment plan binds them.
+    "CONTRIBUTOR_TEMPLATE": SymbolicBinding("CONTRIBUTOR_TEMPLATE"),
+    "TRAINING_WHEELS": SymbolicBinding("TRAINING_WHEELS"),
+    "RIPE_TOKEN": SymbolicBinding("RIPE_TOKEN"),
+    "GREEN_TOKEN": SymbolicBinding("GREEN_TOKEN"),
+    "SGREEN_TOKEN": SymbolicBinding("SGREEN_TOKEN"),
+    # Defaults constructor external facts.
+    "USDG": ROBINHOOD_USDG,
+    "WETH": ROBINHOOD_WETH,
+    "STEAKHOUSE_USDG_VAULT": ROBINHOOD_STEAKHOUSE_USDG_VAULT,
+    # Governance, oracle, protocol, and chain identities.
+    "GOVERNANCE": ROBINHOOD_GOVERNANCE,
+    "SAFE": ROBINHOOD_GOVERNANCE,
+    "GUARDIAN": SymbolicBinding("GUARDIAN"),
+    "CHAINLINK_ETH_USD": ROBINHOOD_CHAINLINK_ETH_USD,
+    "CHAINLINK_BTC_USD": ROBINHOOD_CHAINLINK_BTC_USD,
+    "CHAINLINK_USDG_USD": ROBINHOOD_CHAINLINK_USDG_USD,
+    "MORPHO_V2_FACTORY": ROBINHOOD_MORPHO_V2_FACTORY,
+    "NATIVE_ETH_SENTINEL": ROBINHOOD_NATIVE_ETH_SENTINEL,
+    "BTC_SENTINEL": ROBINHOOD_BTC_SENTINEL,
+    "ARB_SYS": ROBINHOOD_ARB_SYS,
+    # Intentionally absent Profile 1 integration.
+    "UNDERSCORE_REGISTRY": ZERO_ADDRESS,
+}
+
+ROBINHOOD_ADDRESS_STATUS = {
+    "CONTRIBUTOR_TEMPLATE": "deployment_produced_unresolved",
+    "TRAINING_WHEELS": "deployment_produced_unresolved",
+    "RIPE_TOKEN": "deployment_produced_unresolved",
+    "GREEN_TOKEN": "deployment_produced_unresolved",
+    "SGREEN_TOKEN": "deployment_produced_unresolved",
+    "GUARDIAN": "deployment_produced_unresolved",
+    "USDG": "selected_external_fact_unverified",
+    "WETH": "selected_external_fact_unverified",
+    "STEAKHOUSE_USDG_VAULT": "selected_external_fact_unverified",
+    "GOVERNANCE": "selected_external_fact_unverified",
+    "SAFE": "selected_external_fact_unverified",
+    "CHAINLINK_ETH_USD": "selected_external_fact_unverified",
+    "CHAINLINK_BTC_USD": "selected_external_fact_unverified",
+    "CHAINLINK_USDG_USD": "selected_external_fact_unverified",
+    "MORPHO_V2_FACTORY": "selected_external_fact_unverified",
+    "NATIVE_ETH_SENTINEL": "selected_external_fact_unverified",
+    "BTC_SENTINEL": "selected_external_fact_unverified",
+    "ARB_SYS": "selected_external_fact_unverified",
+    "UNDERSCORE_REGISTRY": "approved_semantic_absence",
+}
+
+ROBINHOOD_DEFAULTS_CONSTRUCTOR = (
+    ("contributorTemplate", "CONTRIBUTOR_TEMPLATE"),
+    ("trainingWheels", "TRAINING_WHEELS"),
+    ("ripeToken", "RIPE_TOKEN"),
+    ("greenToken", "GREEN_TOKEN"),
+    ("sgreenToken", "SGREEN_TOKEN"),
+    ("usdgToken", "USDG"),
+    ("wethToken", "WETH"),
+    ("steakhouseUsdgVault", "STEAKHOUSE_USDG_VAULT"),
+)
+
+ROBINHOOD_CHAIN = {
+    "mainnet_chain_id": 4663,
+    "testnet_chain_id": 46630,
+    "evm_block_number_seconds": 12,
+    "blocks_per_minute": 5,
+    "action_block_source": SymbolicBinding("LEDGER_ACTION_BLOCK_SOURCE"),
+}
+
+ROBINHOOD_COMPONENT_DEPLOYMENT_STATES = frozenset(
+    {"required", "omitted", "disabled", "deferred", "blocked"}
+)
+ROBINHOOD_SELECTION_STATES = frozenset(
+    {"selected", "omitted", "disabled", "deferred", "blocked", "reserved"}
+)
+
+# Complete Profile 1 component selection authority. Lifecycle, owner, gate,
+# relation, blocker, and evidence metadata remain in robinhood_blueprint.py.
+ROBINHOOD_COMPONENT_SELECTIONS = (
+    RobinhoodComponentSelection("CM-001", "GreenToken", "required", "selected"),
+    RobinhoodComponentSelection("CM-002", "RipeToken", "required", "selected"),
+    RobinhoodComponentSelection("CM-003", "SavingsGreen", "required", "selected"),
+    RobinhoodComponentSelection("CM-004", "RipeHq", "required", "selected"),
+    RobinhoodComponentSelection("CM-005", "Contributor", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-006", "TrainingWheels", "required", "selected"),
+    RobinhoodComponentSelection("CM-007", "DefaultsBase", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-008", "Ledger", "blocked", "blocked"),
+    RobinhoodComponentSelection("CM-009", "MissionControl", "required", "selected"),
+    RobinhoodComponentSelection("CM-010", "Switchboard", "required", "selected"),
+    RobinhoodComponentSelection("CM-011", "SwitchboardAlpha", "required", "selected"),
+    RobinhoodComponentSelection("CM-012", "SwitchboardBravo", "required", "selected"),
+    RobinhoodComponentSelection("CM-013", "SwitchboardCharlie", "required", "selected"),
+    RobinhoodComponentSelection("CM-014", "SwitchboardDelta", "required", "selected"),
+    RobinhoodComponentSelection("CM-015", "PriceDesk", "required", "selected"),
+    RobinhoodComponentSelection("CM-016", "ChainlinkPrices", "required", "selected"),
+    RobinhoodComponentSelection("CM-017", "CurvePrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-018", "BlueChipYieldPrices", "required", "selected"),
+    RobinhoodComponentSelection("CM-019", "PythPrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-020", "StorkPrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-021", "VaultBook", "required", "selected"),
+    RobinhoodComponentSelection("CM-022", "StabilityPool", "required", "selected"),
+    RobinhoodComponentSelection("CM-023", "RipeGov", "required", "selected"),
+    RobinhoodComponentSelection("CM-024", "SimpleErc20", "required", "selected"),
+    RobinhoodComponentSelection(
+        "CM-025", "RebaseErc20 / inherited SharesVault", "omitted", "omitted"
+    ),
+    RobinhoodComponentSelection("CM-026", "AuctionHouse", "required", "selected"),
+    RobinhoodComponentSelection("CM-027", "AuctionHouseNFT", "required", "selected"),
+    RobinhoodComponentSelection("CM-028", "Boardroom", "required", "selected"),
+    RobinhoodComponentSelection("CM-029", "BondRoom", "required", "selected"),
+    RobinhoodComponentSelection("CM-030", "CreditEngine", "required", "selected"),
+    RobinhoodComponentSelection("CM-031", "Endaoment", "required", "selected"),
+    RobinhoodComponentSelection("CM-032", "HumanResources", "required", "selected"),
+    RobinhoodComponentSelection("CM-033", "Lootbox", "required", "selected"),
+    RobinhoodComponentSelection("CM-034", "Teller", "required", "selected"),
+    RobinhoodComponentSelection("CM-035", "GreenPool", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-036", "RipePoolCurve", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-037", "RipePoolAero", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-038", "BondBooster", "required", "selected"),
+    RobinhoodComponentSelection("CM-039", "wsuperOETHbPrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-040", "RedStone", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-041", "UndyVaultPrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-042", "Underscore Vault", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-043", "CreditRedeem", "required", "selected"),
+    RobinhoodComponentSelection("CM-044", "Deleverage", "required", "selected"),
+    RobinhoodComponentSelection("CM-045", "TellerUtils", "required", "selected"),
+    RobinhoodComponentSelection("CM-046", "SwitchboardEcho", "required", "selected"),
+    RobinhoodComponentSelection("CM-047", "EndaomentFunds", "required", "selected"),
+    RobinhoodComponentSelection("CM-048", "EndaomentPSM", "required", "selected"),
+    RobinhoodComponentSelection("CM-049", "DefaultsRobinhood", "required", "selected"),
+    RobinhoodComponentSelection("CM-050", "AeroRipePrices", "omitted", "omitted"),
+    RobinhoodComponentSelection(
+        "CM-051", "GREEN CCIP BurnMint pool", "deferred", "deferred"
+    ),
+    RobinhoodComponentSelection(
+        "CM-052", "RIPE CCIP BurnMint pool", "deferred", "deferred"
+    ),
+    RobinhoodComponentSelection(
+        "CM-053", "CCIP token-admin registration", "deferred", "deferred"
+    ),
+    RobinhoodComponentSelection(
+        "CM-054", "GREEN/RIPE local price adapter", "deferred", "deferred"
+    ),
+    RobinhoodComponentSelection(
+        "CM-055",
+        "Deployment, migration, and parameter-report tooling",
+        "required",
+        "selected",
+    ),
+    RobinhoodComponentSelection(
+        "CM-056", "Manifests and migration history", "required", "selected"
+    ),
+    RobinhoodComponentSelection(
+        "CM-057", "ABI export and explorer verification", "required", "selected"
+    ),
+    RobinhoodComponentSelection(
+        "CM-058", "Solidity build/test/deploy toolchain", "deferred", "deferred"
+    ),
+    RobinhoodComponentSelection("CM-059", "Base/RH test profiles", "required", "selected"),
+    RobinhoodComponentSelection("CM-060", "DefaultsLocal", "omitted", "omitted"),
+)
+
+ROBINHOOD_REGISTRY_DOMAINS = ("ripe_hq", "vault_book", "price_desk", "switchboard")
+ROBINHOOD_REGISTRY_ID_AUTHORITIES = (
+    "source_hard_coded",
+    "registration_order",
+    "provisional_reservation",
+)
+
+# Complete 38-row registry authority. A reserved row is deliberately unselected;
+# its deployment disposition still records whether it is omitted or deferred.
+ROBINHOOD_REGISTRY_TOPOLOGY = (
+    RobinhoodRegistrySelection("ripe_hq", 1, "Green Token", "source_hard_coded", "CM-001", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 2, "Savings Green", "source_hard_coded", "CM-003", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 3, "Ripe Token", "source_hard_coded", "CM-002", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 4, "Ledger", "source_hard_coded", "CM-008", "blocked", "blocked"),
+    RobinhoodRegistrySelection("ripe_hq", 5, "Mission Control", "source_hard_coded", "CM-009", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 6, "Switchboard", "source_hard_coded", "CM-010", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 7, "Price Desk", "source_hard_coded", "CM-015", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 8, "Vault Book", "source_hard_coded", "CM-021", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 9, "Auction House", "source_hard_coded", "CM-026", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 10, "Auction House NFT", "source_hard_coded", "CM-027", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 11, "Boardroom", "source_hard_coded", "CM-028", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 12, "Bond Room", "source_hard_coded", "CM-029", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 13, "Credit Engine", "source_hard_coded", "CM-030", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 14, "Endaoment", "source_hard_coded", "CM-031", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 15, "Human Resources", "source_hard_coded", "CM-032", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 16, "Lootbox", "source_hard_coded", "CM-033", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 17, "Teller", "source_hard_coded", "CM-034", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 18, "Deleverage", "source_hard_coded", "CM-044", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 19, "Credit Redeem", "source_hard_coded", "CM-043", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 20, "Teller Utils", "source_hard_coded", "CM-045", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded", "CM-047", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool", "provisional_reservation", "CM-051", "deferred", "reserved"),
+    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool", "provisional_reservation", "CM-052", "deferred", "reserved"),
+    RobinhoodRegistrySelection("vault_book", 1, "Stability Pool", "source_hard_coded", "CM-022", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault", "source_hard_coded", "CM-023", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault", "registration_order", "CM-024", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault", "registration_order", "CM-025", "omitted", "omitted"),
+    RobinhoodRegistrySelection("price_desk", 1, "Chainlink", "registration_order", "CM-016", "required", "selected"),
+    RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "omitted", "reserved"),
+    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order", "CM-018", "required", "selected"),
+    RobinhoodRegistrySelection("price_desk", 4, "Pyth", "source_hard_coded", "CM-019", "omitted", "omitted"),
+    RobinhoodRegistrySelection("price_desk", 5, "Stork", "registration_order", "CM-020", "omitted", "omitted"),
+    RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha", "source_hard_coded", "CM-011", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo", "registration_order", "CM-012", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 3, "Switchboard Charlie", "registration_order", "CM-013", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta", "registration_order", "CM-014", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo", "registration_order", "CM-046", "required", "selected"),
+)
+
+# Assertion-class records are computed evidence, not ledger-owned values.
+ROBINHOOD_ASSERTION_INVARIANTS = {
+    "deleverage_launch_cooldown": 0,
+    "timelock_base_headroom_blocks": 366,
+    "base_blocks_per_robinhood_block": 6,
+    "psm_activation_sequence": (
+        "redemption",
+        "auto_deposit_off",
+        "reserve_funding",
+        "configuration",
+        "allowlists",
+        "green_mint",
+    ),
+    "aapl_cap_formula": "floor(D * 10^(18+8) / P8)",
+    "aapl_cap_inputs": ("D target", "P8 freeze price"),
+    "stock_enabled_vaults": ("SimpleErc20",),
+    "stock_excluded_from_stability_pool": False,
+    "profile_2_lp_ltv": 0,
+}
+
+ROBINHOOD_COMPONENTS = {
+    "price_desk_registry": {
+        row.registry_id: row.semantic_name if row.selection_state == "selected" else None
+        for row in ROBINHOOD_REGISTRY_TOPOLOGY
+        if row.domain == "price_desk"
+    },
+    "blue_chip_yield": {
+        "protocol": "MorphoV2",
+        "compatibility": "resolved_by_33ad0f3c08bf6dc88f6569c622886d264d6e2868",
+    },
+    "profile_1_omissions": ("GREEN_USDG_LP", "RIPE_WETH_LP"),
+}
+
+ROBINHOOD_DEPLOYMENT_INPUTS = {
+    # DP-04
+    'Deployment.DP-04.ledger.actionBlockSourceBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_04_LEDGER_ACTIONBLOCKSOURCEBINDING'), 'blocked'),
+    # DP-05
+    'Deployment.DP-05.timelocks.TokenHq.actionTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.minTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.actionTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.minTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.actionTimeLock': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.minTimeLock': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.actionTimeLock': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.minTimeLock': RobinhoodInput(600, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.actionTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.minTimeLock': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.Contributor.delay': RobinhoodInput(7200, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.addDelay': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.updateDelay': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.disableDelay': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.minDelay': RobinhoodInput(3600, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.maxDelay': RobinhoodInput(50400, 'approved'),
+    # DP-07
+    'Deployment.DP-07.psm.constructor.canMint': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-07.psm.constructor.canRedeem': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-07.psm.constructor.shouldAutoDeposit': RobinhoodInput(True, 'approved'),
+    'Deployment.DP-07.psm.preActivation.shouldAutoDeposit': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-07.psm.yield.amount': RobinhoodInput(0, 'disabled'),
+    'Deployment.DP-07.psm.yield.asset': RobinhoodInput(ZERO_ADDRESS, 'disabled'),
+    # DP-08
+    'Deployment.DP-08.psm.mintFee': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_MINTFEE'), 'blocked'),
+    'Deployment.DP-08.psm.redeemFee': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_REDEEMFEE'), 'blocked'),
+    'Deployment.DP-08.psm.maxMintPerInterval': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_MAXMINTPERINTERVAL'), 'blocked'),
+    'Deployment.DP-08.psm.maxRedeemPerInterval': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_MAXREDEEMPERINTERVAL'), 'blocked'),
+    'Deployment.DP-08.psm.numBlocksPerInterval': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_NUMBLOCKSPERINTERVAL'), 'blocked'),
+    'Deployment.DP-08.psm.allowlists': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_ALLOWLISTS'), 'blocked'),
+    'Deployment.DP-08.psm.reserveFunding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_RESERVEFUNDING'), 'blocked'),
+    # DP-09
+    'Deployment.DP-09.psm.executionBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_09_PSM_EXECUTIONBINDING'), 'blocked'),
+    # DP-10
+    'Deployment.DP-10.aapl.identity': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_IDENTITY'), 'blocked'),
+    'Deployment.DP-10.aapl.feed': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_FEED'), 'blocked'),
+    'Deployment.DP-10.aapl.decimals': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_DECIMALS'), 'blocked'),
+    'Deployment.DP-10.aapl.P8': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_P8'), 'blocked'),
+    'Deployment.DP-10.aapl.perUserCap': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_PERUSERCAP'), 'blocked'),
+    'Deployment.DP-10.aapl.globalCap': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_GLOBALCAP'), 'blocked'),
+    'Deployment.DP-10.aapl.vault': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_VAULT'), 'blocked'),
+    'Deployment.DP-10.aapl.risk': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_RISK'), 'blocked'),
+    'Deployment.DP-10.aapl.auction': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_AUCTION'), 'blocked'),
+    'Deployment.DP-10.aapl.route': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_ROUTE'), 'blocked'),
+    # DP-11
+    'Deployment.DP-11.stock.vaultArtifact': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTARTIFACT'), 'blocked'),
+    'Deployment.DP-11.stock.vaultSlot': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTSLOT'), 'blocked'),
+    'Deployment.DP-11.stock.m2Movement': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M2MOVEMENT'), 'blocked'),
+    'Deployment.DP-11.stock.m3CreditContainment': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M3CREDITCONTAINMENT'), 'blocked'),
+    'Deployment.DP-11.stock.m4ComposedProof': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M4COMPOSEDPROOF'), 'blocked'),
+    'Deployment.DP-11.stock.m5ActivationBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M5ACTIVATIONBINDING'), 'blocked'),
+    # DP-13
+    'Deployment.DP-13.stability.specialStabPoolId': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_13_STABILITY_SPECIALSTABPOOLID'), 'blocked'),
+    # DP-14
+    'Deployment.DP-14.lp.identities': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_14_LP_IDENTITIES'), 'blocked'),
+    'Deployment.DP-14.lp.decimals': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_14_LP_DECIMALS'), 'blocked'),
+    'Deployment.DP-14.lp.depositLimits': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_14_LP_DEPOSITLIMITS'), 'blocked'),
+    'Deployment.DP-14.lp.oracleArtifacts': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_14_LP_ORACLEARTIFACTS'), 'blocked'),
+    # DP-15
+    'Deployment.DP-15.rewards.arePointsEnabled': RobinhoodInput(SourceReference('Defaults.rewardsConfig.arePointsEnabled'), 'approved'),
+    'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),
+    'Deployment.DP-15.rewards.promotion': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_15_REWARDS_PROMOTION'), 'blocked'),
+    # DP-16
+    'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-16.ccip.sgreenEnabled': RobinhoodInput(False, 'disabled'),
+    'Deployment.DP-16.ccip.promotion': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_16_CCIP_PROMOTION'), 'blocked'),
+    # DP-17
+    'Deployment.DP-17.staleWindows.alphaMinimum': RobinhoodInput(300, 'approved'),
+    'Deployment.DP-17.staleWindows.alphaMaximum': RobinhoodInput(604800, 'approved'),
+    'Deployment.DP-17.staleWindows.chainlinkDefault': RobinhoodInput(86400, 'approved'),
+    'Deployment.DP-17.staleWindows.aaplCeiling': RobinhoodInput(86400, 'approved'),
+    'Deployment.DP-17.staleWindows.usdgCeiling': RobinhoodInput(86400, 'approved'),
+    # DP-18
+    'Deployment.DP-18.roles.governance': RobinhoodInput(ROBINHOOD_ADDRESSES["GOVERNANCE"], 'external_fact'),
+    'Deployment.DP-18.roles.safe': RobinhoodInput(ROBINHOOD_ADDRESSES["SAFE"], 'external_fact'),
+    'Deployment.DP-18.roles.guardian': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_18_ROLES_GUARDIAN'), 'blocked'),
+    'Deployment.DP-18.roles.liteSigners': RobinhoodInput(SourceReference('Defaults.liteSigners[0]'), 'approved'),
+    'Deployment.DP-18.roles.trainingWheels': RobinhoodInput(SourceReference('Defaults.trainingWheels'), 'blocked'),
+    'Deployment.DP-18.roles.trainingWheelsAllowlist': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_18_ROLES_TRAININGWHEELSALLOWLIST'), 'blocked'),
+    # DP-19
+    'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-19.supply.GREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_GREEN_RECIPIENT'), 'blocked'),
+    'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_RIPE_RECIPIENT'), 'blocked'),
+    'Deployment.DP-19.supply.SGREEN.amount': RobinhoodInput(0, 'approved'),
+    'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_SGREEN_RECIPIENT'), 'blocked'),
+    # DP-20
+    'Deployment.DP-20.teller.shouldPause': RobinhoodInput(True, 'approved'),
+    # DP-21
+    'Deployment.DP-21.endaoment.wethIdentity': RobinhoodInput(ROBINHOOD_ADDRESSES["WETH"], 'external_fact'),
+    'Deployment.DP-21.endaoment.nativeSymbol': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVESYMBOL'), 'blocked'),
+    'Deployment.DP-21.endaoment.nativeName': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVENAME'), 'blocked'),
+    'Deployment.DP-21.endaoment.nativeDecimals': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVEDECIMALS'), 'blocked'),
+    # DP-22
+    'Deployment.DP-22.bondBooster.maxBoostRatio': RobinhoodInput(20000, 'approved'),
+    'Deployment.DP-22.bondBooster.maxUnits': RobinhoodInput(25000, 'approved'),
+    'Deployment.DP-22.bondBooster.minLockDuration': RobinhoodInput(1296000, 'approved'),
+    # DP-23
+    'Deployment.DP-23.external.chainlink.ethUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_ETH_USD"], 'external_fact'),
+    'Deployment.DP-23.external.chainlink.btcUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_BTC_USD"], 'external_fact'),
+    'Deployment.DP-23.external.chainlink.usdgUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_USDG_USD"], 'external_fact'),
+    'Deployment.DP-23.external.blueChipYield.morphoV2Factory': RobinhoodInput(ROBINHOOD_ADDRESSES["MORPHO_V2_FACTORY"], 'external_fact'),
+    'Deployment.DP-23.external.nativeEthSentinel': RobinhoodInput(ROBINHOOD_ADDRESSES["NATIVE_ETH_SENTINEL"], 'external_fact'),
+    'Deployment.DP-23.external.btcSentinel': RobinhoodInput(ROBINHOOD_ADDRESSES["BTC_SENTINEL"], 'external_fact'),
+    'Deployment.DP-23.external.arbSys': RobinhoodInput(ROBINHOOD_ADDRESSES["ARB_SYS"], 'external_fact'),
+    'Deployment.DP-23.blueChipYield.morphoV2Support': RobinhoodInput(True, 'approved'),
+}
+
+# DeployArgs indexes all five legacy dictionaries. Robinhood deliberately has
+# no Curve or generic yield-token surface in Profile 1 beyond the selected
+# SteakHouse USDG vault. Values below are references to the authorities above.
+ADDYS["robinhood"] = ROBINHOOD_ADDRESSES
+PARAMS["robinhood"] = {
+    "DEPLOYMENT_INPUTS": ROBINHOOD_DEPLOYMENT_INPUTS,
+    "CHAIN": ROBINHOOD_CHAIN,
+    "COMPONENTS": ROBINHOOD_COMPONENTS,
+}
+CURVE_PARAMS["robinhood"] = {}
+CORE_TOKENS["robinhood"] = {
+    "USDG": ROBINHOOD_ADDRESSES["USDG"],
+    "WETH": ROBINHOOD_ADDRESSES["WETH"],
+    "GREEN": ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+    "RIPE": ROBINHOOD_ADDRESSES["RIPE_TOKEN"],
+    "SGREEN": ROBINHOOD_ADDRESSES["SGREEN_TOKEN"],
+}
+YIELD_TOKENS["robinhood"] = {
+    "STEAKHOUSE_USDG": ROBINHOOD_ADDRESSES["STEAKHOUSE_USDG_VAULT"],
+}

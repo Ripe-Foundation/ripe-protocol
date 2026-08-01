@@ -2,7 +2,7 @@ schema_version: 12
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-07-30
+  as_of: 2026-07-31
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
@@ -30,9 +30,9 @@ snapshot:
 counts:
   workstreams: 28
   rh_d_decisions: 20
-  h03_blockers: 18
-  h04_rows: 21
-  h04_approved_operative: 20
+  h03_blockers: 19
+  h04_rows: 22
+  h04_approved_operative: 21
   h04_retired_non_operative: 1
   h04_open: 0
   binding_schedules: 14
@@ -89,8 +89,34 @@ post_freeze_reconciliation:
     disposition: deferred_nonblocking_with_every_deleverage_task
     reopen_condition: explicit_owner_instruction
     fixed_by_this_refresh: false
-  defaults_robinhood: absent_fail_closed
+  defaults_robinhood: present_source_authoritative_configuration_consistent
   s4_zero_cooldown_decision: closed_not_reopened
+  profile1_launch_input_reconciliation:
+    state: source_authority_candidate_uncommitted
+    candidate_base_commit: 33ad0f3c08bf6dc88f6569c622886d264d6e2868
+    candidate_base_tree: 14954579cbbe33ff7474b19e49d4c26f6bc3cd6e
+    launch_value_authority_commit: 74c4120fbfa1ade859dc32f61acdf567c139fe02
+    controlling_pr66_commit: 0f79b626c6ec4788ba43b3132ada9ebec6084f2a
+    controlling_paths: [config/BluePrint.py, contracts/config/DefaultsRobinhood.vy]
+    derived_ledger: config/robinhood-parameters.json
+    selected_assets: [SteakHouse USDG, WETH, RIPE, sGREEN, GREEN]
+    priority_liquidation_assets: [[3, SteakHouse USDG], [3, WETH]]
+    priority_stability_assets: [[1, sGREEN]]
+    priority_price_source_ids: [1, 3]
+    price_desk_registry:
+      1: { semantic: Chainlink, state: selected }
+      2: { semantic: Curve, state: empty_reserved }
+      3: { semantic: BlueChipYield, state: selected }
+      4: { semantic: Pyth, state: empty }
+      5: { semantic: Stork, state: empty }
+    external_address_state: external_facts_pending_independent_verification
+    deployment_identity_state: unresolved_until_derived
+    bluechip_compatibility_state: resolved_by_integrated_commit_33ad0f3c
+    defaults_state: present_compiling_source_authoritative_derived_ledger_synchronized
+    configuration_consistency: passing
+    deployment_readiness: blocked_unresolved_and_unverified_bindings
+    excluded_lanes: [PSM parameters or activation, Deleverage values, CCIP, CreditEngine zero-backing changes, Curve or LP activation, Uniswap, old migration namespace and custom runner]
+    lifecycle_effect: none_no_deployment_migration_configuration_activation_or_release
 
 publication:
   dashboard_url: https://ripe-robinhood-status.mickhagen.chatgpt.site
@@ -187,12 +213,12 @@ reassessment_and_qualification:
     teller: preserve_current_strict_balance_measurement
     guarded_erc20: preserve_separate_stock_specific_vault
     launch_profile: Profile_1
-    launch_oracle_authority: Chainlink
+    launch_oracle_authority: Chainlink_slot_1_and_BlueChipYield_slot_3_selected
     uniswap_launch_price_source: none
     ripe_weth_v2: optional_externally_held_liquidity_canary_only
     green_usdg: Profile_2
     launch_lp_admissions: none
-    psm: disabled_allowlisted_canary_first_redemption_first
+    psm: excluded_from_pr66_reconciliation_and_preserved_disabled
     h09: opt_in_read_only_archive_fork_network_disabled_by_default
     h10: live_rehearsal_and_external_state
   profile_2:
@@ -201,7 +227,7 @@ reassessment_and_qualification:
     curve_prices: unchanged
     lp_admissions: [RIPE/WETH LP, GREEN/USDG LP]
     promotion_rule: Each stage and each LP admission requires separate acceptance and activation authority.
-    profile1_projection_exclusion: All 72 LP/stability paths, including already approved leaf values, are excluded from Profile 1 and retained solely for separately authorized Profile 2 stages.
+    profile1_projection_exclusion: GREEN/USDG and both LP admission and LP stability paths remain excluded for separately authorized Profile 2 stages; sGREEN is the selected Profile 1 priority stability asset.
   deferred:
     - CreditEngine zero-backing reassessment
     - Every Deleverage task including parameter representation, tests, fork scenarios, documentation, and size/headroom work
@@ -213,7 +239,7 @@ reassessment_and_qualification:
     - Shared-contract release-gate evidence for unchanged Ledger, Teller, and GuardedErc20
     - Immutable external-input and H-07/H-08 artifact closure
     - H-09 safe-default and opt-in archive-fork qualification
-    - Profile 1 deployment preparation and PSM canary
+    - Profile 1 deterministic input closure and fail-closed defaults preparation
     - Profile 2 staged market integration
     - H-10 live rehearsal and operational release preparation
   external_input_classes:
@@ -333,10 +359,10 @@ deployment_owner:
       output: A dependency register that leaves CreditEngine zero-backing, Deleverage, Uniswap TWAP, CCIP, Sites, and live execution unopened.
       boundary: Preserve the four Deleverage values at zero without creating representation or size/headroom work.
     - order: 4
-      label: Generate final DefaultsRobinhood
-      owns: Deterministic DefaultsRobinhood generation after every approved identity and parameter exists.
-      output: Byte-deterministic generated defaults plus fail-closed and parity evidence.
-      boundary: DefaultsRobinhood.vy remains absent until the complete approved input set exists.
+      label: Maintain and synchronize source-authoritative DefaultsRobinhood
+      owns: Owner-edited Defaults getters plus deterministic derived-ledger synchronization.
+      output: Compiling source-authoritative defaults, a synchronized derived ledger, and fail-closed parity evidence.
+      boundary: Configuration consistency does not resolve deployment bindings or authorize configuration, deployment, or activation.
     - order: 5
       label: Finalize deterministic migration and release planning
       owns: Executable deterministic migration and release planning.
@@ -379,24 +405,24 @@ overall:
   bottom_line: >
     Ready to begin Profile 1 deployment preparation under the consolidated
     reassessment and qualification disposition. Ledger and Teller remain
-    unchanged, GuardedErc20 remains separate and Stock-specific, Chainlink
-    remains launch authority, and Profile 2 owns GREEN/USDG plus both LP
-    admissions. Every Deleverage task is deferred. Nothing is deployed,
-    configured, activated, or released.
+    unchanged, GuardedErc20 remains separate and Stock-specific, and PR #66
+    selects Chainlink slot 1 plus source-compatible BlueChipYield slot 3. Profile 2 owns
+    Curve and both LP admissions. Every Deleverage task is deferred. Nothing
+    is deployed, configured, activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
   engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, and corrected PR #61 are integrated for their exact scopes."}
-  launch_implementation: { status: partial, note: "Remaining Profile 1 work is non-Deleverage parameter binding/default rendering, plan readiness, final operator binding, H-07-H-11, M5, PSM canary preparation, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap TWAP, CCIP, and Sites are parked and nonblocking."}
+  launch_implementation: { status: partial, note: "The two source authorities compile and the derived ledger is synchronized. Morpho V2 source compatibility is resolved by 33ad0f3c; external-fact verification and deployment-produced bindings remain independently blocked. Remaining work includes those closures, plan readiness, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap, CCIP, and Sites remain outside this reconciliation."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
   production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
 
 s2_current_authority:
   collected_tests: 95
-  production_occurrences: 99
-  production_lines: 94
-  production_files: 17
+  production_occurrences: 102
+  production_lines: 97
+  production_files: 18
   historical_s5_fingerprint: 924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4
-  current_production_fingerprint: 07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122
-  current_production_admissions: ["contracts/vaults/GuardedErc20.vy (M2)", "contracts/core/CreditEngine.vy (M3)", "corrected PR #61 reviewed inventory batch"]
+  current_production_fingerprint: a1f264788bf1189f554cd7a4952fada353c1d39afb02b032d6dfd145ae902ecb
+  current_production_admissions: ["contracts/vaults/GuardedErc20.vy (M2)", "contracts/core/CreditEngine.vy (M3)", "contracts/config/DefaultsRobinhood.vy (source authority)", "corrected PR #61 reviewed inventory batch", "BlueChipYield Morpho V2 current bindings"]
   checker_result: CLOCK_INVENTORY_OK
   historical_note: Historical 76-case checkpoints remain historical; no current 76-case or 84-case claim is valid.
 
@@ -405,12 +431,12 @@ authorization_boundaries:
   - All CCIP workflows are parked and nonblocking until explicit owner reopening; CCIP remains disabled.
   - Zero-backing settlement and bad-debt policy work is parked and nonblocking for current work; integrated M2/M3 behavior remains unchanged.
   - Stock remains disabled and unreachable.
-  - H-04 schema-v2 is integrated, but unresolved bindings keep DefaultsRobinhood absent and fail-closed.
+  - H-04 source authority is present and its derived ledger is synchronized; unverified external facts and unresolved deployment identities independently keep deployment readiness fail-closed.
   - H-05 deterministic predeployment planning is integrated; migration execution remains unauthorized and no Robinhood migration history exists.
   - H-06 qualifies a candidate operator/storage class only; final operator, machine, volume, deployment, and release authorization remain open.
   - M4 composed-route evidence is integrated; M5 configuration, freeze, and activation remain outstanding.
   - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation; every Deleverage task is parked and nonblocking.
-  - Launch is Profile 1 with Chainlink authority, no Uniswap price-source contract, no Curve registration, and neither LP token admitted.
+  - Launch is Profile 1 with PriceDesk 1 Chainlink and PriceDesk 3 BlueChipYield selected, Morpho V2 source compatibility resolved, PriceDesk 2/4/5 empty, no Uniswap source, no Curve activation, and neither LP token admitted; selected external identities remain verification-gated.
   - GREEN/USDG, both LP admissions, Curve source use, dynamic rates, Teller snapshots, and Endaoment stabilization belong to separately promoted Profile 2 stages.
   - H-09 is network-disabled by default and owns explicit opt-in read-only archive-fork qualification; H-10 separately owns live rehearsal.
   - CCIP is disabled; examples are non-production and manual execution is recovery only.
@@ -432,11 +458,15 @@ accepted_residuals:
 
 h04_decisions:
   schema_v2_integrated: true
-  defaults_render_ready: false
-  approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21]
+  schema_v3_profile1_reconciliation: true
+  derived_ledger_schema: h04-robinhood-parameters-v4-derived-ledger
+  defaults_source_authoritative: true
+  configuration_consistent: true
+  deployment_ready: false
+  approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21, D-H04-22]
   open_ids: []
   retired_ids: [D-H04-19]
-  unresolved_binding_classes: [identity-bearing parameters, TrainingWheels, liteSigners]
+  unresolved_binding_classes: [unverified external facts, deployment-produced identities, TrainingWheels, unresolved non-Defaults deployment inputs]
   deferred_nonblocking_class: [four Deleverage controls and every related task]
   binding_schedule_count: 14
   implementation_file_surface:
@@ -468,10 +498,11 @@ h04_decisions:
     - { id: D-H04-19, title: "Retired environment-exception slot", state: "retired_non_operative"}
     - { id: D-H04-20, title: "Legitimate-zero and legitimate-false register", state: "approved"}
     - { id: D-H04-21, title: "Omitted and blocked field register", state: "approved"}
+    - { id: D-H04-22, title: "Owner-selected PR #66 Profile 1 launch inputs", state: "approved"}
 
 h03_blockers:
   - { id: B-S5-LEDGER, state: "open", implementation_predicate: "satisfied", remaining: "Downstream binding, deployment proof, activation, monitoring, and release remain open."}
-  - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "Schema v2 is integrated, but unresolved non-Deleverage identity bindings, Defaults rendering, and configuration readiness remain; every Deleverage task is parked and nonblocking."}
+  - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "The source-authority configuration and derived ledger are consistent; unresolved non-Deleverage identity bindings and deployment readiness remain. Every Deleverage task is parked and nonblocking."}
   - { id: B-H05-PLAN, state: "open", implementation_predicate: "satisfied", remaining: "Deterministic blocked reports are integrated; unresolved bindings prevent an executable plan, and migration execution remains unauthorized."}
   - { id: B-T8-M1, state: "open", implementation_predicate: "satisfied", remaining: "M1 and M4 proof are integrated; deployment binding and activation remain open."}
   - { id: B-T8-M2, state: "open", implementation_predicate: "satisfied", remaining: "M2 and M4 proof are integrated; registry placement, deployment proof, and activation remain open."}
@@ -480,9 +511,10 @@ h03_blockers:
   - { id: B-T8-M5, state: "open", implementation_predicate: "not_satisfied", remaining: "Configuration, freeze, release evidence, deployment, and activation are unapproved."}
   - { id: B-T8-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "AAPL identity, feed, caps, vault identity, and configuration hashes require final revalidation."}
   - { id: B-ORACLE-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "Feed runtime, decimals, heartbeat, failure evidence, and LP oracle selection are not frozen."}
+  - { id: B-P1-EXTERNAL-VERIFY, state: "open", implementation_predicate: "not_satisfied", remaining: "PR #66 externally verifiable addresses remain source facts pending independent target-chain verification; they are not approved deployment bindings."}
   - { id: B-LP-ARTIFACTS, state: "open", implementation_predicate: "not_satisfied", remaining: "Profile 2 LP artifacts, custody, valuation-route exclusions, and composed proof remain unbound. Neither LP token is admitted at launch; GREEN/USDG and both LP-token admissions belong to Profile 2; RIPE/WETH V2 is only an externally held launch-liquidity canary candidate. These requirements gate Profile 2 activation, not launch."}
   - { id: B-PSM-SEQUENCE, state: "open", implementation_predicate: "not_satisfied", remaining: "PSM runtime, disabled posture, ordered activation, re-verification, and mint activation proof are absent."}
-  - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "Rewards remain disabled; validation, monitoring, kill procedure, and approval are absent."}
+  - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "PR #66 selects core launch reward values, while the Boardroom reward path remains disabled and any later promotion still requires validation, monitoring, kill procedure, and approval."}
   - { id: B-T1-CCIP, state: "open", implementation_predicate: "not_satisfied", remaining: "Historical technical gaps remain recorded, but CCIP is owner-parked and nonblocking for current non-CCIP work until explicitly reopened."}
   - { id: B-T1-TOOLCHAIN, state: "open", implementation_predicate: "not_satisfied", remaining: "No canonical pinned production Solidity toolchain is approved."}
   - { id: B-H08-PROOF, state: "open", implementation_predicate: "not_satisfied", remaining: "Read-only deployed topology and negative-reachability proof does not exist."}
@@ -491,7 +523,7 @@ h03_blockers:
 
 glossary:
   - { term: CCIP, meaning: "Chainlink Cross-Chain Interoperability Protocol; currently disabled, owner-parked, and nonblocking for current non-CCIP work."}
-  - { term: PSM, meaning: "Peg Stability Module for approved reserve minting and redemption; deployment and activation remain gated."}
+  - { term: PSM, meaning: "Peg Stability Module for reserve minting and redemption; its parameters and activation are outside the PR #66 reconciliation and the existing capability remains disabled."}
   - { term: CLI, meaning: "Command-line interface used to select a network and prepare actions; profiles do not authorize live use."}
   - { term: ArbSys at 0x64, meaning: "Robinhood system contract used by the portable Ledger to read child-block identity."}
   - { term: EIP-170, meaning: "Ethereum deployed-contract size limit that constrained the integrated M1 Teller change."}
@@ -502,8 +534,8 @@ glossary:
   - { term: Stage C, meaning: "Post-Gate-1 checked inventory and planning-document reconciliation; it is not implementation validation."}
 
 critical_path:
-  - { order: 1, label: "Bind unresolved Profile 1 machine inputs", internal_reference: "H-04 binding readiness", plain_language_scope: "Bind every unresolved non-Deleverage identity while preserving all consolidated deferrals.", why_it_matters: "Approved decisions do not make Defaults or plans executable when required machine inputs are absent.", detail: "Keep DefaultsRobinhood absent and fail-closed until every in-scope required binding is resolved; do not open Deleverage representation or size/headroom work.", state: "gated", owner_gate: "H-04, protocol security, and independent reviewers"}
-  - { order: 2, label: "Render and verify Robinhood defaults", internal_reference: "H-04 / S6", plain_language_scope: "Render the deterministic compatible DefaultsRobinhood projection only from fully bound approved authority.", why_it_matters: "Defaults must remain a projection of approved values, never a placeholder source or a copy of Base.", detail: "Require a successful fail-closed-to-renderable transition, deterministic bytes, parity checks, and configuration-readiness review.", state: "gated", owner_gate: "H-04 owner and independent reviewers"}
+  - { order: 1, label: "Bind unresolved Profile 1 deployment inputs", internal_reference: "H-04 deployment readiness", plain_language_scope: "Verify external facts and bind every unresolved non-Deleverage deployment identity while preserving all consolidated deferrals.", why_it_matters: "A consistent source configuration does not make unresolved deployment inputs executable.", detail: "Keep deployment readiness fail-closed; do not open Deleverage representation or size/headroom work.", state: "gated", owner_gate: "H-04, protocol security, and independent reviewers"}
+  - { order: 2, label: "Maintain source and derived-ledger consistency", internal_reference: "H-04 / S6", plain_language_scope: "Edit Blueprint and DefaultsRobinhood directly, then synchronize and check the derived evidence ledger.", why_it_matters: "The JSON ledger must never become an alternate product-value authority.", detail: "Require deterministic sync, read-only check mode, exact ownership, compilation, parity, and configuration-consistency review.", state: "active", owner_gate: "H-04 owner and independent reviewers"}
   - { order: 3, label: "Promote deterministic planning to release-candidate readiness", internal_reference: "H-05 planning", plain_language_scope: "Rebuild deterministic reports after binding while preserving blocked, omitted, assertion-only, and executable distinctions.", why_it_matters: "Integrated planning code must not turn absent values or reservations into transactions.", detail: "No Robinhood migration history exists; plan execution remains a later separately authorized gate.", state: "gated", owner_gate: "H-05, protocol, security, and release reviewers"}
   - { order: 4, label: "Bind the final manifest operator and storage", internal_reference: "H-06 qualification", plain_language_scope: "Bind the qualified macOS/APFS class to the intended operator machine, selected volume, and frozen release candidate.", why_it_matters: "Candidate class qualification is not final machine, volume, publication, deployment, or release authorization.", detail: "Preserve the case-sensitive history residual and keep Linux unsupported and fail-closed.", state: "gated", owner_gate: "H-06 operations, security, and release reviewers"}
   - { order: 5, label: "Freeze configuration without activating Stock", internal_reference: "M5", plain_language_scope: "Register, configure, verify, and freeze the Stock route while retaining the disabled and unreachable posture.", why_it_matters: "Integrated M1-M4 proof does not select production values or authorize reachability.", detail: "Begin only after parameter, oracle, SecOps, deployment, and release prerequisites close.", state: "gated", owner_gate: "Track 8, H-04, oracle, SecOps, and release owners"}
@@ -590,17 +622,17 @@ workstreams:
   - id: S6
     name: Robinhood defaults and parameter authority
     group: Launch configuration
-    plain_language_scope: Convert explicit approved values into a typed manifest and compatible DefaultsRobinhood projection.
-    why_it_matters: Shared contracts remain unsafe if values are guessed, copied from Base, or generated from an unapproved source.
-    current_phase: schema-v2 package integrated; rendering gated
-    implementation_state: manifest and fail-closed generator integrated
+    plain_language_scope: Maintain approved values in Blueprint and DefaultsRobinhood and derive the evidence ledger from those sources.
+    why_it_matters: Shared contracts remain unsafe if values are guessed, copied from Base, or overridden in a secondary ledger.
+    current_phase: source-authority candidate complete; deployment bindings gated
+    implementation_state: two editable sources, compiling Defaults, and fail-closed ledger synchronizer implemented
     integration_state: integrated
-    review_state: reviewed and integrated for exact schema-v2 scope
+    review_state: candidate ready for consolidated independent review
     owner_decision_state: 20 approved operative; 1 retired non-operative; 0 open
     remaining_blockers: [Identity bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
     deployment_release_state: no defaults deployed or active
-    exact_next_action: Keep DefaultsRobinhood absent until all bindings and machine-facing inputs make rendering deterministic and complete.
-    authority: Integrated H-04 schema-v2 manifest, generator, tests, evidence, and binding schedules.
+    exact_next_action: Independently review the source-authority candidate, then close deployment bindings through their named owners without treating configuration consistency as deployment readiness.
+    authority: Blueprint and DefaultsRobinhood source values plus the derived v4 ledger, tests, evidence, and binding schedules.
     docs: [{ label: H-04/S6 brief, path: docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md }]
   - id: H-01
     name: Dependency security
@@ -650,17 +682,17 @@ workstreams:
   - id: H-04
     name: Defaults and parameter decisions
     group: Launch configuration
-    plain_language_scope: Bind unresolved in-scope identities and render approved launch parameters without inventing placeholders or reopening parked Deleverage work.
-    why_it_matters: Schema approval is not configuration readiness while required non-Deleverage identities and machine-facing parameter rows are absent.
-    current_phase: schema-v2 package integrated; binding and rendering gated
-    implementation_state: parameter manifest and fail-closed generator integrated
+    plain_language_scope: Maintain approved launch values in the two canonical sources and keep deployment readiness separate from configuration consistency.
+    why_it_matters: Source consistency does not verify external facts or resolve deployment-produced identities.
+    current_phase: source-authority candidate complete; deployment readiness gated
+    implementation_state: source-authoritative Defaults and Blueprint plus fail-closed derived-ledger synchronization implemented
     integration_state: integrated
-    review_state: reviewed and integrated for exact schema-v2 scope
+    review_state: candidate ready for consolidated independent review
     owner_decision_state: 20 approved operative, 1 retired non-operative, 0 open
     remaining_blockers: [Identity-bearing bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
-    deployment_release_state: no configuration generated, deployed, or active
-    exact_next_action: Keep DefaultsRobinhood absent until all in-scope bindings close deterministically; do not open Deleverage representation work.
-    authority: Integrated H-04 schema-v2 manifest, generator, tests, evidence, and 14 binding schedules.
+    deployment_release_state: local configuration sources consistent; nothing deployed, configured, or active
+    exact_next_action: Review the source-authority candidate and close in-scope bindings independently; do not open Deleverage representation work.
+    authority: Blueprint and DefaultsRobinhood source values, derived v4 ledger, synchronizer, tests, evidence, and 14 binding schedules.
     docs: [{ label: H-04 evidence, path: docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md }]
   - id: H-05
     name: Migration discovery and planning
@@ -947,13 +979,13 @@ decisions:
   - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
-  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; concrete values and all 18 blockers remain open.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
-  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "schema_v2_integrated_bindings_open", summary: "Twenty decisions are approved and operative, one ID is retired, none are open; unresolved in-scope identities, TrainingWheels, and liteSigners keep Defaults fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
+  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; the Profile 1 launch-input overlay has 20 open blockers and grants no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
+  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "source_authority_candidate_bindings_open", summary: "Blueprint and DefaultsRobinhood are the two value authorities and the v4 ledger is derived. Configuration consistency passes; unverified external facts and deployment-produced identities keep deployment readiness fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
   - { id: RH-D016, title: "Shared migration source, isolated histories", status: "deterministic_planning_integrated_execution_unauthorized", summary: "Deterministic blocked planning is integrated; no Robinhood history exists and execution remains unauthorized.", source: "docs/chains/rh/evidence/robinhood-migration-phase-a.md"}
   - { id: RH-D017, title: "Immutable manifest and evidence chain", status: "candidate_class_qualified_final_binding_open", summary: "H-06 qualifies a macOS/APFS operator/storage class only; final machine/volume, deployment, promotion, and release remain unauthorized.", source: "docs/chains/rh/evidence/robinhood-manifest-macos-release-qualification.md"}
   - { id: RH-D018, title: "Dashboard tooling is separate from launch dependencies", status: "approved_current_handoff", summary: "Dashboard tooling remains outside H-01 and cannot affect its disposition.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D019, title: "Private dashboard is a temporary presentation mirror", status: "approved_temporary", summary: "The private mirror is optional; repository documents remain complete authority and fallback.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
-  - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_controlling", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture; launch Profile 1 with Chainlink, no launch DEX oracle or LP admission, stage GREEN/USDG and both LPs in Profile 2, and preserve H-09/H-10 lifecycle separation.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
+  - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_controlling", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture; launch Profile 1 with Chainlink at slot 1 and Morpho-V2-compatible BlueChipYield at slot 3, no launch DEX oracle or LP admission, stage GREEN/USDG and both LPs in Profile 2, and preserve H-09/H-10 lifecycle separation.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
@@ -961,7 +993,7 @@ deadlines:
 
 hard_gates:
   - { id: G-M5, label: "Freeze Stock configuration without activation", plain_language_scope: "Bind AAPL identity, oracle, vault, caps, routes, assertions, monitoring, and a disabled configuration package.", why_it_matters: "Integrated M1-M4 proof does not choose production values or make Stock reachable safely.", state: "open", effect: "Blocks Stock reachability, deployment, activation, and release; parked policy work remains nonblocking."}
-  - { id: G-H04-BINDING, label: "Resolve parameter binding and rendering readiness", plain_language_scope: "Bind in-scope identities, TrainingWheels, liteSigners, and required non-Deleverage machine inputs before Defaults generation or configuration use.", why_it_matters: "Twenty approved decisions and an integrated schema do not make unresolved inputs deployable.", state: "open", effect: "Blocks DefaultsRobinhood rendering, H-05 release-candidate planning, configuration, deployment, and release."}
+  - { id: G-H04-BINDING, label: "Resolve deployment binding readiness", plain_language_scope: "Verify external facts and bind deployment-produced identities, TrainingWheels, and required non-Deleverage machine inputs before any deployment use.", why_it_matters: "A compiling, synchronized configuration does not make unresolved inputs deployable.", state: "open", effect: "Blocks H-05 release-candidate planning, deployment configuration, deployment, activation, and release; it does not block local source/ledger consistency checks."}
   - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero without opening representation, configuration, test, fork, documentation, or size/headroom work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred every Deleverage task rather than authorizing a machine implementation.", state: "parked_nonblocking", effect: "Does not block current non-Deleverage Profile 1 preparation; explicit owner reopening is required before any Deleverage work."}
   - { id: G-H05-READINESS, label: "Promote deterministic planning after bindings", plain_language_scope: "Rebuild the integrated deterministic reports only after required bindings exist, preserving typed blocked and non-executable rows.", why_it_matters: "Planning code must not turn missing inputs or reservations into transactions.", state: "open", effect: "Blocks an executable release-candidate plan and later deployment evidence; migration execution remains separately unauthorized."}
   - { id: G-H06-OPS, label: "Qualify intended manifest operator and storage", plain_language_scope: "Repeat exact macOS/APFS qualification for the intended operator, device, filesystem, and runbook.", why_it_matters: "Integrated implementation evidence is not operational publication or release qualification.", state: "open", effect: "Blocks operational publication, deployment evidence, and release."}

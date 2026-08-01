@@ -150,7 +150,7 @@ def test_omitted_component_has_no_surface():
         for component in ROBINHOOD_BLUEPRINT.components
         if component.deployment is Disposition.OMITTED
     )
-    assert len(omitted) == 16
+    assert len(omitted) == 15
     assert all(component.surfaces == () for component in omitted)
 
     injected = SurfaceRecord(
@@ -297,10 +297,9 @@ def test_stock_stability_swap_false():
     )
 
 
-def test_unsupported_oracle_unreachable():
-    oracle_components = {
+def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
+    omitted_oracle_components = {
         "CM-017",
-        "CM-018",
         "CM-019",
         "CM-020",
         "CM-039",
@@ -310,22 +309,29 @@ def test_unsupported_oracle_unreachable():
     }
     assert all(
         get_component(component_id).deployment is Disposition.OMITTED
-        for component_id in oracle_components
+        for component_id in omitted_oracle_components
     )
+    bluechip = get_component("CM-018")
+    assert bluechip.deployment is Disposition.REQUIRED
+    assert bluechip.blocker_ids == ("B-P1-EXTERNAL-VERIFY",)
     topology = registry_map()
     policy = blueprint_policy()
     assert [
         topology[(RegistryDomain.PRICE_DESK, value)].semantic_name
         for value in range(2, 6)
     ] == ["Curve", "BlueChipYield", "Pyth", "Stork"]
+    assert topology[(RegistryDomain.PRICE_DESK, 3)].disposition is (
+        Disposition.REQUIRED
+    )
     assert all(
         topology[(RegistryDomain.PRICE_DESK, value)].disposition
         is Disposition.OMITTED
-        for value in range(2, 6)
+        for value in (2, 4, 5)
     )
     assert {
         key for key in policy.reserved_registries if key[0] == "price_desk"
-    } == {("price_desk", value) for value in range(2, 6)}
+    } == {("price_desk", value) for value in (2, 4, 5)}
+    assert ("price_desk", 3) in policy.required_registries
 
 
 def test_ccip_capability_withheld_until_complete():
@@ -350,13 +356,12 @@ def test_ccip_capability_withheld_until_complete():
         "H03_PROMOTION_SET",
         replace(
             ROBINHOOD_BLUEPRINT,
-            promotions=(
-                replace(
-                    promotion,
-                    surface_ids=promotion.surface_ids[:-1],
+                promotions=(
+                    replace(
+                        promotion,
+                        surface_ids=promotion.surface_ids[:-1],
+                    ),
                 ),
-                ROBINHOOD_BLUEPRINT.promotions[1],
-            ),
         ),
     )
 
@@ -412,7 +417,7 @@ def test_sgreen_required_chain_native_and_never_ccip():
     for surface_id in ("S-003-DEPOSIT", "S-003-WITHDRAW"):
         assert surfaces[surface_id].disposition is Disposition.REQUIRED
     assert surfaces["S-003-CCIP"].disposition is Disposition.OMITTED
-    assert surfaces["S-003-REWARDS"].disposition is Disposition.DISABLED
+    assert surfaces["S-003-REWARDS"].disposition is Disposition.REQUIRED
     assert_code(
         "H03_SURFACE_SET",
         replace_surface("S-003-CCIP", disposition=Disposition.REQUIRED),
@@ -429,16 +434,16 @@ def test_hr_scaffold_has_no_contributors_or_rewards():
     assert hr.surfaces[0].disposition is Disposition.DISABLED
 
 
-def test_bond_and_reward_paths_stay_disabled():
+def test_bonds_stay_disabled_while_selected_rewards_and_booster_are_required():
     surfaces = surface_map()
     for surface_id in (
         "S-028-REWARD-PATH",
         "S-029-BONDS",
         "S-029-RIPE-CAP",
-        "S-033-REWARD-MINT",
-        "S-038-BOOSTER-CFG",
     ):
         assert surfaces[surface_id].disposition is Disposition.DISABLED
+    assert surfaces["S-033-REWARD-MINT"].disposition is Disposition.REQUIRED
+    assert surfaces["S-038-BOOSTER-CFG"].disposition is Disposition.REQUIRED
     assert_code(
         "H03_SURFACE_SET",
         replace_surface("S-029-BONDS", disposition=Disposition.REQUIRED),
@@ -448,18 +453,23 @@ def test_bond_and_reward_paths_stay_disabled():
 def test_slot_scaffolds_have_exact_disabled_capabilities():
     surfaces = surface_map()
     expected = {
-        "S-013-REWARD-ACTIONS",
         "S-014-INERT-ACTIONS",
         "S-028-REWARD-PATH",
         "S-029-BONDS",
         "S-029-RIPE-CAP",
         "S-032-HR-ACTIVATION",
-        "S-033-REWARD-MINT",
-        "S-038-BOOSTER-CFG",
     }
     assert all(
         surfaces[surface_id].disposition is Disposition.DISABLED
         for surface_id in expected
+    )
+    assert all(
+        surfaces[surface_id].disposition is Disposition.REQUIRED
+        for surface_id in (
+            "S-013-REWARD-ACTIONS",
+            "S-033-REWARD-MINT",
+            "S-038-BOOSTER-CFG",
+        )
     )
     assert surfaces["S-003-DEPOSIT"].disposition is Disposition.REQUIRED
 
@@ -467,10 +477,15 @@ def test_slot_scaffolds_have_exact_disabled_capabilities():
 def test_pricedesk_reservations_cannot_be_repurposed():
     topology = registry_map()
     reserved = tuple(
-        topology[(RegistryDomain.PRICE_DESK, value)]
-        for value in range(2, 6)
+        topology[(RegistryDomain.PRICE_DESK, value)] for value in (2, 4, 5)
     )
     assert all(item.disposition is Disposition.OMITTED for item in reserved)
+    assert topology[(RegistryDomain.PRICE_DESK, 3)].semantic_name == (
+        "BlueChipYield"
+    )
+    assert topology[(RegistryDomain.PRICE_DESK, 3)].disposition is (
+        Disposition.REQUIRED
+    )
     component = get_component("CM-017")
     row = component.registry_expectations[0]
     assert_code(
@@ -647,7 +662,7 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
     surfaces = surface_map()
     topology = registry_map()
 
-    assert records["Deployment.DP-18.roles.liteSigners"]["value"]["raw"] == "[]"
+    assert records["Deployment.DP-18.roles.liteSigners"]["value"]["raw"] == []
     assert records["Defaults.underscoreRegistry"]["value"]["raw"] == (
         "empty(address)"
     )
@@ -657,6 +672,8 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
     assert records[
         "Deployment.DP-07.psm.constructor.canRedeem"
     ]["value"]["raw"] is False
+
+
     assert all(
         records[f"Deployment.DP-08.psm.{field}"]["status"] == "blocked"
         for field in (
@@ -669,13 +686,19 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
             "reserveFunding",
         )
     )
-    assert records[
-        "Defaults.assetConfigs[GREEN_USDG_LP].config.debtTerms.ltv"
-    ]["value"]["raw"] == 0
-    assert records[
-        "Defaults.assetConfigs[RIPE_WETH_LP].config.debtTerms.ltv"
-    ]["value"]["raw"] == 0
-    assert records["Defaults.assetConfigs[AAPL].asset"]["status"] == "omitted"
+    assert all(
+        records[f"Defaults.assetConfigs[{asset}].config.debtTerms.ltv"]["status"]
+        == "omitted"
+        for asset in ("GREEN_USDG_LP", "RIPE_WETH_LP")
+    )
+    assert "Defaults.assetConfigs[AAPL].asset" not in records
+    assert {
+        path.split("[", 1)[1].split("]", 1)[0]
+        for path in records
+        if path.startswith("Defaults.assetConfigs[")
+        and path.endswith(".asset")
+        and records[path]["status"] != "omitted"
+    } == {"STEAKHOUSE_USDG", "WETH", "RIPE", "SGREEN", "GREEN"}
 
     assert surfaces["S-048-MINT"].disposition is Disposition.DISABLED
     assert surfaces["S-048-REDEEM"].disposition is Disposition.DISABLED
@@ -690,7 +713,7 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
     assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is (
         Disposition.OMITTED
     )
-    assert not (ROOT / "contracts" / "config" / "DefaultsRobinhood.vy").exists()
+    assert (ROOT / "contracts" / "config" / "DefaultsRobinhood.vy").is_file()
 
 
 def test_psm_lite_pause_and_reserve_transfer_authority_is_explicitly_coupled():
@@ -753,7 +776,21 @@ def test_stock_activation_stays_parked_without_the_atomic_guarded_tuple():
     }
     surfaces = surface_map()
 
-    assert records["Defaults.assetConfigs[AAPL].asset"]["status"] == "omitted"
+    assert "Defaults.assetConfigs[AAPL].asset" not in records
+    assert all(
+        record["status"] in {"blocked", "derived"}
+        or (
+            path == "Deployment.DP-11.stock.enabledVaultCount"
+            and record["status"] == "approved"
+            and record["value"]["raw"] == 1
+            and record["launch_phase"] == "atomic Stock activation"
+            and record["source"]["commit"]
+            != "0f79b626c6ec4788ba43b3132ada9ebec6084f2a"
+        )
+        for path, record in records.items()
+        if path.startswith("Deployment.DP-10.aapl.")
+        or path.startswith("Deployment.DP-11.stock.")
+    )
     assert surfaces["S-022-STOCK-SWAP"].disposition is Disposition.DISABLED
     assert surfaces["S-033-STOCK-REWARD"].disposition is Disposition.DISABLED
     assert surfaces["S-024-STOCK-USE"].disposition is Disposition.BLOCKED
@@ -765,13 +802,14 @@ def test_stock_activation_stays_parked_without_the_atomic_guarded_tuple():
     )
 
 
-def test_stock_rewards_start_disabled_but_are_promotion_eligible():
+def test_stock_rewards_start_disabled_and_are_not_selected_for_promotion():
     stock = surface_map()["S-033-STOCK-REWARD"]
-    promotion = get_promotion("P-REWARDS-SEVEN-DAY")
     assert stock.disposition is Disposition.DISABLED
     assert stock.lifecycle_phase is LifecyclePhase.DEPLOYED_INITIAL_VALUE
-    assert stock.surface_id in promotion.surface_ids
-    assert promotion.disposition is Disposition.DEFERRED
+    assert all(
+        stock.surface_id not in promotion.surface_ids
+        for promotion in ROBINHOOD_BLUEPRINT.promotions
+    )
     assert_code(
         "H03_TRACK8_GATE",
         replace_surface(

@@ -14,17 +14,20 @@ from pathlib import Path
 
 import pytest
 
+from config import BluePrint as blueprint_source
 from config.BluePrint import ADDYS, CORE_TOKENS, WHALES, YIELD_TOKENS
 from config.robinhood_blueprint import (
     ROBINHOOD_BLUEPRINT,
     ROBINHOOD_BLUEPRINT_ID,
     ROBINHOOD_PROFILE_IDS,
+    AuthorityClass,
     Blocker,
     ComponentRecord,
     ComponentRelation,
     Disposition,
     LifecyclePhase,
     PromotionRecord,
+    Profile1LaunchSelection,
     RegistryDomain,
     RegistryExpectation,
     RegistryIdAuthority,
@@ -39,7 +42,6 @@ from config.robinhood_blueprint import (
     SurfaceKind,
     SurfaceRecord,
     SymbolicInput,
-    AuthorityClass,
     _validate_symbolic_authority_classes,
     get_blocker,
     get_component,
@@ -220,6 +222,12 @@ def test_nonexact_profiles_are_rejected_before_h02_lookup(
 
 
 def test_closed_enums_have_exact_approved_values():
+    assert {value.value for value in AuthorityClass} == {
+        "repository_approved",
+        "externally_verifiable_canonical_fact",
+        "owner_selected",
+        "deployment_produced",
+    }
     assert {value.value for value in Disposition} == {
         "required",
         "omitted",
@@ -349,6 +357,13 @@ def test_frozen_slotted_records_have_exact_approved_fields():
             "blocker_ids",
             "assertion_ids",
         ),
+            Profile1LaunchSelection: (
+                "source_commit",
+                "source_paths",
+                "external_fact_input_ids",
+            "deployment_produced_input_ids",
+            "excluded_lanes",
+        ),
         RegistryExpectation: (
             "domain",
             "registry_id",
@@ -375,6 +390,7 @@ def test_frozen_slotted_records_have_exact_approved_fields():
         RobinhoodBlueprint: (
             "blueprint_id",
             "profile_ids",
+            "profile1_selection",
             "symbolic_inputs",
             "blockers",
             "promotions",
@@ -399,34 +415,34 @@ def test_complete_inventory_and_cardinality_reconciliation():
         f"CM-{value:03d}" for value in range(1, 61)
     )
     assert Counter(component.deployment for component in components) == {
-        Disposition.REQUIRED: 38,
-        Disposition.OMITTED: 16,
+        Disposition.REQUIRED: 39,
+        Disposition.OMITTED: 15,
         Disposition.DEFERRED: 5,
         Disposition.BLOCKED: 1,
     }
-    assert len(surfaces) == 94
+    assert len(surfaces) == 96
     assert Counter(surface.kind for surface in surfaces) == {
         SurfaceKind.ARTIFACT: 7,
         SurfaceKind.CAPABILITY: 18,
         SurfaceKind.ROUTE: 43,
         SurfaceKind.PERMISSION: 3,
-        SurfaceKind.CONFIGURATION: 7,
-        SurfaceKind.REGISTRATION: 7,
+        SurfaceKind.CONFIGURATION: 8,
+        SurfaceKind.REGISTRATION: 8,
         SurfaceKind.BEHAVIORAL_INVARIANT: 9,
     }
     assert Counter(surface.disposition for surface in surfaces) == {
-        Disposition.REQUIRED: 10,
+        Disposition.REQUIRED: 17,
         Disposition.OMITTED: 20,
-        Disposition.DISABLED: 29,
+        Disposition.DISABLED: 23,
         Disposition.DEFERRED: 5,
-        Disposition.BLOCKED: 30,
+        Disposition.BLOCKED: 31,
     }
     assert Counter(surface.lifecycle_phase for surface in surfaces) == {
-        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 29,
-        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 17,
+        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 30,
+        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 19,
         LifecyclePhase.ATOMIC_STOCK_ACTIVATION: 4,
         LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_CCIP_PROMOTION: 6,
-        LifecyclePhase.POST_LAUNCH_RELEASE: 5,
+        LifecyclePhase.POST_LAUNCH_RELEASE: 4,
         LifecyclePhase.OMITTED: 20,
         LifecyclePhase.BLOCKED: 13,
     }
@@ -463,8 +479,8 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourcePathKind.NONE: 5,
     }
     assert Counter(source.path_state for _, source in paths) == {
-        SourcePathState.EXISTING: 91,
-        SourcePathState.REVIEWED_PLANNED: 7,
+        SourcePathState.EXISTING: 92,
+        SourcePathState.REVIEWED_PLANNED: 6,
         SourcePathState.EXTERNAL_PENDING: 4,
         SourcePathState.ABSENT: 1,
     }
@@ -475,8 +491,8 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.CHAIN_SPECIFIC_CONFIG: 3,
         SourceClass.EXTERNAL_ARTIFACT: 3,
     }
-    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 48
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 18
+    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 51
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 19
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -484,7 +500,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         RegistryDomain.PRICE_DESK: 5,
         RegistryDomain.SWITCHBOARD: 5,
     }
-    assert len(ROBINHOOD_BLUEPRINT.promotions) == 2
+    assert len(ROBINHOOD_BLUEPRINT.promotions) == 1
 
 
 def test_primary_and_nested_structures_are_immutable():
@@ -509,6 +525,26 @@ def test_primary_and_nested_structures_are_immutable():
         "H03_IMMUTABLE",
         replace_component("CM-001", relations=list(component.relations)),
     )
+
+
+def test_profile1_launch_selection_is_exact_and_exclusion_complete():
+    selection = ROBINHOOD_BLUEPRINT.profile1_selection
+    assert selection.source_commit == (
+        "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+    )
+    assert selection.source_paths == (
+        "config/BluePrint.py",
+        "contracts/config/DefaultsRobinhood.vy",
+    )
+    assert set(selection.excluded_lanes) == {
+        "PSM_PARAMETERS_OR_ACTIVATION",
+        "DELEVERAGE_VALUES",
+        "CCIP",
+        "CREDIT_ENGINE_ZERO_BACKING",
+        "CURVE_OR_LP_ACTIVATION",
+        "UNISWAP",
+        "OLD_MIGRATION_NAMESPACE_AND_CUSTOM_RUNNER",
+    }
 
 
 def test_symbolic_inputs_are_value_free_owned_gated_and_bidirectional():
@@ -576,11 +612,11 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
         ),
         "I-PSM-CONFIG": AuthorityClass.OWNER_SELECTED,
         "I-ECHO-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
-        "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+        "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.OWNER_SELECTED,
         "I-ASSET-CONFIG-STOCK": AuthorityClass.OWNER_SELECTED,
-        "I-STABILITY-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
-        "I-RIPE-GOV-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
-        "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+        "I-STABILITY-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-RIPE-GOV-CONFIG": AuthorityClass.OWNER_SELECTED,
+        "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.OWNER_SELECTED,
         "I-AUCTION-CREDIT-STOCK": AuthorityClass.OWNER_SELECTED,
         "I-ENDAOMENT-NATIVE-METADATA": (
             AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
@@ -596,6 +632,13 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
         "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
         "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
         "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
+        "I-STEAKHOUSE-USDG": (
+            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        ),
+        "I-MORPHO-V2-FACTORY": (
+            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
+        ),
+        "I-CONTRIB-TEMPLATE": AuthorityClass.DEPLOYMENT_PRODUCED,
     }
     actual = {
         item.field_id: item.authority_class
@@ -603,10 +646,10 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
     }
     assert actual == expected
     assert Counter(actual.values()) == {
-        AuthorityClass.REPOSITORY_APPROVED: 9,
-        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 8,
-        AuthorityClass.OWNER_SELECTED: 23,
-        AuthorityClass.DEPLOYMENT_PRODUCED: 8,
+        AuthorityClass.REPOSITORY_APPROVED: 5,
+        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 10,
+        AuthorityClass.OWNER_SELECTED: 27,
+        AuthorityClass.DEPLOYMENT_PRODUCED: 9,
     }
     for field_id in ("I-WETH", "I-USDG", "I-CHAINLINK-CORE"):
         item = get_symbolic_input(field_id)
@@ -646,7 +689,7 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_18_blockers_remain_open_and_h02_audit_stays_closed():
+def test_all_19_remaining_blockers_are_open_and_morpho_gate_is_closed():
     expected = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
@@ -658,6 +701,7 @@ def test_all_18_blockers_remain_open_and_h02_audit_stays_closed():
         "B-T8-M5",
         "B-T8-FREEZE",
         "B-ORACLE-FREEZE",
+        "B-P1-EXTERNAL-VERIFY",
         "B-LP-ARTIFACTS",
         "B-PSM-SEQUENCE",
         "B-REWARD-PROMOTION",
@@ -670,6 +714,7 @@ def test_all_18_blockers_remain_open_and_h02_audit_stays_closed():
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
     assert set(blockers) == expected
     assert "B-H02-AUDIT" not in blockers
+    assert "B-P1-BLUECHIP-MORPHO-V2" not in blockers
     assert all(blocker.primary_owner_id for blocker in blockers.values())
     assert all(blocker.deadline_gate for blocker in blockers.values())
     ledger = blockers["B-S5-LEDGER"]
@@ -876,6 +921,71 @@ def test_exact_registry_topology_and_authority_classes():
     )
 
 
+def test_blueprint_owns_complete_component_and_registry_censuses():
+    assert len(blueprint_source.ROBINHOOD_COMPONENT_SELECTIONS) == 60
+    assert tuple(
+        row.component_id for row in blueprint_source.ROBINHOOD_COMPONENT_SELECTIONS
+    ) == tuple(f"CM-{value:03d}" for value in range(1, 61))
+
+    rows = blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY
+    assert len(rows) == 38
+    assert Counter(row.domain for row in rows) == {
+        "ripe_hq": 24,
+        "vault_book": 4,
+        "price_desk": 5,
+        "switchboard": 5,
+    }
+    price_rows = tuple(row for row in rows if row.domain == "price_desk")
+    assert [row.registry_id for row in price_rows if row.selection_state == "selected"] == [1, 3]
+    assert next(row for row in price_rows if row.registry_id == 2).selection_state == "reserved"
+
+
+def test_non_price_desk_blueprint_registry_drift_fails_closed(monkeypatch):
+    rows = blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY
+    changed = tuple(
+        replace(row, semantic_name="Unexpected Vault")
+        if (row.domain, row.registry_id) == ("vault_book", 3)
+        else row
+        for row in rows
+    )
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_REGISTRY_TOPOLOGY", changed)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "H03_REGISTRY_SOURCE_DRIFT"
+
+
+def test_blueprint_component_disposition_drift_fails_closed(monkeypatch):
+    rows = blueprint_source.ROBINHOOD_COMPONENT_SELECTIONS
+    changed = tuple(
+        replace(row, deployment_disposition="omitted", selection_state="omitted")
+        if row.component_id == "CM-018"
+        else row
+        for row in rows
+    )
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_COMPONENT_SELECTIONS", changed)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "H03_COMPONENT_SOURCE_DRIFT"
+
+
+@pytest.mark.parametrize("mutation", ("missing", "duplicate", "extra"))
+def test_blueprint_registry_source_census_fails_closed(monkeypatch, mutation):
+    rows = blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY
+    if mutation == "missing":
+        changed = rows[:-1]
+    elif mutation == "duplicate":
+        changed = (*rows[:-1], rows[0])
+    else:
+        changed = (
+            *rows,
+            replace(rows[-1], registry_id=6, semantic_name="Unexpected Extra"),
+        )
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_REGISTRY_TOPOLOGY", changed)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "H03_REGISTRY_SOURCE_CENSUS"
+
+
 def test_registry_shift_and_semantic_reuse_fail_closed():
     component = get_component("CM-018")
     changed = replace(
@@ -904,9 +1014,8 @@ def test_registry_shift_and_semantic_reuse_fail_closed():
     )
 
 
-def test_promotion_sets_are_exact_separate_and_nonautomatic():
+def test_ccip_is_the_only_remaining_nonautomatic_promotion():
     ccip = get_promotion("P-CCIP-SEVEN-DAY")
-    rewards = get_promotion("P-REWARDS-SEVEN-DAY")
     assert ccip.surface_ids == (
         "S-001-CCIP-CAP",
         "S-002-CCIP-CAP",
@@ -915,20 +1024,8 @@ def test_promotion_sets_are_exact_separate_and_nonautomatic():
         "S-053-REGISTRATION",
         "S-058-TOOLCHAIN",
     )
-    assert rewards.surface_ids == (
-        "S-003-REWARDS",
-        "S-013-REWARD-ACTIONS",
-        "S-022-REWARDS",
-        "S-023-REWARDS",
-        "S-028-REWARD-PATH",
-        "S-033-REWARD-MINT",
-        "S-033-STOCK-REWARD",
-    )
-    assert set(ccip.surface_ids).isdisjoint(rewards.surface_ids)
-    assert all(
-        promotion.disposition is Disposition.DEFERRED
-        for promotion in (ccip, rewards)
-    )
+    assert ROBINHOOD_BLUEPRINT.promotions == (ccip,)
+    assert ccip.disposition is Disposition.DEFERRED
     assert not any(
         surface.lifecycle_phase
         is LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_REWARD_ACTIVATION
@@ -936,25 +1033,14 @@ def test_promotion_sets_are_exact_separate_and_nonautomatic():
     )
 
 
-def test_promotion_subset_and_cross_assignment_fail_closed():
-    ccip, rewards = ROBINHOOD_BLUEPRINT.promotions
+def test_promotion_subset_fails_closed():
+    (ccip,) = ROBINHOOD_BLUEPRINT.promotions
     assert_code(
         "H03_PROMOTION_SET",
         replace(
             ROBINHOOD_BLUEPRINT,
             promotions=(
                 replace(ccip, surface_ids=ccip.surface_ids[:-1]),
-                rewards,
-            ),
-        ),
-    )
-    assert_code(
-        "H03_PROMOTION_SET",
-        replace(
-            ROBINHOOD_BLUEPRINT,
-            promotions=(
-                replace(ccip, surface_ids=rewards.surface_ids),
-                rewards,
             ),
         ),
     )

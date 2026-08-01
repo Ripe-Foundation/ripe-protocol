@@ -1,1075 +1,554 @@
-"""H-04 canonical Robinhood manifest and fail-closed generator tests."""
-
 from __future__ import annotations
 
-import ast
+from collections import Counter
 import copy
-import hashlib
 import importlib.util
 import json
 import os
+from pathlib import Path
+import re
 import subprocess
 import sys
-from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-
-REPOSITORY = Path(__file__).resolve().parents[2]
-GENERATOR_PATH = REPOSITORY / "scripts/params/generate_robinhood_defaults.py"
-MANIFEST_PATH = REPOSITORY / "config/robinhood-parameters.json"
-REAL_OUTPUT = REPOSITORY / "contracts/config/DefaultsRobinhood.vy"
-EXPECTED_GENERATION_BLOCKERS = (
-    "Defaults.ripeGovVaultConfigs[RIPE].asset",
-    "Defaults.trainingWheels",
-    "Defaults.assetConfigs[GREEN].asset",
-    "Defaults.assetConfigs[RIPE].asset",
-    "Defaults.assetConfigs[SGREEN].asset",
-    "Defaults.priorityStabVaults[1].asset",
-)
-# This ten-line block deliberately preserves reviewed cadence line anchors.
-# Profile 1 excludes the RIPE/WETH governance-vault identity.
-# Profile 1 excludes both GREEN/USDG and RIPE/WETH asset identities.
-# Profile 1 excludes both LP deposit-limit and minimum-balance bindings.
-# Profile 1 excludes the RIPE/WETH stability-vault identity.
-# Profile 2 owns both later LP admissions under separate activation authority.
-# Authority: docs/chains/rh/reassessment-and-qualification-synthesis.md.
-# The complete manifest schema is retained for later Profile 2 authority.
-# Deferred rows are not unresolved Profile 1 generation paths.
-# Closure tests below prove they cannot reach the Profile 1 render.
+from config import BluePrint as blueprint_source
+from scripts.params import generate_robinhood_defaults as sync
 
 
-def _load_generator():
-    spec = importlib.util.spec_from_file_location(
-        "generate_robinhood_defaults",
-        GENERATOR_PATH,
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+ROOT = Path(__file__).resolve().parents[2]
+LEDGER = ROOT / "config" / "robinhood-parameters.json"
+DEFAULTS = ROOT / "contracts" / "config" / "DefaultsRobinhood.vy"
+GENERATOR = ROOT / "scripts" / "params" / "generate_robinhood_defaults.py"
+PR66 = "0f79b626c6ec4788ba43b3132ada9ebec6084f2a"
+LAUNCH = "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+MORPHO = "33ad0f3c08bf6dc88f6569c622886d264d6e2868"
 
 
-GENERATOR = _load_generator()
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Override the repository autouse deployment fixture for source checks."""
 
 
-@pytest.fixture(scope="module")
-def manifest():
-    return GENERATOR.load_manifest(MANIFEST_PATH)
+def _ledger() -> dict:
+    return json.loads(LEDGER.read_text())
 
 
-def _lookup(manifest):
+def _records(ledger: dict | None = None) -> dict[str, dict]:
+    selected = ledger or _ledger()
     return {
         record["destination"]["path"]: record
-        for record in manifest["parameters"]
+        for record in selected["parameters"]
     }
 
 
-def _synthetic_manifest(manifest):
-    bound = copy.deepcopy(manifest)
-    address_by_symbol = {
-        "[RIPE]": "0x1111111111111111111111111111111111111101",
-        # Profile 2 LP rows deliberately have no synthetic address binding.
-        "[GREEN]": "0x1111111111111111111111111111111111111103",
-        "[SGREEN]": "0x1111111111111111111111111111111111111104",
-        # Keep deferred LP identities unreachable from Profile 1 rendering.
-    }
-    next_address = 0x1200
-    required = set(GENERATOR.required_generation_paths())
-    for record in bound["parameters"]:
-        path = record["destination"]["path"]
-        if path not in required or record["status"] not in {"blocked", "unresolved"}:
-            continue
-        kind = record["unit"]["kind"]
-        if kind == "address":
-            raw = next(
-                (
-                    address
-                    for marker, address in address_by_symbol.items()
-                    if marker in path
-                ),
-                f"0x{next_address:040x}",
-            )
-            next_address += 1
-        elif kind == "boolean":
-            raw = False
-        elif kind == "registry_id":
-            raw = "[1]" if path.endswith(".vaultIds") else 1
-        else:
-            raw = 1
-        schedule_id = record["approval"]["schedule_id"]
-        record["value"] = {"kind": "concrete", "raw": raw}
-        record["status"] = "approved"
-        record["approval"] = {
-            "status": "approved",
-            "date": "2026-07-28",
-            "provenance": "synthetic rendering fixture",
-            "schedule_id": schedule_id,
-        }
-        record["blockers"] = []
-        record["zero_semantics"] = (
-            {
-                "kind": "legitimate_false",
-                "explanation": "Synthetic explicit false.",
-            }
-            if raw is False
-            else {
-                "kind": "not_zero",
-                "explanation": "Synthetic nonzero binding.",
-            }
-        )
-        record["base_comparison"] = {
-            "kind": "not_applicable",
-            "detail": "Synthetic fixture has no production comparison.",
-        }
-        record["conversion"] = {"kind": "identity"}
-        record["generated_repr"] = {
-            "kind": "vyper",
-            "repr": "False" if raw is False else str(raw),
-        }
-    GENERATOR.validate_manifest(bound, require_canonical_state=False)
-    return bound
+def _write_ledger(tmp_path: Path, ledger: dict) -> Path:
+    path = tmp_path / "robinhood-parameters.json"
+    path.write_bytes(sync.canonical_json(ledger))
+    return path
 
 
-def _mutated(manifest):
-    return copy.deepcopy(manifest)
+def _mutated_defaults(tmp_path: Path, old: str, new: str) -> Path:
+    source = DEFAULTS.read_text()
+    assert source.count(old) >= 1
+    path = tmp_path / "DefaultsRobinhood.vy"
+    path.write_text(source.replace(old, new, 1), encoding="utf-8")
+    return path
 
 
-def _assert_code(manifest, code):
-    with pytest.raises(GENERATOR.ManifestError, match=code):
-        GENERATOR.validate_manifest(manifest)
-
-
-def test_manifest_validates_as_one_closed_canonical_document(manifest):
-    assert GENERATOR.validate_manifest(manifest) is manifest
-    assert len(manifest["parameters"]) == 428
-    assert list(manifest) == [
-        "schema_version",
-        "baseline",
-        "decision_registry",
-        "binding_schedules",
-        "parameters",
-    ]
-    assert manifest["schema_version"] == "h04-robinhood-parameters-v2"
-
-
-def test_every_record_has_exactly_the_approved_nineteen_keys(manifest):
-    expected = set(GENERATOR.RECORD_KEYS)
-    assert len(expected) == 19
-    assert all(set(record) == expected for record in manifest["parameters"])
-
-
-def test_manifest_contains_no_json_null_or_missing_field_equivalence():
-    raw = MANIFEST_PATH.read_text(encoding="utf-8")
-    assert ": null" not in raw
-    assert "\u0000" not in raw
-    assert json.loads(raw)["parameters"]
-
-
-def test_complete_109_leaf_and_17_selector_census(manifest):
-    defaults = [
-        record["destination"]["path"]
-        for record in manifest["parameters"]
-        if record["destination"]["kind"] == "defaults_field"
-    ]
-    normalized = {
-        GENERATOR.re.sub(r"\[[^]]+\]", "[*]", path) for path in defaults
-    }
-    assert len(normalized) == 109
-    assert normalized == set(GENERATOR.canonical_default_templates())
-    assert len(GENERATOR.default_selectors()) == 17
-    assert len(defaults) == 305
-
-
-def test_all_twenty_two_deployment_only_rows_are_covered(manifest):
-    rows = {
-        record["destination"]["path"].split(".")[1]
-        for record in manifest["parameters"]
-        if record["destination"]["path"].startswith("Deployment.DP-")
-    }
-    assert rows == {f"DP-{number:02d}" for number in range(1, 23)}
-
-
-def test_ids_destinations_and_order_are_unique_and_canonical(manifest):
-    ids = [record["id"] for record in manifest["parameters"]]
-    paths = [record["destination"]["path"] for record in manifest["parameters"]]
-    assert ids == [f"P-H04-{number:03d}" for number in range(1, 429)]
-    assert len(paths) == len(set(paths))
-    assert tuple(paths[:305]) == GENERATOR.canonical_default_paths()
-
-
-def test_group_two_general_debt_and_auction_values_are_exact(manifest):
-    records = _lookup(manifest)
-    expected = {
-        "Defaults.genConfig.perUserMaxVaults": 5,
-        "Defaults.genConfig.perUserMaxAssetsPerVault": 15,
-        "Defaults.genConfig.priceStaleTime": 86_400,
-        "Defaults.genDebtConfig.perUserDebtLimit": "20000000000000000000000",
-        "Defaults.genDebtConfig.globalDebtLimit": "200000000000000000000000",
-        "Defaults.genDebtConfig.numBlocksPerInterval": 7_200,
-        "Defaults.genDebtConfig.increasePerDangerBlock": 10,
-        "Defaults.genDebtConfig.genAuctionParams.duration": 7_200,
-    }
-    for path, value in expected.items():
-        assert records[path]["value"]["raw"] == value
-    for field in GENERATOR.GEN_CONFIG_FIELDS[3:]:
-        assert records[f"Defaults.genConfig.{field}"]["value"]["raw"] is True
-
-
-def test_rewards_bonds_hr_and_underscore_preserve_inert_launch_posture(manifest):
-    records = _lookup(manifest)
-    for field in GENERATOR.REWARD_FIELDS:
-        record = records[f"Defaults.rewardsConfig.{field}"]
-        assert record["status"] == "disabled"
-        assert record["value"]["raw"] in (0, False)
-    assert records["Defaults.ripeBondConfig.canBond"]["value"]["raw"] is False
-    assert records["Defaults.ripeBondConfig.epochLength"]["value"]["raw"] == 2_400
-    assert records["Defaults.hrConfig.maxCompensation"]["value"]["raw"] == 0
-    assert records["Defaults.underscoreRegistry"]["value"]["raw"] == "empty(address)"
-    assert records["Defaults.shouldCheckLastTouch"]["value"]["raw"] is True
-
-
-def test_product_graph_posture_is_explicit(manifest):
-    records = _lookup(manifest)
-    assert records["Defaults.assetConfigs[AAPL].asset"]["status"] == "omitted"
-    assert records["Defaults.assetConfigs[USDG].asset"]["status"] == (
-        "not_applicable"
-    )
-    assert records["Defaults.assetConfigs[GREEN_USDG_LP].config.debtTerms.ltv"][
-        "value"
-    ]["raw"] == 0
-    assert records["Defaults.assetConfigs[RIPE_WETH_LP].config.debtTerms.ltv"][
-        "value"
-    ]["raw"] == 0
-    assert records["Deployment.DP-20.teller.shouldPause"]["value"]["raw"] is True
-    assert records["Deployment.DP-16.ccip.greenEnabled"]["value"]["raw"] is False
-
-
-def test_decision_lifecycle_is_twenty_approved_zero_open_and_one_retired(
-    manifest,
-):
-    registry = manifest["decision_registry"]
-    approved = [
-        decision["id"]
-        for decision in registry
-        if decision["status"] == "approved"
-    ]
-    assert approved == [
-        *(f"D-H04-{number:02d}" for number in range(1, 19)),
-        "D-H04-20",
-        "D-H04-21",
-    ]
-    assert [
-        decision
-        for decision in registry
-        if decision["status"] != "approved"
-    ] == [
-        {
-            "id": "D-H04-19",
-            "status": "retired_non_operative",
-            "operative": False,
-        }
-    ]
-    assert not any(
-        record["approval"]["status"] == "pending"
-        for record in manifest["parameters"]
-    )
-    assert all(
-        record["value"]["kind"] in {"typed_null", "derived"}
-        for record in manifest["parameters"]
-        if record["status"] in {"blocked", "unresolved", "derived"}
+def _blueprint_proxy() -> SimpleNamespace:
+    return SimpleNamespace(
+        ZERO_ADDRESS=blueprint_source.ZERO_ADDRESS,
+        ROBINHOOD_ADDRESSES=dict(blueprint_source.ROBINHOOD_ADDRESSES),
+        ROBINHOOD_ADDRESS_STATUS=dict(blueprint_source.ROBINHOOD_ADDRESS_STATUS),
+        ROBINHOOD_DEFAULTS_CONSTRUCTOR=tuple(
+            blueprint_source.ROBINHOOD_DEFAULTS_CONSTRUCTOR
+        ),
+        ROBINHOOD_DEPLOYMENT_INPUTS=dict(
+            blueprint_source.ROBINHOOD_DEPLOYMENT_INPUTS
+        ),
+        ROBINHOOD_CHAIN=dict(blueprint_source.ROBINHOOD_CHAIN),
+        ROBINHOOD_ASSERTION_INVARIANTS=copy.deepcopy(
+            blueprint_source.ROBINHOOD_ASSERTION_INVARIANTS
+        ),
     )
 
 
-def test_zero_false_blocked_deferred_omitted_and_missing_are_distinct(manifest):
-    records = _lookup(manifest)
-    assert records["Defaults.ripeAvailForRewards"]["value"] == {
-        "kind": "concrete",
-        "raw": 0,
-    }
-    assert records["Defaults.rewardsConfig.arePointsEnabled"]["value"] == {
-        "kind": "concrete",
-        "raw": False,
-    }
-    assert records["Defaults.trainingWheels"]["value"]["kind"] == "typed_null"
-    assert records["Defaults.trainingWheels"]["status"] == "blocked"
-    assert records["Deployment.DP-18.roles.liteSigners"]["value"] == {
-        "kind": "concrete",
-        "raw": "[]",
-    }
-    assert records["Deployment.DP-18.roles.liteSigners"]["zero_semantics"][
-        "kind"
-    ] == "legitimate_empty"
-    deferred = records["Deployment.DP-22.bondBooster.minLockDuration"]
-    assert deferred["status"] == "approved"
-    assert deferred["launch_phase"] == "post-launch release"
-    omitted = records["Defaults.priorityLiqAssetVaults[0].vaultId"]
-    assert omitted["status"] == "omitted"
-    assert omitted["value"]["kind"] == "typed_null"
-
-    missing = _mutated(manifest)
-    del missing["parameters"][0]["status"]
-    _assert_code(missing, "H04_RECORD_KEYS")
+def _semantic_raw(value: dict):
+    if value["kind"] in {"typed_null", "symbolic_binding", "omitted"}:
+        return None
+    raw = value.get("raw")
+    if isinstance(raw, str) and raw.isdigit():
+        return int(raw)
+    if isinstance(raw, str) and raw.startswith("["):
+        return json.loads(raw)
+    if isinstance(raw, str) and raw.startswith("0x"):
+        return raw.lower()
+    return raw
 
 
-def test_psm_is_disabled_and_every_numeric_or_capacity_value_is_blocked(manifest):
-    records = _lookup(manifest)
-    assert records["Deployment.DP-07.psm.constructor.canMint"]["value"]["raw"] is (
-        False
-    )
-    assert records[
-        "Deployment.DP-07.psm.constructor.canRedeem"
-    ]["value"]["raw"] is False
-    assert records[
-        "Deployment.DP-07.psm.constructor.shouldAutoDeposit"
-    ]["value"]["raw"] is True
-    assert records[
-        "Deployment.DP-07.psm.preActivation.shouldAutoDeposit"
-    ]["value"]["raw"] is False
-    assert all(
-        records[f"Deployment.DP-08.psm.{field}"]["status"] == "blocked"
-        for field in (
-            "mintFee",
-            "redeemFee",
-            "maxMintPerInterval",
-            "maxRedeemPerInterval",
-            "numBlocksPerInterval",
-            "allowlists",
-            "reserveFunding",
-        )
-    )
-
-
-def test_s3_s4_s5_bindings_are_assertion_only_or_blocked(manifest):
-    records = _lookup(manifest)
-    assert records[
-        "Deployment.DP-01.lootbox.minUnderscoreSendInterval"
-    ]["destination"]["kind"] == "assertion"
-    s4 = records["Deployment.DP-03.deleverage.deleverageCooldown"]
-    assert s4["value"]["raw"] == 0
-    assert "activation requires reopening S4" in s4["description"]
-    assert records[
-        "Deployment.DP-04.ledger.actionBlockSourceSemantic"
-    ]["value"]["raw"] == "0x64"
-    assert records[
-        "Deployment.DP-04.ledger.actionBlockSourceBinding"
-    ]["status"] == "blocked"
-
-
-def test_block_conversion_zero_minimum_and_seconds_separation():
-    assert GENERATOR.convert_base_blocks(0) == 0
-    assert GENERATOR.convert_base_blocks(1) == 1
-    assert GENERATOR.convert_base_blocks(6) == 1
-    assert GENERATOR.convert_base_blocks(7) == 2
-    assert GENERATOR.convert_base_blocks(43_200) == 7_200
-    with pytest.raises(GENERATOR.ManifestError, match="H04_BLOCK_CONVERSION_INPUT"):
-        GENERATOR.convert_base_blocks(-1)
-
-
-def test_rate_per_block_danger_slope_is_never_converted(manifest):
-    record = _lookup(manifest)[
-        "Defaults.genDebtConfig.increasePerDangerBlock"
+def test_canonical_sources_exist_and_filename_casing_is_unique():
+    names = [
+        path.name
+        for path in DEFAULTS.parent.iterdir()
+        if path.name.lower() == "defaultsrobinhood.vy"
     ]
-    assert record["unit"] == {
-        "kind": "rate_per_block_1e6",
-        "denominator": 1_000_000,
+    assert names == ["DefaultsRobinhood.vy"]
+    assert DEFAULTS.is_file()
+    assert (ROOT / "config" / "BluePrint.py").is_file()
+
+
+def test_defaults_implements_all_seventeen_interface_getters():
+    assert sync.default_selectors() == (
+        "genConfig",
+        "genDebtConfig",
+        "ripeAvailForRewards",
+        "ripeAvailForHr",
+        "ripeAvailForBonds",
+        "ripeBondConfig",
+        "rewardsConfig",
+        "ripeGovVaultConfigs",
+        "hrConfig",
+        "underscoreRegistry",
+        "trainingWheels",
+        "shouldCheckLastTouch",
+        "assetConfigs",
+        "priorityLiqAssetVaults",
+        "priorityStabVaults",
+        "priorityPriceSourceIds",
+        "liteSigners",
+    )
+    source = DEFAULTS.read_text()
+    interface = (ROOT / "interfaces" / "Defaults.vyi").read_text()
+    source_getters = set(re.findall(r"^def (\w+)\(", source, re.MULTILINE))
+    source_getters.remove("__init__")
+    assert source_getters == set(
+        re.findall(r"^def (\w+)\(", interface, re.MULTILINE)
+    )
+
+
+def test_constructor_has_eight_named_blueprint_bindings_and_no_address_literals():
+    values = sync.extract_defaults_values()
+    assert tuple(blueprint_source.ROBINHOOD_DEFAULTS_CONSTRUCTOR) == (
+        ("contributorTemplate", "CONTRIBUTOR_TEMPLATE"),
+        ("trainingWheels", "TRAINING_WHEELS"),
+        ("ripeToken", "RIPE_TOKEN"),
+        ("greenToken", "GREEN_TOKEN"),
+        ("sgreenToken", "SGREEN_TOKEN"),
+        ("usdgToken", "USDG"),
+        ("wethToken", "WETH"),
+        ("steakhouseUsdgVault", "STEAKHOUSE_USDG_VAULT"),
+    )
+    assert values["Defaults.hrConfig.contribTemplate"] == {
+        "kind": "symbolic_binding",
+        "name": "CONTRIBUTOR_TEMPLATE",
     }
-    assert record["conversion"] == {"kind": "identity"}
+    assert values["Defaults.trainingWheels"] == {
+        "kind": "symbolic_binding",
+        "name": "TRAINING_WHEELS",
+    }
+    assert values["Defaults.ripeBondConfig.asset"] == {
+        "kind": "external_fact",
+        "raw": blueprint_source.ROBINHOOD_ADDRESSES["USDG"],
+    }
+    assert not re.findall(r"0x[0-9A-Fa-f]{40}", DEFAULTS.read_text())
 
 
-def test_real_manifest_fails_closed_without_creating_output_or_temporary_file(
-    manifest,
-):
-    assert not REAL_OUTPUT.exists()
-    before = set(REAL_OUTPUT.parent.iterdir())
-    with pytest.raises(
-        GENERATOR.ManifestError,
-        match=r"H04_UNRESOLVED_GENERATION:",
-    ):
-        GENERATOR.render_defaults(manifest)
-    assert not REAL_OUTPUT.exists()
-    assert set(REAL_OUTPUT.parent.iterdir()) == before
-
-
-def test_exact_profile1_generation_bearers_are_blocked_deterministically(
-    manifest,
-):
-    records = _lookup(manifest)
-    blocked = tuple(
+def test_constructor_abi_intentionally_extends_pr66_five_arguments():
+    abi = json.loads((ROOT / "scripts" / "abis" / "DefaultsRobinhood.json").read_text())
+    constructor = next(entry for entry in abi if entry["type"] == "constructor")
+    assert [item["name"] for item in constructor["inputs"]] == list(
+        sync.CONSTRUCTOR_ABI_NAMES
+    )
+    tree_paths = subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", PR66],
+        cwd=ROOT,
+        text=True,
+    )
+    precedent_path = next(
         path
-        for path in GENERATOR.required_generation_paths()
-        if records[path]["status"] in {"blocked", "unresolved"}
+        for path in tree_paths.splitlines()
+        if path.lower() == "contracts/config/defaultsrobinhood.vy"
     )
-    assert blocked == EXPECTED_GENERATION_BLOCKERS
-    assert len(blocked) == 6
-    assert all(records[path]["value"]["kind"] == "typed_null" for path in blocked)
-    assert "Defaults.liteSigners[0]" not in GENERATOR.required_generation_paths()
-
-
-@pytest.mark.parametrize("remaining", EXPECTED_GENERATION_BLOCKERS)
-def test_closing_fewer_than_all_generation_blockers_never_renders(
-    manifest,
-    remaining,
-):
-    candidate = _synthetic_manifest(manifest)
-    candidate_record = _lookup(candidate)[remaining]
-    original_record = _lookup(manifest)[remaining]
-    candidate_record.clear()
-    candidate_record.update(copy.deepcopy(original_record))
-    GENERATOR.validate_manifest(candidate, require_canonical_state=False)
-    with pytest.raises(
-        GENERATOR.ManifestError,
-        match="H04_UNRESOLVED_GENERATION:" + GENERATOR.re.escape(remaining),
-    ):
-        GENERATOR.render_defaults(candidate)
-    assert not REAL_OUTPUT.exists()
-
-
-def test_real_check_only_command_is_stable_and_output_free():
-    command = [sys.executable, str(GENERATOR_PATH), "--check"]
-    first = subprocess.run(
-        command,
-        cwd=REPOSITORY,
-        check=False,
-        capture_output=True,
+    precedent = subprocess.check_output(
+        ["git", "show", f"{PR66}:{precedent_path}"],
+        cwd=ROOT,
         text=True,
     )
-    second = subprocess.run(
-        command,
-        cwd=REPOSITORY,
-        check=False,
-        capture_output=True,
-        text=True,
+    assert precedent.count("immutable(address)") == 5
+    assert "_usdgToken" not in precedent
+    assert "_wethToken" not in precedent
+    assert "_steakhouseUsdgVault" not in precedent
+
+
+def test_manifest_partition_statuses_assets_and_omissions_are_exact():
+    ledger = _ledger()
+    records = ledger["parameters"]
+    assert ledger["schema_version"] == sync.SCHEMA_VERSION
+    assert len(records) == 436
+    assert Counter(r["destination"]["kind"] for r in records) == Counter(
+        defaults_field=305,
+        deployment_input=119,
+        assertion=12,
     )
-    assert first.returncode == second.returncode == 2
-    assert first.stdout == second.stdout
-    assert first.stdout.startswith(
-        "H04_BLOCKED: H04_UNRESOLVED_GENERATION:"
+    defaults = [r for r in records if r["destination"]["kind"] == "defaults_field"]
+    assert Counter(r["status"] for r in defaults) == Counter(
+        approved=223,
+        external_fact=5,
+        blocked=7,
+        omitted=70,
     )
-    assert first.stderr == second.stderr == ""
-    assert not REAL_OUTPUT.exists()
-
-
-def test_stale_defaults_is_rejected_before_check_render(
-    manifest,
-    monkeypatch,
-    tmp_path,
-):
-    manifest_path = tmp_path / "robinhood-parameters.json"
-    output = tmp_path / "DefaultsRobinhood.vy"
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    output.write_text("stale\n", encoding="utf-8")
-    monkeypatch.setattr(
-        GENERATOR,
-        "_repository_paths",
-        lambda: (manifest_path, output),
-    )
-    assert GENERATOR.main(["--check"]) == 2
-    assert output.read_text(encoding="utf-8") == "stale\n"
-
-
-def test_synthetic_render_is_byte_identical_across_repeated_runs(manifest):
-    synthetic = _synthetic_manifest(manifest)
-    first = GENERATOR.render_defaults(synthetic)
-    second = GENERATOR.render_defaults(copy.deepcopy(synthetic))
-    assert first == second
-    assert hashlib.sha256(first.encode()).hexdigest() == hashlib.sha256(
-        second.encode()
-    ).hexdigest()
-    assert all(marker not in first for marker in ("DefaultsBase", "DefaultsLocal"))
-    assert all(marker not in first for marker in ("GREEN_USDG_LP", "RIPE_WETH_LP"))
-    assert (
-        "def liteSigners() -> DynArray[address, 10]:\n"
-        "    return []\n"
-    ) in first
-    assert "Defaults.liteSigners[0]" not in first
-
-
-def test_two_process_synthetic_determinism(manifest, tmp_path):
-    synthetic_path = tmp_path / "synthetic.json"
-    synthetic_path.write_text(
-        json.dumps(_synthetic_manifest(manifest), sort_keys=True),
-        encoding="utf-8",
-    )
-    program = (
-        "import hashlib,importlib.util,json,pathlib;"
-        f"p=pathlib.Path({str(GENERATOR_PATH)!r});"
-        "s=importlib.util.spec_from_file_location('g',p);"
-        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
-        f"d=json.loads(pathlib.Path({str(synthetic_path)!r}).read_text());"
-        "print(hashlib.sha256(m.render_defaults(d).encode()).hexdigest())"
-    )
-    outputs = [
-        subprocess.run(
-            [sys.executable, "-c", program],
-            cwd=tmp_path,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        for _ in range(2)
+    asset_records = [
+        r
+        for r in defaults
+        if r["destination"]["path"].startswith("Defaults.assetConfigs[")
+        and r["status"] != "omitted"
     ]
-    assert outputs[0] == outputs[1]
+    assert len(asset_records) == 155
+    assert {
+        r["destination"]["path"].split("[", 1)[1].split("]", 1)[0]
+        for r in asset_records
+    } == {"GREEN", "RIPE", "SGREEN", "WETH", "STEAKHOUSE_USDG"}
+    omitted = [r for r in defaults if r["status"] == "omitted"]
+    assert len(omitted) == 70
+    assert all(r["value"] == {"kind": "omitted", "profile": "Profile 2"} for r in omitted)
 
 
-def test_two_clean_export_roots_render_identically(manifest, tmp_path):
-    synthetic = _synthetic_manifest(manifest)
-    digests = []
-    for name in ("checkout-a", "checkout-b"):
-        root = tmp_path / name
-        root.mkdir()
-        fixture = root / "manifest.json"
-        fixture.write_text(
-            json.dumps(synthetic, sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
-        digests.append(
-            hashlib.sha256(
-                GENERATOR.render_defaults(
-                    json.loads(fixture.read_text(encoding="utf-8"))
-                ).encode()
-            ).hexdigest()
-        )
-    assert digests[0] == digests[1]
+def test_priority_and_profile1_values_normalize_from_defaults():
+    values = sync.extract_defaults_values()
+    assert values["Defaults.priorityLiqAssetVaults[0].vaultId"]["raw"] == 3
+    assert values["Defaults.priorityLiqAssetVaults[0].asset"]["raw"] == (
+        blueprint_source.ROBINHOOD_ADDRESSES["STEAKHOUSE_USDG_VAULT"]
+    )
+    assert values["Defaults.priorityLiqAssetVaults[1].vaultId"]["raw"] == 3
+    assert values["Defaults.priorityLiqAssetVaults[1].asset"]["raw"] == (
+        blueprint_source.ROBINHOOD_ADDRESSES["WETH"]
+    )
+    assert values["Defaults.priorityStabVaults[0].vaultId"]["raw"] == 1
+    assert values["Defaults.priorityStabVaults[0].asset"] == {
+        "kind": "symbolic_binding",
+        "name": "SGREEN_TOKEN",
+    }
+    assert values["Defaults.priorityPriceSourceIds"] == {
+        "kind": "concrete",
+        "raw": [1, 3],
+    }
 
 
-def test_atomic_replacement_uses_same_directory_only(
-    manifest,
-    monkeypatch,
+def test_every_value_has_one_source_owner_and_full_coverage():
+    ledger = _ledger()
+    defaults = sync.extract_defaults_values()
+    deployment = sync.extract_deployment_values(defaults)
+    assertions = sync.derive_assertion_values(defaults)
+    destinations = [r["destination"]["path"] for r in ledger["parameters"]]
+    assert len(destinations) == len(set(destinations)) == 436
+    assert set(defaults) == {
+        r["destination"]["path"]
+        for r in ledger["parameters"]
+        if r["destination"]["kind"] == "defaults_field"
+    }
+    assert set(deployment) == {
+        r["destination"]["path"]
+        for r in ledger["parameters"]
+        if r["destination"]["kind"] == "deployment_input"
+    }
+    assert set(assertions) == {
+        r["destination"]["path"]
+        for r in ledger["parameters"]
+        if r["destination"]["kind"] == "assertion"
+    }
+    assert not (set(defaults) & set(deployment))
+    assert not (set(defaults) & set(assertions))
+    assert not (set(deployment) & set(assertions))
+
+
+def test_assertion_path_census_and_p_h04_306_are_source_derived():
+    ledger = _ledger()
+    assertion_records = [
+        record
+        for record in ledger["parameters"]
+        if record["destination"]["kind"] == "assertion"
+    ]
+    assert tuple(
+        record["destination"]["path"] for record in assertion_records
+    ) == sync.ASSERTION_DESTINATION_PATHS
+    defaults = sync.extract_defaults_values()
+    assertions = sync.derive_assertion_values(defaults)
+    assert assertions["Deployment.DP-01.lootbox.minUnderscoreSendInterval"] == {
+        "kind": "concrete",
+        "raw": blueprint_source.ROBINHOOD_CHAIN["blocks_per_minute"] * 60 * 24,
+    }
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate", "unknown"])
+def test_assertion_missing_extra_duplicate_and_unknown_paths_fail_closed(
+    tmp_path, mutation
+):
+    ledger = _ledger()
+    assertions = [
+        record
+        for record in ledger["parameters"]
+        if record["destination"]["kind"] == "assertion"
+    ]
+    if mutation == "missing":
+        assertions[0]["destination"]["kind"] = "deployment_input"
+    elif mutation == "extra":
+        next(
+            record
+            for record in ledger["parameters"]
+            if record["destination"]["kind"] == "deployment_input"
+        )["destination"]["kind"] = "assertion"
+    elif mutation == "duplicate":
+        assertions[1]["destination"]["path"] = assertions[0]["destination"]["path"]
+    else:
+        assertions[1]["destination"]["path"] = "Deployment.UNKNOWN.assertion"
+    path = _write_ledger(tmp_path, ledger)
+    with pytest.raises(sync.ManifestError, match="H04_ASSERTION_PATH_CENSUS"):
+        sync.check_ledger(path)
+
+
+def test_assertion_only_ledger_drift_and_p_h04_306_mutation_fail_check(tmp_path):
+    ledger = _ledger()
+    record = next(item for item in ledger["parameters"] if item["id"] == "P-H04-306")
+    record["value"] = {"kind": "concrete", "raw": 7_201}
+    path = _write_ledger(tmp_path, ledger)
+    with pytest.raises(sync.ManifestError, match="H04_LEDGER_DRIFT"):
+        sync.check_ledger(path)
+
+
+def test_defaults_extraction_preserves_boa_environment_and_cache_on_all_paths(
     tmp_path,
 ):
-    rendered = GENERATOR.render_defaults(_synthetic_manifest(manifest))
-    output = tmp_path / "DefaultsRobinhood.vy"
-    calls = []
-    original = os.replace
+    import boa
+    import boa.interpret as boa_interpret
 
-    def observed(source, destination):
-        calls.append((Path(source), Path(destination)))
-        original(source, destination)
-
-    monkeypatch.setattr(GENERATOR.os, "replace", observed)
-    GENERATOR.atomic_replace_output(
-        rendered,
-        output,
-        canonical_output=output,
+    marker = boa.loads(
+        """# @version 0.4.3
+@external
+@view
+def marker() -> uint256:
+    return 73
+""",
+        name="source_authority_environment_marker",
     )
-    assert output.read_text(encoding="utf-8") == rendered
-    assert len(calls) == 1
-    assert calls[0][0].parent == calls[0][1].parent == tmp_path
-    assert not list(tmp_path.glob(".DefaultsRobinhood.*.tmp"))
-
-
-@pytest.mark.parametrize(
-    "name",
-    ("DefaultsBase.vy", "DefaultsLocal.vy", "Elsewhere.vy"),
-)
-def test_every_noncanonical_target_is_refused(name, tmp_path):
-    output = tmp_path / name
-    with pytest.raises(
-        GENERATOR.ManifestError,
-        match="H04_(?:FORBIDDEN|NONCANONICAL)_TARGET",
-    ):
-        GENERATOR.atomic_replace_output(
-            "unchanged",
-            output,
-            canonical_output=output,
-        )
-    assert not output.exists()
-
-
-def test_failed_target_check_leaves_existing_output_untouched(tmp_path):
-    output = tmp_path / "DefaultsRobinhood.vy"
-    output.write_text("existing\n", encoding="utf-8")
-    with pytest.raises(GENERATOR.ManifestError, match="H04_NONCANONICAL_TARGET"):
-        GENERATOR.atomic_replace_output(
-            "replacement",
-            output,
-            canonical_output=tmp_path / "different" / "DefaultsRobinhood.vy",
-        )
-    assert output.read_text(encoding="utf-8") == "existing\n"
-
-
-def test_generator_imports_only_the_standard_library():
-    tree = ast.parse(GENERATOR_PATH.read_text(encoding="utf-8"))
-    imports = {
-        alias.name.split(".")[0]
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Import)
-        for alias in node.names
-    } | {
-        node.module.split(".")[0]
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module
-    }
-    assert imports <= {
-        "__future__",
-        "argparse",
-        "collections",
-        "hashlib",
-        "json",
-        "os",
-        "re",
-        "tempfile",
-        "pathlib",
-        "typing",
-    }
-
-
-def test_exact_semantic_census_and_approval_branches(manifest):
-    assert GENERATOR.Counter(
-        record["status"] for record in manifest["parameters"]
-    ) == GENERATOR.Counter(
-        {
-            "approved": 152,
-            "disabled": 150,
-            "omitted": 34,
-            "blocked": 60,
-            "derived": 1,
-            "not_applicable": 31,
-        }
-    )
-    assert GENERATOR.Counter(
-        record["approval"]["status"] for record in manifest["parameters"]
-    ) == GENERATOR.Counter({"approved": 367, "pending_binding": 61})
-
-
-def test_registry_v1_exact_mapping_reverse_ownership_and_digest(manifest):
-    schedules = manifest["binding_schedules"]
-    assert schedules == GENERATOR.EXPECTED_BINDING_SCHEDULES
-    assert len(schedules) == 14
-    assert sum(len(schedule["records"]) for schedule in schedules) == 61
-    assert GENERATOR.binding_schedules_digest(schedules) == (
-        "f6605710bb6a3f7274d66bfcbb8104fdd21f9a78cf043736474a2f5a6e14e167"
-    )
-    records = {record["id"]: record for record in manifest["parameters"]}
-    owners = {}
-    for schedule in schedules:
-        for record_id in schedule["records"]:
-            assert record_id not in owners
-            owners[record_id] = schedule["id"]
-            assert records[record_id]["approval"] == {
-                "status": "pending_binding",
-                "schedule_id": schedule["id"],
-            }
-    assert len(owners) == 61
-
-
-def test_exact_owner_policy_transitions_are_concrete_or_omitted(manifest):
-    records = {record["id"]: record for record in manifest["parameters"]}
-    assert records["P-H04-305"]["status"] == "omitted"
-    assert records["P-H04-305"]["value"]["kind"] == "typed_null"
-    assert records["P-H04-305"]["blockers"] == []
-    assert records["P-H04-412"]["value"] == {
-        "kind": "concrete",
-        "raw": "[]",
-    }
-    assert records["P-H04-412"]["unit"] == {"kind": "address"}
-    assert records["P-H04-412"]["blockers"] == []
-    for record_id in ("P-H04-415", "P-H04-417", "P-H04-419"):
-        assert records[record_id]["value"] == {"kind": "concrete", "raw": 0}
-        assert records[record_id]["zero_semantics"]["kind"] == "legitimate_zero"
-        assert records[record_id]["blockers"] == []
-    assert all(
-        records[f"P-H04-{number:03d}"]["status"] == "omitted"
-        and records[f"P-H04-{number:03d}"]["blockers"] == []
-        for number in range(81, 112)
+    original_env = boa.env
+    original_cache = boa_interpret._disk_cache
+    original_cache_config = (
+        getattr(original_cache, "cache_dir", None),
+        getattr(original_cache, "version_salt", None),
     )
 
+    values = sync.extract_defaults_values()
+    assert len(values) == 305
+    assert boa.env is original_env
+    assert boa_interpret._disk_cache is original_cache
+    assert (
+        getattr(boa_interpret._disk_cache, "cache_dir", None),
+        getattr(boa_interpret._disk_cache, "version_salt", None),
+    ) == original_cache_config
+    assert marker.marker() == 73
 
-def test_policy_approval_never_supplies_concrete_scheduled_bindings(manifest):
-    records = {record["id"]: record for record in manifest["parameters"]}
-    scheduled = {
-        record_id
-        for schedule in manifest["binding_schedules"]
-        for record_id in schedule["records"]
-    }
-    assert all(
-        records[record_id]["approval"]["status"] == "pending_binding"
-        for record_id in scheduled
-    )
-    assert all(
-        records[record_id]["status"]
-        in {"blocked", "derived"}
-        for record_id in scheduled
-    )
-    assert not any(
-        blocker.startswith("D-H04-")
-        for record in manifest["parameters"]
-        for blocker in record["blockers"]
-    )
-
-
-def test_parked_schedules_cannot_be_mistaken_for_release_bindings(manifest):
-    schedules = {
-        schedule["id"]: schedule for schedule in manifest["binding_schedules"]
-    }
-    assert {
-        schedule_id
-        for schedule_id, schedule in schedules.items()
-        if schedule["classification"] == "parked"
-    } == {
-        "BS-H04-STOCK-ACTIVATION-PARKED",
-        "BS-H04-CCIP-PARKED",
-    }
-    assert all(
-        schedule["closure_artifacts"][0]
-        == "cannot close under current authority"
-        for schedule in schedules.values()
-        if schedule["classification"] == "parked"
-    )
+    broken = tmp_path / "DefaultsRobinhood.vy"
+    broken.write_text(DEFAULTS.read_text() + "\nthis is not vyper\n")
+    with pytest.raises(sync.ManifestError, match="H04_DEFAULTS_COMPILE"):
+        sync.extract_defaults_values(broken)
+    assert boa.env is original_env
+    assert boa_interpret._disk_cache is original_cache
+    assert (
+        getattr(boa_interpret._disk_cache, "cache_dir", None),
+        getattr(boa_interpret._disk_cache, "version_salt", None),
+    ) == original_cache_config
+    assert marker.marker() == 73
 
 
-def test_lite_signer_policy_crosses_defaults_and_deployment_boundaries(
-    manifest,
-):
-    records = _lookup(manifest)
-    default = records["Defaults.liteSigners[0]"]
-    deployment = records["Deployment.DP-18.roles.liteSigners"]
-    assert default["status"] == "omitted"
-    assert default["value"]["kind"] == "typed_null"
-    assert deployment["status"] == "approved"
-    assert deployment["value"]["raw"] == "[]"
-    assert "Defaults.liteSigners[0]" in GENERATOR.canonical_default_paths()
-    assert "Defaults.liteSigners[0]" not in GENERATOR.required_generation_paths()
-
-
-def test_zero_premints_do_not_approve_recipients_or_later_issuance(manifest):
-    records = {record["id"]: record for record in manifest["parameters"]}
-    for amount, recipient in (
-        ("P-H04-415", "P-H04-416"),
-        ("P-H04-417", "P-H04-418"),
-        ("P-H04-419", "P-H04-420"),
-    ):
-        assert records[amount]["value"] == {"kind": "concrete", "raw": 0}
-        assert records[recipient]["status"] == "blocked"
-        assert records[recipient]["value"]["kind"] == "typed_null"
-        assert records[recipient]["approval"]["schedule_id"] == (
-            "BS-H04-SUPPLY-RECIPIENTS-OP"
-        )
-
-
-def test_stock_defaults_are_launch_omissions_not_future_values(manifest):
-    records = {record["id"]: record for record in manifest["parameters"]}
-    omitted = [records[f"P-H04-{number:03d}"] for number in range(81, 112)]
-    assert len(omitted) == 31
-    assert all(record["status"] == "omitted" for record in omitted)
-    assert all(record["value"]["kind"] == "typed_null" for record in omitted)
-    assert all(record["launch_phase"] == "omitted" for record in omitted)
-    assert all(not record["blockers"] for record in omitted)
-    parked = next(
-        schedule
-        for schedule in manifest["binding_schedules"]
-        if schedule["id"] == "BS-H04-STOCK-ACTIVATION-PARKED"
-    )
-    assert len(parked["records"]) == 17
-    assert set(parked["records"]).isdisjoint(
-        {record["id"] for record in omitted}
-    )
-
-
-@pytest.mark.parametrize(
-    ("mutation", "code"),
-    [
-        ("decision_open", "H04_DECISION_LIFECYCLE"),
-        ("decision_typo", "H04_DECISION_LIFECYCLE"),
-        ("old_pending", "H04_APPROVAL_STATUS"),
-        ("unknown_schedule", "H04_UNKNOWN_SCHEDULE_ID"),
-        ("reverse_schedule", "H04_SCHEDULE_REVERSE_REFERENCE"),
-        ("duplicate_ownership", "H04_DUPLICATE_SCHEDULE_OWNERSHIP"),
-        ("missing_ownership", "H04_BINDING_SCHEDULE_CENSUS"),
-        ("schedule_semantics", "H04_BINDING_SCHEDULE_SEMANTICS"),
-        ("decision_blocker", "H04_UNKNOWN_BLOCKER"),
-        ("lite_policy", "H04_LITE_SIGNER_POLICY"),
-        ("lite_cross_boundary", "H04_LITE_SIGNER_CROSS_BOUNDARY"),
-        ("premint", "H04_NO_PREMINT_POLICY"),
-        ("stock_omission", "H04_STOCK_LAUNCH_OMISSION"),
-    ],
-)
-def test_v2_lifecycle_schedule_and_policy_mutations_fail_closed(
-    manifest,
-    mutation,
-    code,
-):
-    candidate = _mutated(manifest)
-    records = {record["id"]: record for record in candidate["parameters"]}
-    if mutation == "decision_open":
-        candidate["decision_registry"][11]["status"] = "open"
-    elif mutation == "decision_typo":
-        candidate["decision_registry"][0]["id"] = "D-H04-001"
-    elif mutation == "old_pending":
-        records["P-H04-056"]["approval"] = {
-            "status": "pending",
-            "decision": "D-H04-15",
-        }
-    elif mutation == "unknown_schedule":
-        records["P-H04-056"]["approval"]["schedule_id"] = "BS-H04-UNKNOWN"
-    elif mutation == "reverse_schedule":
-        records["P-H04-056"]["approval"]["schedule_id"] = (
-            "BS-H04-LP-ARTIFACTS-RC"
-        )
-    elif mutation == "duplicate_ownership":
-        candidate["binding_schedules"][1]["records"].append("P-H04-056")
-    elif mutation == "missing_ownership":
-        candidate["binding_schedules"][0]["records"].remove("P-H04-056")
-    elif mutation == "schedule_semantics":
-        candidate["binding_schedules"][0]["prerequisite"] += " drift"
-    elif mutation == "decision_blocker":
-        records["P-H04-056"]["blockers"].append("D-H04-15")
-    elif mutation == "lite_policy":
-        records["P-H04-305"]["status"] = "not_applicable"
-    elif mutation == "lite_cross_boundary":
-        records["P-H04-412"]["value"]["raw"] = "empty(address)"
-        records["P-H04-412"]["zero_semantics"]["kind"] = "not_zero"
-    elif mutation == "premint":
-        records["P-H04-415"]["value"]["raw"] = 1
-        records["P-H04-415"]["zero_semantics"]["kind"] = "not_zero"
+@pytest.mark.parametrize("mutation", ["missing", "extra"])
+def test_missing_or_duplicate_blueprint_ownership_fails_closed(mutation):
+    proxy = _blueprint_proxy()
+    if mutation == "missing":
+        proxy.ROBINHOOD_DEPLOYMENT_INPUTS.pop(next(iter(proxy.ROBINHOOD_DEPLOYMENT_INPUTS)))
     else:
-        records["P-H04-081"]["launch_phase"] = "atomic Stock activation"
-    _assert_code(candidate, code)
-
-
-def test_registry_digest_is_independently_enforced(manifest, monkeypatch):
-    monkeypatch.setattr(GENERATOR, "BINDING_SCHEDULES_SHA256", "0" * 64)
-    _assert_code(manifest, "H04_BINDING_SCHEDULE_DIGEST")
-
-
-@pytest.mark.parametrize(
-    ("mutation", "code"),
-    [
-        ("top_key", "H04_TOP_KEYS"),
-        ("record_key", "H04_RECORD_KEYS"),
-        ("null", "H04_NULL_FORBIDDEN"),
-        ("id_order", "H04_ID_ORDER"),
-        ("destination_duplicate", "H04_DUPLICATE_DESTINATION"),
-        ("h03", "H04_H03_REFERENCE"),
-        ("status_value", "H04_STATUS_VALUE_KIND"),
-        ("unit", "H04_UNIT_KIND"),
-        ("zero", "H04_ZERO_UNTYPED"),
-        ("false", "H04_FALSE_UNTYPED"),
-        ("block_conversion", "H04_BLOCK_CONVERSION"),
-        ("seconds_conversion", "H04_SECONDS_CONVERSION"),
-        ("rate_conversion", "H04_DANGER_SLOPE_CONVERSION"),
-        ("unknown_blocker", "H04_UNKNOWN_BLOCKER"),
-        ("missing_blocker", "H04_MISSING_BLOCKER"),
-        ("base_address", "H04_BASE_ADDRESS_LEAK"),
-        ("zero_address", "H04_ZERO_ADDRESS_LITERAL"),
-        ("forbidden_text", "H04_FORBIDDEN_TEXT"),
-        ("allocation", "H04_REWARD_ALLOCATION"),
-        ("default_order", "H04_DEFAULT_ORDER_OR_CENSUS"),
-    ],
-)
-def test_closed_schema_and_cross_record_rejections(manifest, mutation, code):
-    candidate = _mutated(manifest)
-    records = candidate["parameters"]
-    lookup = _lookup(candidate)
-    if mutation == "top_key":
-        candidate["extra"] = True
-    elif mutation == "record_key":
-        records[0]["extra"] = True
-    elif mutation == "null":
-        records[0]["description"] = None
-    elif mutation == "id_order":
-        records[0]["id"] = "P-H04-999"
-    elif mutation == "destination_duplicate":
-        records[1]["destination"]["path"] = records[0]["destination"]["path"]
-    elif mutation == "h03":
-        records[0]["h03_ref"] = "CM-061"
-    elif mutation == "status_value":
-        records[0]["status"] = "blocked"
-    elif mutation == "unit":
-        records[0]["unit"] = {"kind": "unknown"}
-    elif mutation == "zero":
-        lookup["Defaults.ripeAvailForRewards"]["zero_semantics"] = {
-            "kind": "not_zero",
-            "explanation": "invalid",
-        }
-    elif mutation == "false":
-        lookup["Defaults.rewardsConfig.arePointsEnabled"]["zero_semantics"] = {
-            "kind": "not_zero",
-            "explanation": "invalid",
-        }
-    elif mutation == "block_conversion":
-        lookup["Defaults.ripeBondConfig.epochLength"]["conversion"][
-            "rh_blocks"
-        ] = 2_401
-    elif mutation == "seconds_conversion":
-        lookup["Defaults.genConfig.priceStaleTime"]["conversion"] = {
-            "kind": "identity"
-        }
-    elif mutation == "rate_conversion":
-        lookup["Defaults.genDebtConfig.increasePerDangerBlock"]["conversion"] = {
-            "kind": "not_applicable"
-        }
-    elif mutation == "unknown_blocker":
-        lookup["Defaults.trainingWheels"]["blockers"].append("B-UNKNOWN")
-    elif mutation == "missing_blocker":
-        lookup["Defaults.trainingWheels"]["blockers"] = []
-    elif mutation == "base_address":
-        records[0]["description"] = next(
-            iter(GENERATOR.FORBIDDEN_BASE_ADDRESSES)
+        proxy.ROBINHOOD_DEPLOYMENT_INPUTS["Deployment.EXTRA"] = (
+            blueprint_source.RobinhoodInput(1, "approved")
         )
-    elif mutation == "zero_address":
-        records[0]["description"] = "0x" + ("0" * 40)
-    elif mutation == "forbidden_text":
-        records[0]["description"] = "TBD"
-    elif mutation == "allocation":
-        record = lookup["Defaults.rewardsConfig.borrowersAlloc"]
-        record["value"]["raw"] = 1
-        record["zero_semantics"] = {
-            "kind": "not_zero",
-            "explanation": "invalid",
-        }
-        record["generated_repr"]["repr"] = "1"
-    else:
-        records[0], records[1] = records[1], records[0]
-        records[0]["id"], records[1]["id"] = records[1]["id"], records[0]["id"]
-    _assert_code(candidate, code)
+    with pytest.raises(sync.ManifestError, match="H04_BLUEPRINT_DEPLOYMENT_INPUT_CENSUS"):
+        sync.derive_ledger(_ledger(), blueprint=proxy)
+
+
+def test_derived_ledger_matches_both_sources_and_check_mode():
+    tracked = sync.load_ledger()
+    assert sync.derive_ledger(tracked) == tracked
+    identity = sync.check_ledger()
+    assert identity == sync.ledger_sha256(tracked)
+
+
+def test_manual_ledger_value_edit_and_metadata_override_fail(tmp_path):
+    ledger = _ledger()
+    record = _records(ledger)["Defaults.genConfig.perUserMaxVaults"]
+    record["value"] = {"kind": "concrete", "raw": 999}
+    record["source"] = {
+        "citation": "owner metadata cannot override source",
+        "commit": "0" * 40,
+    }
+    path = _write_ledger(tmp_path, ledger)
+    with pytest.raises(sync.ManifestError, match="H04_LEDGER_DRIFT"):
+        sync.check_ledger(path)
+
+
+def test_unknown_ledger_keys_fail_closed(tmp_path):
+    ledger = _ledger()
+    ledger["parameters"][0]["unknown_value_authority"] = 7
+    path = _write_ledger(tmp_path, ledger)
+    with pytest.raises(sync.ManifestError, match="H04_RECORD_KEYS"):
+        sync.check_ledger(path)
+
+
+def test_blueprint_address_mutation_fails_ledger_check():
+    proxy = _blueprint_proxy()
+    proxy.ROBINHOOD_ADDRESSES["USDG"] = "0x1111111111111111111111111111111111111111"
+    with pytest.raises(sync.ManifestError, match="H04_LEDGER_DRIFT"):
+        sync.check_ledger(blueprint=proxy)
 
 
 @pytest.mark.parametrize(
-    ("path", "raw", "code"),
+    ("old", "new"),
     (
-        (
-            "Deployment.DP-03.deleverage.futureValue",
-            None,
-            "H04_DELEVERAGE_REPRESENTATION",
-        ),
-        (
-            "Deployment.DP-03.fullPayoffBuffer",
-            None,
-            "H04_DELEVERAGE_REPRESENTATION",
-        ),
-        (
-            "Deployment.DP-03.payoff.overageBps",
-            None,
-            "H04_DELEVERAGE_REPRESENTATION",
-        ),
-        (
-            "Deployment.DP-03.dust.dustThreshold",
-            None,
-            "H04_DELEVERAGE_REPRESENTATION",
-        ),
-        (
-            "Deployment.DP-03.dust.dustBps",
-            None,
-            "H04_DELEVERAGE_REPRESENTATION",
-        ),
-        (
-            "Deployment.DP-03.fullPayoffBuffer",
-            10**15,
-            "H04_BASE_DELEVERAGE_VALUE",
-        ),
-        (
-            "Deployment.DP-03.payoff.overageBps",
-            100,
-            "H04_BASE_DELEVERAGE_VALUE",
-        ),
+        ("perUserMaxVaults = 5", "perUserMaxVaults = 6"),
+        ("canDeposit = True", "canDeposit = False"),
+        ("return [1, 3]", "return [1]"),
+        ("vaultIds=[3]", "vaultIds=[2]"),
     ),
 )
-def test_deleverage_representation_and_base_values_fail_closed(
-    manifest,
-    path,
-    raw,
-    code,
-):
-    candidate = _mutated(manifest)
-    record = candidate["parameters"][-1]
-    record["destination"]["path"] = path
-    if raw is not None:
-        record["value"]["raw"] = raw
-        record["conversion"] = {"kind": "identity"}
-    _assert_code(candidate, code)
+def test_defaults_numeric_boolean_list_and_asset_tuple_mutations_fail(tmp_path, old, new):
+    mutated = _mutated_defaults(tmp_path, old, new)
+    with pytest.raises(sync.ManifestError, match="H04_LEDGER_DRIFT"):
+        sync.check_ledger(defaults_path=mutated)
 
 
-def test_profile1_render_projection_is_exact_and_schema_bounded(manifest):
-    assert GENERATOR.PROFILE1_GOV_ROWS == ("RIPE",)
-    assert GENERATOR.PROFILE1_ASSET_ROWS == ("GREEN", "RIPE", "SGREEN")
-    assert GENERATOR.PROFILE1_STAB_VAULT_INDEXES == (1,)
-    assert set(GENERATOR.PROFILE1_GOV_ROWS) <= set(GENERATOR.GOV_ROWS)
-    assert set(GENERATOR.PROFILE1_ASSET_ROWS) <= set(GENERATOR.ASSET_ROWS)
-    canonical = set(GENERATOR.canonical_default_paths())
-    required = set(GENERATOR.required_generation_paths())
-    deferred = {
-        path
-        for path in canonical
-        if "[GREEN_USDG_LP]" in path
-        or "[RIPE_WETH_LP]" in path
-        or path.startswith("Defaults.priorityStabVaults[0].")
+def test_missing_and_uncompilable_defaults_fail_closed(tmp_path):
+    with pytest.raises(sync.ManifestError, match="H04_DEFAULTS_MISSING"):
+        sync.extract_defaults_values(tmp_path / "DefaultsRobinhood.vy")
+    broken = tmp_path / "DefaultsRobinhood.vy"
+    broken.write_text(DEFAULTS.read_text() + "\nthis is not vyper\n")
+    with pytest.raises(sync.ManifestError, match="H04_DEFAULTS_COMPILE"):
+        sync.extract_defaults_values(broken)
+
+
+def test_sensitive_and_placeholder_rejection_remains_fail_closed():
+    proxy = _blueprint_proxy()
+    path = "Deployment.DP-05.timelocks.TokenHq.actionTimeLock"
+    proxy.ROBINHOOD_DEPLOYMENT_INPUTS[path] = blueprint_source.RobinhoodInput(
+        "placeholder-secret",
+        "approved",
+    )
+    defaults = sync.extract_defaults_values(blueprint=proxy)
+    with pytest.raises(sync.ManifestError, match="H04_FORBIDDEN_TEXT"):
+        sync.extract_deployment_values(defaults, blueprint=proxy)
+
+
+def test_sync_is_deterministic_and_writes_only_the_ledger(tmp_path):
+    path = _write_ledger(tmp_path, _ledger())
+    first_identity = sync.sync_ledger(path)
+    first = path.read_bytes()
+    second_identity = sync.sync_ledger(path)
+    assert path.read_bytes() == first
+    assert first_identity == second_identity == sync.ledger_sha256(json.loads(first))
+
+
+def test_check_mode_performs_no_repository_writes(tmp_path):
+    tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).split(b"\0")
+    before = {
+        path: (ROOT / path.decode()).read_bytes()
+        for path in tracked
+        if path and (ROOT / path.decode()).is_file()
     }
-    records = _lookup(manifest)
-    assert len(deferred) == 72
-    assert hashlib.sha256(
-        ("\n".join(sorted(deferred)) + "\n").encode()
-    ).hexdigest() == (
-        "1b1fa2c5f0b4626b05bdb86eeb7b713ca9487e53fa3880ff1707647a6355aa98"
+    environment = os.environ.copy()
+    environment.update(
+        PYTHONDONTWRITEBYTECODE="1",
+        PYTHONPYCACHEPREFIX=str(tmp_path / "pycache"),
+        XDG_CACHE_HOME=str(tmp_path / "xdg"),
+        ETHERSCAN_API_KEY="local-placeholder",
     )
-    assert deferred.isdisjoint(required)
-    assert sum(records[path]["status"] == "approved" for path in deferred) == 18
-    assert sum(records[path]["status"] == "disabled" for path in deferred) == 44
-    assert sum(records[path]["status"] == "blocked" for path in deferred) == 10
-    assert all(
-        records[path]["value"]["kind"] == "concrete"
-        for path in deferred
-        if records[path]["status"] == "approved"
-    )
-    rendered = GENERATOR.render_defaults(_synthetic_manifest(manifest))
-    assert "GREEN_USDG_LP" not in rendered
-    assert "RIPE_WETH_LP" not in rendered
-
-
-def test_profile1_projection_authority_is_current_and_hash_bound():
-    authority = REPOSITORY / GENERATOR.PROFILE1_AUTHORITY_PATH
-    current = authority.read_bytes()
-    introduced = subprocess.run(
-        [
-            "/usr/bin/git",
-            "show",
-            (
-                f"{GENERATOR.PROFILE1_AUTHORITY_COMMIT}:"
-                f"{GENERATOR.PROFILE1_AUTHORITY_PATH}"
-            ),
-        ],
-        cwd=REPOSITORY,
-        check=True,
-        capture_output=True,
-    ).stdout
-    assert hashlib.sha256(current).hexdigest() == (
-        GENERATOR.PROFILE1_AUTHORITY_SHA256
-    )
-    assert introduced == current
-
-
-def test_blocked_typed_null_deleverage_name_uses_normal_command_contract(
-    manifest,
-    tmp_path,
-):
-    candidate = _mutated(manifest)
-    record = next(
-        item for item in candidate["parameters"] if item["id"] == "P-H04-393"
-    )
-    assert record["status"] == "blocked"
-    assert record["value"]["kind"] == "typed_null"
-    assert "raw" not in record["value"]
-    record["destination"]["path"] = "Deployment.DP-14.lp.dustThreshold"
-
-    repository = tmp_path / "repo"
-    script = repository / "scripts/params/generate_robinhood_defaults.py"
-    manifest_path = repository / "config/robinhood-parameters.json"
-    output = repository / "contracts/config/DefaultsRobinhood.vy"
-    script.parent.mkdir(parents=True)
-    manifest_path.parent.mkdir(parents=True)
-    output.parent.mkdir(parents=True)
-    script.write_bytes(GENERATOR_PATH.read_bytes())
-    manifest_path.write_text(json.dumps(candidate), encoding="utf-8")
-
     result = subprocess.run(
-        [sys.executable, str(script), "--check"],
-        cwd=repository,
-        check=False,
+        [sys.executable, str(GENERATOR), "--check"],
+        cwd=ROOT,
+        env=environment,
+        text=True,
         capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    after = {
+        path: (ROOT / path.decode()).read_bytes()
+        for path in tracked
+        if path and (ROOT / path.decode()).is_file()
+    }
+    assert after == before
+
+
+def test_generator_has_no_defaults_render_or_write_path():
+    source = GENERATOR.read_text()
+    assert "render_defaults" not in source
+    assert "atomic_replace_output" not in source
+    assert "Generated only from" not in source
+    assert "atomic_write_ledger" in source
+    assert "DefaultsRobinhood.vy" in source
+    assert "write_text" not in source
+
+
+def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
+    records = _records()
+    compatibility = records["Deployment.DP-23.blueChipYield.morphoV2Support"]
+    assert compatibility["status"] == "approved"
+    assert compatibility["value"] == {"kind": "concrete", "raw": True}
+    assert compatibility["source"]["commit"] == MORPHO
+    assert compatibility["blockers"] == []
+    assert blueprint_source.ROBINHOOD_COMPONENTS["price_desk_registry"] == {
+        1: "Chainlink",
+        2: None,
+        3: "BlueChipYield",
+        4: None,
+        5: None,
+    }
+    ready, blockers = sync.deployment_readiness()
+    assert ready is False
+    assert any(item.endswith(":unresolved") for item in blockers)
+    assert any(item.endswith(":unverified") for item in blockers)
+
+
+def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
+    launch = json.loads(
+        subprocess.check_output(
+            ["git", "show", f"{LAUNCH}:config/robinhood-parameters.json"],
+            cwd=ROOT,
+            text=True,
+        )
+    )
+    current = _ledger()
+    old_by_id = {record["id"]: record for record in launch["parameters"]}
+    new_by_id = {record["id"]: record for record in current["parameters"]}
+    assert set(old_by_id) == set(new_by_id)
+    for record_id, old in old_by_id.items():
+        new = new_by_id[record_id]
+        assert new["destination"] == old["destination"]
+        if record_id == "P-H04-436":
+            assert old["status"] == "blocked"
+            assert new["status"] == "approved"
+            continue
+        assert new["status"] == old["status"]
+        if old["status"] in {"approved", "disabled", "external_fact", "derived"}:
+            assert _semantic_raw(new["value"]) == _semantic_raw(old["value"])
+
+
+def test_base_and_local_blueprint_values_are_byte_semantically_unchanged():
+    baseline_source = subprocess.check_output(
+        ["git", "show", f"{MORPHO}:config/BluePrint.py"],
+        cwd=ROOT,
         text=True,
     )
-    assert result.returncode == 2
-    assert result.stdout == "H04_BLOCKED: H04_DELEVERAGE_REPRESENTATION\n"
-    assert result.stderr == ""
-    assert not output.exists()
+    baseline: dict = {}
+    exec(compile(baseline_source, "BluePrint-baseline.py", "exec"), baseline)
+    for name in ("ADDYS", "PARAMS", "CURVE_PARAMS", "CORE_TOKENS", "YIELD_TOKENS"):
+        current = getattr(blueprint_source, name)
+        for profile, values in baseline[name].items():
+            assert current[profile] == values

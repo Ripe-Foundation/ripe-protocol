@@ -19,6 +19,7 @@ REQUIRED_CONTRACTS = frozenset(
         "AuctionHouse",
         "CreditEngine",
         "Deleverage",
+        "DefaultsRobinhood",
         "GuardedErc20",
         "Ledger",
         "Lootbox",
@@ -29,6 +30,7 @@ REQUIRED_CONTRACTS = frozenset(
 NEW_CONTRACT_SOURCES = {
     "AuctionHouse": ROOT / "contracts" / "core" / "AuctionHouse.vy",
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
+    "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "SwitchboardDelta": ROOT / "contracts" / "config" / "SwitchboardDelta.vy",
 }
 
@@ -56,6 +58,12 @@ CREATION_BINDING_FACTS = {
         "prefix_sha256": "26ff82b5e245dbcc146adc36452a4352581c81d04820d95194fe58611d49e219",
         "metadata_size": 61,
         "metadata_sha256": "0e52a5555be52eda112bd98d8a9a6ddf439f00837b49eb27a5aa8363065273ac",
+    },
+    "DefaultsRobinhood": {
+        "prefix_size": 2_938,
+        "prefix_sha256": "58f068b8289c0d0e5144c4213ba1f62fb2865aee519099ecc0e5fce7cac45e0b",
+        "metadata_size": 57,
+        "metadata_sha256": "2d744bd39555fe8802d117d5d9959427d76b93858fb52442e22ee0a30125e56e",
     },
     "GuardedErc20": {
         "prefix_size": 10_635,

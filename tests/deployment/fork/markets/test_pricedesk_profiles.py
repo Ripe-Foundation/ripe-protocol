@@ -25,9 +25,11 @@ def test_profile_one_pricedesk_topology_uses_real_robinhood_blueprint(
     rows = _price_desk_rows()
     assert rows[1].semantic_name == "Chainlink"
     assert rows[1].disposition is Disposition.REQUIRED
+    assert rows[3].semantic_name == "BlueChipYield"
+    assert rows[3].disposition is Disposition.REQUIRED
     assert all(
         rows[index].disposition is Disposition.OMITTED
-        for index in range(2, 6)
+        for index in (2, 4, 5)
     )
 
 

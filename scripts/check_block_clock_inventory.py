@@ -22,7 +22,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_SCHEMA_VERSION = 1
-EXPECTED_PRODUCTION_COUNTS = (99, 94, 17)
+EXPECTED_PRODUCTION_COUNTS = (102, 97, 18)
 EXPECTED_TIMESTAMP_COUNTS = (37, 37, 11)
 EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
 EXPECTED_CAD_IDS = {"CAD-001"}
@@ -32,6 +32,9 @@ HARDENING_REVIEW_COMMIT = "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
 H04_REVIEW_COMMIT = "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
 PROFILE1_CONFIGURATION_PROVENANCE_COMMIT = (
     "059b4aa0809c8df28250dc47e3abfe7836f0938c"
+)
+SOURCE_AUTHORITY_REVIEW_COMMIT = (
+    "74c4120fbfa1ade859dc32f61acdf567c139fe02"
 )
 PR61_REVIEW_COMMIT = "2c36e4aa06395d5075c348aab71d468fa099775f"
 PR61_PRODUCTION_SOURCE_SHA256 = {
@@ -79,6 +82,29 @@ H04_CADENCE_RECORDS_SHA256 = (
 H04_CAD_SITE_COUNT = 6
 H04_CAD_SITES_SHA256 = (
     "8ffb9dd92c225d4cacea6827194bf3b42eb5cb2efaf6729f6aa1f083503f42ee"
+)
+# The H-04 constants above are immutable historical identities. The current
+# source-authority batch replaces those JSON-first records with an exact,
+# separately fingerprinted source-derived projection.
+SOURCE_AUTHORITY_DIRECT_RECORD_COUNT = 3
+SOURCE_AUTHORITY_DIRECT_RECORDS_SHA256 = (
+    "223f29872a37ab6af14e2b25f560e94b112ce074c5d00f60454c253e36f88125"
+)
+SOURCE_AUTHORITY_CADENCE_RECORD_COUNT = 121
+SOURCE_AUTHORITY_CADENCE_RECORDS_SHA256 = (
+    "2ffc6436b552ecef9ab7c62d68c8cbc567a19b15144081643f4f02fb25d2a5e3"
+)
+SOURCE_AUTHORITY_SECONDS_RECORD_COUNT = 12
+SOURCE_AUTHORITY_SECONDS_RECORDS_SHA256 = (
+    "c16f93204ceab299209ba8daf2f97968f7535be49d8ef39a5bbf0680eb0f6ebc"
+)
+SOURCE_AUTHORITY_PATH_RECORD_COUNT = 1
+SOURCE_AUTHORITY_PATH_RECORDS_SHA256 = (
+    "31ffdb4ad933cc33f74b5897f1e7881de00d52428d86076c15cab88521f00137"
+)
+SOURCE_AUTHORITY_CAD_SITE_COUNT = 5
+SOURCE_AUTHORITY_CAD_SITES_SHA256 = (
+    "7bd4eb03d20abaf7b1776e7032b9c66a39fd3dae9975ebc1a3e688cf75140e7c"
 )
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
@@ -134,6 +160,7 @@ EXPECTED_REVIEW_PROVENANCE = {
     "track3ReviewCommit": TRACK3_REVIEW_COMMIT,
     "hardeningApprovalCommit": HARDENING_REVIEW_COMMIT,
     "pr61ReviewCommit": PR61_REVIEW_COMMIT,
+    "sourceAuthorityReviewCommit": SOURCE_AUTHORITY_REVIEW_COMMIT,
 }
 S5_REVIEW_ARTIFACT_SHA256 = (
     "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76"
@@ -158,6 +185,9 @@ M3_CREDIT_ENGINE_BASELINE_SHA256 = (
 )
 POST_S5_PRODUCTION_INVENTORY_SHA256 = (
     "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
+)
+CURRENT_PRODUCTION_INVENTORY_SHA256 = (
+    "a1f264788bf1189f554cd7a4952fada353c1d39afb02b032d6dfd145ae902ecb"
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
@@ -286,7 +316,66 @@ PROFILE1_CONFIGURATION_CADENCE_KEY = (
 )
 PROFILE1_CONFIGURATION_CADENCE_RECORD_COUNT = 1
 PROFILE1_CONFIGURATION_CADENCE_RECORDS_SHA256 = (
-    "28b77bf87ae472e6ac504d806b678d0010b9ec9b53f8b3820a387ce946e93091"
+    "9b799b5681ec1279eac6f3a44d0f3dc79babfeaf28bbd33064ab24954c11d118"
+)
+SOURCE_AUTHORITY_CADENCE_PATHS = frozenset(
+    {
+        "config/robinhood-parameters.json",
+        "contracts/config/DefaultsRobinhood.vy",
+        "scripts/abis/DefaultsRobinhood.json",
+        "scripts/params/generate_robinhood_defaults.py",
+        "tests/config/test_defaults_robinhood.py",
+    }
+)
+SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS = frozenset(
+    {
+        (
+            "config/BluePrint.py",
+            "<module>",
+            "block-default-key",
+            '"timelock_base_headroom_blocks":',
+            '"timelock_base_headroom_blocks": 366,',
+            1,
+        ),
+        (
+            "config/BluePrint.py",
+            "<module>",
+            "block-default-key",
+            '"base_blocks_per_robinhood_block":',
+            '"base_blocks_per_robinhood_block": 6,',
+            1,
+        ),
+        (
+            "config/BluePrint.py",
+            "<module>",
+            "reviewed-cadence-identifier",
+            "numBlocksPerInterval",
+            "'Deployment.DP-08.psm.numBlocksPerInterval': "
+            "RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_"
+            "NUMBLOCKSPERINTERVAL'), 'blocked'),",
+            1,
+        ),
+        (
+            "config/BluePrint.py",
+            "<module>",
+            "reviewed-cadence-identifier",
+            "ripePerBlock",
+            "'Deployment.DP-15.rewards.ripePerBlock': "
+            "RobinhoodInput(SourceReference('Defaults.rewardsConfig."
+            "ripePerBlock'), 'approved'),",
+            1,
+        ),
+        (
+            "config/BluePrint.py",
+            "<module>",
+            "reviewed-cadence-identifier",
+            "ripePerBlock",
+            "'Deployment.DP-15.rewards.ripePerBlock': "
+            "RobinhoodInput(SourceReference('Defaults.rewardsConfig."
+            "ripePerBlock'), 'approved'),",
+            2,
+        ),
+    }
 )
 REVIEWER_REMEDIATION_CADENCE_KEYS = {
     PROFILE1_CONFIGURATION_CADENCE_KEY,
@@ -357,6 +446,12 @@ REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256 = (
 PR61_ARTIFACT_EXPECTATIONS_PATH = "config/contract-artifact-expectations.json"
 PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
     "9f205beb9a1aadc2b4bab676d2c1e5277b576547a1e74e91818262f073815fe7"
+)
+CURRENT_ARTIFACT_EXPECTATIONS_SHA256 = (
+    "267034af0256258ae7746e0912ce3f3753471f129845b2dd600e5e768c598ed4"
+)
+DEFAULTS_ROBINHOOD_ARTIFACT_RECORD_SHA256 = (
+    "a6f847c6106d40b3b6f18d3cec90bca891f916c54a5d05c2b99dc75f79e001b9"
 )
 PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT = 8
 PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256 = (
@@ -1141,6 +1236,122 @@ def _h04_cad_sites(data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     ]
 
 
+def _source_authority_direct_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["directOccurrences"]
+        if str(record.get("path", ""))
+        == "contracts/config/DefaultsRobinhood.vy"
+    ]
+
+
+def _source_authority_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if str(record.get("path", "")) in SOURCE_AUTHORITY_CADENCE_PATHS
+        or _candidate_from_record(record)
+        in SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS
+    ]
+
+
+def _source_authority_seconds_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["secondsUnitCandidates"]
+        if str(record.get("path", ""))
+        == "contracts/config/DefaultsRobinhood.vy"
+    ]
+
+
+def _source_authority_path_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["vyperPathClassifications"]
+        if str(record.get("path", ""))
+        == "contracts/config/DefaultsRobinhood.vy"
+    ]
+
+
+def _source_authority_cad_sites(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        site
+        for record in data["indirectCadence"]
+        for site in record.get("sites", [])
+        if isinstance(site, Mapping)
+        and str(site.get("path", "")) in SOURCE_AUTHORITY_CADENCE_PATHS
+    ]
+
+
+def _is_exact_source_authority_batch(data: Mapping[str, Any]) -> bool:
+    direct = _source_authority_direct_records(data)
+    cadence = _source_authority_cadence_records(data)
+    seconds = _source_authority_seconds_records(data)
+    paths = _source_authority_path_records(data)
+    sites = _source_authority_cad_sites(data)
+    return (
+        len(direct) == SOURCE_AUTHORITY_DIRECT_RECORD_COUNT
+        and _records_fingerprint(direct)
+        == SOURCE_AUTHORITY_DIRECT_RECORDS_SHA256
+        and len(cadence) == SOURCE_AUTHORITY_CADENCE_RECORD_COUNT
+        and _records_fingerprint(cadence)
+        == SOURCE_AUTHORITY_CADENCE_RECORDS_SHA256
+        and len(seconds) == SOURCE_AUTHORITY_SECONDS_RECORD_COUNT
+        and _records_fingerprint(seconds)
+        == SOURCE_AUTHORITY_SECONDS_RECORDS_SHA256
+        and len(paths) == SOURCE_AUTHORITY_PATH_RECORD_COUNT
+        and _records_fingerprint(paths)
+        == SOURCE_AUTHORITY_PATH_RECORDS_SHA256
+        and len(sites) == SOURCE_AUTHORITY_CAD_SITE_COUNT
+        and _records_fingerprint(sites) == SOURCE_AUTHORITY_CAD_SITES_SHA256
+    )
+
+
+def _exact_source_authority_record_fingerprints(
+    data: Mapping[str, Any],
+) -> tuple[
+    frozenset[str],
+    frozenset[str],
+    frozenset[str],
+    frozenset[str],
+    frozenset[str],
+]:
+    if not _is_exact_source_authority_batch(data):
+        return (frozenset(),) * 5
+    return (
+        frozenset(
+            _record_fingerprint(record)
+            for record in _source_authority_direct_records(data)
+        ),
+        frozenset(
+            _record_fingerprint(record)
+            for record in _source_authority_cadence_records(data)
+        ),
+        frozenset(
+            _record_fingerprint(record)
+            for record in _source_authority_seconds_records(data)
+        ),
+        frozenset(
+            _record_fingerprint(record)
+            for record in _source_authority_path_records(data)
+        ),
+        frozenset(
+            _record_fingerprint(site)
+            for site in _source_authority_cad_sites(data)
+        ),
+    )
+
+
 def _records_fingerprint(records: Sequence[Mapping[str, Any]]) -> str:
     encoded = (
         json.dumps(records, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1541,13 +1752,37 @@ def _is_exact_pr61_artifact_layout_metadata(
     path_records = _pr61_artifact_expectations_cadence_records(data)
     artifact_path = root / PR61_ARTIFACT_EXPECTATIONS_PATH
     try:
-        artifact_sha256 = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
-    except OSError:
+        artifact_bytes = artifact_path.read_bytes()
+        artifact_data = json.loads(artifact_bytes)
+        defaults_record = artifact_data["contracts"]["DefaultsRobinhood"]
+        legacy_projection = copy.deepcopy(artifact_data)
+        legacy_projection["contracts"].pop("DefaultsRobinhood")
+        legacy_bytes = (
+            json.dumps(legacy_projection, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
         return False
+    artifact_sha256 = hashlib.sha256(artifact_bytes).hexdigest()
+    legacy_sha256 = hashlib.sha256(legacy_bytes).hexdigest()
     return (
         _is_exact_pr61_reconciliation(data)
         and _is_exact_reviewer_remediation_cadence_registry(data)
-        and artifact_sha256 == PR61_ARTIFACT_EXPECTATIONS_SHA256
+        and set(artifact_data["contracts"])
+        == {
+            "AuctionHouse",
+            "CreditEngine",
+            "Deleverage",
+            "DefaultsRobinhood",
+            "GuardedErc20",
+            "Ledger",
+            "Lootbox",
+            "SwitchboardDelta",
+            "Teller",
+        }
+        and legacy_sha256 == PR61_ARTIFACT_EXPECTATIONS_SHA256
+        and artifact_sha256 == CURRENT_ARTIFACT_EXPECTATIONS_SHA256
+        and _record_fingerprint(defaults_record)
+        == DEFAULTS_ROBINHOOD_ARTIFACT_RECORD_SHA256
         and len(records) == PR61_ARTIFACT_LAYOUT_METADATA_RECORD_COUNT
         and _records_fingerprint(records)
         == PR61_ARTIFACT_LAYOUT_METADATA_RECORDS_SHA256
@@ -1723,8 +1958,14 @@ def _s5_legacy_inventory_fingerprint(
     data: Mapping[str, Any],
     root: Path = ROOT,
 ) -> str:
-    exact_h04_records, exact_h04_sites = (
-        _exact_reviewed_h04_record_fingerprints(data)
+    (
+        exact_source_direct,
+        exact_source_cadence,
+        exact_source_seconds,
+        exact_source_paths,
+        exact_source_sites,
+    ) = (
+        _exact_source_authority_record_fingerprints(data)
     )
     exact_pr61_reconciliation = _is_exact_pr61_reconciliation(data)
     exact_pr61_artifact_metadata = _is_exact_pr61_artifact_layout_metadata(
@@ -1747,10 +1988,15 @@ def _s5_legacy_inventory_fingerprint(
     # part of the immutable historical serialization or its fingerprint.
     legacy.pop("currentBindings", None)
     legacy.pop("expectedProductionCounts", None)
+    if exact_source_cadence:
+        legacy["reviewProvenance"].pop(
+            "sourceAuthorityReviewCommit", None
+        )
     legacy["directOccurrences"] = [
         record
         for record in legacy["directOccurrences"]
         if _record_key(record) not in S5_RECONCILED_DIRECT_KEYS
+        and _record_fingerprint(record) not in exact_source_direct
     ]
     legacy["cadenceCandidates"] = [
         record
@@ -1761,14 +2007,19 @@ def _s5_legacy_inventory_fingerprint(
             | exact_reviewer_remediation_keys
             | exact_pr61_artifact_metadata_keys
         )
-        and _record_fingerprint(record) not in exact_h04_records
+        and _record_fingerprint(record) not in exact_source_cadence
     ]
-    if exact_h04_sites:
+    legacy["secondsUnitCandidates"] = [
+        record
+        for record in legacy["secondsUnitCandidates"]
+        if _record_fingerprint(record) not in exact_source_seconds
+    ]
+    if exact_source_sites:
         for record in legacy["indirectCadence"]:
             record["sites"] = [
                 site
                 for site in record["sites"]
-                if _record_fingerprint(site) not in exact_h04_sites
+                if _record_fingerprint(site) not in exact_source_sites
             ]
     legacy["vyperPathClassifications"] = [
         _m3_baseline_credit_engine_record()
@@ -1778,6 +2029,7 @@ def _s5_legacy_inventory_fingerprint(
         if str(record.get("path", "")) not in S5_REVIEW_PATHS
         and not _is_reviewed_ccip_excluded_record(record)
         and not _is_reviewed_m2_production_record(record)
+        and _record_fingerprint(record) not in exact_source_paths
     ]
     encoded = (
         json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1803,13 +2055,13 @@ def _check_post_s5_production_inventory_fingerprint(
     data: Mapping[str, Any],
 ) -> list[Finding]:
     fingerprint = _post_s5_production_inventory_fingerprint(data)
-    if fingerprint == POST_S5_PRODUCTION_INVENTORY_SHA256:
+    if fingerprint == CURRENT_PRODUCTION_INVENTORY_SHA256:
         return []
     return [
         Finding(
             code="INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
             domain="schema",
-            expected=POST_S5_PRODUCTION_INVENTORY_SHA256,
+            expected=CURRENT_PRODUCTION_INVENTORY_SHA256,
             actual=fingerprint,
             remediation=(
                 "restore the exact current production-classification ledger "
@@ -2413,31 +2665,47 @@ def _validate_schema(
             )
     if findings:
         return findings
-    h04_records = _h04_cadence_records(data)
-    h04_sites = _h04_cad_sites(data)
-    exact_h04_batch = _is_exact_h04_cadence_batch(data)
+    source_direct = _source_authority_direct_records(data)
+    source_cadence = _source_authority_cadence_records(data)
+    source_seconds = _source_authority_seconds_records(data)
+    source_paths = _source_authority_path_records(data)
+    source_sites = _source_authority_cad_sites(data)
+    exact_source_authority_batch = _is_exact_source_authority_batch(data)
     exact_reviewer_remediation_registry = (
         _is_exact_reviewer_remediation_cadence_registry(data)
     )
-    if not exact_h04_batch:
+    if not exact_source_authority_batch:
         findings.append(
             Finding(
-                code="INV-SCHEMA-H04-CADENCE-BATCH",
+                code="INV-SCHEMA-SOURCE-AUTHORITY-BATCH",
                 domain="cadence",
                 expected=(
-                    f"records={H04_CADENCE_RECORD_COUNT}/"
-                    f"{H04_CADENCE_RECORDS_SHA256},"
-                    f"cad_sites={H04_CAD_SITE_COUNT}/{H04_CAD_SITES_SHA256}"
+                    f"direct={SOURCE_AUTHORITY_DIRECT_RECORD_COUNT}/"
+                    f"{SOURCE_AUTHORITY_DIRECT_RECORDS_SHA256},"
+                    f"cadence={SOURCE_AUTHORITY_CADENCE_RECORD_COUNT}/"
+                    f"{SOURCE_AUTHORITY_CADENCE_RECORDS_SHA256},"
+                    f"seconds={SOURCE_AUTHORITY_SECONDS_RECORD_COUNT}/"
+                    f"{SOURCE_AUTHORITY_SECONDS_RECORDS_SHA256},"
+                    f"paths={SOURCE_AUTHORITY_PATH_RECORD_COUNT}/"
+                    f"{SOURCE_AUTHORITY_PATH_RECORDS_SHA256},"
+                    f"cad_sites={SOURCE_AUTHORITY_CAD_SITE_COUNT}/"
+                    f"{SOURCE_AUTHORITY_CAD_SITES_SHA256}"
                 ),
                 actual=(
-                    f"records={len(h04_records)}/"
-                    f"{_records_fingerprint(h04_records)},"
-                    f"cad_sites={len(h04_sites)}/"
-                    f"{_records_fingerprint(h04_sites)}"
+                    f"direct={len(source_direct)}/"
+                    f"{_records_fingerprint(source_direct)},"
+                    f"cadence={len(source_cadence)}/"
+                    f"{_records_fingerprint(source_cadence)},"
+                    f"seconds={len(source_seconds)}/"
+                    f"{_records_fingerprint(source_seconds)},"
+                    f"paths={len(source_paths)}/"
+                    f"{_records_fingerprint(source_paths)},"
+                    f"cad_sites={len(source_sites)}/"
+                    f"{_records_fingerprint(source_sites)}"
                 ),
                 remediation=(
-                    "restore the exact reviewed H-04 cadence records and CAD-001 "
-                    "mirrors; no registry or path expansion inherits authority"
+                    "restore the exact reviewed source-authority inventory batch; "
+                    "no adjacent record or path inherits this authority"
                 ),
             )
         )
@@ -2502,7 +2770,8 @@ def _validate_schema(
                     f"path_records="
                     f"{PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORD_COUNT}/"
                     f"{PR61_ARTIFACT_EXPECTATIONS_CADENCE_RECORDS_SHA256},"
-                    f"artifact={PR61_ARTIFACT_EXPECTATIONS_SHA256},"
+                    f"legacy_artifact={PR61_ARTIFACT_EXPECTATIONS_SHA256},"
+                    f"current_artifact={CURRENT_ARTIFACT_EXPECTATIONS_SHA256},"
                     f"general_registry="
                     f"{REVIEWER_REMEDIATION_CADENCE_KEY_COUNT}/"
                     f"{REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256},"
@@ -2513,7 +2782,7 @@ def _validate_schema(
                     f"{_records_fingerprint(metadata_records)},"
                     f"path_records={len(artifact_path_records)}/"
                     f"{_records_fingerprint(artifact_path_records)},"
-                    f"artifact={artifact_sha256},"
+                    f"current_artifact={artifact_sha256},"
                     f"general_registry="
                     f"{len(REVIEWER_REMEDIATION_CADENCE_KEYS)}/"
                     f"{_key_set_fingerprint(set(REVIEWER_REMEDIATION_CADENCE_KEYS))},"
@@ -2522,8 +2791,8 @@ def _validate_schema(
                 ),
                 remediation=(
                     "restore the exact eight-record PR #61 artifact-layout "
-                    "metadata package, finalized artifact bytes, general "
-                    "remediation registry, and PR #61 provenance"
+                    "projection plus the exact authorized DefaultsRobinhood "
+                    "artifact record, general remediation registry, and provenance"
                 ),
             )
         )
@@ -2768,6 +3037,20 @@ def _validate_schema(
                     in PR61_PRODUCTION_SOURCE_SHA256
                 ):
                     record_expected_commit = PR61_REVIEW_COMMIT
+                elif (
+                    domain == "classification"
+                    and str(record.get("path", ""))
+                    == "contracts/config/DefaultsRobinhood.vy"
+                    and exact_source_authority_batch
+                ):
+                    record_expected_commit = SOURCE_AUTHORITY_REVIEW_COMMIT
+                elif (
+                    domain == "seconds"
+                    and str(record.get("path", ""))
+                    == "contracts/config/DefaultsRobinhood.vy"
+                    and exact_source_authority_batch
+                ):
+                    record_expected_commit = SOURCE_AUTHORITY_REVIEW_COMMIT
                 _validate_semantic_review(
                     record,
                     domain,
@@ -2783,20 +3066,25 @@ def _validate_schema(
             TRACK3_REVIEW_COMMIT
             if "CAD-001" in semantic_ids
             else (
+                SOURCE_AUTHORITY_REVIEW_COMMIT
+                if exact_source_authority_batch
+                and (
+                    str(record.get("path", ""))
+                    in SOURCE_AUTHORITY_CADENCE_PATHS
+                    or _candidate_from_record(record)
+                    in SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS
+                )
+                else (
                 PROFILE1_CONFIGURATION_PROVENANCE_COMMIT
                 if _candidate_from_record(record)
                 == PROFILE1_CONFIGURATION_CADENCE_KEY
                 and exact_reviewer_remediation_registry
                 else (
-                    H04_REVIEW_COMMIT
-                    if exact_h04_batch
-                    and _is_h04_cadence_path(str(record.get("path", "")))
-                    else (
                         PR61_REVIEW_COMMIT
                         if _candidate_from_record(record)
                         == PR61_NEW_CONSTRUCTOR_CADENCE_KEY
                         else HARDENING_REVIEW_COMMIT
-                    )
+                )
                 )
             )
         )

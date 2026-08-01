@@ -22,7 +22,8 @@
   "reviewProvenance": {
     "track3ReviewCommit": "c3040041a1254a774e0a305060330d6ab9cc04ca",
     "hardeningApprovalCommit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e",
-    "pr61ReviewCommit": "2c36e4aa06395d5075c348aab71d468fa099775f"
+    "pr61ReviewCommit": "2c36e4aa06395d5075c348aab71d468fa099775f",
+    "sourceAuthorityReviewCommit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
   },
   "currentBindings": {
     "schemaVersion": 1,
@@ -111,9 +112,9 @@
     "interfaces"
   ],
   "expectedProductionCounts": {
-    "occurrences": 99,
-    "lines": 94,
-    "files": 17
+    "occurrences": 102,
+    "lines": 97,
+    "files": 18
   },
   "directOccurrences": [
     {
@@ -1799,6 +1800,57 @@
         "status": "reviewed",
         "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
       }
+    },
+    {
+      "id": "BN-029",
+      "category": "configurable economic duration",
+      "sourceReference": "docs/chains/rh/block-number-inventory.md#exact-occurrence-coverage-ledger",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "normalizedExpression": "block.number",
+      "ordinalInFunction": 1,
+      "reviewedLine": 21,
+      "reviewedColumn": 4,
+      "reviewedSnippet": "# `block.number` is the ancestor (Ethereum L1) estimate, which advances every ~12s"
+    },
+    {
+      "id": "BN-029",
+      "category": "configurable economic duration",
+      "sourceReference": "docs/chains/rh/block-number-inventory.md#exact-occurrence-coverage-ledger",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "normalizedExpression": "block.number",
+      "ordinalInFunction": 2,
+      "reviewedLine": 23,
+      "reviewedColumn": 4,
+      "reviewedSnippet": "# `block.number`, so the clock here is 12s -- not the 100ms child cadence. The"
+    },
+    {
+      "id": "BN-029",
+      "category": "configurable economic duration",
+      "sourceReference": "docs/chains/rh/block-number-inventory.md#exact-occurrence-coverage-ledger",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "normalizedExpression": "block.number",
+      "ordinalInFunction": 3,
+      "reviewedLine": 26,
+      "reviewedColumn": 53,
+      "reviewedSnippet": "BLOCKS_PER_MINUTE: constant(uint256) = 5 # 12s per `block.number`"
     }
   ],
   "indirectCadence": [
@@ -2191,7 +2243,7 @@
           "matchedText": "increasePerDangerBlock",
           "normalizedSnippet": "\"path\": \"Defaults.genDebtConfig.increasePerDangerBlock\"",
           "ordinalInFunction": 1,
-          "reviewedLine": 1687,
+          "reviewedLine": 1629,
           "classification": "config",
           "semanticIds": [
             "CAD-001"
@@ -2205,7 +2257,7 @@
           "matchedText": "increasePerDangerBlock",
           "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.genDebtConfig.increasePerDangerBlock.\",",
           "ordinalInFunction": 1,
-          "reviewedLine": 1689,
+          "reviewedLine": 1626,
           "classification": "config",
           "semanticIds": [
             "CAD-001"
@@ -2219,7 +2271,7 @@
           "matchedText": "increasePerDangerBlock",
           "normalizedSnippet": "\"increasePerDangerBlock\",",
           "ordinalInFunction": 1,
-          "reviewedLine": 674,
+          "reviewedLine": 97,
           "classification": "tooling",
           "semanticIds": [
             "CAD-001"
@@ -2227,42 +2279,28 @@
           "reviewDomain": "cadence-surface"
         },
         {
-          "path": "tests/config/test_defaults_robinhood.py",
-          "function": "test_group_two_general_debt_and_auction_values_are_exact",
-          "pattern": "reviewed-cadence-identifier",
-          "matchedText": "increasePerDangerBlock",
-          "normalizedSnippet": "\"Defaults.genDebtConfig.increasePerDangerBlock\": 10,",
-          "ordinalInFunction": 1,
-          "reviewedLine": 210,
-          "classification": "test",
           "semanticIds": [
             "CAD-001"
           ],
-          "reviewDomain": "cadence-surface"
-        },
-        {
-          "path": "tests/config/test_defaults_robinhood.py",
-          "function": "test_rate_per_block_danger_slope_is_never_converted",
+          "reviewDomain": "cadence-surface",
+          "path": "contracts/config/DefaultsRobinhood.vy",
+          "function": "genDebtConfig",
           "pattern": "reviewed-cadence-identifier",
           "matchedText": "increasePerDangerBlock",
-          "normalizedSnippet": "\"Defaults.genDebtConfig.increasePerDangerBlock\"",
+          "normalizedSnippet": "increasePerDangerBlock = 60,",
           "ordinalInFunction": 1,
-          "reviewedLine": 371,
-          "classification": "test",
-          "semanticIds": [
-            "CAD-001"
-          ],
-          "reviewDomain": "cadence-surface"
+          "reviewedLine": 103,
+          "classification": "production"
         },
         {
-          "path": "tests/config/test_defaults_robinhood.py",
-          "function": "test_closed_schema_and_cross_record_rejections",
+          "path": "scripts/abis/DefaultsRobinhood.json",
+          "function": "<module>",
           "pattern": "reviewed-cadence-identifier",
           "matchedText": "increasePerDangerBlock",
-          "normalizedSnippet": "lookup[\"Defaults.genDebtConfig.increasePerDangerBlock\"][\"conversion\"] = {",
+          "normalizedSnippet": "\"name\": \"increasePerDangerBlock\",",
           "ordinalInFunction": 1,
-          "reviewedLine": 900,
-          "classification": "test",
+          "reviewedLine": 111,
+          "classification": "tooling",
           "semanticIds": [
             "CAD-001"
           ],
@@ -11072,7 +11110,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"path\": \"Defaults.genDebtConfig.numBlocksPerInterval\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 1521,
+      "reviewedLine": 1477,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11081,7 +11119,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11091,7 +11129,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.genDebtConfig.numBlocksPerInterval.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 1523,
+      "reviewedLine": 1474,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11100,7 +11138,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11110,7 +11148,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 1,
-      "reviewedLine": 1558,
+      "reviewedLine": 15942,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11119,7 +11157,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11129,7 +11167,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 1,
-      "reviewedLine": 1559,
+      "reviewedLine": 15944,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11138,7 +11176,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11148,7 +11186,7 @@
       "matchedText": "increasePerDangerBlock",
       "normalizedSnippet": "\"path\": \"Defaults.genDebtConfig.increasePerDangerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 1687,
+      "reviewedLine": 1629,
       "classification": "config",
       "semanticIds": [
         "CAD-001"
@@ -11167,7 +11205,7 @@
       "matchedText": "increasePerDangerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.genDebtConfig.increasePerDangerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 1689,
+      "reviewedLine": 1626,
       "classification": "config",
       "semanticIds": [
         "CAD-001"
@@ -11186,7 +11224,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 2,
-      "reviewedLine": 2379,
+      "reviewedLine": 16195,
       "classification": "config",
       "semanticIds": [
         "BN-031"
@@ -11195,7 +11233,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11205,7 +11243,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 2,
-      "reviewedLine": 2380,
+      "reviewedLine": 16197,
       "classification": "config",
       "semanticIds": [
         "BN-031"
@@ -11214,49 +11252,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 14400,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 2922,
-      "classification": "config",
-      "semanticIds": [
-        "BN-014",
-        "BN-015",
-        "BN-017"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 2400",
-      "ordinalInFunction": 1,
-      "reviewedLine": 2923,
-      "classification": "config",
-      "semanticIds": [
-        "BN-014",
-        "BN-015",
-        "BN-017"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11266,7 +11262,7 @@
       "matchedText": "restartDelayBlocks",
       "normalizedSnippet": "\"path\": \"Defaults.ripeBondConfig.restartDelayBlocks\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 2995,
+      "reviewedLine": 2839,
       "classification": "config",
       "semanticIds": [
         "BN-017"
@@ -11275,7 +11271,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11285,7 +11281,7 @@
       "matchedText": "restartDelayBlocks",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.ripeBondConfig.restartDelayBlocks.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 2997,
+      "reviewedLine": 2836,
       "classification": "config",
       "semanticIds": [
         "BN-017"
@@ -11294,7 +11290,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11304,7 +11300,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"path\": \"Defaults.rewardsConfig.ripePerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 3103,
+      "reviewedLine": 2939,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -11313,7 +11309,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11323,7 +11319,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.rewardsConfig.ripePerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 3105,
+      "reviewedLine": 2936,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -11332,7 +11328,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11342,7 +11338,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 3,
-      "reviewedLine": 3633,
+      "reviewedLine": 16247,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11351,7 +11347,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11361,7 +11357,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 3,
-      "reviewedLine": 3634,
+      "reviewedLine": 16249,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11370,45 +11366,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 47304000,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 3689,
-      "classification": "config",
-      "semanticIds": [
-        "BN-009"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7884000",
-      "ordinalInFunction": 1,
-      "reviewedLine": 3690,
-      "classification": "config",
-      "semanticIds": [
-        "BN-009"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11418,7 +11376,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 4,
-      "reviewedLine": 4074,
+      "reviewedLine": 16351,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11427,7 +11385,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11437,7 +11395,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 4,
-      "reviewedLine": 4075,
+      "reviewedLine": 16353,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11446,45 +11404,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 47304000,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 4130,
-      "classification": "config",
-      "semanticIds": [
-        "BN-009"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7884000",
-      "ordinalInFunction": 2,
-      "reviewedLine": 4131,
-      "classification": "config",
-      "semanticIds": [
-        "BN-009"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11494,7 +11414,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 5,
-      "reviewedLine": 17188,
+      "reviewedLine": 16403,
       "classification": "config",
       "semanticIds": [
         "BN-025"
@@ -11503,7 +11423,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11513,7 +11433,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 5,
-      "reviewedLine": 17189,
+      "reviewedLine": 16405,
       "classification": "config",
       "semanticIds": [
         "BN-025"
@@ -11522,7 +11442,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11532,7 +11452,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 6,
-      "reviewedLine": 17461,
+      "reviewedLine": 17899,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11541,7 +11461,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11551,7 +11471,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 6,
-      "reviewedLine": 17462,
+      "reviewedLine": 17901,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11560,7 +11480,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11570,7 +11490,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 7,
-      "reviewedLine": 17517,
+      "reviewedLine": 17951,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11579,7 +11499,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11589,7 +11509,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 7,
-      "reviewedLine": 17518,
+      "reviewedLine": 17953,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11598,7 +11518,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11608,7 +11528,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 1,
-      "reviewedLine": 17573,
+      "reviewedLine": 16299,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11617,7 +11537,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11627,7 +11547,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 1,
-      "reviewedLine": 17574,
+      "reviewedLine": 16301,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11636,7 +11556,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11646,7 +11566,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 8,
-      "reviewedLine": 17629,
+      "reviewedLine": 18107,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11655,7 +11575,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11665,7 +11585,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 8,
-      "reviewedLine": 17630,
+      "reviewedLine": 18109,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11674,45 +11594,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 9,
-      "reviewedLine": 17685,
-      "classification": "config",
-      "semanticIds": [
-        "BN-003"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
-      "ordinalInFunction": 9,
-      "reviewedLine": 17686,
-      "classification": "config",
-      "semanticIds": [
-        "BN-003"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11722,7 +11604,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 2,
-      "reviewedLine": 17741,
+      "reviewedLine": 16455,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11731,7 +11613,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11741,7 +11623,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 2,
-      "reviewedLine": 17742,
+      "reviewedLine": 16457,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11750,7 +11632,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -11760,757 +11642,757 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 1,
+      "reviewedLine": 16507,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16509,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 21600,",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16559,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16561,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 3,
+      "reviewedLine": 16611,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 3,
+      "reviewedLine": 16613,
+      "classification": "config",
+      "semanticIds": [
+        "BN-018"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16713,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16715,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 4,
+      "reviewedLine": 16765,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 4,
+      "reviewedLine": 16767,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 5,
+      "reviewedLine": 16817,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 5,
+      "reviewedLine": 16819,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16919,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16921,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 6,
+      "reviewedLine": 16971,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 6,
+      "reviewedLine": 16973,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 7,
+      "reviewedLine": 17023,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 7,
+      "reviewedLine": 17025,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 3,
+      "reviewedLine": 17125,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 3,
+      "reviewedLine": 17127,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 8,
+      "reviewedLine": 17177,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 8,
+      "reviewedLine": 17179,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 9,
+      "reviewedLine": 17229,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 9,
+      "reviewedLine": 17231,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 4,
+      "reviewedLine": 17331,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 4,
+      "reviewedLine": 17333,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 10,
+      "reviewedLine": 17383,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 10,
+      "reviewedLine": 17385,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 11,
+      "reviewedLine": 17435,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 11,
+      "reviewedLine": 17437,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 5,
+      "reviewedLine": 17537,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 5,
+      "reviewedLine": 17539,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 12,
+      "reviewedLine": 17589,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 12,
+      "reviewedLine": 17591,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 13,
+      "reviewedLine": 17641,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 13,
+      "reviewedLine": 17643,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
+      "ordinalInFunction": 6,
+      "reviewedLine": 17743,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 6,
+      "reviewedLine": 17745,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
+      "ordinalInFunction": 14,
+      "reviewedLine": 17795,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 14,
       "reviewedLine": 17797,
       "classification": "config",
       "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 3600",
-      "ordinalInFunction": 1,
-      "reviewedLine": 17798,
-      "classification": "config",
-      "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 21600,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 17853,
-      "classification": "config",
-      "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 3600",
-      "ordinalInFunction": 2,
-      "reviewedLine": 17854,
-      "classification": "config",
-      "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 3,
-      "reviewedLine": 17909,
-      "classification": "config",
-      "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 3,
-      "reviewedLine": 17910,
-      "classification": "config",
-      "semanticIds": [
-        "BN-018"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 18019,
-      "classification": "config",
-      "semanticIds": [
         "BN-004"
       ],
       "reviewDomain": "cadence-surface",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 1,
-      "reviewedLine": 18020,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 4,
-      "reviewedLine": 18075,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 4,
-      "reviewedLine": 18076,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 5,
-      "reviewedLine": 18131,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 5,
-      "reviewedLine": 18132,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 18241,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 2,
-      "reviewedLine": 18242,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 6,
-      "reviewedLine": 18297,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 6,
-      "reviewedLine": 18298,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 7,
-      "reviewedLine": 18353,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 7,
-      "reviewedLine": 18354,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 3,
-      "reviewedLine": 18463,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 3,
-      "reviewedLine": 18464,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 8,
-      "reviewedLine": 18519,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 8,
-      "reviewedLine": 18520,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 9,
-      "reviewedLine": 18575,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 9,
-      "reviewedLine": 18576,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 4,
-      "reviewedLine": 18685,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 4,
-      "reviewedLine": 18686,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 10,
-      "reviewedLine": 18741,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 10,
-      "reviewedLine": 18742,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 11,
-      "reviewedLine": 18797,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 11,
-      "reviewedLine": 18798,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 5,
-      "reviewedLine": 18907,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 5,
-      "reviewedLine": 18908,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 12,
-      "reviewedLine": 18963,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 12,
-      "reviewedLine": 18964,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 13,
-      "reviewedLine": 19019,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 13,
-      "reviewedLine": 19020,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 6,
-      "reviewedLine": 19129,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
-      "ordinalInFunction": 6,
-      "reviewedLine": 19130,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 14,
-      "reviewedLine": 19185,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
-      "ordinalInFunction": 14,
-      "reviewedLine": 19186,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12520,7 +12402,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 15,
-      "reviewedLine": 19241,
+      "reviewedLine": 17847,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12529,7 +12411,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12539,7 +12421,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 15,
-      "reviewedLine": 19242,
+      "reviewedLine": 17849,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12548,83 +12430,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 10,
-      "reviewedLine": 19297,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
-      "ordinalInFunction": 10,
-      "reviewedLine": 19298,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 11,
-      "reviewedLine": 19353,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
-      "ordinalInFunction": 11,
-      "reviewedLine": 19354,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12634,7 +12440,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 16,
-      "reviewedLine": 19409,
+      "reviewedLine": 18003,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12643,7 +12449,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12653,7 +12459,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 16,
-      "reviewedLine": 19410,
+      "reviewedLine": 18005,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12662,7 +12468,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12672,7 +12478,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 17,
-      "reviewedLine": 19465,
+      "reviewedLine": 18055,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12681,7 +12487,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12691,7 +12497,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 17,
-      "reviewedLine": 19466,
+      "reviewedLine": 18057,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12700,47 +12506,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 12,
-      "reviewedLine": 19521,
-      "classification": "config",
-      "semanticIds": [
-        "BN-005",
-        "BN-006"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
-      "ordinalInFunction": 12,
-      "reviewedLine": 19522,
-      "classification": "config",
-      "semanticIds": [
-        "BN-005",
-        "BN-006"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12750,7 +12516,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 3,
-      "reviewedLine": 19577,
+      "reviewedLine": 18159,
       "classification": "config",
       "semanticIds": [
         "BN-019"
@@ -12759,7 +12525,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12769,7 +12535,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 3,
-      "reviewedLine": 19578,
+      "reviewedLine": 18161,
       "classification": "config",
       "semanticIds": [
         "BN-019"
@@ -12778,7 +12544,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12788,7 +12554,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 4,
-      "reviewedLine": 19633,
+      "reviewedLine": 18211,
       "classification": "config",
       "semanticIds": [
         "BN-020"
@@ -12797,7 +12563,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12807,7 +12573,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 4,
-      "reviewedLine": 19634,
+      "reviewedLine": 18213,
       "classification": "config",
       "semanticIds": [
         "BN-020"
@@ -12816,7 +12582,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12826,7 +12592,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 5,
-      "reviewedLine": 19689,
+      "reviewedLine": 18263,
       "classification": "config",
       "semanticIds": [
         "BN-021"
@@ -12835,7 +12601,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12845,7 +12611,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 5,
-      "reviewedLine": 19690,
+      "reviewedLine": 18265,
       "classification": "config",
       "semanticIds": [
         "BN-021"
@@ -12854,7 +12620,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12864,7 +12630,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 6,
-      "reviewedLine": 19745,
+      "reviewedLine": 18315,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12875,7 +12641,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12885,7 +12651,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 6,
-      "reviewedLine": 19746,
+      "reviewedLine": 18317,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12896,7 +12662,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12906,7 +12672,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 18,
-      "reviewedLine": 19801,
+      "reviewedLine": 18367,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12917,7 +12683,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12927,7 +12693,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 18,
-      "reviewedLine": 19802,
+      "reviewedLine": 18369,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12938,7 +12704,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12948,7 +12714,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 366,",
       "ordinalInFunction": 1,
-      "reviewedLine": 19857,
+      "reviewedLine": 18419,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12957,7 +12723,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12967,7 +12733,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 61",
       "ordinalInFunction": 1,
-      "reviewedLine": 19858,
+      "reviewedLine": 18421,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12976,7 +12742,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -12986,7 +12752,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"path\": \"Deployment.DP-08.psm.numBlocksPerInterval\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 20422,
+      "reviewedLine": 18983,
       "classification": "config",
       "semanticIds": [
         "BN-027",
@@ -12996,7 +12762,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13006,7 +12772,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Deployment.DP-08.psm.numBlocksPerInterval.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 20424,
+      "reviewedLine": 18980,
       "classification": "config",
       "semanticIds": [
         "BN-027",
@@ -13016,7 +12782,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13026,7 +12792,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"path\": \"Deployment.DP-15.rewards.ripePerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 22243,
+      "reviewedLine": 20671,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -13035,7 +12801,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13045,7 +12811,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Deployment.DP-15.rewards.ripePerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 22245,
+      "reviewedLine": 20668,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -13054,45 +12820,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 7776000,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 23919,
-      "classification": "config",
-      "semanticIds": [
-        "BN-032"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 1296000",
-      "ordinalInFunction": 1,
-      "reviewedLine": 23920,
-      "classification": "config",
-      "semanticIds": [
-        "BN-032"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13102,7 +12830,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"numBlocksPerInterval\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 671,
+      "reviewedLine": 94,
       "classification": "tooling",
       "semanticIds": [
         "BN-029"
@@ -13111,7 +12839,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13121,7 +12849,7 @@
       "matchedText": "increasePerDangerBlock",
       "normalizedSnippet": "\"increasePerDangerBlock\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 674,
+      "reviewedLine": 97,
       "classification": "tooling",
       "semanticIds": [
         "CAD-001"
@@ -13140,7 +12868,7 @@
       "matchedText": "restartDelayBlocks",
       "normalizedSnippet": "\"restartDelayBlocks\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 692,
+      "reviewedLine": 115,
       "classification": "tooling",
       "semanticIds": [
         "BN-017"
@@ -13149,7 +12877,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13159,7 +12887,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"ripePerBlock\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 696,
+      "reviewedLine": 119,
       "classification": "tooling",
       "semanticIds": [
         "BN-024"
@@ -13168,120 +12896,7 @@
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "scripts/params/generate_robinhood_defaults.py",
-      "function": "_validate_record",
-      "pattern": "block-default-key",
-      "matchedText": "\"blocks\":",
-      "normalizedSnippet": "if record[\"unit\"][\"kind\"] != \"blocks\":",
-      "ordinalInFunction": 1,
-      "reviewedLine": 1203,
-      "classification": "tooling",
-      "semanticIds": [],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "tests/config/test_defaults_robinhood.py",
-      "function": "test_group_two_general_debt_and_auction_values_are_exact",
-      "pattern": "reviewed-cadence-identifier",
-      "matchedText": "numBlocksPerInterval",
-      "normalizedSnippet": "\"Defaults.genDebtConfig.numBlocksPerInterval\": 7_200,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 209,
-      "classification": "test",
-      "semanticIds": [
-        "BN-029"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "tests/config/test_defaults_robinhood.py",
-      "function": "test_group_two_general_debt_and_auction_values_are_exact",
-      "pattern": "reviewed-cadence-identifier",
-      "matchedText": "increasePerDangerBlock",
-      "normalizedSnippet": "\"Defaults.genDebtConfig.increasePerDangerBlock\": 10,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 210,
-      "classification": "test",
-      "semanticIds": [
-        "CAD-001"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "risk/oracle",
-        "status": "reviewed",
-        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
-      }
-    },
-    {
-      "path": "tests/config/test_defaults_robinhood.py",
-      "function": "test_psm_is_disabled_and_every_numeric_or_capacity_value_is_blocked",
-      "pattern": "reviewed-cadence-identifier",
-      "matchedText": "numBlocksPerInterval",
-      "normalizedSnippet": "\"numBlocksPerInterval\",",
-      "ordinalInFunction": 1,
-      "reviewedLine": 336,
-      "classification": "test",
-      "semanticIds": [
-        "BN-027",
-        "BN-028"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
-      }
-    },
-    {
-      "path": "tests/config/test_defaults_robinhood.py",
-      "function": "test_rate_per_block_danger_slope_is_never_converted",
-      "pattern": "reviewed-cadence-identifier",
-      "matchedText": "increasePerDangerBlock",
-      "normalizedSnippet": "\"Defaults.genDebtConfig.increasePerDangerBlock\"",
-      "ordinalInFunction": 1,
-      "reviewedLine": 371,
-      "classification": "test",
-      "semanticIds": [
-        "CAD-001"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "risk/oracle",
-        "status": "reviewed",
-        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
-      }
-    },
-    {
-      "path": "tests/config/test_defaults_robinhood.py",
-      "function": "test_closed_schema_and_cross_record_rejections",
-      "pattern": "reviewed-cadence-identifier",
-      "matchedText": "increasePerDangerBlock",
-      "normalizedSnippet": "lookup[\"Defaults.genDebtConfig.increasePerDangerBlock\"][\"conversion\"] = {",
-      "ordinalInFunction": 1,
-      "reviewedLine": 900,
-      "classification": "test",
-      "semanticIds": [
-        "CAD-001"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "risk/oracle",
-        "status": "reviewed",
-        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     },
     {
@@ -13580,7 +13195,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"numBlocksPerInterval\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 667,
+      "reviewedLine": 684,
       "classification": "test",
       "semanticIds": [
         "BN-027",
@@ -13591,6 +13206,483 @@
         "owner": "protocol/security",
         "status": "reviewed",
         "commit": "059b4aa0809c8df28250dc47e3abfe7836f0938c"
+      }
+    },
+    {
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "config/BluePrint.py",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"timelock_base_headroom_blocks\":",
+      "normalizedSnippet": "\"timelock_base_headroom_blocks\": 366,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 522,
+      "classification": "config"
+    },
+    {
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "config/BluePrint.py",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"base_blocks_per_robinhood_block\":",
+      "normalizedSnippet": "\"base_blocks_per_robinhood_block\": 6,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 523,
+      "classification": "config"
+    },
+    {
+      "semanticIds": [
+        "BN-027",
+        "BN-028",
+        "BN-029"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "config/BluePrint.py",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "numBlocksPerInterval",
+      "normalizedSnippet": "'Deployment.DP-08.psm.numBlocksPerInterval': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_NUMBLOCKSPERINTERVAL'), 'blocked'),",
+      "ordinalInFunction": 1,
+      "reviewedLine": 611,
+      "classification": "config"
+    },
+    {
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "config/BluePrint.py",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),",
+      "ordinalInFunction": 1,
+      "reviewedLine": 643,
+      "classification": "config"
+    },
+    {
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "config/BluePrint.py",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),",
+      "ordinalInFunction": 2,
+      "reviewedLine": 643,
+      "classification": "config"
+    },
+    {
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "HOUR_IN_BLOCKS",
+      "normalizedSnippet": "HOUR_IN_BLOCKS: constant(uint256) = 60 * BLOCKS_PER_MINUTE",
+      "ordinalInFunction": 1,
+      "reviewedLine": 27,
+      "classification": "production"
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "DAY_IN_BLOCKS: constant(uint256) = 24 * HOUR_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 28,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "HOUR_IN_BLOCKS",
+      "normalizedSnippet": "DAY_IN_BLOCKS: constant(uint256) = 24 * HOUR_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 28,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "WEEK_IN_BLOCKS",
+      "normalizedSnippet": "WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 29,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 29,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "MONTH_IN_BLOCKS",
+      "normalizedSnippet": "MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 30,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 30,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "YEAR_IN_BLOCKS",
+      "normalizedSnippet": "YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 31,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 31,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "genDebtConfig",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "numBlocksPerInterval = 1 * DAY_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 100,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "genDebtConfig",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "numBlocksPerInterval",
+      "normalizedSnippet": "numBlocksPerInterval = 1 * DAY_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 100,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "semanticIds": [
+        "CAD-001"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "risk/oracle",
+        "status": "reviewed",
+        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "genDebtConfig",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "increasePerDangerBlock",
+      "normalizedSnippet": "increasePerDangerBlock = 60,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 103,
+      "classification": "production"
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "genDebtConfig",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "duration = 1 * DAY_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 116,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "ripeBondConfig",
+      "pattern": "block-unit-identifier",
+      "matchedText": "HOUR_IN_BLOCKS",
+      "normalizedSnippet": "epochLength = 8 * HOUR_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 155,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "ripeBondConfig",
+      "pattern": "block-unit-identifier",
+      "matchedText": "restartDelayBlocks",
+      "normalizedSnippet": "restartDelayBlocks = 0,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 157,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      },
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "rewardsConfig",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "ripePerBlock = 9 * 10**15, #0.009 RIPE",
+      "ordinalInFunction": 1,
+      "reviewedLine": 169,
+      "classification": "production"
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "ripeGovVaultConfigs",
+      "pattern": "block-unit-identifier",
+      "matchedText": "DAY_IN_BLOCKS",
+      "normalizedSnippet": "minLockDuration=1 * DAY_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 193,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "ripeGovVaultConfigs",
+      "pattern": "block-unit-identifier",
+      "matchedText": "YEAR_IN_BLOCKS",
+      "normalizedSnippet": "maxLockDuration=3 * YEAR_IN_BLOCKS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 194,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "scripts/abis/DefaultsRobinhood.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "numBlocksPerInterval",
+      "normalizedSnippet": "\"name\": \"numBlocksPerInterval\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 99,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "scripts/abis/DefaultsRobinhood.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "increasePerDangerBlock",
+      "normalizedSnippet": "\"name\": \"increasePerDangerBlock\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 111,
+      "classification": "tooling",
+      "semanticIds": [
+        "CAD-001"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "risk/oracle",
+        "status": "reviewed",
+        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
+      }
+    },
+    {
+      "path": "scripts/abis/DefaultsRobinhood.json",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "restartDelayBlocks",
+      "normalizedSnippet": "\"name\": \"restartDelayBlocks\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 251,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "scripts/abis/DefaultsRobinhood.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"name\": \"ripePerBlock\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 273,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     }
   ],
@@ -14579,6 +14671,210 @@
         "owner": "protocol/security",
         "status": "reviewed",
         "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "DAY_IN_SECONDS",
+      "normalizedSnippet": "DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24",
+      "ordinalInFunction": 1,
+      "reviewedLine": 14,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "WEEK_IN_SECONDS",
+      "normalizedSnippet": "WEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 15,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "DAY_IN_SECONDS",
+      "normalizedSnippet": "WEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 15,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "MONTH_IN_SECONDS",
+      "normalizedSnippet": "MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "DAY_IN_SECONDS",
+      "normalizedSnippet": "MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "YEAR_IN_SECONDS",
+      "normalizedSnippet": "YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 17,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "<module>",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "DAY_IN_SECONDS",
+      "normalizedSnippet": "YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS",
+      "ordinalInFunction": 1,
+      "reviewedLine": 17,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "genConfig",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "DAY_IN_SECONDS",
+      "normalizedSnippet": "priceStaleTime = 1 * DAY_IN_SECONDS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 74,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "hrConfig",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "WEEK_IN_SECONDS",
+      "normalizedSnippet": "minCliffLength = 1 * WEEK_IN_SECONDS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 215,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "hrConfig",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "MONTH_IN_SECONDS",
+      "normalizedSnippet": "maxStartDelay = 3 * MONTH_IN_SECONDS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 216,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "hrConfig",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "WEEK_IN_SECONDS",
+      "normalizedSnippet": "minVestingLength = 1 * WEEK_IN_SECONDS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 217,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "function": "hrConfig",
+      "pattern": "seconds-unit-identifier",
+      "matchedText": "YEAR_IN_SECONDS",
+      "normalizedSnippet": "maxVestingLength = 10 * YEAR_IN_SECONDS,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 218,
+      "classification": "production",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     }
   ],
@@ -15579,6 +15875,16 @@
         "owner": "engineering/tooling",
         "status": "reviewed",
         "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "contracts/config/DefaultsRobinhood.vy",
+      "classification": "production",
+      "contentSha256": "ad2b0db5a3fed9e2cc37e7234f81fb74928536107d79e51d0b2dea949f722200",
+      "semanticReview": {
+        "owner": "engineering/tooling",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
       }
     }
   ]

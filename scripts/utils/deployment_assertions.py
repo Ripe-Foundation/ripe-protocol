@@ -1,8 +1,8 @@
 """Pure, deterministic deployment/topology assertions.
 
-The blueprint supplies canonical structural policy. Exact addresses,
-constructor-bound runtimes, roles, capabilities, parameters, and Profile 2
-bindings must be supplied by an owner-controlled expectations envelope.
+The structural blueprint supplies lifecycle policy and cross-checks registry
+selection against config/BluePrint.py. Exact observed deployment facts must be
+supplied by an owner-controlled expectations envelope.
 Future fork tooling can collect observations and pass them here without adding
 RPC behavior to this module.
 """

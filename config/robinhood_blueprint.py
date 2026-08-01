@@ -3,8 +3,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
 
+from config import BluePrint as source_blueprint
 from config.network_profiles import get_profile
 
 
@@ -196,9 +197,19 @@ class ComponentRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class Profile1LaunchSelection:
+    source_commit: str
+    source_paths: tuple[str, ...]
+    external_fact_input_ids: tuple[str, ...]
+    deployment_produced_input_ids: tuple[str, ...]
+    excluded_lanes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class RobinhoodBlueprint:
     blueprint_id: str
     profile_ids: tuple[str, ...]
+    profile1_selection: Profile1LaunchSelection
     symbolic_inputs: tuple[SymbolicInput, ...]
     blockers: tuple[Blocker, ...]
     promotions: tuple[PromotionRecord, ...]
@@ -331,6 +342,11 @@ _BLOCKER_ROWS = (('B-S5-LEDGER',
   'Exact feed/runtime/decimals/heartbeat/failure evidence and LP oracle selection are not frozen '
   'for deployment',
   'before the oracle plan is frozen'),
+ ('B-P1-EXTERNAL-VERIFY',
+  'OWN-H04',
+  ('OWN-ORACLE', 'OWN-SECOPS'),
+  'PR #66 external addresses are selected source facts, not independently verified chain facts',
+  'before Defaults render or Profile 1 plan freeze'),
  ('B-LP-ARTIFACTS',
   'OWN-H04',
   ('OWN-H05', 'OWN-ORACLE'),
@@ -405,9 +421,9 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('CM-001',),
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS'),
-  'before H-05 plan freeze',
-  'required',
-  ('B-H04-PARAMS',)),
+ 'before H-05 plan freeze',
+ 'required',
+  ()),
  ('I-GREEN-INITIAL-SUPPLY-RECIPIENT',
   'GREEN constructor initial-supply recipient',
   ('CM-001',),
@@ -468,7 +484,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-H05',),
   'before testnet/production handoff',
   'required',
-  ('B-SECOPS-HANDOFF',)),
+  ('B-P1-EXTERNAL-VERIFY', 'B-SECOPS-HANDOFF')),
  ('I-CLOCK-PARAMS',
   'registry/governance/config timing classes not separately enumerated below',
   ('CM-001',
@@ -503,7 +519,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-SECOPS',),
   'before CM-008 enters H-05',
   'blocked',
-  ('B-S5-LEDGER',)),
+  ('B-S5-LEDGER', 'B-P1-EXTERNAL-VERIFY')),
  ('I-LEDGER-DEFAULTS',
   'Ledger constructor defaults dependency and initial allocation fields',
   ('CM-008', 'CM-049'),
@@ -536,7 +552,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-H04', 'OWN-H05'),
   'before oracle plan freeze',
   'required',
-  ('B-ORACLE-FREEZE',)),
+  ('B-ORACLE-FREEZE', 'B-P1-EXTERNAL-VERIFY')),
  ('I-CHAINLINK-TIMELOCKS',
   'Chainlink min/max price-change timelocks and default stale-time classes',
   ('CM-016',),
@@ -592,7 +608,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-H05', 'OWN-ORACLE'),
   'before PSM/LP plan freeze',
   'required',
-  ('B-H05-PLAN',)),
+  ('B-H05-PLAN', 'B-P1-EXTERNAL-VERIFY')),
  ('I-USDG-FEED',
   'symbolic USDG/USD feed identity and provenance',
   ('CM-016', 'CM-048'),
@@ -624,7 +640,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-H05', 'OWN-ORACLE'),
   'before LP/Endaoment plan freeze',
   'required',
-  ('B-H05-PLAN',)),
+  ('B-H05-PLAN', 'B-P1-EXTERNAL-VERIFY')),
  ('I-GREEN-USDG-LP',
   'LP artifact/runtime/oracle and ordinary-only Teller configuration',
   ('CM-016', 'CM-024'),
@@ -642,13 +658,13 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'blocked',
   ('B-LP-ARTIFACTS', 'B-ORACLE-FREEZE')),
  ('I-ASSET-CONFIG-NONSTOCK',
-  'typed non-Stock asset/vault/LTV/route settings',
+  'owner-selected PR #66 five-asset vault, limits, debt, permission, and liquidation tuples',
   ('CM-009', 'CM-011', 'CM-024', 'CM-034'),
   'OWN-H04',
   ('OWN-T8', 'OWN-ORACLE'),
-  'before M5/H-05 plan freeze',
-  'required',
-  ('B-H04-PARAMS',)),
+ 'before M5/H-05 plan freeze',
+ 'required',
+  ('B-P1-EXTERNAL-VERIFY',)),
  ('I-ASSET-CONFIG-STOCK',
   'typed initial-Stock asset/vault/LTV/route settings',
   ('CM-009', 'CM-011', 'CM-021', 'CM-026', 'CM-030', 'CM-034', 'CM-043'),
@@ -698,22 +714,21 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'required',
   ('B-H04-PARAMS',)),
  ('I-REWARDS-PROMOTION',
-  'possible later reward-promotion configuration, validation, monitoring, and kill package; '
-  'launch-disabled state is represented separately',
+  'owner-selected PR #66 launch reward, points, allocation, auto-stake, and Stability Pool values',
   ('CM-009', 'CM-013', 'CM-022', 'CM-023', 'CM-028', 'CM-029', 'CM-033', 'CM-038'),
   'OWN-REWARDS',
   ('OWN-SECOPS', 'OWN-H04'),
-  'within_seven_day_separately_reviewed_reward_activation',
-  'deferred',
-  ('B-REWARD-PROMOTION',)),
+  'before Defaults render',
+  'required',
+  ()),
  ('I-BOND-ROOM-CONFIG',
-  'BondRoom terms, payment, duration, and disabled-launch classes',
+  'owner-selected PR #66 bond terms with canBond false at launch',
   ('CM-014', 'CM-029'),
   'OWN-H04',
   ('OWN-REWARDS',),
   'before any bond release',
-  'deferred',
-  ('B-H04-PARAMS', 'B-REWARD-PROMOTION')),
+  'required',
+  ('B-P1-EXTERNAL-VERIFY',)),
  ('I-BOND-BOOSTER-CONFIG',
   'maximum boost ratio, maximum units, minimum lock duration, and booster rows',
   ('CM-014', 'CM-029', 'CM-038'),
@@ -785,7 +800,31 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-H08', 'OWN-SECOPS'),
   'before testnet/production activation',
   'blocked',
-  ('B-H08-PROOF', 'B-H09-RELEASE')))
+  ('B-H08-PROOF', 'B-H09-RELEASE')),
+ ('I-STEAKHOUSE-USDG',
+  'selected SteakHouse USDG Morpho Vaults V2 identity and membership facts',
+  ('CM-009', 'CM-018', 'CM-034'),
+  'OWN-H04',
+  ('OWN-ORACLE', 'OWN-H05'),
+ 'before Defaults render and oracle plan freeze',
+ 'required',
+  ('B-P1-EXTERNAL-VERIFY',)),
+ ('I-MORPHO-V2-FACTORY',
+  'selected Robinhood Morpho Vaults V2 factory identity and runtime facts',
+  ('CM-018',),
+  'OWN-H04',
+  ('OWN-ORACLE', 'OWN-H09'),
+ 'before BlueChipYield deployment and registration',
+ 'required',
+  ('B-P1-EXTERNAL-VERIFY',)),
+ ('I-CONTRIB-TEMPLATE',
+  'deployment-produced contributor-template identity consumed by Defaults HR config',
+  ('CM-032', 'CM-049'),
+  'OWN-H05',
+  ('OWN-H04', 'OWN-SECOPS'),
+  'before Defaults render',
+  'required',
+  ('B-H05-PLAN',)))
 _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'CM-001',
   'capability',
@@ -847,10 +886,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-003-REWARDS',
   'CM-003',
   'route',
-  'sGREEN reward accrual is disabled at launch',
-  'disabled',
+  'sGREEN receives the PR #66 selected staker-points allocation at launch',
+  'required',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-004-GLOBAL-MINT-DISABLE',
   'CM-004',
@@ -971,10 +1010,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-013-REWARD-ACTIONS',
   'CM-013',
   'route',
-  'reward, points, and emission actions are disabled at launch',
-  'disabled',
+  'PR #66 reward, points, allocations, and emission values are selected at launch',
+  'required',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-014-COOLDOWN',
   'CM-014',
@@ -995,7 +1034,7 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-015-RESERVED-SLOTS',
   'CM-015',
   'registration',
-  'PriceDesk semantic slots 2–5 stay empty',
+  'PriceDesk semantic slots 2, 4, and 5 stay empty; slot 3 is selected BlueChipYield',
   'omitted',
   'omitted',
   (),
@@ -1024,6 +1063,23 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'omitted',
   (),
   ('NEG-024',)),
+ ('S-018-SELECTED-SLOT',
+ 'CM-018',
+ 'registration',
+  'BlueChipYield is selected for PriceDesk slot 3; registration still requires external-fact '
+  'closure',
+  'blocked',
+  'pre_activation_configuration',
+  ('B-P1-EXTERNAL-VERIFY',),
+  ('NEG-024', 'NEG-037')),
+ ('S-018-MORPHO-V2',
+ 'CM-018',
+ 'configuration',
+  'Integrated BlueChipYield supports the selected Morpho Vaults V2 factory and vault path',
+  'blocked',
+  'pre_activation_configuration',
+  ('B-P1-EXTERNAL-VERIFY',),
+  ('NEG-017', 'NEG-024', 'NEG-037')),
  ('S-021-HQ-RIPE-CAP',
   'CM-021',
   'capability',
@@ -1068,10 +1124,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-022-REWARDS',
   'CM-022',
   'route',
-  'Stability Pool reward accrual is disabled at launch',
-  'disabled',
+  'Stability Pool reward accrual uses the PR #66 selected launch values',
+  'required',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-023-GOV-DEPOSIT',
   'CM-023',
@@ -1084,10 +1140,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-023-REWARDS',
   'CM-023',
   'route',
-  'governance-vault reward accrual is disabled at launch',
-  'disabled',
+  'RIPE governance-vault reward accrual uses the PR #66 selected launch values',
+  'required',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-024-LP-DEPOSIT',
   'CM-024',
@@ -1250,10 +1306,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-033-REWARD-MINT',
   'CM-033',
   'capability',
-  'Lootbox reward mint and points are disabled at launch',
-  'disabled',
+  'Lootbox reward mint and points use the PR #66 selected launch values',
+  'required',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-033-UNDERSCORE',
   'CM-033',
@@ -1269,7 +1325,7 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'Stock depositor/borrower reward accrual is disabled at launch',
   'disabled',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-H03-STOCK-REWARD-DISABLED',)),
  ('S-034-USDG-COLLATERAL',
   'CM-034',
@@ -1324,10 +1380,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-038-BOOSTER-CFG',
   'CM-038',
   'configuration',
-  'booster limits, rows, and user units',
-  'disabled',
-  'post_launch_release',
-  ('B-H04-PARAMS', 'B-REWARD-PROMOTION'),
+  'PR #66 bond-booster limits are selected launch configuration inputs',
+  'required',
+  'deployed_initial_value',
+  (),
   ('NEG-035',)),
  ('S-043-STOCK-REDEEM',
   'CM-043',
@@ -1469,12 +1525,12 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   (),
   ('NEG-017',)),
  ('S-049-ARTIFACT',
-  'CM-049',
-  'artifact',
-  'DefaultsRobinhood artifact created only by H-04',
-  'blocked',
+ 'CM-049',
+ 'artifact',
+  'present compiling DefaultsRobinhood source authority',
+  'required',
   'pre_activation_configuration',
-  ('B-H04-PARAMS',),
+  (),
   ('NEG-017',)),
  ('S-051-ARTIFACT',
   'CM-051',
@@ -1560,21 +1616,7 @@ _PROMOTION_ROWS = (('P-CCIP-SEVEN-DAY',
   'OWN-T1',
   ('OWN-SECOPS',),
   ('B-T1-CCIP', 'B-T1-TOOLCHAIN'),
-  ('NEG-025',)),
- ('P-REWARDS-SEVEN-DAY',
-  ('S-003-REWARDS',
-   'S-013-REWARD-ACTIONS',
-   'S-022-REWARDS',
-   'S-023-REWARDS',
-   'S-028-REWARD-PATH',
-   'S-033-REWARD-MINT',
-   'S-033-STOCK-REWARD'),
-  'within_seven_day_separately_reviewed_reward_activation',
-  'deferred',
-  'OWN-REWARDS',
-  ('OWN-SECOPS', 'OWN-H04'),
-  ('B-REWARD-PROMOTION',),
-  ('NEG-035', 'NEG-036', 'NEG-H03-STOCK-REWARD-DISABLED')))
+  ('NEG-025',)),)
 _RELATION_ROWS = (('R-001',
   'CM-003',
   'construction_dependency',
@@ -4434,9 +4476,9 @@ _SOURCE_ROWS = (('CM-001', 'contracts/tokens/GreenToken.vy', 'file', 'existing',
  ('CM-047', 'contracts/core/EndaomentFunds.vy', 'file', 'existing', 'shared_contract', 'E-M0'),
  ('CM-048', 'contracts/core/EndaomentPSM.vy', 'file', 'existing', 'shared_contract', 'E-M0'),
  ('CM-049',
-  'contracts/config/DefaultsRobinhood.vy',
+ 'contracts/config/DefaultsRobinhood.vy',
   'file',
-  'reviewed_planned',
+  'existing',
   'chain_specific_config',
   'E-H04'),
  ('CM-050',
@@ -4561,319 +4603,195 @@ _SOURCE_ROWS = (('CM-001', 'contracts/tokens/GreenToken.vy', 'file', 'existing',
   'existing',
   'chain_specific_config',
   'E-CM'))
-_REGISTRY_ROWS = (('ripe_hq', 1, 'Green Token', 'source_hard_coded', 'CM-001', 'required'),
- ('ripe_hq', 2, 'Savings Green', 'source_hard_coded', 'CM-003', 'required'),
- ('ripe_hq', 3, 'Ripe Token', 'source_hard_coded', 'CM-002', 'required'),
- ('ripe_hq', 4, 'Ledger', 'source_hard_coded', 'CM-008', 'blocked'),
- ('ripe_hq', 5, 'Mission Control', 'source_hard_coded', 'CM-009', 'required'),
- ('ripe_hq', 6, 'Switchboard', 'source_hard_coded', 'CM-010', 'required'),
- ('ripe_hq', 7, 'Price Desk', 'source_hard_coded', 'CM-015', 'required'),
- ('ripe_hq', 8, 'Vault Book', 'source_hard_coded', 'CM-021', 'required'),
- ('ripe_hq', 9, 'Auction House', 'source_hard_coded', 'CM-026', 'required'),
- ('ripe_hq', 10, 'Auction House NFT', 'source_hard_coded', 'CM-027', 'required'),
- ('ripe_hq', 11, 'Boardroom', 'source_hard_coded', 'CM-028', 'required'),
- ('ripe_hq', 12, 'Bond Room', 'source_hard_coded', 'CM-029', 'required'),
- ('ripe_hq', 13, 'Credit Engine', 'source_hard_coded', 'CM-030', 'required'),
- ('ripe_hq', 14, 'Endaoment', 'source_hard_coded', 'CM-031', 'required'),
- ('ripe_hq', 15, 'Human Resources', 'source_hard_coded', 'CM-032', 'required'),
- ('ripe_hq', 16, 'Lootbox', 'source_hard_coded', 'CM-033', 'required'),
- ('ripe_hq', 17, 'Teller', 'source_hard_coded', 'CM-034', 'required'),
- ('ripe_hq', 18, 'Deleverage', 'source_hard_coded', 'CM-044', 'required'),
- ('ripe_hq', 19, 'Credit Redeem', 'source_hard_coded', 'CM-043', 'required'),
- ('ripe_hq', 20, 'Teller Utils', 'source_hard_coded', 'CM-045', 'required'),
- ('ripe_hq', 21, 'Endaoment Funds', 'source_hard_coded', 'CM-047', 'required'),
- ('ripe_hq', 22, 'Endaoment PSM', 'source_hard_coded', 'CM-048', 'required'),
- ('ripe_hq', 23, 'GREEN CCIP BurnMint pool', 'provisional_reservation', 'CM-051', 'deferred'),
- ('ripe_hq', 24, 'RIPE CCIP BurnMint pool', 'provisional_reservation', 'CM-052', 'deferred'),
- ('vault_book', 1, 'Stability Pool', 'source_hard_coded', 'CM-022', 'required'),
- ('vault_book', 2, 'Ripe Gov Vault', 'source_hard_coded', 'CM-023', 'required'),
- ('vault_book', 3, 'Simple ERC20 Vault', 'registration_order', 'CM-024', 'required'),
- ('vault_book', 4, 'Rebase ERC20 Vault', 'registration_order', 'CM-025', 'omitted'),
- ('price_desk', 1, 'Chainlink', 'registration_order', 'CM-016', 'required'),
- ('price_desk', 2, 'Curve', 'source_hard_coded', 'CM-017', 'omitted'),
- ('price_desk', 3, 'BlueChipYield', 'registration_order', 'CM-018', 'omitted'),
- ('price_desk', 4, 'Pyth', 'source_hard_coded', 'CM-019', 'omitted'),
- ('price_desk', 5, 'Stork', 'registration_order', 'CM-020', 'omitted'),
- ('switchboard', 1, 'Switchboard Alpha', 'source_hard_coded', 'CM-011', 'required'),
- ('switchboard', 2, 'Switchboard Bravo', 'registration_order', 'CM-012', 'required'),
- ('switchboard', 3, 'Switchboard Charlie', 'registration_order', 'CM-013', 'required'),
- ('switchboard', 4, 'Switchboard Delta', 'registration_order', 'CM-014', 'required'),
- ('switchboard', 5, 'Switchboard Echo', 'registration_order', 'CM-046', 'required'))
-_COMPONENT_META_ROWS = (('CM-001',
-  'GreenToken',
-  'required',
+_COMPONENT_METADATA_ROWS = (('CM-001',
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS', 'OWN-T1'),
   ('NEG-017', 'NEG-025', 'NEG-031'),
   ('H04', 'H05', 'H08', 'H09', 'T1'),
   ('E-CM', 'E-M0', 'E-T1', 'E-SRC-HQ')),
  ('CM-002',
-  'RipeToken',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS', 'OWN-T1'),
   ('NEG-017', 'NEG-025', 'NEG-031'),
   ('H04', 'H05', 'H08', 'H09', 'T1'),
   ('E-CM', 'E-M0', 'E-T1', 'E-SRC-HQ')),
  ('CM-003',
-  'SavingsGreen',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-H09'),
   ('NEG-031', 'NEG-033', 'NEG-036'),
   ('H04', 'H05', 'H08', 'H09'),
   ('E-M0', 'E-SRC-HQ', 'E-SRC-REG')),
  ('CM-004',
-  'RipeHq',
-  'required',
   'OWN-H05',
   ('OWN-SECOPS', 'OWN-H08'),
   ('NEG-017', 'NEG-025', 'NEG-031', 'NEG-036', 'NEG-H03-GLOBAL-MINT-SEQUENCE'),
   ('H05', 'H08', 'H09'),
   ('E-SRC-HQ', 'E-SRC-REG')),
  ('CM-005',
-  'Contributor',
-  'omitted',
   'OWN-H04',
   ('OWN-SECOPS', 'OWN-H08'),
   ('NEG-016', 'NEG-034'),
   ('post-launch HR amendment',),
   ('E-M0', 'E-VP')),
- ('CM-006',
-  'TrainingWheels',
-  'required',
-  'OWN-SECOPS',
-  ('OWN-H04', 'OWN-H05'),
-  ('NEG-017',),
-  ('H04', 'H05', 'H08'),
-  ('E-CM', 'E-T7')),
+ ('CM-006', 'OWN-SECOPS', ('OWN-H04', 'OWN-H05'), ('NEG-017',), ('H04', 'H05', 'H08'), ('E-CM', 'E-T7')),
  ('CM-007',
-  'DefaultsBase',
-  'omitted',
   'OWN-H04',
   ('OWN-H03', 'OWN-H08'),
   ('NEG-016', 'NEG-017'),
   ('H03', 'H04', 'H08'),
   ('E-CM', 'E-H04')),
  ('CM-008',
-  'Ledger',
-  'blocked',
   'OWN-S5',
   ('OWN-H04', 'OWN-H05', 'OWN-SECOPS'),
   ('NEG-017', 'NEG-031'),
   ('S5', 'H05', 'H08', 'H09'),
   ('E-S5', 'E-SRC-HQ')),
  ('CM-009',
-  'MissionControl',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-T8', 'OWN-SECOPS'),
-  ('NEG-017',
-   'NEG-021',
-   'NEG-022',
-   'NEG-023',
-   'NEG-024',
-   'NEG-033',
-   'NEG-034',
-   'NEG-035',
-   'NEG-036'),
+  ('NEG-017', 'NEG-021', 'NEG-022', 'NEG-023', 'NEG-024', 'NEG-033', 'NEG-034', 'NEG-035', 'NEG-036'),
   ('H04', 'H05', 'H08', 'H09', 'T8'),
   ('E-T7', 'E-M0', 'E-T8')),
  ('CM-010',
-  'Switchboard',
-  'required',
   'OWN-H05',
   ('OWN-H04', 'OWN-SECOPS'),
   ('NEG-017', 'NEG-031', 'NEG-036'),
   ('H04', 'H05', 'H08'),
   ('E-T7', 'E-SRC-HQ', 'E-SRC-SB')),
  ('CM-011',
-  'SwitchboardAlpha',
-  'required',
   'OWN-H04',
   ('OWN-ORACLE', 'OWN-H05'),
   ('NEG-024', 'NEG-031', 'NEG-037'),
   ('H04', 'H05', 'H08'),
   ('E-SRC-SB', 'E-SRC-PD')),
  ('CM-012',
-  'SwitchboardBravo',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-T8'),
   ('NEG-017', 'NEG-031'),
   ('H04', 'H05', 'H08'),
   ('E-T7', 'E-SRC-SB')),
  ('CM-013',
-  'SwitchboardCharlie',
-  'required',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-035', 'NEG-036'),
   ('H04', 'H05', 'reward promotion'),
   ('E-M0', 'E-S3', 'E-SRC-SB')),
  ('CM-014',
-  'SwitchboardDelta',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-REWARDS'),
   ('NEG-034', 'NEG-035', 'NEG-036'),
   ('H04', 'H05', 'H08'),
   ('E-S4', 'E-SRC-SB')),
  ('CM-015',
-  'PriceDesk',
-  'required',
   'OWN-ORACLE',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-024', 'NEG-031', 'NEG-037'),
   ('H04', 'H05', 'H08'),
   ('E-SRC-HQ', 'E-SRC-PD')),
  ('CM-016',
-  'ChainlinkPrices',
-  'required',
   'OWN-ORACLE',
   ('OWN-H04', 'OWN-H05', 'OWN-T8'),
   ('NEG-017', 'NEG-024', 'NEG-037'),
   ('H04', 'H05', 'H08'),
   ('E-M0', 'E-SRC-PD')),
  ('CM-017',
-  'CurvePrices',
-  'omitted',
   'OWN-ORACLE',
   ('OWN-H08', 'OWN-H09'),
   ('NEG-016', 'NEG-024', 'NEG-037'),
   ('H08', 'H09'),
   ('E-CM', 'E-T7', 'E-SRC-PD')),
  ('CM-018',
-  'BlueChipYieldPrices',
-  'omitted',
   'OWN-ORACLE',
-  ('OWN-H08', 'OWN-H09'),
-  ('NEG-016', 'NEG-024', 'NEG-037'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-T7', 'E-SRC-PD')),
+  ('OWN-H04', 'OWN-H05', 'OWN-H08', 'OWN-H09'),
+  ('NEG-017', 'NEG-024', 'NEG-037'),
+  ('H04', 'H05', 'H08', 'H09'),
+  ('E-CM', 'E-H04', 'E-T7', 'E-SRC-PD')),
  ('CM-019',
-  'PythPrices',
-  'omitted',
   'OWN-ORACLE',
   ('OWN-H08', 'OWN-H09'),
   ('NEG-016', 'NEG-024', 'NEG-037'),
   ('H08', 'H09'),
   ('E-CM', 'E-T7', 'E-SRC-PD')),
  ('CM-020',
-  'StorkPrices',
-  'omitted',
   'OWN-ORACLE',
   ('OWN-H08', 'OWN-H09'),
   ('NEG-016', 'NEG-024', 'NEG-037'),
   ('H08', 'H09'),
   ('E-CM', 'E-T7', 'E-SRC-PD')),
  ('CM-021',
-  'VaultBook',
-  'required',
   'OWN-H05',
   ('OWN-T8', 'OWN-H08'),
   ('NEG-021', 'NEG-031', 'NEG-036'),
   ('T8', 'H05', 'H08', 'H09'),
   ('E-M0', 'E-T8', 'E-SRC-HQ', 'E-SRC-VB')),
  ('CM-022',
-  'StabilityPool',
-  'required',
   'OWN-H04',
   ('OWN-T8', 'OWN-H05', 'OWN-H08'),
   ('NEG-021', 'NEG-023', 'NEG-033', 'NEG-036'),
   ('H04', 'T8', 'H05', 'H08'),
   ('E-M0', 'E-T8', 'E-SRC-VB')),
  ('CM-023',
-  'RipeGov',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-H08'),
   ('NEG-035', 'NEG-036'),
   ('H04', 'H05', 'H08'),
   ('E-M0', 'E-SRC-VB')),
  ('CM-024',
-  'SimpleErc20',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-ORACLE', 'OWN-T8'),
   ('NEG-017', 'NEG-021', 'NEG-023', 'NEG-031', 'NEG-H03-LP-ZERO-LTV', 'NEG-H03-LP-ORDINARY-ONLY'),
   ('H04', 'H05', 'T8', 'H08'),
   ('E-M0', 'E-T8', 'E-SRC-VB')),
  ('CM-025',
-  'RebaseErc20 / inherited SharesVault',
-  'omitted',
   'OWN-T8',
   ('OWN-H05', 'OWN-H08'),
   ('NEG-016', 'NEG-021', 'NEG-031'),
   ('T8', 'H05', 'H08'),
   ('E-T8', 'E-SRC-VB')),
  ('CM-026',
-  'AuctionHouse',
-  'required',
   'OWN-T8',
   ('OWN-H04', 'OWN-H05', 'OWN-SECOPS'),
   ('NEG-021', 'NEG-023', 'NEG-036'),
   ('T8', 'H04', 'H05', 'H08', 'H09'),
   ('E-M0', 'E-T8', 'E-SRC-HQ')),
- ('CM-027',
-  'AuctionHouseNFT',
-  'required',
-  'OWN-H05',
-  ('OWN-H08',),
-  ('NEG-031',),
-  ('H05', 'H08'),
-  ('E-CM', 'E-T7')),
+ ('CM-027', 'OWN-H05', ('OWN-H08',), ('NEG-031',), ('H05', 'H08'), ('E-CM', 'E-T7')),
  ('CM-028',
-  'Boardroom',
-  'required',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-035', 'NEG-036'),
   ('H04', 'H05', 'reward promotion'),
   ('E-M0', 'E-T7')),
  ('CM-029',
-  'BondRoom',
-  'required',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05', 'OWN-SECOPS'),
   ('NEG-034', 'NEG-035', 'NEG-036'),
   ('H04', 'H05', 'post-launch bond release'),
   ('E-M0', 'E-T7')),
  ('CM-030',
-  'CreditEngine',
-  'required',
   'OWN-T8',
   ('OWN-H04', 'OWN-S5', 'OWN-SECOPS'),
   ('NEG-021', 'NEG-022', 'NEG-023', 'NEG-024', 'NEG-036'),
   ('T8', 'H04', 'H05', 'H08', 'H09'),
   ('E-M0', 'E-T8', 'E-SRC-HQ')),
  ('CM-031',
-  'Endaoment',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS'),
   ('NEG-016', 'NEG-020', 'NEG-021', 'NEG-024', 'NEG-036'),
   ('H04', 'H05', 'H08'),
   ('E-M0', 'E-T7', 'E-SRC-HQ')),
  ('CM-032',
-  'HumanResources',
-  'required',
   'OWN-H04',
   ('OWN-SECOPS', 'OWN-H05'),
   ('NEG-034', 'NEG-036'),
   ('H04', 'H05', 'H08', 'post-launch HR release'),
   ('E-M0', 'E-T7')),
  ('CM-033',
-  'Lootbox',
-  'required',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-034', 'NEG-035', 'NEG-036', 'NEG-H03-STOCK-REWARD-DISABLED'),
   ('H04', 'H05', 'H08', 'reward promotion'),
   ('E-S3', 'E-M0')),
  ('CM-034',
-  'Teller',
-  'required',
   'OWN-T8',
   ('OWN-H04', 'OWN-H05', 'OWN-SECOPS'),
   ('NEG-017',
@@ -4886,97 +4804,33 @@ _COMPONENT_META_ROWS = (('CM-001',
    'NEG-H03-TELLER-EXACT-RECEIPT'),
   ('T8', 'H04', 'H05', 'H08', 'H09'),
   ('E-M0', 'E-M1')),
- ('CM-035',
-  'GreenPool',
-  'omitted',
-  'OWN-H03',
-  ('OWN-ORACLE', 'OWN-H08'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
- ('CM-036',
-  'RipePoolCurve',
-  'omitted',
-  'OWN-H03',
-  ('OWN-ORACLE', 'OWN-H08'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
- ('CM-037',
-  'RipePoolAero',
-  'omitted',
-  'OWN-H03',
-  ('OWN-ORACLE', 'OWN-H08'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
+ ('CM-035', 'OWN-H03', ('OWN-ORACLE', 'OWN-H08'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
+ ('CM-036', 'OWN-H03', ('OWN-ORACLE', 'OWN-H08'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
+ ('CM-037', 'OWN-H03', ('OWN-ORACLE', 'OWN-H08'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
  ('CM-038',
-  'BondBooster',
-  'required',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-035', 'NEG-036'),
   ('H04', 'H05', 'H08', 'post-launch bond release'),
   ('E-T7', 'E-SRC')),
- ('CM-039',
-  'wsuperOETHbPrices',
-  'omitted',
-  'OWN-ORACLE',
-  ('OWN-H08', 'OWN-H09'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
- ('CM-040',
-  'RedStone',
-  'omitted',
-  'OWN-ORACLE',
-  ('OWN-H08', 'OWN-H09'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
- ('CM-041',
-  'UndyVaultPrices',
-  'omitted',
-  'OWN-ORACLE',
-  ('OWN-T8', 'OWN-H08'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
+ ('CM-039', 'OWN-ORACLE', ('OWN-H08', 'OWN-H09'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
+ ('CM-040', 'OWN-ORACLE', ('OWN-H08', 'OWN-H09'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
+ ('CM-041', 'OWN-ORACLE', ('OWN-T8', 'OWN-H08'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
  ('CM-042',
-  'Underscore Vault',
-  'omitted',
   'OWN-T8',
   ('OWN-H08', 'OWN-H09'),
   ('NEG-016', 'NEG-021', 'NEG-024', 'NEG-033', 'NEG-034', 'NEG-035', 'NEG-036'),
   ('H08', 'H09'),
   ('E-M0', 'E-S4')),
  ('CM-043',
-  'CreditRedeem',
-  'required',
   'OWN-T8',
   ('OWN-H04', 'OWN-H08'),
   ('NEG-021', 'NEG-022', 'NEG-036'),
   ('H04', 'H05', 'T8', 'H08'),
   ('E-M0', 'E-T8')),
- ('CM-044',
-  'Deleverage',
-  'required',
-  'OWN-H04',
-  ('OWN-H05', 'OWN-H08'),
-  ('NEG-036',),
-  ('H04', 'H05', 'H08'),
-  ('E-S4',)),
- ('CM-045',
-  'TellerUtils',
-  'required',
-  'OWN-H05',
-  ('OWN-H04', 'OWN-H08'),
-  ('NEG-016', 'NEG-036'),
-  ('H05', 'H08'),
-  ('E-T7', 'E-M0')),
+ ('CM-044', 'OWN-H04', ('OWN-H05', 'OWN-H08'), ('NEG-036',), ('H04', 'H05', 'H08'), ('E-S4',)),
+ ('CM-045', 'OWN-H05', ('OWN-H04', 'OWN-H08'), ('NEG-016', 'NEG-036'), ('H05', 'H08'), ('E-T7', 'E-M0')),
  ('CM-046',
-  'SwitchboardEcho',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS'),
   ('NEG-018',
@@ -4989,16 +4843,12 @@ _COMPONENT_META_ROWS = (('CM-001',
   ('H04', 'H05', 'H08'),
   ('E-M0', 'E-SRC-SB')),
  ('CM-047',
-  'EndaomentFunds',
-  'required',
   'OWN-H04',
   ('OWN-H05', 'OWN-SECOPS'),
   ('NEG-016', 'NEG-020', 'NEG-021', 'NEG-024', 'NEG-036'),
   ('H04', 'H05', 'H08'),
   ('E-M0',)),
  ('CM-048',
-  'EndaomentPSM',
-  'required',
   'OWN-H04',
   ('OWN-T8', 'OWN-H05', 'OWN-SECOPS', 'OWN-H09'),
   ('NEG-017',
@@ -5014,89 +4864,42 @@ _COMPONENT_META_ROWS = (('CM-001',
    'NEG-H03-PSM-MINT-LAST'),
   ('H04', 'H05', 'H08', 'H09'),
   ('E-M0',)),
- ('CM-049',
-  'DefaultsRobinhood',
-  'required',
-  'OWN-H04',
-  ('OWN-H05',),
-  ('NEG-017',),
-  ('H04', 'H05'),
-  ('E-CM', 'E-H04')),
- ('CM-050',
-  'AeroRipePrices',
-  'omitted',
-  'OWN-ORACLE',
-  ('OWN-H08', 'OWN-H09'),
-  ('NEG-016', 'NEG-024'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-M0')),
+ ('CM-049', 'OWN-H04', ('OWN-H05',), ('NEG-017',), ('H04', 'H05'), ('E-CM', 'E-H04')),
+ ('CM-050', 'OWN-ORACLE', ('OWN-H08', 'OWN-H09'), ('NEG-016', 'NEG-024'), ('H08', 'H09'), ('E-CM', 'E-M0')),
  ('CM-051',
-  'GREEN CCIP BurnMint pool',
-  'deferred',
   'OWN-T1',
   ('OWN-SECOPS', 'OWN-H05'),
   ('NEG-016', 'NEG-025', 'NEG-031', 'NEG-036'),
   ('Track 1 fast follow', 'H08', 'H09'),
   ('E-M0', 'E-T1')),
  ('CM-052',
-  'RIPE CCIP BurnMint pool',
-  'deferred',
   'OWN-T1',
   ('OWN-SECOPS', 'OWN-H05'),
   ('NEG-016', 'NEG-025', 'NEG-031', 'NEG-036'),
   ('Track 1 fast follow', 'H08', 'H09'),
   ('E-M0', 'E-T1')),
  ('CM-053',
-  'CCIP token-admin registration',
-  'deferred',
   'OWN-T1',
   ('OWN-SECOPS',),
   ('NEG-016', 'NEG-025', 'NEG-036'),
   ('Track 1 fast follow',),
   ('E-M0', 'E-T1')),
  ('CM-054',
-  'GREEN/RIPE local price adapter',
-  'deferred',
   'OWN-ORACLE',
   ('OWN-H03', 'OWN-SECOPS'),
   ('NEG-016', 'NEG-024', 'NEG-037'),
   ('post-launch oracle', 'H03 amendment'),
   ('E-CM', 'E-T7')),
  ('CM-055',
-  'Deployment, migration, and parameter-report tooling',
-  'required',
   'OWN-H05',
   ('OWN-H03', 'OWN-H04'),
   ('NEG-017', 'NEG-031'),
   ('H03', 'H04', 'H05'),
   ('E-T7', 'E-H03')),
- ('CM-056',
-  'Manifests and migration history',
-  'required',
-  'OWN-H05',
-  ('OWN-H09',),
-  ('NEG-016', 'NEG-017'),
-  ('H05', 'H09'),
-  ('E-H02', 'E-T7')),
- ('CM-057',
-  'ABI export and explorer verification',
-  'required',
-  'OWN-H09',
-  ('OWN-H05', 'OWN-T1'),
-  ('NEG-016',),
-  ('later Track 7', 'Track 1'),
-  ('E-T7',)),
- ('CM-058',
-  'Solidity build/test/deploy toolchain',
-  'deferred',
-  'OWN-T1',
-  ('OWN-SECOPS',),
-  ('NEG-016', 'NEG-025'),
-  ('Track 1 fast follow',),
-  ('E-T1',)),
+ ('CM-056', 'OWN-H05', ('OWN-H09',), ('NEG-016', 'NEG-017'), ('H05', 'H09'), ('E-H02', 'E-T7')),
+ ('CM-057', 'OWN-H09', ('OWN-H05', 'OWN-T1'), ('NEG-016',), ('later Track 7', 'Track 1'), ('E-T7',)),
+ ('CM-058', 'OWN-T1', ('OWN-SECOPS',), ('NEG-016', 'NEG-025'), ('Track 1 fast follow',), ('E-T1',)),
  ('CM-059',
-  'Base/RH test profiles',
-  'required',
   'OWN-H09',
   ('OWN-H08', 'OWN-H03'),
   ('NEG-016',
@@ -5126,13 +4929,101 @@ _COMPONENT_META_ROWS = (('CM-001',
   ('H03', 'H08', 'H09'),
   ('E-T7', 'E-H02', 'E-S1', 'E-S2')),
  ('CM-060',
-  'DefaultsLocal',
-  'omitted',
   'OWN-H04',
   ('OWN-H03', 'OWN-H08'),
   ('NEG-016', 'NEG-017'),
   ('H03', 'H04', 'H08'),
   ('E-CM', 'E-H04')))
+
+
+def _source_component_selection_map() -> dict[str, Any]:
+    rows = tuple(source_blueprint.ROBINHOOD_COMPONENT_SELECTIONS)
+    expected_ids = tuple(f"CM-{value:03d}" for value in range(1, 61))
+    ids = tuple(getattr(row, "component_id", None) for row in rows)
+    if len(rows) != 60 or ids != expected_ids or len(set(ids)) != 60:
+        raise RobinhoodBlueprintError("H03_COMPONENT_SOURCE_CENSUS")
+    expected_selection = {
+        "required": "selected",
+        "omitted": "omitted",
+        "disabled": "disabled",
+        "deferred": "deferred",
+        "blocked": "blocked",
+    }
+    for row in rows:
+        if (
+            not isinstance(row.semantic_name, str)
+            or not row.semantic_name
+            or row.deployment_disposition not in source_blueprint.ROBINHOOD_COMPONENT_DEPLOYMENT_STATES
+            or row.selection_state not in source_blueprint.ROBINHOOD_SELECTION_STATES
+            or row.selection_state != expected_selection[row.deployment_disposition]
+        ):
+            raise RobinhoodBlueprintError("H03_COMPONENT_SOURCE_CENSUS")
+    return {row.component_id: row for row in rows}
+
+
+def _source_registry_rows() -> tuple[tuple[Any, ...], ...]:
+    rows = tuple(source_blueprint.ROBINHOOD_REGISTRY_TOPOLOGY)
+    keys = tuple(
+        (getattr(row, "domain", None), getattr(row, "registry_id", None))
+        for row in rows
+    )
+    expected_keys = (
+        *(("ripe_hq", value) for value in range(1, 25)),
+        *(("vault_book", value) for value in range(1, 5)),
+        *(("price_desk", value) for value in range(1, 6)),
+        *(("switchboard", value) for value in range(1, 6)),
+    )
+    if len(rows) != 38 or keys != expected_keys or len(set(keys)) != 38:
+        raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_CENSUS")
+    components = _source_component_selection_map()
+    reserved = {
+        ("ripe_hq", 23),
+        ("ripe_hq", 24),
+        ("price_desk", 2),
+    }
+    selected_price_ids: set[int] = set()
+    normalized: list[tuple[Any, ...]] = []
+    for row in rows:
+        if (
+            row.domain not in source_blueprint.ROBINHOOD_REGISTRY_DOMAINS
+            or row.id_authority not in source_blueprint.ROBINHOOD_REGISTRY_ID_AUTHORITIES
+            or row.component_id not in components
+            or row.disposition not in source_blueprint.ROBINHOOD_COMPONENT_DEPLOYMENT_STATES
+            or row.selection_state not in source_blueprint.ROBINHOOD_SELECTION_STATES
+            or not isinstance(row.semantic_name, str)
+            or not row.semantic_name
+        ):
+            raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_CENSUS")
+        key = (row.domain, row.registry_id)
+        expected_selection = (
+            "reserved"
+            if key in reserved
+            else "selected"
+            if row.disposition == "required"
+            else row.disposition
+        )
+        if row.selection_state != expected_selection:
+            raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_CENSUS")
+        if row.domain == "price_desk" and row.selection_state == "selected":
+            selected_price_ids.add(row.registry_id)
+        normalized.append(
+            (
+                row.domain,
+                row.registry_id,
+                row.semantic_name,
+                row.id_authority,
+                row.component_id,
+                row.disposition,
+            )
+        )
+    if selected_price_ids != {1, 3}:
+        raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_DRIFT")
+    return tuple(normalized)
+
+
+_COMPONENT_SELECTION_BY_ID = _source_component_selection_map()
+_REGISTRY_ROWS = _source_registry_rows()
+
 
 
 def _group(rows: tuple[tuple[Any, ...], ...], index: int) -> dict[str, tuple[tuple[Any, ...], ...]]:
@@ -5195,11 +5086,11 @@ _SYMBOLIC_AUTHORITY_CLASSES = {
     "I-RIPE-WETH-LP": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
     "I-PSM-CONFIG": AuthorityClass.OWNER_SELECTED,
     "I-ECHO-TIMELOCKS": AuthorityClass.OWNER_SELECTED,
-    "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+    "I-ASSET-CONFIG-NONSTOCK": AuthorityClass.OWNER_SELECTED,
     "I-ASSET-CONFIG-STOCK": AuthorityClass.OWNER_SELECTED,
-    "I-STABILITY-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
-    "I-RIPE-GOV-CONFIG": AuthorityClass.REPOSITORY_APPROVED,
-    "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.REPOSITORY_APPROVED,
+    "I-STABILITY-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-RIPE-GOV-CONFIG": AuthorityClass.OWNER_SELECTED,
+    "I-AUCTION-CREDIT-NONSTOCK": AuthorityClass.OWNER_SELECTED,
     "I-AUCTION-CREDIT-STOCK": AuthorityClass.OWNER_SELECTED,
     "I-ENDAOMENT-NATIVE-METADATA": (
         AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
@@ -5215,6 +5106,9 @@ _SYMBOLIC_AUTHORITY_CLASSES = {
     "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
     "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
     "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
+    "I-STEAKHOUSE-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-MORPHO-V2-FACTORY": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
+    "I-CONTRIB-TEMPLATE": AuthorityClass.DEPLOYMENT_PRODUCED,
 }
 _validate_symbolic_authority_classes(_SYMBOLIC_AUTHORITY_CLASSES)
 _SYMBOLIC_INPUTS = tuple(
@@ -5239,6 +5133,41 @@ _SYMBOLIC_INPUTS = tuple(
         status,
         blocker_ids,
     ) in _SYMBOLIC_ROWS
+)
+
+_PROFILE1_SELECTION = Profile1LaunchSelection(
+    source_commit="74c4120fbfa1ade859dc32f61acdf567c139fe02",
+    source_paths=(
+        "config/BluePrint.py",
+        "contracts/config/DefaultsRobinhood.vy",
+    ),
+    external_fact_input_ids=(
+        "I-CHAINLINK-CORE",
+        "I-GOV-HANDOFF",
+        "I-LEDGER-BLOCK-SOURCE",
+        "I-MORPHO-V2-FACTORY",
+        "I-STEAKHOUSE-USDG",
+        "I-USDG",
+        "I-USDG-FEED",
+        "I-WETH",
+    ),
+    deployment_produced_input_ids=(
+        "I-CONTRIB-TEMPLATE",
+        "I-GREEN",
+        "I-RH-DEFAULTS",
+        "I-RIPE",
+        "I-SGREEN",
+        "I-TRAINING-WHEELS",
+    ),
+    excluded_lanes=(
+        "CCIP",
+        "CREDIT_ENGINE_ZERO_BACKING",
+        "CURVE_OR_LP_ACTIVATION",
+        "DELEVERAGE_VALUES",
+        "OLD_MIGRATION_NAMESPACE_AND_CUSTOM_RUNNER",
+        "PSM_PARAMETERS_OR_ACTIVATION",
+        "UNISWAP",
+    ),
 )
 _PROMOTIONS = tuple(
     PromotionRecord(
@@ -5282,17 +5211,16 @@ def _component_blockers(component_id: str) -> tuple[str, ...]:
 def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
     (
         component_id,
-        name,
-        deployment,
         primary,
         co_owners,
         assertion_ids,
         downstream,
         evidence_ids,
     ) = row
+    selection = _COMPONENT_SELECTION_BY_ID[component_id]
     return ComponentRecord(
         component_id=component_id,
-        name=name,
+        name=selection.semantic_name,
         source_paths=tuple(
             SourcePathRecord(
                 path,
@@ -5304,7 +5232,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
             for _, path, path_kind, path_state, source_class, evidence_id
             in _sources.get(component_id, ())
         ),
-        deployment=Disposition(deployment),
+        deployment=Disposition(selection.deployment_disposition),
         registry_expectations=tuple(
             RegistryExpectation(
                 RegistryDomain(domain),
@@ -5378,13 +5306,15 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
 ROBINHOOD_BLUEPRINT = RobinhoodBlueprint(
     blueprint_id=ROBINHOOD_BLUEPRINT_ID,
     profile_ids=ROBINHOOD_PROFILE_IDS,
+    profile1_selection=_PROFILE1_SELECTION,
     symbolic_inputs=_SYMBOLIC_INPUTS,
     blockers=_BLOCKERS,
     promotions=_PROMOTIONS,
-    components=tuple(_build_component(row) for row in _COMPONENT_META_ROWS),
+    components=tuple(_build_component(row) for row in _COMPONENT_METADATA_ROWS),
 )
 
 _CANONICAL_SYMBOLIC_INPUTS = ROBINHOOD_BLUEPRINT.symbolic_inputs
+_CANONICAL_PROFILE1_SELECTION = ROBINHOOD_BLUEPRINT.profile1_selection
 _CANONICAL_BLOCKERS = ROBINHOOD_BLUEPRINT.blockers
 _CANONICAL_PROMOTIONS = ROBINHOOD_BLUEPRINT.promotions
 _CANONICAL_COMPONENTS = ROBINHOOD_BLUEPRINT.components
@@ -5466,12 +5396,14 @@ del (
     _RELATION_ROWS,
     _SOURCE_ROWS,
     _REGISTRY_ROWS,
-    _COMPONENT_META_ROWS,
+    _COMPONENT_METADATA_ROWS,
+    _COMPONENT_SELECTION_BY_ID,
     _sources,
     _surfaces,
     _relations,
     _registries,
     _SYMBOLIC_AUTHORITY_CLASSES,
+    _PROFILE1_SELECTION,
 )
 
 
@@ -5557,6 +5489,8 @@ def validate_blueprint(
         or not isinstance(blueprint.profile_ids, tuple)
     ):
         _fail("H03_PROFILE_EXACT")
+    if blueprint.profile1_selection != _CANONICAL_PROFILE1_SELECTION:
+        _fail("RH_P1_SELECTION")
 
     component_ids = tuple(item.component_id for item in blueprint.components)
     if component_ids != _CANONICAL_COMPONENT_IDS or len(set(component_ids)) != 60:
@@ -5569,7 +5503,12 @@ def validate_blueprint(
             _fail("H03_ADDRESS_LITERAL")
 
     symbolic_ids = tuple(item.field_id for item in blueprint.symbolic_inputs)
-    if len(symbolic_ids) != 48 or len(set(symbolic_ids)) != 48:
+    if len(symbolic_ids) != 51 or len(set(symbolic_ids)) != 51:
+        _fail("H03_SYMBOLIC_FIELD")
+    if any(
+        not isinstance(item.authority_class, AuthorityClass)
+        for item in blueprint.symbolic_inputs
+    ):
         _fail("H03_SYMBOLIC_FIELD")
     if any(
         not isinstance(item.authority_class, AuthorityClass)
@@ -5577,12 +5516,12 @@ def validate_blueprint(
     ):
         _fail("H03_SYMBOLIC_FIELD")
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 18 or len(set(blocker_ids)) != 18:
+    if len(blocker_ids) != 19 or len(set(blocker_ids)) != 19:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")
     promotion_ids = tuple(item.promotion_id for item in blueprint.promotions)
-    if promotion_ids != ("P-CCIP-SEVEN-DAY", "P-REWARDS-SEVEN-DAY"):
+    if promotion_ids != ("P-CCIP-SEVEN-DAY",):
         _fail("H03_PROMOTION_SET")
 
     surface_values = _all_surfaces(blueprint)
@@ -5592,7 +5531,7 @@ def validate_blueprint(
             _fail("H03_OMISSION_SURFACE", component.component_id)
         if any(surface.component_id != component.component_id for surface in component.surfaces):
             _fail("H03_SURFACE_SET", component.component_id)
-    if len(surface_values) != 94:
+    if len(surface_values) != 96:
         _fail("H03_SURFACE_SET")
 
     expected_surface_map = _by_id(_CANONICAL_SURFACES, "surface_id")
@@ -5607,12 +5546,9 @@ def validate_blueprint(
     if blueprint.promotions != _CANONICAL_PROMOTIONS:
         _fail("H03_PROMOTION_SET")
     ccip = blueprint.promotions[0]
-    rewards = blueprint.promotions[1]
     if (
         len(ccip.surface_ids) != 6
-        or len(rewards.surface_ids) != 7
         or ccip.disposition is not Disposition.DEFERRED
-        or rewards.disposition is not Disposition.DEFERRED
     ):
         _fail("H03_PROMOTION_SET")
 
@@ -5660,6 +5596,29 @@ def validate_blueprint(
     registry_values = _all_registries(blueprint)
     if len(registry_values) != 38 or registry_values != _CANONICAL_REGISTRIES:
         _fail("H03_REGISTRY_TOPOLOGY")
+    source_registry_values = {
+        (RegistryDomain(domain), registry_id): RegistryExpectation(
+            RegistryDomain(domain),
+            registry_id,
+            semantic_name,
+            RegistryIdAuthority(authority),
+            component_id,
+            Disposition(disposition),
+        )
+        for (
+            domain,
+            registry_id,
+            semantic_name,
+            authority,
+            component_id,
+            disposition,
+        ) in _source_registry_rows()
+    }
+    structural_registry_values = {
+        (item.domain, item.registry_id): item for item in registry_values
+    }
+    if structural_registry_values != source_registry_values:
+        _fail("H03_REGISTRY_SOURCE_DRIFT")
     if any(
         item.authority is RegistryIdAuthority.PROVISIONAL_RESERVATION
         and item.disposition is not Disposition.DEFERRED
@@ -5719,6 +5678,21 @@ def validate_blueprint(
     }
     if used_assertions != set(_ASSERTION_IDS):
         _fail("H03_DISPOSITION")
+
+    source_component_values = tuple(
+        (
+            row.component_id,
+            row.semantic_name,
+            Disposition(row.deployment_disposition),
+        )
+        for row in _source_component_selection_map().values()
+    )
+    structural_component_values = tuple(
+        (item.component_id, item.name, item.deployment)
+        for item in blueprint.components
+    )
+    if structural_component_values != source_component_values:
+        _fail("H03_COMPONENT_SOURCE_DRIFT")
 
 
 def get_robinhood_blueprint(profile_id: str) -> RobinhoodBlueprint:

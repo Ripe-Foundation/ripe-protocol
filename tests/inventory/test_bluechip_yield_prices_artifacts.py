@@ -136,12 +136,12 @@ def test_source_identity_mutation_is_detected(tmp_path):
     assert candidate.integrity != EXPECTED["integrity"]
 
 
-def test_profile1_bluechip_topology_remains_omitted_and_reserved():
+def test_profile1_bluechip_topology_is_selected_in_slot_three():
     component = get_component("CM-018")
     policy = blueprint_policy()
 
     assert component.name == "BlueChipYieldPrices"
-    assert component.deployment is Disposition.OMITTED
+    assert component.deployment is Disposition.REQUIRED
     assert len(component.registry_expectations) == 1
     row = component.registry_expectations[0]
     assert (row.domain.value, row.registry_id, row.semantic_name) == (
@@ -149,10 +149,10 @@ def test_profile1_bluechip_topology_remains_omitted_and_reserved():
         3,
         "BlueChipYield",
     )
-    assert row.disposition is Disposition.OMITTED
+    assert row.disposition is Disposition.REQUIRED
     assert policy.canonical_registries[("price_desk", 3)] == "CM-018"
-    assert ("price_desk", 3) in policy.reserved_registries
-    assert ("price_desk", 3) not in policy.required_registries
+    assert ("price_desk", 3) not in policy.reserved_registries
+    assert ("price_desk", 3) in policy.required_registries
 
 
 def test_integrated_block_clock_current_bindings_reconcile_exactly():

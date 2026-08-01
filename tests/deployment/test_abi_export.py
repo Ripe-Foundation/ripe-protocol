@@ -142,10 +142,11 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 51
+    assert len(report.exported) == 52
     assert {path.name for path in report.exported} >= {
         "Addys.json",
         "Contributor.json",
+        "DefaultsRobinhood.json",
         "Erc20Token.json",
         "LocalGov.json",
     }

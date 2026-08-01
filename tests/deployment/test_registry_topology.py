@@ -59,20 +59,26 @@ def test_blueprint_policy_handles_every_disposition_explicitly():
     assert SUPPORTED_DISPOSITIONS == frozenset(Disposition)
 
     policy = blueprint_policy()
-    assert len(policy.required_registries) == 30
-    assert len(policy.reserved_registries) == 8
+    assert len(policy.required_registries) == 31
+    assert len(policy.reserved_registries) == 7
     assert policy.unavailable_components["CM-008"] is Disposition.BLOCKED
     assert policy.unavailable_components["CM-051"] is Disposition.DEFERRED
 
 
-def test_price_desk_one_and_reserved_two_through_five_are_exact():
+def test_price_desk_selected_one_and_three_and_unavailable_others_are_exact():
     policy = blueprint_policy()
     assert policy.canonical_registries[("price_desk", 1)] == "CM-016"
+    assert policy.canonical_registries[("price_desk", 3)] == "CM-018"
+    assert {
+        key for key in policy.required_registries if key[0] == "price_desk"
+    } == {
+        ("price_desk", 1),
+        ("price_desk", 3),
+    }
     assert {
         key for key in policy.reserved_registries if key[0] == "price_desk"
     } == {
         ("price_desk", 2),
-        ("price_desk", 3),
         ("price_desk", 4),
         ("price_desk", 5),
     }
