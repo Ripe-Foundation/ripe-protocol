@@ -1,18 +1,22 @@
 # Robinhood deployment validation plan
 
-> **31 July 2026 currentness overlay:** Ready to begin deployment preparation.
-> Validation must bind to current configuration-source baseline
-> `e4473ce6485888f1b747761a5ee8693443108877`, tree
-> `33b705690007bda9b11900b5775bd9230e79f09e`. PR #61, Morpho V2 and
+> **1 August 2026 currentness overlay:** Ready to continue bounded launch
+> preparation. Validation must bind to exact baseline
+> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+> `7454b5456ebb6cd02d716a64b408629ab501629e`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
 > planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
-> the derived ledger. Configuration consistency passes; 58 unresolved or
+> the derived ledger. Configuration consistency passes; 80 unresolved or
 > unverified deployment bindings keep deployment readiness false. H-06 is a
 > class qualification only. Repository configuration is prepared and
 > consistent; production/onchain configuration has not occurred. No Robinhood
 > migration, live execution, deployment, activation, RPC, account, key,
-> signer, or release action has occurred. Historical future-path labels below
-> remain narrow validation design, not current lifecycle authority.
+> signer, or release action has occurred. The current PriceDesk topology is
+> ID 1 Chainlink, ID 2 unchanged CurvePrices for GREEN only, ID 3
+> BlueChipYield, IDs 4/5 empty, with priorities `[1,3]`; see
+> [`curve-launch-activation.md`](curve-launch-activation.md). Historical
+> future-path labels below remain narrow validation design, not current
+> lifecycle authority.
 
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`

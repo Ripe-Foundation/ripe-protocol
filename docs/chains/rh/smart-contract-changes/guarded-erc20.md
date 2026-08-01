@@ -7,9 +7,34 @@
 > recommendation unless an owner-approved direction or repository gate is
 > identified explicitly.
 
-This review is bounded to the integrated `rh` snapshot below. The separate
-Deleverage branch/PR was not inspected and is neither a dependency nor a blocker
-for this document. CCIP work is owner-parked and outside scope. Zero-backing
+## Current `rh` rebind
+
+The current authority for this page is `rh` commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The dated 28 July snapshot and
+results below remain historical evidence.
+
+| Current identity | Value |
+| --- | --- |
+| GuardedErc20 source Git blob / SHA-256 | `713dab98bb9a08585e0c1f937425e8142cd600ab` / `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` |
+| Runtime template | 10,524 bytes; SHA-256 `e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14`; 14,052 bytes EIP-170 headroom |
+| [`test_guarded_erc20.py`](../../../../tests/vaults/test_guarded_erc20.py) | Git blob `700d6c3857795cc2058d54668252b53168fdb738`; SHA-256 `45fb971f92987017fed5ea40e85f74a3f3bb41bfe3f0a2f367f57f76c5b248f9` |
+| [Consumer inventory test](../../../../tests/vaults/test_guarded_consumer_inventory.py) | Git blob `f845bb4e317cb4031b0f67cb14f5504d9d3a3c70`; SHA-256 `b975206683403daf27ae40d25a34d56d802fccc731512227888e55bd99697817` |
+| [Stock comparison test](../../../../tests/vaults/test_stock_token_vault_comparison.py) | Git blob `b8c33f0df312d1ed1e04343337685c4f8c88a377`; SHA-256 `288f8d3fb5cc5de902e4d3918f1ab0c1b7946af243148af34dc6f084e681191c` |
+| [AuctionHouse Stock-delivery test](../../../../tests/core/auctionHouse/test_auctionhouse_stock_delivery.py) | Git blob `f19d5dcb1fcf7a6a37132ee1a0b0e02b3b70c3e7`; SHA-256 `2a0be15fe4241562bee5b3157a1f98d17ba9306c7403314c2a7e514df96a9546` |
+| [Deleverage Stock-delivery test](../../../../tests/core/deleverage/test_deleverage_stock_delivery.py) | Git blob `d8a0d95317b45ac7a20016945a05f14ae3eead6d`; SHA-256 `c74b1b0d8b22e5a064109c6f811b98010d40aa979600683d57d3d67e5a385d54` |
+
+Later integrated safety tests now cover named source mutants, deficits and
+surpluses, bounded withdrawals, cross-user/cross-vault isolation, malformed and
+oversized returns, atomic retry, and inherited surplus recovery. Later
+AuctionHouse and Deleverage tests cover composed Stock delivery. These close
+the prior mutation/recovery/composition gaps; they do not prove a final asset
+binding or launch inclusion. No behavioral suite was rerun for this
+documentation-only refresh.
+
+The integrated Deleverage source and composition tests were inspected for the
+current package without reopening further Deleverage work. CCIP work is
+owner-parked and outside scope. Zero-backing
 settlement, loss allocation, and bad-debt policy are also owner-parked: the code
 behavior remains relevant, but those subjects are not current work items or
 current Wave 1 blockers. Parking does not decide their eventual release
@@ -40,7 +65,7 @@ disposition.
 | Source SHA-256 | `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` |
 | Integration status | **Integrated fact:** the implementation commit is an ancestor of the reviewed `rh`; the Guarded source, ABI, and focused test bytes match the implementation snapshot |
 | Deployment/activation status | **Not established by this document:** source integration is not a VaultBook slot, deployed address, asset binding, migration, or activation |
-| Pending feature status | No pending M4, H-04, H-06 qualification, or other feature work is treated as integrated unless present in this exact snapshot |
+| Later evidence status | Dated snapshot only; current M4 and later safety tests are described in the current rebind above |
 
 The implementation commit is a **reviewed implementation snapshot**, not a
 permanent synonym for “current `rh`.” Future readers must rebind the baseline
@@ -72,11 +97,11 @@ before describing later repository state.
    bytecode does not change when source changes. Giving a funded Base asset the
    guarded runtime would require a new deployment and a separately approved
    custody/position migration.
-7. **What is the intended Robinhood role?** **Owner-approved direction:** the
-   initial AAPL-style Stock asset is the only initial Stock set and uses a
-   distinct guarded capability. Simple remains the ordinary non-Stock nominal
-   vault; Rebase is omitted from the initial Robinhood plan. Numeric Guarded
-   VaultBook binding and live activation remain separate.
+7. **What is the intended Robinhood role?** The guarded capability is intended
+   for admitted Stock assets while Simple remains the ordinary non-Stock
+   nominal vault. At the current baseline, the separate AAPL launch-inclusion
+   implementation is not integrated into `rh`; no exact asset, VaultBook slot,
+   configuration, or live activation follows from this source.
 
 ## Executive verdict
 
@@ -85,9 +110,9 @@ before describing later repository state.
 | Is the integrated source technically justified? | **Yes — agent conclusion supported by integrated facts.** It enforces aggregate solvency, exact delivery, strict returndata, and backing-aware valuation without changing shared nominal or share semantics. |
 | Was a separate contract strictly necessary? | **No.** It was the most operationally prudent and least disruptive feasible boundary. |
 | Is a GuardedErc20 source correction currently recommended? | **No — agent recommendation, not owner approval.** No reviewed finding requires a production-source edit. |
-| Are more tests useful? | **Yes — recommended hardening.** Mutation coverage, inherited recovery-path coverage, and automated ABI/layout checks would improve future regression sensitivity; they are not evidence of a current runtime defect. |
+| Are more tests useful? | The former mutation and inherited-recovery gaps are closed by later integrated tests. Exact-token qualification and change-triggered artifact checks remain release controls, not evidence of a current runtime defect. |
 | What remains before deployment or activation? | **Deployment/release gates:** exact artifact and VaultBook binding, exact-token compatibility, composed route/configuration evidence, and the applicable owner-approved operational package. |
-| What is parked? | **Owner-parked:** zero-backing settlement, loss allocation, bad-debt policy, CCIP, and the separate Deleverage work. None is converted here into current implementation scope or a current Wave 1 blocker. |
+| What is parked? | **Owner-parked:** zero-backing settlement, loss allocation, bad-debt policy, CCIP, and further Deleverage work. None is converted here into current implementation scope or a current Wave 1 blocker. |
 
 ## Behavior before the change and concrete failure mode
 
@@ -299,7 +324,7 @@ adopt Guarded behavior.
 
 | Asset class | Reviewed direction/status |
 | --- | --- |
-| Initial AAPL-style Stock asset | **Owner-approved direction:** one guarded capability; exact deployed artifact, slot/ID, token identity, and activation remain separate |
+| Potential admitted Stock asset | Guarded capability exists, but AAPL launch inclusion is not integrated at the current baseline; exact artifact, slot/ID, token identity, configuration, and activation remain separate |
 | Later Stock assets | No automatic assignment; token-specific review required |
 | Ordinary non-Stock nominal assets / approved LP routes | SimpleErc20 remains the documented ordinary nominal role |
 | Rebase/share assets | Rebase semantic slot is reserved but omitted from the initial Robinhood plan |
@@ -346,10 +371,10 @@ The focused file is
 | [`test_roles_pause_and_normal_recipient_behavior_remain_live`, 1222](../../../../tests/vaults/test_guarded_erc20.py#L1222) | Unauthorized/paused paths reject while authorized ordinary recipients remain live. |
 
 The real batch tests use Teller's fungible-auction batch path with an
-AuctionHouse-compatible endpoint. They do not inspect or prove the separate
-Deleverage branch/PR.
+AuctionHouse-compatible endpoint. The current package also inspects the later
+integrated AuctionHouse and Deleverage Stock-delivery composition tests.
 
-### Mutation sensitivity and known gaps
+### Current mutation sensitivity and residual limits
 
 | Evidence | Classification |
 | --- | --- |
@@ -357,10 +382,10 @@ Deleverage branch/PR.
 | Oversized transfer tests | Strong: 33- and 64-byte returndata directly exercise the corrected raw-length boundary |
 | Later-row batch rollback | Strong: proves real transaction-level rollback, not scalar behavior only |
 | Source/ABI/layout assertions | Static or compiler evidence; protects reviewed identity but is not a behavioral mutation |
-| Guard-by-guard deletion | Gap: no checked-in mutation suite removes every invariant and requires a named test failure |
-| Post-read malformed matrix | Gap: representative failures exist, but every malformed length is not repeated at every post-read site |
+| Guard-by-guard deletion | Closed for the named G1 invariants: checked-in mutants cover request bounds, mutex, exact return length, recipient delta, vault outflow, post-solvency, internal custody neutrality, and backing-aware views |
+| Post-read malformed matrix | Representative malformed and oversized cases are integrated; every byte length is not repeated at every post-read site |
 | Dishonest exact balance | Trust boundary: an exact but false `balanceOf` cannot be detected |
-| Recovery exports | Gap: inherited `recoverFunds` behavior is not covered by Guarded's strict recipient-delta tests |
+| Recovery exports | Closed for registered/nonzero-liability rejection, unregistered zero-liability recovery, return variants, recipient mismatch boundary, and `recoverFundsMany` rollback |
 | Gas grief | Residual availability risk: no explicit token-call gas cap |
 
 ### Initial candidate findings and final correction
@@ -439,33 +464,30 @@ implementation:
    with Guarded's aggregate-backing checks.
 4. Revalidate the relevant Teller, AuctionHouse, CreditEngine, and Guarded
    routes against the exact deployment artifacts and configuration.
-5. Preserve the documented initial assignment: one AAPL-style guarded Stock
-   capability, no guessed slot, no automatic later-Stock or future-chain
+5. Preserve the capability boundary without claiming AAPL launch inclusion:
+   no guessed asset or slot and no automatic later-Stock or future-chain
    adoption.
 
-This class does **not** include the separate Deleverage PR, CCIP, settlement,
-loss allocation, bad debt, or pending M4 work.
+This class does **not** authorize further Deleverage work, CCIP, settlement,
+loss allocation, bad debt, or launch inclusion. Current M4 composition evidence
+is integrated and inspected as supporting evidence only.
 
 ### Recommended hardening
 
 **Agent recommendations — not owner-approved and not current source defects:**
 
-1. Add mutation evidence that removes the mutex, exact returndata length,
-   recipient delta, vault outflow, post-solvency, internal custody neutrality,
-   and backing-aware views; require a named test to fail for each.
-2. Add focused inherited `recoverFunds`/`recoverFundsMany` tests covering
-   registered assets, nonzero liabilities, unregistered zero-liability assets,
-   token return variants, and recipient mismatch.
-3. Automate locked-compiler ABI regeneration, selector/event comparison,
+1. Retain the integrated named-mutant and inherited
+   `recoverFunds`/`recoverFundsMany` regressions.
+2. Automate locked-compiler ABI regeneration, selector/event comparison,
    persistent-layout comparison, runtime-size checks, the focused Guarded
    suite, Guarded inventory selection, and the inventory checker when relevant
    files change.
-4. Add consumer-path tests proving all collateral-value and borrowing paths use
+3. Retain consumer-path tests proving collateral-value and borrowing paths use
    a backing-aware amount while position discovery may remain nominal.
-5. Add monitoring and an incident runbook for unknown observations,
+4. Add monitoring and an incident runbook for unknown observations,
    `custody < nominal`, unexpected surplus, issuer/admin changes, and repeated
    guarded reverts.
-6. Label SimpleErc20 in asset-admission material as an ordinary nominal vault
+5. Label SimpleErc20 in asset-admission material as an ordinary nominal vault
    that is unsuitable by default when custody can change outside the vault.
 
 ### Parked by owner
@@ -481,7 +503,7 @@ current Wave 1 blockers, or source-change authorization:
 - policy for permanent versus temporary backing loss;
 - automatic Base migration;
 - CCIP workflows; and
-- the separate Deleverage branch/PR.
+- further Deleverage work beyond the integrated source and composition evidence.
 
 Parking does not approve, reject, or set the release disposition of those
 subjects.
@@ -532,8 +554,9 @@ The exported recovery path remains
 [`VaultData.recoverFunds`](../../../../contracts/vaults/modules/VaultData.vy#L277-L302).
 It is restricted to an unregistered asset with zero recorded liability and is
 not a deficit settlement mechanism. It also retains typed token calls rather
-than Guarded's exact recipient-delta wrapper, which is why focused recovery-path
-tests are listed as recommended hardening.
+than Guarded's exact recipient-delta wrapper. The current G2 recovery tests pin
+that compatibility boundary, including accepted/rejected return shapes,
+recipient mismatch, and batch rollback.
 
 ### Function and event compatibility
 

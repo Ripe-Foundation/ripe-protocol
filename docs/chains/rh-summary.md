@@ -1,19 +1,19 @@
 # Robinhood Chain Technical Deployment Summary
 
-## 31 July 2026 current reconciliation
+## 1 August 2026 current reconciliation
 
 The current configuration-source baseline is `rh` commit
-`e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`. The earlier `ae0cb49…`
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The earlier `ae0cb49…`
 protocol/pause checkpoint remains historical evidence, not the present program
 subject. PR #61, Morpho V2 and BlueChipYield support, and the two-source
 Blueprint/Defaults authority are integrated.
 
 `DefaultsRobinhood.vy` exists and compiles; the derived parameter ledger is
 synchronized. The current register has 22 H-04 rows: 21 approved and
-operative, one retired and non-operative, and zero open. All 19 canonical H-03
-blockers remain open. The source check reports
-`configuration_consistent=true`, `deployment_ready=false`, and 58 readiness
+operative, one retired and non-operative, and zero open. All 42 canonical H-03
+blockers remain open, including the 23 Curve-specific typed inputs. The source check reports
+`configuration_consistent=true`, `deployment_ready=false`, and 80 readiness
 blockers. Repository configuration is prepared and consistent;
 production/onchain configuration has not occurred.
 
@@ -38,7 +38,7 @@ candidate operator/storage class, not a final operator, machine, volume,
 deployment, or release. Remaining work is predeployment infrastructure,
 qualification, rehearsal, and release preparation.
 
-## 30 July 2026 reassessment and qualification disposition
+## 1 August 2026 reassessment and qualification disposition
 
 The consolidated
 [`reassessment-and-qualification-synthesis.md`](rh/reassessment-and-qualification-synthesis.md)
@@ -46,11 +46,14 @@ is the current coordination entry point for eight byte-identical source
 reports. It records one program package, not eight implementation trains.
 
 The accepted architecture preserves the current Ledger and Teller designs,
-keeps GuardedErc20 separate and Stock-specific, launches Profile 1 with
-Chainlink as the sole PSM oracle authority, deploys no Uniswap price-source
-contract at launch, and moves GREEN/USDG plus both LP-token admissions to
-Profile 2. RIPE/WETH V2 is at most an externally held launch-liquidity canary.
-The PSM posture is disabled, allowlisted, canary-first, and redemption-first.
+keeps GuardedErc20 separate and Stock-specific, selects Chainlink at PriceDesk
+ID 1, unchanged CurvePrices at ID 2 for GREEN only, and BlueChipYield at ID 3,
+with IDs 4/5 empty and priorities `[1,3]`. USDG remains Chainlink-only, so the
+GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG route cannot recurse.
+No LP token, additional Curve feed or consumer, dynamic rate, Teller snapshot,
+Endaoment stabilizer, PSM Curve use, or Uniswap price source is admitted.
+RIPE/WETH V2 is at most an externally held launch-liquidity canary. The PSM
+posture is disabled, allowlisted, canary-first, and redemption-first.
 
 H-09 owns explicit opt-in read-only archive-fork qualification with network
 disabled by default. H-10 separately owns live rehearsal. No deployment,
@@ -178,7 +181,7 @@ Freeze and execute restricted mainnet release
 
 - [ ] Pin the exact release commit for implementation and release freeze.
 - [x] Regenerate and review the `block.number` inventory at the audited planning baseline.
-  - Evidence: [`block-number-inventory.md`](rh/block-number-inventory.md) and [`component-matrix.md`](rh/component-matrix.md).
+  - Historical clock evidence: [`block-number-inventory.md`](rh/block-number-inventory.md), whose Curve omission recommendation is explicitly superseded; current topology: [`curve-launch-activation.md`](rh/curve-launch-activation.md); component record: [`component-matrix.md`](rh/component-matrix.md).
 - [x] Commit to one canonical contract source and release line for Base and Robinhood; separate chain configuration and migration directories must not become separate protocol branches.
   - Decision evidence: [`component-matrix.md`](rh/component-matrix.md) and [`shared-block-clock-specification.md`](rh/shared-block-clock-specification.md).
 - [ ] Reassess every `modified` or `replaced` component under the
@@ -427,7 +430,10 @@ Robinhood tests pass.
 ## 6. Isolate or disable unsupported integrations
 
 - [ ] Audit constructor, registry, and runtime assumptions for every Base-specific integration in the selected Robinhood inventory.
-- [ ] Omit or disable unsupported Curve and Aerodrome price/liquidity contracts.
+- [ ] Omit or disable unsupported Curve and Aerodrome price/liquidity contracts;
+  the sole current Curve exception is unchanged `CurvePrices` at ID 2 for the
+  bounded GREEN/USDG pricing route described in
+  [`rh/curve-launch-activation.md`](rh/curve-launch-activation.md).
 - [ ] Omit or disable Base USDC, Base yield strategies, and unsupported yield legos.
 - [ ] Omit or disable Underscore vault detection, hooks, reward transfers, registry dependencies, and bypasses.
 - [ ] Separate `EndaomentPSM`, which remains conditionally in scope for USDG, from Base-only Endaoment treasury and partner-liquidity routes.

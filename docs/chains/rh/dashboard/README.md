@@ -6,9 +6,9 @@ machine-readable authority. The dashboard must never become an independently
 maintained status source. Repository documents are the durable handoff and
 fallback.
 
-Current configuration-source subject:
-`e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`.
+Current candidate baseline:
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`.
 
 Ready to begin deployment preparation. PR #61 is merged and closed, and its
 production contract changes are integrated into `rh`. H-04 schema v2, H-05
@@ -17,12 +17,21 @@ qualification are integrated for their exact scopes. No Robinhood migration,
 deployment, production configuration, activation, RPC, account, key, signer,
 or release action has occurred.
 
-Morpho V2 and BlueChipYield support are integrated. BlueChipYield is selected
-at PriceDesk slot 3; `DefaultsRobinhood.vy` exists and compiles, and the
-derived ledger is synchronized. `configuration_consistent=true`,
-`deployment_ready=false`, and the current blocker count is 58. Repository
+Morpho V2 and BlueChipYield support are integrated. The bounded candidate
+selects Chainlink at PriceDesk ID 1, unchanged CurvePrices for GREEN only at
+ID 2, and BlueChipYield at ID 3; IDs 4/5 remain empty and priorities remain
+`[1,3]`. USDG has no Curve feed and neither LP token nor any Curve higher
+power is admitted. `DefaultsRobinhood.vy` exists and compiles, and the derived
+ledger is synchronized. `configuration_consistent=true`,
+`deployment_ready=false`, and the current blocker count is 80. Repository
 configuration is prepared and consistent; production/onchain configuration
 has not occurred.
+
+DP15 and P-H04-399 retain the approved general reward values, while
+`B-REWARD-PROMOTION` remains operationally open and Stock rewards remain
+disabled. The GREEN/USDG pricing pool selection does not admit its LP token;
+RIPE/WETH remains external-canary-only, Uniswap remains PriceDesk-inert, and
+PSM reserves cannot fund LP liquidity.
 
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero,
 deferred, and absent from machine-facing Robinhood parameter/planning sources.
@@ -80,5 +89,5 @@ authenticated owner access unless it is verified under existing credentials.
 
 The current owner priorities are in
 [`../current-owner-priorities.md`](../current-owner-priorities.md): CCIP,
-zero-backing settlement/bad-debt policy, Sites recovery, and dashboard
-deployment are the four parked, nonblocking lanes.
+zero-backing settlement/bad-debt policy, Deleverage, Uniswap TWAP, Sites
+recovery, and dashboard deployment are the six parked, nonblocking lanes.

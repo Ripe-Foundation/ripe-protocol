@@ -1,10 +1,15 @@
 # Robinhood Phase-0 block-number inventory
 
-> **31 July 2026 currentness overlay:** Current configuration-source baseline is
-> `e4473ce6485888f1b747761a5ee8693443108877`, tree
-> `33b705690007bda9b11900b5775bd9230e79f09e`. The checked inventory includes
-> integrated `DefaultsRobinhood` and Morpho V2 `BlueChipYieldPrices`; Profile 1
-> selects BlueChipYield at PriceDesk slot 3. The earlier frozen
+> **1 August 2026 currentness overlay:** Current candidate baseline is
+> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+> `7454b5456ebb6cd02d716a64b408629ab501629e`. This file remains historical
+> clock evidence, not launch-topology authority. Its recommendations to omit
+> or leave `CurvePrices` unregistered are superseded by
+> [`curve-launch-activation.md`](curve-launch-activation.md): unchanged
+> `CurvePrices` is selected at PriceDesk ID 2 for GREEN-only pricing, while
+> reference snapshots, dynamic rates, and Endaoment stabilization remain
+> inactive. The checked inventory includes integrated `DefaultsRobinhood` and
+> Morpho V2 `BlueChipYieldPrices` at ID 3. The earlier frozen
 > `ae0cb49…` checkpoint retained corrected PR #61 and recorded 99 production
 > occurrences, 94
 > lines, 17 files, historical S5 fingerprint

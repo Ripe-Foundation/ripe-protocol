@@ -154,14 +154,21 @@ def test_unavailable_component_presence_fails_closed(component_id, code):
 
 
 def test_disabled_and_profile2_reachability_fail_closed():
-
     disabled = observations()
     disabled["edges"] = [
         {"source": "CM-016", "target": "CM-017", "kind": "pricing"}
     ]
     disabled_codes = codes(assert_deployment(expectations(), disabled))
     assert "DISABLED_FUNCTIONALITY_REACHABLE" in disabled_codes
-    assert "OMITTED_COMPONENT_REACHABLE" in disabled_codes
+    assert "OMITTED_COMPONENT_REACHABLE" not in disabled_codes
+
+    omitted = observations()
+    omitted["edges"] = [
+        {"source": "CM-016", "target": "CM-019", "kind": "pricing"}
+    ]
+    assert "OMITTED_COMPONENT_REACHABLE" in codes(
+        assert_deployment(expectations(), omitted)
+    )
 
     profile2 = observations()
     profile2["edges"] = [

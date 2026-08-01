@@ -415,53 +415,53 @@ def test_complete_inventory_and_cardinality_reconciliation():
         f"CM-{value:03d}" for value in range(1, 61)
     )
     assert Counter(component.deployment for component in components) == {
-        Disposition.REQUIRED: 39,
-        Disposition.OMITTED: 15,
+        Disposition.REQUIRED: 40,
+        Disposition.OMITTED: 14,
         Disposition.DEFERRED: 5,
         Disposition.BLOCKED: 1,
     }
-    assert len(surfaces) == 96
+    assert len(surfaces) == 100
     assert Counter(surface.kind for surface in surfaces) == {
-        SurfaceKind.ARTIFACT: 7,
-        SurfaceKind.CAPABILITY: 18,
-        SurfaceKind.ROUTE: 43,
+        SurfaceKind.ARTIFACT: 8,
+        SurfaceKind.CAPABILITY: 19,
+        SurfaceKind.ROUTE: 45,
         SurfaceKind.PERMISSION: 3,
         SurfaceKind.CONFIGURATION: 8,
         SurfaceKind.REGISTRATION: 8,
         SurfaceKind.BEHAVIORAL_INVARIANT: 9,
     }
     assert Counter(surface.disposition for surface in surfaces) == {
-        Disposition.REQUIRED: 17,
+        Disposition.REQUIRED: 13,
         Disposition.OMITTED: 20,
-        Disposition.DISABLED: 23,
+        Disposition.DISABLED: 24,
         Disposition.DEFERRED: 5,
-        Disposition.BLOCKED: 31,
+        Disposition.BLOCKED: 38,
     }
     assert Counter(surface.lifecycle_phase for surface in surfaces) == {
-        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 30,
-        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 19,
+        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 27,
+        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 21,
         LifecyclePhase.ATOMIC_STOCK_ACTIVATION: 4,
         LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_CCIP_PROMOTION: 6,
         LifecyclePhase.POST_LAUNCH_RELEASE: 4,
         LifecyclePhase.OMITTED: 20,
-        LifecyclePhase.BLOCKED: 13,
+        LifecyclePhase.BLOCKED: 18,
     }
-    assert len(relations) == 288
+    assert len(relations) == 296
     assert Counter(relation.phase for _, relation in relations) == {
-        RelationPhase.CONSTRUCTOR: 37,
+        RelationPhase.CONSTRUCTOR: 40,
         RelationPhase.BOOTSTRAP: 3,
         RelationPhase.POST_DEPLOYMENT_SETUP: 3,
         RelationPhase.REGISTRATION_ORDER: 31,
-        RelationPhase.RUNTIME_SECURITY: 214,
+        RelationPhase.RUNTIME_SECURITY: 219,
     }
     assert Counter(relation.kind for _, relation in relations) == {
-        RelationKind.CONSTRUCTION_DEPENDENCY: 37,
+        RelationKind.CONSTRUCTION_DEPENDENCY: 40,
         RelationKind.BOOTSTRAP_DEPENDENCY: 3,
         RelationKind.SETUP_DEPENDENCY: 3,
         RelationKind.REGISTRATION_ORDER_DEPENDENCY: 31,
-        RelationKind.DIRECT_EXECUTION: 165,
-        RelationKind.AUTHORITY_DEPENDENCY: 39,
-        RelationKind.INDIRECT_SECURITY_DEPENDENCY: 10,
+        RelationKind.DIRECT_EXECUTION: 168,
+        RelationKind.AUTHORITY_DEPENDENCY: 40,
+        RelationKind.INDIRECT_SECURITY_DEPENDENCY: 11,
     }
     assert (
         len(
@@ -470,7 +470,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
                 for source, relation in relations
             }
         )
-        == 284
+        == 292
     )
     assert len(paths) == 103
     assert Counter(source.path_kind for _, source in paths) == {
@@ -492,7 +492,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.EXTERNAL_ARTIFACT: 3,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 51
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 19
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 42
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -541,7 +541,7 @@ def test_profile1_launch_selection_is_exact_and_exclusion_complete():
         "DELEVERAGE_VALUES",
         "CCIP",
         "CREDIT_ENGINE_ZERO_BACKING",
-        "CURVE_OR_LP_ACTIVATION",
+        "CURVE_HIGHER_POWERS_OR_LP_ACTIVATION",
         "UNISWAP",
         "OLD_MIGRATION_NAMESPACE_AND_CUSTOM_RUNNER",
     }
@@ -689,8 +689,8 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_19_remaining_blockers_are_open_and_morpho_gate_is_closed():
-    expected = {
+def test_all_42_remaining_blockers_are_open_and_morpho_gate_is_closed():
+    expected_core = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
         "B-H05-PLAN",
@@ -711,8 +711,19 @@ def test_all_19_remaining_blockers_are_open_and_morpho_gate_is_closed():
         "B-H09-RELEASE",
         "B-SECOPS-HANDOFF",
     }
+    expected_curve = {
+        "B-CURVE-"
+        + row.input_id.removeprefix("curve.")
+        .upper()
+        .replace(".", "-")
+        .replace("_", "-")
+        for row in blueprint_source.ROBINHOOD_CURVE_LAUNCH_INPUTS
+        if row.resolution_state
+        in blueprint_source.ROBINHOOD_CURVE_BLOCKING_STATES
+    }
+    assert len(expected_curve) == 23
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
-    assert set(blockers) == expected
+    assert set(blockers) == expected_core | expected_curve
     assert "B-H02-AUDIT" not in blockers
     assert "B-P1-BLUECHIP-MORPHO-V2" not in blockers
     assert all(blocker.primary_owner_id for blocker in blockers.values())
@@ -729,7 +740,7 @@ def test_relations_are_explicit_typed_oriented_and_proved():
         for source, relation in all_relations()
     }
     assert set(relation_map) == {
-        f"R-{value:03d}" for value in range(1, 289)
+        f"R-{value:03d}" for value in range(1, 297)
     }
     for source, relation in relation_map.values():
         assert source.startswith("CM-")
@@ -936,8 +947,8 @@ def test_blueprint_owns_complete_component_and_registry_censuses():
         "switchboard": 5,
     }
     price_rows = tuple(row for row in rows if row.domain == "price_desk")
-    assert [row.registry_id for row in price_rows if row.selection_state == "selected"] == [1, 3]
-    assert next(row for row in price_rows if row.registry_id == 2).selection_state == "reserved"
+    assert [row.registry_id for row in price_rows if row.selection_state == "selected"] == [1, 2, 3]
+    assert next(row for row in price_rows if row.registry_id == 2).component_id == "CM-017"
 
 
 def test_non_price_desk_blueprint_registry_drift_fails_closed(monkeypatch):
@@ -966,6 +977,165 @@ def test_blueprint_component_disposition_drift_fails_closed(monkeypatch):
     with pytest.raises(RobinhoodBlueprintError) as error:
         validate_blueprint()
     assert error.value.code == "H03_COMPONENT_SOURCE_DRIFT"
+
+
+def test_curve_component_cannot_be_omitted(monkeypatch):
+    rows = blueprint_source.ROBINHOOD_COMPONENT_SELECTIONS
+    changed = tuple(
+        replace(row, deployment_disposition="omitted", selection_state="omitted")
+        if row.component_id == "CM-017"
+        else row
+        for row in rows
+    )
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_COMPONENT_SELECTIONS", changed)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "H03_COMPONENT_SOURCE_DRIFT"
+
+
+def test_curve_registration_source_order_cannot_move_bluechip_into_id_two(monkeypatch):
+    rows = list(blueprint_source.ROBINHOOD_REGISTRY_TOPOLOGY)
+    curve_index = next(
+        index
+        for index, row in enumerate(rows)
+        if (row.domain, row.registry_id) == ("price_desk", 2)
+    )
+    bluechip_index = next(
+        index
+        for index, row in enumerate(rows)
+        if (row.domain, row.registry_id) == ("price_desk", 3)
+    )
+    rows[curve_index], rows[bluechip_index] = rows[bluechip_index], rows[curve_index]
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_REGISTRY_TOPOLOGY", tuple(rows))
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "H03_REGISTRY_SOURCE_CENSUS"
+
+
+def _mutate_curve_input(monkeypatch, input_id, **changes):
+    rows = tuple(
+        replace(row, **changes) if row.input_id == input_id else row
+        for row in blueprint_source.ROBINHOOD_CURVE_LAUNCH_INPUTS
+    )
+    monkeypatch.setattr(blueprint_source, "ROBINHOOD_CURVE_LAUNCH_INPUTS", rows)
+
+
+@pytest.mark.parametrize(
+    ("input_id", "changes", "code"),
+    (
+        ("launch.chain_id", {"value": 1}, "RH_CURVE_LAUNCH_TOPOLOGY"),
+        ("curve.constructor_bindings", {"value": ()}, "RH_CURVE_CONSTRUCTOR_BINDINGS"),
+        ("curve.address_provider", {"value": "0x1111111111111111111111111111111111111111"}, "RH_CURVE_ADDRESS_PROVIDER"),
+        ("curve.address_provider_binding_12", {"value": (12, "StableSwapNG", "0x1111111111111111111111111111111111111111")}, "RH_CURVE_ADDRESS_PROVIDER"),
+        ("pool.coin_order", {"value": ("GREEN", "USDG")}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.coin_decimals", {"value": (18, 6)}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.fee", {"value": 4}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.offpeg_fee_multiplier", {"value": 20}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.ma_exp_time", {"value": 866}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.address", {"value": "0x0000000000000000000000000000000000000000"}, "RH_CURVE_POOL_IDENTITY"),
+        ("pool.factory_method", {"value": "unknown"}, "RH_CURVE_POOL_IDENTITY"),
+        ("pool.factory_nonce_or_order", {"value": "precomputed"}, "RH_CURVE_POOL_IDENTITY"),
+        ("pool.funding_source", {"value": 1}, "RH_CURVE_OWNER_INPUT"),
+        ("pool.production_observation", {"value": 1}, "RH_CURVE_OBSERVATION"),
+        ("feed.curve_assets", {"value": ("GREEN", "USDG")}, "RH_CURVE_RECURSION_GUARD"),
+        ("feed.usdg_curve_feed", {"value": True}, "RH_CURVE_RECURSION_GUARD"),
+        ("feed.route", {"value": ("GREEN", "manual constant")}, "RH_CURVE_RECURSION_GUARD"),
+        ("inactive.capabilities", {"value": ()}, "RH_CURVE_BOUNDED_CAPABILITY"),
+        ("artifact.curve_prices_source_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
+        ("artifact.curve_prices_abi_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
+    ),
+)
+def test_curve_source_authority_mutations_fail_closed(
+    monkeypatch, input_id, changes, code
+):
+    _mutate_curve_input(monkeypatch, input_id, **changes)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == code
+
+
+def test_curve_external_identity_cannot_be_marked_verified_without_observation(monkeypatch):
+    _mutate_curve_input(
+        monkeypatch,
+        "curve.address_provider",
+        resolution_state="resolved_repository_fact",
+    )
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_INPUT_METADATA"
+
+
+def test_curve_official_address_candidate_drift_fails_closed(monkeypatch):
+    monkeypatch.setitem(
+        blueprint_source.ROBINHOOD_ADDRESSES,
+        "CURVE_ADDRESS_PROVIDER",
+        "0x1111111111111111111111111111111111111111",
+    )
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_EXTERNAL_IDENTITY"
+
+
+def test_curve_official_repository_candidates_are_exact():
+    assert {
+        "address_provider": blueprint_source.ROBINHOOD_CURVE_ADDRESS_PROVIDER,
+        "meta_registry": blueprint_source.ROBINHOOD_CURVE_META_REGISTRY,
+        "tricrypto_ng_factory": blueprint_source.ROBINHOOD_CURVE_TRICRYPTO_NG_FACTORY,
+        "stableswap_ng_factory": blueprint_source.ROBINHOOD_CURVE_STABLESWAP_NG_FACTORY,
+        "twocrypto_ng_factory": blueprint_source.ROBINHOOD_CURVE_TWOCRYPTO_NG_FACTORY,
+    } == {
+        "address_provider": "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648",
+        "meta_registry": "0xe6dA14500f0b5783E2325F9C5a7eE5d99DA0fB42",
+        "tricrypto_ng_factory": "0x6E28493348446503db04A49621d8e6C9A40015FB",
+        "stableswap_ng_factory": "0x8271e06E5887FE5ba05234f5315c19f3Ec90E8aD",
+        "twocrypto_ng_factory": "0xe7FBd704B938cB8fe26313C3464D4b7B7348c88C",
+    }
+
+
+def test_curve_profile_view_cannot_drift_from_authority_rows(monkeypatch):
+    monkeypatch.setitem(
+        blueprint_source.CURVE_PARAMS["robinhood"], "GREEN_POOL_A", 200
+    )
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_PROFILE_VIEW"
+
+
+def test_curve_input_provenance_is_required(monkeypatch):
+    _mutate_curve_input(monkeypatch, "pool.A", provenance="")
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_INPUT_SCHEMA"
+
+
+@pytest.mark.parametrize(
+    ("input_id", "changes"),
+    (
+        ("pool.address", {"provenance": "unknown deployment provenance"}),
+        ("pool.address", {"authority_class": "repository_approved"}),
+        ("pool.address", {"primary_owner": "oracle_owner"}),
+        ("pool.A", {"provenance": "unrelated source"}),
+        ("pool.A", {"resolution_state": "owner_choice_unresolved"}),
+    ),
+)
+def test_curve_exact_metadata_substitution_fails_closed(
+    monkeypatch, input_id, changes
+):
+    _mutate_curve_input(monkeypatch, input_id, **changes)
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_INPUT_METADATA"
+
+
+def test_curve_metadata_census_substitution_fails_closed(monkeypatch):
+    monkeypatch.setattr(
+        blueprint_source,
+        "ROBINHOOD_CURVE_LAUNCH_METADATA",
+        blueprint_source.ROBINHOOD_CURVE_LAUNCH_METADATA[:-1],
+    )
+    with pytest.raises(RobinhoodBlueprintError) as error:
+        validate_blueprint()
+    assert error.value.code == "RH_CURVE_INPUT_METADATA"
 
 
 @pytest.mark.parametrize("mutation", ("missing", "duplicate", "extra"))

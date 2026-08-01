@@ -1,9 +1,12 @@
 # Track 7: Robinhood Deployment-Support Specification
 
-> **30 July 2026 currentness overlay:** The specification below is historical
-> planning authority. Current `rh` integrates H-04 schema v2, H-05 deterministic
+> **1 August 2026 currentness overlay:** The specification below is historical
+> planning authority. The current candidate is based on
+> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+> `7454b5456ebb6cd02d716a64b408629ab501629e`, and selects unchanged
+> CurvePrices at ID 2 for GREEN only. Current `rh` integrates H-04 schema v2, H-05 deterministic
 > blocked planning, M4 proof, H-06 candidate-class qualification, and corrected
-> PR #61. Required identity bindings, Defaults rendering, four Deleverage
+> PR #61. Required identity bindings, Curve launch inputs, Defaults rendering, four Deleverage
 > machine-parameter rows, final operator binding, rehearsal, and release
 > preparation remain. No live action or migration history exists; actual
 > deployment remains outside the pause process.

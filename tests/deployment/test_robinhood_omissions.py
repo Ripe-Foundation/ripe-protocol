@@ -47,7 +47,7 @@ ASSERTION_IDS = {
     "NEG-035",
     "NEG-036",
     "NEG-037",
-    "NEG-H03-GLOBAL-MINT-SEQUENCE",
+    "NEG-H03-GLOBAL-MINT-SEQUENCE", "NEG-H03-CURVE-HIGHER-POWERS", "NEG-H03-CURVE-USDG-RECURSION",
     "NEG-H03-LP-ORDINARY-ONLY",
     "NEG-H03-LP-ZERO-LTV",
     "NEG-H03-PSM-REDEEM-FIRST",
@@ -135,7 +135,7 @@ def assert_code(code, candidate):
     assert error.value.code == code
 
 
-def test_exact_24_assertion_ids_are_embedded_in_real_records():
+def test_exact_26_assertion_ids_are_embedded_in_real_records():
     used = {
         assertion
         for component in ROBINHOOD_BLUEPRINT.components
@@ -150,7 +150,7 @@ def test_omitted_component_has_no_surface():
         for component in ROBINHOOD_BLUEPRINT.components
         if component.deployment is Disposition.OMITTED
     )
-    assert len(omitted) == 15
+    assert len(omitted) == 14
     assert all(component.surfaces == () for component in omitted)
 
     injected = SurfaceRecord(
@@ -299,7 +299,6 @@ def test_stock_stability_swap_false():
 
 def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
     omitted_oracle_components = {
-        "CM-017",
         "CM-019",
         "CM-020",
         "CM-039",
@@ -326,11 +325,12 @@ def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
     assert all(
         topology[(RegistryDomain.PRICE_DESK, value)].disposition
         is Disposition.OMITTED
-        for value in (2, 4, 5)
+        for value in (4, 5)
     )
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is Disposition.REQUIRED
     assert {
         key for key in policy.reserved_registries if key[0] == "price_desk"
-    } == {("price_desk", value) for value in (2, 4, 5)}
+    } == {("price_desk", value) for value in (4, 5)}
     assert ("price_desk", 3) in policy.required_registries
 
 
@@ -417,7 +417,7 @@ def test_sgreen_required_chain_native_and_never_ccip():
     for surface_id in ("S-003-DEPOSIT", "S-003-WITHDRAW"):
         assert surfaces[surface_id].disposition is Disposition.REQUIRED
     assert surfaces["S-003-CCIP"].disposition is Disposition.OMITTED
-    assert surfaces["S-003-REWARDS"].disposition is Disposition.REQUIRED
+    assert surfaces["S-003-REWARDS"].disposition is Disposition.BLOCKED
     assert_code(
         "H03_SURFACE_SET",
         replace_surface("S-003-CCIP", disposition=Disposition.REQUIRED),
@@ -434,7 +434,7 @@ def test_hr_scaffold_has_no_contributors_or_rewards():
     assert hr.surfaces[0].disposition is Disposition.DISABLED
 
 
-def test_bonds_stay_disabled_while_selected_rewards_and_booster_are_required():
+def test_bonds_stay_disabled_while_rewards_are_promotion_gated():
     surfaces = surface_map()
     for surface_id in (
         "S-028-REWARD-PATH",
@@ -442,7 +442,7 @@ def test_bonds_stay_disabled_while_selected_rewards_and_booster_are_required():
         "S-029-RIPE-CAP",
     ):
         assert surfaces[surface_id].disposition is Disposition.DISABLED
-    assert surfaces["S-033-REWARD-MINT"].disposition is Disposition.REQUIRED
+    assert all(surfaces[surface_id].disposition is Disposition.BLOCKED for surface_id in ("S-003-REWARDS", "S-013-REWARD-ACTIONS", "S-033-REWARD-MINT"))
     assert surfaces["S-038-BOOSTER-CFG"].disposition is Disposition.REQUIRED
     assert_code(
         "H03_SURFACE_SET",
@@ -464,20 +464,20 @@ def test_slot_scaffolds_have_exact_disabled_capabilities():
         for surface_id in expected
     )
     assert all(
-        surfaces[surface_id].disposition is Disposition.REQUIRED
+        surfaces[surface_id].disposition is Disposition.BLOCKED
         for surface_id in (
             "S-013-REWARD-ACTIONS",
             "S-033-REWARD-MINT",
-            "S-038-BOOSTER-CFG",
         )
     )
+    assert surfaces["S-038-BOOSTER-CFG"].disposition is Disposition.REQUIRED
     assert surfaces["S-003-DEPOSIT"].disposition is Disposition.REQUIRED
 
 
-def test_pricedesk_reservations_cannot_be_repurposed():
+def test_pricedesk_curve_selection_and_empty_slots_cannot_be_repurposed():
     topology = registry_map()
     reserved = tuple(
-        topology[(RegistryDomain.PRICE_DESK, value)] for value in (2, 4, 5)
+        topology[(RegistryDomain.PRICE_DESK, value)] for value in (4, 5)
     )
     assert all(item.disposition is Disposition.OMITTED for item in reserved)
     assert topology[(RegistryDomain.PRICE_DESK, 3)].semantic_name == (
@@ -711,9 +711,42 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
     )
     assert topology[(RegistryDomain.PRICE_DESK, 2)].semantic_name == "Curve"
     assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is (
-        Disposition.OMITTED
+        Disposition.REQUIRED
     )
     assert (ROOT / "contracts" / "config" / "DefaultsRobinhood.vy").is_file()
+
+
+def test_curve_launch_graph_and_registry_selection_are_exact():
+    curve = get_component("CM-017")
+    assert curve.deployment is Disposition.REQUIRED
+    assert len(curve.blocker_ids) == 23
+    assert all(blocker.startswith("B-CURVE-") for blocker in curve.blocker_ids)
+    assert {surface.surface_id for surface in curve.surfaces} == {
+        "S-017-DEPLOYMENT",
+        "S-017-GREEN-FEED",
+        "S-017-USDG-FEED",
+        "S-017-HIGHER-POWERS",
+    }
+    assert {relation.relation_id for relation in curve.relations} == {
+        "R-291",
+        "R-292",
+        "R-293",
+        "R-294",
+        "R-295",
+        "R-296",
+    }
+    price_desk_relations = {
+        relation.relation_id: relation.target_component_id
+        for relation in get_component("CM-015").relations
+    }
+    assert price_desk_relations["R-289"] == "CM-017"
+    assert price_desk_relations["R-290"] == "CM-018"
+
+    topology = registry_map()
+    policy = blueprint_policy()
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].semantic_name == "Curve"
+    assert topology[(RegistryDomain.PRICE_DESK, 2)].disposition is Disposition.REQUIRED
+    assert ("price_desk", 2) in policy.required_registries
 
 
 def test_psm_lite_pause_and_reserve_transfer_authority_is_explicitly_coupled():
@@ -859,7 +892,6 @@ def test_runtime_sources_and_explicit_no_edge_partition_are_exact():
     no_edge = {
         "CM-005",
         "CM-007",
-        "CM-017",
         "CM-018",
         "CM-019",
         "CM-020",
@@ -892,8 +924,8 @@ def test_runtime_sources_and_explicit_no_edge_partition_are_exact():
             for relation in component.relations
         )
     }
-    assert len(no_edge) == 26
-    assert len(runtime) == 34
+    assert len(no_edge) == 25
+    assert len(runtime) == 35
     assert runtime.isdisjoint(no_edge)
     assert runtime | no_edge == {
         f"CM-{value:03d}" for value in range(1, 61)

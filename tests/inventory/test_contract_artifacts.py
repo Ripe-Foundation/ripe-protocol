@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -97,6 +98,15 @@ CREATION_BINDING_FACTS = {
     },
 }
 
+CURVE_LAUNCH_ARTIFACTS = {
+    ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
+        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
+    ),
+    ROOT / "scripts" / "abis" / "CurvePrices.json": (
+        "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
+    ),
+}
+
 
 def _run_checker(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -117,6 +127,18 @@ def _write_expectations(tmp_path: Path, values: dict) -> Path:
 def test_frozen_required_contract_set_is_exact():
     values = json.loads(EXPECTATIONS.read_text())
     assert set(values["contracts"]) == REQUIRED_CONTRACTS
+
+
+def test_robinhood_curve_launch_reuses_frozen_source_and_abi():
+    assert {
+        path.relative_to(ROOT).as_posix(): hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
+        for path in CURVE_LAUNCH_ARTIFACTS
+    } == {
+        path.relative_to(ROOT).as_posix(): expected
+        for path, expected in CURVE_LAUNCH_ARTIFACTS.items()
+    }
 
 
 def test_frozen_contract_artifacts_are_current():

@@ -5,6 +5,30 @@
 > a source change, deployment, activation, migration, release, or parked work.
 > Controlling evidence and owner decisions remain in their designated records.
 
+## Current `rh` rebind
+
+The current authority for this page is `rh` commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The dated 28 July snapshot and
+its validation counts remain historical evidence below; they are not the
+current branch identity.
+
+| Current identity | Value |
+| --- | --- |
+| Teller source Git blob / SHA-256 | `7019b6c47dde03151acc1952944dd19301c83328` / `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` |
+| Runtime template | 24,152 bytes; SHA-256 `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81`; 424 bytes EIP-170 headroom |
+| [`test_teller_deposit.py`](../../../../tests/core/teller/test_teller_deposit.py) | Git blob `22ee55ab035400d2ede8c9ea5e1130a711b05550`; SHA-256 `c58c8fde3158ce16f02ab409408e83533c7e9cd81dc78c5025bec6b4f026dda0` |
+| [`test_teller_action_block.py`](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `25b249342e7edc9efa30da50a9f5cdee8810857a`; SHA-256 `974ac5f7bb47185f29ad4f57e1db91ec0d852ae6f9bf3b13112f48ad72a3741f` |
+| [`test_teller_rebalance.py`](../../../../tests/core/teller/test_teller_rebalance.py) | Git blob `e176bfe64c32514fcce45fba930ded42ff16458d`; SHA-256 `959ad5961e525d7fd2711b0e268026c3783e47ddae52be136cbf50388e352261` |
+| [Stock comparison test](../../../../tests/vaults/test_stock_token_vault_comparison.py) | Git blob `b8c33f0df312d1ed1e04343337685c4f8c88a377`; SHA-256 `288f8d3fb5cc5de902e4d3918f1ab0c1b7946af243148af34dc6f084e681191c` |
+
+Later integrated tests close the former mutex and rollback gaps: the current
+suite uses vault callback mode 5, a mutex-removal mutant, three typed
+balance-return policies, undecorated-route reentrancy composition, and a
+caught nested rejection that preserves the exact outer receipt. The remaining
+trust boundary is a token that returns an exact 32-byte but dishonest balance.
+No behavioral test was rerun for this documentation-only refresh.
+
 ## Reviewed implementation snapshot
 
 | Field | Reviewed value |
@@ -39,10 +63,11 @@ Status language is deliberate:
 - **Deployment or release gate** means evidence needed before making a
   readiness claim, not permission to deploy.
 
-The separate Deleverage branch/PR and every CCIP workflow are outside this
-record and were not inspected or relied upon. CCIP is owner-parked. Zero-backing
-settlement, loss allocation, and bad-debt policy are also owner-parked; Teller
-does not resolve them.
+The integrated Deleverage source and later composition tests were inspected for
+the current package and are documented separately. They are not used to enlarge
+Teller's source rationale or authorize Deleverage work. CCIP is owner-parked.
+Zero-backing settlement, loss allocation, and bad-debt policy are also
+owner-parked; Teller does not resolve them.
 
 ## Direct answers to the owner's questions
 
@@ -108,9 +133,10 @@ but cannot prove that a malicious token's canonical 32-byte value is truthful.
 - **Before deployment or activation:** bind and verify the exact artifact,
   compiler, token, vault, configuration, size, and composed route; obtain the
   applicable owner release decision.
-- **Recommended hardening:** repair the mutex and transient-recovery tests,
-  document the truthful-balance boundary, and retain artifact/size gates.
-- **Owner-parked:** the separate Deleverage work, CCIP, and zero-backing
+- **Recommended hardening:** document the truthful-balance boundary and retain
+  artifact/size gates; the former mutex and caught-rejection gaps are closed by
+  later integrated tests.
+- **Owner-parked:** further Deleverage work, CCIP, and zero-backing
   settlement/loss/bad-debt policy are not current Teller assignments or current
   Wave 1 blockers.
 
@@ -238,9 +264,10 @@ isUnderscoreWalletOwner
 ```
 
 Only `depositFromTrusted` and `depositIntoGovVault` directly enter `_deposit`.
-The three Teller deleverage wrappers do not. A call through the
-separately scoped Deleverage PR was not examined; the reviewed snapshot's
-ordinary trusted-producer boundary is sufficient for this analysis.
+The three Teller deleverage wrappers do not. The current integrated Deleverage
+source and composition tests were examined for the package-level rebind;
+Teller's ordinary trusted-producer boundary remains sufficient for this source
+analysis.
 
 A legitimate first callback must remain possible:
 
@@ -466,22 +493,22 @@ attributed to M1.
 | [Rebalance rollback, line 1309](../../../../tests/core/teller/test_teller_rebalance.py#L1309) | Short deposit leaves both legs, claims, debt, and events unchanged | Proves deposit-first ordering and whole-operation rollback |
 | [Donation masking, line 639](../../../../tests/vaults/test_stock_token_vault_comparison.py#L639) | Prior donation cannot substitute for short receipt in Simple or share vault | Directly sensitive to pre/post Teller measurement |
 
-### Known gaps
+### Current limitations after later integrated hardening
 
-- Removing every `receiptMeasurementActive` read/write still leaves the
-  reviewed-snapshot callback test green because ordinary nonreentrancy fires
-  first.
-- The recovery assertion follows an explicit
-  `clear_transient_storage()` call, so it proves the helper, not EVM rollback.
-- Adversarial vault callback mode 5 is unused; no integrated test directly
-  proves the flag remains active through vault accounting.
-- Constant `balance_mode == 7` yields zero reported delta and does not model an
-  offsetting canonical lie.
-- There is no literal deficit-plus-excess cancellation case or adversarial
-  fresh deposit specifically after the explicit clear.
-- Producer parameterization does not execute every full call chain; short
-  lengths sample 1 and 31 rather than every value; artifact compatibility was
-  independently checked rather than fully enforced by the unit test.
+The first three gaps recorded by the 28 July audit are now closed. Current
+tests make the callback mutex-sensitive with a removal mutant, exercise vault
+callback mode 5 while the flag remains held through vault accounting, and catch
+a nested rejection while proving the outer exact receipt remains valid.
+
+Genuine residual limits remain:
+
+- exact 32-byte `balanceOf` returndata can still be dishonest;
+- producer parameterization does not execute every possible upstream call
+  chain;
+- malformed-length tests select representative shapes rather than every byte
+  length at every observation site; and
+- artifact compatibility is enforced by the central current artifact gate,
+  not solely by the Teller unit file.
 
 ## Historical versus reviewed-snapshot validation
 
@@ -647,28 +674,19 @@ These are deployment or release gates, not authorization to perform them.
 
 The following are **agent recommendations — not owner-approved**:
 
-1. Make the callback regression mutex-sensitive: start from an authorized
-   unguarded route such as `depositFromTrusted`, trigger a one-shot nested
-   deposit, and require a private mutation that deletes the dedicated flag to
-   fail the test. Keep unrelated authorization, funding, approval,
-   nonreentrancy, and receipt failures out of the path.
-2. Exercise adversarial vault callback mode 5 so the nested attempt happens
-   after `C1` and during vault accounting. This should prove why the flag
-   remains active through `V == Q`.
-3. Prove transient rollback with a test-only caller that catches a first
-   post-acquisition revert and successfully deposits again in the same EVM
-   transaction, without manually calling `clear_transient_storage()`.
-4. Add a canonical offsetting-lie token mode: deliver `Q-1` while reporting an
+1. Retain the current mutex-removal, callback-mode-5, return-policy,
+   reentrancy-composition, and caught-nested-rejection regressions.
+2. Add a canonical offsetting-lie token mode: deliver `Q-1` while reporting an
    apparent delta of `Q`. The expected success must be documented as the
    truthful-balance trust boundary, not supported behavior.
-5. Add focused post-clear liveness coverage, and name or remove opaque fixture
+3. Retain focused post-clear liveness coverage, and name or remove opaque fixture
    modes such as constant `balance_mode == 7` and exact-transfer alias
    `transfer_mode == 8`.
-6. Retain the 24,576-byte EIP-170 test and stricter 24,152-byte accepted
+4. Retain the 24,576-byte EIP-170 test and stricter 24,152-byte accepted
    ceiling. For every later Teller source change, run one reproducible
    pinned-compiler artifact comparison; prefer an existing central artifact
    gate over duplicate unit-test constants.
-7. State exact-transfer-only and truthful-balance assumptions in asset
+5. State exact-transfer-only and truthful-balance assumptions in asset
    admission and monitoring material.
 
 A post-vault `C2` reread is worth reconsidering only if supported vaults become
@@ -679,8 +697,8 @@ recommended for the reviewed system.
 
 ### Parked by owner
 
-- The separate Deleverage branch/PR is outside this process and was not
-  inspected or used.
+- Further Deleverage work is separately owner-gated; the integrated source and
+  composition evidence are documented in this package without reopening it.
 - All CCIP workflows are outside this process until the owner reopens them.
 - Zero-backing settlement, loss allocation, and bad-debt policy remain future
   analysis subjects.

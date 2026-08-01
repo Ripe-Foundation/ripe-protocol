@@ -1,229 +1,203 @@
 # Robinhood smart-contract change rationale
 
-**Current configuration-source snapshot:** `rh` commit
-`e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e` (31 July 2026).
-PR #61 is merged and closed at final head `7293cf87…` and `master` squash merge
-`91eda49…`; its production contract changes are integrated into `rh`. No
-Robinhood deployment, migration execution, production configuration,
-activation, RPC, account, key, signer, or release action has occurred.
+This directory is the contract-centric explanation of every Vyper source
+change represented by the current Robinhood (`rh`) branch. It separates current
+`master..rh` production deltas from configuration, archival prototypes,
+supporting/test-only sources, and historical changes whose source bytes are now
+shared by `master` and `rh`.
 
 > [!IMPORTANT]
-> **Draft explanatory synthesis.** This directory explains production source
-> changes present in the reviewed `rh` snapshot below. It is not controlling
-> approval, deployment, configuration, migration, activation, or release
-> evidence. Each page distinguishes integrated facts, historical evidence,
-> independently reproduced results, agent recommendations, owner directions,
-> owner-parked work, and deployment or release gates.
-
-This directory is the contract-centric explanation of production smart-contract
-changes carried by the Robinhood (`rh`) branch. It answers:
-
-- which production contracts changed;
-- why each source change was necessary;
-- what behavior changed;
-- what tests support the change;
-- what the change does not prove; and
-- which risks or deployment decisions remain open.
-
-The individual records intentionally use contract names and behavior as their
-primary structure. Historical workstream labels such as M1, M2, M3, S3, and S5
-appear only in provenance sections.
-
-Current rationale pages:
-
-- [`deleverage.md`](deleverage.md) — trusted full-payoff boundaries, collateral
-  and debt caps, bounded dust write-off, zero defaults, and seven-byte EIP-170
-  headroom;
-- [`auction-house.md`](auction-house.md) — safe conversion, clamps, soft-zero
-  behavior, batch isolation, and Deleverage consistency;
-- [`switchboard-delta.md`](switchboard-delta.md) — four timelocked actions,
-  hard ceilings, and unactivated zero configuration;
-- [`credit-engine.md`](credit-engine.md);
-- [`guarded-erc20.md`](guarded-erc20.md);
-- [`ledger.md`](ledger.md);
-- [`lootbox.md`](lootbox.md); and
-- [`teller.md`](teller.md).
-
-The four Deleverage controls remain zero and deferred, but they currently lack
-Robinhood machine-facing parameter/planning representation. The deployment
-owner owns their final disposition and binding; the machine change still
-requires separate authority and is not fixed here.
-`DefaultsRobinhood.vy` now exists and compiles; it and `config/BluePrint.py`
-are the two editable value authorities, while the JSON ledger is synchronized
-derived evidence. Morpho V2 and BlueChipYield support are integrated, with
-BlueChipYield selected at PriceDesk slot 3. Repository configuration is
-prepared and consistent; production/onchain configuration has not occurred.
+> Source integration, selected repository configuration, deployment,
+> registration, activation, and release are separate lifecycle states. Nothing
+> in this directory authorizes an RPC call, signer, deployment, migration,
+> onchain configuration, registration, activation, or release.
 
 ## Documentation standard
 
-Each contract record is intended to stand on its own. It should explain:
+Each page distinguishes current integrated facts from dated historical
+validation, current local artifact evidence, unresolved risks, and later
+deployment or release gates. Historical commits, counts, and hashes remain
+dated evidence; a current rebind is added rather than rewriting their original
+meaning. Source rationale does not expand owner authority.
 
-- the behavior before the change and a concrete failure scenario;
-- the security property or chain-specific requirement being enforced;
-- the complete modified execution flow;
-- why the chosen implementation was preferred over simpler alternatives;
-- the tests and compiler evidence that support each claim;
-- known gaps, unsupported behaviors, and accepted residual risks; and
-- the distinction between integrated source, historical validation, deployment,
-  configuration, and live activation.
+## Current authority and ancestry
 
-Claims are labeled or written so readers can distinguish repository evidence,
-compiler or specification evidence, independently reproduced results,
-historical results, and technical inference. The records are rationale and
-audit documents, not merely summaries of workstream completion.
+This refresh is bound to the following independently verified identities on
+1 August 2026:
 
-## Owner-facing contract index
-
-| Contract | Direct answers | Executive verdict |
-| --- | --- | --- |
-| Teller | [`receiptMeasurementActive`, explicit clear, and strict `raw_call`](teller.md#direct-answers-to-the-owners-questions) | [Reviewed conclusion](teller.md#executive-verdict) |
-| GuardedErc20 | [Why a new guarded nominal vault was selected](guarded-erc20.md#direct-answers-for-the-owner) | [Reviewed conclusion](guarded-erc20.md#executive-verdict) |
-| CreditEngine | [Zero value, retained terms, and liquidation implications](credit-engine.md#direct-answers-to-the-owners-questions) | [Reviewed conclusion](credit-engine.md#executive-verdict) |
-| Ledger | [`raw_call`, ArbSys knowledge, and architecture alternatives](ledger.md#direct-answers-for-the-owner) | [Reviewed conclusion](ledger.md#executive-verdict) |
-| Lootbox | [Per-deployment floor, Base preservation, and Robinhood configuration](lootbox.md#direct-answers-for-the-owner) | [Reviewed conclusion](lootbox.md#executive-verdict) |
-
-## Current owner scope
-
-The following directions control this explanatory package:
-
-- Corrected PR #61 entered `rh` through historical integration ancestor
-  `ad831669943ccfe7b9ed57454995dfce51630a66` and is retained by current
-  baseline `e4473ce…`. The Deleverage, AuctionHouse, and SwitchboardDelta pages
-  bind their rationale to the earlier source checkpoint as historical evidence;
-  the older hashes are not current branch authority, and integration does not
-  imply deployment, configuration, activation, or release.
-- CCIP workflows are owner-parked and outside the current work program.
-- Zero-backing settlement, loss allocation, and bad-debt policy are
-  owner-parked for later analysis.
-- Sites account/workspace recovery and dashboard deployment are owner-parked.
-- Parked subjects are not current Wave 1 work items or blockers. Parking does
-  not decide their eventual release disposition.
-- H-04 source authority, H-05 deterministic blocked planning, H-06 candidate-class
-  qualification, and M4 proof are integrated for their exact scopes. None is
-  final operator, machine, volume, deployment, or release authority.
-
-The two Base migration scripts and three Base migration-history paths touched
-by the upstream work remain Base-only provenance outside Robinhood parity. At
-the current comparison, the three history paths and the first migration script
-differ; the second migration script is byte-identical. `tests/conf_core.py` is
-the fifth differing squash-touched path because of independent `rh` branch
-evolution. None justifies merging `master` into `rh` or importing Base history.
-
-## Reviewed implementation snapshot
-
-This inventory was regenerated on 28 July 2026 from:
-
-| Ref | Commit | Tree |
-| --- | --- | --- |
-| `master` comparison point | `91d846e8618fbaf3d8fb6770361b48d542d82a76` | `07e0426d3d0bf5a8599ddd6afed87cecc35e75f2` |
-| `rh` reviewed snapshot | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` | `161fb828f3bbf4cb12596a5dfaf6c9bf1e153381` |
-
-The production-contract comparison for the five reviewed components comes
-from:
-
-```text
-git diff --numstat master...rh -- \
-  contracts/core/Teller.vy \
-  contracts/vaults/GuardedErc20.vy \
-  contracts/core/CreditEngine.vy \
-  contracts/data/Ledger.vy \
-  contracts/core/Lootbox.vy
-```
-
-This explicit path list reproduces the five reviewed contract deltas. It is
-not a discovery proof for every possible contract change in the repository.
-The commit and tree above are a dated reviewed snapshot, not a permanent claim
-about the future tip of `rh`.
-
-## Changed production contracts
-
-| Contract | Production delta | Why it changed | Current boundary |
+| Ref or role | Commit | Tree | Meaning |
 | --- | --- | --- | --- |
-| [`Teller`](teller.md) | Measures exact token receipt before crediting a deposit | A requested transfer amount is not proof that the vault actually received that amount | Integrated source; deployment and activation remain separate |
-| [`GuardedErc20`](guarded-erc20.md) | New generic vault with live-backing and exact-delivery guards | Nominal vault accounting can remain positive after issuer-controlled custody loss | Integrated source; not independently launch-ready |
-| [`CreditEngine`](credit-engine.md) | Preserves debt-resolution terms for a nonempty zero-backed position while assigning zero value | Skipping `(asset, 0)` hid unsafe debt by erasing its liquidation and redemption terms | Integrated source; settlement and bad-debt policy are owner-parked |
-| [`Ledger`](ledger.md) | Selects native or Arbitrum action-block identity through one immutable source | Robinhood child blocks cannot use inherited `block.number` as the intended same-execution-block identity | Integrated shared source; deployed Base Ledger remains unchanged |
-| [`Lootbox`](lootbox.md) | Replaces the Base-specific reward interval floor with an immutable constructor value | One hardcoded Base cadence could not safely represent both Base and Robinhood deployments | Integrated shared source; live deployment and Base convergence remain separate |
+| Current local/cached/live `rh` | `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353` | `7454b5456ebb6cd02d716a64b408629ab501629e` | Authority for every current claim in this directory |
+| Current local/cached/live `master` | `91eda49ccd34a25090582aff0695075c4c806011` | `fbd958bec234081f70769045abd8f9bb638f6dd7` | Comparison point and merge base for `master..rh` |
+| Configuration-source ancestor | `e4473ce6485888f1b747761a5ee8693443108877` | `33b705690007bda9b11900b5775bd9230e79f09e` | Ancestor that last changed `DefaultsRobinhood.vy`; not the current `rh` tip |
+| Shared-source import ancestor | `ad831669943ccfe7b9ed57454995dfce51630a66` | `3467f4a75aa37203d615407d5baf9c5fc9035639` | Historical `rh` import of corrected Deleverage work |
 
-Current SHA-256 identities:
+The live ref checks establish repository identity only. They do not establish a
+Robinhood deployment or live protocol state.
 
-| Contract | SHA-256 |
-| --- | --- |
-| `contracts/core/Teller.vy` | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` |
-| `contracts/vaults/GuardedErc20.vy` | `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` |
-| `contracts/core/CreditEngine.vy` | `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` |
-| `contracts/data/Ledger.vy` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
-| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+## Complete current production-source delta
 
-## How the Stock Token changes fit together
+The following six production contracts differ between current `master` and
+current `rh`:
 
-The Stock Token containment changes are three different controls at three
-different trust boundaries:
+| Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
+| --- | --- | --- | --- | ---: | --- |
+| `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `7019b6c47dde03151acc1952944dd19301c83328` | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` | 41,106 | Exact call-local receipt and vault-return policy |
+| `contracts/vaults/GuardedErc20.vy` | [`guarded-erc20.md`](guarded-erc20.md) | `713dab98bb9a08585e0c1f937425e8142cd600ab` | `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` | 9,977 | Nominal vault with fail-closed backing and exact delivery |
+| `contracts/core/CreditEngine.vy` | [`credit-engine.md`](credit-engine.md) | `a98d2522a16708e887a5a8aad78171843d413baf` | `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` | 46,812 | Retains terms for nonempty zero-backed positions without pricing zero |
+| `contracts/data/Ledger.vy` | [`ledger.md`](ledger.md) | `590341e3f9091105036c1cc497bd862ea3769248` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` | 26,492 | Immutable native/ArbSys action-block selection |
+| `contracts/core/Lootbox.vy` | [`lootbox.md`](lootbox.md) | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | 47,731 | Per-deployment immutable Underscore interval floor |
+| `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
+
+These are integrated source facts. None proves that the corresponding contract
+has been deployed, registered, configured, or activated on Robinhood.
+
+## Configuration contract
+
+[`DefaultsRobinhood.vy`](../../../../contracts/config/DefaultsRobinhood.vy) is
+a production-intended configuration contract, but its values and mere presence
+in source are not deployment or onchain configuration:
+
+| Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
+| --- | --- | --- | ---: | --- |
+| [`defaults-robinhood.md`](defaults-robinhood.md) | `c63009f9e03044616da2562767f129d91e0843aa` | `4f89a970c19a7fc5a3d6f05035cd252d660ac6c1696ccddb4bd76c6751f356f8` | 13,617 | Integrated source; repository configuration consistent; deployment readiness fail-closed with unresolved inputs |
+
+`DefaultsRobinhood.vy` and [`config/BluePrint.py`](../../../../config/BluePrint.py)
+are the two human-edited value authorities. The
+[`robinhood-parameters.json`](../../../../config/robinhood-parameters.json)
+ledger is derived evidence, not a third value authority.
+
+## Archival, non-admitted prototype
+
+[`RobinhoodUniswapV2RipePrices.vy`](../../../../contracts/priceSources/RobinhoodUniswapV2RipePrices.vy)
+is present in `master..rh`, but it is not an admitted production price source:
+
+| Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
+| --- | --- | --- | ---: | --- |
+| [`robinhood-uniswap-v2-ripe-prices.md`](robinhood-uniswap-v2-ripe-prices.md) | `11fb790f04f782d7c3e7abcc66f78077c13434d9` | `56a6685442d8730922205f8fcd2893b542e12b7d5d0e1384bcc2f065b945b485` | 42,036 | Archival monitoring prototype; PriceDesk-inert, unregistered, unconfigured, non-admitted, without a repository deployment record, and unavailable for protocol accounting |
+
+No launch Uniswap oracle authority was approved. Its direct monitoring and
+update surfaces do not change its PriceDesk-facing zero/no-feed behavior.
+
+## Historical/shared-source rationale inventory
+
+The corrected Deleverage changes entered `rh` through `ad831669…`. Current
+`master` and current `rh` now contain identical production blobs for all three
+sources, so they are historical/shared-source rationales rather than current
+`master..rh` production deltas:
+
+| Contract | Rationale | Shared Git blob | Current SHA-256 | Source bytes |
+| --- | --- | --- | --- | ---: |
+| `Deleverage.vy` | [`deleverage.md`](deleverage.md) | `b43d373039b352d6eab240be714134764901b947` | `d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138` | 56,068 |
+| `AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `48cbbbca22c87e490ef0f88aae4f643ab5b87987` | `e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921` | 53,173 |
+| `SwitchboardDelta.vy` | [`switchboard-delta.md`](switchboard-delta.md) | `4e234df7626eb332836aceb5cbca2daaef2a0390` | `12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79` | 53,713 |
+
+Their integration history and current shared bytes are established. Robinhood
+deployment, parameter selection, timelock action, configuration, activation,
+and release remain separate.
+
+## Relevant current artifact identities
+
+The repository artifact checker was rerun against the current bytes. BlueChip
+and the archival Uniswap prototype were also freshly compiled with
+Vyper `0.4.3+commit.bff19ea2` and their outputs hashed.
+
+| Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
+| --- | ---: | ---: | --- | --- |
+| AuctionHouse | 24,373 | 203 | `f91c53f0fbfe66b2f9e07003ba712cb976d6941a3b98ec0891918faa0bf6eead` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,132 | 444 | `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| Deleverage | 24,473 | 103 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
+| DefaultsRobinhood | 2,687 | 21,889 | `aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99` | `a2b3232606060b9b296666a2cfbc6a328c2b92897ac6e1dcf9f82920a449bddb` |
+| GuardedErc20 | 10,524 | 14,052 | `e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14` | `453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a` |
+| Ledger | 13,125 | 11,451 | `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7` | `69f5e1c1cccf0f8bfbfa0cae30879635bca241d40af1e95615026b264658fb32` |
+| Lootbox | 21,569 | 3,007 | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
+| SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
+| Teller | 24,152 | 424 | `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
+| BlueChipYieldPrices | 22,054 | 2,522 | `84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578` | `d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73` |
+| RobinhoodUniswapV2RipePrices | 20,556 | 4,020 | `d36fe90fb011e2fbed546c5a0c576c7e5346e90ec34947c7be079884b2ca9c58` | `3dc0dcfe1a130a5911f2b97f106c963ebe9dca17efdad943a0a9c9609bcc837e` |
+
+Runtime templates with constructor-bound immutables are compiler artifacts,
+not final deployed-runtime identities.
+
+## Supporting and test-only Vyper delta
+
+Every remaining Vyper path in `master..rh` is explicitly classified below.
+None is a production component or launch authority.
+
+| Path | Classification | Git blob | SHA-256 | Source bytes |
+| --- | --- | --- | --- | ---: |
+| `contracts/mock/MockMorphoV2Factory.vy` | Morpho V2 factory test double | `725a6f623705e223b891953208be952b77ca5242` | `d4afb38408b542ef123ba5df453de8ed8a871116e85f916be983c934a0f4da60` | 902 |
+| `contracts/mock/MockMorphoV2Vault.vy` | Morpho V2 vault/malformed-return test double | `3f41b99d9ec9ec98dc9484eecf7d0ae9095eb69d` | `d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac` | 2,735 |
+| `contracts/mock/MockYieldRegistry.vy` | Existing yield-registry test double extended for Morpho V2 | `29c23b8042e2271539a87d191a3c561b6c101e42` | `b645e1bc1f9fdb036da47a508f54dac43e000b362463e095ddb434b358de7c5d` | 1,070 |
+| `contracts/mock/MockUniswapV2Factory.vy` | Uniswap factory test double | `ea97d1930b72c41a99b909a2331a8fbd8d51c16e` | `ff4ba203e8e18d11a5738ef68a7f8fa9d677c2817e0f06a683c10c05e0ef83c5` | 828 |
+| `contracts/mock/MockUniswapV2Pair.vy` | Uniswap pair/cumulative-price test double | `30a75af4cab8e62de5ecf2caa8a8bdecf1c1ffc2` | `7c6bc92970be39fa8118c4000379b722bcb87592779c6cb3b45df1f5cab76350` | 7,683 |
+| `contracts/mock/MockUniswapV2Token.vy` | Uniswap token test double | `141137a97d6576d679314ff6366bd1a1659fb04d` | `0e109020f202db31e7a09c6e473b95aad39901f98acbf439fa11aeecacf0b588` | 604 |
+| `contracts/mock/MockUniswapV2FlashBorrower.vy` | Flash-swap test borrower | `812ece36f706b7177a34e0561799dd001b2db54b` | `39b2e4b0e8eebe55175d71465ba33d8430528f0fa221c0b27c3b0f44012d6d84` | 973 |
+| `contracts/mock/MockUniswapV2QuotePriceDesk.vy` | Quote-source/recursive-call test double | `978000acc79cfd1a7c12547896232602f35233f2` | `12d2046240189462486f7b2925228b31f369f83c7f4827faf4857b3de59a4d1f` | 1,540 |
+| `contracts/mock/MockProbeErc20.vy` | Stock-token transferability probe double | `a367fbd89f3fc7d5dbafa3a5c118cabbc70e696b` | `7d84c3f995c7f06588cabda1c8a12d8376217c653a9c4371a69ac8e559bf6a48` | 3,069 |
+| `contracts/mock/MockStockTokenControls.vy` | Stock-control adversarial double | `b9ed997df86bffe529b93bf9b6b00a5d0a9ca331` | `5d1527262aad66642a6e0f6dfdaad03458abdc4085a0445ebff0af8969614ef7` | 4,971 |
+| `contracts/testing/ActionBlockIdentityProbe.vy` | Test-only action-block probe | `82a56a6770d07b6330ca19d55df10f05bef5e105` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` | 1,203 |
+| `contracts/testing/StockTokenTransferProbe.vy` | Test-only Stock transfer probe | `1460f97591ac2a98e244f37fd66ce540d3408391` | `dcf632f75def3d55203731856e5c2813237235bf72c6b8586400c9f858c3046a` | 4,602 |
+| `docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy` | Documentation example; not an admitted or deployable production component | `742f8ce4c41ed18a7fabcd51fa42864433355880` | `7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18` | 34,600 |
+
+The committed ABI files and Python tests are supporting artifacts rather than
+additional Vyper production deltas. Their current paths are linked from the
+individual rationale pages.
+
+## Complete rationale page inventory
+
+- [`defaults-robinhood.md`](defaults-robinhood.md) — configuration values and
+  the two-source authority model;
+- [`teller.md`](teller.md) — exact deposit receipt, mutex, and return policy;
+- [`guarded-erc20.md`](guarded-erc20.md) — backing and delivery containment;
+- [`credit-engine.md`](credit-engine.md) — zero-backing debt-term containment;
+- [`ledger.md`](ledger.md) — portable action-block identity;
+- [`lootbox.md`](lootbox.md) — per-deployment reward interval floor;
+- [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) — Morpho V2 yield
+  pricing and compatibility;
+- [`robinhood-uniswap-v2-ripe-prices.md`](robinhood-uniswap-v2-ripe-prices.md)
+  — archival, PriceDesk-inert monitoring prototype;
+- [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
+  rationale;
+- [`auction-house.md`](auction-house.md) — historical/shared safe conversion,
+  Stock delivery, and liquidation composition; and
+- [`switchboard-delta.md`](switchboard-delta.md) — historical/shared bounded
+  governance actions.
+
+## Lifecycle boundary
+
+The current repository state can be read in this order:
+
+1. **Integrated source:** the bytes exist in current `rh`.
+2. **Selected configuration:** readable repository authorities select some
+   components and values while unresolved inputs remain fail-closed.
+3. **Deployment:** creation bytecode is executed with exact approved inputs.
+4. **Registration:** the deployed address is entered in the approved registry
+   slot or topology.
+5. **Activation:** governed feature/configuration switches make the component
+   live for intended protocol paths.
+6. **Release:** independent evidence and owner authority approve production use.
+
+No later state follows automatically from an earlier one. In particular,
+PriceDesk slot-3 selection for BlueChipYield is not deployment or registration,
+and source-level Defaults values are not onchain configuration.
+
+At this exact baseline, AAPL launch inclusion, LP launch admission, reward
+promotion, Curve activation, and the new Robinhood migration implementation are
+not integrated into `rh`. Published or local feature branches are not current
+`rh` authority.
+
+## Mechanical coverage rule
+
+The discovery set is reproducible with:
 
 ```text
-Teller
-  proves the amount received during this deposit call
-      |
-      v
-GuardedErc20
-  proves aggregate backing and exact delivery while it owns custody
-      |
-      v
-CreditEngine
-  gives unsafe backing zero value without erasing debt-resolution terms
+git diff --name-status \
+  91eda49ccd34a25090582aff0695075c4c806011..\
+  5f5d22b7ee78cbb904c4fe3c6e46599c330c4353 -- '*.vy'
 ```
 
-None of the three can replace the others:
-
-- a vault cannot reconstruct Teller's pre-transfer balance after the transfer;
-- Teller cannot continuously prove custody after the deposit transaction; and
-- CreditEngine should not duplicate token-specific custody reads already owned
-  by the vault.
-
-The combined behavior is containment, not complete loss resolution. A
-zero-backed position may become eligible for liquidation, but liquidation
-entry, auction creation, settlement, collateral delivery, debt reduction, and
-bad-debt accounting remain distinct transitions. The later policy transitions
-are described for technical accuracy but are owner-parked rather than active
-work in this package.
-
-## Shared release boundary
-
-An integrated source change is not proof that:
-
-- the contract is deployed;
-- an existing deployment was upgraded;
-- a Stock asset or route is enabled;
-- the Robinhood constructor/configuration values are final;
-- a zero-backed auction can settle;
-- unrecoverable debt is moved into bad-debt accounting; or
-- an existing Base deployment changed.
-
-Any later deployment or activation claim still requires the exact
-owner-approved configuration, artifact binding, applicable composed-route
-evidence, monitoring, and release authority. This statement does not reopen
-the parked settlement, loss-allocation, bad-debt, or CCIP subjects. The
-Ledger and Lootbox records have their own deployment and live-version
-boundaries.
-
-## Supporting contracts not treated as production components
-
-The `master...rh` contract diff also contains test and probe contracts:
-
-- `contracts/mock/MockProbeErc20.vy`;
-- `contracts/mock/MockStockTokenControls.vy`;
-- `contracts/testing/ActionBlockIdentityProbe.vy`; and
-- `contracts/testing/StockTokenTransferProbe.vy`.
-
-They support adversarial or environment validation. They are intentionally not
-given production-change rationale records in this directory.
-
-## Relationship to detailed records
-
-These files summarize behavior at the reviewed implementation snapshot. They
-do not replace the
-controlling approval, implementation, validation, migration, or release
-records elsewhere in `docs/chains/rh/`. Each contract page links its primary
-evidence and records important residual risks, recommendations, parked work,
-and deployment or release gates.
+It yields 21 Vyper paths: six current production sources, one configuration
+contract, one archival prototype, and thirteen supporting/test-only paths. The
+three historical/shared rationale sources have identical `master` and `rh` Git
+blobs and therefore do not appear in that delta.

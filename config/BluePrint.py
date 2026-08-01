@@ -252,6 +252,10 @@ YIELD_TOKENS = {
 # in contracts/config/DefaultsRobinhood.vy. The JSON ledger is derived evidence.
 
 from dataclasses import dataclass
+import hashlib
+import json
+from pathlib import Path
+import subprocess
 from typing import Any
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -292,6 +296,49 @@ class RobinhoodRegistrySelection:
     selection_state: str
 
 
+@dataclass(frozen=True)
+class RobinhoodStockInputQualification:
+    path: str
+    resolution: str
+    candidate: Any
+    constraints: tuple[str, ...]
+    blocker_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RobinhoodHistoricalTrancheIdentity:
+    integration_commit: str
+    changed_paths: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class RobinhoodGitPathIdentity:
+    path: str
+    git_blob: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class RobinhoodArtifactApplicabilityIdentity:
+    contract: str
+    source_path: str
+    source_git_blob: str
+    source_sha256: str
+    creation_sha256: str
+    runtime_template_sha256: str
+    abi_canonical_sha256: str
+    selectors_canonical_sha256: str
+
+
+@dataclass(frozen=True)
+class RobinhoodStockM4Binding:
+    historical_tranche: RobinhoodHistoricalTrancheIdentity
+    current_test_identities: tuple[RobinhoodGitPathIdentity, ...]
+    current_artifact_identities: tuple[
+        RobinhoodArtifactApplicabilityIdentity, ...
+    ]
+
+
 # Selected external facts remain deployment-readiness blocked until their
 # separately retained verification metadata is closed.
 ROBINHOOD_USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
@@ -305,7 +352,6 @@ ROBINHOOD_MORPHO_V2_FACTORY = "0x0FBad98595b0186dA120E41f77C102beb49f803c"
 ROBINHOOD_NATIVE_ETH_SENTINEL = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 ROBINHOOD_BTC_SENTINEL = "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
 ROBINHOOD_ARB_SYS = "0x0000000000000000000000000000000000000064"
-
 ROBINHOOD_ADDRESSES = {
     # Deployment-produced: symbolic until the deployment plan binds them.
     "CONTRIBUTOR_TEMPLATE": SymbolicBinding("CONTRIBUTOR_TEMPLATE"),
@@ -399,7 +445,7 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
     RobinhoodComponentSelection("CM-014", "SwitchboardDelta", "required", "selected"),
     RobinhoodComponentSelection("CM-015", "PriceDesk", "required", "selected"),
     RobinhoodComponentSelection("CM-016", "ChainlinkPrices", "required", "selected"),
-    RobinhoodComponentSelection("CM-017", "CurvePrices", "omitted", "omitted"),
+    RobinhoodComponentSelection("CM-017", "CurvePrices", "required", "selected"),
     RobinhoodComponentSelection("CM-018", "BlueChipYieldPrices", "required", "selected"),
     RobinhoodComponentSelection("CM-019", "PythPrices", "omitted", "omitted"),
     RobinhoodComponentSelection("CM-020", "StorkPrices", "omitted", "omitted"),
@@ -505,7 +551,7 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault", "registration_order", "CM-024", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault", "registration_order", "CM-025", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 1, "Chainlink", "registration_order", "CM-016", "required", "selected"),
-    RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "omitted", "reserved"),
+    RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order", "CM-018", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 4, "Pyth", "source_hard_coded", "CM-019", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 5, "Stork", "registration_order", "CM-020", "omitted", "omitted"),
@@ -515,6 +561,7 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta", "registration_order", "CM-014", "required", "selected"),
     RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo", "registration_order", "CM-046", "required", "selected"),
 )
+
 
 # Assertion-class records are computed evidence, not ledger-owned values.
 ROBINHOOD_ASSERTION_INVARIANTS = {
@@ -531,10 +578,308 @@ ROBINHOOD_ASSERTION_INVARIANTS = {
     ),
     "aapl_cap_formula": "floor(D * 10^(18+8) / P8)",
     "aapl_cap_inputs": ("D target", "P8 freeze price"),
-    "stock_enabled_vaults": ("SimpleErc20",),
-    "stock_excluded_from_stability_pool": False,
+    "stock_enabled_vaults": ("GuardedErc20",),
+    "stock_excluded_from_stability_pool": True,
     "profile_2_lp_ltv": 0,
 }
+
+# Stock/AAPL launch qualification. These records intentionally do not populate
+# DefaultsRobinhood or make any Stock route reachable. They distinguish exact
+# repository evidence and selected external candidates from the values that
+# still require owner acceptance or current-chain verification. Every record is
+# consumed as one atomic M5 packet; a partial record set is not deployable.
+ROBINHOOD_INITIAL_STOCK_SYMBOLS = ("AAPL",)
+ROBINHOOD_AAPL_TOKEN_CANDIDATE = "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9"
+ROBINHOOD_AAPL_FEED_CANDIDATE = "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0"
+
+ROBINHOOD_STOCK_ACTIVATION_POLICY = (
+    ("vault", "GuardedErc20"),
+    ("exclusiveVaultAssignment", True),
+    ("shouldSwapInStabPools", False),
+    ("shouldTransferToEndaoment", False),
+    ("shouldAuctionInstantly", True),
+    ("canRedeemCollateral", False),
+    ("unsupportedStockRoutes", "absent"),
+    ("stockRewards", "disabled_recommendation_only"),
+    ("defaultsPosture", "absent_until_atomic_packet_accepted"),
+)
+
+ROBINHOOD_STOCK_ARTIFACT_BINDING = (
+    ("contract", "GuardedErc20"),
+    ("sourcePath", "contracts/vaults/GuardedErc20.vy"),
+    ("sourceGitBlob", "713dab98bb9a08585e0c1f937425e8142cd600ab"),
+    (
+        "sourceSha256",
+        "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
+    ),
+    (
+        "creationSha256",
+        "64e42e5402343c3ffc8ac67b3ab92d90c9d79447e3323660de09aee5c6d30805",
+    ),
+    (
+        "runtimeTemplateSha256",
+        "e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14",
+    ),
+    (
+        "abiCanonicalSha256",
+        "453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a",
+    ),
+    (
+        "selectorsCanonicalSha256",
+        "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
+    ),
+    ("selectorCount", 34),
+    ("runtimeTemplateSize", 10_524),
+)
+
+ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
+    historical_tranche=RobinhoodHistoricalTrancheIdentity(
+        integration_commit="a2d6b940c9b90d9ff1c78560ad61b2dd546f1760",
+        changed_paths=(
+            ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
+            (
+                "A",
+                "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
+            ),
+            (
+                "A",
+                "tests/core/deleverage/test_deleverage_stock_delivery.py",
+            ),
+            (
+                "M",
+                "tests/core/deleverage/test_deleverage_swap_collateral.py",
+            ),
+        ),
+    ),
+    current_test_identities=(
+        RobinhoodGitPathIdentity(
+            "tests/core/auctionHouse/test_ah_auctions.py",
+            "d45629865f93e22dae240c319d393aed04ac8e82",
+            "ecda7d232bf17da43a511f9ac88d3a7ef58f3e4356e9b97edf9af44ab8a71d9a",
+        ),
+        RobinhoodGitPathIdentity(
+            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
+            "f19d5dcb1fcf7a6a37132ee1a0b0e02b3b70c3e7",
+            "2a0be15fe4241562bee5b3157a1f98d17ba9306c7403314c2a7e514df96a9546",
+        ),
+        RobinhoodGitPathIdentity(
+            "tests/core/deleverage/test_deleverage_stock_delivery.py",
+            "d8a0d95317b45ac7a20016945a05f14ae3eead6d",
+            "c74b1b0d8b22e5a064109c6f811b98010d40aa979600683d57d3d67e5a385d54",
+        ),
+        RobinhoodGitPathIdentity(
+            "tests/core/deleverage/test_deleverage_swap_collateral.py",
+            "bb0560048f91a89b7c413ff177360bb4ae0a759f",
+            "3b900a98eb348fa5db94a0090974bb47c7cab3e5e86d951569a978b8181632b9",
+        ),
+    ),
+    current_artifact_identities=(
+        RobinhoodArtifactApplicabilityIdentity(
+            "AuctionHouse",
+            "contracts/core/AuctionHouse.vy",
+            "48cbbbca22c87e490ef0f88aae4f643ab5b87987",
+            "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921",
+            "55c73a3c9f4a03b8fc1feb405e002b36e00ec1186ffb08398fee78d029a71609",
+            "f91c53f0fbfe66b2f9e07003ba712cb976d6941a3b98ec0891918faa0bf6eead",
+            "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
+            "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
+        ),
+        RobinhoodArtifactApplicabilityIdentity(
+            "Deleverage",
+            "contracts/core/Deleverage.vy",
+            "b43d373039b352d6eab240be714134764901b947",
+            "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
+            "cf8462f9489fda051d7e55bb1c52be38984538818ffd0d96338e5a4fade9638b",
+            "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
+            "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
+            "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
+        ),
+        RobinhoodArtifactApplicabilityIdentity(
+            "GuardedErc20",
+            "contracts/vaults/GuardedErc20.vy",
+            "713dab98bb9a08585e0c1f937425e8142cd600ab",
+            "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
+            "64e42e5402343c3ffc8ac67b3ab92d90c9d79447e3323660de09aee5c6d30805",
+            "e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14",
+            "453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a",
+            "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
+        ),
+    ),
+)
+
+ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.identity",
+        "selected_external_fact_pending_current_verification",
+        ROBINHOOD_AAPL_TOKEN_CANDIDATE,
+        (
+            "AAPL is the sole initial Stock symbol",
+            "revalidate proxy implementation runtime controls and multiplier at freeze",
+        ),
+        ("B-T8-FREEZE", "B-P1-EXTERNAL-VERIFY"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.feed",
+        "historical_candidate_pending_current_verification",
+        ROBINHOOD_AAPL_FEED_CANDIDATE,
+        (
+            "prove feed proxy implementation runtime decimals and answer semantics",
+            "bind an accepted freeze-time round under the 86400-second ceiling",
+        ),
+        ("B-T8-FREEZE", "B-ORACLE-FREEZE"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.decimals",
+        "selected_external_fact_pending_current_verification",
+        18,
+        ("revalidate token decimals against the accepted current AAPL identity",),
+        ("B-T8-FREEZE", "B-P1-EXTERNAL-VERIFY"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.P8",
+        "freeze_time_input_unresolved",
+        None,
+        ("positive 8-decimal feed answer from the accepted freeze-time round",),
+        ("B-T8-FREEZE", "B-ORACLE-FREEZE"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.perUserCap",
+        "derived_cap_unresolved",
+        None,
+        (
+            "target exposure is 5000 USD",
+            "floor(5000 * 10^(18+8) / P8)",
+        ),
+        ("B-T8-FREEZE", "B-H04-PARAMS"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.globalCap",
+        "derived_cap_unresolved",
+        None,
+        (
+            "target exposure is 25000 USD",
+            "floor(25000 * 10^(18+8) / P8)",
+        ),
+        ("B-T8-FREEZE", "B-H04-PARAMS"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.vault",
+        "deployment_identity_unresolved",
+        None,
+        (
+            "fresh deployment of the exact GuardedErc20 artifact binding",
+            "exclusive AAPL assignment",
+        ),
+        ("B-T8-FREEZE", "B-H05-PLAN", "B-T8-M5"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.risk",
+        "owner_risk_tuple_unresolved",
+        None,
+        (
+            "exact deposit minimum and debt terms required",
+            "no CreditEngine zero-backing or settlement redesign",
+        ),
+        ("B-H04-PARAMS", "B-T8-M5"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.auction",
+        "policy_constrained_exact_values_unresolved",
+        None,
+        (
+            "shouldSwapInStabPools=false",
+            "shouldTransferToEndaoment=false",
+            "shouldAuctionInstantly=true",
+            "exact custom auction parameter tuple required",
+        ),
+        ("B-H04-PARAMS", "B-T8-M5"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-10.aapl.route",
+        "policy_constrained_exact_values_unresolved",
+        None,
+        (
+            "auction-only liquidation",
+            "canRedeemCollateral=false",
+            "unsupported Stock routes absent",
+            "Stock rewards disabled as a recommendation without DP-15 changes",
+        ),
+        ("B-H04-PARAMS", "B-T8-M5"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.vaultArtifact",
+        "repository_fact_integrated",
+        ROBINHOOD_STOCK_ARTIFACT_BINDING,
+        (
+            "canonical selectors and persistent transient and immutable layouts match SimpleErc20",
+        ),
+        (),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.vaultSlot",
+        "owner_slot_unresolved",
+        None,
+        ("exact fresh VaultBook id and semantic name required",),
+        ("B-H05-PLAN", "B-T8-M5"),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.m2Movement",
+        "repository_fact_integrated",
+        (
+            ("source", "contracts/vaults/GuardedErc20.vy"),
+            ("gitBlob", "713dab98bb9a08585e0c1f937425e8142cd600ab"),
+            ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
+        ),
+        ("preserve nominal internal movement and backing-aware external delivery",),
+        (),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.m3CreditContainment",
+        "repository_fact_integrated",
+        (
+            ("source", "contracts/core/CreditEngine.vy"),
+            ("gitBlob", "a98d2522a16708e887a5a8aad78171843d413baf"),
+            ("integrationCommit", "4c26d7d73bb02f7eae2e5df02314db77a426aced"),
+        ),
+        ("preserve represented zero-amount terms with zero capacity",),
+        (),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.m4ComposedProof",
+        "repository_fact_integrated",
+        ROBINHOOD_STOCK_M4_BINDING,
+        (
+            "historical tranche identity is distinct from current applicability",
+            "current applicability is pinned to exact test and production/artifact identities",
+            "composed proof does not authorize configuration deployment or activation",
+        ),
+        (),
+    ),
+    RobinhoodStockInputQualification(
+        "Deployment.DP-11.stock.m5ActivationBinding",
+        "atomic_binding_unresolved",
+        None,
+        (
+            "one reviewed packet must bind all 16 inputs and exact configuration bytes",
+            "negative reachability must remain true before packet acceptance",
+        ),
+        ("B-T8-M5", "B-H08-PROOF", "B-H09-RELEASE"),
+    ),
+)
+
+ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS = tuple(
+    item.path for item in ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+)
+ROBINHOOD_STOCK_RESOLVED_REPOSITORY_FACT_PATHS = tuple(
+    item.path
+    for item in ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+    if item.resolution == "repository_fact_integrated"
+)
+ROBINHOOD_STOCK_UNRESOLVED_INPUT_PATHS = tuple(
+    item.path
+    for item in ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+    if item.resolution != "repository_fact_integrated"
+)
 
 ROBINHOOD_COMPONENTS = {
     "price_desk_registry": {
@@ -641,7 +986,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     # DP-15
     'Deployment.DP-15.rewards.arePointsEnabled': RobinhoodInput(SourceReference('Defaults.rewardsConfig.arePointsEnabled'), 'approved'),
     'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),
-    'Deployment.DP-15.rewards.promotion': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_15_REWARDS_PROMOTION'), 'blocked'),
+    'Deployment.DP-15.rewards.promotion': RobinhoodInput('7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec', 'approved'),
     # DP-16
     'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(False, 'disabled'),
     'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(False, 'disabled'),
@@ -689,16 +1034,596 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-23.blueChipYield.morphoV2Support': RobinhoodInput(True, 'approved'),
 }
 
-# DeployArgs indexes all five legacy dictionaries. Robinhood deliberately has
-# no Curve or generic yield-token surface in Profile 1 beyond the selected
-# SteakHouse USDG vault. Values below are references to the authorities above.
+@dataclass(frozen=True)
+class RobinhoodCurveLaunchInput:
+    input_id: str
+    value: Any
+    authority_class: str
+    primary_owner: str
+    provenance: str
+    resolution_state: str
+
+
+ROBINHOOD_CURVE_ADDRESS_PROVIDER = "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"
+ROBINHOOD_CURVE_META_REGISTRY = "0xe6dA14500f0b5783E2325F9C5a7eE5d99DA0fB42"
+ROBINHOOD_CURVE_TRICRYPTO_NG_FACTORY = "0x6E28493348446503db04A49621d8e6C9A40015FB"
+ROBINHOOD_CURVE_STABLESWAP_NG_FACTORY = "0x8271e06E5887FE5ba05234f5315c19f3Ec90E8aD"
+ROBINHOOD_CURVE_TWOCRYPTO_NG_FACTORY = "0xe7FBd704B938cB8fe26313C3464D4b7B7348c88C"
+
+ROBINHOOD_ADDRESSES.update(
+    {
+        # Official repository candidates; live identities remain blockers.
+        "CURVE_ADDRESS_PROVIDER": ROBINHOOD_CURVE_ADDRESS_PROVIDER,
+        "CURVE_META_REGISTRY": ROBINHOOD_CURVE_META_REGISTRY,
+        "CURVE_TRICRYPTO_NG_FACTORY": ROBINHOOD_CURVE_TRICRYPTO_NG_FACTORY,
+        "CURVE_STABLESWAP_NG_FACTORY": ROBINHOOD_CURVE_STABLESWAP_NG_FACTORY,
+        "CURVE_TWOCRYPTO_NG_FACTORY": ROBINHOOD_CURVE_TWOCRYPTO_NG_FACTORY,
+        # CREATE output: observed during deployment, never precomputed.
+        "GREEN_USDG_CURVE_POOL": SymbolicBinding("GREEN_USDG_CURVE_POOL"),
+    }
+)
+ROBINHOOD_ADDRESS_STATUS.update(
+    {
+        "CURVE_ADDRESS_PROVIDER": "selected_external_fact_unverified",
+        "CURVE_META_REGISTRY": "selected_external_fact_unverified",
+        "CURVE_TRICRYPTO_NG_FACTORY": "selected_external_fact_unverified",
+        "CURVE_STABLESWAP_NG_FACTORY": "selected_external_fact_unverified",
+        "CURVE_TWOCRYPTO_NG_FACTORY": "selected_external_fact_unverified",
+        "GREEN_USDG_CURVE_POOL": "deployment_produced_unresolved",
+    }
+)
+ROBINHOOD_COMPONENTS["curve_launch"] = {
+    "component_id": "CM-017",
+    "registry_id": 2,
+    "configured_assets": ("GREEN",),
+    "priority_ids": (1, 3),
+}
+
+# Bounded Curve launch authority. Every row is either an approved repository
+# invariant, an independently checked official-repository candidate that still
+# needs a live identity observation, an owner decision, or a deployment output.
+# No row below authorizes deployment, pool funding, or any higher Curve power.
+ROBINHOOD_CURVE_OFFICIAL_PROVENANCE = (
+    "curvefi/curve-core@6222dda9959091db94d61f6d6378234a624cdd66:"
+    "deployments/prod/robinhood.yaml"
+)
+ROBINHOOD_CURVE_LITE_PROVENANCE = (
+    "curvefi/curve-lite@5a9e1ab34c1319de69b987900d859ad2e965d0e2:"
+    "contracts/amm/stableswap/factory/factory_v_100.vy"
+)
+ROBINHOOD_CURVE_POOL_NAME = SymbolicBinding("GREEN_USDG_CURVE_POOL_NAME")
+ROBINHOOD_CURVE_POOL_SYMBOL = SymbolicBinding("GREEN_USDG_CURVE_POOL_SYMBOL")
+
+ROBINHOOD_CURVE_LAUNCH_INPUTS = (
+    RobinhoodCurveLaunchInput(
+        "launch.chain_id", 4663, "repository_approved", "protocol_owner",
+        "config/network_profiles.py", "resolved_repository_fact",
+    ),
+    RobinhoodCurveLaunchInput(
+        "launch.component", "CM-017:CurvePrices", "repository_approved", "oracle_owner",
+        "ROBINHOOD_COMPONENT_SELECTIONS", "selected_launch",
+    ),
+    RobinhoodCurveLaunchInput(
+        "launch.price_desk_registration_order",
+        ((1, "ChainlinkPrices"), (2, "CurvePrices"), (3, "BlueChipYieldPrices")),
+        "repository_approved", "migration_owner", "ROBINHOOD_REGISTRY_TOPOLOGY",
+        "selected_launch",
+    ),
+    RobinhoodCurveLaunchInput(
+        "launch.priority_price_source_ids", (1, 3), "repository_approved", "oracle_owner",
+        "contracts/config/DefaultsRobinhood.vy", "resolved_repository_fact",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.address_provider", ROBINHOOD_ADDRESSES["CURVE_ADDRESS_PROVIDER"],
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "selected_external_fact_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.address_provider_binding_7",
+        (7, "MetaRegistry", ROBINHOOD_ADDRESSES["CURVE_META_REGISTRY"]),
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "selected_external_fact_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.address_provider_binding_11",
+        (11, "TricryptoNG", ROBINHOOD_ADDRESSES["CURVE_TRICRYPTO_NG_FACTORY"]),
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "selected_external_fact_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.address_provider_binding_12",
+        (12, "StableSwapNG", ROBINHOOD_ADDRESSES["CURVE_STABLESWAP_NG_FACTORY"]),
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "selected_external_fact_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.address_provider_binding_13",
+        (13, "TwoCryptoNG", ROBINHOOD_ADDRESSES["CURVE_TWOCRYPTO_NG_FACTORY"]),
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "selected_external_fact_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "curve.constructor_bindings",
+        (
+            ("_ripeHq", "deployment:RIPE_HQ"),
+            ("_tempGov", "owner:GOVERNANCE"),
+            ("_curveAddressProvider", "CURVE_ADDRESS_PROVIDER"),
+            ("_green", "GREEN_TOKEN"),
+            ("_savingsGreen", "SGREEN_TOKEN"),
+            ("_minPriceChangeTimeLock", "Defaults:price source minimum"),
+            ("_maxPriceChangeTimeLock", "Defaults:price source maximum"),
+        ),
+        "repository_approved", "migration_owner", "contracts/priceSources/CurvePrices.vy",
+        "resolved_repository_fact",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.factory", ROBINHOOD_ADDRESSES["CURVE_STABLESWAP_NG_FACTORY"],
+        "externally_verifiable_canonical_fact", "oracle_owner",
+        ROBINHOOD_CURVE_OFFICIAL_PROVENANCE, "resolved_reference_to_unverified_binding",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.factory_method", "deploy_plain_pool/create_from_blueprint/CREATE",
+        "repository_approved", "migration_owner", ROBINHOOD_CURVE_LITE_PROVENANCE,
+        "resolved_repository_fact",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.name", ROBINHOOD_CURVE_POOL_NAME, "owner_selected", "protocol_owner",
+        "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.symbol", ROBINHOOD_CURVE_POOL_SYMBOL, "owner_selected", "protocol_owner",
+        "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.coin_order", ("USDG", "GREEN"), "owner_selected", "oracle_owner",
+        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.coin_decimals", (6, 18), "owner_selected", "oracle_owner",
+        "Robinhood token interfaces and launch research candidate",
+        "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.A", 100, "owner_selected", "liquidity_owner",
+        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.fee", 4_000_000, "owner_selected", "liquidity_owner",
+        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.offpeg_fee_multiplier", 20_000_000_000, "owner_selected", "liquidity_owner",
+        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.ma_exp_time", 600, "owner_selected", "liquidity_owner",
+        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.ma_exp_time_alternative_test_vector", 866, "repository_approved", "oracle_owner",
+        ROBINHOOD_CURVE_LITE_PROVENANCE, "test_vector_only",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.address", ROBINHOOD_ADDRESSES["GREEN_USDG_CURVE_POOL"],
+        "deployment_produced", "migration_owner", ROBINHOOD_CURVE_LITE_PROVENANCE,
+        "deployment_produced_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.factory_nonce_or_order", "not_precomputed; record returned deployment address",
+        "deployment_produced", "migration_owner", ROBINHOOD_CURVE_LITE_PROVENANCE,
+        "resolved_no_predeployment_value",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.production_liquidity_amount", SymbolicBinding("GREEN_USDG_PRODUCTION_LIQUIDITY"),
+        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.funding_source", SymbolicBinding("GREEN_USDG_FUNDING_SOURCE"),
+        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.custodian", SymbolicBinding("GREEN_USDG_CUSTODIAN"),
+        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.approving_account", SymbolicBinding("GREEN_USDG_APPROVING_ACCOUNT"),
+        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.minimum_minted_lp", SymbolicBinding("GREEN_USDG_MINIMUM_MINTED_LP"),
+        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.slippage_limit", SymbolicBinding("GREEN_USDG_SLIPPAGE_LIMIT"),
+        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.withdrawal_authority", SymbolicBinding("GREEN_USDG_WITHDRAWAL_AUTHORITY"),
+        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.minimum_retained_liquidity", SymbolicBinding("GREEN_USDG_MIN_RETAINED_LIQUIDITY"),
+        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+    ),
+    RobinhoodCurveLaunchInput(
+        "pool.production_observation", SymbolicBinding("GREEN_USDG_PRODUCTION_OBSERVATION"),
+        "externally_verifiable_canonical_fact", "oracle_owner", "post-deployment observation",
+        "external_observation_unverified",
+    ),
+    RobinhoodCurveLaunchInput(
+        "feed.route", ("GREEN", "Curve:GREEN/USDG", "PriceDesk", "Chainlink:USDG/USD"),
+        "repository_approved", "oracle_owner", "bounded launch architecture", "selected_launch",
+    ),
+    RobinhoodCurveLaunchInput(
+        "feed.curve_assets", ("GREEN",), "repository_approved", "oracle_owner",
+        "bounded launch architecture", "selected_launch",
+    ),
+    RobinhoodCurveLaunchInput(
+        "feed.usdg_curve_feed", False, "repository_approved", "oracle_owner",
+        "anti-recursion invariant", "explicitly_inactive",
+    ),
+    RobinhoodCurveLaunchInput(
+        "feed.usdg_authority", "ChainlinkPrices only", "repository_approved", "oracle_owner",
+        "anti-recursion invariant", "selected_launch",
+    ),
+    RobinhoodCurveLaunchInput(
+        "inactive.capabilities",
+        (
+            "GREEN_USDG_LP_COLLATERAL", "RIPE_WETH_LP_COLLATERAL", "CURVE_LP_VALUATION",
+            "PSM_CURVE_AUTHORITY", "CURVE_DYNAMIC_RATES", "GREEN_REFERENCE_SNAPSHOTS",
+            "ENDAOMENT_CURVE_STABILIZATION", "STOCK_PRICING", "UNISWAP_ACCOUNTING",
+        ),
+        "repository_approved", "protocol_owner", "bounded launch architecture", "explicitly_inactive",
+    ),
+    RobinhoodCurveLaunchInput(
+        "artifact.curve_prices_source_sha256",
+        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c",
+        "repository_approved", "oracle_owner", "contracts/priceSources/CurvePrices.vy",
+        "source_frozen",
+    ),
+    RobinhoodCurveLaunchInput(
+        "artifact.curve_prices_abi_sha256",
+        "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772",
+        "repository_approved", "oracle_owner", "scripts/abis/CurvePrices.json", "source_frozen",
+    ),
+)
+
+# Immutable metadata projection used by the structural validator. The rows
+# above remain the sole value/metadata authority; this snapshot lets validators
+# reject in-memory provenance, owner, authority-class, or state substitution
+# without duplicating those values in another module.
+ROBINHOOD_CURVE_LAUNCH_METADATA = tuple(
+    (
+        row.input_id,
+        row.authority_class,
+        row.primary_owner,
+        row.provenance,
+        row.resolution_state,
+    )
+    for row in ROBINHOOD_CURVE_LAUNCH_INPUTS
+)
+
+ROBINHOOD_CURVE_AUTHORITY_CLASSES = frozenset(
+    {"repository_approved", "externally_verifiable_canonical_fact", "owner_selected", "deployment_produced"}
+)
+ROBINHOOD_CURVE_RESOLUTION_STATES = frozenset(
+    {
+        "resolved_repository_fact", "selected_launch", "selected_external_fact_unverified",
+        "research_candidate_owner_approval_unresolved", "test_vector_only",
+        "deployment_produced_unresolved", "resolved_no_predeployment_value",
+        "resolved_reference_to_unverified_binding",
+        "owner_choice_unresolved", "external_observation_unverified", "explicitly_inactive",
+        "source_frozen",
+    }
+)
+ROBINHOOD_CURVE_BLOCKING_STATES = frozenset(
+    {
+        "selected_external_fact_unverified", "research_candidate_owner_approval_unresolved",
+        "deployment_produced_unresolved", "owner_choice_unresolved",
+        "external_observation_unverified",
+    }
+)
+
+
+
+def validate_robinhood_stock_launch_qualification(
+    qualifications: tuple[RobinhoodStockInputQualification, ...] = (
+        ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+    ),
+) -> None:
+    expected_paths = (
+        "Deployment.DP-10.aapl.identity",
+        "Deployment.DP-10.aapl.feed",
+        "Deployment.DP-10.aapl.decimals",
+        "Deployment.DP-10.aapl.P8",
+        "Deployment.DP-10.aapl.perUserCap",
+        "Deployment.DP-10.aapl.globalCap",
+        "Deployment.DP-10.aapl.vault",
+        "Deployment.DP-10.aapl.risk",
+        "Deployment.DP-10.aapl.auction",
+        "Deployment.DP-10.aapl.route",
+        "Deployment.DP-11.stock.vaultArtifact",
+        "Deployment.DP-11.stock.vaultSlot",
+        "Deployment.DP-11.stock.m2Movement",
+        "Deployment.DP-11.stock.m3CreditContainment",
+        "Deployment.DP-11.stock.m4ComposedProof",
+        "Deployment.DP-11.stock.m5ActivationBinding",
+    )
+    paths = tuple(item.path for item in qualifications)
+    if paths != expected_paths or len(paths) != len(set(paths)):
+        raise ValueError("RH_STOCK_INPUT_CENSUS")
+    if any(path not in ROBINHOOD_DEPLOYMENT_INPUTS for path in paths):
+        raise ValueError("RH_STOCK_INPUT_AUTHORITY")
+    if any(
+        not isinstance(ROBINHOOD_DEPLOYMENT_INPUTS[path].value, SymbolicBinding)
+        or ROBINHOOD_DEPLOYMENT_INPUTS[path].disposition != "blocked"
+        for path in paths
+    ):
+        raise ValueError("RH_STOCK_PREMATURE_BINDING")
+    if ROBINHOOD_INITIAL_STOCK_SYMBOLS != ("AAPL",):
+        raise ValueError("RH_STOCK_SYMBOL_SCOPE")
+    if dict(ROBINHOOD_STOCK_ACTIVATION_POLICY) != {
+        "vault": "GuardedErc20",
+        "exclusiveVaultAssignment": True,
+        "shouldSwapInStabPools": False,
+        "shouldTransferToEndaoment": False,
+        "shouldAuctionInstantly": True,
+        "canRedeemCollateral": False,
+        "unsupportedStockRoutes": "absent",
+        "stockRewards": "disabled_recommendation_only",
+        "defaultsPosture": "absent_until_atomic_packet_accepted",
+    }:
+        raise ValueError("RH_STOCK_POLICY")
+    if ROBINHOOD_ASSERTION_INVARIANTS["stock_enabled_vaults"] != (
+        "GuardedErc20",
+    ):
+        raise ValueError("RH_STOCK_VAULT_SELECTION")
+    if ROBINHOOD_ASSERTION_INVARIANTS[
+        "stock_excluded_from_stability_pool"
+    ] is not True:
+        raise ValueError("RH_STOCK_STABILITY_EXCLUSION")
+    if tuple(
+        item.path
+        for item in qualifications
+        if item.resolution == "repository_fact_integrated"
+    ) != (
+        "Deployment.DP-11.stock.vaultArtifact",
+        "Deployment.DP-11.stock.m2Movement",
+        "Deployment.DP-11.stock.m3CreditContainment",
+        "Deployment.DP-11.stock.m4ComposedProof",
+    ):
+        raise ValueError("RH_STOCK_REPOSITORY_FACT_SET")
+    if any(
+        item.resolution != "repository_fact_integrated"
+        and not item.blocker_ids
+        for item in qualifications
+    ):
+        raise ValueError("RH_STOCK_UNTYPED_BLOCKER")
+    if any(
+        item.resolution == "repository_fact_integrated" and item.blocker_ids
+        for item in qualifications
+    ):
+        raise ValueError("RH_STOCK_RESOLVED_BLOCKER")
+    m4_candidate = next(
+        item.candidate
+        for item in qualifications
+        if item.path == "Deployment.DP-11.stock.m4ComposedProof"
+    )
+    if not isinstance(m4_candidate, RobinhoodStockM4Binding):
+        raise ValueError("RH_STOCK_M4_BINDING_SHAPE")
+
+
+def validate_robinhood_stock_m4_binding(
+    repository_root: Path | str,
+    binding: RobinhoodStockM4Binding = ROBINHOOD_STOCK_M4_BINDING,
+) -> None:
+    """Validate historical M4 identity and its separate current applicability."""
+
+    if not isinstance(binding, RobinhoodStockM4Binding):
+        raise ValueError("RH_STOCK_M4_BINDING_SHAPE")
+
+    root = Path(repository_root).resolve()
+
+    def git(*args: str) -> bytes:
+        result = subprocess.run(
+            ["/usr/bin/git", "-C", str(root), *args],
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise ValueError("RH_STOCK_M4_GIT")
+        return result.stdout
+
+    expected_commit = "a2d6b940c9b90d9ff1c78560ad61b2dd546f1760"
+    expected_changed_paths = (
+        ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
+        (
+            "A",
+            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
+        ),
+        (
+            "A",
+            "tests/core/deleverage/test_deleverage_stock_delivery.py",
+        ),
+        (
+            "M",
+            "tests/core/deleverage/test_deleverage_swap_collateral.py",
+        ),
+    )
+    historical = binding.historical_tranche
+    if historical.integration_commit != expected_commit:
+        raise ValueError("RH_STOCK_M4_COMMIT")
+
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(root),
+            "merge-base",
+            "--is-ancestor",
+            expected_commit,
+            "HEAD",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        raise ValueError("RH_STOCK_M4_NON_ANCESTOR")
+
+    commit_with_parents = git(
+        "rev-list", "--parents", "-n", "1", expected_commit
+    ).decode().split()
+    if len(commit_with_parents) != 2:
+        raise ValueError("RH_STOCK_M4_PARENT_CENSUS")
+    parent = commit_with_parents[1]
+    changed_path_lines = git(
+        "diff-tree",
+        "--no-commit-id",
+        "--name-status",
+        "-r",
+        "--no-renames",
+        parent,
+        expected_commit,
+        "--",
+    ).decode().splitlines()
+    try:
+        derived_changed_paths = tuple(
+            tuple(line.split("\t", 1)) for line in changed_path_lines
+        )
+    except ValueError as error:
+        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS") from error
+    if any(len(item) != 2 for item in derived_changed_paths):
+        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS")
+    if (
+        historical.changed_paths != expected_changed_paths
+        or derived_changed_paths != expected_changed_paths
+        or historical.changed_paths != derived_changed_paths
+    ):
+        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS")
+
+    expected_test_paths = tuple(path for _, path in expected_changed_paths)
+    test_identities = binding.current_test_identities
+    if tuple(item.path for item in test_identities) != expected_test_paths:
+        raise ValueError("RH_STOCK_M4_TEST_IDENTITY_CENSUS")
+    for identity in test_identities:
+        baseline_bytes = git("cat-file", "blob", f"HEAD:{identity.path}")
+        baseline_blob = git("rev-parse", f"HEAD:{identity.path}").decode().strip()
+        if identity.git_blob != baseline_blob:
+            raise ValueError("RH_STOCK_M4_TEST_BLOB")
+        if identity.sha256 != hashlib.sha256(baseline_bytes).hexdigest():
+            raise ValueError("RH_STOCK_M4_TEST_SHA256")
+        try:
+            working_bytes = (root / identity.path).read_bytes()
+        except OSError as error:
+            raise ValueError("RH_STOCK_M4_TEST_WORKTREE_DRIFT") from error
+        if working_bytes != baseline_bytes:
+            raise ValueError("RH_STOCK_M4_TEST_WORKTREE_DRIFT")
+
+    expected_artifacts = (
+        ("AuctionHouse", "contracts/core/AuctionHouse.vy"),
+        ("Deleverage", "contracts/core/Deleverage.vy"),
+        ("GuardedErc20", "contracts/vaults/GuardedErc20.vy"),
+    )
+    artifact_identities = binding.current_artifact_identities
+    if tuple(
+        (item.contract, item.source_path) for item in artifact_identities
+    ) != expected_artifacts:
+        raise ValueError("RH_STOCK_M4_ARTIFACT_IDENTITY_CENSUS")
+
+    expectations_path = "config/contract-artifact-expectations.json"
+    expectations_bytes = git("cat-file", "blob", f"HEAD:{expectations_path}")
+    try:
+        if (root / expectations_path).read_bytes() != expectations_bytes:
+            raise ValueError("RH_STOCK_M4_ARTIFACT_FILE_DRIFT")
+        expectations = json.loads(expectations_bytes)["contracts"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError("RH_STOCK_M4_ARTIFACT_FILE_DRIFT") from error
+
+    for identity in artifact_identities:
+        baseline_bytes = git("cat-file", "blob", f"HEAD:{identity.source_path}")
+        baseline_blob = git(
+            "rev-parse", f"HEAD:{identity.source_path}"
+        ).decode().strip()
+        if identity.source_git_blob != baseline_blob:
+            raise ValueError("RH_STOCK_M4_SOURCE_BLOB")
+        if identity.source_sha256 != hashlib.sha256(baseline_bytes).hexdigest():
+            raise ValueError("RH_STOCK_M4_SOURCE_SHA256")
+        try:
+            working_bytes = (root / identity.source_path).read_bytes()
+        except OSError as error:
+            raise ValueError("RH_STOCK_M4_SOURCE_WORKTREE_DRIFT") from error
+        if working_bytes != baseline_bytes:
+            raise ValueError("RH_STOCK_M4_SOURCE_WORKTREE_DRIFT")
+
+        try:
+            canonical = expectations[identity.contract]
+            canonical_identity = (
+                canonical["source_path"],
+                canonical["source_git_blob"],
+                canonical["source_sha256"],
+                canonical["artifacts"]["creation_sha256"],
+                canonical["artifacts"]["runtime_template_sha256"],
+                canonical["abi"]["canonical_sha256"],
+                canonical["selectors"]["canonical_sha256"],
+            )
+        except (KeyError, TypeError) as error:
+            raise ValueError("RH_STOCK_M4_ARTIFACT_EXPECTATION") from error
+        bound_identity = (
+            identity.source_path,
+            identity.source_git_blob,
+            identity.source_sha256,
+            identity.creation_sha256,
+            identity.runtime_template_sha256,
+            identity.abi_canonical_sha256,
+            identity.selectors_canonical_sha256,
+        )
+        if bound_identity != canonical_identity:
+            raise ValueError("RH_STOCK_M4_ARTIFACT_EXPECTATION")
+
+
+def robinhood_stock_launch_readiness() -> tuple[bool, tuple[str, ...]]:
+    validate_robinhood_stock_launch_qualification()
+    blockers = tuple(
+        f"input:{item.path}:{item.resolution}"
+        for item in ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+        if item.resolution != "repository_fact_integrated"
+    )
+    return False, (*blockers, "activation:atomic_packet_unaccepted")
+
+
+validate_robinhood_stock_launch_qualification()
+
+# DeployArgs indexes all five legacy dictionaries. Robinhood exposes only the
+# bounded GREEN/USDG Curve candidate here; unresolved owner choices and the
+# deployment-produced pool address remain fail-closed in the authority rows.
 ADDYS["robinhood"] = ROBINHOOD_ADDRESSES
 PARAMS["robinhood"] = {
     "DEPLOYMENT_INPUTS": ROBINHOOD_DEPLOYMENT_INPUTS,
     "CHAIN": ROBINHOOD_CHAIN,
     "COMPONENTS": ROBINHOOD_COMPONENTS,
 }
-CURVE_PARAMS["robinhood"] = {}
+_ROBINHOOD_CURVE_VALUES = {
+    row.input_id: row.value for row in ROBINHOOD_CURVE_LAUNCH_INPUTS
+}
+CURVE_PARAMS["robinhood"] = {
+    "GREEN_POOL_NAME": _ROBINHOOD_CURVE_VALUES["pool.name"],
+    "GREEN_POOL_SYMBOL": _ROBINHOOD_CURVE_VALUES["pool.symbol"],
+    "GREEN_POOL_COINS": (
+        ROBINHOOD_ADDRESSES["USDG"],
+        ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+    ),
+    "GREEN_POOL_COIN_DECIMALS": _ROBINHOOD_CURVE_VALUES["pool.coin_decimals"],
+    "GREEN_POOL_A": _ROBINHOOD_CURVE_VALUES["pool.A"],
+    "GREEN_POOL_FEE": _ROBINHOOD_CURVE_VALUES["pool.fee"],
+    "GREEN_POOL_OFFPEG_MULTIPLIER": _ROBINHOOD_CURVE_VALUES[
+        "pool.offpeg_fee_multiplier"
+    ],
+    "GREEN_POOL_MA_EXP_TIME": _ROBINHOOD_CURVE_VALUES["pool.ma_exp_time"],
+    "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": _ROBINHOOD_CURVE_VALUES[
+        "pool.ma_exp_time_alternative_test_vector"
+    ],
+    "GREEN_POOL_ADDRESS": _ROBINHOOD_CURVE_VALUES["pool.address"],
+}
 CORE_TOKENS["robinhood"] = {
     "USDG": ROBINHOOD_ADDRESSES["USDG"],
     "WETH": ROBINHOOD_ADDRESSES["WETH"],

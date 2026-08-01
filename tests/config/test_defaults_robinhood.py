@@ -505,15 +505,38 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     assert compatibility["blockers"] == []
     assert blueprint_source.ROBINHOOD_COMPONENTS["price_desk_registry"] == {
         1: "Chainlink",
-        2: None,
+        2: "Curve",
         3: "BlueChipYield",
         4: None,
         5: None,
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False
+    assert len(blockers) == 80
+    assert not any("Deployment.DP-15.rewards.promotion" in item for item in blockers)
     assert any(item.endswith(":unresolved") for item in blockers)
     assert any(item.endswith(":unverified") for item in blockers)
+    assert any(item.startswith("curve:owner_selected:") for item in blockers)
+    assert any(item.startswith("curve:deployment_produced:") for item in blockers)
+
+
+def test_curve_launch_values_are_blueprint_owned_and_not_derived_json_values():
+    params = blueprint_source.CURVE_PARAMS["robinhood"]
+    assert params["GREEN_POOL_COINS"] == (
+        blueprint_source.ROBINHOOD_ADDRESSES["USDG"],
+        blueprint_source.ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+    )
+    assert params["GREEN_POOL_COIN_DECIMALS"] == (6, 18)
+    assert params["GREEN_POOL_A"] == 100
+    assert params["GREEN_POOL_FEE"] == 4_000_000
+    assert params["GREEN_POOL_OFFPEG_MULTIPLIER"] == 20_000_000_000
+    assert params["GREEN_POOL_MA_EXP_TIME"] == 600
+    assert params["GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR"] == 866
+    assert type(params["GREEN_POOL_ADDRESS"]).__name__ == "SymbolicBinding"
+    destinations = {
+        record["destination"]["path"] for record in _ledger()["parameters"]
+    }
+    assert not any("curve" in destination.lower() for destination in destinations)
 
 
 def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
@@ -531,9 +554,20 @@ def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
     for record_id, old in old_by_id.items():
         new = new_by_id[record_id]
         assert new["destination"] == old["destination"]
-        if record_id == "P-H04-436":
+        if record_id in {"P-H04-399", "P-H04-436"}:
             assert old["status"] == "blocked"
             assert new["status"] == "approved"
+            continue
+        if record_id == "P-H04-391":
+            assert old["value"] == {"kind": "concrete", "raw": False}
+            assert new["value"] == {"kind": "concrete", "raw": True}
+            assert new["zero_semantics"] == {
+                "kind": "not_zero",
+                "explanation": (
+                    "Approved explicit Stock exclusion; false, absence, "
+                    "and omission are distinct."
+                ),
+            }
             continue
         assert new["status"] == old["status"]
         if old["status"] in {"approved", "disabled", "external_fact", "derived"}:

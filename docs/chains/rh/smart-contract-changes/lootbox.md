@@ -10,14 +10,38 @@
 > marked “independently reproduced” were rerun at the reviewed snapshot. A modeled
 > cadence is never represented as a chain guarantee.
 
+## Current `rh` rebind
+
+The current authority for this page is `rh` commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July snapshot and
+validation results remain dated historical evidence below.
+
+| Current identity | Value |
+| --- | --- |
+| Lootbox source Git blob / SHA-256 | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` / `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+| Creation artifact | 21,911 bytes; SHA-256 `0222bd8f06f226cff079c5798df5fe7fd5d97d722bc2132c454865c7c8853e09` |
+| Runtime template | 21,569 bytes; SHA-256 `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097`; 3,007 bytes EIP-170 headroom |
+| [`test_underscore_rewards.py`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Git blob `b2b23f3b7683534c7a492d1461bc8991d0d65050`; SHA-256 `e670b36ae68f2ceeee1b3c0c6a0e663213172b1aa27b7203e02ab6a400e0b7d3` |
+| [Deployment-profile test](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Git blob `d082c315a12f4fdb6136b34925e335250fec9a91`; SHA-256 `e929e6c7f91e6d73ba0b2c96bd7cdb4d69d28db2ad0def700863190d86245a6c` |
+| [Contract-artifact test](../../../../tests/inventory/test_contract_artifacts.py) | Git blob `3eb4a93c0d5bd400586a1b1aa980432ac2aa0284`; SHA-256 `ecbd803c2e002eac39a565e3d2bbf419af16319952a0c7ef0867e5c50b61ac86` |
+
+Later integrated tests now pin exact five-argument manifest order, both local
+deployment postures and readbacks, historical Base arity incompatibility,
+initially-disabled/later-enabled first-send behavior, and the accepted
+max-minus-one checked-addition overflow boundary. These close the old missing
+profile and edge-case evidence gaps. They do not create a Robinhood migration
+or deployment. No behavioral suite was rerun for this documentation-only
+refresh.
+
 ## Reviewed implementation snapshot
 
 | Identity | Reviewed value |
 | --- | --- |
 | Branch | `rh` |
-| `HEAD`, local `rh`, cached `origin/rh` | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
-| Credential-disabled live `origin/rh` | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
-| `HEAD` tree | `161fb828f3bbf4cb12596a5dfaf6c9bf1e153381` |
+| Dated reviewed `HEAD`, local `rh`, cached `origin/rh` | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
+| Dated credential-disabled live `origin/rh` | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
+| Dated reviewed `HEAD` tree | `161fb828f3bbf4cb12596a5dfaf6c9bf1e153381` |
 | Production implementation | `f40dc25ff0352b6ce79944fb28c37499da7bf0f0` |
 | Implementation parent | `f0bfd0fd5ac2be1d27321463b77248c7cd91d829` |
 | Current `Lootbox.vy` SHA-256 / Git blob | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` / `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` |
@@ -309,11 +333,11 @@ The constructor’s reward-amount arguments are still required ABI inputs, but w
 the initial interval is zero the constructor deliberately leaves both stored
 amounts at zero.
 
-**Integrated fact.** No integrated `migrations/robinhood/` namespace, Lootbox
-deployment migration, `DefaultsRobinhood.vy`, or
-`config/robinhood-parameters.json` exists at this snapshot. The repository has a
-reserved *proposed* `0010_Track6S3LootboxFloor.py` pre-deployment assertion, not an
-onchain upgrade or integrated migration
+**Current fact.** `DefaultsRobinhood.vy`, `config/BluePrint.py`, the derived
+parameter ledger, and local Lootbox deployment-profile evidence now exist.
+There is still no integrated Robinhood Lootbox deployment migration or onchain
+deployment. The historical reserved `0010_Track6S3LootboxFloor.py` name is a
+planning assertion, not an onchain upgrade or integrated migration
 ([reservation](../robinhood-deployment-support-specification.md#L1185-L1192)).
 
 > **Deployment or release gate.** The deployment owner must supply and approve
@@ -367,9 +391,9 @@ only be reproduced from its pinned historical source/artifact/manifest context.
 policy. It does not make them forward-compatible.
 
 > **Deployment or release gate.** A future Base replacement and the initial
-> Robinhood deployment each need a new explicit current-constructor path. There is
-> no migration/deployment-configuration test at this snapshot proving that future
-> path, because that path is not yet integrated.
+> Robinhood deployment each need a new explicit current-constructor path. Local
+> profile tests now prove constructor order and readback, but no integrated
+> migration executes those profiles.
 
 ## Test-to-invariant matrix
 
@@ -387,8 +411,8 @@ policy. It does not make them forward-compatible.
 | Claims, deposit/borrow points, and RIPE rewards remain unchanged | [borrow points](../../../../tests/core/lootbox/test_loot_borrow_points.py#L6-L49), [claims](../../../../tests/core/lootbox/test_loot_claim.py#L7-L61), [deposit points](../../../../tests/core/lootbox/test_loot_deposit_points.py#L7-L64), [RIPE rewards](../../../../tests/core/lootbox/test_loot_ripe_rewards.py#L9-L56) | These suites do not isolate the new floor, but they are meaningful regression coverage because all compile/deploy the changed shared contract. All are included in 175 current passes. |
 | Inventory classifies and content-pins production source | [path/content pin](../../../../config/block-clock-inventory.json#L12161-L12170), [BN-025 rows](../../../../config/block-clock-inventory.json#L1437-L1469) | Checker validates exact path/hash/occurrences. Current checker is green. |
 | Floor discovery fails on delete/rename/move | [exact pattern and mutations](../../../../tests/inventory/test_block_clock_inventory.py#L700-L748) | Explicit mutation-sensitive tests; all four cases passed within the current 95-test inventory run. |
-| Migration/configuration supplies five correct arguments | No integrated test/path | **Gap:** direct fixtures prove the constructor, but no future Base or Robinhood migration/manifest is integrated to test. |
-| Extreme allowed interval cannot overflow `last + interval` | No direct Lootbox test | **Gap:** exact max is rejected, but max-minus-one checked-addition behavior is not covered. Approved values are safe; a sane deployment cap would be separate hardening. |
+| Local deployment profile supplies five correct arguments | [`test_lootbox_deployment_profiles.py`](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Current tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. No Robinhood migration is integrated. |
+| Max-minus-one interval overflows `last + interval` | [`test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Current test establishes the accepted fail-closed checked-addition boundary; a sane upper limit would require a separate source/configuration decision. |
 | General mutation testing | No mutation framework run | **Gap:** boundary and inventory tests are demonstrably mutation-sensitive, but there is no broad compiler/source mutation score. |
 
 ## Historical versus current validation evidence
@@ -510,9 +534,9 @@ runtime hash cannot be known until that input is owner-approved and bound.
 | Block-time/model drift | Accepted design tradeoff plus monitoring concern | Revalidate assumptions at release and monitor event wall-time; do not promise a day |
 | Repeated numbers, jumps, bursts, or halt | Accepted design tradeoff | Repeats/halts delay; jumps may cross boundary; no catch-up; operational alerts should distinguish chain behavior from contract failure |
 | Strict-`>` misunderstanding | Monitoring/documentation concern | Equality fails; runbook and post-deploy probe must use `last + interval + 1` |
-| Extreme interval checked-add overflow | Future hardening / configuration gate | Max-minus-one remains allowed; add a bounded test or approved sane maximum in a separate source decision if desired |
+| Extreme interval checked-add overflow | Covered accepted boundary / configuration gate | Max-minus-one remains allowed and its checked-addition revert is pinned; an approved sane maximum would be a separate source decision |
 | Historical migration replay | Deployment/configuration gate | Old scripts are intentionally immutable but incompatible with current constructor; use new forward paths |
-| Missing future deployment test | Deployment/configuration gate | No RH manifest/migration or new Base migration exists to test yet |
+| Missing executable deployment path | Deployment/configuration gate | Local draft profiles and readback tests exist, but no Robinhood deployment migration or new Base migration is integrated |
 | Inadequate monitoring | Monitoring concern | Observe immutable, mutable state, feature flag, capability, registry, distribution events, and elapsed wall time |
 | Future-chain reuse | Future hardening | New chain needs approved empirical/model evidence and explicit constructor value; do not reuse `7_200` by analogy |
 | Stale test/evidence counts | Monitoring/documentation concern | Pin commit and command output; historical 60/2,722 and current 95/99-94-17 must not be mixed |
@@ -539,25 +563,25 @@ No residual listed here grants authority to modify Lootbox source in this task.
    separate owner gates close.
 6. If Base convergence is pursued, use a new forward migration and a separately
    approved state-window, authority, registry, rollback, and temporary-drift plan.
-7. Add the eventual deployment/manifest tests before claiming deployment readiness.
+7. Add migration-specific execution tests when an actual deployment path is
+   separately authorized; the current draft-profile tests do not replace them.
 
 ### Recommended hardening
 
 > **Agent recommendation — unapproved.**
 
-1. Add a dry-run constructor-arity/order test for each future Base/RH deployment
-   path and assert decoded constructor inputs against the manifest.
-2. Add an explicit initially-disabled/later-enabled first-send boundary test.
-3. Add max-minus-one/overflow coverage and consider a separately approved sane
-   upper bound if governance should never select impractical intervals.
-4. Monitor distribution event gaps in both EVM-number and wall-time domains, with
+1. Retain the current constructor-order/readback, later-enable, and
+   max-minus-one overflow regressions when a future deployment path is added.
+2. Consider a separately approved sane upper bound if governance should never
+   select impractical intervals.
+3. Monitor distribution event gaps in both EVM-number and wall-time domains, with
    alerts that distinguish repeat/jump/halt behavior from wrong configuration.
-5. Regenerate snapshot-specific evidence counts in every release packet rather
+4. Regenerate snapshot-specific evidence counts in every release packet rather
    than copying historical totals.
 
 ### Owner-parked
 
-> **Owner-parked work.** The separate Deleverage branch/PR, CCIP workflows,
+> **Owner-parked work.** Further Deleverage work, CCIP workflows,
 > zero-backing settlement, loss allocation, and bad-debt policy are outside this
 > process. They are neither Lootbox blockers nor current assignments.
 

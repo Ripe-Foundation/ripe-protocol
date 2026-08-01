@@ -36,6 +36,9 @@ PROFILE1_CONFIGURATION_PROVENANCE_COMMIT = (
 SOURCE_AUTHORITY_REVIEW_COMMIT = (
     "74c4120fbfa1ade859dc32f61acdf567c139fe02"
 )
+REWARD_LAUNCH_REVIEW_COMMIT = (
+    "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+)
 PR61_REVIEW_COMMIT = "2c36e4aa06395d5075c348aab71d468fa099775f"
 PR61_PRODUCTION_SOURCE_SHA256 = {
     "contracts/config/SwitchboardDelta.vy": (
@@ -92,7 +95,7 @@ SOURCE_AUTHORITY_DIRECT_RECORDS_SHA256 = (
 )
 SOURCE_AUTHORITY_CADENCE_RECORD_COUNT = 121
 SOURCE_AUTHORITY_CADENCE_RECORDS_SHA256 = (
-    "2ffc6436b552ecef9ab7c62d68c8cbc567a19b15144081643f4f02fb25d2a5e3"
+    "f0a141500ca5bf68b42f1fff8550a61acc1c87369a834f2a350cb9df2b311aa2"
 )
 SOURCE_AUTHORITY_SECONDS_RECORD_COUNT = 12
 SOURCE_AUTHORITY_SECONDS_RECORDS_SHA256 = (
@@ -105,6 +108,10 @@ SOURCE_AUTHORITY_PATH_RECORDS_SHA256 = (
 SOURCE_AUTHORITY_CAD_SITE_COUNT = 5
 SOURCE_AUTHORITY_CAD_SITES_SHA256 = (
     "7bd4eb03d20abaf7b1776e7032b9c66a39fd3dae9975ebc1a3e688cf75140e7c"
+)
+REWARD_LAUNCH_CADENCE_RECORD_COUNT = 21
+REWARD_LAUNCH_CADENCE_RECORDS_SHA256 = (
+    "e8e943571dcedbc6aa56295434857bac69ed34241405e698407ab7721fbbd01d"
 )
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
@@ -184,6 +191,7 @@ EXPECTED_REVIEW_PROVENANCE = {
     "hardeningApprovalCommit": HARDENING_REVIEW_COMMIT,
     "pr61ReviewCommit": PR61_REVIEW_COMMIT,
     "sourceAuthorityReviewCommit": SOURCE_AUTHORITY_REVIEW_COMMIT,
+    "rewardLaunchReviewCommit": REWARD_LAUNCH_REVIEW_COMMIT,
 }
 S5_REVIEW_ARTIFACT_SHA256 = (
     "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76"
@@ -214,7 +222,7 @@ CURRENT_PRODUCTION_INVENTORY_SHA256 = (
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
-    "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441"
+    "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59"
 )
 EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
     {
@@ -231,6 +239,14 @@ EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "historicalContentSha256": None,
         "currentContentSha256": (
             "d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac"
+        ),
+    },
+    {
+        "path": "contracts/mock/MockRobinhoodCurveSystem.vy",
+        "classification": "mock",
+        "historicalContentSha256": None,
+        "currentContentSha256": (
+            "6d180087f56b68ed7387cce91f391fddf6ae9845a1ab78fef095423d0f4279ea"
         ),
     },
     {
@@ -348,6 +364,13 @@ SOURCE_AUTHORITY_CADENCE_PATHS = frozenset(
         "scripts/abis/DefaultsRobinhood.json",
         "scripts/params/generate_robinhood_defaults.py",
         "tests/config/test_defaults_robinhood.py",
+    }
+)
+REWARD_LAUNCH_CADENCE_PATHS = frozenset(
+    {
+        "config/robinhood-reward-launch-plan.json",
+        "scripts/params/validate_robinhood_reward_launch_plan.py",
+        "tests/core/lootbox/test_robinhood_reward_containment.py",
     }
 )
 SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS = frozenset(
@@ -1327,6 +1350,25 @@ def _source_authority_cad_sites(
     ]
 
 
+def _reward_launch_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if str(record.get("path", "")) in REWARD_LAUNCH_CADENCE_PATHS
+    ]
+
+
+def _is_exact_reward_launch_batch(data: Mapping[str, Any]) -> bool:
+    records = _reward_launch_cadence_records(data)
+    return (
+        len(records) == REWARD_LAUNCH_CADENCE_RECORD_COUNT
+        and _records_fingerprint(records)
+        == REWARD_LAUNCH_CADENCE_RECORDS_SHA256
+    )
+
+
 def _is_exact_source_authority_batch(data: Mapping[str, Any]) -> bool:
     direct = _source_authority_direct_records(data)
     cadence = _source_authority_cadence_records(data)
@@ -2015,6 +2057,14 @@ def _s5_legacy_inventory_fingerprint(
         if exact_pr61_artifact_metadata
         else frozenset()
     )
+    exact_reward_launch_records = (
+        frozenset(
+            _record_fingerprint(record)
+            for record in _reward_launch_cadence_records(data)
+        )
+        if _is_exact_reward_launch_batch(data)
+        else frozenset()
+    )
     legacy = copy.deepcopy(dict(data))
     if exact_pr61_reconciliation:
         _restore_pr61_legacy_inventory(legacy)
@@ -2025,6 +2075,10 @@ def _s5_legacy_inventory_fingerprint(
     if exact_source_cadence:
         legacy["reviewProvenance"].pop(
             "sourceAuthorityReviewCommit", None
+        )
+    if exact_reward_launch_records:
+        legacy["reviewProvenance"].pop(
+            "rewardLaunchReviewCommit", None
         )
     legacy["directOccurrences"] = [
         record
@@ -2042,6 +2096,7 @@ def _s5_legacy_inventory_fingerprint(
             | exact_pr61_artifact_metadata_keys
         )
         and _record_fingerprint(record) not in exact_source_cadence
+        and _record_fingerprint(record) not in exact_reward_launch_records
     ]
     legacy["secondsUnitCandidates"] = [
         record
@@ -2436,13 +2491,13 @@ def _validate_current_bindings(
             Finding(
                 code="INV-SCHEMA-CURRENT-BINDINGS",
                 domain="schema",
-                expected="ordered-source=4+ordered-timestamp=4",
+                expected="ordered-source=5+ordered-timestamp=4",
                 actual=(
                     f"source={len(source_bindings)},"
                     f"timestamp={len(timestamp_bindings)}"
                 ),
                 remediation=(
-                    "restore the exact eight current bindings; no adjacent "
+                    "restore the exact nine current bindings; no adjacent "
                     "path or timestamp inherits this authority"
                 ),
             )
@@ -2461,7 +2516,7 @@ def _validate_current_bindings(
             Finding(
                 code="INV-SCHEMA-CURRENT-BINDINGS-DUPLICATE",
                 domain="schema",
-                expected="unique-source=4+unique-timestamp=4",
+                expected="unique-source=5+unique-timestamp=4",
                 actual=(
                     f"source={len(set(source_keys))},"
                     f"timestamp={len(set(timestamp_keys))}"
@@ -2705,6 +2760,8 @@ def _validate_schema(
     source_paths = _source_authority_path_records(data)
     source_sites = _source_authority_cad_sites(data)
     exact_source_authority_batch = _is_exact_source_authority_batch(data)
+    reward_cadence = _reward_launch_cadence_records(data)
+    exact_reward_launch_batch = _is_exact_reward_launch_batch(data)
     exact_reviewer_remediation_registry = (
         _is_exact_reviewer_remediation_cadence_registry(data)
     )
@@ -2740,6 +2797,24 @@ def _validate_schema(
                 remediation=(
                     "restore the exact reviewed source-authority inventory batch; "
                     "no adjacent record or path inherits this authority"
+                ),
+            )
+        )
+    if not exact_reward_launch_batch:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-REWARD-LAUNCH-BATCH",
+                domain="cadence",
+                expected=(
+                    f"cadence={REWARD_LAUNCH_CADENCE_RECORD_COUNT}/"
+                    f"{REWARD_LAUNCH_CADENCE_RECORDS_SHA256}"
+                ),
+                actual=(
+                    f"cadence={len(reward_cadence)}/"
+                    f"{_records_fingerprint(reward_cadence)}"
+                ),
+                remediation=(
+                    "restore the exact signed reward-launch cadence projection"
                 ),
             )
         )
@@ -3096,32 +3171,29 @@ def _validate_schema(
     for record in data["cadenceCandidates"]:
         semantic_ids = _candidate_semantic_ids(record)
         expected_owner = "risk/oracle" if "CAD-001" in semantic_ids else "protocol/security"
-        expected_commit = (
-            TRACK3_REVIEW_COMMIT
-            if "CAD-001" in semantic_ids
-            else (
-                SOURCE_AUTHORITY_REVIEW_COMMIT
-                if exact_source_authority_batch
-                and (
-                    str(record.get("path", ""))
-                    in SOURCE_AUTHORITY_CADENCE_PATHS
-                    or _candidate_from_record(record)
-                    in SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS
-                )
-                else (
-                PROFILE1_CONFIGURATION_PROVENANCE_COMMIT
-                if _candidate_from_record(record)
-                == PROFILE1_CONFIGURATION_CADENCE_KEY
-                and exact_reviewer_remediation_registry
-                else (
-                        PR61_REVIEW_COMMIT
-                        if _candidate_from_record(record)
-                        == PR61_NEW_CONSTRUCTOR_CADENCE_KEY
-                        else HARDENING_REVIEW_COMMIT
-                )
-                )
-            )
-        )
+        record_path = str(record.get("path", ""))
+        record_key = _candidate_from_record(record)
+        if "CAD-001" in semantic_ids:
+            expected_commit = TRACK3_REVIEW_COMMIT
+        elif (
+            exact_reward_launch_batch
+            and record_path in REWARD_LAUNCH_CADENCE_PATHS
+        ):
+            expected_commit = REWARD_LAUNCH_REVIEW_COMMIT
+        elif exact_source_authority_batch and (
+            record_path in SOURCE_AUTHORITY_CADENCE_PATHS
+            or record_key in SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS
+        ):
+            expected_commit = SOURCE_AUTHORITY_REVIEW_COMMIT
+        elif (
+            record_key == PROFILE1_CONFIGURATION_CADENCE_KEY
+            and exact_reviewer_remediation_registry
+        ):
+            expected_commit = PROFILE1_CONFIGURATION_PROVENANCE_COMMIT
+        elif record_key == PR61_NEW_CONSTRUCTOR_CADENCE_KEY:
+            expected_commit = PR61_REVIEW_COMMIT
+        else:
+            expected_commit = HARDENING_REVIEW_COMMIT
         _validate_semantic_review(
             record,
             "cadence",
@@ -3926,7 +3998,7 @@ def check_repository(
             f"timestamp_occurrences={timestamp_counts[0]} "
             f"mixed_clock_functions={len(actual_mixed)} "
             f"vyper_paths={len(data['vyperPathClassifications'])} "
-            "current_bindings=4/4 "
+            "current_bindings=5/4 "
             f"current_state_sha256={CURRENT_BINDINGS_STATE_SHA256} "
             "post_s5_production_records="
             f"{sum(record.get('classification') == 'production' for record in data['vyperPathClassifications'])} "

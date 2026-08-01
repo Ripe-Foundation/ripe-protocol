@@ -1,16 +1,17 @@
 # Robinhood reassessment and qualification synthesis
 
-**Synthesis date:** 30 July 2026
+**Synthesis date:** 1 August 2026
 
-**Repository baseline:** `0d5994aa78f9d6f35b59bd7a2bc70fa18706e693`
+**Repository baseline:** `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`
 
-**Repository tree:** `b68dffdddbdc7c5ae8423db049099c1632b478c9`
+**Repository tree:** `7454b5456ebb6cd02d716a64b408629ab501629e`
 
-**Scope:** documentation and program synthesis only
+**Scope:** current program synthesis, including the bounded launch-pricing
+Curve amendment
 
-**Lifecycle effect:** no implementation, deployment, migration execution,
-configuration, activation, release, RPC, account, signer, Sites, or external
-state action
+**Lifecycle effect:** repository configuration, validation, tests, and handoff
+only; no deployment, migration execution, production configuration,
+activation, release, RPC, account, signer, Sites, or external-state action
 
 ## 1. Purpose and authority
 
@@ -39,6 +40,13 @@ The source reports are:
 Subsequent decision/evidence record (does not rewrite the eight source reports):
 
 - [Robinhood PSM lite-permission split decision and evidence](reassessment/psm-lite-permission-split.md)
+- [Robinhood Curve launch activation](curve-launch-activation.md)
+
+The Curve launch-activation record supersedes the earlier Profile 1/Profile 2
+boundary only for the exact launch-pricing topology it names. The copied source
+reports and hashes below remain historical evidence; their claims that
+PriceDesk ID 2 is empty or that all Curve use belongs to Profile 2 are no
+longer current.
 
 **Fork-census provenance:** intermediate corrected-report revision
 `cd13c3028315784b6a48de097b95529e18ee8d0695f7cd3eca5d6f6fcae6038c`
@@ -83,27 +91,36 @@ The copied-report byte identities are:
 4. Preserve auction-only liquidation initiation for Guarded Stock, external
    delivery as the default settlement, exclusive Guarded assignment, and
    Stock rewards disabled.
-5. Use Profile 1 as the launch profile. PriceDesk ID 1 has Chainlink selected;
-   ID 2 is empty and reserved for Profile 2 Curve; ID 3 has BlueChipYield
-   selected; and IDs 4 and 5 are empty. Priority price-source IDs are `[1, 3]`.
-   Curve remains absent from Profile 1, dynamic rates use the base fallback,
-   Teller's Curve reference branch is unreachable, and the Curve stabilizer is
+5. Retain the owner-approved PR #66 general RIPE reward values and shared
+   `1,000 RIPE` budget, including accepted Stability competition and zero
+   theoretical minimum runway. DP15 and P-H04-399 are approved; checkpoints,
+   identities, runbook operations, monitoring, H-05/H-06/H-08/H-09, rehearsal,
+   deployment, activation, and release stay gated. Stock rewards remain
    disabled.
-6. Keep Chainlink as launch oracle authority and the sole PSM price authority.
-   BlueChipYield provides the selected yield-token pricing route; it is not a
-   Curve or Uniswap launch fallback. Uniswap and Curve are not launch fallbacks.
-7. Do not build or register a Uniswap price-source contract at launch.
-8. RIPE/WETH V2 is at most an externally held launch-liquidity canary. It is
+6. Use the bounded launch-pricing profile. PriceDesk ID 1 has Chainlink
+   selected, ID 2 has unchanged `CurvePrices` selected, ID 3 has
+   BlueChipYield selected, and IDs 4 and 5 are empty. Priority price-source
+   IDs remain `[1, 3]`. ID 2 is used only for GREEN through the candidate
+   GREEN/USDG pool; USDG has no Curve feed. Dynamic rates, Teller reference
+   snapshots, and the Curve stabilizer remain inactive.
+7. Keep Chainlink as the sole USDG and PSM price authority. The GREEN route is
+   GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG, with no recursion.
+   BlueChipYield remains the selected yield-token route. Uniswap is not a
+   launch fallback.
+8. Do not build or register a Uniswap price-source contract at launch.
+9. RIPE/WETH V2 is at most an externally held launch-liquidity canary. It is
    not a protocol oracle and its LP token is not admitted at launch.
-9. Do not create a launch GREEN/USDG Uniswap pool. GREEN/USDG belongs to the
-   staged Profile 2 Curve path.
-10. Neither the RIPE/WETH LP token nor the GREEN/USDG LP token is admitted at
-    launch. Both admissions move to Profile 2 and require separate activation
-    authority.
-11. Preserve the shared `EndaomentPSM` architecture with canonical USDG as the
+10. Do not create a launch GREEN/USDG Uniswap pool. A GREEN/USDG Curve pool is a
+   bounded launch-pricing candidate whose production address, funding,
+   custody, slippage, withdrawal, and operating controls remain blocked.
+11. Neither the RIPE/WETH LP token nor the GREEN/USDG Curve LP token is
+    admitted at launch. The pricing venue does not imply LP collateral,
+    oracle, custody, or stability admission; both LP admissions require
+    separate authority.
+12. Preserve the shared `EndaomentPSM` architecture with canonical USDG as the
     sole reserve asset, no yield position, disabled user directions, no
     effective GREEN-mint authority, and a redemption-first canary sequence.
-12. H-09 owns the opt-in read-only archive-fork qualification lane. Network is
+13. H-09 owns the opt-in read-only archive-fork qualification lane. Network is
     disabled by default. H-10 separately owns live testnet rehearsal and every
     real transaction, signer/account, persistent deployment, or operational
     action.
@@ -116,7 +133,7 @@ The copied-report byte identities are:
 | Teller | Preserve current contract, strict read, mutex, and equality checks | Release-gate test matrix, current rationale update, exact token/proxy qualification |
 | GuardedErc20 | Preserve separate specialized contract and existing ABI | VaultBook/asset binding, deployment policy, composed-route tests, monitoring and incident procedures |
 | Uniswap launch oracle | No contract at launch | Off-chain monitoring and separately approved pool/custody operations only |
-| Curve Profile 1 | No Curve contract, pool, or registration | Prove absence and safe fallback behavior |
+| Curve launch pricing | Unchanged `CurvePrices`, selected at ID 2 for GREEN only | Bind verified official identities and pool deployment/operations; prove exact route, fail-closed behavior, and inactive higher powers |
 | PSM architecture | Reuse shared contract | Later configuration, funding, qualification, and activation work under separate authority |
 | H-09 architecture | No production-contract change | Future test/evidence package after owner APIs and external inputs exist |
 
@@ -130,18 +147,22 @@ by accepting this synthesis.
 
 ### Profile and market topology
 
-- Profile 1 only.
+- Bounded launch-pricing profile only.
 - PriceDesk ID 1 has Chainlink selected.
-- PriceDesk ID 2 is empty and reserved for Profile 2 Curve.
+- PriceDesk ID 2 has unchanged `CurvePrices` selected.
 - PriceDesk ID 3 has BlueChipYield selected.
 - PriceDesk IDs 4 and 5 are empty.
 - Priority price-source IDs are `[1, 3]`.
-- Chainlink remains launch oracle authority. BlueChipYield provides the
-  selected yield-token pricing route; it is not a Curve or Uniswap launch
-  fallback.
-- No `CurvePrices` deployment or registration.
+- Chainlink remains the sole USDG and PSM authority. GREEN alone uses
+  GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no Curve
+  feed, so the route cannot recurse. BlueChipYield provides the selected
+  yield-token route.
+- Deploy/register `CurvePrices` at ID 2 only after the typed address,
+  constructor, pool, artifact, and operating blockers close.
 - No Uniswap price-source deployment or registration.
-- No GREEN/USDG launch pool.
+- The GREEN/USDG Curve venue is pricing-only. Its LP token is not admitted and
+  its deployment, funding, custody, slippage, withdrawal, observation, and
+  incident inputs remain blocked.
 - Any RIPE/WETH V2 canary remains externally held, operationally monitored,
   separately funded, and outside Ripe custody and valuation.
 - Neither LP token is admitted.
@@ -180,7 +201,8 @@ by accepting this synthesis.
 ### PSM disabled/canary-first posture
 
 - Deployment and registration, if later authorized, begin fully disabled.
-- Chainlink is the sole USDG price authority and PriceDesk ID 2 stays empty.
+- Chainlink is the sole USDG price authority. ID 2 may price GREEN through the
+  GREEN/USDG pool, but USDG itself has no Curve feed.
 - Yield remains `(0, zero)`, auto-deposit is disabled, and Underscore remains
   zero.
 - Both user directions and effective GREEN mint authority remain disabled
@@ -210,41 +232,42 @@ by accepting this synthesis.
 - Deployment, configuration, activation, release, and role transfer each remain
   separate later approvals.
 
-## 4. Profile 2 requirements
+## 4. Post-launch Curve higher powers and LP requirements
 
-Profile 2 is a staged near-term follow-on, not part of launch.
+The bounded GREEN pricing route is part of launch. Every other Curve power and
+every LP admission is a separately promoted follow-on.
 
 | Stage | Capability | Required boundary |
 | --- | --- | --- |
-| P2-A | Observation-only Curve fork qualification | No Ripe registry, pricing, rate, Teller, Endaoment, PSM, or live-chain authority change |
-| P2-B | Deploy/configure `CurvePrices` but keep ID 2 empty | Separate artifact/configuration approval; still no protocol consumer |
-| P2-C | Register approved ID-2 rows | Exact ordering, clock, staleness, snapshot, incident-disable, and per-asset approval |
+| P2-A | Production observation and bounded launch-route qualification | Exact ID-2 GREEN route only; no dynamic rate, Teller snapshot, Endaoment, PSM, LP, or broader feed authority |
+| P2-B | Later additional Curve feeds or consumers | Separate per-asset and per-consumer approval; USDG remains Chainlink-only unless explicitly changed |
+| P2-C | Promote optional snapshot or reference consumers | Exact clock, staleness, incident-disable, and consumer-specific approval |
 | P2-D | Enable dynamic-rate parameters | Accepted P2-C soak, risk parameters, caps, repeated/jump clock tests, emergency disable |
 | P2-E | Enable Endaoment stabilization | Exact roles, GREEN cap, liquidity/custody, profit/slippage, pool-admin, pause and recovery evidence |
 
-The preferred Profile 2 qualification candidates are
+The launch pool research candidates are
 `ma_exp_time=600`, `stabilizerAdjustWeight=5_000`, and
 `staleBlocks=7_200`. Required alternative fork vectors are
 `ma_exp_time=866` and `stabilizerAdjustWeight=7_500`. These are qualification
 candidates, not deployed configuration. `staleBlocks=0` and copied Base
 `43_200` are rejected.
 
-Profile 2 also owns:
+The follow-on lane owns:
 
-- GREEN/USDG Curve pool identity, graph, parameters, liquidity, custody, and
-  staged protocol use;
+- any GREEN/USDG use beyond the bounded launch-pricing route, plus broader
+  liquidity/custody and staged protocol use;
 - both LP-token admissions, each with `ltv=0`, no PriceDesk feed, complete
   valuation-negative proof, and separate activation;
 - unchanged `CurvePrices` using the deliberately accepted L1-derived EVM
   `NUMBER` semantics, subject to full repeated-number and jump qualification;
 - any Teller snapshots, dynamic-rate production, or Endaoment stabilization;
   and
-- the P2-C Switchboard pause, PriceDesk-ID-2 disable, repair, and guarded
-  re-enable runbook.
+- promotion beyond the launch route after the launch incident-disable, repair,
+  and guarded re-enable runbook has been qualified.
 
 Failure at any stage leaves or returns the system to the last accepted stage.
 Passing fork tests does not deploy, register, configure, activate, or release
-Profile 2.
+any launch or follow-on capability.
 
 ## 5. Explicitly deferred work
 
@@ -315,23 +338,22 @@ implementation grant. H-09 must reseal its final paths, nodes, stop codes, and
 verdict vocabulary, with Deleverage excluded unless reopened. The maximum
 result remains non-authoritative `LOCAL_FORK_QUALIFIED`.
 
-### Package D — Profile 1 deployment-preparation and PSM canary
+### Package D — launch deployment-preparation and PSM canary
 
-One later configuration/operations package for exact Profile 1 bindings,
-Chainlink launch-oracle authority, the selected BlueChipYield route, disabled
+One later configuration/operations package for exact launch bindings,
+Chainlink USDG authority, the bounded GREEN Curve route, the selected BlueChipYield route, disabled
 PSM preparation, reserve/custody decisions, redemption-first qualification,
 monitoring, incident controls, and a restricted activation packet. It begins
 only after exact machine, manifest, role, feed, token, and operator inputs exist.
 It does not combine preparation, qualification, and production activation into
 one authority.
 
-### Package E — Profile 2 staged market integration
+### Package E — post-launch Curve higher powers and LP integration
 
-One staged Curve/LP package progressing P2-A through P2-E with independent
-promotion gates. It covers the Curve graph and clock model, GREEN/USDG pool,
-observation, optional source registration, optional dynamic rates, optional
-stabilizer, and later LP admissions. No stage is implied by acceptance of the
-previous stage.
+One staged package for capabilities excluded from the bounded launch route. It
+covers additional Curve feeds or consumers, optional dynamic rates, optional
+Teller snapshots, optional stabilizer use, and later LP admissions. No stage is
+implied by acceptance of the previous stage.
 
 Uniswap TWAP implementation remains excluded while deferred.
 
@@ -350,25 +372,44 @@ The consolidated owner decisions no longer open for this program slice are:
 - preserve current Ledger architecture and raw-call boundary;
 - preserve current Teller strict balance-measurement design and global mutex;
 - preserve GuardedErc20 as a separate Stock-specific vault;
-- use Profile 1 at launch and stage Profile 2 as follow-on;
-- keep Chainlink as launch and PSM oracle authority, with PriceDesk ID 1
-  selected;
+- use the bounded Curve pricing topology at launch and stage every higher power
+  and LP admission as follow-on;
+- keep Chainlink as sole USDG and PSM authority, with PriceDesk ID 1 selected;
 - select BlueChipYield at PriceDesk ID 3 for the yield-token pricing route,
-  keep ID 2 empty/reserved for Profile 2 Curve, keep IDs 4 and 5 empty, and use
-  priority price-source IDs `[1, 3]`;
+  select unchanged `CurvePrices` at ID 2 for GREEN only, keep IDs 4 and 5
+  empty, and use priority price-source IDs `[1, 3]`;
 - deploy no Uniswap price-source contract at launch;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;
 - create no launch GREEN/USDG Uniswap venue;
-- move both LP admissions to Profile 2;
+- keep both LP admissions outside launch and separately gated;
 - keep `CurvePrices` unchanged;
 - use a disabled, allowlisted, redemption-first PSM canary posture;
 - keep PSM reserve separate from DEX liquidity;
 - keep H-09 network-disabled by default with explicit opt-in read-only archive
   qualification; and
-- keep H-10 as the separate live-rehearsal owner.
+- keep H-10 as the separate live-rehearsal owner; and
+- use the exact PR #66 initial-launch reward values with one shared 1,000-RIPE
+  Lootbox/Stability budget; accept an approximately 15.432-day emission-only
+  runway, Stability claims shortening it, and a zero theoretical minimum; and
+  select no Stability reserve, separate budget, redesign, or launch disablement.
 
 Reopening one of these decisions requires an explicit owner action and does not
 by itself authorize implementation or a later lifecycle phase.
+
+The owner exercised that reopening authority for both LP launch admissions on
+1 August 2026. The independent qualification in
+[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md)
+reaffirmed no LP-token protocol admission on fresh source-path evidence: the
+GREEN/USDG pool and bounded GREEN pricing route are selected launch work, but
+its LP token remains excluded; RIPE/WETH remains only a conditional externally
+held V2 canary. This is a new qualification decision, not reliance on the
+earlier no-admission conclusion. It changes no Defaults LP row, PSM,
+Deleverage, Uniswap-accounting, deployment, or activation state. The negative
+LP-admission result follows from missing verified facts, owner controls, and
+shared-path safety properties. No LP token is configured, registered, held as
+a Ripe asset, admitted, or active, and the selected GREEN/USDG pool remains
+undeployed and unfunded. Owner, external, implementation, fork, and security
+work may explicitly reopen a future result without authorizing it.
 
 ## 8. Remaining external inputs and residual decisions
 
@@ -403,7 +444,7 @@ by itself authorize implementation or a later lifecycle phase.
   and
 - monitoring, pause, escalation, grace, fresh-round, and recovery authority.
 
-### Liquidity, Curve, and Profile 2
+### Liquidity, Curve, and follow-on powers
 
 - final Curve source/artifact graph and current onchain graph at an approved
   pin;
@@ -413,8 +454,9 @@ by itself authorize implementation or a later lifecycle phase.
 - RIPE/WETH canary factory/router/pair, initialization, budget, custody,
   approvals, retained reserves, trade/slippage limits, unwind, and incident
   owners if the optional pool proceeds; and
-- separate owner approvals for each P2-C, P2-D, P2-E, and LP-admission
-  promotion.
+- closure of every typed launch-pool blocker before the bounded route is
+  deployment-ready, plus separate owner approvals for each later feed,
+  consumer, P2-C, P2-D, P2-E, and LP-admission promotion.
 
 ### PSM and operations
 
@@ -444,7 +486,8 @@ At this synthesis baseline:
 - no production configuration or registration has occurred;
 - no pool has been created or funded by this program;
 - no PSM reserve has been funded;
-- no Profile 2 capability has been deployed or activated;
+- no Curve launch-pricing or follow-on capability has been deployed or
+  activated;
 - no testnet or production rehearsal has occurred;
 - no account, key, signer, Safe, RPC endpoint, or transaction was used; and
 - no production activation or release has occurred.

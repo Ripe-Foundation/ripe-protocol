@@ -637,10 +637,11 @@ def test_real_price_desk_monitor_does_not_interfere_with_authoritative_sources(
 def test_launch_configuration_has_no_lp_admission_or_psm_authority():
     assert get_component("CM-015").deployment is Disposition.REQUIRED
     assert get_component("CM-016").deployment is Disposition.REQUIRED
+    assert get_component("CM-017").deployment is Disposition.REQUIRED
     assert get_component("CM-018").deployment is Disposition.REQUIRED
     assert {
         get_component(component_id).deployment
-        for component_id in ("CM-017", "CM-019", "CM-020")
+        for component_id in ("CM-019", "CM-020")
     } == {Disposition.OMITTED}
     assert all(
         component.name != "RobinhoodUniswapV2RipePrices"

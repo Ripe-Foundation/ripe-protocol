@@ -6,6 +6,29 @@
 > activation, migration, or release evidence, and it does not authorize any
 > source, test, configuration, or operational change.
 
+## Current `rh` rebind
+
+The current authority for this page is `rh` commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July snapshot and its
+test counts remain dated historical evidence below.
+
+| Current identity | Value |
+| --- | --- |
+| CreditEngine source Git blob / SHA-256 | `a98d2522a16708e887a5a8aad78171843d413baf` / `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` |
+| Runtime template | 24,132 bytes; SHA-256 `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de`; 444 bytes EIP-170 headroom |
+| [`test_stock_backing.py`](../../../../tests/core/creditEngine/test_stock_backing.py) | Git blob `2e72b0cffc1a11e47fd962c11b31cc5459b40fcd`; SHA-256 `6c2362f1074acbe05fa2a6b7f2b14919f484eaf176eef80507cfefea86f2d099` |
+| [`test_credit_borrow.py`](../../../../tests/core/creditEngine/test_credit_borrow.py) | Git blob `1139615df45f201dc401d9c68b3f075853d9394d`; SHA-256 `3d0e45f8cc6441d086766f09018bd1bbbc025e83c30e25f433b8ce2ea5310bd0` |
+| [`test_credit_repay.py`](../../../../tests/core/creditEngine/test_credit_repay.py) | Git blob `0c6390fcb54480cfe1376af1958c2ee97071e9cb`; SHA-256 `a65e733eb632dc74d1e69c42062ed7fda49dc60de322dd56d58aa13592490d91` |
+| [Guarded integration test](../../../../tests/vaults/test_guarded_erc20.py) | Git blob `700d6c3857795cc2058d54668252b53168fdb738`; SHA-256 `45fb971f92987017fed5ea40e85f74a3f3bb41bfe3f0a2f367f57f76c5b248f9` |
+
+Later integrated hardening closes the former withdrawal-surface and
+many-position-gas evidence gaps with
+`test_c1_max_withdrawable_numeric_null_and_terms_failure_surface` and the C2
+marginal gas protocol. Later AuctionHouse/Deleverage Stock composition is also
+present and inspected separately. No behavioral suite was rerun for this
+documentation-only refresh.
+
 ## Authority and status labels
 
 - **Integrated fact:** directly present in the reviewed repository snapshot.
@@ -62,10 +85,9 @@ treated as permanently synonymous with whatever `rh` may contain later.
 | What remains before deployment or activation? | Exact artifact/configuration binding, release-snapshot focused and composed validation, deployment evidence, monitoring, and an operational response path. These are gates around the source, not proof of a source defect. |
 | What is owner-parked? | Cross-asset `lowestLtv`, post-loss interest policy, settlement, recapitalization, loss allocation, and bad-debt design. They are not current Wave 1 blockers or automatic implementation assignments. |
 
-The separate Deleverage branch/PR and every CCIP workflow are explicitly
-outside this analysis. This record neither inspects nor depends on them. It
-also does not claim that pending H-04, H-06, M4, or other feature work is
-integrated unless present in the exact reviewed baseline above.
+The current integrated Deleverage source and composition tests were inspected
+for the package-level rebind; they do not enlarge this CreditEngine rationale
+or authorize further Deleverage work. CCIP remains outside this analysis.
 
 ## Behavior before the change and the concrete failure mode
 
@@ -269,8 +291,8 @@ not.
 The previously suggested change to exclude zero-capacity collateral from
 `lowestLtv` is an **agent research proposal, not owner-approved**. It is parked.
 This document does not recommend, schedule, or authorize that source change.
-The Deleverage references above describe only the exact reviewed `rh` baseline;
-the separate Deleverage branch/PR was not inspected and is not a dependency.
+The Deleverage references above describe integrated current source behavior;
+the later Stock composition tests were also inspected for the package rebind.
 
 ### Interest treatment — owner-parked
 
@@ -362,8 +384,8 @@ contract.
 | Settlement, loss allocation, and bad debt | Owner-parked product policy | Eligibility and auction creation do not guarantee deliverable collateral or liability resolution | Not a current Wave 1 item or blocker; parking does not decide release disposition |
 | Erroneous or malicious `(asset, 0)` report | Trust assumption / accepted residual | CreditEngine correctly trusts the selected Vault and can remove capacity or trigger eligibility on a false report | Vault admission, artifact binding, and monitoring remain required |
 | Fallback weight `1` | Accepted arithmetic residual | Weighted terms can move only after an operationally infeasible number of ordinary 18-decimal zero-capacity entries; `lowestLtv` is the separate one-entry asymmetry | No active change |
-| Withdrawal dependency surface | Missing targeted test | Numeric output is unchanged, but an additional terms call and aggregation can add failure/gas exposure | Recommended hardening only |
-| Many-position gas | Missing targeted test | One-position smoke evidence does not establish a realistic scaling bound | Recommended hardening only |
+| Withdrawal dependency surface | Later integrated regression | C1 pins the successful numeric null and debt-configuration failure surface | Preserve current regression |
+| Many-position gas | Later integrated measurement protocol | C2 records marginal gas across configured position counts; it is local evidence, not a chain fee guarantee | Re-measure at release snapshot |
 | Oracle bypass | Integrated safety property | Zero amount is deliberately not priced; a nonzero amount with an unavailable price retains pre-existing PriceDesk behavior | Preserve and regression-test |
 
 CreditEngine assumes that the selected Vault reports position identity and
@@ -396,22 +418,20 @@ not authorization to edit CreditEngine:
    state, auction creation, purchase, delivery, and bad-debt recognition are
    separate transitions.
 
-No pending H-04, H-06, M4, Deleverage-PR, or CCIP result is claimed integrated
-or required by this document merely because it exists elsewhere.
+Current H-04 and M4 evidence is reflected only for its exact integrated scope;
+it does not authorize deployment, configuration, CCIP, or further Deleverage
+work.
 
 ### Recommended hardening
 
 These are **agent recommendations, not owner-approved requirements**:
 
-1. Add a focused `getMaxWithdrawableForAsset` regression proving the successful
-   numeric null and separately pinning the added debt-configuration failure
-   surface.
-2. Replace the one-position gas smoke description with measured marginal gas
-   across realistic user-vault and asset counts.
-3. Add change-triggered CI that records CreditEngine ABI/blob identity,
+1. Retain the integrated C1 `getMaxWithdrawableForAsset` regression and C2
+   marginal-gas protocol.
+2. Add change-triggered CI that records CreditEngine ABI/blob identity,
    selectors, events, constructor, persistent layout, runtime size/headroom,
    focused tests, and the exact compiler/tool versions.
-4. Retain mutation checks that fail if `(asset, 0)` is skipped again or if a
+3. Retain mutation checks that fail if `(asset, 0)` is skipped again or if a
    zero amount reaches PriceDesk.
 
 ### Parked by owner
@@ -425,7 +445,8 @@ current Wave 1 blockers, or authorized source/test changes:
   backing loss;
 - grace periods, recapitalization, settlement, restoration, loss allocation,
   and exactly-once bad-debt accounting;
-- the separate Deleverage updates branch/PR; and
+- further Deleverage work beyond the integrated source and composition
+  evidence; and
 - every CCIP workflow.
 
 Parking does not approve the present behavior forever and does not decide an

@@ -1,9 +1,9 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 31 July 2026
+**Snapshot date:** 1 August 2026
 **Current configuration-source subject:** commit
-`e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`
 **Current status authority:** [`status.yaml`](status.yaml)
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
@@ -33,7 +33,7 @@ The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
 `DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
 two editable value authorities, and the ledger is derived and synchronized.
 The exact current result is `configuration_consistent=true`,
-`deployment_ready=false`, with 58 readiness blockers. Repository configuration
+`deployment_ready=false`, with 80 readiness blockers. Repository configuration
 is prepared and consistent; production/onchain configuration has not occurred.
 
 ## Program-level decisions
@@ -219,7 +219,8 @@ Sources:
 ### RH-D014 — Symbolic blueprint before concrete values
 
 **Status:** H-03 Phase A evidence and implementation integrated; all concrete
-values and all 19 canonical blockers remain open.
+values and all 42 canonical blockers remain open, including the 23
+Curve-specific typed inputs.
 
 H-03 controls the typed launch graph, symbolic inputs, explicit omissions,
 relation semantics, provenance, and blocker ownership. It does not approve
@@ -243,7 +244,7 @@ the typed JSON ledger is derived evidence, not an input surface.
 All operative decisions are approved, and the integrated manifest carries 14
 binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
-remain unresolved, so deployment readiness fails closed with 58 blockers. The
+remain unresolved, so deployment readiness fails closed with 80 blockers. The
 corrected PR #61 four-control machine representation gap remains
 preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
@@ -345,17 +346,18 @@ hosting destination must not change the authority hierarchy.
 
 ### RH-D020 — Consolidated Profile 1 launch and Profile 2 follow-on
 
-**Status:** Approved and controlling for current program sequencing.
+**Status:** Approved; superseded by RH-D021 only for the Curve launch topology.
 
 The eight-report reassessment and qualification corpus is one consolidated
 program package. The controlling disposition is:
 
 - preserve current Ledger and Teller architecture;
 - keep GuardedErc20 separate and Stock-specific;
-- launch Profile 1 with Chainlink as oracle authority, no Uniswap price-source
-  contract, no Curve registration, and neither LP token admitted;
+- preserve the launch boundaries that RH-D021 does not change: no Uniswap
+  price-source contract and neither LP token admitted;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;
-- move GREEN/USDG and both LP admissions to Profile 2;
+- retain GREEN/USDG follow-on higher powers and both LP admissions as
+  separately gated, subject to RH-D021's bounded GREEN pricing route;
 - keep the PSM disabled, allowlisted, canary-first, redemption-first, and
   separately activated;
 - keep H-09 network-disabled by default with explicit opt-in read-only
@@ -373,6 +375,90 @@ This decision records architecture and sequencing only. It does not authorize
 contract, interface, ABI, migration, configuration, generator, test, RPC,
 account, signer, deployment, activation, Sites, publication, or external-state
 work.
+
+### RH-D021 — Bounded Curve launch pricing
+
+**Status:** Approved for this bounded repository candidate; deployment and
+every external-state phase remain blocked.
+
+Select unchanged `CurvePrices` at PriceDesk ID 2 for GREEN only, while keeping
+Chainlink at ID 1, BlueChipYield at ID 3, IDs 4 and 5 empty, and priority IDs
+`[1, 3]`. The exact route is GREEN -> Curve GREEN/USDG -> PriceDesk ->
+Chainlink USDG. USDG has no Curve feed, so the route cannot recurse.
+
+This decision does not admit either LP token, add another Curve feed or
+consumer, enable dynamic rates, create Teller reference snapshots, enable
+Endaoment stabilization, use Curve in the PSM, or add Stock/Uniswap behavior.
+Five official identities remain unverified, six pool values remain research
+candidates, ten operating inputs remain owner choices, the pool address must
+be deployment-produced, and production observation remains absent. Those 23
+Curve-specific blockers contribute to the current 80-blocker fail-closed
+readiness result.
+
+Source: [`curve-launch-activation.md`](curve-launch-activation.md).
+
+### RH-D022 — RIPE reward launch product decision approved; operations open
+
+**Status:** Approved product decision; DP15 and P-H04-399 approved;
+B-REWARD-PROMOTION remains operationally blocked.
+
+The existing PR #66 values are the candidate initial-launch economics: points
+enabled, `0.009 RIPE/block`, 10% borrower and 90% staker allocation, zero voter
+and general-depositor allocation, 75% auto-stake for an explicit non-staking
+claim, a 33% lock-duration ratio, `1 RIPE/$` Stability rewards, and the shared
+initial `1,000 RIPE` budget. Stock rewards remain disabled. The owner accepts
+the approximately 15.432-day emission-only runway, Stability competition that
+can shorten it, and the theoretical zero shared-budget minimum. No Stability
+reserve, separate budget, redesign, or launch disablement is selected.
+
+The exact derived approved-decision packet, lifecycle, runway limits, emergency
+procedure, monitoring decisions, and rollback limits are recorded in
+[`reward-launch-qualification.md`](reward-launch-qualification.md) and
+`config/robinhood-reward-launch-plan.json`. Its SHA-256 identity binds the
+approved decision bytes and is the concrete DP15 value. Initial checkpoints;
+governance, lite-signer, and registered checkpoint-caller identities;
+emergency-runbook acceptance; monitoring owners/routes; H-05/H-06/H-08/H-09;
+testnet rehearsal; and release authorization remain open. This record
+authorizes no deployment, activation, RPC, governance, signer, operator, or
+release action.
+
+### RH-D023 — LP launch admission reconsidered independently
+
+**Status:** Qualification completed; neither LP token is launch-admissible as
+a Ripe asset.
+
+The owner explicitly reopened both LP launch-admission decisions on 1 August
+2026. The fresh qualification did not treat RH-D020's prior no-admission
+posture as a stop condition. It independently found:
+
+- the GREEN/USDG pool and bounded GREEN pricing route are selected launch work,
+  but the GREEN/USDG LP token is not launch-admissible as collateral or another
+  valuation-dependent Ripe asset;
+- RIPE/WETH may remain a conditional externally held V2 liquidity/monitoring
+  canary, but its LP token is not launch-admissible in Ripe; and
+- neither zero LTV nor a missing price feed proves ordinary-only routing under
+  the current shared contracts. Trusted deposit and valuation-dependent
+  routes remain reachable if an LP becomes a supported asset.
+
+Both Defaults LP rows therefore remain omitted, every DP-14 leaf remains a
+typed blocker, priority IDs stay `[1, 3]`, unchanged `CurvePrices` remains
+selected at PriceDesk ID 2 for GREEN only, and the Uniswap monitor stays
+interface-inert. Pool selection and GREEN pricing do not grant LP-token
+admission. Closing the LP route gap would require shared production design
+beyond a narrow LP configuration change and outside the preserved Deleverage
+boundary.
+
+This negative LP-admission result follows from missing verified identities,
+decimals, limits, custody controls, and negative-route evidence—not merely
+RH-D020's prior policy. No LP token is configured, registered, held as a Ripe
+asset, admitted, or active; the selected GREEN/USDG pool remains undeployed and
+unfunded. Future owner, external, implementation, fork, and security work may
+explicitly reopen the result.
+
+See
+[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md).
+This decision grants no pool creation, funding, custody, RPC, migration,
+registration, configuration, deployment, activation, or release authority.
 
 ## Dated security obligations
 
@@ -397,7 +483,8 @@ The following are explicitly not decided or authorized:
   pool/custody, and H-07/H-08/H-09 interface packets;
 - final PSM production economics, reserve coverage, authorities, and activation
   ceremony;
-- every Profile 2 stage promotion and both LP-token admissions;
+- every Curve use beyond the bounded GREEN launch route and both LP-token
+  admissions;
 - Sites account/workspace recovery, dashboard deployment, or access changes;
 - any testnet funding, signing, broadcast, deployment, or governance action;
 - any production deployment, configuration, activation, or role transfer; and

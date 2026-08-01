@@ -500,6 +500,26 @@ def _blueprint_module() -> Any:
         raise ManifestError("H04_BLUEPRINT_DEPLOYMENT_INPUT_CENSUS")
     if tuple(key for _, key in module.ROBINHOOD_DEFAULTS_CONSTRUCTOR) != CONSTRUCTOR_BLUEPRINT_KEYS:
         raise ManifestError("H04_CONSTRUCTOR_BINDING_ORDER")
+    try:
+        importlib.import_module("config.robinhood_blueprint").validate_curve_launch_authority()
+    except Exception as exc:
+        raise ManifestError(f"H04_CURVE_AUTHORITY:{type(exc).__name__}:{exc}") from exc
+    curve_values = {
+        row.input_id: row.value for row in module.ROBINHOOD_CURVE_LAUNCH_INPUTS
+    }
+    curve_artifacts = {
+        "artifact.curve_prices_source_sha256": ROOT
+        / "contracts"
+        / "priceSources"
+        / "CurvePrices.vy",
+        "artifact.curve_prices_abi_sha256": ROOT
+        / "scripts"
+        / "abis"
+        / "CurvePrices.json",
+    }
+    for input_id, path in curve_artifacts.items():
+        if hashlib.sha256(path.read_bytes()).hexdigest() != curve_values[input_id]:
+            raise ManifestError(f"H04_CURVE_ARTIFACT_DRIFT:{input_id}")
     return module
 
 
@@ -966,6 +986,14 @@ def derive_ledger(
             record["value"] = copy.deepcopy(deployment_values[path])
         elif destination["kind"] == "assertion":
             record["value"] = copy.deepcopy(assertion_values[path])
+            if path == "Deployment.DP-13.stock.excludedFromStabilityPool":
+                record["zero_semantics"] = {
+                    "kind": "not_zero",
+                    "explanation": (
+                        "Approved explicit Stock exclusion; false, absence, "
+                        "and omission are distinct."
+                    ),
+                }
     _validate_shape(expected, allow_legacy=False)
     _validate_census(expected)
     return expected
@@ -1006,8 +1034,19 @@ def _first_difference(actual: Any, expected: Any, path: str = "$") -> str | None
 def deployment_readiness(blueprint: Any | None = None) -> tuple[bool, tuple[str, ...]]:
     selected = blueprint or _blueprint_module()
     blockers: set[str] = set()
+    curve_address_names = {
+        "CURVE_ADDRESS_PROVIDER",
+        "CURVE_META_REGISTRY",
+        "CURVE_TRICRYPTO_NG_FACTORY",
+        "CURVE_STABLESWAP_NG_FACTORY",
+        "CURVE_TWOCRYPTO_NG_FACTORY",
+        "GREEN_USDG_CURVE_POOL",
+    }
     for name, value in selected.ROBINHOOD_ADDRESSES.items():
         status = selected.ROBINHOOD_ADDRESS_STATUS[name]
+        # Curve rows below retain richer authority and resolution-state types.
+        if name in curve_address_names:
+            continue
         if type(value).__name__ == "SymbolicBinding" or status.endswith("unresolved"):
             blockers.add(f"address:{name}:unresolved")
         if status.endswith("unverified"):
@@ -1015,6 +1054,12 @@ def deployment_readiness(blueprint: Any | None = None) -> tuple[bool, tuple[str,
     for path, record in selected.ROBINHOOD_DEPLOYMENT_INPUTS.items():
         if type(record.value).__name__ == "SymbolicBinding":
             blockers.add(f"input:{path}:unresolved")
+    for row in selected.ROBINHOOD_CURVE_LAUNCH_INPUTS:
+        if row.resolution_state in selected.ROBINHOOD_CURVE_BLOCKING_STATES:
+            blockers.add(
+                "curve:"
+                f"{row.authority_class}:{row.input_id}:{row.resolution_state}"
+            )
     return (not blockers, tuple(sorted(blockers)))
 
 

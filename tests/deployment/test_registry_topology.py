@@ -59,35 +59,39 @@ def test_blueprint_policy_handles_every_disposition_explicitly():
     assert SUPPORTED_DISPOSITIONS == frozenset(Disposition)
 
     policy = blueprint_policy()
-    assert len(policy.required_registries) == 31
-    assert len(policy.reserved_registries) == 7
+    assert len(policy.required_registries) == 32
+    assert len(policy.reserved_registries) == 6
     assert policy.unavailable_components["CM-008"] is Disposition.BLOCKED
     assert policy.unavailable_components["CM-051"] is Disposition.DEFERRED
 
 
-def test_price_desk_selected_one_and_three_and_unavailable_others_are_exact():
+def test_price_desk_selected_one_two_three_and_unavailable_others_are_exact():
     policy = blueprint_policy()
     assert policy.canonical_registries[("price_desk", 1)] == "CM-016"
+    assert policy.canonical_registries[("price_desk", 2)] == "CM-017"
     assert policy.canonical_registries[("price_desk", 3)] == "CM-018"
     assert {
         key for key in policy.required_registries if key[0] == "price_desk"
     } == {
         ("price_desk", 1),
+        ("price_desk", 2),
         ("price_desk", 3),
     }
     assert {
         key for key in policy.reserved_registries if key[0] == "price_desk"
     } == {
-        ("price_desk", 2),
         ("price_desk", 4),
         ("price_desk", 5),
     }
 
     value = observations()
-    value["registries"].append(
-        {"domain": "price_desk", "registry_id": 2, "component_id": "CM-017"}
+    curve = next(
+        row
+        for row in value["registries"]
+        if (row["domain"], row["registry_id"]) == ("price_desk", 2)
     )
-    assert "RESERVED_REGISTRY_REUSE" in codes(
+    curve["component_id"] = "CM-018"
+    assert "SHIFTED_REGISTRY_ID" in codes(
         assert_deployment(expectations(), value)
     )
 
@@ -133,6 +137,20 @@ def test_shift_duplicate_and_reserved_reuse_fail_closed():
     duplicate["registries"].append(deepcopy(duplicate["registries"][0]))
     assert "DUPLICATE_REGISTRY_ID" in codes(
         assert_deployment(expectations(), duplicate)
+    )
+
+
+@pytest.mark.parametrize("replacement", ("CM-018", "CM-999", "0x0000000000000000000000000000000000000000"))
+def test_curve_slot_rejects_bluechip_unrelated_and_zero_placeholders(replacement):
+    value = observations()
+    curve = next(
+        row
+        for row in value["registries"]
+        if (row["domain"], row["registry_id"]) == ("price_desk", 2)
+    )
+    curve["component_id"] = replacement
+    assert "SHIFTED_REGISTRY_ID" in codes(
+        assert_deployment(expectations(), value)
     )
 
 

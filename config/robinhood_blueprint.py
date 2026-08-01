@@ -278,6 +278,8 @@ _ASSERTION_IDS = ('NEG-016',
  'NEG-036',
  'NEG-037',
  'NEG-H03-GLOBAL-MINT-SEQUENCE',
+ 'NEG-H03-CURVE-HIGHER-POWERS',
+ 'NEG-H03-CURVE-USDG-RECURSION',
  'NEG-H03-LP-ORDINARY-ONLY',
  'NEG-H03-LP-ZERO-LTV',
  'NEG-H03-PSM-MINT-LAST',
@@ -361,10 +363,11 @@ _BLOCKER_ROWS = (('B-S5-LEDGER',
   'before launch plan can close'),
  ('B-REWARD-PROMOTION',
   'OWN-REWARDS',
-  ('OWN-SECOPS',),
-  'Rewards are launch-disabled; later validation, monitoring, kill procedure, and owner approval '
-  'are absent',
-  'at within_seven_day_separately_reviewed_reward_activation'),
+  ('OWN-SECOPS', 'OWN-H04'),
+  'Owner-approved initial-launch RIPE reward economics remain operationally gated by initial '
+  'global and points checkpoints, exact governance/lite/checkpoint-caller identities, emergency '
+  'runbook acceptance, monitoring owners and routes, H-05/H-06/H-08/H-09, testnet rehearsal, and release authority',
+  'before reward configuration can be accepted for deployment'),
  ('B-T1-CCIP',
   'OWN-T1',
   ('OWN-SECOPS',),
@@ -391,7 +394,43 @@ _BLOCKER_ROWS = (('B-S5-LEDGER',
   ('OWN-H05',),
   'Exact public authorities, capability handoff, monitoring, and operational approvals are not '
   'frozen',
-  'before testnet or production handoff'))
+ 'before testnet or production handoff'))
+
+_CURVE_OWNER_IDS = {
+    "protocol_owner": ("OWN-H04", ("OWN-H05", "OWN-SECOPS")),
+    "oracle_owner": ("OWN-ORACLE", ("OWN-H04", "OWN-H09")),
+    "migration_owner": ("OWN-H05", ("OWN-H04", "OWN-SECOPS")),
+    "liquidity_owner": ("OWN-H04", ("OWN-H05", "OWN-SECOPS")),
+    "security_owner": ("OWN-SECOPS", ("OWN-H04", "OWN-H05")),
+}
+
+
+def _curve_blocker_id(input_id: str) -> str:
+    stem = input_id.removeprefix("curve.")
+    return "B-CURVE-" + stem.upper().replace(".", "-").replace("_", "-")
+
+
+_CURVE_BLOCKING_INPUTS = tuple(
+    row
+    for row in source_blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
+    if row.resolution_state in source_blueprint.ROBINHOOD_CURVE_BLOCKING_STATES
+)
+_CURVE_BLOCKER_IDS = tuple(
+    _curve_blocker_id(row.input_id) for row in _CURVE_BLOCKING_INPUTS
+)
+_CURVE_BLOCKER_ROWS = tuple(
+    (
+        _curve_blocker_id(row.input_id),
+        _CURVE_OWNER_IDS[row.primary_owner][0],
+        _CURVE_OWNER_IDS[row.primary_owner][1],
+        f"Curve launch input {row.input_id} remains {row.resolution_state}; "
+        f"authority={row.authority_class}; provenance={row.provenance}",
+        "before Curve deployment, PriceDesk ID 2 registration, or GREEN feed activation",
+    )
+    for row in _CURVE_BLOCKING_INPUTS
+)
+_BLOCKER_ROWS = (*_BLOCKER_ROWS, *_CURVE_BLOCKER_ROWS)
+
 _SYMBOLIC_ROWS = (('I-GREEN',
   'GREEN deployment identity',
   ('CM-001', 'CM-003', 'CM-004', 'CM-022', 'CM-048'),
@@ -714,13 +753,13 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'required',
   ('B-H04-PARAMS',)),
  ('I-REWARDS-PROMOTION',
-  'owner-selected PR #66 launch reward, points, allocation, auto-stake, and Stability Pool values',
+  'owner-approved PR #66 launch reward, points, allocation, auto-stake, and shared-budget Stability Pool values; operational prerequisites remain open',
   ('CM-009', 'CM-013', 'CM-022', 'CM-023', 'CM-028', 'CM-029', 'CM-033', 'CM-038'),
   'OWN-REWARDS',
   ('OWN-SECOPS', 'OWN-H04'),
-  'before Defaults render',
-  'required',
-  ()),
+  'before reward configuration can be accepted for deployment',
+  'blocked',
+  ('B-REWARD-PROMOTION',)),
  ('I-BOND-ROOM-CONFIG',
   'owner-selected PR #66 bond terms with canBond false at launch',
   ('CM-014', 'CM-029'),
@@ -736,7 +775,7 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   ('OWN-REWARDS',),
   'before any bond release',
   'deferred',
-  ('B-H04-PARAMS', 'B-REWARD-PROMOTION')),
+  ('B-H04-PARAMS',)),
  ('I-HR-TIMELOCKS',
   'HumanResources min/max configuration timelocks',
   ('CM-014', 'CM-032'),
@@ -886,10 +925,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-003-REWARDS',
   'CM-003',
   'route',
-  'sGREEN receives the PR #66 selected staker-points allocation at launch',
-  'required',
-  'deployed_initial_value',
-  (),
+  'sGREEN owner-approved staker-points allocation pending reward operational readiness',
+  'blocked',
+  'blocked',
+  ('B-REWARD-PROMOTION',),
   ('NEG-035', 'NEG-036')),
  ('S-004-GLOBAL-MINT-DISABLE',
   'CM-004',
@@ -1010,10 +1049,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-013-REWARD-ACTIONS',
   'CM-013',
   'route',
-  'PR #66 reward, points, allocations, and emission values are selected at launch',
-  'required',
-  'deployed_initial_value',
-  (),
+  'owner-approved PR #66 reward, points, allocations, and emission values pending operational readiness',
+  'blocked',
+  'blocked',
+  ('B-REWARD-PROMOTION',),
   ('NEG-035', 'NEG-036')),
  ('S-014-COOLDOWN',
   'CM-014',
@@ -1034,9 +1073,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-015-RESERVED-SLOTS',
   'CM-015',
   'registration',
-  'PriceDesk semantic slots 2, 4, and 5 stay empty; slot 3 is selected BlueChipYield',
-  'omitted',
-  'omitted',
+  'Sequential PriceDesk registration is Chainlink ID 1, Curve ID 2, then BlueChipYield ID 3; '
+  'IDs 4 and 5 stay empty',
+  'required',
+  'deployed_initial_value',
   (),
   ('NEG-024', 'NEG-037')),
  ('S-016-FEED-REG',
@@ -1063,6 +1103,38 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'omitted',
   (),
   ('NEG-024',)),
+ ('S-017-DEPLOYMENT',
+  'CM-017',
+  'artifact',
+  'unchanged CurvePrices deployment with exact Blueprint constructor and official Curve graph',
+  'blocked',
+  'pre_activation_configuration',
+  _CURVE_BLOCKER_IDS,
+  ('NEG-024', 'NEG-037')),
+ ('S-017-GREEN-FEED',
+  'CM-017',
+  'route',
+  'GREEN-only Curve pricing through GREEN/USDG and nested Chainlink USDG/USD',
+  'blocked',
+  'pre_activation_configuration',
+  _CURVE_BLOCKER_IDS,
+  ('NEG-024', 'NEG-037', 'NEG-H03-CURVE-USDG-RECURSION')),
+ ('S-017-USDG-FEED',
+  'CM-017',
+  'route',
+  'USDG Curve feed and recursive Curve authority',
+  'omitted',
+  'omitted',
+  (),
+  ('NEG-H03-CURVE-USDG-RECURSION',)),
+ ('S-017-HIGHER-POWERS',
+  'CM-017',
+  'capability',
+  'LP pricing/admission, dynamic rates, reference snapshots, stabilization, PSM, Stock, and Uniswap authority',
+  'disabled',
+  'deployed_initial_value',
+  (),
+  ('NEG-H03-CURVE-HIGHER-POWERS',)),
  ('S-018-SELECTED-SLOT',
  'CM-018',
  'registration',
@@ -1124,10 +1196,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-022-REWARDS',
   'CM-022',
   'route',
-  'Stability Pool reward accrual uses the PR #66 selected launch values',
-  'required',
-  'deployed_initial_value',
-  (),
+  'owner-approved shared-budget Stability Pool reward accrual pending operational readiness',
+  'blocked',
+  'blocked',
+  ('B-REWARD-PROMOTION',),
   ('NEG-035', 'NEG-036')),
  ('S-023-GOV-DEPOSIT',
   'CM-023',
@@ -1140,10 +1212,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-023-REWARDS',
   'CM-023',
   'route',
-  'RIPE governance-vault reward accrual uses the PR #66 selected launch values',
-  'required',
-  'deployed_initial_value',
-  (),
+  'RIPE governance-vault owner-approved reward accrual pending operational readiness',
+  'blocked',
+  'blocked',
+  ('B-REWARD-PROMOTION',),
   ('NEG-035', 'NEG-036')),
  ('S-024-LP-DEPOSIT',
   'CM-024',
@@ -1216,10 +1288,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-028-REWARD-PATH',
   'CM-028',
   'route',
-  'Boardroom rewards and allocations are disabled at launch',
+  'Boardroom governance-power notification hook is deployed, but its current hook is a no-op and has no reward allocation',
   'disabled',
   'deployed_initial_value',
-  ('B-REWARD-PROMOTION',),
+  (),
   ('NEG-035', 'NEG-036')),
  ('S-029-BONDS',
   'CM-029',
@@ -1227,7 +1299,7 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'bonds, terms, and payment routes',
   'disabled',
   'post_launch_release',
-  ('B-H04-PARAMS', 'B-REWARD-PROMOTION'),
+  ('B-H04-PARAMS',),
   ('NEG-034', 'NEG-035')),
  ('S-029-RIPE-CAP',
   'CM-029',
@@ -1235,7 +1307,7 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
   'BondRoom RIPE mint capability',
   'disabled',
   'post_launch_release',
-  ('B-SECOPS-HANDOFF', 'B-REWARD-PROMOTION'),
+  ('B-SECOPS-HANDOFF',),
   ('NEG-035', 'NEG-036')),
  ('S-030-HQ-GREEN-CAP',
   'CM-030',
@@ -1265,7 +1337,8 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-030-CURVE-ABSENT-BASE-RATE',
   'CM-030',
   'behavioral_invariant',
-  'absent Curve source returns the named base rate without a Curve call',
+  'selected Curve source has no GREEN reference-pool config, so dynamic-rate status stays zero '
+  'and the named base/static rate applies',
   'required',
   'deployed_initial_value',
   (),
@@ -1306,10 +1379,10 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-033-REWARD-MINT',
   'CM-033',
   'capability',
-  'Lootbox reward mint and points use the PR #66 selected launch values',
-  'required',
-  'deployed_initial_value',
-  (),
+  'Lootbox owner-approved reward mint and points pending operational readiness',
+  'blocked',
+  'blocked',
+  ('B-REWARD-PROMOTION',),
   ('NEG-035', 'NEG-036')),
  ('S-033-UNDERSCORE',
   'CM-033',
@@ -2608,7 +2681,7 @@ _RELATION_ROWS = (('R-001',
   ('contracts/config/SwitchboardCharlie.vy:470',
    'contracts/config/SwitchboardCharlie.vy:617-741',
    'contracts/config/SwitchboardCharlie.vy:1056-1066'),
-  'Charlie directly executes the launch-disabled Lootbox reward actions.',
+  'Charlie directly executes separately governed Lootbox reward actions; product values are approved but launch use remains operationally gated.',
   ('E-S3', 'E-M0')),
  ('R-111',
   'CM-013',
@@ -3279,8 +3352,8 @@ _RELATION_ROWS = (('R-001',
   'runtime_security',
   'CM-017',
   ('contracts/core/CreditEngine.vy:1047-1055',),
-  "CreditEngine's retained dynamic-rate route directly calls omitted CurvePrices and must fail "
-  'closed.',
+  "CreditEngine's retained dynamic-rate route calls selected CurvePrices, whose deliberately "
+  'empty GREEN reference-pool config preserves the base/static rate.',
   ('E-SRC-PD', 'E-M0')),
  ('R-183',
   'CM-030',
@@ -3422,8 +3495,8 @@ _RELATION_ROWS = (('R-001',
    'contracts/core/Endaoment.vy:848-849',
    'contracts/core/Endaoment.vy:916-917',
    'contracts/core/Endaoment.vy:933-934'),
-  "Endaoment's retained stabilizer route directly calls omitted CurvePrices and must remain "
-  'disabled.',
+  "Endaoment's retained stabilizer route calls selected CurvePrices, whose deliberately empty "
+  'GREEN reference-pool config keeps stabilization disabled.',
   ('E-SRC-PD', 'E-M0')),
  ('R-197',
   'CM-031',
@@ -3722,7 +3795,8 @@ _RELATION_ROWS = (('R-001',
   'runtime_security',
   'CM-017',
   ('contracts/core/Teller.vy:1000-1002',),
-  "Teller's retained snapshot route directly calls omitted CurvePrices and must fail closed.",
+  "Teller's retained snapshot route calls selected CurvePrices; with no GREEN reference-pool "
+  'config, addGreenRefPoolSnapshot returns false and is inert.',
   ('E-SRC-PD', 'E-M0')),
  ('R-229',
   'CM-034',
@@ -4284,7 +4358,75 @@ _RELATION_ROWS = (('R-001',
    'contracts/modules/Addys.vy:452-465',
    'contracts/core/EndaomentFunds.vy:50-70'),
   'PSM resolves EndaomentFunds and transfers reserve assets into that custody target.',
-  ('E-M0', 'E-SRC')))
+  ('E-M0', 'E-SRC')),
+ ('R-289',
+  'CM-015',
+  'direct_execution',
+  'runtime_security',
+  'CM-017',
+  ('contracts/registries/PriceDesk.vy:178-230',
+   'contracts/priceSources/CurvePrices.vy:270-345'),
+  'PriceDesk directly calls the selected Curve source at ID 2 for GREEN valuation and retained snapshot housekeeping.',
+  ('E-SRC-PD', 'E-CM')),
+ ('R-290',
+  'CM-015',
+  'direct_execution',
+  'runtime_security',
+  'CM-018',
+  ('contracts/registries/PriceDesk.vy:178-230',
+   'contracts/priceSources/BlueChipYieldPrices.vy'),
+  'PriceDesk directly calls the selected BlueChipYield source at ID 3.',
+  ('E-SRC-PD', 'E-H04')),
+ ('R-291',
+  'CM-017',
+  'construction_dependency',
+  'constructor',
+  'CM-004',
+  ('contracts/priceSources/CurvePrices.vy:222-249',),
+  'CurvePrices binds the chain-local RipeHq and its governance/address registry graph.',
+  ('E-CM', 'E-SRC-HQ')),
+ ('R-292',
+  'CM-017',
+  'construction_dependency',
+  'constructor',
+  'CM-001',
+  ('contracts/priceSources/CurvePrices.vy:222-249',),
+  'CurvePrices binds the chain-local GREEN token used by the sole launch feed.',
+  ('E-CM', 'E-SRC')),
+ ('R-293',
+  'CM-017',
+  'construction_dependency',
+  'constructor',
+  'CM-003',
+  ('contracts/priceSources/CurvePrices.vy:222-249',),
+  'CurvePrices retains the sGREEN constructor binding without configuring a separate sGREEN feed.',
+  ('E-CM', 'E-SRC')),
+ ('R-294',
+  'CM-017',
+  'direct_execution',
+  'runtime_security',
+  'CM-015',
+  ('contracts/priceSources/CurvePrices.vy:343-443',),
+  'The GREEN Curve read calls PriceDesk for the USDG alternative-asset price.',
+  ('E-CM', 'E-SRC-PD')),
+ ('R-295',
+  'CM-017',
+  'indirect_security_dependency',
+  'runtime_security',
+  'CM-016',
+  ('contracts/priceSources/CurvePrices.vy:406-443',
+   'contracts/registries/PriceDesk.vy:178-230'),
+  'The nested USDG lookup must terminate at the selected Chainlink source and never recurse into Curve.',
+  ('E-CM', 'E-SRC-PD')),
+ ('R-296',
+  'CM-017',
+  'authority_dependency',
+  'runtime_security',
+  'CM-010',
+  ('contracts/priceSources/CurvePrices.vy:12-20',
+   'contracts/modules/LocalGov.vy:139-158'),
+  'CurvePrices pause and recovery authority is admitted through the chain-local governance graph.',
+  ('E-CM', 'E-SRC-SB')))
 _SOURCE_ROWS = (('CM-001', 'contracts/tokens/GreenToken.vy', 'file', 'existing', 'shared_contract', 'E-SRC'),
  ('CM-001',
   'contracts/tokens/modules/Erc20Token.vy',
@@ -4674,7 +4816,7 @@ _COMPONENT_METADATA_ROWS = (('CM-001',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-035', 'NEG-036'),
-  ('H04', 'H05', 'reward promotion'),
+  ('H04', 'H05', 'initial reward launch'),
   ('E-M0', 'E-S3', 'E-SRC-SB')),
  ('CM-014',
   'OWN-H04',
@@ -4696,10 +4838,10 @@ _COMPONENT_METADATA_ROWS = (('CM-001',
   ('E-M0', 'E-SRC-PD')),
  ('CM-017',
   'OWN-ORACLE',
-  ('OWN-H08', 'OWN-H09'),
-  ('NEG-016', 'NEG-024', 'NEG-037'),
-  ('H08', 'H09'),
-  ('E-CM', 'E-T7', 'E-SRC-PD')),
+  ('OWN-H04', 'OWN-H05', 'OWN-H08', 'OWN-H09', 'OWN-SECOPS'),
+  ('NEG-024', 'NEG-037', 'NEG-H03-CURVE-HIGHER-POWERS', 'NEG-H03-CURVE-USDG-RECURSION'),
+  ('H04', 'H05', 'H08', 'H09'),
+  ('E-CM', 'E-H04', 'E-T7', 'E-SRC-PD')),
  ('CM-018',
   'OWN-ORACLE',
   ('OWN-H04', 'OWN-H05', 'OWN-H08', 'OWN-H09'),
@@ -4759,7 +4901,7 @@ _COMPONENT_METADATA_ROWS = (('CM-001',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-035', 'NEG-036'),
-  ('H04', 'H05', 'reward promotion'),
+  ('H04', 'H05', 'initial reward launch'),
   ('E-M0', 'E-T7')),
  ('CM-029',
   'OWN-REWARDS',
@@ -4789,7 +4931,7 @@ _COMPONENT_METADATA_ROWS = (('CM-001',
   'OWN-REWARDS',
   ('OWN-H04', 'OWN-H05'),
   ('NEG-034', 'NEG-035', 'NEG-036', 'NEG-H03-STOCK-REWARD-DISABLED'),
-  ('H04', 'H05', 'H08', 'reward promotion'),
+  ('H04', 'H05', 'H08', 'initial reward launch'),
   ('E-S3', 'E-M0')),
  ('CM-034',
   'OWN-T8',
@@ -4976,11 +5118,7 @@ def _source_registry_rows() -> tuple[tuple[Any, ...], ...]:
     if len(rows) != 38 or keys != expected_keys or len(set(keys)) != 38:
         raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_CENSUS")
     components = _source_component_selection_map()
-    reserved = {
-        ("ripe_hq", 23),
-        ("ripe_hq", 24),
-        ("price_desk", 2),
-    }
+    reserved = {("ripe_hq", 23), ("ripe_hq", 24)}
     selected_price_ids: set[int] = set()
     normalized: list[tuple[Any, ...]] = []
     for row in rows:
@@ -5016,9 +5154,323 @@ def _source_registry_rows() -> tuple[tuple[Any, ...], ...]:
                 row.disposition,
             )
         )
-    if selected_price_ids != {1, 3}:
+    if selected_price_ids != {1, 2, 3}:
         raise RobinhoodBlueprintError("H03_REGISTRY_SOURCE_DRIFT")
     return tuple(normalized)
+
+
+_CURVE_LAUNCH_INPUT_IDS = (
+    "launch.chain_id",
+    "launch.component",
+    "launch.price_desk_registration_order",
+    "launch.priority_price_source_ids",
+    "curve.address_provider",
+    "curve.address_provider_binding_7",
+    "curve.address_provider_binding_11",
+    "curve.address_provider_binding_12",
+    "curve.address_provider_binding_13",
+    "curve.constructor_bindings",
+    "pool.factory",
+    "pool.factory_method",
+    "pool.name",
+    "pool.symbol",
+    "pool.coin_order",
+    "pool.coin_decimals",
+    "pool.A",
+    "pool.fee",
+    "pool.offpeg_fee_multiplier",
+    "pool.ma_exp_time",
+    "pool.ma_exp_time_alternative_test_vector",
+    "pool.address",
+    "pool.factory_nonce_or_order",
+    "pool.production_liquidity_amount",
+    "pool.funding_source",
+    "pool.custodian",
+    "pool.approving_account",
+    "pool.minimum_minted_lp",
+    "pool.slippage_limit",
+    "pool.withdrawal_authority",
+    "pool.minimum_retained_liquidity",
+    "pool.production_observation",
+    "feed.route",
+    "feed.curve_assets",
+    "feed.usdg_curve_feed",
+    "feed.usdg_authority",
+    "inactive.capabilities",
+    "artifact.curve_prices_source_sha256",
+    "artifact.curve_prices_abi_sha256",
+)
+
+
+def validate_curve_launch_authority() -> None:
+    """Validate the one human-readable source for the bounded Curve launch."""
+    rows = tuple(source_blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS)
+    ids = tuple(getattr(row, "input_id", None) for row in rows)
+    if ids != _CURVE_LAUNCH_INPUT_IDS or len(set(ids)) != len(ids):
+        _fail("RH_CURVE_INPUT_CENSUS")
+    if source_blueprint.ROBINHOOD_CURVE_AUTHORITY_CLASSES != frozenset(
+        {
+            "repository_approved",
+            "externally_verifiable_canonical_fact",
+            "owner_selected",
+            "deployment_produced",
+        }
+    ):
+        _fail("RH_CURVE_INPUT_SCHEMA")
+    if source_blueprint.ROBINHOOD_CURVE_BLOCKING_STATES - source_blueprint.ROBINHOOD_CURVE_RESOLUTION_STATES:
+        _fail("RH_CURVE_INPUT_SCHEMA")
+
+    expected_metadata = {
+        input_id: (authority_class, primary_owner, provenance, resolution_state)
+        for (
+            input_id,
+            authority_class,
+            primary_owner,
+            provenance,
+            resolution_state,
+        ) in source_blueprint.ROBINHOOD_CURVE_LAUNCH_METADATA
+    }
+    if (
+        tuple(expected_metadata) != _CURVE_LAUNCH_INPUT_IDS
+        or len(expected_metadata) != len(_CURVE_LAUNCH_INPUT_IDS)
+    ):
+        _fail("RH_CURVE_INPUT_METADATA")
+
+    allowed_owners = {
+        "protocol_owner",
+        "oracle_owner",
+        "migration_owner",
+        "liquidity_owner",
+        "security_owner",
+    }
+    for row in rows:
+        if (
+            row.authority_class not in source_blueprint.ROBINHOOD_CURVE_AUTHORITY_CLASSES
+            or row.resolution_state not in source_blueprint.ROBINHOOD_CURVE_RESOLUTION_STATES
+            or row.primary_owner not in allowed_owners
+            or not isinstance(row.provenance, str)
+            or not row.provenance
+            or isinstance(row.value, (dict, list, set, frozenset))
+        ):
+            _fail("RH_CURVE_INPUT_SCHEMA", row.input_id)
+        if (
+            row.authority_class,
+            row.primary_owner,
+            row.provenance,
+            row.resolution_state,
+        ) != expected_metadata[row.input_id]:
+            _fail("RH_CURVE_INPUT_METADATA", row.input_id)
+    values = {row.input_id: row.value for row in rows}
+    states = {row.input_id: row.resolution_state for row in rows}
+
+    expected_official_addresses = {
+        "CURVE_ADDRESS_PROVIDER": source_blueprint.ROBINHOOD_CURVE_ADDRESS_PROVIDER,
+        "CURVE_META_REGISTRY": source_blueprint.ROBINHOOD_CURVE_META_REGISTRY,
+        "CURVE_TRICRYPTO_NG_FACTORY": source_blueprint.ROBINHOOD_CURVE_TRICRYPTO_NG_FACTORY,
+        "CURVE_STABLESWAP_NG_FACTORY": source_blueprint.ROBINHOOD_CURVE_STABLESWAP_NG_FACTORY,
+        "CURVE_TWOCRYPTO_NG_FACTORY": source_blueprint.ROBINHOOD_CURVE_TWOCRYPTO_NG_FACTORY,
+    }
+    if any(
+        source_blueprint.ROBINHOOD_ADDRESSES[name] != address
+        or source_blueprint.ROBINHOOD_ADDRESS_STATUS[name]
+        != "selected_external_fact_unverified"
+        for name, address in expected_official_addresses.items()
+    ) or (
+        source_blueprint.ROBINHOOD_ADDRESS_STATUS["GREEN_USDG_CURVE_POOL"]
+        != "deployment_produced_unresolved"
+    ):
+        _fail("RH_CURVE_EXTERNAL_IDENTITY")
+    if (
+        source_blueprint.ROBINHOOD_CURVE_OFFICIAL_PROVENANCE
+        != "curvefi/curve-core@6222dda9959091db94d61f6d6378234a624cdd66:"
+        "deployments/prod/robinhood.yaml"
+        or source_blueprint.ROBINHOOD_CURVE_LITE_PROVENANCE
+        != "curvefi/curve-lite@5a9e1ab34c1319de69b987900d859ad2e965d0e2:"
+        "contracts/amm/stableswap/factory/factory_v_100.vy"
+    ):
+        _fail("RH_CURVE_PROVENANCE")
+
+    expected_registration = (
+        (1, "ChainlinkPrices"),
+        (2, "CurvePrices"),
+        (3, "BlueChipYieldPrices"),
+    )
+    if (
+        values["launch.chain_id"] != 4663
+        or values["launch.component"] != "CM-017:CurvePrices"
+        or values["launch.price_desk_registration_order"] != expected_registration
+        or values["launch.priority_price_source_ids"] != (1, 3)
+    ):
+        _fail("RH_CURVE_LAUNCH_TOPOLOGY")
+
+    expected_constructor_bindings = (
+        ("_ripeHq", "deployment:RIPE_HQ"),
+        ("_tempGov", "owner:GOVERNANCE"),
+        ("_curveAddressProvider", "CURVE_ADDRESS_PROVIDER"),
+        ("_green", "GREEN_TOKEN"),
+        ("_savingsGreen", "SGREEN_TOKEN"),
+        ("_minPriceChangeTimeLock", "Defaults:price source minimum"),
+        ("_maxPriceChangeTimeLock", "Defaults:price source maximum"),
+    )
+    if values["curve.constructor_bindings"] != expected_constructor_bindings:
+        _fail("RH_CURVE_CONSTRUCTOR_BINDINGS")
+
+    addresses = source_blueprint.ROBINHOOD_ADDRESSES
+    bindings = {
+        7: ("MetaRegistry", addresses["CURVE_META_REGISTRY"]),
+        11: ("TricryptoNG", addresses["CURVE_TRICRYPTO_NG_FACTORY"]),
+        12: ("StableSwapNG", addresses["CURVE_STABLESWAP_NG_FACTORY"]),
+        13: ("TwoCryptoNG", addresses["CURVE_TWOCRYPTO_NG_FACTORY"]),
+    }
+    if values["curve.address_provider"] != addresses["CURVE_ADDRESS_PROVIDER"]:
+        _fail("RH_CURVE_ADDRESS_PROVIDER")
+    for provider_id, expected in bindings.items():
+        if values[f"curve.address_provider_binding_{provider_id}"] != (
+            provider_id,
+            *expected,
+        ):
+            _fail("RH_CURVE_ADDRESS_PROVIDER", str(provider_id))
+    external_addresses = (
+        addresses["CURVE_ADDRESS_PROVIDER"],
+        *(address for _, address in bindings.values()),
+    )
+    if (
+        len(set(value.lower() for value in external_addresses)) != 5
+        or any(not isinstance(value, str) or not _ADDRESS_TOKEN.fullmatch(value) for value in external_addresses)
+        or values["pool.factory"] != addresses["CURVE_STABLESWAP_NG_FACTORY"]
+        or any(
+            states[input_id] != "selected_external_fact_unverified"
+            for input_id in (
+                "curve.address_provider",
+                "curve.address_provider_binding_7",
+                "curve.address_provider_binding_11",
+                "curve.address_provider_binding_12",
+                "curve.address_provider_binding_13",
+            )
+        )
+        or states["pool.factory"] != "resolved_reference_to_unverified_binding"
+    ):
+        _fail("RH_CURVE_EXTERNAL_IDENTITY")
+
+    expected_pool_values = {
+        "pool.coin_order": ("USDG", "GREEN"),
+        "pool.coin_decimals": (6, 18),
+        "pool.A": 100,
+        "pool.fee": 4_000_000,
+        "pool.offpeg_fee_multiplier": 20_000_000_000,
+        "pool.ma_exp_time": 600,
+        "pool.ma_exp_time_alternative_test_vector": 866,
+    }
+    if any(values[key] != expected for key, expected in expected_pool_values.items()):
+        _fail("RH_CURVE_POOL_PARAMS")
+    if any(
+        states[key] != "research_candidate_owner_approval_unresolved"
+        for key in expected_pool_values
+        if key != "pool.ma_exp_time_alternative_test_vector"
+    ) or states["pool.ma_exp_time_alternative_test_vector"] != "test_vector_only":
+        _fail("RH_CURVE_POOL_PARAMS")
+    if (
+        type(values["pool.address"]).__name__ != "SymbolicBinding"
+        or values["pool.address"] != addresses["GREEN_USDG_CURVE_POOL"]
+        or states["pool.address"] != "deployment_produced_unresolved"
+        or values["pool.factory_method"] != "deploy_plain_pool/create_from_blueprint/CREATE"
+        or values["pool.factory_nonce_or_order"]
+        != "not_precomputed; record returned deployment address"
+    ):
+        _fail("RH_CURVE_POOL_IDENTITY")
+
+    owner_choice_ids = (
+        "pool.name",
+        "pool.symbol",
+        "pool.production_liquidity_amount",
+        "pool.funding_source",
+        "pool.custodian",
+        "pool.approving_account",
+        "pool.minimum_minted_lp",
+        "pool.slippage_limit",
+        "pool.withdrawal_authority",
+        "pool.minimum_retained_liquidity",
+    )
+    expected_symbolic_names = {
+        "pool.name": "GREEN_USDG_CURVE_POOL_NAME",
+        "pool.symbol": "GREEN_USDG_CURVE_POOL_SYMBOL",
+        "pool.production_liquidity_amount": "GREEN_USDG_PRODUCTION_LIQUIDITY",
+        "pool.funding_source": "GREEN_USDG_FUNDING_SOURCE",
+        "pool.custodian": "GREEN_USDG_CUSTODIAN",
+        "pool.approving_account": "GREEN_USDG_APPROVING_ACCOUNT",
+        "pool.minimum_minted_lp": "GREEN_USDG_MINIMUM_MINTED_LP",
+        "pool.slippage_limit": "GREEN_USDG_SLIPPAGE_LIMIT",
+        "pool.withdrawal_authority": "GREEN_USDG_WITHDRAWAL_AUTHORITY",
+        "pool.minimum_retained_liquidity": "GREEN_USDG_MIN_RETAINED_LIQUIDITY",
+    }
+    if any(
+        type(values[input_id]).__name__ != "SymbolicBinding"
+        or values[input_id].semantic_name != expected_symbolic_names[input_id]
+        or states[input_id] != "owner_choice_unresolved"
+        for input_id in owner_choice_ids
+    ):
+        _fail("RH_CURVE_OWNER_INPUT")
+    if (
+        type(values["pool.production_observation"]).__name__ != "SymbolicBinding"
+        or values["pool.production_observation"].semantic_name
+        != "GREEN_USDG_PRODUCTION_OBSERVATION"
+        or states["pool.production_observation"] != "external_observation_unverified"
+    ):
+        _fail("RH_CURVE_OBSERVATION")
+
+    expected_profile = {
+        "GREEN_POOL_NAME": values["pool.name"],
+        "GREEN_POOL_SYMBOL": values["pool.symbol"],
+        "GREEN_POOL_COINS": (
+            source_blueprint.ROBINHOOD_ADDRESSES["USDG"],
+            source_blueprint.ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+        ),
+        "GREEN_POOL_COIN_DECIMALS": values["pool.coin_decimals"],
+        "GREEN_POOL_A": values["pool.A"],
+        "GREEN_POOL_FEE": values["pool.fee"],
+        "GREEN_POOL_OFFPEG_MULTIPLIER": values["pool.offpeg_fee_multiplier"],
+        "GREEN_POOL_MA_EXP_TIME": values["pool.ma_exp_time"],
+        "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": values[
+            "pool.ma_exp_time_alternative_test_vector"
+        ],
+        "GREEN_POOL_ADDRESS": values["pool.address"],
+    }
+    if source_blueprint.CURVE_PARAMS.get("robinhood") != expected_profile:
+        _fail("RH_CURVE_PROFILE_VIEW")
+
+    if (
+        values["feed.route"]
+        != ("GREEN", "Curve:GREEN/USDG", "PriceDesk", "Chainlink:USDG/USD")
+        or values["feed.curve_assets"] != ("GREEN",)
+        or values["feed.usdg_curve_feed"] is not False
+        or values["feed.usdg_authority"] != "ChainlinkPrices only"
+        or "USDG" in values["feed.curve_assets"]
+    ):
+        _fail("RH_CURVE_RECURSION_GUARD")
+    expected_inactive = {
+        "GREEN_USDG_LP_COLLATERAL",
+        "RIPE_WETH_LP_COLLATERAL",
+        "CURVE_LP_VALUATION",
+        "PSM_CURVE_AUTHORITY",
+        "CURVE_DYNAMIC_RATES",
+        "GREEN_REFERENCE_SNAPSHOTS",
+        "ENDAOMENT_CURVE_STABILIZATION",
+        "STOCK_PRICING",
+        "UNISWAP_ACCOUNTING",
+    }
+    if set(values["inactive.capabilities"]) != expected_inactive:
+        _fail("RH_CURVE_BOUNDED_CAPABILITY")
+
+    expected_artifacts = {
+        "artifact.curve_prices_source_sha256": (
+            "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
+        ),
+        "artifact.curve_prices_abi_sha256": (
+            "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
+        ),
+    }
+    if any(values[input_id] != expected for input_id, expected in expected_artifacts.items()):
+        _fail("RH_CURVE_ARTIFACT_DRIFT")
 
 
 _COMPONENT_SELECTION_BY_ID = _source_component_selection_map()
@@ -5162,7 +5614,7 @@ _PROFILE1_SELECTION = Profile1LaunchSelection(
     excluded_lanes=(
         "CCIP",
         "CREDIT_ENGINE_ZERO_BACKING",
-        "CURVE_OR_LP_ACTIVATION",
+        "CURVE_HIGHER_POWERS_OR_LP_ACTIVATION",
         "DELEVERAGE_VALUES",
         "OLD_MIGRATION_NAMESPACE_AND_CUSTOM_RUNNER",
         "PSM_PARAMETERS_OR_ACTIVATION",
@@ -5480,6 +5932,7 @@ def _by_id(values: tuple[Any, ...], attribute: str) -> dict[str, Any]:
 def validate_blueprint(
     blueprint: RobinhoodBlueprint = ROBINHOOD_BLUEPRINT,
 ) -> None:
+    validate_curve_launch_authority()
     if not isinstance(blueprint, RobinhoodBlueprint):
         _fail("H03_IMMUTABLE")
     _require_immutable(blueprint)
@@ -5516,7 +5969,7 @@ def validate_blueprint(
     ):
         _fail("H03_SYMBOLIC_FIELD")
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 19 or len(set(blocker_ids)) != 19:
+    if len(blocker_ids) != 42 or len(set(blocker_ids)) != 42:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")
@@ -5531,7 +5984,7 @@ def validate_blueprint(
             _fail("H03_OMISSION_SURFACE", component.component_id)
         if any(surface.component_id != component.component_id for surface in component.surfaces):
             _fail("H03_SURFACE_SET", component.component_id)
-    if len(surface_values) != 96:
+    if len(surface_values) != 100:
         _fail("H03_SURFACE_SET")
 
     expected_surface_map = _by_id(_CANONICAL_SURFACES, "surface_id")
@@ -5555,7 +6008,7 @@ def validate_blueprint(
     relation_values = _all_relations(blueprint)
     relation_ids = tuple(relation.relation_id for _, relation in relation_values)
     if tuple(sorted(relation_ids)) != tuple(
-        f"R-{value:03d}" for value in range(1, 289)
+        f"R-{value:03d}" for value in range(1, 297)
     ):
         _fail("H03_RELATION")
     if any(
@@ -5571,7 +6024,7 @@ def validate_blueprint(
         (source, relation.phase, relation.target_component_id)
         for source, relation in relation_values
     }
-    if len(triples) != 284:
+    if len(triples) != 292:
         _fail("H03_RELATION")
 
     source_values = _all_sources(blueprint)

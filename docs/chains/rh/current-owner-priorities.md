@@ -1,6 +1,6 @@
 # Robinhood current owner priorities
 
-**Effective:** 31 July 2026
+**Effective:** 1 August 2026
 
 **Authority:** explicit owner directive
 
@@ -12,9 +12,9 @@ authorize deployment, configuration, activation, or release.
 
 ## Active focus
 
-Ready to begin deployment preparation from current configuration-source
-baseline `e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`. The earlier `ae0cb49…`
+Ready to continue bounded launch preparation from exact baseline
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The earlier `ae0cb49…`
 protocol/pause baseline and corrected PR #61 import ancestor `ad831669…` remain
 historical evidence, not present branch authority. The deployment owner may
 now advance:
@@ -29,7 +29,7 @@ now advance:
 H-04 source authority and H-05 blocked planning are integrated; M4 proof is
 integrated. `DefaultsRobinhood.vy` exists, compiles, and is synchronized with
 the derived ledger. The generator reports `configuration_consistent=true`,
-`deployment_ready=false`, and 58 blockers. Repository configuration is
+`deployment_ready=false`, and 80 blockers. Repository configuration is
 prepared and consistent; production/onchain configuration has not occurred.
 No deployment, migration execution or history, activation, or release has
 occurred. The smart-contract reassessment and
@@ -45,11 +45,24 @@ The sole canonical deployment-owner handoff is
 - Preserve the current Ledger and Teller contracts and their reviewed
   measurement/clock boundaries.
 - Keep GuardedErc20 separate and Stock-specific.
-- Launch Profile 1 with Chainlink at PriceDesk slot 1 and BlueChipYield at slot
-  3, no Uniswap launch price source, no Curve registration, and neither LP
-  token admitted. Priority source IDs remain `[1, 3]`.
+- Launch with Chainlink at PriceDesk slot 1, unchanged CurvePrices at slot 2
+  for GREEN only, and BlueChipYield at slot 3. USDG has no Curve feed, slots 4
+  and 5 remain empty, neither LP token is admitted, and priority source IDs
+  remain `[1, 3]`.
 - Treat RIPE/WETH V2 only as an optional externally held liquidity canary.
-- Move GREEN/USDG and both LP admissions to Profile 2.
+- Treat GREEN/USDG as a bounded launch-pricing venue candidate only; keep its
+  deployment/operations, both LP admissions, additional Curve feeds or
+  consumers, dynamic rates, Teller snapshots, and Endaoment stabilization
+  separately gated.
+- Preserve the approved general reward values and shared `1,000 RIPE` budget;
+  DP15 and P-H04-399 are closed product/configuration decisions, while
+  `B-REWARD-PROMOTION` remains open for checkpoints, identities, monitoring,
+  operator binding, rehearsal, and release prerequisites. Stock rewards remain
+  disabled.
+- Preserve the fresh LP-admission result: the selected GREEN/USDG pricing pool
+  does not admit its LP token; RIPE/WETH is at most a separately authorized
+  externally held canary; Uniswap remains PriceDesk-inert; and PSM reserves
+  cannot fund LP liquidity.
 - Keep the PSM disabled, allowlisted, canary-first, and redemption-first until
   separately activated.
 - Keep H-09 network-disabled by default with explicit opt-in read-only
@@ -104,8 +117,8 @@ the four zero-valued controls.
 The archival `RobinhoodUniswapV2RipePrices` research/monitoring prototype
 source is present in the repository. It is not registered, configured,
 admitted, deployed, or activated and is unavailable for protocol accounting.
-No Uniswap launch price source is required; Profile 1 behavior and PriceDesk
-priority source IDs `[1, 3]` remain unchanged.
+No Uniswap launch price source is required; bounded launch behavior and
+PriceDesk priority source IDs `[1, 3]` remain unchanged.
 
 - Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
   pool address, liquidity amount, funding or custody authority, migration,

@@ -5,9 +5,35 @@
 > approval, deployment authorization, activation approval, or claim that a
 > Robinhood Ledger exists on a live network. “Required,” “recommended,” and
 > “not recommended” below are agent recommendations unless expressly labeled
-> as an earlier owner decision. Any external Deleverage branch or PR and every
-> CCIP workflow are outside this review. The one integrated Deleverage test
-> cited below is used only as evidence of Ledger-guard rollback.
+> as an earlier owner decision. Further Deleverage work and every CCIP workflow
+> are outside this review. Integrated Deleverage composition evidence is used
+> only to assess Ledger-guard rollback.
+
+## Current `rh` rebind
+
+The current authority for this page is `rh` commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July review remains dated
+historical evidence below.
+
+| Current identity | Value |
+| --- | --- |
+| Ledger source Git blob / SHA-256 | `590341e3f9091105036c1cc497bd862ea3769248` / `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
+| Runtime template | 13,125 bytes; SHA-256 `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7`; 11,451 bytes EIP-170 headroom |
+| [`test_ledger_action_block.py`](../../../../tests/data/test_ledger_action_block.py) | Git blob `800988b23656e47287b5ea752b1f46dd37f169bc`; SHA-256 `5d631ef7e6e97f31367222a74b150f829330756f8ce34765ba2b6d755b3b9b23` |
+| [Teller action-block test](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `25b249342e7edc9efa30da50a9f5cdee8810857a`; SHA-256 `974ac5f7bb47185f29ad4f57e1db91ec0d852ae6f9bf3b13112f48ad72a3741f` |
+| [Robinhood profile test](../../../../tests/deployment_profiles/test_ledger_robinhood_profile.py) | Git blob `8c946bab5b5a867a9d0e68f457bf0f6d7a632d21`; SHA-256 `1df761c09b0f1d9f0dcc3ffcc4b6281437978a01ceef6a96e5bbc3417f3f2ab2` |
+| [Artifact-bundle test](../../../../tests/deployment_profiles/test_ledger_artifact_bundle.py) | Git blob `7b7e89750576d9e7c6ceab44b14a96737c1ca91a`; SHA-256 `0645965c6a5b8df67545a59ca69f414c381e9e2621f1901f11d499ed3e45ad5c` |
+
+Current tests cover exact 32-byte success; 33-, 64-, and 96-byte oversized
+returns; typed-call, truncation, and native-fallback mutants; both
+`checkAndUpdateLastTouch` selectors; and expanded `lastTouch` behavior across
+users, native/ArbSys identities, trusted deposits, housekeeping, rollback, and
+composition. This closes the older return-shape, dual-selector, and
+`depositFromTrusted` evidence gaps. The remaining deployment gap is an actual
+authorized Robinhood deployment/migration path and live-network proof, not a
+local source-test gap. No behavioral suite was rerun for this documentation-only
+refresh.
 
 ## Reviewed implementation snapshot
 
@@ -639,17 +665,13 @@ authority, zero user, unchecked repeats, and mixed modes.
 - Locked-account and later-route tests detect observable rollback/order
   changes.
 
-Remaining evidence gaps:
+Remaining evidence gaps after later integrated hardening:
 
-- no executable Robinhood deployment test proves that production tooling passes
-  exact `0x64`;
-- no dedicated mutation-sensitive test pins `depositFromTrusted` itself as
-  non-arming;
+- no authorized Robinhood migration/deployment execution proves the final
+  creation arguments and deployed runtime at exact `0x64`;
 - no external-consumer test proves frontend/indexer interpretation of
   `lastTouch`;
 - no live-network execution was authorized;
-- no dual-selector behavior test specifically pins the pre-existing optional
-  `_mc` selector; and
 - a separate `LedgerRh.vy` could be silently undertested unless every suite is
   explicitly parameterized over both artifacts.
 
@@ -720,7 +742,7 @@ not current Robinhood fee predictions:
 | External consumer assumes `lastTouch == EVM NUMBER` | Moderate | Unknown | Analytics/indexing mismatch | Document domain; consumer-owner sign-off | Conditional |
 | Historical Base migration loads current three-arg source | Moderate operational | Certain under that resolution model | Replay fails or is misrepresented | Version-pin historical artifact; new migrations for new deployments | Blocks replayability claims |
 | Broad external Teller housekeeping parameters | Moderate | Existing/accepted | Valid Ripe caller can select victim/risk/Addys | Registry control, existing tests, separate Teller review | No new Ledger blocker |
-| `depositFromTrusted` itself does not arm | Low/policy | Expected | Trusted deposit alone does not block a later checked action | Document and add focused policy test | No |
+| `depositFromTrusted` itself does not arm | Low/policy | Expected and covered by current composition tests | Trusted deposit alone does not block a later checked action | Preserve current policy regression | No |
 | Optional unused `_mc` selector | Low | Certain | ABI complexity/confusion | Preserve now; remove only in versioned cleanup | No |
 | Third source family | Architectural | Event-driven | Current Ledger cannot deploy without source change | Trigger adapter/provider decision | No current blocker |
 
@@ -765,11 +787,8 @@ Ledger-associated release gap.
 
 These improve assurance but do not identify a defect in the current runtime:
 
-- add a dedicated `depositFromTrusted` test proving the deposit itself does not
-  arm the guard, explicit later housekeeping does, and enclosing failure rolls
-  both back;
-- add a dual-selector test for the optional `_mc` ABI surface;
-- add deployment-profile mutations for zero/wrong source, removed constructor
+- retain the current `depositFromTrusted`, dual-selector, and deployment-profile
+  mutation tests for zero/wrong source, removed constructor
   probe, typed-call substitution, `max_outsize=32`, native fallback, monotonic
   comparison, and omitted immutable/runtime assertions;
 - automate source/ABI/compiler/layout/runtime-size and immutable-bound artifact
@@ -784,12 +803,12 @@ These improve assurance but do not identify a defect in the current runtime:
 These subjects are not current Ledger release blockers and are not expanded
 into Ledger recommendations:
 
-- the external Deleverage branch/PR;
+- further Deleverage work beyond the integrated composition evidence;
 - every CCIP workflow; and
 - zero-backing settlement, loss allocation, and bad-debt policy.
 
-The integrated Deleverage test remains relevant only as a guard-rollback
-consumer test.
+The integrated Deleverage tests remain relevant only as guard-rollback consumer
+evidence.
 
 ### Explicitly not recommended
 

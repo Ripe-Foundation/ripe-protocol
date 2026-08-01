@@ -59,6 +59,48 @@ def test_loot_claim_basic(
     assert claimable == 0
 
 
+def test_accrued_loot_buckets_remain_claimable_while_new_points_are_disabled(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setRipeRewardsConfig(True)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    stored_points = ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints
+    claimable_before_disable = lootbox.getClaimableLoot(bob)
+    assert stored_points > 0
+    assert claimable_before_disable > 0
+
+    setRipeRewardsConfig(False)
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == stored_points
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed == claimable_before_disable
+    assert ripe_token.balanceOf(bob) == claimed
+
+
+
 def test_loot_claim_multiple_users(
     bob,
     alice,

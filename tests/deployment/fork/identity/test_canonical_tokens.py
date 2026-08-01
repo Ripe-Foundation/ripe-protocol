@@ -4,6 +4,8 @@ import copy
 
 import pytest
 
+from config.BluePrint import ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+
 
 def test_owner_identity_manifest_parses_without_observed_facts(
     parse_identity,
@@ -24,6 +26,28 @@ def test_accepted_preflight_exposes_owner_token_identity(
     )
     assert len(tokens) == 1
     assert tokens[0].authority == "owner-supplied"
+
+
+def test_aapl_blueprint_candidate_cannot_substitute_for_owner_observation(
+    accepted_preflight,
+):
+    candidates = {
+        item.path: item
+        for item in ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
+    }
+    aapl = candidates["Deployment.DP-10.aapl.identity"]
+    owner_addresses = {
+        identity.address
+        for identity in accepted_preflight.identity_manifest.identities
+    }
+    assert aapl.resolution == (
+        "selected_external_fact_pending_current_verification"
+    )
+    assert aapl.candidate not in owner_addresses
+    assert aapl.blocker_ids == (
+        "B-T8-FREEZE",
+        "B-P1-EXTERNAL-VERIFY",
+    )
 
 
 @pytest.mark.parametrize(

@@ -13,6 +13,8 @@ const paths = {
   readiness: resolve(rhDocs, "deployment-owner-readiness.md"),
   quickstart: resolve(rhDocs, "deployment-owner-quickstart.md"),
   synthesis: resolve(rhDocs, "reassessment-and-qualification-synthesis.md"),
+  curve: resolve(rhDocs, "curve-launch-activation.md"),
+  curveMigration: resolve(rhDocs, "curve-launch-migration-handoff.md"),
   deleverage: resolve(rhDocs, "smart-contract-changes/deleverage.md"),
   priorities: resolve(rhDocs, "current-owner-priorities.md"),
   register: resolve(rhDocs, "decision-register.md"),
@@ -55,7 +57,7 @@ test("the canonical quick-start binds the current subject and lifecycle facts", 
     assert.match(document, /DefaultsRobinhood\.vy.*exists.*compiles/is);
     assert.match(document, /configuration_consistent=true/is);
     assert.match(document, /deployment_ready=false/is);
-    assert.match(document, /58/is);
+    assert.match(document, /80/is);
     assert.match(document, /H-05.*deterministic/is);
     assert.match(document, /H-06.*class|H-06.*operator\/storage/is);
   }
@@ -91,14 +93,14 @@ test("source ownership gives constructor and immutable bindings precedence over 
   assert.doesNotMatch(quickstart, /If a value is returned by a Defaults getter/i);
 });
 
-test("current accepted architecture matches the selected Profile 1 price topology", async () => {
+test("current accepted architecture matches the bounded Curve launch topology", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
   assert.deepEqual(
     status.post_freeze_reconciliation.profile1_launch_input_reconciliation.price_desk_registry,
     {
       1: { semantic: "Chainlink", state: "selected" },
-      2: { semantic: "Curve", state: "empty_reserved" },
+      2: { semantic: "Curve", state: "selected_green_only" },
       3: { semantic: "BlueChipYield", state: "selected" },
       4: { semantic: "Pyth", state: "empty" },
       5: { semantic: "Stork", state: "empty" },
@@ -109,28 +111,31 @@ test("current accepted architecture matches the selected Profile 1 price topolog
     [1, 3],
   );
   assert.match(documents.synthesis, /PriceDesk ID 1 has Chainlink selected/i);
-  assert.match(documents.synthesis, /ID 2 is empty and reserved for Profile 2 Curve/i);
+  assert.match(documents.synthesis, /PriceDesk ID 2 has unchanged `CurvePrices` selected/i);
   assert.match(documents.synthesis, /ID 3 has BlueChipYield selected/i);
   assert.match(documents.synthesis, /IDs 4 and 5 are empty/i);
   assert.match(documents.synthesis, /Priority price-source IDs are `\[1, 3\]`/i);
-  assert.match(documents.synthesis, /Chainlink as launch oracle authority/i);
+  assert.match(documents.synthesis, /Chainlink remains the sole USDG and PSM authority/i);
   assert.match(
     documents.synthesis,
-    /BlueChipYield provides the selected yield-token pricing route; it is not a\s+Curve or Uniswap launch fallback/i,
+    /GREEN -> Curve GREEN\/USDG -> PriceDesk -> Chainlink USDG/i,
   );
+  assert.match(documents.curve, /USDG has no Curve feed/i);
+  assert.match(documents.curve, /80 blockers/i);
+  assert.match(documents.curveMigration, /Do not edit or execute `migrations\/robinhood\/\*\*`/i);
   assert.doesNotMatch(documents.synthesis, /IDs 2-5 remain empty|PriceDesk IDs 2-5 empty/i);
   const synthesisRole = status.document_roles.find(
     ({ file }) => file === "docs/chains/rh/reassessment-and-qualification-synthesis.md",
   );
-  assert.match(synthesisRole.role, /Current consolidated architecture/i);
+  assert.match(synthesisRole.role, /Current consolidated launch topology/i);
 });
 
 test("the current Deleverage disposition preserves parked zero controls without stale Defaults claims", async () => {
   const { deleverage } = await readAll();
-  assert.match(deleverage, /e4473ce6485888f1b747761a5ee8693443108877/);
+  assert.match(deleverage, /5f5d22b7ee78cbb904c4fe3c6e46599c330c4353/);
   assert.match(deleverage, /DefaultsRobinhood\.vy.*exists.*compiles.*source-authoritative/is);
   assert.match(deleverage, /all four remain zero and deferred/is);
-  assert.match(deleverage, /outside the\s+currently selected Profile 1 value projection/is);
+  assert.match(deleverage, /outside the\s+currently selected launch value projection/is);
   assert.match(deleverage, /No Deleverage configuration has\s+been applied onchain/is);
   assert.match(deleverage, /Every Deleverage task remains parked unless\s+an explicit owner instruction reopens it/is);
   assert.doesNotMatch(deleverage, /DefaultsRobinhood\.vy.*absent/is);
@@ -153,8 +158,8 @@ test("counts and current priority boundaries remain consistent", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
   assert.equal(status.owner_priority_overlay.parked_lanes.length, status.counts.parked_lanes);
-  assert.equal(status.owner_priority_overlay.effective_at, "2026-07-31");
-  assert.match(documents.priorities, /\*\*Effective:\*\* 31 July 2026/);
+  assert.equal(status.owner_priority_overlay.effective_at, "2026-08-01");
+  assert.match(documents.priorities, /\*\*Effective:\*\* 1 August 2026/);
   assert.equal((documents.priorities.match(/^### \d+\./gm) ?? []).length, status.counts.parked_lanes);
   assert.match(documents.priorities, /CCIP.*parked/is);
   assert.match(documents.priorities, /zero-backing settlement.*bad-debt policy.*parked/is);

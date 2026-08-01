@@ -380,3 +380,42 @@ def test_initial_robinhood_underscore_omission_cannot_create_exemption(
             sender=deleverage.address,
         )
     assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+def test_selected_real_curve_component_is_inert_without_reference_pool_config(
+    teller,
+    ledger,
+    price_desk,
+    curve_prices,
+    governance,
+    deleverage,
+    alice,
+):
+    """ID 2 makes Teller call real CurvePrices, but the empty ref config is inert."""
+    with boa.env.anchor():
+        if price_desk.getAddr(2) != curve_prices.address:
+            assert price_desk.startAddressUpdateToRegistry(
+                2, curve_prices, sender=governance.address
+            )
+            boa.env.time_travel(blocks=price_desk.registryChangeTimeLock() + 1)
+            assert price_desk.confirmAddressUpdateToRegistry(
+                2, sender=governance.address
+            )
+
+        config = curve_prices.greenRefPoolConfig()
+        assert config.pool == ZERO_ADDRESS
+        assert config.lpToken == ZERO_ADDRESS
+        before = curve_prices.getCurrentGreenPoolStatus()
+        assert before.weightedRatio == 0
+        assert before.numBlocksInDanger == 0
+
+        teller.performHousekeeping(
+            False,
+            alice,
+            False,
+            sender=deleverage.address,
+        )
+
+        after = curve_prices.getCurrentGreenPoolStatus()
+        assert after == before
+        assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number

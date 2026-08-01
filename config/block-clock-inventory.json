@@ -23,11 +23,12 @@
     "track3ReviewCommit": "c3040041a1254a774e0a305060330d6ab9cc04ca",
     "hardeningApprovalCommit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e",
     "pr61ReviewCommit": "2c36e4aa06395d5075c348aab71d468fa099775f",
-    "sourceAuthorityReviewCommit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+    "sourceAuthorityReviewCommit": "74c4120fbfa1ade859dc32f61acdf567c139fe02",
+    "rewardLaunchReviewCommit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
   },
   "currentBindings": {
     "schemaVersion": 1,
-    "currentStateSha256": "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441",
+    "currentStateSha256": "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59",
     "sourcePaths": [
       {
         "path": "contracts/mock/MockMorphoV2Factory.vy",
@@ -40,6 +41,12 @@
         "classification": "mock",
         "historicalContentSha256": null,
         "currentContentSha256": "d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac"
+      },
+      {
+        "path": "contracts/mock/MockRobinhoodCurveSystem.vy",
+        "classification": "mock",
+        "historicalContentSha256": null,
+        "currentContentSha256": "6d180087f56b68ed7387cce91f391fddf6ae9845a1ab78fef095423d0f4279ea"
       },
       {
         "path": "contracts/mock/MockYieldRegistry.vy",
@@ -11110,7 +11117,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"path\": \"Defaults.genDebtConfig.numBlocksPerInterval\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 1477,
+      "reviewedLine": 1479,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11129,7 +11136,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.genDebtConfig.numBlocksPerInterval.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 1474,
+      "reviewedLine": 1476,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11148,7 +11155,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 1,
-      "reviewedLine": 15942,
+      "reviewedLine": 15944,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11167,7 +11174,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 1,
-      "reviewedLine": 15944,
+      "reviewedLine": 15946,
       "classification": "config",
       "semanticIds": [
         "BN-029"
@@ -11186,7 +11193,7 @@
       "matchedText": "increasePerDangerBlock",
       "normalizedSnippet": "\"path\": \"Defaults.genDebtConfig.increasePerDangerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 1629,
+      "reviewedLine": 1631,
       "classification": "config",
       "semanticIds": [
         "CAD-001"
@@ -11205,7 +11212,7 @@
       "matchedText": "increasePerDangerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.genDebtConfig.increasePerDangerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 1626,
+      "reviewedLine": 1628,
       "classification": "config",
       "semanticIds": [
         "CAD-001"
@@ -11224,7 +11231,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 2,
-      "reviewedLine": 16195,
+      "reviewedLine": 16197,
       "classification": "config",
       "semanticIds": [
         "BN-031"
@@ -11243,7 +11250,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 2,
-      "reviewedLine": 16197,
+      "reviewedLine": 16199,
       "classification": "config",
       "semanticIds": [
         "BN-031"
@@ -11262,7 +11269,7 @@
       "matchedText": "restartDelayBlocks",
       "normalizedSnippet": "\"path\": \"Defaults.ripeBondConfig.restartDelayBlocks\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 2839,
+      "reviewedLine": 2841,
       "classification": "config",
       "semanticIds": [
         "BN-017"
@@ -11281,7 +11288,7 @@
       "matchedText": "restartDelayBlocks",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.ripeBondConfig.restartDelayBlocks.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 2836,
+      "reviewedLine": 2838,
       "classification": "config",
       "semanticIds": [
         "BN-017"
@@ -11300,7 +11307,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"path\": \"Defaults.rewardsConfig.ripePerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 2939,
+      "reviewedLine": 2941,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -11319,7 +11326,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Defaults.rewardsConfig.ripePerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 2936,
+      "reviewedLine": 2938,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -11338,7 +11345,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 3,
-      "reviewedLine": 16247,
+      "reviewedLine": 16249,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11357,7 +11364,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 3,
-      "reviewedLine": 16249,
+      "reviewedLine": 16251,
       "classification": "config",
       "semanticIds": [
         "BN-008"
@@ -11375,25 +11382,6 @@
       "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 4,
-      "reviewedLine": 16351,
-      "classification": "config",
-      "semanticIds": [
-        "BN-008"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 4,
       "reviewedLine": 16353,
       "classification": "config",
@@ -11411,13 +11399,13 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 5,
-      "reviewedLine": 16403,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "ordinalInFunction": 4,
+      "reviewedLine": 16355,
       "classification": "config",
       "semanticIds": [
-        "BN-025"
+        "BN-008"
       ],
       "reviewDomain": "cadence-surface",
       "semanticReview": {
@@ -11430,8 +11418,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 5,
       "reviewedLine": 16405,
       "classification": "config",
@@ -11449,13 +11437,13 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 6,
-      "reviewedLine": 17899,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "ordinalInFunction": 5,
+      "reviewedLine": 16407,
       "classification": "config",
       "semanticIds": [
-        "BN-001"
+        "BN-025"
       ],
       "reviewDomain": "cadence-surface",
       "semanticReview": {
@@ -11468,8 +11456,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 6,
       "reviewedLine": 17901,
       "classification": "config",
@@ -11487,10 +11475,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 43200,",
-      "ordinalInFunction": 7,
-      "reviewedLine": 17951,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "ordinalInFunction": 6,
+      "reviewedLine": 17903,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11506,8 +11494,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 7,
       "reviewedLine": 17953,
       "classification": "config",
@@ -11525,10 +11513,29 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 7200",
+      "ordinalInFunction": 7,
+      "reviewedLine": 17955,
+      "classification": "config",
+      "semanticIds": [
+        "BN-001"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 1,
-      "reviewedLine": 16299,
+      "reviewedLine": 16301,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11547,7 +11554,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 1,
-      "reviewedLine": 16301,
+      "reviewedLine": 16303,
       "classification": "config",
       "semanticIds": [
         "BN-001"
@@ -11566,7 +11573,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 43200,",
       "ordinalInFunction": 8,
-      "reviewedLine": 18107,
+      "reviewedLine": 18109,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11585,7 +11592,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 7200",
       "ordinalInFunction": 8,
-      "reviewedLine": 18109,
+      "reviewedLine": 18111,
       "classification": "config",
       "semanticIds": [
         "BN-003"
@@ -11603,25 +11610,6 @@
       "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 16455,
-      "classification": "config",
-      "semanticIds": [
-        "BN-003"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 2,
       "reviewedLine": 16457,
       "classification": "config",
@@ -11639,13 +11627,13 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 21600,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 16507,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16459,
       "classification": "config",
       "semanticIds": [
-        "BN-018"
+        "BN-003"
       ],
       "reviewDomain": "cadence-surface",
       "semanticReview": {
@@ -11658,8 +11646,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 1,
       "reviewedLine": 16509,
       "classification": "config",
@@ -11677,10 +11665,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 21600,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 16559,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16511,
       "classification": "config",
       "semanticIds": [
         "BN-018"
@@ -11696,8 +11684,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 2,
       "reviewedLine": 16561,
       "classification": "config",
@@ -11715,10 +11703,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 3,
-      "reviewedLine": 16611,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16563,
       "classification": "config",
       "semanticIds": [
         "BN-018"
@@ -11734,8 +11722,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 3,
       "reviewedLine": 16613,
       "classification": "config",
@@ -11753,13 +11741,13 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 1,
-      "reviewedLine": 16713,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 3,
+      "reviewedLine": 16615,
       "classification": "config",
       "semanticIds": [
-        "BN-004"
+        "BN-018"
       ],
       "reviewDomain": "cadence-surface",
       "semanticReview": {
@@ -11772,8 +11760,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 1,
       "reviewedLine": 16715,
       "classification": "config",
@@ -11791,10 +11779,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 4,
-      "reviewedLine": 16765,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 1,
+      "reviewedLine": 16717,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -11810,8 +11798,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 4,
       "reviewedLine": 16767,
       "classification": "config",
@@ -11829,10 +11817,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 5,
-      "reviewedLine": 16817,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 4,
+      "reviewedLine": 16769,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -11848,8 +11836,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 5,
       "reviewedLine": 16819,
       "classification": "config",
@@ -11867,10 +11855,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 2,
-      "reviewedLine": 16919,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 5,
+      "reviewedLine": 16821,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -11886,8 +11874,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 2,
       "reviewedLine": 16921,
       "classification": "config",
@@ -11905,10 +11893,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 6,
-      "reviewedLine": 16971,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 2,
+      "reviewedLine": 16923,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -11924,8 +11912,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 6,
       "reviewedLine": 16973,
       "classification": "config",
@@ -11943,10 +11931,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 7,
-      "reviewedLine": 17023,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 6,
+      "reviewedLine": 16975,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -11962,8 +11950,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 7,
       "reviewedLine": 17025,
       "classification": "config",
@@ -11981,10 +11969,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 3,
-      "reviewedLine": 17125,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 7,
+      "reviewedLine": 17027,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12000,8 +11988,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 3,
       "reviewedLine": 17127,
       "classification": "config",
@@ -12019,10 +12007,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 8,
-      "reviewedLine": 17177,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 3,
+      "reviewedLine": 17129,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12038,8 +12026,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 8,
       "reviewedLine": 17179,
       "classification": "config",
@@ -12057,10 +12045,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 9,
-      "reviewedLine": 17229,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 8,
+      "reviewedLine": 17181,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12076,8 +12064,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 9,
       "reviewedLine": 17231,
       "classification": "config",
@@ -12095,10 +12083,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 4,
-      "reviewedLine": 17331,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 9,
+      "reviewedLine": 17233,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12114,8 +12102,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 4,
       "reviewedLine": 17333,
       "classification": "config",
@@ -12133,10 +12121,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 10,
-      "reviewedLine": 17383,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 4,
+      "reviewedLine": 17335,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12152,8 +12140,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 10,
       "reviewedLine": 17385,
       "classification": "config",
@@ -12171,10 +12159,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 11,
-      "reviewedLine": 17435,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 10,
+      "reviewedLine": 17387,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12190,8 +12178,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 11,
       "reviewedLine": 17437,
       "classification": "config",
@@ -12209,10 +12197,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 3600,",
-      "ordinalInFunction": 5,
-      "reviewedLine": 17537,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 11,
+      "reviewedLine": 17439,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12228,8 +12216,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 600",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 5,
       "reviewedLine": 17539,
       "classification": "config",
@@ -12247,10 +12235,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 12,
-      "reviewedLine": 17589,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 600",
+      "ordinalInFunction": 5,
+      "reviewedLine": 17541,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12266,8 +12254,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 12,
       "reviewedLine": 17591,
       "classification": "config",
@@ -12285,10 +12273,29 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 12,
+      "reviewedLine": 17593,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 13,
-      "reviewedLine": 17641,
+      "reviewedLine": 17643,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12307,7 +12314,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 13,
-      "reviewedLine": 17643,
+      "reviewedLine": 17645,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12326,7 +12333,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 3600,",
       "ordinalInFunction": 6,
-      "reviewedLine": 17743,
+      "reviewedLine": 17745,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12345,7 +12352,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 600",
       "ordinalInFunction": 6,
-      "reviewedLine": 17745,
+      "reviewedLine": 17747,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12363,25 +12370,6 @@
       "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 14,
-      "reviewedLine": 17795,
-      "classification": "config",
-      "semanticIds": [
-        "BN-004"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 14,
       "reviewedLine": 17797,
       "classification": "config",
@@ -12399,10 +12387,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 15,
-      "reviewedLine": 17847,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 14,
+      "reviewedLine": 17799,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12418,8 +12406,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 15,
       "reviewedLine": 17849,
       "classification": "config",
@@ -12437,10 +12425,10 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"base_blocks\":",
-      "normalizedSnippet": "\"base_blocks\": 302400,",
-      "ordinalInFunction": 16,
-      "reviewedLine": 18003,
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 15,
+      "reviewedLine": 17851,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12456,8 +12444,8 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "matchedText": "\"base_blocks\":",
+      "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 16,
       "reviewedLine": 18005,
       "classification": "config",
@@ -12475,10 +12463,29 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 50400",
+      "ordinalInFunction": 16,
+      "reviewedLine": 18007,
+      "classification": "config",
+      "semanticIds": [
+        "BN-004"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 17,
-      "reviewedLine": 18055,
+      "reviewedLine": 18057,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12497,7 +12504,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 17,
-      "reviewedLine": 18057,
+      "reviewedLine": 18059,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12516,7 +12523,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 3,
-      "reviewedLine": 18159,
+      "reviewedLine": 18161,
       "classification": "config",
       "semanticIds": [
         "BN-019"
@@ -12535,7 +12542,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 3,
-      "reviewedLine": 18161,
+      "reviewedLine": 18163,
       "classification": "config",
       "semanticIds": [
         "BN-019"
@@ -12554,7 +12561,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 4,
-      "reviewedLine": 18211,
+      "reviewedLine": 18213,
       "classification": "config",
       "semanticIds": [
         "BN-020"
@@ -12573,7 +12580,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 4,
-      "reviewedLine": 18213,
+      "reviewedLine": 18215,
       "classification": "config",
       "semanticIds": [
         "BN-020"
@@ -12592,7 +12599,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
       "ordinalInFunction": 5,
-      "reviewedLine": 18263,
+      "reviewedLine": 18265,
       "classification": "config",
       "semanticIds": [
         "BN-021"
@@ -12611,7 +12618,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 5,
-      "reviewedLine": 18265,
+      "reviewedLine": 18267,
       "classification": "config",
       "semanticIds": [
         "BN-021"
@@ -12629,27 +12636,6 @@
       "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 21600,",
-      "ordinalInFunction": 6,
-      "reviewedLine": 18315,
-      "classification": "config",
-      "semanticIds": [
-        "BN-019",
-        "BN-020",
-        "BN-021"
-      ],
-      "reviewDomain": "cadence-surface",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
-      }
-    },
-    {
-      "path": "config/robinhood-parameters.json",
-      "function": "<module>",
-      "pattern": "block-default-key",
-      "matchedText": "\"rh_blocks\":",
-      "normalizedSnippet": "\"rh_blocks\": 3600",
       "ordinalInFunction": 6,
       "reviewedLine": 18317,
       "classification": "config",
@@ -12669,10 +12655,31 @@
       "path": "config/robinhood-parameters.json",
       "function": "<module>",
       "pattern": "block-default-key",
+      "matchedText": "\"rh_blocks\":",
+      "normalizedSnippet": "\"rh_blocks\": 3600",
+      "ordinalInFunction": 6,
+      "reviewedLine": 18319,
+      "classification": "config",
+      "semanticIds": [
+        "BN-019",
+        "BN-020",
+        "BN-021"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-parameters.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 302400,",
       "ordinalInFunction": 18,
-      "reviewedLine": 18367,
+      "reviewedLine": 18369,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12693,7 +12700,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 50400",
       "ordinalInFunction": 18,
-      "reviewedLine": 18369,
+      "reviewedLine": 18371,
       "classification": "config",
       "semanticIds": [
         "BN-019",
@@ -12714,7 +12721,7 @@
       "matchedText": "\"base_blocks\":",
       "normalizedSnippet": "\"base_blocks\": 366,",
       "ordinalInFunction": 1,
-      "reviewedLine": 18419,
+      "reviewedLine": 18421,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12733,7 +12740,7 @@
       "matchedText": "\"rh_blocks\":",
       "normalizedSnippet": "\"rh_blocks\": 61",
       "ordinalInFunction": 1,
-      "reviewedLine": 18421,
+      "reviewedLine": 18423,
       "classification": "config",
       "semanticIds": [
         "BN-004"
@@ -12752,7 +12759,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"path\": \"Deployment.DP-08.psm.numBlocksPerInterval\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 18983,
+      "reviewedLine": 18985,
       "classification": "config",
       "semanticIds": [
         "BN-027",
@@ -12772,7 +12779,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Deployment.DP-08.psm.numBlocksPerInterval.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 18980,
+      "reviewedLine": 18982,
       "classification": "config",
       "semanticIds": [
         "BN-027",
@@ -12792,7 +12799,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"path\": \"Deployment.DP-15.rewards.ripePerBlock\"",
       "ordinalInFunction": 1,
-      "reviewedLine": 20671,
+      "reviewedLine": 20673,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -12811,7 +12818,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "\"description\": \"Canonical Robinhood value for Deployment.DP-15.rewards.ripePerBlock.\",",
       "ordinalInFunction": 1,
-      "reviewedLine": 20668,
+      "reviewedLine": 20670,
       "classification": "config",
       "semanticIds": [
         "BN-024"
@@ -13224,7 +13231,7 @@
       "matchedText": "\"timelock_base_headroom_blocks\":",
       "normalizedSnippet": "\"timelock_base_headroom_blocks\": 366,",
       "ordinalInFunction": 1,
-      "reviewedLine": 522,
+      "reviewedLine": 569,
       "classification": "config"
     },
     {
@@ -13243,7 +13250,7 @@
       "matchedText": "\"base_blocks_per_robinhood_block\":",
       "normalizedSnippet": "\"base_blocks_per_robinhood_block\": 6,",
       "ordinalInFunction": 1,
-      "reviewedLine": 523,
+      "reviewedLine": 570,
       "classification": "config"
     },
     {
@@ -13264,7 +13271,7 @@
       "matchedText": "numBlocksPerInterval",
       "normalizedSnippet": "'Deployment.DP-08.psm.numBlocksPerInterval': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_08_PSM_NUMBLOCKSPERINTERVAL'), 'blocked'),",
       "ordinalInFunction": 1,
-      "reviewedLine": 611,
+      "reviewedLine": 956,
       "classification": "config"
     },
     {
@@ -13283,7 +13290,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),",
       "ordinalInFunction": 1,
-      "reviewedLine": 643,
+      "reviewedLine": 988,
       "classification": "config"
     },
     {
@@ -13302,7 +13309,7 @@
       "matchedText": "ripePerBlock",
       "normalizedSnippet": "'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),",
       "ordinalInFunction": 2,
-      "reviewedLine": 643,
+      "reviewedLine": 988,
       "classification": "config"
     },
     {
@@ -13683,6 +13690,407 @@
         "owner": "protocol/security",
         "status": "reviewed",
         "commit": "74c4120fbfa1ade859dc32f61acdf567c139fe02"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"ripePerBlock\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 46,
+      "classification": "config",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"ripePerBlock\":",
+      "normalizedSnippet": "\"ripePerBlock\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 46,
+      "classification": "config",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"source\": \"Defaults.rewardsConfig.ripePerBlock\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 47,
+      "classification": "config",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"seconds_per_block\":",
+      "normalizedSnippet": "\"seconds_per_block\": 12,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 83,
+      "classification": "config",
+      "semanticIds": [
+        "BN-007",
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "block-default-key",
+      "matchedText": "\"auto_stake_lock_blocks\":",
+      "normalizedSnippet": "\"auto_stake_lock_blocks\": 2599344,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 97,
+      "classification": "config",
+      "semanticIds": [
+        "BN-007"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "config/robinhood-reward-launch-plan.json",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"checkpoint\": \"verify both pending actions cleared, ripePerBlock zero, Stability rate zero, and both auto-stake ratios unchanged; keep Lootbox paused\"",
+      "ordinalInFunction": 1,
+      "reviewedLine": 204,
+      "classification": "config",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "elapsedBlocks",
+      "normalizedSnippet": "\"if elapsedBlocks == 0 or _config.ripePerBlock == 0 or b.ripeAvailForRewards == 0:\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 62,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"if elapsedBlocks == 0 or _config.ripePerBlock == 0 or b.ripeAvailForRewards == 0:\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 62,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "elapsedBlocks",
+      "normalizedSnippet": "\"newRipeDistro: uint256 = min(elapsedBlocks * _config.ripePerBlock, b.ripeAvailForRewards)\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 63,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "<module>",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"newRipeDistro: uint256 = min(elapsedBlocks * _config.ripePerBlock, b.ripeAvailForRewards)\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 63,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "<module>",
+      "pattern": "block-unit-identifier",
+      "matchedText": "elapsedBlocks",
+      "normalizedSnippet": "\"if not _arePointsEnabled or elapsedBlocks == 0:\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 64,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_candidate_values",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"ripePerBlock\": \"Defaults.rewardsConfig.ripePerBlock\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 95,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_candidate_values",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"ripePerBlock\": \"Defaults.rewardsConfig.ripePerBlock\",",
+      "ordinalInFunction": 2,
+      "reviewedLine": 95,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_candidate_values",
+      "pattern": "block-default-key",
+      "matchedText": "\"ripePerBlock\":",
+      "normalizedSnippet": "\"ripePerBlock\": \"Defaults.rewardsConfig.ripePerBlock\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 95,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_derived",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "rate = Decimal(raw[\"ripePerBlock\"]) / Decimal(10**18)",
+      "ordinalInFunction": 1,
+      "reviewedLine": 115,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_derived",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "raw[\"ripeAvailForRewards\"] + raw[\"ripePerBlock\"] - 1",
+      "ordinalInFunction": 1,
+      "reviewedLine": 122,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_derived",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": ") // raw[\"ripePerBlock\"]",
+      "ordinalInFunction": 1,
+      "reviewedLine": 123,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_derived",
+      "pattern": "block-default-key",
+      "matchedText": "\"seconds_per_block\":",
+      "normalizedSnippet": "\"seconds_per_block\": seconds_per_block,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 138,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-007",
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "_derived",
+      "pattern": "block-default-key",
+      "matchedText": "\"auto_stake_lock_blocks\":",
+      "normalizedSnippet": "\"auto_stake_lock_blocks\": lock_blocks,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 164,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-007"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "scripts/params/validate_robinhood_reward_launch_plan.py",
+      "function": "expected_plan",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "\"checkpoint\": \"verify both pending actions cleared, ripePerBlock zero, Stability rate zero, and both auto-stake ratios unchanged; keep Lootbox paused\",",
+      "ordinalInFunction": 1,
+      "reviewedLine": 325,
+      "classification": "tooling",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
+      }
+    },
+    {
+      "path": "tests/core/lootbox/test_robinhood_reward_containment.py",
+      "function": "test_ordered_pause_to_zero_keeps_lootbox_paused_until_both_actions_confirm",
+      "pattern": "reviewed-cadence-identifier",
+      "matchedText": "ripePerBlock",
+      "normalizedSnippet": "assert zeroed.ripePerBlock == 0",
+      "ordinalInFunction": 1,
+      "reviewedLine": 142,
+      "classification": "test",
+      "semanticIds": [
+        "BN-024"
+      ],
+      "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "625ea83fbefde0caf5cbb296bb51afa13cfa7aa9"
       }
     }
   ],

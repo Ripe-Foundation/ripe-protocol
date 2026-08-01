@@ -1,15 +1,17 @@
 # Robinhood Phase-0 component matrix
 
-> **31 July 2026 currentness overlay:** Current configuration-source baseline is
-> `e4473ce6485888f1b747761a5ee8693443108877`, tree
-> `33b705690007bda9b11900b5775bd9230e79f09e`. Morpho V2 and
+> **1 August 2026 currentness overlay:** Current candidate baseline is
+> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+> `7454b5456ebb6cd02d716a64b408629ab501629e`. Morpho V2 and
 > `BlueChipYieldPrices` support are integrated; CM-018 is selected at PriceDesk
 > slot 3 for Profile 1. CM-049 `DefaultsRobinhood` exists, compiles, and is one
 > of two editable value authorities with `config/BluePrint.py`; the JSON ledger
 > is synchronized derived evidence. Repository configuration is prepared and
 > consistent; production/onchain configuration has not occurred. The Phase-0
 > matrix below is preserved as historical planning evidence, so its earlier
-> omitted/absent proposals are not current authority. Nothing has been
+> omitted/absent proposals are not current authority. CM-017 is now selected
+> at PriceDesk ID 2 for GREEN only; see
+> [`curve-launch-activation.md`](curve-launch-activation.md). Nothing has been
 > deployed, migrated, activated, or released.
 
 **Status:** Complete analysis; S3, S4, S5, and Stock Token launch-scope
@@ -191,7 +193,7 @@ about current live Base bytecode or current external state.
 | CM-026–027 | Base auction delay/duration and local dependencies | RH auction values and roles; Stock Token settlement remains disabled until the minimum-containment gate closes, after which the launch lifecycle is required | MissionControl, CreditEngine, vaults; BN-030/031 | AuctionHouse corrected shared source is integrated and matches current `master`; AuctionHouseNFT is unchanged | Clock tests plus corrected safe-conversion/batch-isolation evidence, Track 5 live-backing, external-only settlement, atomic payment, and zero-custody progress invariants | Source/tests + Track 5; high on current behavior, design open |
 | CM-028 | Base rewards config | RH local rewards config | RIPE/Lootbox/BondRoom; indirect BN clocks | Source unchanged | Reward-role and accounting integration tests | Source/migrations; high |
 | CM-029 | Base epoch `14,400`, restart `0` | Provisionally `2,400` for 8h, restart owner-set | RIPE/RipeGov/BondBooster; BN-014–017 | Source unchanged | Epoch/jump spec; repeat, +1 and multi-epoch jump tests | Source/defaults/tests; high |
-| CM-030 | Borrow interval `43,200`; seconds interest; Curve danger boost consumes CAD-001 | Provisionally `7,200` for one day; seconds interest unchanged; base-rate fallback while Curve is absent; Stock Token borrowing disabled until containment approval, then required for initial launch | Oracles/vaults; BN-029, TS-010, CAD-001 | Current source unchanged unless Track 8 proves shared fail-closed valuation or deficit-aware debt-health changes indispensable | Debt/rate and clock tests plus Track 5 zero-custody borrowing, liquidation eligibility, and bad-debt invariants; omission cannot satisfy launch | Source/defaults/tests + Track 5; high on current behavior, product direction approved, implementation open |
+| CM-030 | Borrow interval `43,200`; seconds interest; Curve danger boost consumes CAD-001 | Provisionally `7,200` for one day; seconds interest unchanged; base-rate fallback while the selected Curve source has no GREEN reference-pool configuration; Stock Token borrowing disabled until containment approval, then required for initial launch | Oracles/vaults; BN-029, TS-010, CAD-001 | Current source unchanged unless Track 8 proves shared fail-closed valuation or deficit-aware debt-health changes indispensable | Debt/rate and clock tests plus Track 5 zero-custody borrowing, liquidation eligibility, and bad-debt invariants; omission cannot satisfy launch | Source/defaults/tests + Track 5; high on current behavior, product direction approved, implementation open |
 | CM-031 | Base Curve/liquidity/yield treasury actions configured as applicable | Local reserve role; leave unsupported partner-liquidity, Curve and yield actions unconfigured | EndaomentFunds/PSM/external protocols; inherited timelocks | Source unchanged if omission is fully supported | Explicit action/permission allowlist and negative tests; no silent zero-address calls | Source/migrations/executive summary; medium-high |
 | CM-032 | Dated HR deployment | Deploy only if contributors are required at launch | Contributor/RIPE/governance; mixed clocks | Source unchanged | Inclusion/roles; reconcile existing defaults/setter mismatch (1-week/10-year defaults versus >1-month/≤5-year governed vesting bounds); contributor lifecycle and permission tests | Source/defaults/Switchboard/tests; high |
 | CM-033 | `ripePerBlock=0.0075`; Underscore interval/min `43,200` | Tokenomics-approved rate; Underscore disabled with floor `7,200` and interval zero | RIPE, vaults, Underscore; BN-022–026 | Owner retained the shared S3 constructor/ABI change; deployment and Base convergence remain unapproved | Verify RH disabled posture; separately review Base state/registry/capability rollout and bounded drift | Source/defaults/tests; high mechanics |

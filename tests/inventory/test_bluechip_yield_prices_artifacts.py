@@ -158,7 +158,7 @@ def test_profile1_bluechip_topology_is_selected_in_slot_three():
 def test_integrated_block_clock_current_bindings_reconcile_exactly():
     result = block_clock_checker.check_repository(ROOT)
     assert result.ok, result.output
-    assert "current_bindings=4/4" in result.output
+    assert "current_bindings=5/4" in result.output
     assert (
         "current_state_sha256="
         + block_clock_checker.CURRENT_BINDINGS_STATE_SHA256

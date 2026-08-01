@@ -2260,6 +2260,88 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     assert actual_rewards == limited_ripe_available, "Should receive exactly the limited amount available"
 
 
+def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    lootbox,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    setupStabPoolClaimsRewards,
+    switchboard_alpha,
+):
+    reward_rate = 10 * EIGHTEEN_DECIMALS
+    setupStabPoolClaimsRewards(_ripePerDollar=reward_rate)
+    setRipeRewardsConfig(
+        True,
+        reward_rate,
+        100_00,
+        0,
+        0,
+        0,
+        _stabPoolRipePerDollarClaimed=reward_rate,
+    )
+    setAssetConfig(bravo_token)
+    price = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    shared_budget = 150 * EIGHTEEN_DECIMALS
+    ledger.setRipeAvailForRewards(shared_budget, sender=switchboard_alpha.address)
+    lootbox.updateRipeRewards(sender=teller.address)
+    boa.env.time_travel(blocks=5)
+    emitted = lootbox.updateRipeRewards(sender=teller.address)
+    assert emitted.newRipeRewards == 50 * EIGHTEEN_DECIMALS
+    assert ledger.ripeAvailForRewards() == 100 * EIGHTEEN_DECIMALS
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    claimable_amount = 50 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    initial_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    vault_id = vault_book.getRegId(stability_pool)
+    teller.claimFromStabilityPool(
+        vault_id,
+        alpha_token,
+        bravo_token,
+        sender=bob,
+    )
+    claimed_reward = (
+        ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) - initial_balance
+    )
+    assert claimed_reward == 100 * EIGHTEEN_DECIMALS
+    assert ledger.ripeAvailForRewards() == 0
+
+
 def test_stab_vault_claim_rewards_partial_claims(
     stability_pool,
     alpha_token,

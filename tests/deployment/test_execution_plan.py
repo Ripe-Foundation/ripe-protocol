@@ -227,7 +227,7 @@ def test_current_blocked_report_contract(
         "plan_hash",
         "report_sha256",
     ]
-    assert report["schema"] == "ripe.robinhood.migration-dry-plan.v1"
+    assert report["schema"] == "ripe.robinhood.migration-dry-plan.v2"
     assert report["mode"] == "dry-plan"
     assert report["status"] == "blocked"
     assert report["profile_id"] == profile_id
@@ -290,6 +290,22 @@ def test_step_local_blockers_do_not_leak_global():
         "0800": ["B-PSM-SEQUENCE"],
         "1000": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
     }
+
+
+def test_stock_step_binds_the_exact_atomic_launch_input_census():
+    from config.BluePrint import ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS
+
+    steps = {
+        step["migration_id"]: step for step in _report()["steps"]
+    }
+    assert tuple(steps["0500"]["input_bindings"]) == (
+        ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS
+    )
+    assert all(
+        not step["input_bindings"]
+        for migration_id, step in steps.items()
+        if migration_id != "0500"
+    )
 
 
 def test_historical_blockers_and_integrated_m4_are_not_current():
@@ -400,8 +416,8 @@ def test_jcs_rejects_invalid_surrogates_and_nonstring_keys():
 
 def test_reservation_digest_is_reproducible():
     assert RESERVATION_DIGEST == (
-        "9e8a36c1ed85ce9f27a2b1319a9e0007"
-        "8727380d0f4ba42f8d1920030e6cbd91"
+        "7ad4a3e5556453eb32a1933a4a4d5569"
+        "1cfc767022ff267a2c8b5aadf248d70d"
     )
     assert [step["migration_id"] for step in _report()["steps"]] == [
         item.migration_id for item in ROBINHOOD_RESERVATIONS

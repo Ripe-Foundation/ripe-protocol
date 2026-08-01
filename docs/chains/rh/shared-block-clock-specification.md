@@ -1,12 +1,15 @@
 # Shared block-clock specification
 
-> **31 July 2026 currentness overlay:** Current configuration-source baseline is
-> `e4473ce6485888f1b747761a5ee8693443108877`, tree
-> `33b705690007bda9b11900b5775bd9230e79f09e`. `DefaultsRobinhood.vy` now exists
+> **1 August 2026 currentness overlay:** Current candidate baseline is
+> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+> `7454b5456ebb6cd02d716a64b408629ab501629e`. `DefaultsRobinhood.vy` now exists
 > and compiles, and Morpho V2 `BlueChipYieldPrices` is integrated and selected
 > at PriceDesk slot 3. The detailed S1-S9 tables below retain their historical
 > planning context; earlier proposals to add Defaults or omit BlueChipYield are
-> not current authority. Repository configuration is prepared and consistent;
+> not current authority. Unchanged CurvePrices is selected at PriceDesk ID 2
+> for GREEN only; its EVM `NUMBER` behavior is preserved, while dynamic rates,
+> Teller snapshots, and Endaoment stabilization stay inactive. Repository
+> configuration is prepared and consistent;
 > production/onchain configuration has not occurred. No deployment, migration,
 > activation, or release is authorized by this specification.
 
@@ -242,7 +245,7 @@ source/default evidence only. Values in the `RH target` column remain candidates
 | BN-004; CM-011–014,016–020,032,039–041,046,050 | `TimeLock._initiateAction/_canConfirmAction/_isExpired`; action setter; immutable min/max and `expiration`; per-deployment config | Governance duration/window; live values in inheritor table below | Delay before a queued action, then finite exclusive confirmation window | Per inheritor below | Per inheritor below; ceil `/6`, zero preserved |
 | BN-005; CM-005,032 | `Contributor.initiateRipeTransfer/confirm`; `keyActionDelay` constructor/config validation | Treasury duration; dated/repo `43,200` | RIPE transfer authority waits 1d | `43,200`; constructor term must be nonzero/not max | `7,200`; same semantic validator; ceil `/6` |
 | BN-006; CM-005,032 | `Contributor.changeOwnership/confirm`; same `keyActionDelay` | Treasury/governance duration; dated/repo `43,200` | Contributor ownership transfer waits 1d | same BN-005 | same BN-005 |
-| BN-007; CM-023,009,028 | `RipeGov` points checkpoint helpers; `RipeGovVaultConfig` asset weight/lock terms | Relative reward points; no cadence scalar | Prior checkpointed shares earn `shares * elapsed NUMBER`, then weight/lock bonus floors apply | Retain current formula pending rewards acceptance | Same formula candidate; no numeric target or implicit normalization |
+| BN-007; CM-023,009,028 | `RipeGov` points checkpoint helpers; `RipeGovVaultConfig` asset weight/lock terms | Relative reward points; no cadence scalar | Prior checkpointed shares earn `shares * elapsed NUMBER`, then weight/lock bonus floors apply | Retain owner-approved current formula; operational launch gates remain | Same approved formula; no implicit normalization |
 | BN-008; CM-023,009,014 | `RipeGov` withdraw/early-release unlock; governed lock terms and validators | Lock duration; dated Base `43,200..47,304,000` | 1d minimum, 3y maximum governance lock | `43,200..47,304,000` | `7,200..7,884,000`; ceil `/6` |
 | BN-009; CM-023,009,014 | `RipeGov.adjustLock`, bonus, weighted lock, refresh; same terms | Lock/bonus math; dated Base as BN-008 | Same wall-time lock and linear remaining-duration bonus | BN-008 bounds | BN-008 bounds |
 | BN-010; CM-017,015,009 | `CurvePrices.getCurrentGreenPoolStatus`; governed `greenRefPoolConfig.staleBlocks`; migration | Base-only snapshot age; repo/migration `43,200` | Curve snapshot stale after about 1d | `43,200`; Base-only governed value | N/A: omit/de-register Curve; no converted RH value |
@@ -257,8 +260,8 @@ source/default evidence only. Values in the `RH target` column remain candidates
 | BN-019; CM-004,010,015,021 | `AddressRegistry` add pending/confirm; governed registry delay, immutable bounds | Registry duration; live HQ/VaultBook `21,600`; PriceDesk setup value `0`; bounds vary by deployment | Add address waits 12h after setup | target `21,600`; HQ/VaultBook bounds `21,600..302,400`, PriceDesk blueprint min `3,600` | target `3,600`; proposed common RH bounds `3,600..50,400`, owner must accept one policy |
 | BN-020; CM-004,010,015,021 | `AddressRegistry` update pending/confirm; same | Registry duration; same BN-019 | High-authority address replacement waits 12h | BN-019 | BN-019 |
 | BN-021; CM-004,010,015,021 | `AddressRegistry` disable pending/confirm; same | Registry/emergency duration; same BN-019 | Current source gives disable same delay as add/update | BN-019 unless owner selects separate shared redesign | BN-019; owner must confirm shared delay |
-| BN-022; CM-033,009,023 | `Lootbox` global/asset/user deposit checkpoints; rewards/point allocations | Relative reward points; repo, no cadence scalar | Prior balance/value earns points across elapsed `NUMBER`; allocation ratios, not supply, consume points | Retain pending rewards approval | Same formula candidate; no implicit multiplier |
-| BN-023; CM-033,009,030 | `Lootbox` global/user borrow checkpoints; same | Relative reward points | Prior principal earns points across elapsed `NUMBER` | Retain pending rewards approval | Same formula candidate |
+| BN-022; CM-033,009,023 | `Lootbox` global/asset/user deposit checkpoints; rewards/point allocations | Relative reward points; repo, no cadence scalar | Prior balance/value earns points across elapsed `NUMBER`; allocation ratios, not supply, consume points | Retain owner-approved rewards formula; operational launch gates remain | Same approved formula; no implicit multiplier |
+| BN-023; CM-033,009,030 | `Lootbox` global/user borrow checkpoints; same | Relative reward points | Prior principal earns points across elapsed `NUMBER` | Retain owner-approved rewards formula; operational launch gates remain | Same approved formula |
 | BN-024; CM-033,009,028 | `Lootbox._getLatestGlobalRipeRewards`; governed `rewardsConfig.ripePerBlock` | Monetary emission; repo/dated `0.0075 RIPE` per number | Nominal `324 RIPE/day`, capped by available reward balance | `0.0075 RIPE`; current validator/config bounds retained | candidate `0.045 RIPE`; exact `*6`; tokenomics approval open |
 | BN-025; CM-033,013,055 | `Lootbox.distributeUnderscoreRewards`; constructor/setter enforce `ONE_DAY`; Charlie governance | Hardcoded minimum interval; live interval `43,200` | Underscore sends no more often than one nominal day; feature is absent on RH | floor and default `43,200`; setter `< max`; current strict `>` eligibility retained under S3 approval | owner-approved immutable floor `7,200`; feature disabled/omitted; ceil `/6` |
 | BN-026; CM-033,055 | Lootbox distribution event `blockNumber`; consumers/reports | Telemetry; observed-number field | Record EVM `NUMBER`, which may repeat or jump | Retain | Retain and document; no conversion |
@@ -754,7 +757,7 @@ Base Ledger. The exact abstraction remains Stage A and security-review work.
 | Deleverage maximum | Keep launch cooldown zero; Base 7,200/RH 1,200 (~4h); Base 43,200/RH 7,200 (~1d) if S4 later reopens | code cap vs comment intent conflict; zero launch value makes both maximum choices dormant | Do not select or convert a launch maximum; retain current constants as latent debt and resolve intent only if S4 reopens | BN-012; CM-014,044 | Security/protocol | S4/S6 | owner/security-approved zero launch value; maximum decision deferred |
 | Deleverage exception | unchanged source with zero cooldown; authorized transient context; no exception; retain same NUMBER | zero cooldown makes the exception/cap dormant; nonzero policy reopens repeated-number bypass | retain unchanged source and accept zero/no pacing for initial launch | BN-012 | Security/protocol | S4 | owner/security-approved no-code disposition; reopen before Underscore or nonzero proposal/queue |
 | Lootbox interval floor | immutable constructor floor; governed floor | owner accepted the small shared change despite viable pre-S3 interval-zero launch | Base `43,200`; RH `7,200`; RH mutable interval `0`; strict `>` retained | BN-025; CM-033 | Protocol/rewards | S3 / deployment gates | implemented, integrated, owner-retained; deployments open |
-| Point attribution | prior checkpoint gets full gap; seconds normalization; checkpoint-before-config | current RipeGov/Lootbox math | retain prior-checkpoint gap attribution only with rewards acceptance | BN-007,022,023; CM-023,033 | Rewards/tokenomics | S6/S8 | blocked |
+| Point attribution | prior checkpoint gets full gap; seconds normalization; checkpoint-before-config | current RipeGov/Lootbox math | owner-approved current attribution; initial checkpoint execution and operational launch gates remain | BN-007,022,023; CM-023,033 | Rewards/tokenomics | S6/S8 | blocked |
 | RIPE emission | RH 0.045; retain 0.0075; new economics | 324/day nominal comparison; jump/cap behavior | 0.045 candidate, current floor/dust explicit | BN-024; CM-033 | Tokenomics/rewards | S6/S8 | blocked |
 | Timelocks and headroom | table values; revised values; zero-delay policy | live calls and `+60` profile | ceil `/6`, expiry at least stress+1; review every live zero | BN-001,003–006,018–021; CM-001–021,032,046 | Protocol/security | S6/S7 | open |
 | Registry action policy | one delay; separate disable delay via shared redesign | current shared field | retain one 12h intent only if owner accepts disable latency | BN-019–021 | Protocol/security | S6/S7 | blocked |

@@ -1,5 +1,15 @@
 # Track 7 H-03: Robinhood Blueprint and Explicit Omissions
 
+> **1 August 2026 supersession overlay:** This is a historical Phase A task
+> brief, not a fresh-agent task contract or current topology authority. The
+> integrated H-03 graph now selects unchanged `CurvePrices` as CM-017 at
+> PriceDesk ID 2 for GREEN-only launch pricing, retains BlueChipYield at ID 3,
+> and exposes the 23 Curve-specific typed blockers. Follow
+> [`curve-launch-activation.md`](curve-launch-activation.md),
+> [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),
+> and [`status.yaml`](status.yaml). Historical instructions below to omit
+> Curve or leave ID 2 empty are superseded and must not be executed.
+
 **Status:** Phase A R6 correction pending independent complete-file review and
 exact-hash owner approval. H-02 and Track 8 M0 are integrated. Owner decisions
 `D-H03-005` (typed caller-to-callee relations) and `D-H03-006` (terminal

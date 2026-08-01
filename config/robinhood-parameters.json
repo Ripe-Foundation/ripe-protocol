@@ -338,25 +338,27 @@
       "reviewer_class": "protocol"
     },
     {
-      "classification": "release_candidate",
+      "classification": "owner_decision_approved_operational_prerequisites_open",
       "closure_artifacts": [
-        "exact promotion values",
+        "candidate launch values",
         "allocation conservation",
-        "artifacts",
-        "execution plan",
+        "deterministic approved decision packet",
+        "runtime calculations",
         "monitoring",
-        "separate activation approval"
+        "incident controls",
+        "owner acceptance",
+        "separate deployment and activation authority"
       ],
-      "id": "BS-H04-REWARDS-PROMOTION-RC",
+      "id": "BS-H04-REWARDS-LAUNCH-OWNER-DECISION",
       "invalidation": [
         "reward economics",
         "token",
         "plan",
-        "promotion-window drift"
+        "runtime-accounting drift"
       ],
-      "lifecycle_phase": "separately reviewed release candidate",
+      "lifecycle_phase": "approved product decision; pre-deployment operations open",
       "owner": "OWN-REWARDS",
-      "prerequisite": "within the seven-day reward promotion",
+      "prerequisite": "product values accepted; operational prerequisites remain before deployment",
       "records": [
         "P-H04-399"
       ],
@@ -20332,11 +20334,11 @@
       },
       "value": {
         "kind": "concrete",
-        "raw": false
+        "raw": true
       },
       "zero_semantics": {
-        "explanation": "Approved explicit false; absence and omission are distinct.",
-        "kind": "legitimate_false"
+        "explanation": "Approved explicit Stock exclusion; false, absence, and omission are distinct.",
+        "kind": "not_zero"
       }
     },
     {
@@ -20700,23 +20702,21 @@
     },
     {
       "approval": {
-        "schedule_id": "BS-H04-REWARDS-PROMOTION-RC",
-        "status": "pending_binding"
+        "schedule_id": "BS-H04-REWARDS-LAUNCH-OWNER-DECISION",
+        "status": "approved"
       },
       "base_comparison": {
         "detail": "Robinhood authority is explicit; Base and local values are not inherited.",
         "kind": "blocked_no_inheritance"
       },
-      "blockers": [
-        "B-H04-REWARD-PROMO"
-      ],
+      "blockers": [],
       "consumers": [
         "H-05 deployment planning"
       ],
       "conversion": {
         "kind": "not_applicable"
       },
-      "description": "Canonical Robinhood value for Deployment.DP-15.rewards.promotion.",
+      "description": "Canonical approved Robinhood product decision for Deployment.DP-15.rewards.promotion; the packet binds exact PR #66 values and accepted shared-budget risks without lifecycle authority.",
       "destination": {
         "kind": "deployment_input",
         "path": "Deployment.DP-15.rewards.promotion"
@@ -20726,26 +20726,26 @@
       "invalidation": [
         "Any controlling H-04 decision or interface change"
       ],
-      "launch_phase": "within-seven-day separately reviewed reward activation",
+      "launch_phase": "approved initial-launch product configuration",
       "owner": {
         "id": "D-H04-09",
         "kind": "decision"
       },
       "reviewer_class": "protocol",
       "source": {
-        "citation": "review-archives/h04/h04-group2-proposal-R2.md",
-        "commit": "a86650b187c523f27c92f05bfe959d06840025a6"
+        "citation": "Owner confirmation 2026-08-01; docs/chains/rh/reward-launch-qualification.md and config/robinhood-reward-launch-plan.json",
+        "commit": "5f5d22b7ee78cbb904c4fe3c6e46599c330c4353"
       },
-      "status": "blocked",
+      "status": "approved",
       "unit": {
         "kind": "hash"
       },
       "value": {
-        "kind": "symbolic_binding",
-        "name": "DEPLOYMENT_DP_15_REWARDS_PROMOTION"
+        "kind": "concrete",
+        "raw": "7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec"
       },
       "zero_semantics": {
-        "explanation": "No value exists until the cited blocker closes.",
+        "explanation": "The owner-approved packet hash is nonzero and binds exact product-decision bytes.",
         "kind": "not_applicable"
       }
     },

@@ -160,12 +160,12 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=18" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=612" in result.output
+    assert "cadence_candidates=633" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=70" in result.output
     assert "mixed_clock_functions=4" in result.output
     assert "vyper_paths=96" in result.output
-    assert "current_bindings=4/4" in result.output
+    assert "current_bindings=5/4" in result.output
     assert (
         "current_state_sha256=" + checker.CURRENT_BINDINGS_STATE_SHA256
         in result.output
@@ -178,7 +178,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=172" in result.output
+    assert "test=173" in result.output
 
 
 def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
@@ -200,7 +200,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
     assert bindings["timestampLines"] == list(
         checker.EXPECTED_CURRENT_TIMESTAMP_BINDINGS
     )
-    assert len({record["path"] for record in bindings["sourcePaths"]}) == 4
+    assert len({record["path"] for record in bindings["sourcePaths"]}) == 5
     assert len(
         {
             checker._current_binding_timestamp_key(record)
@@ -208,7 +208,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
         }
     ) == 4
     assert checker.CURRENT_BINDINGS_STATE_SHA256 == (
-        "f5809ea7953ced8ea5ec0526cad0c3a22713b1391bf1c745e2c4ab2f73305441"
+        "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59"
     )
     assert checker._current_bindings_fingerprint(bindings) == (
         checker.CURRENT_BINDINGS_STATE_SHA256

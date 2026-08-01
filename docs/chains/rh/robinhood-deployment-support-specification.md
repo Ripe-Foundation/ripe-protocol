@@ -1,20 +1,26 @@
 # Robinhood deployment-support specification
 
-> **31 July 2026 currentness overlay:** Ready to begin deployment preparation
-> from current configuration-source baseline `e4473ce6485888f1b747761a5ee8693443108877`,
-> tree `33b705690007bda9b11900b5775bd9230e79f09e`. PR #61, Morpho V2 and
+> **1 August 2026 currentness overlay:** Ready to continue bounded launch
+> preparation from exact baseline `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`,
+> tree `7454b5456ebb6cd02d716a64b408629ab501629e`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, H-05 deterministic blocked
 > planning, M4 proof, and the H-06 candidate operator/storage class are
 > integrated. `DefaultsRobinhood.vy` exists and compiles; Blueprint and Defaults
 > are the two editable value authorities, and the JSON ledger is synchronized
 > derived evidence. The current check is `configuration_consistent=true`,
-> `deployment_ready=false`, with 58 blockers. Repository configuration is
+> `deployment_ready=false`, with 80 blockers. The current launch candidate
+> selects unchanged CurvePrices at PriceDesk ID 2 for GREEN only, with ID 1
+> Chainlink, ID 3 BlueChipYield, IDs 4/5 empty, and priorities `[1,3]`.
+> USDG remains Chainlink-only; no LP token or Curve higher power is admitted.
+> Repository configuration is
 > prepared and consistent; production/onchain configuration has not occurred.
 > No Robinhood migration, deployment, activation, RPC, account, key, signer,
 > or release action has occurred. The sole current operational handoff is
 > [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md). The
 > phase tables below preserve historical specification proposals and are not
-> current source or lifecycle authority.
+> current source or lifecycle authority. In particular, their CM-017
+> omitted/empty-ID-2 row is superseded by
+> [`curve-launch-activation.md`](curve-launch-activation.md).
 
 - Status: Phases A–H completion draft for owner/reviewer scrutiny
 - Review status: independent checkpoint/completion findings incorporated; specification directions approved only where recorded
@@ -1068,18 +1074,18 @@ shifted registration.
 | CM-014 `SwitchboardDelta` | Selected unchanged with Deleverage cooldown zero unless S4 necessity approval requires a shared artifact | `contracts/config/SwitchboardDelta.vy`; `ARG-HQ`, timelocks, zero cooldown and other approved values | `0300`; Switchboard ID 4 `Switchboard Delta` | `ROLE-G`; zero/non-activation assertion; `BASE-U`; conditional `BASE-M` only after S4 security/protocol approval; S5 may consume the existing Boolean policy but must not change Delta without separate necessity proof; `ABORT-G` |
 | CM-015 `PriceDesk` | Selected registry | `contracts/registries/PriceDesk.vy`; RipeHq, ETH sentinel/native metadata, registry timelocks | `0400_PriceSources.py`; RipeHq ID 7 `Price Desk`; no capability | `ROLE-G`; only approved sources registered; `ASSERT-S`; `BASE-U`; `ABORT-G` |
 | CM-016 `ChainlinkPrices` | Selected adapter, but no asset feed registered without dated feed approval | `contracts/priceSources/ChainlinkPrices.vy`; RipeHq, native/BTC sentinels and primary-source feed addresses through `ARG-P` | `0400`; PriceDesk ID 1 `Chainlink`; feed registrations follow adapter confirmation | `ROLE-G`; feed decimals/quote/heartbeat assertions; `BASE-U`; `ABORT-G`; oracle owner approval open |
-| CM-017 `CurvePrices` | Omitted and unregistered | `contracts/priceSources/CurvePrices.vy`; no RH constructor values | No migration; PriceDesk ID 2 remains empty and reserved exclusively for Curve semantics | `ASSERT-O`; danger-rate path must return base behavior; topology asserts no other source at ID 2; `BASE-O`; no rollback |
-| CM-018 `BlueChipYieldPrices` | Omitted and unregistered | `contracts/priceSources/BlueChipYieldPrices.vy` | No migration; PriceDesk ID 3 remains empty and reserved exclusively for BlueChipYield semantics | `ASSERT-O`; no other source at ID 3; `BASE-O`; no rollback |
-| CM-019 `PythPrices` | Omitted and unregistered at launch | `contracts/priceSources/PythPrices.vy` | No migration; PriceDesk ID 4 remains empty and reserved for Pyth semantics | `ASSERT-O`; future use needs a new decision/migration and a reviewed way to preserve empty IDs 2–3; `BASE-O` |
-| CM-020 `StorkPrices` | Omitted and unregistered | `contracts/priceSources/StorkPrices.vy` | No migration; PriceDesk ID 5 remains empty and reserved for Stork semantics | `ASSERT-O`; no other source at ID 5; future use must preserve IDs 2–4; `BASE-O`; no rollback |
+| CM-017 `CurvePrices` | Selected unchanged for bounded GREEN-only launch pricing; no LP admission or higher power | `contracts/priceSources/CurvePrices.vy`; RipeHq plus selected AddressProvider ID 7 MetaRegistry and deployment-produced GREEN/USDG pool through `ARG-P` | Exact registration order is Chainlink ID 1, Curve ID 2, BlueChipYield ID 3; GREEN alone receives the Curve feed; USDG has no Curve feed | `ROLE-G`; prove GREEN → Curve → USDG → Chainlink, priorities `[1,3]`, zero/revert/stale/paused/disabled behavior, and no recursive USDG lookup; `ASSERT-S`; `BASE-U`; deployment blocked by the 23 typed Curve inputs; `ABORT-G` |
+| CM-018 `BlueChipYieldPrices` | Selected source-compatible launch adapter | `contracts/priceSources/BlueChipYieldPrices.vy`; RipeHq and approved market bindings through `ARG-P` | Registered after Curve at PriceDesk ID 3; retained as priority ID 3 | `ROLE-G`; source-specific market, decimals, and failure assertions; `ASSERT-S`; `BASE-U`; final external bindings remain open; `ABORT-G` |
+| CM-019 `PythPrices` | Omitted and unregistered at launch | `contracts/priceSources/PythPrices.vy` | No migration; PriceDesk ID 4 remains empty and reserved for Pyth semantics | `ASSERT-O`; future use needs a new decision/migration that preserves the selected IDs 1–3 topology; `BASE-O` |
+| CM-020 `StorkPrices` | Omitted and unregistered | `contracts/priceSources/StorkPrices.vy` | No migration; PriceDesk ID 5 remains empty and reserved for Stork semantics | `ASSERT-O`; no other source at ID 5; future use must preserve selected IDs 1–3 and the semantic ID 4 reservation; `BASE-O`; no rollback |
 
 ### 13.4 Components CM-021 through CM-040
 
 | ID / component | Robinhood disposition and form | Canonical source; constructor/value source | Order, reservation, registry and capability | Controls, assertions, Base policy, abort and approval |
 | --- | --- | --- | --- | --- |
 | CM-021 `VaultBook` | Selected registry, but final vault artifact set is blocked by Track 8 | `contracts/registries/VaultBook.vy`; RipeHq and registry timelocks | `0500_VaultsAndAssets.py`; RipeHq ID 8 `Vault Book`; canMintRIPE true only if canonical behavior still requires it | `ROLE-G`; exact IDs 1–4 below; `ASSERT-S`; `BASE-U`; `ABORT-G`; Track 8 reconciliation required |
-| CM-022 `StabilityPool` | Scaffolded disabled pending CM-003/SavingsGreen owner decision | `contracts/vaults/StabilityPool.vy`; `ARG-HQ` | `0500`, VaultBook ID 1 `Stability Pool`; enablement configuration in `0700_SavingsGreenPath.py` | `ROLE-G`; no Stock Token custody/swap; `ASSERT-D`; `BASE-U`; `ABORT-G` |
-| CM-023 `RipeGov` | Provisionally selected governance vault | `contracts/vaults/RipeGov.vy`; `ARG-HQ` | `0500`, VaultBook ID 2 `Ripe Gov Vault` | `ROLE-G`; lock/reward values pending; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-022 `StabilityPool` | Reward product values approved; enablement remains operationally gated with CM-003/SavingsGreen | `contracts/vaults/StabilityPool.vy`; `ARG-HQ` | `0500`, VaultBook ID 1 `Stability Pool`; enablement configuration in `0700_SavingsGreenPath.py` | `ROLE-G`; no Stock Token custody/swap; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-023 `RipeGov` | Selected governance vault; reward values approved and operational bindings open | `contracts/vaults/RipeGov.vy`; `ARG-HQ` | `0500`, VaultBook ID 2 `Ripe Gov Vault` | `ROLE-G`; `ASSERT-S`; `BASE-U`; `ABORT-G` |
 | CM-024 `SimpleErc20` | Registry slot required; current artifact is blocked for Stock Tokens; deploy only the Track 8-approved minimum-containment canonical artifact | `contracts/vaults/SimpleErc20.vy`; `ARG-HQ` | `0500`, VaultBook ID 3 `Simple ERC20 Vault` | No Stock asset registration before Track 8 acceptance; initial launch is blocked if the approved Stock path cannot then be registered; live-backing tests required; `BASE-M` if changed; `ABORT-G`; Track 8 owner/security gate |
 | CM-025 `RebaseErc20` / `SharesVault` | Blocked unchanged for Stock Tokens; deploy only if Track 8 selects this as part of the minimum-containment artifact set | `contracts/vaults/RebaseErc20.vy`, `contracts/vaults/modules/SharesVault.vy`; `ARG-HQ` | `0500`, VaultBook ID 4 `Rebase ERC20 Vault` | No Stock asset registration before Track 8 acceptance; initial launch cannot pass by silently omitting Stock Tokens; total-loss/post-zero assertions if selected; `BASE-M` if changed; `ABORT-G`; Track 8 owner/security gate |
 | CM-026 `AuctionHouse` | Selected core Department; Stock settlement disabled until Track 8 acceptance, then enabled only through the approved minimum-containment path | `contracts/core/AuctionHouse.vy`; `ARG-HQ` | `0600_CoreDepartments.py`; RipeHq ID 9 `Auction House`; canMintGREEN true only after assertions | `ROLE-G`; pre-gate Stock path disabled; launch requires the approved external-delivery/settlement invariant; `ASSERT-S`; `BASE-M` if Track 8 changes source; `ABORT-G` |

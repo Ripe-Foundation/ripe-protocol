@@ -11,11 +11,10 @@ activation, release, or Sites actions.
 Work from the current `rh` tip after confirming parity among local `rh`, cached
 `origin/rh`, and credential-free live `rh`.
 
-Commit `e4473ce6485888f1b747761a5ee8693443108877`, tree
-`33b705690007bda9b11900b5775bd9230e79f09e`, is the integrated
-configuration-source subject. It must remain an ancestor of current `rh`, but
-it is not the checkout target. Approved descendants do not invalidate its
-configuration-source authority.
+Commit `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`, is the exact baseline for the
+bounded Curve launch-pricing candidate. Rebind only to a later exact `rh`
+commit/tree under explicit authority; do not infer currentness from ancestry.
 
 Repository configuration is prepared and consistent; production/onchain
 configuration has not occurred.
@@ -28,10 +27,20 @@ Ready to begin deployment preparation.
 - `DefaultsRobinhood.vy` exists, compiles, and is source-authoritative.
 - The derived parameter ledger is synchronized.
 - The current H-04 register has 22 rows: 21 approved and operative, one
-  retired and non-operative, and zero open. All 19 canonical H-03 blockers
-  remain open.
+  retired and non-operative, and zero open. All 42 canonical H-03 blockers
+  remain open, including the 23 Curve-specific typed inputs.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
-  readiness blocker count is 58.
+  readiness blocker count is 80: the remaining 57 non-Curve blockers plus 23
+  typed Curve launch inputs.
+- DP15 and P-H04-399 are approved product/configuration decisions. The exact
+  reward values remain points enabled, `0.009 RIPE/block`, 10% borrower / 90%
+  staker allocation, 75% conditional auto-stake, 33% lock ratio, `1 RIPE/$`
+  Stability rewards, and one shared `1,000 RIPE` budget. Stock rewards remain
+  disabled. `B-REWARD-PROMOTION` stays open for operational prerequisites.
+- The GREEN/USDG pool and bounded GREEN pricing route are selected launch work,
+  but neither the GREEN/USDG nor RIPE/WETH LP token is admitted as a Ripe asset.
+  RIPE/WETH remains only a separately authorized external canary possibility;
+  PSM reserves cannot fund either venue.
 - External facts remain independently unverified and deployment-produced
   identities remain unresolved where the sources say so.
 - No Robinhood deployment or migration has occurred. Nothing has been
@@ -39,7 +48,12 @@ Ready to begin deployment preparation.
 
 [`status.yaml`](status.yaml) is the sole machine-readable current-status
 authority. Use the [reassessment and qualification synthesis](reassessment-and-qualification-synthesis.md)
-for accepted architecture and Profile 1/Profile 2 decisions.
+for accepted launch architecture and separately gated follow-on decisions. The
+[Curve launch-activation record](curve-launch-activation.md) is controlling for
+the bounded ID-2 route. The [reward qualification](reward-launch-qualification.md)
+and [LP-admission qualification](qualification/lp-launch-admission.md) retain
+their product and non-admission decisions without granting operational or
+lifecycle authority.
 
 ## Exactly two editable value authorities
 
@@ -69,6 +83,10 @@ Two adjacent files are not value authorities:
   structural policy and validation: types, lifecycle, gates, relations,
   blockers, assertions, and address-literal prohibitions. It is not a third
   product-value surface.
+- [`config/robinhood-reward-launch-plan.json`](../../../config/robinhood-reward-launch-plan.json)
+  is deterministic derived evidence for the approved product decision. Its
+  SHA-256 identity binds the exact decision bytes; it does not supersede
+  Defaults or authorize execution, deployment, activation, or release.
 
 ## Exact input map
 
@@ -76,8 +94,8 @@ Two adjacent files are not value authorities:
 
 | Input class | Exact source |
 | --- | --- |
-| Selected external addresses | `ROBINHOOD_USDG`, `ROBINHOOD_WETH`, `ROBINHOOD_STEAKHOUSE_USDG_VAULT`, `ROBINHOOD_GOVERNANCE`, three `ROBINHOOD_CHAINLINK_*` feeds, `ROBINHOOD_MORPHO_V2_FACTORY`, `ROBINHOOD_NATIVE_ETH_SENTINEL`, `ROBINHOOD_BTC_SENTINEL`, and `ROBINHOOD_ARB_SYS`; resolution state is in `ROBINHOOD_ADDRESS_STATUS`. |
-| Deployment-produced addresses | Symbolic entries in `ROBINHOOD_ADDRESSES`: `CONTRIBUTOR_TEMPLATE`, `TRAINING_WHEELS`, `RIPE_TOKEN`, `GREEN_TOKEN`, `SGREEN_TOKEN`, and `GUARDIAN`. Leave them symbolic until a deterministic plan or authorized deployment binds them. |
+| Selected external addresses | `ROBINHOOD_USDG`, `ROBINHOOD_WETH`, `ROBINHOOD_STEAKHOUSE_USDG_VAULT`, `ROBINHOOD_GOVERNANCE`, three `ROBINHOOD_CHAINLINK_*` feeds, `ROBINHOOD_MORPHO_V2_FACTORY`, `ROBINHOOD_NATIVE_ETH_SENTINEL`, `ROBINHOOD_BTC_SENTINEL`, `ROBINHOOD_ARB_SYS`, and the five official Curve address-provider/registry/factory candidates; resolution state is in `ROBINHOOD_ADDRESS_STATUS`. |
+| Deployment-produced addresses | Symbolic entries in `ROBINHOOD_ADDRESSES`: `CONTRIBUTOR_TEMPLATE`, `TRAINING_WHEELS`, `RIPE_TOKEN`, `GREEN_TOKEN`, `SGREEN_TOKEN`, `GUARDIAN`, and `GREEN_USDG_CURVE_POOL`. Leave them symbolic until a deterministic plan or authorized deployment binds them. |
 | Defaults constructor identities | `CONTRIBUTOR_TEMPLATE` (ContributorTemplate), `TRAINING_WHEELS` (TrainingWheels), `RIPE_TOKEN` (RIPE), `GREEN_TOKEN` (GREEN), `SGREEN_TOKEN` (sGREEN), `ROBINHOOD_USDG` (USDG), `ROBINHOOD_WETH` (WETH), and `ROBINHOOD_STEAKHOUSE_USDG_VAULT` (SteakHouse USDG) are all `BluePrint.py`-owned constructor/immutable bindings, even where `hrConfig()`, `trainingWheels()`, `ripeBondConfig()`, `assetConfigs()`, or a priority getter returns them. |
 | Chain identity and clocks | `ROBINHOOD_CHAIN`: mainnet chain ID `4663`, testnet chain ID `46630`, 12-second EVM `block.number` basis, five blocks per minute, and symbolic `action_block_source`. |
 | Approved absence | `UNDERSCORE_REGISTRY=ZERO_ADDRESS`. Zero is valid only for this declared semantic absence, never as a substitute for an unresolved identity. |
@@ -95,19 +113,27 @@ verification.
 | Defaults constructor | Ordered `ROBINHOOD_DEFAULTS_CONSTRUCTOR`: `contributorTemplate`, `trainingWheels`, `ripeToken`, `greenToken`, `sgreenToken`, `usdgToken`, `wethToken`, `steakhouseUsdgVault`. Do not reorder or fall back to the older five-argument shape. |
 | Other constructors and deployment inputs | `ROBINHOOD_DEPLOYMENT_INPUTS` (`Deployment.DP-04` through `DP-23`) plus `ADDYS`, `PARAMS`, `CORE_TOKENS`, `CURVE_PARAMS`, and `YIELD_TOKENS` for profile `robinhood`. |
 
-Profile 1 topology is exact:
+Bounded launch topology is exact:
 
 | PriceDesk slot | State |
 | --- | --- |
 | 1 | Chainlink selected |
-| 2 | Empty and reserved for Profile 2 Curve |
+| 2 | Unchanged CurvePrices selected for GREEN only |
 | 3 | BlueChipYield selected |
 | 4 | Empty Pyth |
 | 5 | Empty Stork |
 
-Priority price-source IDs are `[1, 3]`. Profile 1 asset tuples are GREEN,
-RIPE, sGREEN, WETH, and SteakHouse USDG. GREEN/USDG LP and RIPE/WETH LP remain
-outside Profile 1.
+Priority price-source IDs are `[1, 3]`. The exact GREEN route is GREEN ->
+Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no Curve feed. Launch
+asset tuples are GREEN, RIPE, sGREEN, WETH, and SteakHouse USDG. Neither the
+GREEN/USDG LP nor RIPE/WETH LP is admitted.
+
+`ROBINHOOD_CURVE_LAUNCH_INPUTS` and `CURVE_PARAMS["robinhood"]` in
+`BluePrint.py` own the official identity candidates, constructor bindings,
+pool candidates, typed owner choices, deployment-produced pool identity,
+production observation, exact GREEN-only feed route, and explicit inactive
+capabilities. `config/robinhood-parameters.json` contains no alternate Curve
+value rows.
 
 ### Governance, roles, product, and risk values
 
@@ -123,9 +149,10 @@ outside Profile 1.
 | Asset caps, vault IDs, debt/liquidation risk, auction behavior, and permissions | Directly encoded fields in `assetConfigs()` in `DefaultsRobinhood.vy`; each tuple's asset identity remains constructor-bound in `BluePrint.py`. |
 | Liquidation, stability, and price-source ordering | Directly encoded ordering and vault-ID fields in `priorityLiqAssetVaults()`, `priorityStabVaults()`, and `priorityPriceSourceIds()` in `DefaultsRobinhood.vy`; returned asset identities remain constructor-bound in `BluePrint.py`. |
 
-Do not open PSM activation, LP/Profile 2 activation, Uniswap prototype
-admission, Deleverage, CreditEngine zero-backing, CCIP, or Sites work through an
-otherwise valid configuration edit.
+Do not open PSM activation, LP admission, any Curve feed or consumer beyond
+GREEN, dynamic rates, Teller reference snapshots, Endaoment stabilization,
+Uniswap prototype admission, Deleverage, CreditEngine zero-backing, CCIP, or
+Sites work through an otherwise valid configuration edit.
 
 ## Synchronize and check
 
@@ -145,7 +172,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=58
+configuration_consistent=true deployment_ready=false blockers=80
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:
@@ -164,7 +191,7 @@ owner binding to be resolved. Never collapse those gates.
 ### 1. Close inputs and authorities
 
 Bind the exact baseline, preserve a clean isolated worktree, classify each of
-the 58 readiness blockers, and obtain its named external verification,
+the 80 readiness blockers, and obtain its named external verification,
 deployment-produced identity, or owner decision. Freeze governance, Safe,
 Guardian, TrainingWheels, lite signers, operators, emergency roles, and signer
 policy as reviewed inputs. A missing value remains symbolic and blocked.
@@ -260,12 +287,13 @@ already superseded by stronger implementations on current `rh`.
 Its incompatible assumptions include `DefaultsRobinHood.vy` instead of the
 authoritative `DefaultsRobinhood.vy`, five Defaults constructor arguments
 instead of the current eight bindings, BlueChipYield in PriceDesk slot 2 and
-priority IDs `[1,2,3]` instead of slot 3 and `[1,3]`, an obsolete
+priority IDs `[1,2,3]` instead of exact ID-1 Chainlink, ID-2 GREEN-only Curve,
+ID-3 BlueChipYield with priorities `[1,3]`, an obsolete
 Robinhood-mainnet-only migration namespace/order, a custom runner and history
 workflow that bypass the deterministic planner, unresolved identities treated
 as usable,
-and currently deferred or excluded Deleverage, Curve/LP, PSM activation, and
-CCIP work.
+and currently deferred or excluded Deleverage, Curve higher-power/LP, PSM
+activation, and CCIP work.
 
 Deployment agents must branch freshly from the parity-verified current `rh`
 tip and consume current `config/BluePrint.py` and
@@ -277,8 +305,10 @@ post-deployment assertion interfaces.
 Until required bindings close, deterministic typed-blocked plans are correct.
 Do not create migration history, use the old custom runner, access RPC or
 signers, or substitute placeholders merely to make a blocked plan executable.
-The eventual replacement should be a narrow H-05 migration-source, plan, and
-assertion PR authored from current `rh`.
+The eventual replacement should follow the exact order and abort rules in the
+[Curve launch migration handoff](curve-launch-migration-handoff.md), authored
+from an explicitly rebound current `rh`. This candidate does not edit
+`migrations/robinhood/**` or authorize migration work.
 
 ## Stop conditions and prohibited substitutions
 

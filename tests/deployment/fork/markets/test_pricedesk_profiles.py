@@ -16,7 +16,7 @@ def _price_desk_rows():
     }
 
 
-def test_profile_one_pricedesk_topology_uses_real_robinhood_blueprint(
+def test_launch_pricedesk_topology_uses_real_robinhood_blueprint(
     fork_framework, accepted_preflight
 ):
     fork_framework.require_owner_bindings(
@@ -25,15 +25,17 @@ def test_profile_one_pricedesk_topology_uses_real_robinhood_blueprint(
     rows = _price_desk_rows()
     assert rows[1].semantic_name == "Chainlink"
     assert rows[1].disposition is Disposition.REQUIRED
+    assert rows[2].semantic_name == "Curve"
+    assert rows[2].disposition is Disposition.REQUIRED
     assert rows[3].semantic_name == "BlueChipYield"
     assert rows[3].disposition is Disposition.REQUIRED
     assert all(
         rows[index].disposition is Disposition.OMITTED
-        for index in (2, 4, 5)
+        for index in (4, 5)
     )
 
 
-def test_profile_two_is_not_inferred_from_profile_one_authority(
+def test_curve_pool_identity_and_higher_powers_are_not_inferred_from_launch_selection(
     fork_framework, accepted_preflight
 ):
     fork_framework.require_owner_bindings(
@@ -72,9 +74,9 @@ def test_pricedesk_synthetic_observation_consumes_accepted_h08_binding(
     )
     fields = ("profile", "source_1_role", "source_2_role")
     owner = {
-        "profile": "synthetic-profile-1",
+        "profile": "synthetic-launch",
         "source_1_role": "synthetic-chainlink-authority",
-        "source_2_role": "synthetic-empty",
+        "source_2_role": "synthetic-green-only-curve",
     }
     assert fork_framework.consume_owner_output(
         owner,

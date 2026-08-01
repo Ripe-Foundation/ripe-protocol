@@ -9,28 +9,28 @@ from pathlib import Path
 import pytest
 
 
-EXPECTED_NODE_COUNT = 175
+EXPECTED_NODE_COUNT = 177
 EXPECTED_NODE_DIGEST = (
-    "829ea019d7028129c703a053111ea9f2f9d3e92b1fa0ddfc1c66a63e463e281a"
+    "f3b35ad98bca50c14615a2d7bd646e42096ae5f024d9aac591a9e23a5647703f"
 )
 EXPECTED_CLASSIFICATION_SHA256 = {
     "disabled": (
-        "04f2e307291eda018243c1934fae514edcd6672104a324eaf4039242098156a9"
+        "6a18dac61eb8ba41aa309089bf4d8ae6144d042b6c93be0c2e7e1eefd5e46531"
     ),
     "read-only-archive-fork": (
-        "a74f93ae6e44685cea403ef66f39febd38c5031ddc3f9100598d79aeb69e7534"
+        "3943a6036398cabec7934038cb9bce6aa51046cb14ea554fedd8dd07be08f0bb"
     ),
 }
 EXPECTED_CLASS_COUNTS = {
     "disabled": {
-        "blocked": 4,
+        "blocked": 5,
         "deselected-safe-default": 1,
-        "supporting": 170,
+        "supporting": 171,
     },
     "read-only-archive-fork": {
-        "blocked": 4,
+        "blocked": 5,
         "qualifying": 1,
-        "supporting": 170,
+        "supporting": 171,
     },
 }
 
@@ -131,15 +131,15 @@ def test_safe_default_deselection_set_is_exact(
     deselected = pytestconfig.stash[
         fork_framework.DESELECTED_NODE_IDS_STASH
     ]
-    if fork_framework.qualification_mode(os.environ) == (
-        fork_framework.DISABLED_MODE
-    ):
-        assert deselected == (
-            "tests/deployment/fork/network/test_pin_archive.py::"
-            "test_robinhood_archive_qualification_preflight",
+    mapping = pytestconfig.stash[fork_framework.NODE_CLASSIFICATION_STASH]
+    expected = tuple(
+        sorted(
+            node_id
+            for node_id, classification in mapping.items()
+            if classification == "deselected-safe-default"
         )
-    else:
-        assert deselected == ()
+    )
+    assert deselected == expected
 
 
 def test_archive_node_classification_changes_only_with_exact_opt_in(

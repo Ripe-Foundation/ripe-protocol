@@ -34,6 +34,7 @@ class MigrationReservation:
     semantic_id: str
     disposition: str
     local_blockers: tuple[str, ...] = ()
+    input_bindings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +138,24 @@ ROBINHOOD_RESERVATIONS: tuple[MigrationReservation, ...] = (
         "vaults-and-assets",
         "blocked",
         ("B-T8-FREEZE", "B-T8-M5"),
+        (
+            "Deployment.DP-10.aapl.identity",
+            "Deployment.DP-10.aapl.feed",
+            "Deployment.DP-10.aapl.decimals",
+            "Deployment.DP-10.aapl.P8",
+            "Deployment.DP-10.aapl.perUserCap",
+            "Deployment.DP-10.aapl.globalCap",
+            "Deployment.DP-10.aapl.vault",
+            "Deployment.DP-10.aapl.risk",
+            "Deployment.DP-10.aapl.auction",
+            "Deployment.DP-10.aapl.route",
+            "Deployment.DP-11.stock.vaultArtifact",
+            "Deployment.DP-11.stock.vaultSlot",
+            "Deployment.DP-11.stock.m2Movement",
+            "Deployment.DP-11.stock.m3CreditContainment",
+            "Deployment.DP-11.stock.m4ComposedProof",
+            "Deployment.DP-11.stock.m5ActivationBinding",
+        ),
     ),
     MigrationReservation(
         "0600",
@@ -185,7 +204,7 @@ _CURRENT_GLOBAL_BLOCKERS = (
     "B-S5-LEDGER",
     "B-SECOPS-HANDOFF",
 )
-_REPORT_SCHEMA = "ripe.robinhood.migration-dry-plan.v1"
+_REPORT_SCHEMA = "ripe.robinhood.migration-dry-plan.v2"
 _CANONICAL_FILENAME = re.compile(
     r"(?P<migration_id>[0-9]{4})_"
     r"(?P<semantic_name>[A-Za-z][A-Za-z0-9]*)\.py",
@@ -292,6 +311,7 @@ def _reservation_records() -> list[dict[str, Any]]:
             "semantic_id": item.semantic_id,
             "disposition": item.disposition,
             "blockers": list(item.local_blockers),
+            "input_bindings": list(item.input_bindings),
         }
         for item in ROBINHOOD_RESERVATIONS
     ]
