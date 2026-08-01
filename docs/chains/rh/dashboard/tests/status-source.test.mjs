@@ -876,8 +876,11 @@ test("H-04 lifecycle and fail-closed readiness mirror the integrated manifest", 
   assert.deepEqual(status.h04_decisions.open_ids, []);
   assert.equal(status.h04_decisions.binding_schedule_count, parameters.binding_schedules.length);
   assert.equal(status.h04_decisions.schema_v2_integrated, true);
-  assert.equal(status.h04_decisions.defaults_render_ready, false);
-  await assert.rejects(access(resolve(repositoryRoot, "contracts/config/DefaultsRobinhood.vy")));
+  assert.equal(status.h04_decisions.defaults_source_authoritative, true);
+  assert.equal(status.h04_decisions.configuration_consistent, true);
+  assert.equal(status.h04_decisions.deployment_ready, false);
+  assert.equal(status.h04_decisions.deployment_readiness_blocker_count, 58);
+  await access(resolve(repositoryRoot, "contracts/config/DefaultsRobinhood.vy"));
 });
 
 test("the four deferred controls are explicit and absent from machine-facing parameters", async () => {

@@ -357,9 +357,10 @@ function decisionHref(decision: Decision) {
 }
 
 const readingLabels: Record<string, string> = {
-  "AGENT-HANDOFF.md": "Open the agent bootstrap",
-  "START-HERE.md": "Open START-HERE",
+  "deployment-owner-quickstart.md": "Open the canonical deployment handoff",
   "decision-register.md": "Open the decision register",
+  "release-packet-evidence-checklist.md": "Open the release-evidence checklist",
+  "robinhood-manifest-operator-runbook.md": "Open the operator runbook",
   "minimal-contract-change-reassessment.md": "Read minimum-change reassessment",
   "rh-summary.md": "Read the architecture summary",
   "robinhood-deployment-support-specification.md":
@@ -624,10 +625,16 @@ export default function Home() {
 
       <section className="section path-section" id="ownership">
         <SectionHeading
-          eyebrow="Deployment-owner handoff"
+          eyebrow="Deployment-owner sequence"
           title={status.deployment_owner.readiness}
           copy={status.deployment_owner.authority_boundary}
         />
+        <p>
+          The complete canonical human handoff is the{" "}
+          <a href={handoffHref("docs/chains/rh/deployment-owner-quickstart.md") ?? "#"}>
+            deployment-owner quick-start
+          </a>.
+        </p>
 
         <ol className="critical-path owner-sequence">
           {status.deployment_owner.sequence.map((step, index) => (
@@ -1085,14 +1092,14 @@ export default function Home() {
         <SectionHeading
           eyebrow="04 · Current owner surface"
           title={`${status.h04_decisions.rows.length} H-04 rows: ${h04ApprovedDecisionCount} approved, ${h04RetiredDecisionCount} retired, ${h04OpenDecisionCount} open.`}
-          copy="Schema v2 is integrated, but unresolved machine bindings, Defaults rendering, configuration readiness, and downstream release gates remain explicit."
+          copy="The two source authorities and synchronized derived ledger are integrated; unresolved external facts, deployment-produced bindings, deployment readiness, and downstream release gates remain explicit."
         />
         <div className="decision-layout">
           <div>
             <div className="truth-strip">
               <span className="truth-strip__mark" aria-hidden="true">!</span>
               <p>
-                <strong>H-04 schema v2 is integrated; Defaults rendering is not ready.</strong>{" "}
+                <strong>H-04 source authority is integrated; configuration consistency passes and deployment readiness does not.</strong>{" "}
                 Approved operative decisions: {status.h04_decisions.approved_ids.join(", ")}.
                 Retired non-operative IDs: {status.h04_decisions.retired_ids.join(", ")}.
                 Unresolved binding classes:{" "}

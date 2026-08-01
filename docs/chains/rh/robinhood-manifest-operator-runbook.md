@@ -1,13 +1,17 @@
 # Robinhood Manifest v2 macOS/APFS Operator Runbook
 
-> **30 July 2026 currentness overlay:** Ready to begin deployment preparation
-> from frozen protocol/pause baseline `ae0cb49…`. H-06 qualifies a candidate
+> **31 July 2026 currentness overlay:** Ready to begin deployment preparation
+> from current configuration-source baseline `e4473ce6485888f1b747761a5ee8693443108877`,
+> tree `33b705690007bda9b11900b5775bd9230e79f09e`. H-06 qualifies a candidate
 > operator/storage class only. It is not final operator, machine, volume,
 > migration, deployment, production publication, configuration, activation, or
 > release authorization. The deployment owner must bind the frozen release
 > candidate, intended operator machine, and selected volume before any future
 > run. No Robinhood migration has been executed and no history has been
-> promoted.
+> promoted. Repository configuration is prepared and consistent;
+> production/onchain configuration has not occurred. Begin from the canonical
+> [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md) and use
+> this runbook only at the operator-binding phase.
 
 ## Purpose and authority
 

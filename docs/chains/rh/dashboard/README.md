@@ -6,9 +6,9 @@ machine-readable authority. The dashboard must never become an independently
 maintained status source. Repository documents are the durable handoff and
 fallback.
 
-Frozen protocol/pause subject:
-`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
-`a6a34a385b48819bbf66249d518d76da3806b033`.
+Current configuration-source subject:
+`e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e`.
 
 Ready to begin deployment preparation. PR #61 is merged and closed, and its
 production contract changes are integrated into `rh`. H-04 schema v2, H-05
@@ -17,10 +17,21 @@ qualification are integrated for their exact scopes. No Robinhood migration,
 deployment, production configuration, activation, RPC, account, key, signer,
 or release action has occurred.
 
+Morpho V2 and BlueChipYield support are integrated. BlueChipYield is selected
+at PriceDesk slot 3; `DefaultsRobinhood.vy` exists and compiles, and the
+derived ledger is synchronized. `configuration_consistent=true`,
+`deployment_ready=false`, and the current blocker count is 58. Repository
+configuration is prepared and consistent; production/onchain configuration
+has not occurred.
+
 `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` remain zero,
 deferred, and absent from machine-facing Robinhood parameter/planning sources.
 The deployment owner owns final disposition and binding; the gap is not fixed
-here. `DefaultsRobinhood.vy` remains absent and fail-closed.
+here.
+
+[`../deployment-owner-quickstart.md`](../deployment-owner-quickstart.md) is the
+sole canonical human deployment handoff. `START-HERE.md` is a router, and the
+legacy handoff/readiness paths are compatibility redirects.
 
 ## Authority and generated files
 

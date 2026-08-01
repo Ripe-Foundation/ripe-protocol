@@ -1,6 +1,6 @@
 # Robinhood current owner priorities
 
-**Effective:** 30 July 2026
+**Effective:** 31 July 2026
 
 **Authority:** explicit owner directive
 
@@ -12,29 +12,33 @@ authorize deployment, configuration, activation, or release.
 
 ## Active focus
 
-Ready to begin deployment preparation from frozen protocol/pause baseline
-`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`. The corrected PR #61 import
-commit `ad831669943ccfe7b9ed57454995dfce51630a66` is a historical integration
-ancestor, not the present branch authority. The deployment owner may now
-advance:
+Ready to begin deployment preparation from current configuration-source
+baseline `e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e`. The earlier `ae0cb49…`
+protocol/pause baseline and corrected PR #61 import ancestor `ad831669…` remain
+historical evidence, not present branch authority. The deployment owner may
+now advance:
 
-- unresolved non-Deleverage H-04 parameter binding, deterministic Defaults
-  rendering, and configuration readiness;
+- unresolved non-Deleverage external verification and deployment-produced
+  bindings, while preserving configuration consistency;
 - H-05 release-candidate planning readiness without migration execution;
 - final H-06 operator machine/volume binding; and
 - remaining predeployment infrastructure, qualification, rehearsal, SecOps,
   release-packet, rollback/abort, and signer-ceremony preparation.
 
-H-04 schema v2 and H-05 blocked planning are already integrated; M4 proof is
-integrated. `DefaultsRobinhood.vy` remains absent and fail-closed. No
-deployment, migration execution or history, production configuration,
-activation, or release has occurred. The smart-contract reassessment and
+H-04 source authority and H-05 blocked planning are integrated; M4 proof is
+integrated. `DefaultsRobinhood.vy` exists, compiles, and is synchronized with
+the derived ledger. The generator reports `configuration_consistent=true`,
+`deployment_ready=false`, and 58 blockers. Repository configuration is
+prepared and consistent; production/onchain configuration has not occurred.
+No deployment, migration execution or history, activation, or release has
+occurred. The smart-contract reassessment and
 Robinhood fork/external-integration reports are consolidated in
 [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md);
 affected gates must consume that synthesis.
 
-The ordered ownership map is
-[`deployment-owner-readiness.md`](deployment-owner-readiness.md).
+The sole canonical deployment-owner handoff is
+[`deployment-owner-quickstart.md`](deployment-owner-quickstart.md).
 
 ## Accepted synthesis posture
 

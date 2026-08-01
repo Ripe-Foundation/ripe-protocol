@@ -1,9 +1,9 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 30 July 2026
-**Frozen protocol/pause subject:** commit
-`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
-`a6a34a385b48819bbf66249d518d76da3806b033`
+**Snapshot date:** 31 July 2026
+**Current configuration-source subject:** commit
+`e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e`
 **Current status authority:** [`status.yaml`](status.yaml)
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
@@ -28,6 +28,13 @@ exactly: CCIP; CreditEngine zero-backing reassessment and policy; every
 Deleverage task; Uniswap TWAP implementation; Sites recovery; and dashboard
 deployment. The S4 zero-cooldown decision remains closed. All six lanes are
 nonblocking until explicitly reopened.
+
+The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
+`DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
+two editable value authorities, and the ledger is derived and synchronized.
+The exact current result is `configuration_consistent=true`,
+`deployment_ready=false`, with 58 readiness blockers. Repository configuration
+is prepared and consistent; production/onchain configuration has not occurred.
 
 ## Program-level decisions
 
@@ -212,7 +219,7 @@ Sources:
 ### RH-D014 — Symbolic blueprint before concrete values
 
 **Status:** H-03 Phase A evidence and implementation integrated; all concrete
-values and all 18 typed blockers remain open.
+values and all 19 canonical blockers remain open.
 
 H-03 controls the typed launch graph, symbolic inputs, explicit omissions,
 relation semantics, provenance, and blocker ownership. It does not approve
@@ -225,18 +232,19 @@ and
 
 ### RH-D015 — One combined defaults and parameter workstream
 
-**Status:** H-04 schema v2 integrated; 20 decisions approved and operative,
-`D-H04-19` retired and non-operative, zero open; binding and rendering remain
-gated.
+**Status:** H-04 source authority integrated; 21 decisions approved and
+operative, `D-H04-19` retired and non-operative, zero open; deployment binding
+and readiness remain gated.
 
-H-04 and S6 share one owner and file boundary. The typed manifest is the value
-and provenance authority. `DefaultsRobinhood` is a deterministic compatible
-projection, not an independent source of values.
+H-04 and S6 share one owner and file boundary. `config/BluePrint.py` and
+`contracts/config/DefaultsRobinhood.vy` are the two editable value authorities;
+the typed JSON ledger is derived evidence, not an input surface.
 
-All genuine decisions are approved, and the integrated manifest carries 14
-binding schedules. Required identities, `TrainingWheels`, and `liteSigners`
-remain unresolved, so `DefaultsRobinhood.vy` is absent and the generator fails
-closed. The corrected PR #61 four-control machine representation gap remains
+All operative decisions are approved, and the integrated manifest carries 14
+binding schedules. Defaults exists and compiles, and the ledger is
+synchronized. Required external verification and deployment-produced bindings
+remain unresolved, so deployment readiness fails closed with 58 blockers. The
+corrected PR #61 four-control machine representation gap remains
 preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
 

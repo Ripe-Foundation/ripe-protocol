@@ -11,6 +11,9 @@ const paths = {
   start: resolve(rhDocs, "START-HERE.md"),
   agent: resolve(rhDocs, "AGENT-HANDOFF.md"),
   readiness: resolve(rhDocs, "deployment-owner-readiness.md"),
+  quickstart: resolve(rhDocs, "deployment-owner-quickstart.md"),
+  synthesis: resolve(rhDocs, "reassessment-and-qualification-synthesis.md"),
+  deleverage: resolve(rhDocs, "smart-contract-changes/deleverage.md"),
   priorities: resolve(rhDocs, "current-owner-priorities.md"),
   register: resolve(rhDocs, "decision-register.md"),
   summary: resolve(rhDocs, "../rh-summary.md"),
@@ -38,41 +41,120 @@ test("all local Markdown links in the durable handoff resolve", async () => {
   assert.ok(checked > 0);
 });
 
-test("primary entrypoints bind the current subject and lifecycle facts", async () => {
+test("the canonical quick-start binds the current subject and lifecycle facts", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
   for (const document of [
-    documents.start,
-    documents.agent,
-    documents.readiness,
+    documents.quickstart,
     documents.readme,
   ]) {
     assert.match(document, new RegExp(status.snapshot.program_subject_commit));
     assert.match(document, new RegExp(status.snapshot.program_subject_tree));
-    assert.match(document, /PR #61.*integrated/is);
-    assert.match(document, /PR #61.*merged and closed/is);
     assert.match(document, /Ready to begin deployment preparation\./);
     assert.match(document, /nothing\s+(?:is|has been)\s+deployed|no .*deployment/is);
-    assert.match(document, /DefaultsRobinhood\.vy.*absent.*fail-closed/is);
+    assert.match(document, /DefaultsRobinhood\.vy.*exists.*compiles/is);
+    assert.match(document, /configuration_consistent=true/is);
+    assert.match(document, /deployment_ready=false/is);
+    assert.match(document, /58/is);
     assert.match(document, /H-05.*deterministic/is);
     assert.match(document, /H-06.*class|H-06.*operator\/storage/is);
   }
-  for (const control of status.post_freeze_reconciliation.deleverage_parameter_gap.controls) {
-    for (const document of [
-      documents.start,
-      documents.agent,
-      documents.readiness,
-      documents.readme,
-    ]) {
-      assert.match(document, new RegExp(control));
-    }
+});
+
+test("source ownership gives constructor and immutable bindings precedence over getter exposure", async () => {
+  const { quickstart } = await readAll();
+  assert.match(
+    quickstart,
+    /constructor arguments, immutable identities, deployment-produced\s+addresses, and external address bindings are owned by `config\/BluePrint\.py`/i,
+  );
+  assert.match(quickstart, /even when a Defaults getter later returns them/i);
+  assert.match(
+    quickstart,
+    /Product and configuration values encoded directly in Defaults getter bodies\s+are owned by `contracts\/config\/DefaultsRobinhood\.vy`/i,
+  );
+  assert.match(
+    quickstart,
+    /All other non-Defaults deployment inputs are owned by `config\/BluePrint\.py`/i,
+  );
+  for (const identity of [
+    "ContributorTemplate",
+    "TrainingWheels",
+    "RIPE",
+    "GREEN",
+    "sGREEN",
+    "USDG",
+    "WETH",
+    "SteakHouse USDG",
+  ]) {
+    assert.match(quickstart, new RegExp(identity));
   }
+  assert.doesNotMatch(quickstart, /If a value is returned by a Defaults getter/i);
+});
+
+test("current accepted architecture matches the selected Profile 1 price topology", async () => {
+  const documents = await readAll();
+  const status = YAML.parse(documents.status);
+  assert.deepEqual(
+    status.post_freeze_reconciliation.profile1_launch_input_reconciliation.price_desk_registry,
+    {
+      1: { semantic: "Chainlink", state: "selected" },
+      2: { semantic: "Curve", state: "empty_reserved" },
+      3: { semantic: "BlueChipYield", state: "selected" },
+      4: { semantic: "Pyth", state: "empty" },
+      5: { semantic: "Stork", state: "empty" },
+    },
+  );
+  assert.deepEqual(
+    status.post_freeze_reconciliation.profile1_launch_input_reconciliation.priority_price_source_ids,
+    [1, 3],
+  );
+  assert.match(documents.synthesis, /PriceDesk ID 1 has Chainlink selected/i);
+  assert.match(documents.synthesis, /ID 2 is empty and reserved for Profile 2 Curve/i);
+  assert.match(documents.synthesis, /ID 3 has BlueChipYield selected/i);
+  assert.match(documents.synthesis, /IDs 4 and 5 are empty/i);
+  assert.match(documents.synthesis, /Priority price-source IDs are `\[1, 3\]`/i);
+  assert.match(documents.synthesis, /Chainlink as launch oracle authority/i);
+  assert.match(
+    documents.synthesis,
+    /BlueChipYield provides the selected yield-token pricing route; it is not a\s+Curve or Uniswap launch fallback/i,
+  );
+  assert.doesNotMatch(documents.synthesis, /IDs 2-5 remain empty|PriceDesk IDs 2-5 empty/i);
+  const synthesisRole = status.document_roles.find(
+    ({ file }) => file === "docs/chains/rh/reassessment-and-qualification-synthesis.md",
+  );
+  assert.match(synthesisRole.role, /Current consolidated architecture/i);
+});
+
+test("the current Deleverage disposition preserves parked zero controls without stale Defaults claims", async () => {
+  const { deleverage } = await readAll();
+  assert.match(deleverage, /e4473ce6485888f1b747761a5ee8693443108877/);
+  assert.match(deleverage, /DefaultsRobinhood\.vy.*exists.*compiles.*source-authoritative/is);
+  assert.match(deleverage, /all four remain zero and deferred/is);
+  assert.match(deleverage, /outside the\s+currently selected Profile 1 value projection/is);
+  assert.match(deleverage, /No Deleverage configuration has\s+been applied onchain/is);
+  assert.match(deleverage, /Every Deleverage task remains parked unless\s+an explicit owner instruction reopens it/is);
+  assert.doesNotMatch(deleverage, /DefaultsRobinhood\.vy.*absent/is);
+});
+
+test("legacy entrypoints are redirects and the start page is only a router", async () => {
+  const documents = await readAll();
+  for (const document of [documents.agent, documents.readiness]) {
+    assert.match(document, /sole canonical.*deployment-owner/is);
+    assert.match(document, /deployment-owner-quickstart\.md/);
+    assert.doesNotMatch(document, /[a-f0-9]{40}/);
+    assert.doesNotMatch(document, /configuration_consistent|deployment_ready|blockers=|python /i);
+  }
+  assert.match(documents.start, /only a router/i);
+  assert.match(documents.start, /deployment-owner-quickstart\.md/);
+  assert.doesNotMatch(documents.start, /[a-f0-9]{40}/);
 });
 
 test("counts and current priority boundaries remain consistent", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
   assert.equal(status.owner_priority_overlay.parked_lanes.length, status.counts.parked_lanes);
+  assert.equal(status.owner_priority_overlay.effective_at, "2026-07-31");
+  assert.match(documents.priorities, /\*\*Effective:\*\* 31 July 2026/);
   assert.equal((documents.priorities.match(/^### \d+\./gm) ?? []).length, status.counts.parked_lanes);
   assert.match(documents.priorities, /CCIP.*parked/is);
   assert.match(documents.priorities, /zero-backing settlement.*bad-debt policy.*parked/is);
@@ -80,14 +162,9 @@ test("counts and current priority boundaries remain consistent", async () => {
     documents.priorities,
     /does not authorize production-contract\s+edits.*testnet or production actions/is,
   );
-  assert.match(documents.readiness, /Smart-contract reassessment/is);
-  assert.match(
-    documents.readiness,
-    /Robinhood fork and external-integration qualification/is,
-  );
-  assert.match(documents.agent, new RegExp(`${status.counts.workstreams} workstreams`));
-  assert.match(documents.agent, new RegExp(`${status.counts.rh_d_decisions}\\s+RH-D decisions`));
-  assert.match(documents.agent, new RegExp(`All ${status.counts.h03_blockers} H-03 blockers remain open`));
+  assert.match(documents.quickstart, new RegExp(`${status.counts.h04_rows} rows`));
+  assert.match(documents.quickstart, new RegExp(`All ${status.counts.h03_blockers} canonical H-03 blockers`));
+  assert.match(documents.quickstart, new RegExp(`${status.counts.deployment_readiness_blockers}`));
 });
 
 test("canonical register records the post-freeze H-04, H-05, H-06, and S4 lifecycle", async () => {
@@ -97,7 +174,7 @@ test("canonical register records the post-freeze H-04, H-05, H-06, and S4 lifecy
       .map((match) => [match[1], match[2].replace(/\n/g, " ")]),
   );
   assert.match(statuses.get("RH-D011"), /zero-cooldown.*closed.*corrected PR #61.*integrated/i);
-  assert.match(statuses.get("RH-D015"), /schema v2 integrated.*20 decisions approved.*zero open/i);
+  assert.match(statuses.get("RH-D015"), /source authority integrated.*21 decisions approved.*zero open/i);
   assert.match(statuses.get("RH-D016"), /deterministic blocked planning integrated.*execution.*unauthorized/i);
   assert.match(statuses.get("RH-D017"), /candidate macOS\/APFS operator\/storage-class qualification integrated/i);
 });
@@ -105,9 +182,7 @@ test("canonical register records the post-freeze H-04, H-05, H-06, and S4 lifecy
 test("the private dashboard remains an optional repository-derived mirror", async () => {
   const documents = await readAll();
   const status = YAML.parse(documents.status);
-  for (const document of [documents.start, documents.agent, documents.register, documents.summary]) {
-    assert.match(document, new RegExp(status.publication.dashboard_url.replaceAll(".", "\\.")));
-  }
+  assert.match(status.publication.dashboard_url, /^https:\/\//);
   assert.match(documents.readme, /YAML ledger is the sole current\s+machine-readable authority/i);
   assert.match(documents.readme, /generated files are validation output only/i);
   assert.match(documents.readme, /do not edit, stage,\s+or commit them/i);

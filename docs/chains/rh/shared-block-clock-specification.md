@@ -1,5 +1,15 @@
 # Shared block-clock specification
 
+> **31 July 2026 currentness overlay:** Current configuration-source baseline is
+> `e4473ce6485888f1b747761a5ee8693443108877`, tree
+> `33b705690007bda9b11900b5775bd9230e79f09e`. `DefaultsRobinhood.vy` now exists
+> and compiles, and Morpho V2 `BlueChipYieldPrices` is integrated and selected
+> at PriceDesk slot 3. The detailed S1-S9 tables below retain their historical
+> planning context; earlier proposals to add Defaults or omit BlueChipYield are
+> not current authority. Repository configuration is prepared and consistent;
+> production/onchain configuration has not occurred. No deployment, migration,
+> activation, or release is authorized by this specification.
+
 **Status:** Specification complete; recorded S3/S4/S5 decisions control their
 slices, and remaining owner decisions block only their dependent work
 

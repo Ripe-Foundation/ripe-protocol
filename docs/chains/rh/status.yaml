@@ -6,19 +6,20 @@ snapshot:
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
-  program_subject_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
-  program_subject_tree: a6a34a385b48819bbf66249d518d76da3806b033
+  program_subject_commit: e4473ce6485888f1b747761a5ee8693443108877
+  program_subject_tree: 33b705690007bda9b11900b5775bd9230e79f09e
   subject_in_origin_history: build_derived
   origin_commits_after_subject: build_derived
   build_worktree_clean: build_derived
   reconciliation: >
-    This status is bound to the frozen protocol/pause baseline above.
-    Documentation authority and publication lifecycle are derived at build
-    time, never hardcoded. Historical evidence remains checkpoint evidence;
-    this file is the sole current machine-readable lifecycle authority.
-  posture: "Reassessment and qualification are consolidated for Profile 1 preparation. Nothing is deployed, configured, or active."
+    This status is bound to the current integrated configuration-source
+    baseline above. Documentation authority and publication lifecycle are
+    derived at build time, never hardcoded. The earlier frozen protocol/pause
+    baseline remains historical checkpoint evidence; this file is the sole
+    current machine-readable lifecycle authority.
+  posture: "Repository configuration is prepared and consistent; production/onchain configuration has not occurred."
   hero_lead: "Ready to begin deployment preparation."
-  hero_emphasis: Nothing is deployed, configured, or active.
+  hero_emphasis: Repository configuration is prepared and consistent; production/onchain configuration has not occurred.
   launch_readiness: "Ready to begin Profile 1 deployment preparation under the consolidated deferrals and external-input gates."
   live_actions_completed: 0
   status_owner: Robinhood deployment owner
@@ -35,6 +36,7 @@ counts:
   h04_approved_operative: 21
   h04_retired_non_operative: 1
   h04_open: 0
+  deployment_readiness_blockers: 58
   binding_schedules: 14
   hard_gates: 9
   handoff_documents: 11
@@ -92,10 +94,11 @@ post_freeze_reconciliation:
   defaults_robinhood: present_source_authoritative_configuration_consistent
   s4_zero_cooldown_decision: closed_not_reopened
   profile1_launch_input_reconciliation:
-    state: source_authority_candidate_uncommitted
-    candidate_base_commit: 33ad0f3c08bf6dc88f6569c622886d264d6e2868
-    candidate_base_tree: 14954579cbbe33ff7474b19e49d4c26f6bc3cd6e
-    launch_value_authority_commit: 74c4120fbfa1ade859dc32f61acdf567c139fe02
+    state: integrated_current_source_authority
+    configuration_source_baseline_commit: e4473ce6485888f1b747761a5ee8693443108877
+    configuration_source_baseline_tree: 33b705690007bda9b11900b5775bd9230e79f09e
+    source_authority_commit: b7531316ba6e9dfa5a7187d3098dbc4477fcfc87
+    morpho_v2_support_commit: 33ad0f3c08bf6dc88f6569c622886d264d6e2868
     controlling_pr66_commit: 0f79b626c6ec4788ba43b3132ada9ebec6084f2a
     controlling_paths: [config/BluePrint.py, contracts/config/DefaultsRobinhood.vy]
     derived_ledger: config/robinhood-parameters.json
@@ -112,6 +115,8 @@ post_freeze_reconciliation:
     external_address_state: external_facts_pending_independent_verification
     deployment_identity_state: unresolved_until_derived
     bluechip_compatibility_state: resolved_by_integrated_commit_33ad0f3c
+    bluechip_runtime_bytes: 22054
+    bluechip_eip170_headroom_bytes: 2522
     defaults_state: present_compiling_source_authoritative_derived_ledger_synchronized
     configuration_consistency: passing
     deployment_readiness: blocked_unresolved_and_unverified_bindings
@@ -198,8 +203,10 @@ decision_namespace:
 document_roles:
   - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
   - { file: docs/chains/rh/current-owner-priorities.md, role: "Dated owner-priority overlay for active, parked, and excluded work."}
-  - { file: docs/chains/rh/START-HERE.md, role: "Human onboarding and current-state narrative."}
-  - { file: docs/chains/rh/AGENT-HANDOFF.md, role: "Cold-agent bootstrap and authority contract."}
+  - { file: docs/chains/rh/deployment-owner-quickstart.md, role: "Sole canonical human handoff for the deployment owner and deployment agents."}
+  - { file: docs/chains/rh/START-HERE.md, role: "Audience and phase router only."}
+  - { file: docs/chains/rh/AGENT-HANDOFF.md, role: "Compatibility redirect to the canonical quick-start."}
+  - { file: docs/chains/rh/deployment-owner-readiness.md, role: "Compatibility redirect to the canonical quick-start."}
   - { file: docs/chains/rh/decision-register.md, role: "Canonical RH-D namespace and accepted-risk index."}
   - { file: docs/chains/rh-summary.md, role: "Stable architecture and launch checklist; not live status authority."}
   - { file: docs/chains/rh/reassessment-and-qualification-synthesis.md, role: "Current consolidated architecture, Profile 1/Profile 2, deferral, package, and external-input authority."}
@@ -239,7 +246,7 @@ reassessment_and_qualification:
     - Shared-contract release-gate evidence for unchanged Ledger, Teller, and GuardedErc20
     - Immutable external-input and H-07/H-08 artifact closure
     - H-09 safe-default and opt-in archive-fork qualification
-    - Profile 1 deterministic input closure and fail-closed defaults preparation
+    - Profile 1 deterministic deployment-input closure and readiness qualification
     - Profile 2 staged market integration
     - H-10 live rehearsal and operational release preparation
   external_input_classes:
@@ -257,7 +264,7 @@ reassessment_and_qualification:
     release: none
 
 owner_priority_overlay:
-  effective_at: "2026-07-30"
+  effective_at: "2026-07-31"
   authority: Explicit owner directive
   scope: >
     This overlay controls current prioritization, blocker treatment, and agent
@@ -407,11 +414,12 @@ overall:
     reassessment and qualification disposition. Ledger and Teller remain
     unchanged, GuardedErc20 remains separate and Stock-specific, and PR #66
     selects Chainlink slot 1 plus source-compatible BlueChipYield slot 3. Profile 2 owns
-    Curve and both LP admissions. Every Deleverage task is deferred. Nothing
-    is deployed, configured, activated, or released.
+    Curve and both LP admissions. Every Deleverage task is deferred. Repository
+    configuration is prepared and consistent; production/onchain configuration
+    has not occurred. Nothing is deployed, activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
-  engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, and corrected PR #61 are integrated for their exact scopes."}
-  launch_implementation: { status: partial, note: "The two source authorities compile and the derived ledger is synchronized. Morpho V2 source compatibility is resolved by 33ad0f3c; external-fact verification and deployment-produced bindings remain independently blocked. Remaining work includes those closures, plan readiness, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap, CCIP, and Sites remain outside this reconciliation."}
+  engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, corrected PR #61, Morpho V2 support, and the two-source configuration authority are integrated for their exact scopes."}
+  launch_implementation: { status: partial, note: "The two source authorities compile and the derived ledger is synchronized at e4473ce; Morpho V2 source compatibility is integrated. External-fact verification and deployment-produced bindings remain independently blocked. Remaining work includes those closures, plan readiness, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap, CCIP, and Sites remain outside this reconciliation."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
   production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
 
@@ -463,6 +471,7 @@ h04_decisions:
   defaults_source_authoritative: true
   configuration_consistent: true
   deployment_ready: false
+  deployment_readiness_blocker_count: 58
   approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21, D-H04-22]
   open_ids: []
   retired_ids: [D-H04-19]
@@ -624,14 +633,14 @@ workstreams:
     group: Launch configuration
     plain_language_scope: Maintain approved values in Blueprint and DefaultsRobinhood and derive the evidence ledger from those sources.
     why_it_matters: Shared contracts remain unsafe if values are guessed, copied from Base, or overridden in a secondary ledger.
-    current_phase: source-authority candidate complete; deployment bindings gated
+    current_phase: source authority integrated; deployment bindings gated
     implementation_state: two editable sources, compiling Defaults, and fail-closed ledger synchronizer implemented
     integration_state: integrated
-    review_state: candidate ready for consolidated independent review
-    owner_decision_state: 20 approved operative; 1 retired non-operative; 0 open
+    review_state: integrated source authority; deployment readiness remains open
+    owner_decision_state: 21 approved operative; 1 retired non-operative; 0 open
     remaining_blockers: [Identity bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
     deployment_release_state: no defaults deployed or active
-    exact_next_action: Independently review the source-authority candidate, then close deployment bindings through their named owners without treating configuration consistency as deployment readiness.
+    exact_next_action: Close deployment bindings through their named owners without treating configuration consistency as deployment readiness.
     authority: Blueprint and DefaultsRobinhood source values plus the derived v4 ledger, tests, evidence, and binding schedules.
     docs: [{ label: H-04/S6 brief, path: docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md }]
   - id: H-01
@@ -674,7 +683,7 @@ workstreams:
     integration_state: integrated
     review_state: reviewed and integrated
     owner_decision_state: symbolic graph approved; concrete values unapproved
-    remaining_blockers: [All 18 canonical H-03 blockers remain open.]
+    remaining_blockers: [All 19 canonical H-03 blockers remain open.]
     deployment_release_state: blueprint only; no deployment authority
     exact_next_action: Consume the blueprint read-only while closing blockers through their owners.
     authority: Integrated H-03 implementation and provenance.
@@ -684,14 +693,14 @@ workstreams:
     group: Launch configuration
     plain_language_scope: Maintain approved launch values in the two canonical sources and keep deployment readiness separate from configuration consistency.
     why_it_matters: Source consistency does not verify external facts or resolve deployment-produced identities.
-    current_phase: source-authority candidate complete; deployment readiness gated
+    current_phase: source authority integrated; deployment readiness gated
     implementation_state: source-authoritative Defaults and Blueprint plus fail-closed derived-ledger synchronization implemented
     integration_state: integrated
-    review_state: candidate ready for consolidated independent review
-    owner_decision_state: 20 approved operative, 1 retired non-operative, 0 open
+    review_state: integrated source authority; deployment readiness remains open
+    owner_decision_state: 21 approved operative, 1 retired non-operative, 0 open
     remaining_blockers: [Identity-bearing bindings, TrainingWheels, liteSigners, B-H04-PARAMS; four-control representation is parked and nonblocking.]
-    deployment_release_state: local configuration sources consistent; nothing deployed, configured, or active
-    exact_next_action: Review the source-authority candidate and close in-scope bindings independently; do not open Deleverage representation work.
+    deployment_release_state: repository configuration consistent; nothing deployed or configured onchain, active, or released
+    exact_next_action: Close in-scope deployment bindings independently; do not open Deleverage representation work.
     authority: Blueprint and DefaultsRobinhood source values, derived v4 ledger, synchronizer, tests, evidence, and 14 binding schedules.
     docs: [{ label: H-04 evidence, path: docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md }]
   - id: H-05
@@ -764,7 +773,7 @@ workstreams:
     integration_state: not integrated
     review_state: consolidated architecture reviewed; provisional 33-path ceiling requires reseal
     owner_decision_state: network-disabled default and opt-in read-only ownership approved; implementation and execution unapproved
-    remaining_blockers: [Exact pin/provider/engine, external identities, H-05/H-06/H-07/H-08 APIs, final H-09 ceiling/nodes/stops/evidence vocabulary, configuration readiness, B-H09-RELEASE.]
+    remaining_blockers: [Exact pin/provider/engine, external identities, H-05/H-06/H-07/H-08 APIs, final H-09 ceiling/nodes/stops/evidence vocabulary, deployment readiness, B-H09-RELEASE.]
     deployment_release_state: no clean-deployment or release proof
     exact_next_action: Close owner APIs and external packets, then reseal the H-09 ledger without a Deleverage lane unless explicitly reopened; ordinary execution remains network-disabled.
     authority: Integrated support specification and consolidated fork-suite architecture.
@@ -979,8 +988,8 @@ decisions:
   - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
-  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; the Profile 1 launch-input overlay has 20 open blockers and grants no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
-  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "source_authority_candidate_bindings_open", summary: "Blueprint and DefaultsRobinhood are the two value authorities and the v4 ledger is derived. Configuration consistency passes; unverified external facts and deployment-produced identities keep deployment readiness fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
+  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; all 19 canonical H-03 blockers remain open and grant no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
+  - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "source_authority_integrated_bindings_open", summary: "Blueprint and DefaultsRobinhood are the two value authorities and the v4 ledger is derived. Configuration consistency passes; unverified external facts and deployment-produced identities keep deployment readiness fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
   - { id: RH-D016, title: "Shared migration source, isolated histories", status: "deterministic_planning_integrated_execution_unauthorized", summary: "Deterministic blocked planning is integrated; no Robinhood history exists and execution remains unauthorized.", source: "docs/chains/rh/evidence/robinhood-migration-phase-a.md"}
   - { id: RH-D017, title: "Immutable manifest and evidence chain", status: "candidate_class_qualified_final_binding_open", summary: "H-06 qualifies a macOS/APFS operator/storage class only; final machine/volume, deployment, promotion, and release remain unauthorized.", source: "docs/chains/rh/evidence/robinhood-manifest-macos-release-qualification.md"}
   - { id: RH-D018, title: "Dashboard tooling is separate from launch dependencies", status: "approved_current_handoff", summary: "Dashboard tooling remains outside H-01 and cannot affect its disposition.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
@@ -1003,12 +1012,11 @@ hard_gates:
   - { id: G-PROD, label: "Authorize restricted production deployment and release", plain_language_scope: "Approve the exact production plan, authorities, artifacts, configuration, monitoring, activation, and release sequence.", why_it_matters: "Production affects real users and assets and has no implied authority from earlier phases.", state: "open", effect: "Blocks production deployment, migration, registration, role transfer, configuration, activation, and release."}
 
 reading_paths:
-  human_10_minute: [docs/chains/rh/START-HERE.md, docs/chains/rh/reassessment-and-qualification-synthesis.md, docs/chains/rh/deployment-owner-readiness.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/status.yaml, docs/chains/rh/decision-register.md]
-  human_45_minute: [docs/chains/rh-summary.md, docs/chains/rh/minimal-contract-change-reassessment.md, docs/chains/rh/robinhood-deployment-support-specification.md, docs/chains/rh/robinhood-deployment-validation-plan.md]
+  human_10_minute: [docs/chains/rh/deployment-owner-quickstart.md, docs/chains/rh/reassessment-and-qualification-synthesis.md, docs/chains/rh/status.yaml]
+  human_45_minute: [docs/chains/rh/current-owner-priorities.md, docs/chains/rh/decision-register.md, docs/chains/rh-summary.md, docs/chains/rh/minimal-contract-change-reassessment.md, docs/chains/rh/robinhood-deployment-support-specification.md, docs/chains/rh/robinhood-deployment-validation-plan.md, docs/chains/rh/robinhood-manifest-operator-runbook.md, docs/chains/rh/hardening/release-packet-evidence-checklist.md]
   agent_bootstrap:
-    - docs/chains/rh/AGENT-HANDOFF.md
+    - docs/chains/rh/deployment-owner-quickstart.md
     - docs/chains/rh/reassessment-and-qualification-synthesis.md
-    - docs/chains/rh/deployment-owner-readiness.md
     - docs/chains/rh/current-owner-priorities.md
     - docs/chains/rh/status.yaml
     - docs/chains/rh-summary.md

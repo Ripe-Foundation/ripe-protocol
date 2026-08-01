@@ -1,17 +1,18 @@
 # Robinhood deployment validation plan
 
-> **30 July 2026 currentness overlay:** Ready to begin deployment preparation.
-> Validation must bind to frozen protocol/pause baseline
-> `ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`. Historical PR #61 import
-> ancestor `ad831669…` is not present branch authority; PR #61 is merged and
-> closed. H-04 schema v2 and H-05 deterministic blocked planning are
-> integrated, but unresolved bindings and the missing machine representation of
-> `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` keep Defaults
-> and executable planning unready. H-06 is a class qualification only. No
-> Robinhood migration, live execution, deployment, configuration, activation,
-> RPC, account, key, signer, or release action has occurred. Smart-contract
-> reassessment and fork/external-integration qualification do not block
-> preparation from starting; affected gates must consume their findings.
+> **31 July 2026 currentness overlay:** Ready to begin deployment preparation.
+> Validation must bind to current configuration-source baseline
+> `e4473ce6485888f1b747761a5ee8693443108877`, tree
+> `33b705690007bda9b11900b5775bd9230e79f09e`. PR #61, Morpho V2 and
+> BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
+> planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
+> the derived ledger. Configuration consistency passes; 58 unresolved or
+> unverified deployment bindings keep deployment readiness false. H-06 is a
+> class qualification only. Repository configuration is prepared and
+> consistent; production/onchain configuration has not occurred. No Robinhood
+> migration, live execution, deployment, activation, RPC, account, key,
+> signer, or release action has occurred. Historical future-path labels below
+> remain narrow validation design, not current lifecycle authority.
 
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`

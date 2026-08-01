@@ -1,31 +1,34 @@
 # Robinhood Chain Technical Deployment Summary
 
-## 30 July 2026 deployment-owner readiness
+## 31 July 2026 current reconciliation
 
-**Ready to begin deployment preparation.** The frozen protocol/pause baseline
-is `rh` commit `ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
-`a6a34a385b48819bbf66249d518d76da3806b033`, signed tag
-`rh-pause-2026-07-30`. PR #61 is merged and closed at final head
-`7293cf87c3c5afb06c3aeac90ffb0cd0cd27e253` and `master` squash merge
-`91eda49ccd34a25090582aff0695075c4c806011`. Its production contract changes
-are integrated into `rh`; `ad831669…` is the historical import ancestor, not
-the present branch authority.
+The current configuration-source baseline is `rh` commit
+`e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e`. The earlier `ae0cb49…`
+protocol/pause checkpoint remains historical evidence, not the present program
+subject. PR #61, Morpho V2 and BlueChipYield support, and the two-source
+Blueprint/Defaults authority are integrated.
 
-This handoff is a documentation-only descendant of the frozen baseline. Its
-exact documentation authority commit is derived after commit; feature
-publication does not integrate it into `rh`. No Robinhood deployment,
-migration execution, production configuration, activation, RPC, account, key,
-signer, or release action has occurred.
+`DefaultsRobinhood.vy` exists and compiles; the derived parameter ledger is
+synchronized. The current register has 22 H-04 rows: 21 approved and
+operative, one retired and non-operative, and zero open. All 19 canonical H-03
+blockers remain open. The source check reports
+`configuration_consistent=true`, `deployment_ready=false`, and 58 readiness
+blockers. Repository configuration is prepared and consistent;
+production/onchain configuration has not occurred.
 
-H-04 schema v2 and H-05 deterministic blocked planning are integrated. All 20
-genuine H-04 decisions are approved and operative; `D-H04-19` is retired and
-non-operative; none are open. Four corrected-PR controls—`fullPayoffBuffer`,
-`overageBps`, `dustThreshold`, and `dustBps`—remain zero, deferred, and absent
-from Robinhood machine-facing parameter/planning representation. Every
-Deleverage task, including representation and size/headroom work, is now
-deferred and nonblocking until explicitly reopened. The unresolved identities,
-`TrainingWheels`, and `liteSigners` still keep `DefaultsRobinhood.vy` absent and
-the generator fail-closed.
+No Robinhood deployment, migration execution, activation, RPC, account, key,
+signer, or release action has occurred. The sole canonical deployment-owner
+handoff is
+[`rh/deployment-owner-quickstart.md`](rh/deployment-owner-quickstart.md).
+The older checklist below is preserved as historical architecture/planning
+material; unchecked historical rows are not current lifecycle claims.
+
+Four corrected-PR controls—`fullPayoffBuffer`, `overageBps`, `dustThreshold`,
+and `dustBps`—remain zero, deferred, and absent from Robinhood machine-facing
+parameter/planning representation. Every Deleverage task, including
+representation and size/headroom work, remains deferred and nonblocking until
+explicitly reopened.
 
 The historical S4 zero-`deleverageCooldown` decision remains closed and was
 not reopened. CreditEngine zero-backing reassessment, Uniswap TWAP

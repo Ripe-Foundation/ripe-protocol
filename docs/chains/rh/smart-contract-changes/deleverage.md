@@ -2,18 +2,20 @@
 
 ## Current disposition
 
-The corrected shared `Deleverage` source entered `rh` at historical import
-ancestor `ad831669943ccfe7b9ed57454995dfce51630a66` and remains present at
-frozen protocol/pause baseline `ae0cb49…`. The older hash is not current branch
-authority. It has not been deployed or configured on Robinhood. The constructor controls `fullPayoffBuffer`,
-`overageBps`, `dustThreshold`, and `dustBps`; all four Robinhood values remain
-zero and deferred. They currently have no Robinhood machine-facing parameter
-or planning representation. The deployment owner owns final disposition and
-binding; a separately authorized machine implementation track must close the
-gap. This documentation page does not.
+The current integrated configuration baseline is
+`e4473ce6485888f1b747761a5ee8693443108877`. The corrected shared `Deleverage`
+source entered `rh` at historical import ancestor
+`ad831669943ccfe7b9ed57454995dfce51630a66`; the older import and frozen
+protocol/pause hashes remain historical evidence, not current branch authority.
+`DefaultsRobinhood.vy` exists, compiles, and is source-authoritative.
 
-The historical S4 `deleverageCooldown == 0` decision remains closed and was not
-reopened. `DefaultsRobinhood.vy` remains absent and fail-closed.
+The constructor controls `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and
+`dustBps`. All four remain zero and deferred and, as applicable, outside the
+currently selected Profile 1 value projection. No Deleverage configuration has
+been applied onchain. The historical S4 `deleverageCooldown == 0` decision
+remains closed and was not reopened. Every Deleverage task remains parked unless
+an explicit owner instruction reopens it; this documentation correction does
+not reopen or implement Deleverage work.
 
 ## Why the change exists
 

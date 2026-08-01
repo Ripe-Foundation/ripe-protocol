@@ -79,12 +79,15 @@ The copied-report byte identities are:
 4. Preserve auction-only liquidation initiation for Guarded Stock, external
    delivery as the default settlement, exclusive Guarded assignment, and
    Stock rewards disabled.
-5. Use Profile 1 as the launch profile. PriceDesk ID 1 remains Chainlink;
-   IDs 2-5 remain empty/reserved; Curve is absent; dynamic rates use the base
-   fallback; Teller's Curve reference branch is unreachable; and the Curve
-   stabilizer is disabled.
+5. Use Profile 1 as the launch profile. PriceDesk ID 1 has Chainlink selected;
+   ID 2 is empty and reserved for Profile 2 Curve; ID 3 has BlueChipYield
+   selected; and IDs 4 and 5 are empty. Priority price-source IDs are `[1, 3]`.
+   Curve remains absent from Profile 1, dynamic rates use the base fallback,
+   Teller's Curve reference branch is unreachable, and the Curve stabilizer is
+   disabled.
 6. Keep Chainlink as launch oracle authority and the sole PSM price authority.
-   Uniswap and Curve are not launch fallbacks.
+   BlueChipYield provides the selected yield-token pricing route; it is not a
+   Curve or Uniswap launch fallback. Uniswap and Curve are not launch fallbacks.
 7. Do not build or register a Uniswap price-source contract at launch.
 8. RIPE/WETH V2 is at most an externally held launch-liquidity canary. It is
    not a protocol oracle and its LP token is not admitted at launch.
@@ -124,9 +127,14 @@ by accepting this synthesis.
 ### Profile and market topology
 
 - Profile 1 only.
-- Chainlink at PriceDesk ID 1.
-- PriceDesk IDs 2-5 empty/reserved, with ID 2 reserved for possible later
-  Curve use.
+- PriceDesk ID 1 has Chainlink selected.
+- PriceDesk ID 2 is empty and reserved for Profile 2 Curve.
+- PriceDesk ID 3 has BlueChipYield selected.
+- PriceDesk IDs 4 and 5 are empty.
+- Priority price-source IDs are `[1, 3]`.
+- Chainlink remains launch oracle authority. BlueChipYield provides the
+  selected yield-token pricing route; it is not a Curve or Uniswap launch
+  fallback.
 - No `CurvePrices` deployment or registration.
 - No Uniswap price-source deployment or registration.
 - No GREEN/USDG launch pool.
@@ -306,11 +314,12 @@ result remains non-authoritative `LOCAL_FORK_QUALIFIED`.
 ### Package D — Profile 1 deployment-preparation and PSM canary
 
 One later configuration/operations package for exact Profile 1 bindings,
-Chainlink-only topology, disabled PSM preparation, reserve/custody decisions,
-redemption-first qualification, monitoring, incident controls, and a restricted
-activation packet. It begins only after exact machine, manifest, role, feed,
-token, and operator inputs exist. It does not combine preparation,
-qualification, and production activation into one authority.
+Chainlink launch-oracle authority, the selected BlueChipYield route, disabled
+PSM preparation, reserve/custody decisions, redemption-first qualification,
+monitoring, incident controls, and a restricted activation packet. It begins
+only after exact machine, manifest, role, feed, token, and operator inputs exist.
+It does not combine preparation, qualification, and production activation into
+one authority.
 
 ### Package E — Profile 2 staged market integration
 
@@ -338,7 +347,11 @@ The consolidated owner decisions no longer open for this program slice are:
 - preserve current Teller strict balance-measurement design and global mutex;
 - preserve GuardedErc20 as a separate Stock-specific vault;
 - use Profile 1 at launch and stage Profile 2 as follow-on;
-- keep Chainlink as launch and PSM oracle authority;
+- keep Chainlink as launch and PSM oracle authority, with PriceDesk ID 1
+  selected;
+- select BlueChipYield at PriceDesk ID 3 for the yield-token pricing route,
+  keep ID 2 empty/reserved for Profile 2 Curve, keep IDs 4 and 5 empty, and use
+  priority price-source IDs `[1, 3]`;
 - deploy no Uniswap price-source contract at launch;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;
 - create no launch GREEN/USDG Uniswap venue;

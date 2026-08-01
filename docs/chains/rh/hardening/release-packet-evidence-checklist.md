@@ -1,16 +1,22 @@
 # RH release-packet evidence checklist
 
-> **30 July 2026 currentness:** Ready to begin deployment preparation. Any
-> future packet must bind frozen protocol/pause baseline `ae0cb49…`, the
-> documentation authority derived from its committed bytes, H-04 schema v2,
+> **31 July 2026 currentness:** Ready to begin deployment preparation. Any
+> future packet must bind current configuration-source baseline
+> `e4473ce6485888f1b747761a5ee8693443108877`, tree
+> `33b705690007bda9b11900b5775bd9230e79f09e`, the documentation authority
+> derived from its committed bytes, H-04 source authority,
 > H-05 deterministic planning reports, and the final H-06 operator
-> machine/volume. Historical PR #61 import ancestor `ad831669…` is not present
-> branch authority. The packet must fail closed while `DefaultsRobinhood.vy` is absent or
-> while `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps` lack
+> machine/volume. Historical checkpoints are not present branch authority.
+> `DefaultsRobinhood.vy` exists and compiles; the packet must fail closed while
+> deployment readiness is false or while `fullPayoffBuffer`, `overageBps`,
+> `dustThreshold`, and `dustBps` lack
 > machine-facing Robinhood parameter/planning representation. All four values
 > remain zero and deferred. No Robinhood migration, deployment, production
 > configuration, activation, RPC, account, key, signer, or release action has
-> occurred.
+> occurred. Repository configuration is prepared and consistent;
+> production/onchain configuration has not occurred. Use this checklist only
+> after reaching the release-evidence phase in the canonical
+> [`../deployment-owner-quickstart.md`](../deployment-owner-quickstart.md).
 
 > **DRAFT — reusable offline checklist.** Completing this file does not approve,
 > sign, publish, deploy, configure, activate, or release anything. Adoption into

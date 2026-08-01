@@ -1,17 +1,20 @@
 # Robinhood deployment-support specification
 
-> **30 July 2026 currentness overlay:** Ready to begin deployment preparation
-> from frozen protocol/pause baseline `ae0cb49…`. PR #61 is merged and closed,
-> and its production contract changes, H-04 schema v2, H-05 deterministic
-> blocked planning, M4 proof, and the H-06 candidate operator/storage class are
-> integrated. No Robinhood migration, deployment, production configuration,
-> activation, RPC, account, key, or signer action has occurred. Four Deleverage
-> controls remain zero and lack machine-facing representation;
-> `DefaultsRobinhood.vy` remains absent and fail-closed. The deployment owner
-> may execute the preparation sequence in
-> [`deployment-owner-readiness.md`](deployment-owner-readiness.md), while every
-> machine implementation, testnet action, and production action retains its
-> separate gate.
+> **31 July 2026 currentness overlay:** Ready to begin deployment preparation
+> from current configuration-source baseline `e4473ce6485888f1b747761a5ee8693443108877`,
+> tree `33b705690007bda9b11900b5775bd9230e79f09e`. PR #61, Morpho V2 and
+> BlueChipYield support, H-04 source authority, H-05 deterministic blocked
+> planning, M4 proof, and the H-06 candidate operator/storage class are
+> integrated. `DefaultsRobinhood.vy` exists and compiles; Blueprint and Defaults
+> are the two editable value authorities, and the JSON ledger is synchronized
+> derived evidence. The current check is `configuration_consistent=true`,
+> `deployment_ready=false`, with 58 blockers. Repository configuration is
+> prepared and consistent; production/onchain configuration has not occurred.
+> No Robinhood migration, deployment, activation, RPC, account, key, signer,
+> or release action has occurred. The sole current operational handoff is
+> [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md). The
+> phase tables below preserve historical specification proposals and are not
+> current source or lifecycle authority.
 
 - Status: Phases A–H completion draft for owner/reviewer scrutiny
 - Review status: independent checkpoint/completion findings incorporated; specification directions approved only where recorded

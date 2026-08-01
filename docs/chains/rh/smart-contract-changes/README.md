@@ -1,8 +1,8 @@
 # Robinhood smart-contract change rationale
 
-**Current frozen source snapshot:** `rh` commit
-`ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c`, tree
-`a6a34a385b48819bbf66249d518d76da3806b033` (30 July 2026).
+**Current configuration-source snapshot:** `rh` commit
+`e4473ce6485888f1b747761a5ee8693443108877`, tree
+`33b705690007bda9b11900b5775bd9230e79f09e` (31 July 2026).
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash merge
 `91eda49…`; its production contract changes are integrated into `rh`. No
 Robinhood deployment, migration execution, production configuration,
@@ -49,7 +49,11 @@ The four Deleverage controls remain zero and deferred, but they currently lack
 Robinhood machine-facing parameter/planning representation. The deployment
 owner owns their final disposition and binding; the machine change still
 requires separate authority and is not fixed here.
-`DefaultsRobinhood.vy` remains absent and fail-closed.
+`DefaultsRobinhood.vy` now exists and compiles; it and `config/BluePrint.py`
+are the two editable value authorities, while the JSON ledger is synchronized
+derived evidence. Morpho V2 and BlueChipYield support are integrated, with
+BlueChipYield selected at PriceDesk slot 3. Repository configuration is
+prepared and consistent; production/onchain configuration has not occurred.
 
 ## Documentation standard
 
@@ -84,18 +88,18 @@ audit documents, not merely summaries of workstream completion.
 The following directions control this explanatory package:
 
 - Corrected PR #61 entered `rh` through historical integration ancestor
-  `ad831669943ccfe7b9ed57454995dfce51630a66` and is retained by frozen
-  baseline `ae0cb49…`. The Deleverage, AuctionHouse, and SwitchboardDelta pages
-  bind their rationale to that source; the older import hash is not current
-  branch authority, and integration does not imply deployment, configuration,
-  activation, or release.
+  `ad831669943ccfe7b9ed57454995dfce51630a66` and is retained by current
+  baseline `e4473ce…`. The Deleverage, AuctionHouse, and SwitchboardDelta pages
+  bind their rationale to the earlier source checkpoint as historical evidence;
+  the older hashes are not current branch authority, and integration does not
+  imply deployment, configuration, activation, or release.
 - CCIP workflows are owner-parked and outside the current work program.
 - Zero-backing settlement, loss allocation, and bad-debt policy are
   owner-parked for later analysis.
 - Sites account/workspace recovery and dashboard deployment are owner-parked.
 - Parked subjects are not current Wave 1 work items or blockers. Parking does
   not decide their eventual release disposition.
-- H-04 schema v2, H-05 deterministic blocked planning, H-06 candidate-class
+- H-04 source authority, H-05 deterministic blocked planning, H-06 candidate-class
   qualification, and M4 proof are integrated for their exact scopes. None is
   final operator, machine, volume, deployment, or release authority.
 

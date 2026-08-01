@@ -1,15 +1,20 @@
 # Robinhood Phase-0 block-number inventory
 
-> **30 July 2026 currentness overlay:** The checked inventory now reflects the
-> frozen protocol/pause baseline `ae0cb49…`, which retains corrected PR #61
-> source first imported at historical ancestor `ad831669…`: 99 production
+> **31 July 2026 currentness overlay:** Current configuration-source baseline is
+> `e4473ce6485888f1b747761a5ee8693443108877`, tree
+> `33b705690007bda9b11900b5775bd9230e79f09e`. The checked inventory includes
+> integrated `DefaultsRobinhood` and Morpho V2 `BlueChipYieldPrices`; Profile 1
+> selects BlueChipYield at PriceDesk slot 3. The earlier frozen
+> `ae0cb49…` checkpoint retained corrected PR #61 and recorded 99 production
 > occurrences, 94
 > lines, 17 files, historical S5 fingerprint
 > `924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4`,
 > and current post-S5 fingerprint
 > `07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122`.
 > The historical ledger below remains evidence; `status.yaml` is current
-> authority. Nothing is deployed, configured, or active.
+> authority. Repository configuration is prepared and consistent;
+> production/onchain configuration has not occurred. Nothing is deployed,
+> migrated, activated, or released.
 
 **Status:** Complete analysis; BN-002 and BN-025 directions are recorded;
 remaining recommendations and owner decisions are unapproved

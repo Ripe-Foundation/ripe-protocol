@@ -1,16 +1,16 @@
 # Robinhood Phase-0 component matrix
 
-> **30 July 2026 currentness overlay:** Frozen protocol/pause baseline
-> `ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c` retains corrected PR #61.
-> Historical import ancestor `ad831669…` is not present branch authority. The
-> Phase-0 rows below remain historical planning evidence, but `Deleverage`,
-> `AuctionHouse`, and `SwitchboardDelta` now use the corrected shared source.
-> PR #61 is merged and closed on `master`. Robinhood keeps
-> `deleverageCooldown`, `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and
-> `dustBps` at zero. The latter four lack machine-facing parameter/planning
-> representation and require a separately authorized future track.
-> `DefaultsRobinhood.vy` remains absent and fail-closed. Nothing has been
-> deployed, configured, activated, or released.
+> **31 July 2026 currentness overlay:** Current configuration-source baseline is
+> `e4473ce6485888f1b747761a5ee8693443108877`, tree
+> `33b705690007bda9b11900b5775bd9230e79f09e`. Morpho V2 and
+> `BlueChipYieldPrices` support are integrated; CM-018 is selected at PriceDesk
+> slot 3 for Profile 1. CM-049 `DefaultsRobinhood` exists, compiles, and is one
+> of two editable value authorities with `config/BluePrint.py`; the JSON ledger
+> is synchronized derived evidence. Repository configuration is prepared and
+> consistent; production/onchain configuration has not occurred. The Phase-0
+> matrix below is preserved as historical planning evidence, so its earlier
+> omitted/absent proposals are not current authority. Nothing has been
+> deployed, migrated, activated, or released.
 
 **Status:** Complete analysis; S3, S4, S5, and Stock Token launch-scope
 decisions are recorded; remaining recommendations and owner decisions are
