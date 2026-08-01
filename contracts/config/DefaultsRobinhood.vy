@@ -333,9 +333,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[2],
             stakersPointsAlloc=15_00,
             voterPointsAlloc=0,
-            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  
-            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS, 
-            minDepositBalance=1 * 10**14,  
+            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,
+            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,
+            minDepositBalance=1 * 10**14,
             debtTerms=cs.DebtTerms(
                 ltv=0,
                 redemptionThreshold=0,

@@ -63,7 +63,7 @@ CREATION_BINDING_FACTS = {
         "prefix_size": 2_938,
         "prefix_sha256": "58f068b8289c0d0e5144c4213ba1f62fb2865aee519099ecc0e5fce7cac45e0b",
         "metadata_size": 57,
-        "metadata_sha256": "2d744bd39555fe8802d117d5d9959427d76b93858fb52442e22ee0a30125e56e",
+        "metadata_sha256": "e900bfb673577092d576a12fd2cd757791ac09fd5620297d355cc3eee4e47f39",
     },
     "GuardedErc20": {
         "prefix_size": 10_635,

@@ -1234,7 +1234,7 @@
         "committed_path": "scripts/abis/DefaultsRobinhood.json"
       },
       "artifacts": {
-        "creation_sha256": "7b893594d1b32f8fd1b1434e586b2e241da483cefd2f1efe26b41d53c8be7763",
+        "creation_sha256": "8ecc4f51e3764a74cb17ebfa084331a97c89329475f4188c61baf6c4813f2870",
         "creation_size": 2995,
         "eip170_headroom": 21889,
         "runtime_template_sha256": "aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99",
@@ -1337,12 +1337,12 @@
         "canonical_sha256": "47a9316a506fe7fc4d50d878451f93bd629152c603a110085e06fbf0c7a3e28a",
         "count": 17
       },
-      "source_git_blob": "77f6521ee0bf60186997c00c07d1af943c52fd59",
+      "source_git_blob": "c63009f9e03044616da2562767f129d91e0843aa",
       "source_path": "contracts/config/DefaultsRobinhood.vy",
-      "source_sha256": "ad2b0db5a3fed9e2cc37e7234f81fb74928536107d79e51d0b2dea949f722200",
+      "source_sha256": "4f89a970c19a7fc5a3d6f05035cd252d660ac6c1696ccddb4bd76c6751f356f8",
       "storage_layout": {},
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "1fd4655792900157077dfdaa8b4cae2d735fea162f11bf7c8f3cc1aaca7223e0"
+      "transitive_compiler_input_integrity": "d76fa3423ddd4b8d12a173b8f7c01104bdd31a666b458be172850329f23201d6"
     }
   },
   "schema_version": 1

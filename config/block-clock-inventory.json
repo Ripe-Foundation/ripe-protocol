@@ -15880,7 +15880,7 @@
     {
       "path": "contracts/config/DefaultsRobinhood.vy",
       "classification": "production",
-      "contentSha256": "ad2b0db5a3fed9e2cc37e7234f81fb74928536107d79e51d0b2dea949f722200",
+      "contentSha256": "4f89a970c19a7fc5a3d6f05035cd252d660ac6c1696ccddb4bd76c6751f356f8",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
