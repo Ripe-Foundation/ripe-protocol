@@ -36,6 +36,10 @@ The source reports are:
 - [Robinhood network, token, clock, and oracle qualification authority](qualification/network-token-oracle-authority.md)
 - [Robinhood fork-suite coverage census and implementation design](qualification/fork-suite-coverage-census.md)
 
+Subsequent decision/evidence record (does not rewrite the eight source reports):
+
+- [Robinhood PSM lite-permission split decision and evidence](reassessment/psm-lite-permission-split.md)
+
 **Fork-census provenance:** intermediate corrected-report revision
 `cd13c3028315784b6a48de097b95529e18ee8d0695f7cd3eca5d6f6fcae6038c`
 was a pre-disposition revision and was not durably archived. The owner has
