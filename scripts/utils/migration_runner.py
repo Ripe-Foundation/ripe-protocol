@@ -203,6 +203,7 @@ _ARTIFACT_KINDS = {
     "preview-plan",
     "synthetic-proof",
 }
+_EXECUTION_ENVELOPE_SCHEMA = "ripe.robinhood.execution-envelope.v1"
 _CANONICAL_FILENAME = re.compile(
     r"(?P<migration_id>[0-9]{4})_"
     r"(?P<semantic_name>[A-Za-z][A-Za-z0-9]*)\.py",
@@ -259,8 +260,12 @@ _FIXED_PLANNING_INPUTS = (
     "contracts/config/DefaultsRobinhood.vy",
     "scripts/migrate.py",
     "scripts/utils/deployment_assertions.py",
+    "scripts/utils/deploy_args.py",
+    "scripts/utils/manifest_schema.py",
     "scripts/utils/migration.py",
     "scripts/utils/migration_runner.py",
+    "scripts/utils/robinhood_backends.py",
+    "scripts/utils/robinhood_executor.py",
 )
 
 
@@ -807,6 +812,7 @@ def _resolve_reference(
     blueprint: Any,
     produced: set[str],
     prior_actions: set[str],
+    accepted_values: Mapping[str, Any],
 ) -> str | None:
     if reference.startswith("action:"):
         return None if reference[7:] in prior_actions else "H05_ACTION_ORDER"
@@ -819,6 +825,8 @@ def _resolve_reference(
             return None
         if status is None:
             return _blocker_code("ADDRESS", key)
+        if reference in accepted_values:
+            return None
         if status == "deployment_produced_unresolved":
             return _blocker_code("DEPLOYMENT_OUTPUT", key)
         return _blocker_code("EXTERNAL", key)
@@ -839,6 +847,8 @@ def _resolve_reference(
             return _blocker_code("INPUT_AUTHORITY", key)
         if row.disposition in {"approved", "disabled"}:
             return None
+        if reference in accepted_values:
+            return None
         return _blocker_code("INPUT", key)
     if reference.startswith("curve:"):
         input_id = reference[6:]
@@ -846,6 +856,8 @@ def _resolve_reference(
         if row is None:
             raise MigrationPlanError("H05_CURVE_INPUT_UNKNOWN")
         if row.resolution_state in blueprint.ROBINHOOD_CURVE_BLOCKING_STATES:
+            if reference in accepted_values:
+                return None
             return _blocker_code("CURVE", input_id)
         return None
     if reference.startswith("curve-binding:"):
@@ -870,15 +882,347 @@ def _resolve_reference(
         if row is None:
             raise MigrationPlanError("H05_STOCK_INPUT_UNKNOWN")
         if row.resolution != "repository_fact_integrated":
+            if reference in accepted_values:
+                return None
             return _blocker_code("STOCK", input_path)
         return None
     if reference.startswith("binding:"):
+        if reference in accepted_values:
+            return None
         return _blocker_code("BINDING", reference[8:])
     if reference.startswith("defaults:"):
         return None
     if reference.startswith("blueprint:"):
         return None
     return "H05_REFERENCE_UNKNOWN"
+
+
+def _validate_envelope_json(value: Any, *, depth: int = 0) -> None:
+    if depth > 8:
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            _validate_envelope_json(item, depth=depth + 1)
+        return
+    if isinstance(value, Mapping) and all(
+        isinstance(key, str) for key in value
+    ):
+        for item in value.values():
+            _validate_envelope_json(item, depth=depth + 1)
+        return
+    raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+
+
+def _validate_envelope_typed_value(
+    reference: str, value: Any
+) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "type",
+        "value",
+        "authority_ref",
+        "evidence_sha256",
+    }:
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    type_name = value.get("type")
+    item = value.get("value")
+    authority = value.get("authority_ref")
+    evidence = value.get("evidence_sha256")
+    if (
+        type_name
+        not in {
+            "address",
+            "boolean",
+            "uint256",
+            "string",
+            "address-array",
+            "uint256-array",
+            "string-array",
+            "json",
+        }
+        or not isinstance(authority, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]*", authority)
+        is None
+        or not isinstance(evidence, str)
+        or _HEX64.fullmatch(evidence) is None
+    ):
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    valid = False
+    if type_name == "address":
+        valid = item is None or (
+            isinstance(item, str)
+            and re.fullmatch(r"0x[0-9a-fA-F]{40}", item) is not None
+        )
+    elif type_name == "boolean":
+        valid = isinstance(item, bool)
+    elif type_name == "uint256":
+        valid = (
+            isinstance(item, int)
+            and not isinstance(item, bool)
+            and 0 <= item < 2**256
+        )
+    elif type_name == "string":
+        valid = isinstance(item, str)
+    elif type_name == "address-array":
+        valid = isinstance(item, (list, tuple)) and all(
+            isinstance(entry, str)
+            and re.fullmatch(r"0x[0-9a-fA-F]{40}", entry) is not None
+            for entry in item
+        )
+    elif type_name == "uint256-array":
+        valid = isinstance(item, (list, tuple)) and all(
+            isinstance(entry, int)
+            and not isinstance(entry, bool)
+            and 0 <= entry < 2**256
+            for entry in item
+        )
+    elif type_name == "string-array":
+        valid = isinstance(item, (list, tuple)) and all(
+            isinstance(entry, str) for entry in item
+        )
+    else:
+        _validate_envelope_json(item)
+        valid = True
+    if not valid:
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    if type_name == "address" and item is None and reference != "curve:pool.address":
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    if reference == "curve:pool.address" and not (
+        type_name == "address"
+    ):
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    return {
+        "type": type_name,
+        "value": _plain(item),
+        "authority_ref": authority,
+        "evidence_sha256": evidence,
+    }
+
+
+def _execution_envelope(
+    value: Mapping[str, Any] | None,
+    *,
+    profile_id: str,
+    expected_chain_id: int,
+    source_commit: str,
+    source_tree: str,
+) -> tuple[dict[str, Any] | None, Mapping[str, Any], frozenset[str]]:
+    if value is None:
+        return None, {}, frozenset()
+    if not isinstance(value, Mapping) or set(value) != {
+        "schema",
+        "profile_id",
+        "expected_chain_id",
+        "source_commit",
+        "source_tree",
+        "values",
+        "accepted_blockers",
+        "authorization",
+    }:
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_SCHEMA")
+    if value.get("schema") != _EXECUTION_ENVELOPE_SCHEMA:
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_SCHEMA")
+    if value.get("profile_id") != profile_id:
+        raise MigrationPlanError("H05_PLAN_PROFILE_MISMATCH")
+    if value.get("expected_chain_id") != expected_chain_id:
+        raise MigrationPlanError("H05_PLAN_CHAIN_MISMATCH")
+    if value.get("source_commit") != source_commit or value.get(
+        "source_tree"
+    ) != source_tree:
+        raise MigrationPlanError("H05_PLAN_SOURCE_MISMATCH")
+    authorization = value.get("authorization")
+    if not isinstance(authorization, Mapping) or dict(authorization) != {
+        "execution_approved": True,
+        "history_approved": True,
+    }:
+        raise MigrationPlanError("H05_EXECUTION_AUTHORIZATION")
+    values = value.get("values")
+    if not isinstance(values, Mapping) or any(
+        not isinstance(reference, str) for reference in values
+    ):
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    normalized_values = {}
+    for reference, item in values.items():
+        if not reference.startswith(
+            (
+                "address:",
+                "input:",
+                "binding:",
+                "curve:",
+                "stock:",
+            )
+        ):
+            raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+        normalized_values[reference] = _validate_envelope_typed_value(
+            reference, item
+        )
+    accepted = value.get("accepted_blockers")
+    if not isinstance(accepted, list) or any(
+        not isinstance(item, str) for item in accepted
+    ) or len(accepted) != len(set(accepted)):
+        raise MigrationPlanError("H05_EXECUTION_ENVELOPE_BLOCKER")
+    normalized = {
+        "schema": _EXECUTION_ENVELOPE_SCHEMA,
+        "profile_id": profile_id,
+        "expected_chain_id": expected_chain_id,
+        "source_commit": source_commit,
+        "source_tree": source_tree,
+        "values": dict(sorted(normalized_values.items())),
+        "accepted_blockers": sorted(accepted),
+        "authorization": {
+            "execution_approved": True,
+            "history_approved": True,
+        },
+    }
+    return normalized, normalized["values"], frozenset(accepted)
+
+
+def _validate_envelope_authority_types(
+    envelope: Mapping[str, Any] | None, blueprint: Any
+) -> None:
+    if envelope is None:
+        return
+    for reference, typed in envelope["values"].items():
+        type_name = typed["type"]
+        namespace, key = reference.split(":", 1)
+        allowed: set[str]
+        if namespace == "address":
+            allowed = {"address"}
+        elif namespace == "input":
+            row = blueprint.ROBINHOOD_DEPLOYMENT_INPUTS.get(key)
+            if row is None:
+                raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+            lowered = key.casefold()
+            if key in {
+                "Deployment.DP-08.psm.numBlocksPerInterval",
+                "Deployment.DP-08.psm.mintFee",
+                "Deployment.DP-08.psm.maxMintPerInterval",
+                "Deployment.DP-08.psm.redeemFee",
+                "Deployment.DP-08.psm.maxRedeemPerInterval",
+            }:
+                allowed = {"uint256"}
+            elif row.disposition == "external_fact" or any(
+                marker in lowered
+                for marker in (
+                    "sourcebinding",
+                    ".guardian",
+                    ".recipient",
+                    "wethidentity",
+                )
+            ):
+                allowed = {"address"}
+            elif "allowlist" in lowered or lowered.endswith("litesigners"):
+                allowed = {"address-array"}
+            elif lowered.endswith(("nativesymbol", "nativename")):
+                allowed = {"string"}
+            elif isinstance(row.value, bool):
+                allowed = {"boolean"}
+            elif isinstance(row.value, int):
+                allowed = {"uint256"}
+            else:
+                raise MigrationPlanError(
+                    "H05_EXECUTION_ENVELOPE_REFERENCE"
+                )
+        elif namespace == "binding":
+            if key in {
+                "initial-ripe-hq",
+                "contributor-template",
+                "temporary-local-governance",
+            } or "identity" in key:
+                allowed = {"address"}
+            elif key == "approved-capability-set":
+                allowed = {"json"}
+            elif key in {
+                "bluechip-morpho-factories",
+                "bluechip-euler-factories",
+            }:
+                allowed = {"address-array"}
+            elif key in {
+                "bluechip-fluid-resolver",
+                "bluechip-compound-configurator",
+                "bluechip-moonwell-comptroller",
+                "bluechip-aave-provider",
+            }:
+                allowed = {"address"}
+            elif key.startswith(("deleverage-", "lootbox-")):
+                allowed = {"uint256"}
+            else:
+                allowed = {"boolean", "json", "string"}
+        elif namespace == "curve":
+            row = _curve_input_rows(blueprint).get(key)
+            if row is None:
+                raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+            if "address_provider_binding_" in key:
+                allowed = {"json"}
+            elif key in {"curve.address_provider", "pool.address", "pool.factory"} or any(
+                marker in key
+                for marker in (
+                    "funding_source",
+                    "custodian",
+                    "approving_account",
+                    "withdrawal_authority",
+                )
+            ):
+                allowed = {"address"}
+            elif isinstance(row.value, bool):
+                allowed = {"boolean"}
+            elif isinstance(row.value, int):
+                allowed = {"uint256"}
+            elif isinstance(row.value, str):
+                allowed = {"string"}
+            elif isinstance(row.value, (tuple, list)):
+                allowed = {"json", "address-array", "uint256-array", "string-array"}
+            elif any(
+                marker in key
+                for marker in (
+                    "liquidity_amount",
+                    "minimum_minted_lp",
+                    "slippage_limit",
+                    "minimum_retained_liquidity",
+                )
+            ):
+                allowed = {"uint256"}
+            else:
+                allowed = {"boolean", "json", "string", "uint256"}
+        elif namespace == "stock":
+            row = _stock_input_rows(blueprint).get(key)
+            if row is None:
+                raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+            if isinstance(row.candidate, str) and re.fullmatch(
+                r"0x[0-9a-fA-F]{40}", row.candidate
+            ):
+                allowed = {"address"}
+            elif isinstance(row.candidate, int):
+                allowed = {"uint256"}
+            else:
+                allowed = {"boolean", "json", "string", "uint256", "address"}
+        else:
+            raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+        if type_name not in allowed:
+            raise MigrationPlanError("H05_EXECUTION_ENVELOPE_VALUE")
+    temporary = envelope["values"].get(
+        "binding:temporary-local-governance"
+    )
+    final_governance = envelope["values"].get(
+        "input:Deployment.DP-18.roles.governance"
+    )
+    if temporary is not None:
+        temporary_address = temporary["value"]
+        if (
+            temporary_address is None
+            or temporary_address.lower() == "0x" + "0" * 40
+            or (
+                final_governance is not None
+                and temporary_address.lower()
+                == final_governance["value"].lower()
+            )
+        ):
+            raise MigrationPlanError(
+                "H05_TEMPORARY_LOCAL_GOVERNANCE_INVALID"
+            )
 
 
 def build_robinhood_plan(
@@ -888,6 +1232,7 @@ def build_robinhood_plan(
     synthetic_bindings: Mapping[str, Any] | None = None,
     synthetic_bind_all: bool = False,
     preview: bool = False,
+    execution_envelope: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Construct the complete offline plan from shared source and authority."""
 
@@ -896,6 +1241,8 @@ def build_robinhood_plan(
         raise MigrationPlanError("H05_SYNTHETIC_BIND_ALL_REQUIRED")
     synthetic = synthetic_bind_all or synthetic_bindings is not None
     if preview and synthetic:
+        raise MigrationPlanError("H05_PLAN_MODE_CONFLICT")
+    if execution_envelope is not None and (preview or synthetic):
         raise MigrationPlanError("H05_PLAN_MODE_CONFLICT")
     artifact_kind = (
         "synthetic-proof"
@@ -915,6 +1262,15 @@ def build_robinhood_plan(
     profile = profiles.get_profile(profile_id)
     if profile.identity.chain_id is None:
         raise MigrationPlanError("H05_PLAN_UNSUPPORTED")
+    envelope, accepted_values, accepted_reservation_blockers = (
+        _execution_envelope(
+            execution_envelope,
+            profile_id=profile_id,
+            expected_chain_id=profile.identity.chain_id,
+            source_commit=commit,
+            source_tree=tree,
+        )
+    )
     expectations = robinhood_source_expectations()
     discovery = discover_migration_sources(
         root,
@@ -930,6 +1286,7 @@ def build_robinhood_plan(
         require_head=artifact_kind == "production-plan",
     )
     blueprint = _load_blueprint(root)
+    _validate_envelope_authority_types(envelope, blueprint)
     _defaults_contract_checks(root, blueprint, stages)
     _constructor_shape_checks(root, stages)
     _validate_curve_authority(blueprint)
@@ -953,7 +1310,9 @@ def build_robinhood_plan(
         reservation = _SOURCE_RESERVATIONS[stage_ordinal]
         if reservation.migration_id != stage["migration_id"]:
             raise MigrationPlanError("H05_RESERVATION_MISMATCH")
-        stage_blockers = set(reservation.local_blockers)
+        stage_blockers = set(reservation.local_blockers) - set(
+            accepted_reservation_blockers
+        )
         blockers.update(stage_blockers)
         for blocker in stage_blockers:
             blocker_references.setdefault(blocker, set()).add(
@@ -1021,6 +1380,7 @@ def build_robinhood_plan(
                         blueprint=blueprint,
                         produced=produced,
                         prior_actions=prior_actions,
+                        accepted_values=accepted_values,
                     )
                     if blocker is not None:
                         action_blockers.add(blocker)
@@ -1162,6 +1522,43 @@ def build_robinhood_plan(
         {"key": key, "references": sorted(blocker_references.get(key, set()))}
         for key in sorted(blockers)
     ]
+    source_references = {
+        reference
+        for stage in planned_stages
+        for action in stage["actions"]
+        for reference in list(action.get("constructor", []))
+        + list(action.get("requires", []))
+    }
+    if envelope is not None:
+        permitted_values = {
+            reference
+            for reference in source_references
+            if _resolve_reference(
+                reference,
+                blueprint=blueprint,
+                produced=set(),
+                prior_actions=set(),
+                accepted_values={},
+            )
+            is not None
+            and not reference.startswith("action:")
+        }
+        if set(accepted_values) - permitted_values:
+            raise MigrationPlanError("H05_EXECUTION_ENVELOPE_REFERENCE")
+        if any(
+            reference.startswith("address:")
+            and blueprint.ROBINHOOD_ADDRESS_STATUS.get(reference[8:])
+            == "deployment_produced_unresolved"
+            for reference in accepted_values
+        ):
+            raise MigrationPlanError("H05_DEPLOYMENT_OUTPUT_PREBOUND")
+        reservation_blockers = {
+            blocker
+            for item in _SOURCE_RESERVATIONS
+            for blocker in item.local_blockers
+        }
+        if set(accepted_reservation_blockers) - reservation_blockers:
+            raise MigrationPlanError("H05_EXECUTION_ENVELOPE_BLOCKER")
     source = {
         "commit": commit if artifact_kind == "production-plan" else None,
         "tree": tree,
@@ -1210,6 +1607,7 @@ def build_robinhood_plan(
             "expected_chain_id": profile.identity.chain_id,
         },
         "source": source,
+        "execution_envelope": envelope,
         "stages": planned_stages,
         "deferred_stages": [
             {
@@ -1825,7 +2223,9 @@ def validate_execution_plan_artifact(
     if not isinstance(profile_id, str):
         raise MigrationPlanError("H05_PLAN_PROFILE_MISMATCH")
     expected = build_robinhood_plan(
-        profile_id, repository_root=repository_root
+        profile_id,
+        repository_root=repository_root,
+        execution_envelope=validated.get("execution_envelope"),
     )
     if expected != validated:
         raise MigrationPlanError("H05_EXECUTION_PLAN_DRIFT")

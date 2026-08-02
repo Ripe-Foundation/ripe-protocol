@@ -2,6 +2,7 @@ import os
 import sys
 from contextlib import ExitStack, contextmanager
 import importlib
+import json
 from pathlib import Path
 
 import click
@@ -25,6 +26,7 @@ from scripts.utils.migration_runner import (
     MigrationRunner,
     build_blocked_migration_report,
     report_bytes,
+    validate_execution_plan_artifact,
 )
 
 
@@ -226,6 +228,9 @@ def _require_plan_flags(
     blueprint,
     account,
     ledger,
+    execution_plan,
+    execution_envelope,
+    execution_history_root,
 ) -> None:
     history = profile.repository.history_dir
     expected_environment = None if history is None else history.name
@@ -242,8 +247,21 @@ def _require_plan_flags(
         or blueprint is not None
         or account != CLICK_PROMPTS["account"]["default"]
         or ledger != -1
+        or execution_plan is not None
+        or execution_envelope is not None
+        or execution_history_root is not None
     ):
         raise MigrationPlanError("H05_PLAN_FLAGS_INCOMPATIBLE")
+
+
+def _read_public_json(path_value: str, code: str):
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise MigrationPlanError(code)
+    try:
+        return json.loads(path.read_bytes())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise MigrationPlanError(code) from None
 
 
 @click.command()
@@ -356,6 +374,27 @@ def _require_plan_flags(
     type=int,
 )
 @click.option(
+    "--execution-plan",
+    default=None,
+    help=(
+        "Absolute path to a clean-tree Robinhood production plan. The file is "
+        "read only after profile, RPC identity, and account gates succeed."
+    ),
+)
+@click.option(
+    "--execution-envelope",
+    default=None,
+    help=(
+        "Absolute path to the accepted public execution envelope already "
+        "bound into --execution-plan."
+    ),
+)
+@click.option(
+    "--execution-history-root",
+    default=None,
+    help="Absolute private H-06 history directory for Robinhood execution.",
+)
+@click.option(
     "--is-retry",
     is_flag=True,
     default=CLICK_PROMPTS["is_retry"]["default"],
@@ -376,6 +415,9 @@ def cli(
     blueprint,
     account,
     ledger,
+    execution_plan=None,
+    execution_envelope=None,
+    execution_history_root=None,
     plan=False,
     preview=False,
 ):
@@ -400,6 +442,9 @@ def cli(
                 blueprint=blueprint,
                 account=account,
                 ledger=ledger,
+                execution_plan=execution_plan,
+                execution_envelope=execution_envelope,
+                execution_history_root=execution_history_root,
             )
             report = build_blocked_migration_report(
                 profile.identity.profile_id,
@@ -414,6 +459,17 @@ def cli(
             Operation.MIGRATION_FORK if fork else Operation.MIGRATION_LIVE
         )
         require_operation(profile, operation)
+
+        is_robinhood = profile.identity.profile_id.startswith("robinhood-")
+        execution_values = (
+            execution_plan,
+            execution_envelope,
+            execution_history_root,
+        )
+        if is_robinhood != all(value is not None for value in execution_values):
+            raise MigrationPlanError("H05_EXECUTION_INPUTS_REQUIRED")
+        if not is_robinhood and any(value is not None for value in execution_values):
+            raise MigrationPlanError("H05_EXECUTION_PROFILE_REQUIRED")
 
         if safe or ledger != -1:
             raise NetworkProfileError(
@@ -441,6 +497,28 @@ def cli(
         paths = repository_paths(
             profile, operation, root=ROOT, identity=identity
         )
+        robinhood_plan = None
+        if is_robinhood:
+            robinhood_plan = _read_public_json(
+                execution_plan, "H05_EXECUTION_PLAN_FILE"
+            )
+            envelope = _read_public_json(
+                execution_envelope, "H05_EXECUTION_ENVELOPE_FILE"
+            )
+            if robinhood_plan.get("execution_envelope") != envelope:
+                raise MigrationPlanError("H05_EXECUTION_ENVELOPE_MISMATCH")
+            validated = validate_execution_plan_artifact(
+                robinhood_plan, repository_root=ROOT
+            )
+            if validated["profile"] != {
+                "profile_id": profile.identity.profile_id,
+                "base_profile_id": None,
+                "expected_chain_id": identity.expected_chain_id,
+            }:
+                raise MigrationPlanError("H05_PLAN_PROFILE_MISMATCH")
+            history_root = Path(execution_history_root)
+            if not history_root.is_absolute():
+                raise MigrationPlanError("H05_EXECUTION_HISTORY_ROOT")
     except (MigrationPlanError, NetworkProfileError) as error:
         raise click.ClickException(str(error)) from None
 
@@ -494,6 +572,27 @@ def cli(
     with _fork_environment(
         profile, operation, redacted_rpc, allow_dirty=True
     ) as env:
+        if robinhood_plan is not None:
+            from scripts.utils.robinhood_backends import BoaRobinhoodBackend
+            from scripts.utils.robinhood_executor import install_robinhood_executor
+
+            backend = BoaRobinhoodBackend(
+                boa_module=boa,
+                files=vyper_files,
+                sender=sender,
+                final_governance_sender=robinhood_plan[
+                    "execution_envelope"
+                ]["values"][
+                    "input:Deployment.DP-18.roles.governance"
+                ]["value"],
+            )
+            install_robinhood_executor(
+                deploy_args,
+                robinhood_plan,
+                repository_root=ROOT,
+                backend=backend,
+                history_root=history_root,
+            )
         try:
             env.set_balance(sender.address, 10 * 10**18)
             log.h2("Fork-only deployer wallet funded with 10 ETH")

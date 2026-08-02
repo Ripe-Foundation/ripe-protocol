@@ -104,9 +104,10 @@ class Migration:
         """Hand one shared literal stage to a separately authorized executor.
 
         Static planning reads the exact same ``MIGRATION_STAGE`` literal.  The
-        live/fork profiles remain unsupported, and no executor is installed by
-        this package, so merely importing or invoking a Robinhood migration can
-        never fall through to legacy transactions or history writes.
+        Network policy remains controlling.  The CLI installs the dedicated
+        executor only after its profile, identity, account, plan, repository,
+        envelope, and history gates succeed.  Merely importing or invoking a
+        Robinhood migration can never fall through to legacy transactions.
         """
         if not self._manifest_v2:
             raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")

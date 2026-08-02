@@ -11,9 +11,9 @@ activation, release, or Sites actions.
 Work from the current `rh` tip after confirming parity among local `rh`, cached
 `origin/rh`, and credential-free live `rh`.
 
-The reviewed shared-migration candidate is rebound to launch-authority parent
-commit `20945001ab1321d73399bcf37b1fa99534c98e8f`, tree
-`337f863cf318bc499d5500d6eaafde8842975abb`. Treat that identity as the exact
+The transaction-executor candidate continues from the integrated shared-
+migration commit `25c0d58e1243449276e4ac4cae8d7abb8272f376`, tree
+`2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`. Treat that identity as the exact
 candidate parent; do not infer currentness from ancestry or another branch tip.
 
 The preserved predecessor candidate was frozen on commit
@@ -37,10 +37,11 @@ Ready to begin deployment preparation.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
   readiness blocker count is 80: the remaining 57 non-Curve blockers plus 23
   typed Curve launch inputs.
-- The executable migration graph is separately typed blocked by 99 keys:
-  37 deployment-produced bindings, 23 Curve inputs, 5 external addresses,
+- The executable migration graph is separately typed blocked by 100 keys:
+  38 execution bindings (37 deployment-produced identities plus the distinct
+  temporary local-governance authority), 23 Curve inputs, 5 external addresses,
   18 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
-  99-key plan census layers migration-specific bindings, reservations, and
+  100-key plan census layers migration-specific bindings, reservations, and
   Stock inputs on top of the 80-key source/configuration readiness state;
   neither count replaces the other.
 - DP15 and P-H04-399 are approved product/configuration decisions. The exact
@@ -103,6 +104,47 @@ Two adjacent files are not value authorities:
   is deterministic derived evidence for the approved product decision. Its
   SHA-256 identity binds the exact decision bytes; it does not supersede
   Defaults or authorize execution, deployment, activation, or release.
+
+## Temporary local-governance execution binding
+
+`binding:temporary-local-governance` is an accepted execution-envelope field,
+not a product/configuration value and not a third substitute for
+`BluePrint.py` or `DefaultsRobinhood.vy`. A production-shaped plan remains
+blocked until the deployment operator identity is explicitly approved and
+bound. The value must be a nonzero address, must equal the executor's actual
+deployment sender, and must differ from both `RipeHq.governance()` and
+`input:Deployment.DP-18.roles.governance`. Never infer it from an owner,
+guardian, Safe, release signer, or another role. The deterministic local
+fixture alone may bind it to its local deployment sender.
+
+The binding is constructor input only for this mechanically verified census:
+
+- stage `0300`: Switchboard, SwitchboardAlpha, SwitchboardBravo,
+  SwitchboardCharlie, SwitchboardDelta, and SwitchboardEcho;
+- stage `0400`: PriceDesk, ChainlinkPrices, CurvePrices, and
+  BlueChipYieldPrices; and
+- stage `0500`: VaultBook.
+
+Within `0400`, register PriceDesk at RipeHq ID 7 after CurvePrices is admitted
+at PriceDesk ID 2 and before adding the GREEN Curve feed. Production
+`CurvePrices.addNewPriceFeed()` resolves PriceDesk through RipeHq, so this is a
+runtime prerequisite, not an activation or authority shortcut.
+
+`RipeHq` and the three token constructors keep the approved final-governance
+lifecycle. HumanResources initializes local governance to zero and is not part
+of the temporary-governance census. Do not use `startGovernanceChange()` as a
+constructor workaround.
+
+The last irreversible action in `0900` must first prove all setup, registry and
+action timelocks, pending-action absence, post-deployment assertions, sender
+identity, and distinct unchanged RipeHq governance. It then records one typed
+`relinquishGov()` receipt for each of the 11 contracts and proves local
+`governance()` is zero, the temporary sender has no remaining governance power,
+and final RipeHq governance is the sole effective governor. An interrupted
+handoff records the exact retained set, cannot promote current history, and may
+resume only under the identical plan/source/profile/history binding. Previously
+validated action and relinquishment receipts are restored; only remaining work
+may execute.
 
 ## Exact input map
 
@@ -210,7 +252,9 @@ Bind the exact baseline, preserve a clean isolated worktree, classify each of
 the 80 readiness blockers, and obtain its named external verification,
 deployment-produced identity, or owner decision. Freeze governance, Safe,
 Guardian, TrainingWheels, lite signers, operators, emergency roles, and signer
-policy as reviewed inputs. A missing value remains symbolic and blocked.
+policy as reviewed inputs. Separately bind `temporary-local-governance` to the
+approved actual deployment sender; zero, final governance, and role inference
+are invalid. A missing value remains symbolic and blocked.
 
 ### 2. Synchronize configuration
 

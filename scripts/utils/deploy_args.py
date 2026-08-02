@@ -46,6 +46,10 @@ class DeployArgs:
         self.ignore_logs = ignore_logs
         self.blueprint = BluePrint(blueprint)
         self.rpc = rpc
+        # Installed only by the post-gate Robinhood execution branch.
+        self.robinhood_execution_plan = None
+        self.robinhood_repository_root = None
+        self.robinhood_stage_executor = None
 
 
 class LegoType:

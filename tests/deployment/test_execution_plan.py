@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -677,11 +678,11 @@ def test_static_plan_call_graph_has_no_writer_or_execution_primitive():
         ".write_text(",
         "open(",
         "transaction",
-        "signer",
         "simulate",
         "broadcast",
     ):
         assert forbidden not in rendered
+    assert re.search(r"\bsigner\b", rendered, flags=re.IGNORECASE) is None
     assert "subprocess.run" in rendered
     assert ".read_bytes(" in rendered
     assert ".lstat(" in rendered

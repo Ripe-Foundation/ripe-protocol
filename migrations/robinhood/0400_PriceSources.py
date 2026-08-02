@@ -11,7 +11,7 @@ MIGRATION_STAGE = {
             "artifact": "PriceDesk",
             "constructor": (
                 "address:RIPE_HQ",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "address:NATIVE_ETH_SENTINEL",
                 "input:Deployment.DP-05.timelocks.AddressRegistry.minDelay",
                 "input:Deployment.DP-05.timelocks.AddressRegistry.maxDelay",
@@ -27,7 +27,7 @@ MIGRATION_STAGE = {
             "artifact": "ChainlinkPrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.Chainlink.minTimeLock",
                 "input:Deployment.DP-05.timelocks.Chainlink.maxTimeLock",
                 "address:WETH",
@@ -77,7 +77,7 @@ MIGRATION_STAGE = {
             "artifact": "CurvePrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "curve:curve.address_provider",
                 "address:GREEN_TOKEN",
                 "address:SGREEN_TOKEN",
@@ -202,6 +202,16 @@ MIGRATION_STAGE = {
             "postconditions": ("returned-registry-id-matches-authority",),
         },
         {
+            "semantic_action_id": "register-price-desk-in-ripe-hq",
+            "kind": "registration",
+            "operation": "register-and-confirm",
+            "component_id": "CM-015",
+            "registry_ref": "registry:ripe_hq:CM-015",
+            "requires": ("address:PRICE_DESK", "action:register-curve-prices"),
+            "abort_if": ("returned-registry-id-mismatch",),
+            "postconditions": ("returned-registry-id-matches-authority",),
+        },
+        {
             "semantic_action_id": "configure-curve-green-feed-at-id-two",
             "kind": "configuration",
             "operation": "add-and-confirm-curve-feed-after-id-two",
@@ -209,7 +219,7 @@ MIGRATION_STAGE = {
             "requires": (
                 "address:GREEN_TOKEN",
                 "address:GREEN_USDG_CURVE_POOL",
-                "action:register-curve-prices",
+                "action:register-price-desk-in-ripe-hq",
             ),
             "abort_if": (
                 "green-feed-confirmation-failed",
@@ -232,7 +242,7 @@ MIGRATION_STAGE = {
             "artifact": "BlueChipYieldPrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.Chainlink.minTimeLock",
                 "input:Deployment.DP-05.timelocks.Chainlink.maxTimeLock",
                 "binding:bluechip-morpho-factories",
@@ -280,16 +290,6 @@ MIGRATION_STAGE = {
                 "pyth-and-stork-absent",
                 "uniswap-unregistered",
             ),
-        },
-        {
-            "semantic_action_id": "register-price-desk-in-ripe-hq",
-            "kind": "registration",
-            "operation": "register-and-confirm",
-            "component_id": "CM-015",
-            "registry_ref": "registry:ripe_hq:CM-015",
-            "requires": ("address:PRICE_DESK", "action:assert-price-source-topology"),
-            "abort_if": ("returned-registry-id-mismatch",),
-            "postconditions": ("returned-registry-id-matches-authority",),
         },
         {
             "semantic_action_id": "recover-disable-curve-id-two",

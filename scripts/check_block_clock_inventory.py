@@ -113,6 +113,10 @@ REWARD_LAUNCH_CADENCE_RECORD_COUNT = 21
 REWARD_LAUNCH_CADENCE_RECORDS_SHA256 = (
     "e8e943571dcedbc6aa56295434857bac69ed34241405e698407ab7721fbbd01d"
 )
+TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT = 7
+TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256 = (
+    "96f8cd1e75e68589b8ecdb98e6ea8aee3251ad7fbfeb88301d5e8e5a3bb85493"
+)
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
     "contracts/mock/**",
@@ -371,6 +375,14 @@ REWARD_LAUNCH_CADENCE_PATHS = frozenset(
         "config/robinhood-reward-launch-plan.json",
         "scripts/params/validate_robinhood_reward_launch_plan.py",
         "tests/core/lootbox/test_robinhood_reward_containment.py",
+    }
+)
+TRANSACTION_EXECUTOR_CADENCE_PATHS = frozenset(
+    {
+        "scripts/utils/migration_runner.py",
+        "scripts/utils/robinhood_backends.py",
+        "scripts/utils/robinhood_executor.py",
+        "tests/deployment/robinhood_execution_support.py",
     }
 )
 SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS = frozenset(
@@ -1360,6 +1372,28 @@ def _reward_launch_cadence_records(
     ]
 
 
+def _transaction_executor_cadence_records(
+    data: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if str(record.get("path", ""))
+        in TRANSACTION_EXECUTOR_CADENCE_PATHS
+    ]
+
+
+def _is_exact_transaction_executor_cadence_batch(
+    data: Mapping[str, Any],
+) -> bool:
+    records = _transaction_executor_cadence_records(data)
+    return (
+        len(records) == TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT
+        and _records_fingerprint(records)
+        == TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256
+    )
+
+
 def _is_exact_reward_launch_batch(data: Mapping[str, Any]) -> bool:
     records = _reward_launch_cadence_records(data)
     return (
@@ -2065,6 +2099,14 @@ def _s5_legacy_inventory_fingerprint(
         if _is_exact_reward_launch_batch(data)
         else frozenset()
     )
+    exact_transaction_executor_records = (
+        frozenset(
+            _record_fingerprint(record)
+            for record in _transaction_executor_cadence_records(data)
+        )
+        if _is_exact_transaction_executor_cadence_batch(data)
+        else frozenset()
+    )
     legacy = copy.deepcopy(dict(data))
     if exact_pr61_reconciliation:
         _restore_pr61_legacy_inventory(legacy)
@@ -2097,6 +2139,8 @@ def _s5_legacy_inventory_fingerprint(
         )
         and _record_fingerprint(record) not in exact_source_cadence
         and _record_fingerprint(record) not in exact_reward_launch_records
+        and _record_fingerprint(record)
+        not in exact_transaction_executor_records
     ]
     legacy["secondsUnitCandidates"] = [
         record
@@ -2762,6 +2806,12 @@ def _validate_schema(
     exact_source_authority_batch = _is_exact_source_authority_batch(data)
     reward_cadence = _reward_launch_cadence_records(data)
     exact_reward_launch_batch = _is_exact_reward_launch_batch(data)
+    transaction_executor_cadence = (
+        _transaction_executor_cadence_records(data)
+    )
+    exact_transaction_executor_cadence_batch = (
+        _is_exact_transaction_executor_cadence_batch(data)
+    )
     exact_reviewer_remediation_registry = (
         _is_exact_reviewer_remediation_cadence_registry(data)
     )
@@ -2815,6 +2865,25 @@ def _validate_schema(
                 ),
                 remediation=(
                     "restore the exact signed reward-launch cadence projection"
+                ),
+            )
+        )
+    if not exact_transaction_executor_cadence_batch:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-TRANSACTION-EXECUTOR-CADENCE-BATCH",
+                domain="cadence",
+                expected=(
+                    f"cadence={TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT}/"
+                    f"{TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256}"
+                ),
+                actual=(
+                    f"cadence={len(transaction_executor_cadence)}/"
+                    f"{_records_fingerprint(transaction_executor_cadence)}"
+                ),
+                remediation=(
+                    "restore the exact approved transaction-executor cadence "
+                    "batch; no adjacent record or path inherits this authority"
                 ),
             )
         )
@@ -3183,6 +3252,11 @@ def _validate_schema(
         elif exact_source_authority_batch and (
             record_path in SOURCE_AUTHORITY_CADENCE_PATHS
             or record_key in SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS
+        ):
+            expected_commit = SOURCE_AUTHORITY_REVIEW_COMMIT
+        elif (
+            exact_transaction_executor_cadence_batch
+            and record_path in TRANSACTION_EXECUTOR_CADENCE_PATHS
         ):
             expected_commit = SOURCE_AUTHORITY_REVIEW_COMMIT
         elif (

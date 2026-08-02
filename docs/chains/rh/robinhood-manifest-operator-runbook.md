@@ -13,6 +13,18 @@
 > [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md) and use
 > this runbook only at the operator-binding phase.
 
+> **1 August 2026 transaction-executor overlay:** The unstaged executor
+> candidate on parent `25c0d58e1243449276e4ac4cae8d7abb8272f376`, tree
+> `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`, extends manifest-v2 execution
+> evidence with typed action outputs, per-contract temporary-governance
+> relinquishment receipts, and exact retained-governance sets. The generated
+> candidate schema is 34,204 bytes with SHA-256
+> `5579f3a505844ba0b83ccf9023e485b3c6f8524b2789ea2d32a0f8d227ed3483`.
+> This extension is awaiting independent review and integration. The historical
+> qualification hash block below is intentionally unchanged and therefore
+> fails closed against these candidate bytes; do not operate the candidate
+> until a new frozen commit/tree and reviewed H-06 byte binding replace it.
+
 ## Purpose and authority
 
 This runbook qualifies and operates the H-06 manifest-v2 filesystem protocol
@@ -448,6 +460,33 @@ may be promoted only when:
 
 Never treat current-index promotion as immutable publication, transaction
 finality, migration success, deployment authority, or release authority.
+
+### Execution failure records and bound resume
+
+Executor action evidence records the accepted typed inputs and exact typed
+outputs. Final `0900` handoff evidence additionally records, in canonical
+contract order, each temporary-governance relinquishment transaction and the
+exact contracts that still retain temporary governance.
+
+If execution stops before the final handoff is complete:
+
+1. publish only the validated failure attempt; never promote
+   `current-manifest.json`;
+2. preserve all earlier immutable successful-action records and every
+   successful per-contract relinquishment receipt;
+3. report the retained set exactly, including a valid empty set when failure
+   occurs after the eleventh relinquishment but before terminal completion;
+4. keep release, handoff, and authority removal incomplete; and
+5. resume only with the identical profile, plan hash, source commit/tree,
+   execution envelope, deployment sender, and history root.
+
+On a bound resume, the executor restores outputs and completed relinquishments
+from immutable evidence, reattaches deployed contracts by their recorded
+addresses, and performs only remaining setup or relinquishment work. Any
+missing, extra, conflicting, or untyped output/receipt is a stop. Never infer a
+temporary-governance value or completed relinquishment from an owner, guardian,
+Safe, signer, final-governance role, transaction position, or observed zero
+alone.
 
 ## Durable, failed, and ambiguous outcomes
 

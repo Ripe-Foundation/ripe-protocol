@@ -73,10 +73,13 @@ _PROFILE_CHAINS = {
 _ACTION_KINDS = (
     "deployment",
     "configuration",
+    "registration",
     "assertion",
     "omission",
     "blocked",
     "deferred",
+    "recovery",
+    "handoff",
     "rejected",
     "tooling-only",
 )
@@ -96,6 +99,7 @@ _NON_EXECUTABLE_KINDS = {
     "deferred",
     "rejected",
     "tooling-only",
+    "recovery",
 }
 _VALUE_TYPES = (
     "boolean",
@@ -191,6 +195,7 @@ class HistoryReadResult:
     head: Mapping[str, Any] | None = None
     current_index: Mapping[str, Any] | None = None
     action_ids: tuple[str, ...] = ()
+    attempts: tuple[Mapping[str, Any], ...] = ()
 
 
 class WriteState(str, Enum):
@@ -584,28 +589,142 @@ def build_manifest_schema() -> dict[str, Any]:
             "reconciliation": {"$ref": "#/$defs/reconciliation"},
         }
     )
-    action = _closed(
+    execution_input = _closed(
         {
-            "action_id": _string(pattern=_ACTION_ID),
-            "ordinal": _integer(),
-            "semantic_action_id": _string(pattern=_SLUG),
-            "kind": _string(enum=_ACTION_KINDS),
-            "required": {"type": "boolean"},
-            "status": _string(enum=_ACTION_STATUSES),
-            "expected_postconditions": _array(
-                {"$ref": "#/$defs/expectedPostcondition"}
+            "reference": _string(
+                pattern=r"^[a-z][a-z-]*:[A-Za-z0-9_][A-Za-z0-9._:/-]*$"
             ),
-            "observed_postconditions": _array(
-                {"$ref": "#/$defs/observedPostcondition"}
+            "provenance": _string(
+                enum=(
+                    "blueprint-authority",
+                    "defaults-authority",
+                    "derived-validation",
+                    "accepted-envelope",
+                    "validated-action-result",
+                    "same-execution-deployment",
+                )
             ),
-            "transaction": {"$ref": "#/$defs/transaction"},
-            "events": _array({"$ref": "#/$defs/event"}),
-            "supersedes": _array({"$ref": "#/$defs/supersedes"}),
-            "disposition": _nullable(
-                {"$ref": "#/$defs/disposition"}
-            ),
-            "error": _nullable({"$ref": "#/$defs/error"}),
+            "canonical_value": _string(),
+            "value_sha256": _string(pattern=_HEX64),
         }
+    )
+    execution_output = _closed(
+        {
+            "reference": _string(
+                pattern=r"^address:[A-Z][A-Z0-9_]*$"
+            ),
+            "type": _string(const="address"),
+            "value": _string(pattern=_PUBLIC_ADDRESS),
+            "value_sha256": _string(pattern=_HEX64),
+        }
+    )
+    execution_assertion = _closed(
+        {
+            "assertion_id": _string(pattern=_SLUG),
+            "matched": {"type": "boolean"},
+            "evidence_sha256": _string(pattern=_HEX64),
+        }
+    )
+    execution_artifact = _closed(
+        {
+            "source_path": _string(min_length=1),
+            "source_sha256": _string(pattern=_HEX64),
+            "runtime_sha256": _nullable(_string(pattern=_HEX64)),
+        }
+    )
+    authority_relinquishment = _closed(
+        {
+            "contract_reference": _string(
+                pattern=r"^address:[A-Z][A-Z0-9_]*$"
+            ),
+            "contract_address": _string(pattern=_PUBLIC_ADDRESS),
+            "sequence": _integer(minimum=0),
+            "status": _string(enum=("complete", "failed")),
+            "transaction_identity": _nullable(
+                _string(pattern=_PUBLIC_BYTES32)
+            ),
+            "temporary_governance_before": _string(
+                pattern=_PUBLIC_ADDRESS
+            ),
+            "local_governance_after": _string(pattern=_PUBLIC_ADDRESS),
+            "ripe_hq_governance_after": _string(
+                pattern=_PUBLIC_ADDRESS
+            ),
+            "temporary_can_govern_after": {"type": "boolean"},
+            "final_can_govern_after": {"type": "boolean"},
+            "failure_classification": _nullable(
+                _string(pattern=_SLUG)
+            ),
+        }
+    )
+    execution_evidence = _closed(
+        {
+            "h05_plan_sha256": _string(pattern=_HEX64),
+            "h06_plan_sha256": _string(pattern=_HEX64),
+            "stage_id": _string(pattern=_MIGRATION_ID),
+            "operation": _string(pattern=_SLUG),
+            "inputs": _array({"$ref": "#/$defs/executionInput"}),
+            "outputs": _array(
+                {"$ref": "#/$defs/executionOutput"}, unique=True
+            ),
+            "dependency_action_ids": _array(
+                _string(pattern=_ACTION_ID), unique=True
+            ),
+            "execution_identity": _nullable(
+                _string(pattern=_PUBLIC_BYTES32)
+            ),
+            "deployed_address": _nullable(
+                _string(pattern=_PUBLIC_ADDRESS)
+            ),
+            "artifact": _nullable(
+                {"$ref": "#/$defs/executionArtifact"}
+            ),
+            "registry_id": _nullable(_integer()),
+            "assertions": _array(
+                {"$ref": "#/$defs/executionAssertion"}
+            ),
+            "failure_classification": _nullable(
+                _string(pattern=_SLUG)
+            ),
+            "previous_record_sha256": _nullable(
+                _string(pattern=_HEX64)
+            ),
+            "authority_relinquishments": _array(
+                {"$ref": "#/$defs/authorityRelinquishment"}
+            ),
+            "retained_temporary_governance": _array(
+                _string(pattern=r"^address:[A-Z][A-Z0-9_]*$"),
+                unique=True,
+            ),
+        }
+    )
+    action_properties = {
+        "action_id": _string(pattern=_ACTION_ID),
+        "ordinal": _integer(),
+        "semantic_action_id": _string(pattern=_SLUG),
+        "kind": _string(enum=_ACTION_KINDS),
+        "required": {"type": "boolean"},
+        "status": _string(enum=_ACTION_STATUSES),
+        "expected_postconditions": _array(
+            {"$ref": "#/$defs/expectedPostcondition"}
+        ),
+        "observed_postconditions": _array(
+            {"$ref": "#/$defs/observedPostcondition"}
+        ),
+        "transaction": {"$ref": "#/$defs/transaction"},
+        "events": _array({"$ref": "#/$defs/event"}),
+        "supersedes": _array({"$ref": "#/$defs/supersedes"}),
+        "disposition": _nullable(
+            {"$ref": "#/$defs/disposition"}
+        ),
+        "error": _nullable({"$ref": "#/$defs/error"}),
+        "execution_evidence": {"$ref": "#/$defs/executionEvidence"},
+    }
+    action = _closed(
+        action_properties,
+        required=tuple(
+            key for key in action_properties if key != "execution_evidence"
+        ),
     )
     error = _closed(
         {
@@ -797,6 +916,12 @@ def build_manifest_schema() -> dict[str, Any]:
             "event": event,
             "eventEvidenceProjection": event_projection,
             "eventField": event_field,
+            "executionArtifact": execution_artifact,
+            "authorityRelinquishment": authority_relinquishment,
+            "executionAssertion": execution_assertion,
+            "executionEvidence": execution_evidence,
+            "executionInput": execution_input,
+            "executionOutput": execution_output,
             "expectedPostcondition": expected_postcondition,
             "finality": _finality_schema(),
             "immutableStepRecord": immutable,
@@ -1517,7 +1642,11 @@ def validate_semantic_plan(value: Any) -> Mapping[str, Any]:
                 raise ManifestError("H06_SUPERSEDES_ORDER")
             non_executable = action["kind"] in _NON_EXECUTABLE_KINDS
             if non_executable != (not action["transaction_required"]):
-                if action["kind"] != "assertion":
+                if action["kind"] not in {
+                    "assertion",
+                    "configuration",
+                    "registration",
+                }:
                     raise ManifestError("H06_PLAN_TRANSACTION_POLICY")
             if non_executable and action["disposition"] is None:
                 raise ManifestError("H06_DISPOSITION_REQUIRED")
@@ -2410,8 +2539,11 @@ def _scan_history(
         os.close(directory_fd)
 
 
-def _attempt_is_unresolved(attempt: Mapping[str, Any]) -> bool:
-    return (
+def _attempt_is_unresolved(
+    attempt: Mapping[str, Any],
+    chain: Sequence[Mapping[str, Any]] = (),
+) -> bool:
+    failed_or_partial = (
         attempt["step"]["status"] != "complete"
         or attempt["plan_state"]["status"] != "complete"
         or any(
@@ -2419,6 +2551,17 @@ def _attempt_is_unresolved(attempt: Mapping[str, Any]) -> bool:
             and action["status"] not in ("reconciled", "complete")
             for action in attempt["step"]["actions"]
         )
+    )
+    if not failed_or_partial:
+        return False
+    return not any(
+        record["step"]["migration_id"]
+        == attempt["step"]["migration_id"]
+        and record["step"]["semantic_step_id"]
+        == attempt["step"]["semantic_step_id"]
+        and record["step"]["previous_record_sha256"]
+        == attempt["base_record_sha256"]
+        for record in chain
     )
 
 
@@ -2571,7 +2714,7 @@ def read_history(
             )
         if (
             head["plan_state"]["status"] == "complete"
-            and not any(_attempt_is_unresolved(item) for item in attempts)
+            and not any(_attempt_is_unresolved(item, chain) for item in attempts)
             and not operational
         ):
             state = HistoryState.VALID
@@ -2591,6 +2734,7 @@ def read_history(
         head=head,
         current_index=current,
         action_ids=action_ids,
+        attempts=attempts,
     )
 
 
@@ -3017,7 +3161,10 @@ def publish_immutable(
                     basename,
                     digest,
                 )
-            if any(_attempt_is_unresolved(item) for item in attempts):
+            if any(
+                _attempt_is_unresolved(item, (*chain, artifact))
+                for item in attempts
+            ):
                 raise ManifestError("H06_ATTEMPT_UNRESOLVED")
             if not idempotent_head:
                 _validate_chain_plan_binding((*chain, artifact), plans)
@@ -3334,7 +3481,7 @@ def promote_current_index(
         if scanned_current != current:
             raise ManifestError("H06_CURRENT_CHANGED_UNDER_LOCK")
         if (
-            any(_attempt_is_unresolved(item) for item in attempts)
+            any(_attempt_is_unresolved(item, chain) for item in attempts)
             or operational
         ):
             raise ManifestError("H06_PROMOTION_INCOMPLETE_HISTORY")
@@ -3508,4 +3655,11 @@ def validate_execution_handoff(
             raise ManifestError("H06_HANDOFF_PLAN_MISMATCH")
     if action_result["status"] not in ("reconciled", "complete"):
         raise ManifestError("H06_HANDOFF_RESULT_INCOMPLETE")
+    evidence = action_result.get("execution_evidence")
+    if evidence is not None and (
+        evidence["h06_plan_sha256"] != digest
+        or evidence["stage_id"] != migration_id
+        or evidence["failure_classification"] is not None
+    ):
+        raise ManifestError("H06_HANDOFF_EXECUTION_EVIDENCE")
     return copy.deepcopy(action_result)

@@ -2,15 +2,15 @@
 
 > **1 August 2026 currentness overlay:** Ready to continue bounded launch
 > preparation. The shared-migration final-review candidate is bound to exact
-> launch-authority parent `20945001ab1321d73399bcf37b1fa99534c98e8f`, tree
-> `337f863cf318bc499d5500d6eaafde8842975abb`. PR #61, Morpho V2 and
+> transaction-executor parent `25c0d58e1243449276e4ac4cae8d7abb8272f376`, tree
+> `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
 > planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
 > the derived ledger. Source/configuration readiness reports exactly 80
 > blockers with `configuration_consistent=true` and
 > `deployment_ready=false`. The executable migration plan separately reports
-> 99 blockers: 37 binding, 23 Curve, 5 external-address, 18 deployment-input,
-> 4 reservation, and 12 Stock keys. The 99-key plan adds migration-specific
+> 100 blockers: 38 binding, 23 Curve, 5 external-address, 18 deployment-input,
+> 4 reservation, and 12 Stock keys. The 100-key plan adds migration-specific
 > bindings, reservations, and Stock inputs on top of source/configuration
 > readiness; neither count replaces the other. H-06 is a
 > class qualification only. Repository configuration is prepared and
@@ -88,6 +88,8 @@ gate. A listed test is not evidence that the test exists or passed.
 11. Preserve Base behavior through explicit regression tests without preserving
     unsafe fallbacks.
 12. Stop at every owner, security, external-action and production-value gate.
+13. Bind temporary local governance explicitly to the nonzero deployment
+    sender; reject final RipeHq governance, zero, and inferred role identities.
 
 ## 3. Prerequisite gate matrix
 
@@ -229,6 +231,25 @@ until shared-state isolation is proven.
   route, approval or enabled flag;
 - inject partial failures at every semantic action boundary;
 - resume only under an identical plan/source/profile/prior-state hash;
+- mechanically prove that only Switchboard, SwitchboardAlpha, SwitchboardBravo,
+  SwitchboardCharlie, SwitchboardDelta, SwitchboardEcho, PriceDesk,
+  ChainlinkPrices, CurvePrices, BlueChipYieldPrices, and VaultBook receive
+  `binding:temporary-local-governance` in their production constructors;
+- reject zero temporary governance, final RipeHq governance used as temporary
+  governance, and a temporary binding different from the executor sender before
+  any transaction;
+- prove the deployment sender completes all required setup while RipeHq final
+  governance remains unchanged and distinct;
+- prove PriceDesk is registered at RipeHq ID 7 before the GREEN Curve feed is
+  added, because production CurvePrices resolves PriceDesk through RipeHq;
+- keep final `0900` relinquishment after every setup/assertion action, finalize
+  all required action and registry timelocks, and reject any pending action;
+- record and verify all 11 per-contract relinquishment receipts, zero local
+  governance, removal of temporary power, and sole effective final RipeHq
+  governance;
+- fault before, during, and after the relinquishment loop; record the exact
+  retained set, prohibit current promotion, and restore a fresh backend from
+  immutable receipts so resume executes only remaining relinquishments;
 - regenerate the current index and compare immutable inputs;
 - reject dirty source, stale compiler output and mismatched chain identity; and
 - rebuild twice and compare all declared artifact hashes.
@@ -412,6 +433,10 @@ Every row is a future named test. `Fast` uses mocks/local unit state,
 | NEG-035 bond/reward path premature | `tests/deployment/test_robinhood_omissions.py::test_bond_and_reward_paths_stay_disabled` | CM-028/029/033/038, terms/tokenomics open | No Boardroom/bond/Lootbox reward enablement or RIPE mint capability | Integration / tokenomics-risk |
 | NEG-036 disabled registry scaffold gains authority | `tests/deployment/test_robinhood_omissions.py::test_slot_scaffolds_have_exact_disabled_capabilities` | CM-003/029/032/033/043/046/048 | Exact registry IDs preserved while all unapproved flags/capabilities/routes remain absent | Integration / security |
 | NEG-037 PriceDesk semantic slot reuse | `tests/deployment/test_registry_topology.py::test_pricedesk_reserved_ids_cannot_be_repurposed` | Chainlink at ID 1; attempt to add a non-Curve source next or to add Pyth/Stork without preserving earlier slots | Plan/registration rejected before submission; IDs 2–5 remain empty or contain only their canonical source identities | Fast + Integration / protocol-oracle owners |
+| NEG-038 invalid temporary local governance | `tests/deployment/test_resume_reconciliation.py::test_zero_temporary_governance_is_rejected_before_execution` and `::test_final_governance_cannot_be_used_as_temporary_governance` | Zero or final DP-18 governance bound as temporary governance | Plan rejected before execution; no transaction receipt | Fast / deployment-security owners |
+| NEG-039 deployment-sender mismatch | `tests/deployment/test_resume_reconciliation.py::test_temporary_governance_must_equal_executor_sender` | Distinct temporary binding does not equal backend deployment sender | Executor preflight rejection with empty backend sequence | Fast / deployment-security owners |
+| NEG-040 partial authority relinquishment | `tests/deployment/test_resume_reconciliation.py::test_partial_relinquishment_history_resumes_only_remaining_contracts` | Failure before first, after an interior, or after final relinquishment | Exact per-contract receipts and retained set; no current promotion; fresh bound resume mutates only remaining contracts | Integration / evidence-security owners |
+| NEG-041 premature final handoff | `tests/deployment/test_resume_reconciliation.py::test_final_handoff_refuses_incomplete_required_assertion` | Required setup/assertion action incomplete | Final handoff absent from backend sequence; no relinquishment or promotion | Integration / deployment-security owners |
 
 ## 11. Approved-path lifecycle matrices
 

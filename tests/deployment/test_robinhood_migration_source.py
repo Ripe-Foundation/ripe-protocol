@@ -87,7 +87,7 @@ def test_fully_bound_synthetic_plan_is_complete_and_deterministic():
     second = _synthetic()
     assert first == second
     assert first["status"] == "proof-complete"
-    assert len(first["blockers"]) == 99
+    assert len(first["blockers"]) == 100
     assert first["plan_hash"] is None
     assert len(first["proof_hash"]) == 64
     assert first["artifact"] == {
@@ -227,7 +227,8 @@ def test_price_registry_order_priority_and_pre_registration_validation_are_exact
     action_ids = [action["semantic_action_id"] for action in _actions(plan)]
     assert action_ids.index("register-chainlink-prices") < action_ids.index("validate-direct-green-pricing")
     assert action_ids.index("validate-direct-green-pricing") < action_ids.index("register-curve-prices")
-    assert action_ids.index("register-curve-prices") < action_ids.index("configure-curve-green-feed-at-id-two")
+    assert action_ids.index("register-curve-prices") < action_ids.index("register-price-desk-in-ripe-hq")
+    assert action_ids.index("register-price-desk-in-ripe-hq") < action_ids.index("configure-curve-green-feed-at-id-two")
     assert action_ids.index("register-curve-prices") < action_ids.index("register-blue-chip-yield-prices")
     assert _action(plan, "apply-price-desk-priority")["postconditions"] == [
         "price-priority-is-one-three"
@@ -239,7 +240,7 @@ def test_curve_feed_is_green_only_and_pricing_graph_is_nonrecursive():
     assert configure["requires"] == [
         "address:GREEN_TOKEN",
         "address:GREEN_USDG_CURVE_POOL",
-        "action:register-curve-prices",
+        "action:register-price-desk-in-ripe-hq",
     ]
     assert "no-curve-usdg-feed" in configure["postconditions"]
     assert "green-resolves-through-curve-after-priority-miss" in configure["postconditions"]
@@ -254,7 +255,7 @@ def test_curve_constructor_uses_exact_integrated_binding_authority():
     )["constructor"]
     assert constructor == [
         "address:RIPE_HQ",
-        "input:Deployment.DP-18.roles.governance",
+        "binding:temporary-local-governance",
         "curve:curve.address_provider",
         "address:GREEN_TOKEN",
         "address:SGREEN_TOKEN",
@@ -439,6 +440,7 @@ def test_final_handoff_is_last_and_requires_all_postconditions():
     final = final_stage["actions"][-1]
     assert final["semantic_action_id"] == "handoff-governance-and-relinquish-deployer"
     assert final["operation"] == "irreversible-final-authority-handoff"
+    assert "binding:temporary-local-governance" in final["requires"]
     assert "handoff-is-final-action" in final["postconditions"]
 
 
@@ -754,6 +756,8 @@ def _clean_committed_fixture(tmp_path: Path) -> Path:
         [
             "/usr/bin/git",
             "-c",
+            "commit.gpgsign=false",
+            "-c",
             "user.name=Robinhood Fixture",
             "-c",
             "user.email=fixture@example.invalid",
@@ -962,7 +966,7 @@ def test_assertion_derivation_rejects_blocked_disposition_suppression():
         expectations_from_plan(proof)
 
 
-def test_80_source_readiness_and_99_plan_blockers_cannot_drift():
+def test_80_source_readiness_and_100_plan_blockers_cannot_drift():
     plan = build_robinhood_plan(
         "robinhood-mainnet", repository_root=ROOT, preview=True
     )
@@ -974,9 +978,9 @@ def test_80_source_readiness_and_99_plan_blockers_cannot_drift():
         "reservation": sum(key.startswith("B-") for key in plan["blockers"]),
         "stock": sum(key.startswith("H05_STOCK_") for key in plan["blockers"]),
     }
-    assert len(plan["blockers"]) == 99
+    assert len(plan["blockers"]) == 100
     assert census == {
-        "binding": 37,
+        "binding": 38,
         "curve": 23,
         "external_address": 5,
         "deployment_input": 18,
@@ -992,7 +996,7 @@ def test_80_source_readiness_and_99_plan_blockers_cannot_drift():
         "deployment_ready": False,
     }
     assert readiness["executable_plan"] == {
-        "blockers": 99,
+        "blockers": 100,
         "categories": census,
     }
     assert "Neither count replaces the other" in readiness["relationship"]
@@ -1004,8 +1008,8 @@ def test_80_source_readiness_and_99_plan_blockers_cannot_drift():
         text = (ROOT / relative).read_text()
         for phrase in (
             "80",
-            "99",
-            "37",
+            "100",
+            "38",
             "23",
             "5 external",
             "18 deployment",

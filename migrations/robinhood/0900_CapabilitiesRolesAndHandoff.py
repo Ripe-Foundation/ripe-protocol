@@ -50,7 +50,11 @@ MIGRATION_STAGE = {
             "semantic_action_id": "handoff-governance-and-relinquish-deployer",
             "kind": "handoff",
             "operation": "irreversible-final-authority-handoff",
-            "requires": ("binding:final-handoff-authorization", "action:assert-pre-handoff-postconditions"),
+            "requires": (
+                "binding:final-handoff-authorization",
+                "binding:temporary-local-governance",
+                "action:assert-pre-handoff-postconditions",
+            ),
             "abort_if": ("any-postcondition-failed", "identity-mismatch", "pending-action-exists"),
             "postconditions": ("governance-authority-final", "deployer-authority-zero", "handoff-is-final-action"),
         },

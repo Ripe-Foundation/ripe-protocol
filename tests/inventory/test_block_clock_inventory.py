@@ -160,7 +160,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=18" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=633" in result.output
+    assert "cadence_candidates=640" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=70" in result.output
     assert "mixed_clock_functions=4" in result.output
@@ -178,7 +178,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=173" in result.output
+    assert "test=174" in result.output
 
 
 def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
@@ -381,6 +381,91 @@ def test_source_authority_batch_preserves_historical_fingerprints(
     )
     assert checker._post_s5_production_inventory_fingerprint(inventory) == (
         checker.CURRENT_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_transaction_executor_cadence_batch_is_exact_and_additive(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = checker._transaction_executor_cadence_records(inventory)
+
+    assert checker._is_exact_transaction_executor_cadence_batch(inventory)
+    assert len(records) == checker.TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT == 7
+    assert checker._records_fingerprint(records) == (
+        checker.TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256
+    )
+    assert [record["path"] for record in records] == [
+        "scripts/utils/migration_runner.py",
+        "scripts/utils/robinhood_backends.py",
+        "scripts/utils/robinhood_backends.py",
+        "scripts/utils/robinhood_backends.py",
+        "scripts/utils/robinhood_executor.py",
+        "scripts/utils/robinhood_executor.py",
+        "tests/deployment/robinhood_execution_support.py",
+    ]
+    assert [record["semanticIds"] for record in records] == [
+        ["BN-027", "BN-028"],
+        ["BN-024"],
+        ["BN-024"],
+        ["BN-024"],
+        [],
+        [],
+        ["BN-027", "BN-028"],
+    ]
+    assert all(
+        record["semanticReview"]
+        == {
+            "owner": "protocol/security",
+            "status": "reviewed",
+            "commit": checker.SOURCE_AUTHORITY_REVIEW_COMMIT,
+        }
+        for record in records
+    )
+    assert checker._s5_legacy_inventory_fingerprint(inventory) == (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert checker._post_s5_production_inventory_fingerprint(inventory) == (
+        checker.CURRENT_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_transaction_executor_cadence_batch_removal_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    removed = checker._transaction_executor_cadence_records(inventory)[0]
+    inventory["cadenceCandidates"].remove(removed)
+
+    assert not checker._is_exact_transaction_executor_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-TRANSACTION-EXECUTOR-CADENCE-BATCH",
+    )
+
+
+def test_transaction_executor_cadence_batch_cannot_widen_by_path(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    extra = copy.deepcopy(
+        checker._transaction_executor_cadence_records(inventory)[0]
+    )
+    extra["function"] = "future_executor_branch"
+    inventory["cadenceCandidates"].append(extra)
+
+    assert not checker._is_exact_transaction_executor_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-TRANSACTION-EXECUTOR-CADENCE-BATCH",
     )
 
 

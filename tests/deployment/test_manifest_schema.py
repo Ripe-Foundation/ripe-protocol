@@ -611,22 +611,26 @@ def test_schema_file_is_exact_authoritative_builder_output():
     ] is False
 
 
-def test_every_schema_object_branch_is_closed_and_declares_required_keys():
+def test_every_schema_object_branch_is_closed_and_declares_exact_required_keys():
     schema = build_manifest_schema()
     visited = 0
 
-    def walk(node):
+    def walk(node, path=()):
         nonlocal visited
         if isinstance(node, dict):
             if node.get("type") == "object":
                 visited += 1
                 assert node["additionalProperties"] is False
-                assert set(node["required"]) == set(node["properties"])
-            for child in node.values():
-                walk(child)
+                optional = set(node["properties"]) - set(node["required"])
+                if path == ("$defs", "action"):
+                    assert optional == {"execution_evidence"}
+                else:
+                    assert optional == set()
+            for key, child in node.items():
+                walk(child, path + (key,))
         elif isinstance(node, list):
-            for child in node:
-                walk(child)
+            for index, child in enumerate(node):
+                walk(child, path + (index,))
 
     walk(schema)
     assert visited >= 50
