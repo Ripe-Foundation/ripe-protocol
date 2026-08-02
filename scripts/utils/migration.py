@@ -14,6 +14,10 @@ from scripts.utils.manifest_schema import (
     ManifestError,
     validate_execution_handoff,
 )
+from scripts.utils.migration_runner import (
+    MigrationPlanError,
+    validate_execution_plan_artifact,
+)
 
 
 _ROBINHOOD_HISTORY_SUFFIXES = (
@@ -95,6 +99,35 @@ class Migration:
             self._manifest_v2_results[action_id]
             for action_id in sorted(self._manifest_v2_results)
         )
+
+    def apply_robinhood_stage(self, stage):
+        """Hand one shared literal stage to a separately authorized executor.
+
+        Static planning reads the exact same ``MIGRATION_STAGE`` literal.  The
+        live/fork profiles remain unsupported, and no executor is installed by
+        this package, so merely importing or invoking a Robinhood migration can
+        never fall through to legacy transactions or history writes.
+        """
+        if not self._manifest_v2:
+            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
+        execution_plan = getattr(
+            self._deploy_args, "robinhood_execution_plan", None
+        )
+        repository_root = getattr(
+            self._deploy_args, "robinhood_repository_root", None
+        )
+        if execution_plan is None or repository_root is None:
+            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED")
+        try:
+            validate_execution_plan_artifact(
+                execution_plan, repository_root=repository_root
+            )
+        except MigrationPlanError:
+            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED") from None
+        executor = getattr(self._deploy_args, "robinhood_stage_executor", None)
+        if executor is None:
+            raise ManifestError("H06_EXECUTION_HANDOFF_REQUIRED")
+        return executor(self, stage)
 
     def execute(self, transaction, *args, **kwargs):
         """

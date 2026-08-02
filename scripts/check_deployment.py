@@ -17,9 +17,11 @@ from scripts.utils.deployment_assertions import (
     DeploymentAssertionInputError,
     ObservationMode,
     assert_deployment,
+    expectations_from_plan,
     expectations_template,
     observations_template,
 )
+from scripts.utils.migration_runner import build_robinhood_plan
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -40,12 +42,45 @@ def _parser() -> argparse.ArgumentParser:
         choices=("expectations", *(mode.value for mode in ObservationMode)),
         help="print a versioned envelope template and exit",
     )
+    parser.add_argument(
+        "--print-plan-expectations",
+        choices=("robinhood-mainnet", "robinhood-testnet"),
+        help=(
+            "derive the pre-collected observation expectation envelope from "
+            "the current offline migration plan and exit"
+        ),
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help=(
+            "with --print-plan-expectations, bind the non-production "
+            "expectations to the prospective working tree"
+        ),
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
+    if args.preview and not args.print_plan_expectations:
+        parser.error("--preview requires --print-plan-expectations")
+    if args.print_plan_expectations:
+        plan = build_robinhood_plan(
+            args.print_plan_expectations,
+            repository_root=ROOT,
+            preview=args.preview,
+        )
+        print(
+            json.dumps(
+                expectations_from_plan(plan),
+                ensure_ascii=True,
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
     if args.print_template:
         template = (
             expectations_template()

@@ -275,6 +275,15 @@ def _require_plan_flags(
     ),
 )
 @click.option(
+    "--preview",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bind --plan to the complete prospective working tree and mark the "
+        "artifact non-production and non-executable."
+    ),
+)
+@click.option(
     "--rpc",
     default=None,
     help=(
@@ -368,10 +377,13 @@ def cli(
     account,
     ledger,
     plan=False,
+    preview=False,
 ):
     """Run migrations through a validated, explicit network profile."""
     try:
         profile = get_profile(profile_id)
+        if preview and not plan:
+            raise MigrationPlanError("H05_PREVIEW_REQUIRES_PLAN")
         if plan:
             require_operation(profile, Operation.MIGRATION_PLAN)
             _require_plan_flags(
@@ -392,6 +404,7 @@ def cli(
             report = build_blocked_migration_report(
                 profile.identity.profile_id,
                 repository_root=ROOT,
+                preview=preview,
             )
             click.echo(report_bytes(report).decode("utf-8"), nl=False)
             return

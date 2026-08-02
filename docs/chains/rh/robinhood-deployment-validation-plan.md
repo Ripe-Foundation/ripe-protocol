@@ -1,17 +1,24 @@
 # Robinhood deployment validation plan
 
 > **1 August 2026 currentness overlay:** Ready to continue bounded launch
-> preparation. Validation must bind to exact baseline
-> `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-> `7454b5456ebb6cd02d716a64b408629ab501629e`. PR #61, Morpho V2 and
+> preparation. The shared-migration final-review candidate is bound to exact
+> launch-authority parent `20945001ab1321d73399bcf37b1fa99534c98e8f`, tree
+> `337f863cf318bc499d5500d6eaafde8842975abb`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
 > planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
-> the derived ledger. Configuration consistency passes; 80 unresolved or
-> unverified deployment bindings keep deployment readiness false. H-06 is a
+> the derived ledger. Source/configuration readiness reports exactly 80
+> blockers with `configuration_consistent=true` and
+> `deployment_ready=false`. The executable migration plan separately reports
+> 99 blockers: 37 binding, 23 Curve, 5 external-address, 18 deployment-input,
+> 4 reservation, and 12 Stock keys. The 99-key plan adds migration-specific
+> bindings, reservations, and Stock inputs on top of source/configuration
+> readiness; neither count replaces the other. H-06 is a
 > class qualification only. Repository configuration is prepared and
 > consistent; production/onchain configuration has not occurred. No Robinhood
 > migration, live execution, deployment, activation, RPC, account, key,
-> signer, or release action has occurred. The current PriceDesk topology is
+> signer, or release action has occurred. The candidate implements 17 shared
+> stages through `0900`, 117 actions, and 33 registrations; `1000` remains
+> deferred without an executable source file. The current PriceDesk topology is
 > ID 1 Chainlink, ID 2 unchanged CurvePrices for GREEN only, ID 3
 > BlueChipYield, IDs 4/5 empty, with priorities `[1,3]`; see
 > [`curve-launch-activation.md`](curve-launch-activation.md). Historical
@@ -21,7 +28,13 @@
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`
 - Completion commit: recorded in the Track 7 handoff after final validation
-- Canonical migration source: proposed `migrations/robinhood/`
+- Canonical migration source: implemented final-review candidate
+  `migrations/robinhood/`; real profiles remain typed blocked with
+  `plan_hash=null` until actual inputs close
+- Candidate identity: uncommitted validation uses explicit preview artifacts
+  bound to the complete prospective tree. Preview and synthetic-proof
+  artifacts are non-production, non-executable, history-ineligible, and
+  domain-separated from clean-HEAD production artifacts.
 - Test history: proposed `migration_history/robinhood-testnet/v1/`
 - Mainnet history: proposed `migration_history/robinhood-mainnet/v1/`
 - Evidence date: 2026-07-23, America/Denver
@@ -194,9 +207,23 @@ until shared-state isolation is proven.
 - reject `DefaultsBase` and `DefaultsLocal` in a Robinhood plan;
 - apply only the approved CM-049 parameter manifest;
 - validate every RipeHq, Switchboard, PriceDesk and VaultBook ID;
-- prove PriceDesk IDs 2–5 remain empty/reserved and reject any sequential
-  registration that would assign a different source to Curve ID 2 or another
-  canonical source ID;
+- prove the exact PriceDesk sequence Chainlink ID 1, Curve ID 2, and
+  BlueChipYield ID 3, followed by priority IDs `[1,3]`;
+- prove priority sources 1 and 3 are checked before GREEN reaches Curve ID 2,
+  GREEN composes through Curve plus Chainlink USDG, USDG has no Curve feed, and
+  zero, stale, invalid, incompatible, reverting, recursive, or unsafe pricing
+  fails closed;
+- prove post-registration Curve pause/ID-2 disable and governed recovery keep
+  BlueChipYield at ID 3 and preserve priority IDs `[1,3]`;
+- prove AAPL remains Guarded-only, auction-only, Stability-excluded,
+  stock-reward-disabled, absent from Defaults, and typed blocked on 12 of its
+  16 canonical inputs;
+- prove approved reward values are consumed while `B-REWARD-PROMOTION` and all
+  checkpoint, identity, monitoring, response, operator, qualification,
+  rehearsal, and release prerequisites remain open;
+- prove pool deployment/funding is distinct from LP asset admission, both LP
+  tokens remain absent, PSM reserves do not fund liquidity, and Uniswap remains
+  PriceDesk-inert;
 - prove optional mint capabilities remain withheld until the owning step;
 - prove every unsupported integration has no address, registration, capability,
   route, approval or enabled flag;
@@ -530,7 +557,7 @@ slice creates the named paths and closes its prerequisite gates.
 | H-02 | `python -m pytest -q tests/deployment/test_network_profiles.py tests/deployment/test_secret_handling.py tests/deployment/test_base_profile_regression.py`; CLI help/import with env absent | Stage 1 subset; full suite |
 | H-03 | `python -m pytest -q tests/deployment/test_robinhood_blueprint.py tests/deployment/test_robinhood_omissions.py`; prove H-03 registry-slot expectations in those owned tests | Base profile regression; full suite. `tests/deployment/test_registry_topology.py` remains H-08-owned and is run only after H-08 creates it |
 | H-04 | `python -m pytest -q tests/config/test_defaults_robinhood.py tests/deployment/test_network_clock_profiles.py`; deterministic generator comparison | Track 6 S1/S2 and Base defaults regression; full suite |
-| H-05 | `python -m pytest -q tests/deployment/test_migration_discovery.py tests/deployment/test_execution_plan.py`; dry plan for both RH profiles | Base runner/history regression; full suite |
+| H-05 | `python -m pytest -q tests/deployment/test_migration_discovery.py tests/deployment/test_execution_plan.py tests/deployment/test_robinhood_migration_source.py`; dry plan for both RH profiles | Base runner/history regression; one complete serial suite on final bytes |
 | H-06 | `python -m pytest -q tests/deployment/test_manifest_schema.py tests/deployment/test_current_manifest_promotion.py`; parse all historical JSON | Base history read compatibility; full suite |
 | H-07 | `python -m pytest -q tests/deployment/test_verifier_adapters.py tests/deployment/test_abi_export.py`; two clean artifact builds | Base verifier/ABI consumer regression; full suite |
 | H-08 | `python -m pytest -q tests/deployment/test_post_deployment_assertions.py tests/deployment/test_registry_topology.py tests/deployment/test_robinhood_omissions.py` | Golden Base/RH checker fixtures; full suite |

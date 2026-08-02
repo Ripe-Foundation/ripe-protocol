@@ -8,6 +8,11 @@ snapshot:
   branch: rh
   program_subject_commit: 5f5d22b7ee78cbb904c4fe3c6e46599c330c4353
   program_subject_tree: 7454b5456ebb6cd02d716a64b408629ab501629e
+  migration_candidate_parent_commit: 20945001ab1321d73399bcf37b1fa99534c98e8f
+  migration_candidate_parent_tree: 337f863cf318bc499d5500d6eaafde8842975abb
+  migration_candidate_branch: codex/rh-shared-migration-source-final-rebind
+  migration_candidate_state: final_review_unstaged_uncommitted
+  migration_candidate_census: { stages: 17, actions: 117, deployments: 37, registrations: 33, deferred_executable_stage_1000: false }
   subject_in_origin_history: build_derived
   origin_commits_after_subject: build_derived
   build_worktree_clean: build_derived
@@ -42,6 +47,25 @@ counts:
   handoff_documents: 15
   parked_lanes: 6
   live_actions: 0
+
+migration_readiness:
+  source_configuration:
+    blockers: 80
+    configuration_consistent: true
+    deployment_ready: false
+  executable_plan:
+    blockers: 99
+    categories:
+      binding: 37
+      curve: 23
+      external_address: 5
+      deployment_input: 18
+      reservation: 4
+      stock: 12
+  relationship: >
+    The 99 executable-plan blockers layer migration-specific bindings,
+    reservations, and Stock inputs on top of the 80 source/configuration
+    readiness blockers. Neither count replaces the other.
 
 post_freeze_reconciliation:
   frozen_protocol_pause_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
@@ -437,7 +461,7 @@ overall:
     activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
   engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, corrected PR #61, Morpho V2 support, and the two-source configuration authority are integrated for their exact scopes."}
-  launch_implementation: { status: partial, note: "The bounded Curve launch candidate is based on 5f5d22b7/tree 7454b545, the two source authorities compile, and the derived ledger remains synchronized. Morpho V2 compatibility is integrated. Five official Curve identities remain unverified; the pool address, six research candidates, ten owner controls, and production observation are typed blockers. Remaining work includes those closures, plan readiness, exact migration rebind, final operator binding, H-07-H-11, M5, SecOps, rehearsal, and release preparation; CreditEngine zero-backing, Deleverage, Uniswap, CCIP, and Sites remain outside this reconciliation."}
+  launch_implementation: { status: partial_final_review_candidate, note: "The shared migration source is rebound to launch-authority parent 20945001/tree 337f863c and implements 17 stages through 0900, 117 actions, and 33 registrations; stage 1000 remains deferred without an executable file. Real testnet/mainnet plans remain typed blocked with null plan hashes while actual Curve, AAPL, external, owner, operator, reward-promotion, and release inputs remain open. The synthetic fully bound plan is implementation proof only. No migration history, execution, deployment, configuration, activation, or release authority exists."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
   production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
 
@@ -458,7 +482,7 @@ authorization_boundaries:
   - Zero-backing settlement and bad-debt policy work is parked and nonblocking for current work; integrated M2/M3 behavior remains unchanged.
   - Stock remains disabled and unreachable.
   - H-04 source authority is present and its derived ledger is synchronized; unverified external facts and unresolved deployment identities independently keep deployment readiness fail-closed.
-  - H-05 deterministic predeployment planning is integrated; migration execution remains unauthorized and no Robinhood migration history exists.
+  - H-05 deterministic predeployment planning is integrated; the shared-source final-review candidate adds the complete 0010-0900 graph without authorizing migration execution or creating Robinhood history.
   - H-06 qualifies a candidate operator/storage class only; final operator, machine, volume, deployment, and release authorization remain open.
   - M4 composed-route evidence is integrated; M5 configuration, freeze, and activation remain outstanding.
   - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation; every Deleverage task is parked and nonblocking.
@@ -534,7 +558,7 @@ h04_decisions:
 h03_blockers:
   - { id: B-S5-LEDGER, state: "open", implementation_predicate: "satisfied", remaining: "Downstream binding, deployment proof, activation, monitoring, and release remain open."}
   - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "The source-authority configuration and derived ledger are consistent; unresolved non-Deleverage identity bindings and deployment readiness remain. Every Deleverage task is parked and nonblocking."}
-  - { id: B-H05-PLAN, state: "open", implementation_predicate: "satisfied", remaining: "Deterministic blocked reports are integrated; unresolved bindings prevent an executable plan, and migration execution remains unauthorized."}
+  - { id: B-H05-PLAN, state: "open", implementation_predicate: "satisfied", remaining: "The complete shared-source candidate produces deterministic blocked reports; independent review/integration and unresolved bindings still prevent an executable plan, and migration execution remains unauthorized."}
   - { id: B-T8-M1, state: "open", implementation_predicate: "satisfied", remaining: "M1 and M4 proof are integrated; deployment binding and activation remain open."}
   - { id: B-T8-M2, state: "open", implementation_predicate: "satisfied", remaining: "M2 and M4 proof are integrated; registry placement, deployment proof, and activation remain open."}
   - { id: B-T8-M3, state: "open", implementation_predicate: "satisfied", remaining: "M3 and M4 proof are integrated; M5 activation and parked policy work remain separate."}
@@ -753,15 +777,15 @@ workstreams:
     group: Deployment execution
     plain_language_scope: Discover immutable history and produce a plan that keeps blocked, omitted, assertion-only, and executable rows distinct.
     why_it_matters: A reservation or symbolic graph row must never become an executable migration by implication.
-    current_phase: deterministic blocked planning integrated; execution unauthorized
-    implementation_state: import-free deterministic report construction integrated
-    integration_state: integrated
-    review_state: reviewed and corrected for dynamic Git identity
+    current_phase: complete shared-source candidate ready for one independent review; execution unauthorized
+    implementation_state: 17-stage shared source through 0900 with 117 actions and 33 registrations; deterministic reports and assertion expectations generated offline
+    integration_state: candidate_not_integrated
+    review_state: final_candidate_awaiting_independent_review
     owner_decision_state: planning implementation approved; migration execution not approved
-    remaining_blockers: [In-scope H-04 bindings, B-H05-PLAN, exact execution authority; four-control representation is parked and nonblocking.]
+    remaining_blockers: [Independent candidate review/integration, typed Curve and AAPL inputs, external and deployment-produced identities, reward operational promotion gates, in-scope H-04 bindings, B-H05-PLAN, exact execution authority; four-control representation is parked and nonblocking.]
     deployment_release_state: no migration history, plan execution, or deployment
-    exact_next_action: Rebuild deterministic reports after bindings; preserve plan_hash null and do not create history or execute migrations.
-    authority: Integrated H-05 evidence, MIGRATION_PLAN operation, runner, and deterministic report tests.
+    exact_next_action: Independently review the complete unstaged candidate; preserve real plan_hash null and do not stage, create history, or execute migrations.
+    authority: Integrated H-05 framework plus the unstaged shared-source final-review candidate on the recorded launch-authority parent.
     docs: [{ label: H-05 evidence, path: docs/chains/rh/evidence/robinhood-migration-phase-a.md }]
   - id: H-06
     name: Immutable manifest and evidence writer

@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,12 +20,14 @@ from config.network_profiles import (
     operation_decision,
 )
 from scripts import migrate
+from scripts.utils.migration import Migration
 import scripts.utils.migration_runner as migration_runner
 from scripts.utils.migration_runner import (
     MigrationPlanError,
     RESERVATION_DIGEST,
     ROBINHOOD_RESERVATIONS,
     build_blocked_migration_report,
+    build_robinhood_plan,
     canonical_jcs_bytes,
     read_bound_h06_history,
     report_bytes,
@@ -32,6 +35,7 @@ from scripts.utils.migration_runner import (
 )
 from scripts.utils.manifest_schema import (
     HistoryState,
+    ManifestError,
     canonical_json_bytes,
     immutable_basename,
     plan_sha256,
@@ -50,20 +54,6 @@ from tests.deployment.test_manifest_schema import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PYTHON = Path(sys.executable)
-CURRENT_GLOBAL_BLOCKERS = [
-    "B-H04-PARAMS",
-    "B-H05-PLAN",
-    "B-H05-SOURCE-ABSENT",
-    "B-H06-HISTORIES-ABSENT",
-    "B-H08-PROOF",
-    "B-H09-RELEASE",
-    "B-LP-ARTIFACTS",
-    "B-ORACLE-FREEZE",
-    "B-S5-LEDGER",
-    "B-SECOPS-HANDOFF",
-]
-
-
 def _current_git_identity() -> tuple[str, str]:
     identities = []
     for revision in ("HEAD^{commit}", "HEAD^{tree}"):
@@ -80,18 +70,28 @@ def _current_git_identity() -> tuple[str, str]:
     return identities[0], identities[1]
 
 
-def _assert_current_report_git_identity(report) -> None:
+def _assert_current_report_preview_identity(report) -> None:
     current_commit, current_tree = _current_git_identity()
-    assert report["source_commit"] == current_commit
-    assert report["source_tree"] == current_tree
-    for identity in (report["source_commit"], report["source_tree"]):
+    expected_tree = build_robinhood_plan(
+        "robinhood-mainnet", repository_root=ROOT, preview=True
+    )["source"]["tree"]
+    assert report["source_commit"] is None
+    assert report["source_base_commit"] == current_commit
+    assert report["source_base_tree"] == current_tree
+    assert report["source_tree"] == expected_tree
+    assert report["source_tree"] != current_tree
+    for identity in (
+        report["source_base_commit"],
+        report["source_base_tree"],
+        report["source_tree"],
+    ):
         assert len(identity) == 40
         assert all(character in "0123456789abcdef" for character in identity)
 
 
 def _report(profile_id="robinhood-mainnet"):
     return build_blocked_migration_report(
-        profile_id, repository_root=ROOT
+        profile_id, repository_root=ROOT, preview=True
     )
 
 
@@ -113,6 +113,7 @@ def _run_plan(profile_id="robinhood-mainnet", *extra):
             "--profile",
             profile_id,
             "--plan",
+            "--preview",
             *extra,
         ],
         cwd=ROOT,
@@ -152,6 +153,27 @@ def test_migration_plan_is_a_ninth_total_operation():
         assert {policy.operation for policy in profile.operations} == set(
             Operation
         )
+
+
+def test_executor_rejects_synthetic_proof_before_calling_executor():
+    proof = build_robinhood_plan(
+        "robinhood-mainnet",
+        repository_root=ROOT,
+        synthetic_bind_all=True,
+    )
+    migration = object.__new__(Migration)
+    migration._manifest_v2 = True
+    migration._deploy_args = SimpleNamespace(
+        robinhood_execution_plan=proof,
+        robinhood_repository_root=ROOT,
+        robinhood_stage_executor=lambda *_args: pytest.fail(
+            "executor must not be called"
+        ),
+    )
+    with pytest.raises(
+        ManifestError, match="H06_PRODUCTION_PLAN_REQUIRED"
+    ):
+        migration.apply_robinhood_stage({"migration_id": "0010"})
 
 
 @pytest.mark.parametrize(
@@ -212,6 +234,7 @@ def test_current_blocked_report_contract(
     assert list(report) == [
         "schema",
         "mode",
+        "artifact",
         "status",
         "profile_id",
         "expected_chain_id",
@@ -220,36 +243,61 @@ def test_current_blocked_report_contract(
         "source_commit",
         "source_tree",
         "source_digest",
+        "source_base_commit",
+        "source_base_tree",
+        "planning_inputs",
         "reservation_digest",
         "prior_history_digest",
+        "source_members",
         "steps",
+        "deferred_steps",
+        "component_coverage",
+        "registry_coverage",
+        "action_census",
+        "blocker_details",
         "blockers",
         "plan_hash",
+        "preview_hash",
+        "proof_hash",
+        "artifact_hash",
+        "expectation_digest",
         "report_sha256",
     ]
-    assert report["schema"] == "ripe.robinhood.migration-dry-plan.v2"
-    assert report["mode"] == "dry-plan"
+    assert report["schema"] == "ripe.robinhood.migration-plan.v3"
+    assert report["mode"] == "preview-plan"
+    assert report["artifact"]["kind"] == "preview-plan"
     assert report["status"] == "blocked"
     assert report["profile_id"] == profile_id
     assert report["expected_chain_id"] == chain_id
     assert report["source_root"] == "migrations/robinhood"
     assert report["history_root"] == history_root
-    _assert_current_report_git_identity(report)
-    assert report["source_digest"] is None
+    _assert_current_report_preview_identity(report)
+    assert len(report["source_digest"]) == 64
     assert report["reservation_digest"] == RESERVATION_DIGEST
     assert report["prior_history_digest"] is None
     assert report["plan_hash"] is None
-    assert report["blockers"] == CURRENT_GLOBAL_BLOCKERS
-    assert len(report["steps"]) == 18
+    assert len(report["preview_hash"]) == 64
+    assert report["proof_hash"] is None
+    assert report["artifact_hash"] == report["preview_hash"]
+    assert "H05_CURVE_LAUNCH_AUTHORITY_PENDING" not in report["blockers"]
+    assert len(report["steps"]) == 17
+    assert len(report["source_members"]) == 17
+    assert report["deferred_steps"] == [
+        {
+            "migration_id": "1000",
+            "semantic_id": "ccip-pools-and-registration",
+            "reason": "ccip-deferred-outside-launch-graph",
+        }
+    ]
     assert report["report_sha256"] == report_sha256(report)
 
 
-@pytest.mark.parametrize("field", ("source_commit", "source_tree"))
-def test_independent_git_identity_rejects_wrong_production_report(field):
+@pytest.mark.parametrize("field", ("source_base_commit", "source_base_tree", "source_tree"))
+def test_independent_git_identity_rejects_wrong_preview_report(field):
     report = _report()
     report[field] = "0" * 40
     with pytest.raises(AssertionError):
-        _assert_current_report_git_identity(report)
+        _assert_current_report_preview_identity(report)
 
 
 def test_profile_differences_are_limited_to_four_fields_and_hash():
@@ -262,23 +310,14 @@ def test_profile_differences_are_limited_to_four_fields_and_hash():
         "profile_id",
         "expected_chain_id",
         "history_root",
+        "preview_hash",
+        "artifact_hash",
         "report_sha256",
     }
 
 
-def test_step_local_blockers_do_not_leak_global():
+def test_step_local_launch_blockers_are_preserved_but_deferred_1000_is_absent():
     report = _report()
-    assert all(
-        blocker not in report["blockers"]
-        for blocker in (
-            "B-T8-M5",
-            "B-T8-FREEZE",
-            "B-PSM-SEQUENCE",
-            "B-REWARD-PROMOTION",
-            "B-T1-CCIP",
-            "B-T1-TOOLCHAIN",
-        )
-    )
     local = {
         step["migration_id"]: step["blockers"]
         for step in report["steps"]
@@ -288,8 +327,10 @@ def test_step_local_blockers_do_not_leak_global():
         "0500": ["B-T8-FREEZE", "B-T8-M5"],
         "0600": ["B-REWARD-PROMOTION"],
         "0800": ["B-PSM-SEQUENCE"],
-        "1000": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
     }
+    assert set().union(*map(set, local.values())) <= set(report["blockers"])
+    assert "B-T1-CCIP" not in report["blockers"]
+    assert "B-T1-TOOLCHAIN" not in report["blockers"]
 
 
 def test_stock_step_binds_the_exact_atomic_launch_input_census():
@@ -416,12 +457,15 @@ def test_jcs_rejects_invalid_surrogates_and_nonstring_keys():
 
 def test_reservation_digest_is_reproducible():
     assert RESERVATION_DIGEST == (
-        "7ad4a3e5556453eb32a1933a4a4d5569"
-        "1cfc767022ff267a2c8b5aadf248d70d"
+        "7ad4a3e5556453eb32a1933a4a4d55691cfc767022ff267a2c8b5aadf248d70d"
     )
-    assert [step["migration_id"] for step in _report()["steps"]] == [
-        item.migration_id for item in ROBINHOOD_RESERVATIONS
+    report = _report()
+    assert [step["migration_id"] for step in report["steps"]] == [
+        item.migration_id
+        for item in ROBINHOOD_RESERVATIONS
+        if item.migration_id != "1000"
     ]
+    assert report["deferred_steps"][0]["migration_id"] == "1000"
 
 
 @pytest.mark.parametrize(
@@ -475,19 +519,20 @@ def test_cli_is_deterministic_across_separate_processes():
     ).hexdigest()
 
 
-def test_real_plan_process_never_imports_boa_blueprint_executor_or_h06():
+def test_real_plan_imports_authority_but_not_boa_executor_or_h06():
     code = (
         "import sys\n"
         "sys.argv = ['scripts.migrate', '--profile', "
-        "'robinhood-mainnet', '--plan']\n"
+        "'robinhood-mainnet', '--plan', '--preview']\n"
         "from scripts import migrate\n"
-        "for forbidden in ('boa', 'config.BluePrint', "
+        "for forbidden in ('boa', "
         "'scripts.utils.migration', 'scripts.utils.manifest_schema'):\n"
         "    assert forbidden not in sys.modules, forbidden\n"
         "migrate.cli.main(standalone_mode=False)\n"
-        "for forbidden in ('boa', 'config.BluePrint', "
+        "for forbidden in ('boa', "
         "'scripts.utils.migration', 'scripts.utils.manifest_schema'):\n"
         "    assert forbidden not in sys.modules, forbidden\n"
+        "assert 'config.BluePrint' not in sys.modules\n"
     )
     result = subprocess.run(
         [str(PYTHON), "-c", code],
@@ -549,6 +594,7 @@ def test_plan_mode_does_not_read_environment_or_reach_legacy_setup(
         account="DEPLOYER",
         ledger=-1,
         plan=True,
+        preview=True,
     )
     assert result is None
     assert capsys.readouterr().out.encode() == report_bytes(_report())
@@ -623,8 +669,6 @@ def test_static_plan_call_graph_has_no_writer_or_execution_primitive():
         "EthereumRPC",
         "boa.",
         "Migration(",
-        "importlib.util",
-        "exec_module",
         "publish_immutable",
         "promote_current_index",
         "os.makedirs",
@@ -643,7 +687,7 @@ def test_static_plan_call_graph_has_no_writer_or_execution_primitive():
     assert ".lstat(" in rendered
 
 
-def test_source_absence_short_circuits_h06_import(monkeypatch):
+def test_source_plan_does_not_import_h06(monkeypatch):
     imported = []
     real_import = __import__
 
@@ -655,7 +699,7 @@ def test_source_absence_short_circuits_h06_import(monkeypatch):
 
     monkeypatch.setattr("builtins.__import__", tracking)
     report = _report()
-    assert report["source_digest"] is None
+    assert len(report["source_digest"]) == 64
     assert "scripts.utils.manifest_schema" not in imported
 
 
@@ -675,7 +719,7 @@ def test_cli_creates_no_repository_state():
     ).stdout
     assert result.returncode == 0
     assert after == before
-    assert not (ROOT / "migrations/robinhood").exists()
+    assert (ROOT / "migrations/robinhood").is_dir()
     assert not (ROOT / "migration_history/robinhood-mainnet").exists()
     assert not (ROOT / "migration_history/robinhood-testnet").exists()
 
@@ -854,4 +898,4 @@ def test_history_state_never_changes_phase_b_plan_hash(tmp_path):
         )
         assert candidate["status"] == "blocked"
         assert candidate["plan_hash"] is None
-        assert candidate["mode"] == "dry-plan"
+        assert candidate["mode"] == "preview-plan"

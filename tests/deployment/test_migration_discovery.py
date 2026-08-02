@@ -15,6 +15,7 @@ from scripts.utils.migration_runner import (
     build_blocked_migration_report,
     canonical_jcs_bytes,
     discover_migration_sources,
+    robinhood_source_expectations,
 )
 
 
@@ -109,12 +110,17 @@ def test_canonical_reservations_are_exact_and_ordered():
     ]
 
 
-def test_reservations_are_typed_data_not_repository_files():
+def test_reservations_bind_exact_source_files_and_keep_1000_deferred():
+    source_names = {
+        expectation.filename for expectation in robinhood_source_expectations()
+    }
+    assert len(source_names) == 17
     for reservation in ROBINHOOD_RESERVATIONS:
-        assert not (
-            ROOT / "migrations/robinhood" / reservation.filename
-        ).exists()
-    assert not (ROOT / "migrations/robinhood").exists()
+        path = ROOT / "migrations/robinhood" / reservation.filename
+        assert path.exists() == (reservation.migration_id != "1000")
+    assert {
+        path.name for path in (ROOT / "migrations/robinhood").iterdir()
+    } == source_names
 
 
 def test_flat_discovery_is_canonical_and_import_free(tmp_path):
@@ -409,6 +415,8 @@ def test_tracked_blob_byte_mismatch_is_rejected(monkeypatch, tmp_path):
 def test_source_and_history_collision_fails_before_path_access(
     monkeypatch, tmp_path
 ):
+    import config.network_profiles as profiles
+
     original = get_profile("robinhood-mainnet")
     repository = replace(
         original.repository,
@@ -416,12 +424,16 @@ def test_source_and_history_collision_fails_before_path_access(
     )
     collided = replace(original, repository=repository)
     monkeypatch.setattr(
-        "config.network_profiles.get_profile",
+        profiles,
+        "get_profile",
         lambda profile_id: (
             collided
             if profile_id == "robinhood-mainnet"
             else get_profile(profile_id)
         ),
+    )
+    monkeypatch.setattr(
+        migration_runner, "_load_network_profiles", lambda _root: profiles
     )
     with pytest.raises(
         MigrationPlanError, match="H05_SOURCE_HISTORY_COLLISION"
@@ -434,28 +446,25 @@ def test_source_and_history_collision_fails_before_path_access(
 def test_history_without_source_is_unverifiable_and_cross_profile(
     monkeypatch, tmp_path
 ):
+    import config.network_profiles as profiles
+
     mainnet = get_profile("robinhood-mainnet")
     testnet = get_profile("robinhood-testnet")
     monkeypatch.setattr(
-        migration_runner,
-        "_git_identity",
-        lambda _root: ("11" * 20, "22" * 20),
+        migration_runner, "_load_network_profiles", lambda _root: profiles
     )
     other = tmp_path.joinpath(*testnet.repository.history_dir.parts)
     other.mkdir(mode=0o700, parents=True)
-    report = build_blocked_migration_report(
-        mainnet.identity.profile_id,
-        repository_root=tmp_path,
-    )
-    assert report["source_digest"] is None
-    assert report["prior_history_digest"] is None
-    assert "B-H06-HISTORY-UNVERIFIABLE" in report["blockers"]
-    assert "B-H06-CROSS-PROFILE-HISTORY" in report["blockers"]
+    with pytest.raises(MigrationPlanError, match="H05_SOURCE_ABSENT"):
+        build_blocked_migration_report(
+            mainnet.identity.profile_id,
+            repository_root=tmp_path,
+        )
 
 
 def test_current_repository_has_no_robinhood_operational_state():
+    assert (ROOT / "migrations/robinhood").is_dir()
     forbidden = (
-        ROOT / "migrations/robinhood",
         ROOT / "migration_history/robinhood-mainnet",
         ROOT / "migration_history/robinhood-testnet",
     )

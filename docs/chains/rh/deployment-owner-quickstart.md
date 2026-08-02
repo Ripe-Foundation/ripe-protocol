@@ -11,10 +11,15 @@ activation, release, or Sites actions.
 Work from the current `rh` tip after confirming parity among local `rh`, cached
 `origin/rh`, and credential-free live `rh`.
 
-Commit `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`, is the exact baseline for the
-bounded Curve launch-pricing candidate. Rebind only to a later exact `rh`
-commit/tree under explicit authority; do not infer currentness from ancestry.
+The reviewed shared-migration candidate is rebound to launch-authority parent
+commit `20945001ab1321d73399bcf37b1fa99534c98e8f`, tree
+`337f863cf318bc499d5500d6eaafde8842975abb`. Treat that identity as the exact
+candidate parent; do not infer currentness from ancestry or another branch tip.
+
+The preserved predecessor candidate was frozen on commit
+`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
+`7454b5456ebb6cd02d716a64b408629ab501629e`. It is historical comparison
+evidence only; it is not the parent or launch authority for this rebind.
 
 Repository configuration is prepared and consistent; production/onchain
 configuration has not occurred.
@@ -32,6 +37,12 @@ Ready to begin deployment preparation.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
   readiness blocker count is 80: the remaining 57 non-Curve blockers plus 23
   typed Curve launch inputs.
+- The executable migration graph is separately typed blocked by 99 keys:
+  37 deployment-produced bindings, 23 Curve inputs, 5 external addresses,
+  18 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
+  99-key plan census layers migration-specific bindings, reservations, and
+  Stock inputs on top of the 80-key source/configuration readiness state;
+  neither count replaces the other.
 - DP15 and P-H04-399 are approved product/configuration decisions. The exact
   reward values remain points enabled, `0.009 RIPE/block`, 10% borrower / 90%
   staker allocation, 75% conditional auto-stake, 33% lock ratio, `1 RIPE/$`
@@ -41,6 +52,11 @@ Ready to begin deployment preparation.
   but neither the GREEN/USDG nor RIPE/WETH LP token is admitted as a Ripe asset.
   RIPE/WETH remains only a separately authorized external canary possibility;
   PSM reserves cannot fund either venue.
+- The shared `migrations/robinhood/` source exists as 17 ordered stages through
+  `0900`; it contains 117 plan actions and 33 registrations. Stage `1000`
+  remains deferred with no executable source file.
+- H-05 deterministic offline planning now consumes that shared source for both
+  Robinhood profiles; it does not authorize execution or deployment.
 - External facts remain independently unverified and deployment-produced
   identities remain unresolved where the sources say so.
 - No Robinhood deployment or migration has occurred. Nothing has been
@@ -220,20 +236,38 @@ only when this phase begins.
 
 ### 4. Produce deterministic plans
 
-After required bindings exist, require H-05 deterministic planning through the
-integrated network profiles and
-shared `migrations/robinhood/` source to produce deterministic plans for both
-environments:
+Review component selection, omission, deferral, and registry topology in
+`config/BluePrint.py`. While this candidate is uncommitted, review the exact
+stage/action sequence in explicit preview output from the shared
+`migrations/robinhood/` source:
 
 ```sh
-python -m scripts.migrate --profile robinhood-testnet --plan
-python -m scripts.migrate --profile robinhood-mainnet --plan
+python -m scripts.migrate --profile robinhood-testnet --plan --preview
+python -m scripts.migrate --profile robinhood-mainnet --plan --preview
 ```
 
-Until the migration source and required bindings are ready, a typed blocked
-report is correct. Do not create history, execute a plan, add a custom runner,
-or copy Base migrations to make planning appear ready. H-05 planning is not
-migration authority.
+Preview output is bound to the complete prospective working tree and is
+intrinsically non-production, non-executable, and ineligible for history. Once
+the same bytes are reviewed and committed in a clean worktree, omit
+`--preview` to produce a production-bound plan; production planning rejects
+dirty, untracked, missing, symlinked, or non-HEAD planning inputs. Both
+profiles use the same source without RPC, an account, key, signer, or history
+creation. Typed-blocked output with `plan_hash=null` is correct while
+external facts, deployment-produced identities, AAPL inputs, Curve inputs,
+reward operational gates, owners, operators, or release inputs remain
+unresolved. These blockers are configuration and operational inputs, not a
+missing migration implementation.
+
+Generate the matching pre-collected assertion envelope without live RPC:
+
+```sh
+python scripts/check_deployment.py --print-plan-expectations robinhood-testnet --preview
+python scripts/check_deployment.py --print-plan-expectations robinhood-mainnet --preview
+```
+
+Do not create history, execute a plan, add a custom runner, or copy Base
+migrations to make planning appear ready. No plan, synthetic fixture, fork
+result, or passing test authorizes deployment.
 
 ### 5. Qualify locally and on a pinned archive fork
 
@@ -295,20 +329,17 @@ as usable,
 and currently deferred or excluded Deleverage, Curve higher-power/LP, PSM
 activation, and CCIP work.
 
-Deployment agents must branch freshly from the parity-verified current `rh`
-tip and consume current `config/BluePrint.py` and
-`contracts/config/DefaultsRobinhood.vy`. Re-author useful PR #66 migration
-intent under shared `migrations/robinhood/`, the current reserved ordering,
-`python -m scripts.migrate`, and the current artifact, topology, and
-post-deployment assertion interfaces.
+Deployment agents must consume current `config/BluePrint.py` and
+`contracts/config/DefaultsRobinhood.vy` through the shared
+`migrations/robinhood/` package and `python -m scripts.migrate`. PR #66 remains
+historical input and must not be rebased, merged, or used as migration source.
 
 Until required bindings close, deterministic typed-blocked plans are correct.
 Do not create migration history, use the old custom runner, access RPC or
 signers, or substitute placeholders merely to make a blocked plan executable.
-The eventual replacement should follow the exact order and abort rules in the
-[Curve launch migration handoff](curve-launch-migration-handoff.md), authored
-from an explicitly rebound current `rh`. This candidate does not edit
-`migrations/robinhood/**` or authorize migration work.
+The shared source follows the exact order and abort rules in the
+[Curve launch migration handoff](curve-launch-migration-handoff.md). Its
+presence and deterministic output do not authorize migration execution.
 
 ## Stop conditions and prohibited substitutions
 

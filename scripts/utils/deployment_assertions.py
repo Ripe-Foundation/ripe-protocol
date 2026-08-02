@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
+import json
 from typing import Any, Mapping, Sequence
 
 from config.robinhood_blueprint import (
@@ -278,6 +280,296 @@ IDENTITY_FIELDS = (
     "constructor_sha256",
     "artifact_sha256",
 )
+PLAN_COMPONENT_FIELDS = (
+    "artifact",
+    "constructor_refs",
+    "activation_state",
+)
+
+
+def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Derive pre-collected observation expectations from an H-05 plan.
+
+    This transformation is pure and retains source references rather than
+    inventing deployment values.  A blocked plan can still produce reviewable
+    expectations, but only a complete plan carries a non-null plan hash.
+    """
+
+    plan = _require_mapping(plan_value, "plan")
+    profile = _require_mapping(plan.get("profile"), "plan.profile")
+    stages = _require_rows(plan.get("stages"), "plan.stages")
+    components: dict[str, Mapping[str, Any]] = {}
+    registries: list[Mapping[str, Any]] = []
+    actions: list[Mapping[str, Any]] = []
+    for stage in stages:
+        for action in _require_rows(stage.get("actions"), "plan.stages.actions"):
+            actions.append(action)
+            component_id = action.get("component_id")
+            if action.get("kind") == "deployment":
+                _require_string(component_id, "plan.action.component_id")
+                authority = _require_mapping(
+                    action.get("component_authority"),
+                    "plan.action.component_authority",
+                )
+                selection_state = authority.get("selection_state")
+                if selection_state not in {"selected", "blocked"}:
+                    raise DeploymentAssertionInputError(
+                        "plan deployment action has unavailable authority: "
+                        f"{component_id}"
+                    )
+                if component_id in components:
+                    raise DeploymentAssertionInputError(
+                        f"plan has duplicate deployment component: {component_id}"
+                    )
+                postconditions = action.get("postconditions", [])
+                disabled = any(
+                    marker in str(condition)
+                    for condition in postconditions
+                    for marker in ("disabled", "inactive", "not-activated", "withheld", "paused")
+                )
+                components[component_id] = {
+                    "component_id": component_id,
+                    "artifact": _require_string(action.get("artifact"), "plan.action.artifact"),
+                    "constructor_refs": list(action.get("constructor", [])),
+                    "activation_state": "deployed-disabled" if disabled else "deployed",
+                    "authority_selection_state": selection_state,
+                }
+            registry = action.get("registry")
+            if action.get("kind") == "registration" and registry is not None:
+                row = _require_mapping(registry, "plan.action.registry")
+                selection_state = row.get("selection_state")
+                if selection_state not in {"selected", "blocked"}:
+                    raise DeploymentAssertionInputError(
+                        "plan registration action has unavailable authority"
+                    )
+                registries.append(
+                    {
+                        "domain": _require_string(row.get("domain"), "plan.action.registry.domain"),
+                        "registry_id": _require_int(row.get("registry_id"), "plan.action.registry.registry_id"),
+                        "component_id": _require_string(row.get("component_id"), "plan.action.registry.component_id"),
+                        "authority_selection_state": selection_state,
+                    }
+                )
+
+    census = _require_mapping(plan.get("action_census"), "plan.action_census")
+    action_ids = [
+        _require_string(action.get("action_id"), "plan.action.action_id")
+        for action in actions
+    ]
+    deployment_action_ids = [
+        action["action_id"]
+        for action in actions
+        if action.get("kind") == "deployment"
+    ]
+    registration_action_ids = [
+        action["action_id"]
+        for action in actions
+        if action.get("kind") == "registration"
+    ]
+    expected_census = {
+        "total": 117,
+        "deployments": 37,
+        "registrations": 33,
+        "all_action_ids": action_ids,
+        "deployment_action_ids": deployment_action_ids,
+        "registration_action_ids": registration_action_ids,
+    }
+    if dict(census) != expected_census:
+        raise DeploymentAssertionInputError(
+            "plan action census does not exactly account for 117/37/33 actions"
+        )
+    ledger = components.get("CM-008")
+    if ledger is None or ledger.get("authority_selection_state") != "blocked":
+        raise DeploymentAssertionInputError(
+            "plan must retain CM-008 Ledger blocked disposition"
+        )
+    ledger_registries = [
+        row for row in registries if row["component_id"] == "CM-008"
+    ]
+    if len(ledger_registries) != 1 or ledger_registries[0].get(
+        "authority_selection_state"
+    ) != "blocked":
+        raise DeploymentAssertionInputError(
+            "plan must retain CM-008 Ledger blocked registration"
+        )
+    artifact_kind = _require_string(
+        _require_mapping(plan.get("artifact"), "plan.artifact").get("kind"),
+        "plan.artifact.kind",
+    )
+    ledger_action = next(
+        (
+            action
+            for action in actions
+            if action.get("semantic_action_id") == "deploy-ledger"
+        ),
+        None,
+    )
+    ledger_blockers = set(
+        ledger_action.get("blockers", []) if ledger_action else []
+    )
+    if not ledger_blockers or not ledger_blockers.issubset(
+        set(plan.get("blockers", []))
+    ):
+        raise DeploymentAssertionInputError(
+            "plan must preserve Ledger authority blockers"
+        )
+    if artifact_kind == "synthetic-proof":
+        overrides = _require_rows(
+            plan.get("synthetic_authority_overrides"),
+            "plan.synthetic_authority_overrides",
+        )
+        overridden = {row.get("key") for row in overrides}
+        if not ledger_blockers.issubset(overridden):
+            raise DeploymentAssertionInputError(
+                "synthetic proof must enumerate Ledger authority override"
+            )
+
+    actions_by_semantic_id: dict[str, Mapping[str, Any]] = {}
+    for action in actions:
+        semantic_id = _require_string(
+            action.get("semantic_action_id"), "plan.action.semantic_action_id"
+        )
+        if semantic_id in actions_by_semantic_id:
+            raise DeploymentAssertionInputError(
+                f"plan has duplicate semantic action: {semantic_id}"
+            )
+        actions_by_semantic_id[semantic_id] = action
+
+    def required_action(semantic_id: str) -> Mapping[str, Any]:
+        action = actions_by_semantic_id.get(semantic_id)
+        if action is None:
+            raise DeploymentAssertionInputError(
+                f"plan required action is missing: {semantic_id}"
+            )
+        return action
+
+    curve_validation = required_action("validate-direct-green-pricing")
+    curve_configuration = required_action(
+        "configure-curve-green-feed-at-id-two"
+    )
+    curve_disable = required_action("recover-disable-curve-id-two")
+    curve_recovery = required_action("recover-update-curve-id-two")
+    aapl_seam = required_action("preserve-stock-extension-seam")
+    reward_seam = required_action("preserve-reward-promotion-seam")
+    lp_seam = required_action("preserve-lp-extension-seam")
+    role_bindings = required_action("bind-governance-safe-guardian")
+    operator_bindings = required_action(
+        "bind-training-wheels-operator-signers"
+    )
+    capability_bindings = required_action("apply-approved-capabilities")
+    psm_assertion = required_action("assert-psm-disabled-posture")
+    handoff = actions[-1] if actions else {}
+    if handoff.get("semantic_action_id") != "handoff-governance-and-relinquish-deployer":
+        raise DeploymentAssertionInputError("plan final handoff action is missing or not last")
+    coverage = _require_mapping(plan.get("component_coverage"), "plan.component_coverage")
+    source = _require_mapping(plan.get("source"), "plan.source")
+    plan_contract = {
+        "artifact_kind": artifact_kind,
+        "plan_hash": plan.get("plan_hash"),
+        "proof_hash": plan.get("proof_hash"),
+        "preview_hash": plan.get("preview_hash"),
+        "source_digest": _require_string(source.get("source_digest"), "plan.source.source_digest"),
+        "expectation_digest": _require_string(plan.get("expectation_digest"), "plan.expectation_digest"),
+        "stage_ids": [
+            _require_string(stage.get("migration_id"), "plan.stage.migration_id")
+            for stage in stages
+        ],
+        "action_census": expected_census,
+        "selected_components": sorted(list(coverage.get("selected", []))),
+        "blocked_components": sorted(list(coverage.get("blocked", []))),
+        "absent_components": sorted(
+            list(coverage.get("omitted", [])) + list(coverage.get("deferred", []))
+        ),
+        "pricing_posture": {
+            "price_desk_registrations": [
+                [row["registry_id"], row["component_id"]]
+                for row in sorted(
+                    (
+                        row
+                        for row in registries
+                        if row["domain"] == "price_desk"
+                    ),
+                    key=lambda row: row["registry_id"],
+                )
+            ],
+            "priority_ids": [1, 3],
+            "validation_postconditions": list(
+                curve_validation.get("postconditions", [])
+            ),
+            "validation_abort_if": list(curve_validation.get("abort_if", [])),
+            "feed_postconditions": list(
+                curve_configuration.get("postconditions", [])
+            ),
+            "disable_operation": curve_disable.get("operation"),
+            "disable_postconditions": list(
+                curve_disable.get("postconditions", [])
+            ),
+            "recovery_operation": curve_recovery.get("operation"),
+            "recovery_postconditions": list(
+                curve_recovery.get("postconditions", [])
+            ),
+        },
+        "aapl_posture": {
+            "input_refs": list(aapl_seam.get("requires", [])),
+            "postconditions": list(aapl_seam.get("postconditions", [])),
+        },
+        "reward_posture": {
+            "input_refs": list(reward_seam.get("requires", [])),
+            "postconditions": list(reward_seam.get("postconditions", [])),
+        },
+        "lp_posture": {
+            "input_refs": list(lp_seam.get("requires", [])),
+            "postconditions": list(lp_seam.get("postconditions", [])),
+        },
+        "role_posture": {
+            "governance_safe_guardian_refs": list(
+                role_bindings.get("requires", [])
+            ),
+            "training_wheels_operator_signer_refs": list(
+                operator_bindings.get("requires", [])
+            ),
+        },
+        "capability_posture": {
+            "input_refs": list(capability_bindings.get("requires", [])),
+            "postconditions": list(
+                capability_bindings.get("postconditions", [])
+            ),
+        },
+        "psm_posture": list(psm_assertion.get("postconditions", [])),
+        "ccip_present": False,
+        "uniswap_present": False,
+        "final_authority": {
+            "action_id": handoff.get("action_id"),
+            "deployer_retains_authority": False,
+            "is_final_action": True,
+        },
+    }
+    expectations = {
+        "schema_version": SCHEMA_VERSION,
+        "profile_id": _require_string(profile.get("profile_id"), "plan.profile.profile_id"),
+        "profile_kind": "profile1",
+        "chain_id": _require_int(profile.get("expected_chain_id"), "plan.profile.expected_chain_id"),
+        "registries": sorted(registries, key=lambda row: (row["domain"], row["registry_id"])),
+        "components": [components[key] for key in sorted(components)],
+        "capabilities": [],
+        "forbidden_edges": [],
+        "profile2_components": [],
+        "configuration_sources": {
+            "plan.authority": "config/BluePrint.py",
+            "defaults.authority": "contracts/config/DefaultsRobinhood.vy",
+        },
+        "plan_contract": plan_contract,
+    }
+    identity = hashlib.sha256(
+        json.dumps(
+            expectations,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    plan_contract["output_identity"] = identity
+    return expectations
 
 
 def expectations_template() -> Mapping[str, Any]:
@@ -351,6 +643,27 @@ def assert_deployment(
         raise DeploymentAssertionInputError(
             "observations.mode is unsupported"
         ) from exc
+
+    raw_plan_contract = expectations.get("plan_contract")
+    synthetic_proof = (
+        mode is ObservationMode.SYNTHETIC
+        and isinstance(raw_plan_contract, Mapping)
+        and raw_plan_contract.get("artifact_kind") == "synthetic-proof"
+    )
+    synthetic_blocked_registry_keys = {
+        (row.get("domain"), row.get("registry_id"))
+        for row in _require_rows(
+            expectations.get("registries", []), "expectations.registries"
+        )
+        if row.get("authority_selection_state") == "blocked"
+    }
+    synthetic_blocked_components = {
+        row.get("component_id")
+        for row in _require_rows(
+            expectations.get("components", []), "expectations.components"
+        )
+        if row.get("authority_selection_state") == "blocked"
+    }
 
     expected_profile = _require_string(
         expectations.get("profile_id"), "expectations.profile_id"
@@ -450,6 +763,8 @@ def assert_deployment(
     for domain, registry_id in sorted(policy.reserved_registries):
         key = (domain, registry_id)
         if key in observed_registries:
+            if synthetic_proof and key in synthetic_blocked_registry_keys:
+                continue
             _failure(
                 failures,
                 "RESERVED_REGISTRY_REUSE",
@@ -480,10 +795,13 @@ def assert_deployment(
     )
     for key, row in sorted(expected_registries.items()):
         if key in policy.reserved_registries:
-            raise DeploymentAssertionInputError(
-                "expectations.registries cannot authorize reserved blueprint key: "
-                f"{key[0]}/{key[1]}"
-            )
+            if synthetic_proof and key in synthetic_blocked_registry_keys:
+                pass
+            else:
+                raise DeploymentAssertionInputError(
+                    "expectations.registries cannot authorize reserved blueprint key: "
+                    f"{key[0]}/{key[1]}"
+                )
         observed = observed_registries.get(key)
         path = f"registries.{key[0]}.{key[1]}"
         if observed is None:
@@ -544,6 +862,8 @@ def assert_deployment(
     for (component_id,) in expected_components:
         disposition = policy.unavailable_components.get(component_id)
         if disposition is not None:
+            if synthetic_proof and component_id in synthetic_blocked_components:
+                continue
             raise DeploymentAssertionInputError(
                 "expectations.components cannot authorize "
                 f"{disposition.value} blueprint component: {component_id}"
@@ -552,6 +872,8 @@ def assert_deployment(
     for (component_id,), row in sorted(observed_components.items()):
         disposition = policy.unavailable_components.get(component_id)
         if disposition is not None:
+            if synthetic_proof and component_id in synthetic_blocked_components:
+                continue
             _failure(
                 failures,
                 f"{disposition.value.upper()}_COMPONENT_PRESENT",
@@ -585,6 +907,17 @@ def assert_deployment(
             )
             continue
         for field in IDENTITY_FIELDS:
+            if field not in expected:
+                continue
+            if observed.get(field) != expected.get(field):
+                _failure(
+                    failures,
+                    f"{field.upper()}_MISMATCH",
+                    f"components.{component_id}.{field}",
+                    expected.get(field),
+                    observed.get(field),
+                )
+        for field in PLAN_COMPONENT_FIELDS:
             if field not in expected:
                 continue
             if observed.get(field) != expected.get(field):
@@ -791,6 +1124,24 @@ def assert_deployment(
                 f"configuration_sources.{field}",
                 expected_profile,
                 actual_source,
+            )
+
+    expected_plan_contract = expectations.get("plan_contract")
+    observed_plan_contract = observations.get("plan_contract")
+    if expected_plan_contract is not None or observed_plan_contract is not None:
+        expected_plan_contract = _require_mapping(
+            expected_plan_contract, "expectations.plan_contract"
+        )
+        observed_plan_contract = _require_mapping(
+            observed_plan_contract, "observations.plan_contract"
+        )
+        if expected_plan_contract != observed_plan_contract:
+            _failure(
+                failures,
+                "PLAN_EXPECTATION_MISMATCH",
+                "plan_contract",
+                json.dumps(expected_plan_contract, sort_keys=True),
+                json.dumps(observed_plan_contract, sort_keys=True),
             )
 
     return AssertionReport(
