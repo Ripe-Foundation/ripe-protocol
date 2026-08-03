@@ -1225,24 +1225,31 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "resolved_no_predeployment_value",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.production_liquidity_amount", SymbolicBinding("GREEN_USDG_PRODUCTION_LIQUIDITY"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # (USDG, GREEN) in the pool coin order. 100 USDG at 6 decimals and 100
+        # GREEN at 18, the same seed Base used.
+        "pool.production_liquidity_amount", (100 * 10**6, 100 * 10**18),
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.funding_source", SymbolicBinding("GREEN_USDG_FUNDING_SOURCE"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # The deployer, which must already hold the USDG. GREEN comes from the
+        # 100 minted to it at construction (DP-19).
+        "pool.funding_source", "temporary-local-governance",
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.custodian", SymbolicBinding("GREEN_USDG_CUSTODIAN"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        # Endaoment holds the LP, as on Base.
+        "pool.custodian", "ENDAOMENT",
+        "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.approving_account", SymbolicBinding("GREEN_USDG_APPROVING_ACCOUNT"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        "pool.approving_account", "temporary-local-governance",
+        "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.minimum_minted_lp", SymbolicBinding("GREEN_USDG_MINIMUM_MINTED_LP"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # Base passed 0. Kept at 0 for parity; raise it if slippage protection on
+        # the seeding transaction is wanted.
+        "pool.minimum_minted_lp", 0,
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.slippage_limit", SymbolicBinding("GREEN_USDG_SLIPPAGE_LIMIT"),

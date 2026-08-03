@@ -90,6 +90,7 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
         "irreversible-final-authority-handoff",
         "pause-then-timelocked-disable-registry-address",
         "register-and-confirm",
+        "seed-pool-and-transfer-lp",
         "set-auto-deposit-disabled",
         "set-priority-price-source-ids",
         "timelocked-update-registry-address",
@@ -98,10 +99,10 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
 )
 EXPECTED_NAMESPACE_COUNTS = {
     "action": 7,
-    "address": 141,
+    "address": 144,
     "binding": 58,
     "blueprint": 6,
-    "curve": 40,
+    "curve": 45,
     "curve-binding": 2,
     "defaults": 7,
     "input": 73,
@@ -250,6 +251,7 @@ class RobinhoodBackend(Protocol):
     def add_and_confirm_chainlink_feed(self, context: "ActionContext") -> BackendOutcome: ...
     def validate_external_identities(self, context: "ActionContext") -> BackendOutcome: ...
     def create_or_bind_pool(self, context: "ActionContext") -> BackendOutcome: ...
+    def seed_pool_and_transfer_lp(self, context: "ActionContext") -> BackendOutcome: ...
     def assert_pool_runtime(self, context: "ActionContext") -> BackendOutcome: ...
     def assert_direct_price(self, context: "ActionContext") -> BackendOutcome: ...
     def add_and_confirm_curve_feed_after_id_two(self, context: "ActionContext") -> BackendOutcome: ...
@@ -373,6 +375,10 @@ def _pool_assertion(context: ActionContext) -> BackendOutcome:
     return context.backend.assert_pool_runtime(context)
 
 
+def _seed_pool(context: ActionContext) -> BackendOutcome:
+    return context.backend.seed_pool_and_transfer_lp(context)
+
+
 def _direct_price(context: ActionContext) -> BackendOutcome:
     return context.backend.assert_direct_price(context)
 
@@ -426,7 +432,7 @@ def _non_executing(context: ActionContext) -> BackendOutcome:
 
 
 def build_handler_registry() -> HandlerRegistry:
-    """Build the exact 46-operation registry without a fallback handler."""
+    """Build the exact 47-operation registry without a fallback handler."""
 
     registry = HandlerRegistry()
     rows = (
@@ -437,6 +443,7 @@ def build_handler_registry() -> HandlerRegistry:
         (_contract("validate-external-identities", "configuration", "curve"), _external_identities),
         (_contract("create-or-bind-pool", "configuration", "curve", "address", transactional=True), _pool),
         (_contract("assert-pool-runtime", "assertion", "address,curve"), _pool_assertion),
+        (_contract("seed-pool-and-transfer-lp", "configuration", "address,curve", transactional=True), _seed_pool),
         (_contract("assert-direct-price", "assertion", "address,curve"), _direct_price),
         (_contract("add-and-confirm-curve-feed-after-id-two", "configuration", "action,address", transactional=True), _curve_feed),
         (_contract("set-priority-price-source-ids", "configuration", "defaults", transactional=True), _priority),
@@ -1183,7 +1190,7 @@ class RobinhoodStageExecutor:
             raise RobinhoodExecutionError("RHX_STAGE_CENSUS_DRIFT")
         actions = [action for stage in stages for action in stage["actions"]]
         census = self.plan["action_census"]
-        if (len(actions), census["deployments"], census["registrations"]) != (117, 37, 33):
+        if (len(actions), census["deployments"], census["registrations"]) != (118, 37, 33):
             raise RobinhoodExecutionError("RHX_ACTION_CENSUS_DRIFT")
         operations = {action["operation"] for action in actions}
         self.registry.validate_vocabulary(operations)

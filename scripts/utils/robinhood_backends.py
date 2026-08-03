@@ -110,6 +110,61 @@ CURVE_STABLESWAP_NG_POOL_ABI = (
         "inputs": [{"name": "k", "type": "uint256"}],
         "outputs": [{"name": "", "type": "uint256"}],
     },
+    # Seeding: add_liquidity plus the LP-token surface needed to hand custody of
+    # the minted LP to the approved custodian.
+    {
+        "type": "function",
+        "name": "add_liquidity",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "_amounts", "type": "uint256[]"},
+            {"name": "_min_mint_amount", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "balanceOf",
+        "stateMutability": "view",
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "transfer",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "_to", "type": "address"},
+            {"name": "_value", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
+)
+ERC20_ABI = (
+    {
+        "type": "function",
+        "name": "approve",
+        "stateMutability": "nonpayable",
+        "inputs": [
+            {"name": "_spender", "type": "address"},
+            {"name": "_value", "type": "uint256"},
+        ],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
+    {
+        "type": "function",
+        "name": "balanceOf",
+        "stateMutability": "view",
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "outputs": [{"name": "", "type": "uint256"}],
+    },
+    {
+        "type": "function",
+        "name": "decimals",
+        "stateMutability": "view",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint8"}],
+    },
 )
 
 
@@ -403,6 +458,11 @@ class DeterministicRobinhoodBackend:
 
     def validate_external_identities(self, context: ActionContext) -> BackendOutcome:
         return self._run(context)
+
+    def seed_pool_and_transfer_lp(self, context: ActionContext) -> BackendOutcome:
+        # State-machine double: the real balance, approval and custody checks
+        # live in BoaRobinhoodBackend against actual contracts.
+        return self._configuration(context)
 
     def create_or_bind_pool(self, context: ActionContext) -> BackendOutcome:
         reference = context.action["provides"][0]
@@ -987,6 +1047,81 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             deployed_address=address,
             transactional=True,
         )
+
+    def seed_pool_and_transfer_lp(self, context: ActionContext) -> BackendOutcome:
+        """Seed the GREEN/USDG pool and hand the LP to the approved custodian.
+
+        Mirrors Base's 2001_CurvePools.py: approve both coins, add_liquidity in
+        the pool's declared coin order, then transfer the whole LP balance to
+        the custodian so the deployer retains nothing.
+
+        The funding account must already hold the USDG. This never mints or
+        acquires it -- if the balance is short the run aborts here rather than
+        seeding a partial pool.
+        """
+        pool_address = self._address(context.value("address:GREEN_USDG_CURVE_POOL"))
+        pool = self._curve_pool_view(pool_address)
+        usdg_address = self._address(context.value("address:USDG"))
+        green = self._contract_for_reference("address:GREEN_TOKEN")
+        usdg = self._external_view(
+            usdg_address, interface_name="robinhood_usdg", abi=ERC20_ABI
+        )
+
+        usdg_amount, green_amount = (
+            int(amount) for amount in context.value("curve:pool.production_liquidity_amount")
+        )
+        minimum_lp = int(context.value("curve:pool.minimum_minted_lp"))
+
+        # custodian and funding_source are symbolic role names, not literals:
+        # the addresses only exist once this run has deployed or bound them.
+        custodian_role = str(context.value("curve:pool.custodian"))
+        if custodian_role == "ENDAOMENT":
+            custodian = self._address(
+                self._contract_for_reference("address:ENDAOMENT")
+            )
+        else:
+            custodian = self._address(custodian_role)
+
+        funding_role = str(context.value("curve:pool.funding_source"))
+        if funding_role != "temporary-local-governance":
+            raise RobinhoodExecutionError(
+                "RHX_SEED_FUNDING_SOURCE_UNSUPPORTED",
+                action_id=context.action["action_id"],
+            )
+
+        held = int(usdg.balanceOf(self.sender))
+        if held < usdg_amount:
+            raise RobinhoodExecutionError(
+                "RHX_SEED_FUNDING_INSUFFICIENT",
+                action_id=context.action["action_id"],
+            )
+
+        usdg.approve(pool_address, usdg_amount, sender=self.sender)
+        green.approve(pool_address, green_amount, sender=self.sender)
+
+        # coin_order is (USDG, GREEN); amounts must follow the pool's ordering.
+        minted = int(
+            pool.add_liquidity([usdg_amount, green_amount], minimum_lp, sender=self.sender)
+        )
+        if minted < minimum_lp:
+            raise RobinhoodExecutionError(
+                "RHX_SEED_MINIMUM_LP_UNMET",
+                action_id=context.action["action_id"],
+            )
+
+        balance = int(pool.balanceOf(self.sender))
+        pool.transfer(custodian, balance, sender=self.sender)
+        if int(pool.balanceOf(self.sender)) != 0:
+            raise RobinhoodExecutionError(
+                "RHX_SEED_LP_CUSTODY_INCOMPLETE",
+                action_id=context.action["action_id"],
+            )
+        if int(pool.balanceOf(custodian)) < balance:
+            raise RobinhoodExecutionError(
+                "RHX_SEED_LP_CUSTODY_INCOMPLETE",
+                action_id=context.action["action_id"],
+            )
+        return self._boa_outcome(context, transactional=True)
 
     def assert_pool_runtime(self, context: ActionContext) -> BackendOutcome:
         pool_address = self._address(context.value("address:GREEN_USDG_CURVE_POOL"))

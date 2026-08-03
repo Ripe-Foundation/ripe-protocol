@@ -5386,21 +5386,11 @@ def validate_curve_launch_authority() -> None:
     # pool.name and pool.symbol are owner-selected concrete strings now; the
     # remaining rows are the liquidity/funding decisions, still unresolved.
     owner_choice_ids = (
-        "pool.production_liquidity_amount",
-        "pool.funding_source",
-        "pool.custodian",
-        "pool.approving_account",
-        "pool.minimum_minted_lp",
         "pool.slippage_limit",
         "pool.withdrawal_authority",
         "pool.minimum_retained_liquidity",
     )
     expected_symbolic_names = {
-        "pool.production_liquidity_amount": "GREEN_USDG_PRODUCTION_LIQUIDITY",
-        "pool.funding_source": "GREEN_USDG_FUNDING_SOURCE",
-        "pool.custodian": "GREEN_USDG_CUSTODIAN",
-        "pool.approving_account": "GREEN_USDG_APPROVING_ACCOUNT",
-        "pool.minimum_minted_lp": "GREEN_USDG_MINIMUM_MINTED_LP",
         "pool.slippage_limit": "GREEN_USDG_SLIPPAGE_LIMIT",
         "pool.withdrawal_authority": "GREEN_USDG_WITHDRAWAL_AUTHORITY",
         "pool.minimum_retained_liquidity": "GREEN_USDG_MIN_RETAINED_LIQUIDITY",
@@ -5970,11 +5960,12 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
-    # 19 base blockers + 15 curve blockers. Was 42 before the owner approved the
-    # Base GREEN pool configuration, which resolved 8 curve inputs
-    # (name, symbol, coin_order, coin_decimals, A, fee, offpeg, ma_exp_time).
+    # 19 base blockers + 10 curve blockers. Was 42: the owner approved the Base
+    # GREEN pool configuration (8 params) and the Base seed path (5 funding
+    # inputs), leaving address-provider verification, the deployment-produced
+    # pool address, and the slippage/withdrawal/retained-liquidity policy rows.
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 34 or len(set(blocker_ids)) != 34:
+    if len(blocker_ids) != 29 or len(set(blocker_ids)) != 29:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")

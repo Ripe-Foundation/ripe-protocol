@@ -103,7 +103,24 @@ def isGovernanceStandIn() -> bool:
         name="robinhood_final_governance_standin",
     ).address
     boa.env.set_balance(final_sender, 10**20)
+    # The deployer must hold the USDG it seeds the pool with. On the real chain
+    # that is the funding_source's responsibility; on a fork we write the
+    # balance directly rather than hunting for a holder, since a young chain may
+    # have no USDG whale to prank.
+    usdg_address = source_blueprint.ROBINHOOD_ADDRESSES["USDG"]
+    seed_usdg, _seed_green = next(
+        row.value
+        for row in source_blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
+        if row.input_id == "pool.production_liquidity_amount"
+    )
+    usdg_token = boa.loads_abi(
+        '[{"type":"function","name":"balanceOf","stateMutability":"view",'
+        '"inputs":[{"name":"o","type":"address"}],'
+        '"outputs":[{"name":"","type":"uint256"}]}]'
+    ).at(usdg_address)
+    boa.deal(usdg_token, sender, seed_usdg)
     print(f"  temporary governance (deployer): {sender}")
+    print(f"  dealt {seed_usdg / 10**6:.2f} USDG to the deployer for pool seeding")
     print(f"  final governance (stand-in Safe): {final_sender}")
 
     overrides = {
