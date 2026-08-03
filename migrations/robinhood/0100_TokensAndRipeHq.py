@@ -15,9 +15,11 @@ MIGRATION_STAGE = {
                 "input:Deployment.DP-05.timelocks.TokenHq.minTimeLock",
                 "input:Deployment.DP-05.timelocks.TokenHq.maxTimeLock",
                 "input:Deployment.DP-19.supply.GREEN.amount",
-                # The deployer, which seeds the GREEN/USDG pool in 0600. Base
-                # minted its 100 GREEN to the deployer for the same reason.
-                "binding:temporary-local-governance",
+                # Distinct from temporary-local-governance even though it is the
+                # same account today: an action's references must be unique, and
+                # keeping "who governs" separate from "who receives the initial
+                # supply" leaves both independently reviewable.
+                "binding:green-supply-recipient",
             ),
             "provides": ("address:GREEN_TOKEN",),
             "postconditions": ("green-token-deployed", "green-mint-not-granted"),

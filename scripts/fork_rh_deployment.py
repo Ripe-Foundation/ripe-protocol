@@ -130,6 +130,8 @@ def isGovernanceStandIn() -> bool:
 
     overrides = {
         "binding:temporary-local-governance": ("address", str(sender)),
+        # The deployer seeds the pool, so it receives the initial GREEN.
+        "binding:green-supply-recipient": ("address", str(sender)),
         "input:Deployment.DP-18.roles.governance": ("address", str(final_sender)),
         # Take the CREATE path, not the BIND path. create_or_bind_pool binds to
         # a pre-existing pool when this is a non-zero address, and requires code
