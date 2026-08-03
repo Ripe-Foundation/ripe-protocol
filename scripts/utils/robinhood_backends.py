@@ -216,15 +216,15 @@ class DeterministicRobinhoodBackend:
                     )
                 self.deployments[reference] = address
             if reference == "address:RIPE_HQ":
+                # Mirrors the deploy path: temporary deployer governance until
+                # the handoff. A resume must reconstruct the same state.
                 self.hq_governance = str(
                     plan["execution_envelope"]["values"][
-                        "input:Deployment.DP-18.roles.governance"
+                        "binding:temporary-local-governance"
                     ]["value"]
                 ).lower()
             if reference in LOCAL_GOVERNANCE_REFERENCES:
-                self.local_governance.setdefault(
-                    reference, self.execution_sender
-                )
+                self.local_governance.setdefault(reference, ZERO_ADDRESS)
         if action["operation"] == "finalize-timelocks":
             self.timelocks_finalized = True
         self._restore_relinquishments(evidence)
@@ -287,9 +287,11 @@ class DeterministicRobinhoodBackend:
                 "input:Deployment.DP-18.roles.governance"
             ]["value"]
         ).lower()
-        if (
-            self.hq_governance is not None
-            and self.hq_governance != expected_governance
+        # Before the handoff RipeHq governance is the temporary deployer; after
+        # it, the final Safe. Accept exactly those two, and nothing else.
+        if self.hq_governance is not None and self.hq_governance not in (
+            expected_governance,
+            self.execution_sender,
         ):
             raise RobinhoodExecutionError(
                 "RHX_FINAL_GOVERNANCE_MISMATCH",
@@ -348,11 +350,16 @@ class DeterministicRobinhoodBackend:
         ).hexdigest()[-40:]
         self.deployments[reference] = address
         if reference == "address:RIPE_HQ":
+            # RipeHq is constructed with the temporary deployer as governance,
+            # matching Base. It becomes the final Safe only at the irreversible
+            # handoff in 0900, which is the one place hq_governance changes.
             self.hq_governance = str(
-                context.value("input:Deployment.DP-18.roles.governance")
+                context.value("binding:temporary-local-governance")
             ).lower()
         if reference in LOCAL_GOVERNANCE_REFERENCES:
-            self.local_governance[reference] = self.execution_sender
+            # Departments carry no local governance: LocalGov asserts
+            # `_initialGov != hqGov`, and hqGov is now the deployer.
+            self.local_governance[reference] = ZERO_ADDRESS
         source = f"contracts/{context.action['artifact']}.vy"
         artifact = ArtifactIdentity(
             source,
@@ -466,7 +473,11 @@ class DeterministicRobinhoodBackend:
                 "RHX_TEMPORARY_GOVERNANCE_SENDER_MISMATCH",
                 action_id=context.action["action_id"],
             )
-        if self.hq_governance != final_governance or temporary == final_governance:
+        # This runs immediately BEFORE finishRipeHqSetup, so RipeHq governance
+        # must still be the temporary deployer -- it is what authorises the
+        # handoff call. Requiring it to already equal the Safe would only ever
+        # pass if the handoff had somehow already happened.
+        if self.hq_governance != temporary or temporary == final_governance:
             raise RobinhoodExecutionError(
                 "RHX_FINAL_GOVERNANCE_MISMATCH",
                 action_id=context.action["action_id"],
@@ -491,27 +502,38 @@ class DeterministicRobinhoodBackend:
                     "injected-before-relinquishment",
                 )
                 raise self._partial_handoff_failure(context, failed)
-            if self.local_governance.get(reference) != temporary:
+            # Departments deploy with NO local governance, because RipeHq
+            # governance is the deployer and LocalGov asserts
+            # `_initialGov != hqGov`. There is therefore nothing to relinquish:
+            # the authority teardown is vacuous, and the receipt records that
+            # rather than being skipped, so the evidence shape and sequence stay
+            # identical whether or not a department ever held local gov.
+            observed_local = self.local_governance.get(reference, ZERO_ADDRESS)
+            vacuous = observed_local == ZERO_ADDRESS
+            if not vacuous and observed_local != temporary:
                 raise RobinhoodExecutionError(
                     "RHX_LOCAL_GOVERNANCE_MISMATCH",
                     action_id=context.action["action_id"],
                 )
-            identity = "0x" + hashlib.sha256(
+            identity = None if vacuous else "0x" + hashlib.sha256(
                 f"relinquish:{context.plan['plan_hash']}:{reference}".encode(
                     "ascii"
                 )
             ).hexdigest()
             self.local_governance[reference] = ZERO_ADDRESS
-            self.relinquishment_mutation_counts[reference] = (
-                self.relinquishment_mutation_counts.get(reference, 0) + 1
-            )
+            if not vacuous:
+                # A vacuous relinquishment sends no transaction, so it must not
+                # be counted as a state mutation.
+                self.relinquishment_mutation_counts[reference] = (
+                    self.relinquishment_mutation_counts.get(reference, 0) + 1
+                )
             receipt = AuthorityRelinquishment(
                 reference,
                 address,
                 sequence,
                 "complete",
                 identity,
-                temporary,
+                observed_local,
                 ZERO_ADDRESS,
                 final_governance,
                 False,
@@ -521,6 +543,8 @@ class DeterministicRobinhoodBackend:
             if self.fail_relinquishment_after == reference:
                 self.fail_relinquishment_after = None
                 raise self._partial_handoff_failure(context)
+        # Governance is now the Safe; the deployer holds nothing.
+        self.hq_governance = str(final_governance).lower()
         self.handed_off = True
         outcome = self._configuration(context)
         return BackendOutcome(
@@ -697,7 +721,18 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
                     "input:Deployment.DP-18.roles.governance"
                 ]["value"]
             )
-            if self._address(hq.governance()) != expected_governance:
+            # RipeHq governance is the temporary deployer until the handoff and
+            # the final Safe strictly after it. Checking against the exact
+            # expected value for the current phase keeps this invariant able to
+            # catch an unintended governance change, which a permissive
+            # "either value" check would not.
+            observed = self._address(hq.governance())
+            expected_now = (
+                expected_governance
+                if self.handed_off
+                else self._address(self.execution_sender)
+            )
+            if observed != expected_now:
                 raise RobinhoodExecutionError(
                     "RHX_FINAL_GOVERNANCE_MISMATCH",
                     action_id=context.action["action_id"],
@@ -835,11 +870,10 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             next(item.value for item in context.inputs if item.reference.startswith("address:"))
         )
         expected_id = int(row["registry_id"])
-        sender = (
-            self.final_governance_sender
-            if row["domain"] == "ripe_hq"
-            else self.sender
-        )
+        # The deployer holds RipeHq governance until the final handoff, so
+        # every registry -- including ripe_hq -- is registered by the same
+        # sender. RipeHq asserts `msg.sender == gov.governance` exactly.
+        sender = self.sender
         observed = self._address(registry.getAddr(expected_id))
         if observed == ZERO_ADDRESS:
             if not registry.startAddNewAddressToRegistry(
@@ -879,7 +913,7 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             token = self._contract_for_reference(reference)
             if self._address(token.ripeHq()) != hq_address:
                 token.finishTokenSetup(
-                    hq, sender=self.final_governance_sender
+                    hq, sender=self.sender
                 )
             if self._address(token.ripeHq()) != hq_address:
                 raise RobinhoodExecutionError("RHX_TOKEN_HQ_MISMATCH", action_id=context.action["action_id"])
@@ -1121,13 +1155,13 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
                 mint_green,
                 mint_ripe,
                 blacklist,
-                sender=self.final_governance_sender,
+                sender=self.sender,
             )
             delay = int(hq.registryChangeTimeLock())
             if delay:
                 self.boa.env.time_travel(blocks=delay + 1)
             if not hq.confirmHqConfigChange(
-                reg_id, sender=self.final_governance_sender
+                reg_id, sender=self.sender
             ):
                 raise RobinhoodExecutionError("RHX_CAPABILITY_APPLY_FAILED", action_id=context.action["action_id"])
         return self._boa_outcome(context, transactional=True)
@@ -1142,11 +1176,11 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             self._contract_for_reference(reference).setActionTimeLockAfterSetup(sender=self.sender)
         self._contract_for_reference(
             "address:HUMAN_RESOURCES"
-        ).setActionTimeLockAfterSetup(sender=self.final_governance_sender)
+        ).setActionTimeLockAfterSetup(sender=self.sender)
         self._contract_for_reference(
             "address:RIPE_HQ"
         ).setRegistryTimeLockAfterSetup(
-            sender=self.final_governance_sender
+            sender=self.sender
         )
         for reference in (
             "address:SWITCHBOARD",
@@ -1211,8 +1245,12 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
                 "RHX_TEMPORARY_GOVERNANCE_SENDER_MISMATCH",
                 action_id=context.action["action_id"],
             )
+        # This runs immediately BEFORE finishRipeHqSetup, so on-chain RipeHq
+        # governance must still be the temporary deployer -- that is precisely
+        # what authorises the handoff call. Requiring it to already equal the
+        # Safe could only pass if the handoff had somehow already happened.
         if (
-            self._address(hq.governance()) != self._address(governance)
+            self._address(hq.governance()) != self._address(temporary)
             or self._address(temporary) == self._address(governance)
         ):
             raise RobinhoodExecutionError(
@@ -1227,12 +1265,32 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             current = self._address(contract.governance())
             if current == ZERO_ADDRESS:
                 prior = self.relinquishment_receipts.get(reference)
-                if prior is None:
-                    raise RobinhoodExecutionError(
-                        "RHX_RELINQUISHMENT_RECEIPT_MISSING",
-                        action_id=context.action["action_id"],
-                    )
-                receipts.append(prior)
+                if prior is not None:
+                    receipts.append(prior)
+                    continue
+                # Zero with no prior receipt means the department never held
+                # local governance -- it was constructed that way, because
+                # RipeHq governance is the deployer and LocalGov asserts
+                # `_initialGov != hqGov`. The teardown is vacuous: record a
+                # receipt with no transaction identity so the evidence sequence
+                # is complete, and verify the authority end-state directly.
+                governors = {
+                    self._address(item) for item in contract.getGovernors()
+                }
+                vacuous = AuthorityRelinquishment(
+                    reference,
+                    address,
+                    sequence,
+                    "complete",
+                    None,
+                    ZERO_ADDRESS,
+                    ZERO_ADDRESS,
+                    self._address(governance),
+                    self._address(temporary) in governors,
+                    self._address(governance) in governors,
+                )
+                self.relinquishment_receipts[reference] = vacuous
+                receipts.append(vacuous)
                 continue
             if current != self._address(temporary):
                 raise RobinhoodExecutionError(
@@ -1303,12 +1361,14 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             receipts.append(receipt)
         try:
             hq.finishRipeHqSetup(
-                governance, sender=self.final_governance_sender
+                governance, sender=self.sender
             )
         except Exception as error:
             raise self._boa_partial_handoff_failure(context) from error
         if self._address(hq.governance()) != self._address(governance):
             raise self._boa_partial_handoff_failure(context)
+        # Governance is now the Safe; the deployer holds nothing.
+        self.hq_governance = self._address(governance).lower()
         self.handed_off = True
         outcome = self._boa_outcome(context, transactional=True)
         return BackendOutcome(

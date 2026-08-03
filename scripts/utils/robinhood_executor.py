@@ -99,12 +99,12 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
 EXPECTED_NAMESPACE_COUNTS = {
     "action": 7,
     "address": 141,
-    "binding": 54,
+    "binding": 58,
     "blueprint": 6,
     "curve": 40,
     "curve-binding": 2,
     "defaults": 7,
-    "input": 77,
+    "input": 73,
     "input-prefix": 2,
     "registry": 36,
     "stock": 16,
@@ -123,6 +123,9 @@ NON_EXECUTING_KINDS = frozenset(
     {"omission", "blocked", "deferred", "recovery", "tooling-only"}
 )
 _ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}")
+# Defined here rather than imported from robinhood_backends: that module imports
+# from this one, so the dependency only runs one way.
+ZERO_ADDRESS = "0x" + "0" * 40
 
 
 class RobinhoodExecutionError(RuntimeError):
@@ -543,6 +546,13 @@ class RuntimeBindingStore:
         )
 
     def resolve(self, reference: str) -> BoundValue:
+        if reference == "binding:no-local-governance":
+            # Resolved before the envelope on purpose. Departments deploy with
+            # no local governance because RipeHq governance is the deployer and
+            # LocalGov asserts `_initialGov != hqGov`; that is a property of the
+            # contracts, not an operator choice, so an envelope must not be able
+            # to override it with a different address.
+            return BoundValue(reference, ZERO_ADDRESS, BindingProvenance.DERIVED)
         if reference in self._runtime:
             return self._runtime[reference]
         if reference in self._actions:

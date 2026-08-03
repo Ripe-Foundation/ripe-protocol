@@ -11,7 +11,7 @@ MIGRATION_STAGE = {
             "artifact": "PriceDesk",
             "constructor": (
                 "address:RIPE_HQ",
-                "binding:temporary-local-governance",
+                "binding:no-local-governance",
                 "address:NATIVE_ETH_SENTINEL",
                 "input:Deployment.DP-05.timelocks.AddressRegistry.minDelay",
                 "input:Deployment.DP-05.timelocks.AddressRegistry.maxDelay",
@@ -27,7 +27,7 @@ MIGRATION_STAGE = {
             "artifact": "ChainlinkPrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "binding:temporary-local-governance",
+                "binding:no-local-governance",
                 "input:Deployment.DP-05.timelocks.Chainlink.minTimeLock",
                 "input:Deployment.DP-05.timelocks.Chainlink.maxTimeLock",
                 "address:WETH",
@@ -77,7 +77,7 @@ MIGRATION_STAGE = {
             "artifact": "CurvePrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "binding:temporary-local-governance",
+                "binding:no-local-governance",
                 "curve:curve.address_provider",
                 "address:GREEN_TOKEN",
                 "address:SGREEN_TOKEN",
@@ -242,7 +242,7 @@ MIGRATION_STAGE = {
             "artifact": "BlueChipYieldPrices",
             "constructor": (
                 "address:RIPE_HQ",
-                "binding:temporary-local-governance",
+                "binding:no-local-governance",
                 "input:Deployment.DP-05.timelocks.Chainlink.minTimeLock",
                 "input:Deployment.DP-05.timelocks.Chainlink.maxTimeLock",
                 "binding:bluechip-morpho-factories",

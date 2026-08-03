@@ -9,7 +9,7 @@ MIGRATION_STAGE = {
             "operation": "deploy",
             "component_id": "CM-021",
             "artifact": "VaultBook",
-            "constructor": ("address:RIPE_HQ", "binding:temporary-local-governance", "input:Deployment.DP-05.timelocks.AddressRegistry.minDelay", "input:Deployment.DP-05.timelocks.AddressRegistry.maxDelay"),
+            "constructor": ("address:RIPE_HQ", "binding:no-local-governance", "input:Deployment.DP-05.timelocks.AddressRegistry.minDelay", "input:Deployment.DP-05.timelocks.AddressRegistry.maxDelay"),
             "provides": ("address:VAULT_BOOK",),
             "postconditions": ("vault-book-deployed",),
         },

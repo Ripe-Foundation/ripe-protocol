@@ -11,7 +11,7 @@ MIGRATION_STAGE = {
             "artifact": "GreenToken",
             "constructor": (
                 "binding:initial-ripe-hq",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.TokenHq.minTimeLock",
                 "input:Deployment.DP-05.timelocks.TokenHq.maxTimeLock",
                 "input:Deployment.DP-19.supply.GREEN.amount",
@@ -28,7 +28,7 @@ MIGRATION_STAGE = {
             "artifact": "RipeToken",
             "constructor": (
                 "binding:initial-ripe-hq",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.TokenHq.minTimeLock",
                 "input:Deployment.DP-05.timelocks.TokenHq.maxTimeLock",
                 "input:Deployment.DP-19.supply.RIPE.amount",
@@ -46,7 +46,7 @@ MIGRATION_STAGE = {
             "constructor": (
                 "address:GREEN_TOKEN",
                 "binding:initial-ripe-hq",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.TokenHq.minTimeLock",
                 "input:Deployment.DP-05.timelocks.TokenHq.maxTimeLock",
                 "input:Deployment.DP-19.supply.SGREEN.amount",
@@ -65,7 +65,7 @@ MIGRATION_STAGE = {
                 "address:GREEN_TOKEN",
                 "address:SGREEN_TOKEN",
                 "address:RIPE_TOKEN",
-                "input:Deployment.DP-18.roles.governance",
+                "binding:temporary-local-governance",
                 "input:Deployment.DP-05.timelocks.RipeHq.minTimeLock",
                 "input:Deployment.DP-05.timelocks.RipeHq.maxTimeLock",
                 "input:Deployment.DP-05.timelocks.AddressRegistry.minDelay",

@@ -114,15 +114,18 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
         "input:Deployment.DP-18.roles.governance"
     ]["value"].lower()
     assert backend.hq_governance == final_governance
+    # Departments never hold local governance -- RipeHq governance is the
+    # deployer, and LocalGov asserts `_initialGov != hqGov`. Every relinquishment
+    # is therefore VACUOUS: a receipt is still recorded, in sequence, so the
+    # evidence trail stays complete, but it carries no transaction identity and
+    # no state mutation because nothing was sent on chain.
     for sequence, receipt in enumerate(
         handoff["authority_relinquishments"]
     ):
         assert receipt["sequence"] == sequence
         assert receipt["status"] == "complete"
-        assert receipt["transaction_identity"] is not None
-        assert receipt["temporary_governance_before"] == (
-            backend.execution_sender
-        )
+        assert receipt["transaction_identity"] is None
+        assert receipt["temporary_governance_before"] == ZERO_ADDRESS
         assert receipt["local_governance_after"] == ZERO_ADDRESS
         assert receipt["ripe_hq_governance_after"] == final_governance
         assert receipt["temporary_can_govern_after"] is False
@@ -130,23 +133,41 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
         assert receipt["failure_classification"] is None
     assert handoff["retained_temporary_governance"] == []
     assert set(backend.local_governance.values()) == {ZERO_ADDRESS}
-    assert all(
-        count == 1
-        for count in backend.relinquishment_mutation_counts.values()
-    )
+    # No relinquishment transaction was sent, so nothing may be counted as a
+    # mutation. A non-empty count here would mean the manifest is claiming
+    # writes that never happened.
+    assert backend.relinquishment_mutation_counts == {}
 
 
 def test_temporary_local_governance_constructor_census_is_exact(
     committed_execution_root,
     bound_mainnet_plan,
 ):
-    governed = [
-        action["artifact"]
-        for stage in bound_mainnet_plan["stages"]
-        for action in stage["actions"]
-        if "binding:temporary-local-governance"
-        in action.get("constructor", ())
+    def artifacts_taking(binding):
+        return [
+            action["artifact"]
+            for stage in bound_mainnet_plan["stages"]
+            for action in stage["actions"]
+            if binding in action.get("constructor", ())
+        ]
+
+    # The temporary deployer is governance for the tokens and RipeHq only,
+    # matching Base: it holds authority until the single irreversible handoff
+    # in 0900.
+    assert artifacts_taking("binding:temporary-local-governance") == [
+        "GreenToken",
+        "RipeToken",
+        "SavingsGreen",
+        "RipeHq",
     ]
+
+    # Every department deploys with NO local governance. It cannot take the
+    # deployer, because LocalGov asserts `_initialGov != hqGov` and RipeHq
+    # governance is the deployer. They remain governable throughout, since
+    # LocalGov._getGovernors() also returns RipeHq governance.
+    #
+    # This is also the exact set of contracts whose Vyper source accepts a
+    # _tempGov constructor parameter, asserted against source below.
     expected = [
         "Switchboard",
         "SwitchboardAlpha",
@@ -160,7 +181,7 @@ def test_temporary_local_governance_constructor_census_is_exact(
         "BlueChipYieldPrices",
         "VaultBook",
     ]
-    assert governed == expected
+    assert artifacts_taking("binding:no-local-governance") == expected
 
     production_files = _production_files(committed_execution_root)
     deployed_artifacts = [
@@ -196,12 +217,12 @@ def test_profiles_share_source_but_bind_isolated_plan_and_history_identities(
     assert EXPECTED_NAMESPACE_COUNTS == {
         "action": 7,
         "address": 141,
-        "binding": 54,
+        "binding": 58,
         "blueprint": 6,
         "curve": 40,
         "curve-binding": 2,
         "defaults": 7,
-        "input": 77,
+        "input": 73,
         "input-prefix": 2,
         "registry": 36,
         "stock": 16,
