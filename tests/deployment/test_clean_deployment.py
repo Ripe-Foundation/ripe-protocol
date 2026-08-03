@@ -56,13 +56,13 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
     assert accepted_temporary_governance["evidence_sha256"]
     assert tuple(stage["migration_id"] for stage in plan["stages"]) == EXPECTED_STAGE_IDS
     actions = [action for stage in plan["stages"] for action in stage["actions"]]
-    assert len(actions) == 117
+    assert len(actions) == 118
     assert Counter(action["kind"] for action in actions)["deployment"] == 37
     assert Counter(action["kind"] for action in actions)["registration"] == 33
     assert {action["operation"] for action in actions} == EXPECTED_OPERATION_VOCABULARY
 
     executor, backend, migration = _execute(plan, root)
-    assert len(executor.results) == len(migration.results) == 117
+    assert len(executor.results) == len(migration.results) == 118
     assert len(backend.deployments) == 37
     assert sum(len(rows) for rows in backend.registries.values()) == 33
     assert backend.sequence[-1] == "0900:000005:handoff-governance-and-relinquish-deployer"
@@ -441,8 +441,8 @@ def deploy_plain_pool(
         for stage in plan["stages"]:
             executor(MigrationHandoff(), stage)
 
-        assert len(executor.results) == 117
-        assert len(backend.sequence) == 117
+        assert len(executor.results) == 118
+        assert len(backend.sequence) == 118
         assert len(backend.production_deployments) == 37
         assert backend.handed_off is True
         handoff = executor.results[

@@ -367,7 +367,7 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
         if action.get("kind") == "registration"
     ]
     expected_census = {
-        "total": 117,
+        "total": 118,
         "deployments": 37,
         "registrations": 33,
         "all_action_ids": action_ids,

@@ -1511,7 +1511,9 @@ def build_robinhood_plan(
         "deployment_action_ids": deployment_action_ids,
         "registration_action_ids": registration_action_ids,
     }
-    if action_census["total"] != 117:
+    # 118 since the Base-parity pool seed action was added to 0400. Deployment
+    # and registration counts are unchanged: seeding is a configuration action.
+    if action_census["total"] != 118:
         raise MigrationPlanError("H05_ACTION_CENSUS")
     if action_census["deployments"] != 37:
         raise MigrationPlanError("H05_DEPLOYMENT_CENSUS")
@@ -1813,7 +1815,7 @@ def _validate_artifact_action_census(plan: Mapping[str, Any]) -> None:
     except (KeyError, TypeError):
         raise MigrationPlanError("H05_ACTION_CENSUS") from None
     expected = {
-        "total": 117,
+        "total": 118,
         "deployments": 37,
         "registrations": 33,
         "all_action_ids": action_ids,
