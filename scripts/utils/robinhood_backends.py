@@ -511,7 +511,8 @@ class DeterministicRobinhoodBackend:
         return self._configuration(context)
 
     def irreversible_final_authority_handoff(self, context: ActionContext) -> BackendOutcome:
-        if len(set(self.sequence)) != 116:
+        # 117 of 118: everything except the handoff itself.
+        if len(set(self.sequence)) != 117:
             raise RobinhoodExecutionError("RHX_FINAL_HANDOFF_PRECONDITION", action_id=context.action["action_id"])
         if not self.timelocks_finalized:
             raise RobinhoodExecutionError(
@@ -1376,7 +1377,8 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
         return self._boa_outcome(context, transactional=True)
 
     def irreversible_final_authority_handoff(self, context: ActionContext) -> BackendOutcome:
-        if len(set(self.sequence)) != 116:
+        # 117 of 118: everything except the handoff itself.
+        if len(set(self.sequence)) != 117:
             raise RobinhoodExecutionError("RHX_FINAL_HANDOFF_PRECONDITION", action_id=context.action["action_id"])
         if not self.timelocks_finalized:
             raise RobinhoodExecutionError(
