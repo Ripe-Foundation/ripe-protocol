@@ -1075,12 +1075,14 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
         # custodian and funding_source are symbolic role names, not literals:
         # the addresses only exist once this run has deployed or bound them.
         custodian_role = str(context.value("curve:pool.custodian"))
-        if custodian_role == "ENDAOMENT":
-            custodian = self._address(
-                self._contract_for_reference("address:ENDAOMENT")
-            )
-        else:
+        if custodian_role.startswith("0x"):
             custodian = self._address(custodian_role)
+        else:
+            # A role name, not a literal: the address only exists once this run
+            # has deployed it.
+            custodian = self._address(
+                self._contract_for_reference(f"address:{custodian_role}")
+            )
 
         funding_role = str(context.value("curve:pool.funding_source"))
         if funding_role != "temporary-local-governance":
@@ -1100,9 +1102,20 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
         green.approve(pool_address, green_amount, sender=self.sender)
 
         # coin_order is (USDG, GREEN); amounts must follow the pool's ordering.
-        minted = int(
-            pool.add_liquidity([usdg_amount, green_amount], minimum_lp, sender=self.sender)
-        )
+        try:
+            minted = int(
+                pool.add_liquidity(
+                    [usdg_amount, green_amount], minimum_lp, sender=self.sender
+                )
+            )
+        except Exception as error:
+            # Surface the revert reason: boa's own stack-trace handler can raise
+            # while formatting an external-contract failure, which otherwise
+            # hides why seeding failed.
+            raise RobinhoodExecutionError(
+                "RHX_SEED_ADD_LIQUIDITY_FAILED",
+                action_id=context.action["action_id"],
+            ) from error
         if minted < minimum_lp:
             raise RobinhoodExecutionError(
                 "RHX_SEED_MINIMUM_LP_UNMET",

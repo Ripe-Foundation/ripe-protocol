@@ -1237,8 +1237,10 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        # Endaoment holds the LP, as on Base.
-        "pool.custodian", "ENDAOMENT",
+        # EndaomentFunds holds the LP. Base sent it to the Endaoment, but
+        # local custody moved to the dedicated EndaomentFunds department
+        # (RipeHq id 21) since then.
+        "pool.custodian", "ENDAOMENT_FUNDS",
         "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
