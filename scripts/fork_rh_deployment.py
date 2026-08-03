@@ -113,10 +113,15 @@ def isGovernanceStandIn() -> bool:
         for row in source_blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
         if row.input_id == "pool.production_liquidity_amount"
     )
+    # boa.deal adjusts totalSupply alongside the balance, so both must be in the
+    # ABI. Keeping the adjustment (rather than passing adjust_supply=False)
+    # leaves the token self-consistent: dealt balances never exceed supply.
     usdg_token = boa.loads_abi(
         '[{"type":"function","name":"balanceOf","stateMutability":"view",'
         '"inputs":[{"name":"o","type":"address"}],'
-        '"outputs":[{"name":"","type":"uint256"}]}]'
+        '"outputs":[{"name":"","type":"uint256"}]},'
+        '{"type":"function","name":"totalSupply","stateMutability":"view",'
+        '"inputs":[],"outputs":[{"name":"","type":"uint256"}]}]'
     ).at(usdg_address)
     boa.deal(usdg_token, sender, seed_usdg)
     print(f"  temporary governance (deployer): {sender}")
