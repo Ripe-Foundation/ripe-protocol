@@ -86,9 +86,23 @@ def main() -> int:
     print(f"  verified fork identity: USDG at canonical address returns {symbol!r}")
 
     sender = boa.env.generate_address()
-    final_sender = boa.env.generate_address()
-    for account in (sender, final_sender):
-        boa.env.set_balance(account, 10**20)
+    boa.env.set_balance(sender, 10**20)
+
+    # The final governance stand-in must be a CONTRACT, not an EOA:
+    # LocalGov.finishRipeHqSetup asserts `_newGov.is_contract`. On the real
+    # chain that is satisfied by the Safe; here a minimal contract stands in.
+    # This is the same constraint that would abort a live run at the last
+    # action if the Safe were not yet deployed on the target chain.
+    final_sender = boa.loads(
+        """
+@external
+@view
+def isGovernanceStandIn() -> bool:
+    return True
+""",
+        name="robinhood_final_governance_standin",
+    ).address
+    boa.env.set_balance(final_sender, 10**20)
     print(f"  temporary governance (deployer): {sender}")
     print(f"  final governance (stand-in Safe): {final_sender}")
 
@@ -101,33 +115,10 @@ def main() -> int:
         # deployed by this very run -- so binding is impossible and creating
         # through the real StableSwap-NG factory is what a launch would do.
         "curve:pool.address": ("address", ZERO_ADDRESS),
-        # The GREEN/USDG pool parameters are genuinely unresolved (B-H04-LP), so
-        # build_fully_bound_envelope fills them with placeholder booleans. Those
-        # cannot be ABI-encoded, so the harness supplies REHEARSAL values --
-        # Base's approved GREEN pool config, which is the closest reviewed
-        # precedent. These are not approved Robinhood values and must not be
-        # copied into the blueprint; they exist so the factory call is
-        # exercised against the real chain.
-        "curve:pool.factory": (
-            "address",
-            # StableSwap-NG factory, AddressProvider id 12, read from the chain.
-            "0x8271e06e5887fe5ba05234f5315c19f3ec90e8ad",
-        ),
-        "curve:pool.name": ("string", "GREEN/USDG Pool"),
-        "curve:pool.symbol": ("string", "GREEN/USDG"),
-        "curve:pool.A": ("uint256", source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_A"]),
-        "curve:pool.fee": (
-            "uint256",
-            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_FEE"],
-        ),
-        "curve:pool.offpeg_fee_multiplier": (
-            "uint256",
-            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_OFFPEG_MULTIPLIER"],
-        ),
-        "curve:pool.ma_exp_time": (
-            "uint256",
-            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_MA_EXP_TIME"],
-        ),
+        # NOTE: the pool parameters are deliberately NOT overridden here. They
+        # are now resolved in the blueprint (owner-approved Base GREEN config),
+        # so the fork exercises the real configuration path. Overriding them
+        # would shadow exactly what we want this run to prove.
     }
 
     plan = build_bound_plan(ROOT, overrides=overrides)
