@@ -92,10 +92,15 @@ def main() -> int:
     print(f"  temporary governance (deployer): {sender}")
     print(f"  final governance (stand-in Safe): {final_sender}")
 
-    addresses = source_blueprint.ROBINHOOD_ADDRESSES
     overrides = {
         "binding:temporary-local-governance": ("address", str(sender)),
         "input:Deployment.DP-18.roles.governance": ("address", str(final_sender)),
+        # Take the CREATE path, not the BIND path. create_or_bind_pool binds to
+        # a pre-existing pool when this is a non-zero address, and requires code
+        # there. No GREEN/USDG pool can exist on Robinhood yet -- GREEN is
+        # deployed by this very run -- so binding is impossible and creating
+        # through the real StableSwap-NG factory is what a launch would do.
+        "curve:pool.address": ("address", ZERO_ADDRESS),
     }
 
     plan = build_bound_plan(ROOT, overrides=overrides)
