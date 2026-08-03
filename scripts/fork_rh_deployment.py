@@ -101,6 +101,33 @@ def main() -> int:
         # deployed by this very run -- so binding is impossible and creating
         # through the real StableSwap-NG factory is what a launch would do.
         "curve:pool.address": ("address", ZERO_ADDRESS),
+        # The GREEN/USDG pool parameters are genuinely unresolved (B-H04-LP), so
+        # build_fully_bound_envelope fills them with placeholder booleans. Those
+        # cannot be ABI-encoded, so the harness supplies REHEARSAL values --
+        # Base's approved GREEN pool config, which is the closest reviewed
+        # precedent. These are not approved Robinhood values and must not be
+        # copied into the blueprint; they exist so the factory call is
+        # exercised against the real chain.
+        "curve:pool.factory": (
+            "address",
+            # StableSwap-NG factory, AddressProvider id 12, read from the chain.
+            "0x8271e06e5887fe5ba05234f5315c19f3ec90e8ad",
+        ),
+        "curve:pool.name": ("string", "GREEN/USDG Pool"),
+        "curve:pool.symbol": ("string", "GREEN/USDG"),
+        "curve:pool.A": ("uint256", source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_A"]),
+        "curve:pool.fee": (
+            "uint256",
+            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_FEE"],
+        ),
+        "curve:pool.offpeg_fee_multiplier": (
+            "uint256",
+            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_OFFPEG_MULTIPLIER"],
+        ),
+        "curve:pool.ma_exp_time": (
+            "uint256",
+            source_blueprint.CURVE_PARAMS["base"]["GREEN_POOL_MA_EXP_TIME"],
+        ),
     }
 
     plan = build_bound_plan(ROOT, overrides=overrides)
