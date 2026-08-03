@@ -5402,6 +5402,43 @@ def validate_curve_launch_authority() -> None:
         for input_id in owner_choice_ids
     ):
         _fail("RH_CURVE_OWNER_INPUT")
+
+    # The seeding controls left `owner_choice_ids` when they were resolved to
+    # approved repository facts, so they need their own gate: without one, a
+    # bad edit here would silently reduce the blocker count and read as
+    # progress. The three role bindings stay ROLE NAMES rather than literal
+    # addresses because the custodian (EndaomentFunds) is deployment-produced
+    # and has no address at plan time; the executor resolves them at execution.
+    role_binding_ids = (
+        "pool.funding_source",
+        "pool.custodian",
+        "pool.approving_account",
+    )
+    if any(
+        not isinstance(values[input_id], str)
+        or not values[input_id]
+        or values[input_id].startswith("0x")
+        or states[input_id] != "resolved_repository_fact"
+        for input_id in role_binding_ids
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+    liquidity = values["pool.production_liquidity_amount"]
+    if (
+        not isinstance(liquidity, tuple)
+        or len(liquidity) != 2
+        or any(not isinstance(item, int) or item <= 0 for item in liquidity)
+        or states["pool.production_liquidity_amount"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+    minimum_lp = values["pool.minimum_minted_lp"]
+    if (
+        not isinstance(minimum_lp, int)
+        or isinstance(minimum_lp, bool)
+        or minimum_lp <= 0
+        or states["pool.minimum_minted_lp"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+
     if (
         type(values["pool.production_observation"]).__name__ != "SymbolicBinding"
         or values["pool.production_observation"].semantic_name

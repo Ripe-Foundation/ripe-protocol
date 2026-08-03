@@ -492,7 +492,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.EXTERNAL_ARTIFACT: 3,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 51
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 42
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 29
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -689,7 +689,7 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_42_remaining_blockers_are_open_and_morpho_gate_is_closed():
+def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
     expected_core = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
@@ -721,7 +721,7 @@ def test_all_42_remaining_blockers_are_open_and_morpho_gate_is_closed():
         if row.resolution_state
         in blueprint_source.ROBINHOOD_CURVE_BLOCKING_STATES
     }
-    assert len(expected_curve) == 23
+    assert len(expected_curve) == 10
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
     assert set(blockers) == expected_core | expected_curve
     assert "B-H02-AUDIT" not in blockers
@@ -1035,7 +1035,19 @@ def _mutate_curve_input(monkeypatch, input_id, **changes):
         ("pool.address", {"value": "0x0000000000000000000000000000000000000000"}, "RH_CURVE_POOL_IDENTITY"),
         ("pool.factory_method", {"value": "unknown"}, "RH_CURVE_POOL_IDENTITY"),
         ("pool.factory_nonce_or_order", {"value": "precomputed"}, "RH_CURVE_POOL_IDENTITY"),
-        ("pool.funding_source", {"value": 1}, "RH_CURVE_OWNER_INPUT"),
+        ("pool.funding_source", {"value": 1}, "RH_CURVE_FUNDING_INPUT"),
+        # A literal address here would bypass execution-time role resolution.
+        ("pool.custodian", {"value": "0x" + "11" * 20}, "RH_CURVE_FUNDING_INPUT"),
+        ("pool.approving_account", {"value": ""}, "RH_CURVE_FUNDING_INPUT"),
+        ("pool.production_liquidity_amount", {"value": (0, 0)}, "RH_CURVE_FUNDING_INPUT"),
+        ("pool.minimum_minted_lp", {"value": 0}, "RH_CURVE_FUNDING_INPUT"),
+        (
+            # Caught by the earlier metadata gate rather than the funding gate;
+            # either way, un-resolving an approved value fails closed.
+            "pool.minimum_minted_lp",
+            {"resolution_state": "owner_choice_unresolved"},
+            "RH_CURVE_INPUT_METADATA",
+        ),
         ("pool.production_observation", {"value": 1}, "RH_CURVE_OBSERVATION"),
         ("feed.curve_assets", {"value": ("GREEN", "USDG")}, "RH_CURVE_RECURSION_GUARD"),
         ("feed.usdg_curve_feed", {"value": True}, "RH_CURVE_RECURSION_GUARD"),

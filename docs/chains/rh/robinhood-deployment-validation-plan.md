@@ -6,18 +6,18 @@
 > `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
 > planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
-> the derived ledger. Source/configuration readiness reports exactly 80
+> the derived ledger. Source/configuration readiness reports exactly 67
 > blockers with `configuration_consistent=true` and
 > `deployment_ready=false`. The executable migration plan separately reports
-> 100 blockers: 38 binding, 23 Curve, 5 external-address, 18 deployment-input,
-> 4 reservation, and 12 Stock keys. The 100-key plan adds migration-specific
+> 88 blockers: 40 binding, 10 Curve, 5 external-address, 17 deployment-input,
+> 4 reservation, and 12 Stock keys. The 88-key plan adds migration-specific
 > bindings, reservations, and Stock inputs on top of source/configuration
 > readiness; neither count replaces the other. H-06 is a
 > class qualification only. Repository configuration is prepared and
 > consistent; production/onchain configuration has not occurred. No Robinhood
 > migration, live execution, deployment, activation, RPC, account, key,
 > signer, or release action has occurred. The candidate implements 17 shared
-> stages through `0900`, 117 actions, and 33 registrations; `1000` remains
+> stages through `0900`, 118 actions, and 33 registrations; `1000` remains
 > deferred without an executable source file. The current PriceDesk topology is
 > ID 1 Chainlink, ID 2 unchanged CurvePrices for GREEN only, ID 3
 > BlueChipYield, IDs 4/5 empty, with priorities `[1,3]`; see

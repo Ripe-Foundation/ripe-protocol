@@ -76,7 +76,7 @@ def test_current_integrated_authority_builds_all_steps_with_canonical_curve_bloc
         for detail in plan["blocker_details"]
         if detail["key"].startswith("H05_CURVE_")
     ]
-    assert len(curve_blockers) == 23
+    assert len(curve_blockers) == 10
     assert len(blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS) == 39
     assert [stage["migration_id"] for stage in plan["stages"]] == STAGE_IDS
     assert all(stage["actions"] for stage in plan["stages"])
@@ -87,7 +87,7 @@ def test_fully_bound_synthetic_plan_is_complete_and_deterministic():
     second = _synthetic()
     assert first == second
     assert first["status"] == "proof-complete"
-    assert len(first["blockers"]) == 100
+    assert len(first["blockers"]) == 88
     assert first["plan_hash"] is None
     assert len(first["proof_hash"]) == 64
     assert first["artifact"] == {
@@ -255,7 +255,10 @@ def test_curve_constructor_uses_exact_integrated_binding_authority():
     )["constructor"]
     assert constructor == [
         "address:RIPE_HQ",
-        "binding:temporary-local-governance",
+        # Departments take ZERO local governance, not the deployer: LocalGov
+        # asserts _initialGov != hqGov and the deployer IS RipeHq governance
+        # until the final handoff.
+        "binding:no-local-governance",
         "curve:curve.address_provider",
         "address:GREEN_TOKEN",
         "address:SGREEN_TOKEN",
@@ -268,9 +271,9 @@ def test_curve_constructor_uses_exact_integrated_binding_authority():
     "reference",
     (
         "curve:pool.address",
-        "curve:pool.funding_source",
-        "curve:pool.custodian",
         "curve:pool.slippage_limit",
+        "curve:pool.withdrawal_authority",
+        "curve:pool.minimum_retained_liquidity",
     ),
 )
 def test_curve_external_controls_remain_individually_typed_blocked(reference):
@@ -282,6 +285,38 @@ def test_curve_external_controls_remain_individually_typed_blocked(reference):
     )
     assert detail["key"].startswith("H05_CURVE_")
     assert detail["key"].endswith("_PENDING")
+
+
+@pytest.mark.parametrize(
+    "input_id",
+    (
+        "pool.funding_source",
+        "pool.custodian",
+        "pool.approving_account",
+        "pool.production_liquidity_amount",
+        "pool.minimum_minted_lp",
+    ),
+)
+def test_curve_seed_controls_are_resolved_only_with_owner_approval(input_id):
+    """The seeding controls left the blocked set, so the guard moves with them.
+
+    Being unblocked is only legitimate because an owner approved each value.
+    Assert the approval metadata directly, otherwise silently resolving one of
+    these to an arbitrary value would simply reduce the blocker count and look
+    like progress.
+    """
+    from config import BluePrint as blueprint
+
+    row = next(
+        item
+        for item in blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
+        if item.input_id == input_id
+    )
+    assert row.resolution_state == "resolved_repository_fact"
+    assert row.authority_class == "owner_selected"
+    assert row.primary_owner
+    assert row.provenance
+    assert not isinstance(row.value, blueprint.SymbolicBinding)
 
 
 def test_curve_stage_consumes_every_canonical_input_without_local_value_aliases():
@@ -299,7 +334,7 @@ def test_curve_stage_consumes_every_canonical_input_without_local_value_aliases(
     assert sum(
         row.resolution_state in blueprint.ROBINHOOD_CURVE_BLOCKING_STATES
         for row in blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
-    ) == 23
+    ) == 10
 
 
 def test_aapl_seam_binds_schema_v2_but_produces_no_launch_action():
@@ -971,7 +1006,7 @@ def test_assertion_derivation_rejects_blocked_disposition_suppression():
         expectations_from_plan(proof)
 
 
-def test_80_source_readiness_and_100_plan_blockers_cannot_drift():
+def test_67_source_readiness_and_88_plan_blockers_cannot_drift():
     plan = build_robinhood_plan(
         "robinhood-mainnet", repository_root=ROOT, preview=True
     )
@@ -983,12 +1018,12 @@ def test_80_source_readiness_and_100_plan_blockers_cannot_drift():
         "reservation": sum(key.startswith("B-") for key in plan["blockers"]),
         "stock": sum(key.startswith("H05_STOCK_") for key in plan["blockers"]),
     }
-    assert len(plan["blockers"]) == 100
+    assert len(plan["blockers"]) == 88
     assert census == {
-        "binding": 38,
-        "curve": 23,
+        "binding": 40,
+        "curve": 10,
         "external_address": 5,
-        "deployment_input": 18,
+        "deployment_input": 17,
         "reservation": 4,
         "stock": 12,
     }
@@ -996,12 +1031,12 @@ def test_80_source_readiness_and_100_plan_blockers_cannot_drift():
     status = yaml.safe_load((ROOT / "docs/chains/rh/status.yaml").read_text())
     readiness = status["migration_readiness"]
     assert readiness["source_configuration"] == {
-        "blockers": 80,
+        "blockers": 67,
         "configuration_consistent": True,
         "deployment_ready": False,
     }
     assert readiness["executable_plan"] == {
-        "blockers": 100,
+        "blockers": 88,
         "categories": census,
     }
     assert "Neither count replaces the other" in readiness["relationship"]
@@ -1012,12 +1047,12 @@ def test_80_source_readiness_and_100_plan_blockers_cannot_drift():
     ):
         text = (ROOT / relative).read_text()
         for phrase in (
-            "80",
-            "100",
-            "38",
-            "23",
+            "67",
+            "88",
+            "40",
+            "10 Curve",
             "5 external",
-            "18 deployment",
+            "17 deployment",
             "4 stage" if relative.endswith("quickstart.md") else "4 reservation",
             "12 Stock",
             "neither count replaces the other",

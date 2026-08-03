@@ -228,19 +228,25 @@ def test_partial_relinquishment_history_resumes_only_remaining_contracts(
     assert [row["contract_reference"] for row in failed_receipts] == (
         [reference] if boundary == "before" else []
     )
-    expected_retained = set(
-        LOCAL_GOVERNANCE_REFERENCES[
-            boundary_index
-            if boundary == "before"
-            else boundary_index + 1 :
-        ]
+    # Nothing is ever retained: the deployer is RipeHq governance for the whole
+    # run, so LocalGov's `_initialGov != hqGov` assertion forbids any department
+    # from also taking it as local governance. All 11 are constructed at zero,
+    # so no contract can hold temporary governance to retain. Resume
+    # completeness is therefore carried by the relinquishment receipts asserted
+    # above, not by this set.
+    assert retained == set()
+    assert all(
+        value == "0x" + "0" * 40
+        for value in backend.local_governance.values()
     )
-    assert retained == expected_retained
     assert backend.handed_off is False
     final_governance = bound_mainnet_plan["execution_envelope"]["values"][
         "input:Deployment.DP-18.roles.governance"
     ]["value"].lower()
-    assert backend.hq_governance == final_governance
+    # An interrupted handoff must NOT have moved RipeHq governance. The deployer
+    # still governs; the Safe takes over only after every receipt is recorded.
+    assert backend.hq_governance == TEMPORARY_GOVERNANCE.lower()
+    assert backend.hq_governance != final_governance
     completed_before_resume = dict(
         backend.relinquishment_mutation_counts
     )
@@ -263,8 +269,11 @@ def test_partial_relinquishment_history_resumes_only_remaining_contracts(
     assert set(resume_backend.local_governance.values()) == {
         "0x" + "0" * 40
     }
+    # Relinquishment is vacuous under this governance model: the departments
+    # were constructed at zero local governance, so each receipt records proof
+    # rather than a state transition and mutates nothing.
     assert all(
-        count == 1
+        count == 0
         for count in resume_backend.relinquishment_mutation_counts.values()
     )
     assert all(

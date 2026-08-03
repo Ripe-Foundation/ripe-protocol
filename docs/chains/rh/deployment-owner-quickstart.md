@@ -32,17 +32,19 @@ Ready to begin deployment preparation.
 - `DefaultsRobinhood.vy` exists, compiles, and is source-authoritative.
 - The derived parameter ledger is synchronized.
 - The current H-04 register has 22 rows: 21 approved and operative, one
-  retired and non-operative, and zero open. All 42 canonical H-03 blockers
-  remain open, including the 23 Curve-specific typed inputs.
+  retired and non-operative, and zero open. 29 canonical H-03 blockers remain
+  open; the 13 approved Curve pool and funding inputs are now resolved
+  repository facts, leaving 10 Curve-specific typed inputs.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
-  readiness blocker count is 80: the remaining 57 non-Curve blockers plus 23
+  readiness blocker count is 67: the remaining 57 non-Curve blockers plus 10
   typed Curve launch inputs.
-- The executable migration graph is separately typed blocked by 100 keys:
-  38 execution bindings (37 deployment-produced identities plus the distinct
-  temporary local-governance authority), 23 Curve inputs, 5 external addresses,
-  18 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
-  100-key plan census layers migration-specific bindings, reservations, and
-  Stock inputs on top of the 80-key source/configuration readiness state;
+- The executable migration graph is separately typed blocked by 88 keys:
+  40 execution bindings (37 deployment-produced identities plus the distinct
+  temporary local-governance authority, the zero local-governance authority,
+  and the GREEN supply recipient), 10 Curve inputs, 5 external addresses,
+  17 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
+  88-key plan census layers migration-specific bindings, reservations, and
+  Stock inputs on top of the 67-key source/configuration readiness state;
   neither count replaces the other.
 - DP15 and P-H04-399 are approved product/configuration decisions. The exact
   reward values remain points enabled, `0.009 RIPE/block`, 10% borrower / 90%
@@ -54,7 +56,7 @@ Ready to begin deployment preparation.
   RIPE/WETH remains only a separately authorized external canary possibility;
   PSM reserves cannot fund either venue.
 - The shared `migrations/robinhood/` source exists as 17 ordered stages through
-  `0900`; it contains 117 plan actions and 33 registrations. Stage `1000`
+  `0900`; it contains 118 plan actions and 33 registrations. Stage `1000`
   remains deferred with no executable source file.
 - H-05 deterministic offline planning now consumes that shared source for both
   Robinhood profiles; it does not authorize execution or deployment.
@@ -112,18 +114,38 @@ not a product/configuration value and not a third substitute for
 `BluePrint.py` or `DefaultsRobinhood.vy`. A production-shaped plan remains
 blocked until the deployment operator identity is explicitly approved and
 bound. The value must be a nonzero address, must equal the executor's actual
-deployment sender, and must differ from both `RipeHq.governance()` and
+deployment sender, and must differ from
 `input:Deployment.DP-18.roles.governance`. Never infer it from an owner,
 guardian, Safe, release signer, or another role. The deterministic local
 fixture alone may bind it to its local deployment sender.
 
+It deliberately does **not** differ from `RipeHq.governance()`: the deployer is
+bound as RipeHq governance at construction and stays so until `0900` hands off
+to the Safe. That is the restored Base lifecycle -- the deployer governs the
+whole run, then relinquishes once -- and it is what makes the registration
+calls work, since `RipeHq` registration asserts
+`msg.sender == gov.governance` by strict equality rather than `_canGovern`.
+
 The binding is constructor input only for this mechanically verified census:
+
+- stage `0100`: RipeHq, GreenToken, RipeToken, and SavingsGreen.
+
+The deployer is RipeHq governance for the whole run, so no department may also
+take it as local governance: `LocalGov.__init__` asserts
+`_initialGov != hqGov`. All 11 departments are therefore constructed with
+`binding:no-local-governance`, which is the zero address:
 
 - stage `0300`: Switchboard, SwitchboardAlpha, SwitchboardBravo,
   SwitchboardCharlie, SwitchboardDelta, and SwitchboardEcho;
 - stage `0400`: PriceDesk, ChainlinkPrices, CurvePrices, and
   BlueChipYieldPrices; and
 - stage `0500`: VaultBook.
+
+Because those 11 never hold local governance, their `0900` relinquishment
+receipts are vacuous by construction: each is recorded with no transaction
+identity and mutates nothing. The proof obligation is unchanged -- local
+`governance()` must be zero for all 11 -- but it is satisfied from
+construction rather than by a state transition.
 
 Within `0400`, register PriceDesk at RipeHq ID 7 after CurvePrices is admitted
 at PriceDesk ID 2 and before adding the GREEN Curve feed. Production
@@ -230,7 +252,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=80
+configuration_consistent=true deployment_ready=false blockers=67
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:
@@ -249,7 +271,7 @@ owner binding to be resolved. Never collapse those gates.
 ### 1. Close inputs and authorities
 
 Bind the exact baseline, preserve a clean isolated worktree, classify each of
-the 80 readiness blockers, and obtain its named external verification,
+the 67 readiness blockers, and obtain its named external verification,
 deployment-produced identity, or owner decision. Freeze governance, Safe,
 Guardian, TrainingWheels, lite signers, operators, emergency roles, and signer
 policy as reviewed inputs. Separately bind `temporary-local-governance` to the

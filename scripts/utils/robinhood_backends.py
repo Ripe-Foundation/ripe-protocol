@@ -245,7 +245,13 @@ class DeterministicRobinhoodBackend:
                     "RHX_RESUME_RELINQUISHMENT_AMBIGUOUS"
                 )
             self.relinquishment_receipts[reference] = receipt
-            self.relinquishment_mutation_counts.setdefault(reference, 1)
+            # A restored receipt must restore the same mutation count it was
+            # recorded with. A vacuous relinquishment carries no transaction
+            # identity because it sent no transaction, so resuming past it must
+            # not invent a mutation that never happened.
+            self.relinquishment_mutation_counts.setdefault(
+                reference, 0 if receipt.transaction_identity is None else 1
+            )
 
     def restore_completed_action(
         self,
@@ -549,17 +555,27 @@ class DeterministicRobinhoodBackend:
             address = self.deployments[reference]
             if self.fail_relinquishment_before == reference:
                 self.fail_relinquishment_before = None
+                # Report the local governance this contract ACTUALLY has, which
+                # is zero: it was constructed that way and the failure happened
+                # before any call. Recording `temporary` here would make resume
+                # restore a nonzero local governance that never existed, and the
+                # retry would then look like a real state mutation.
+                observed_local = self.local_governance.get(
+                    reference, ZERO_ADDRESS
+                )
                 failed = AuthorityRelinquishment(
                     reference,
                     address,
                     sequence,
                     "failed",
                     None,
-                    temporary,
-                    temporary,
-                    final_governance,
+                    observed_local,
+                    observed_local,
+                    # The handoff did not complete, so RipeHq governance is
+                    # still the deployer, not the Safe.
+                    self.hq_governance,
                     True,
-                    True,
+                    False,
                     "injected-before-relinquishment",
                 )
                 raise self._partial_handoff_failure(context, failed)
