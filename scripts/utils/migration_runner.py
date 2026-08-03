@@ -1131,6 +1131,9 @@ def _validate_envelope_authority_types(
                 "initial-ripe-hq",
                 "contributor-template",
                 "temporary-local-governance",
+                # Receives the initial GREEN supply and must therefore be an
+                # address: anything else would mint to a non-account.
+                "green-supply-recipient",
             } or "identity" in key:
                 allowed = {"address"}
             elif key == "approved-capability-set":
