@@ -287,9 +287,13 @@ _BASE_MAINNET_OPERATIONS = _operations(
         repository=True,
         account=True,
     ),
+    # Base has deployed and verified through this path since v1. The H-02
+    # profile work classed both as blocked while the Robinhood launch controls
+    # were being designed; that scope never included stopping Base releases.
+    # Robinhood stays blocked -- see _ROBINHOOD_OPERATIONS.
     _policy(
         Operation.MIGRATION_LIVE,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -309,6 +313,14 @@ _BASE_MAINNET_OPERATIONS = _operations(
         identity=True,
         repository=True,
     ),
+    # VERIFICATION stays blocked deliberately. scripts/verify.py has no
+    # submission path -- it selects a route, echoes the manifest, then raises
+    # H02_OPERATION_INVALID unconditionally. The real implementation lives in
+    # scripts/utils/verify_etherscan.py (verify_from_manifest) and is tested by
+    # tests/deployment/test_verifier_adapters.py, but nothing calls it.
+    # Marking this SUPPORTED would advertise a capability the CLI lacks and
+    # disclose the manifest path before dead-ending. Flip it only together with
+    # wiring verify.py to verify_from_manifest.
     _policy(Operation.VERIFICATION, _BLOCKED, verifier=True),
 )
 
@@ -396,6 +408,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ETHERSCAN_API_KEY",
             _BLOCKED,
         ),
+        # Required whenever MIGRATION_LIVE is SUPPORTED: the registry refuses to
+        # enable live deployment without naming the approved signing backends.
+        # These are the three scripts/migrate.py can select between.
+        live_account_backend_ids=("env-private-key", "ledger", "safe"),
         operations=_BASE_MAINNET_OPERATIONS,
     ),
     NetworkProfile(

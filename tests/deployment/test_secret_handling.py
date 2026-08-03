@@ -343,7 +343,10 @@ def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
                 "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
             ),
             Operation.MIGRATION_LIVE,
-            "H02_OPERATION_BLOCKED",
+            # Base live is supported again, so the rejection reason is now the
+            # account backend rather than the operation. The guarantee under
+            # test is unchanged: a local test key is refused and never loaded.
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
         ),
     ),
 )
@@ -847,9 +850,16 @@ def test_fork_teardown_diagnostic_failure_does_not_mask_body_error(
             raise ValueError("synthetic body failure")
 
 
+# Safe and Ledger are approved backends for Base on their own, so neither is
+# rejected in isolation any more. Requesting BOTH is still unapproved, and it is
+# rejected on the same path with the same code -- which is what this test is
+# actually about: an unapproved backend never reaches a chain read or a secret.
 @pytest.mark.parametrize(
     "backend_values",
-    ({"safe": "synthetic-safe"}, {"ledger": 0}),
+    (
+        {"safe": "synthetic-safe", "ledger": 0},
+        {"safe": "synthetic-safe", "ledger": 3},
+    ),
 )
 def test_safe_and_ledger_reject_before_secret_access(
     backend_values, monkeypatch

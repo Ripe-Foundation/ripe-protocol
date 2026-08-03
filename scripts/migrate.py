@@ -182,6 +182,57 @@ def _fork_environment(profile, operation, redacted_rpc, **kwargs):
                 pass
 
 
+def _resolve_sender(
+    *,
+    account,
+    identity,
+    operation,
+    safe,
+    ledger,
+    fork,
+    rpc_url,
+):
+    """Select the signing backend: Safe, Ledger, or a named local account.
+
+    Restores the pre-H-02 behaviour for Base. Both hardware paths are imported
+    lazily so that a missing native dependency -- `hidapi` for Ledger -- fails
+    only the run that actually asked for it, instead of breaking every command
+    that imports this module.
+
+    On a fork, the hardware backend resolves the address and then hands over to
+    MockAccount: forks must never prompt a device for a signature.
+    """
+    # NOTE: get_account is deliberately the module-level import, not a local
+    # one. Re-importing it here would shadow the module attribute and break
+    # every caller that patches or wraps `migrate.get_account`.
+    from scripts.utils.mock_account import MockAccount
+
+    if safe:
+        if fork:
+            return MockAccount(safe)
+        try:
+            from scripts.utils.safe_account import SafeAccount
+        except ImportError as error:
+            raise click.ClickException(
+                f"Safe backend unavailable: {error}"
+            ) from None
+        return SafeAccount(safe_address=safe, rpc_url=rpc_url)
+
+    if ledger != -1:
+        try:
+            from scripts.utils.ledger_account import LedgerAccount
+        except ImportError as error:
+            raise click.ClickException(
+                "Ledger backend unavailable -- the native hidapi library is "
+                f"missing. Install it (macOS: `brew install hidapi`). {error}"
+            ) from None
+        sender = LedgerAccount(rpc_url, ledger)
+        # Resolve the address from the device, then stop touching it.
+        return MockAccount(sender.address) if fork else sender
+
+    return get_account(account, identity, operation)
+
+
 def _require_static_assertions(profile, environment, blueprint) -> str:
     repository = profile.repository
     if repository.history_dir is None:
@@ -471,7 +522,16 @@ def cli(
         if not is_robinhood and any(value is not None for value in execution_values):
             raise MigrationPlanError("H05_EXECUTION_PROFILE_REQUIRED")
 
-        if safe or ledger != -1:
+        # Hardware and Safe backends are approved for Base only. Robinhood
+        # signing is governed by the execution-envelope path, so a Ledger or
+        # Safe there would bypass it entirely.
+        if (safe or ledger != -1) and is_robinhood:
+            raise NetworkProfileError(
+                "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        if safe and ledger != -1:
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
                 profile_id=profile.identity.profile_id,
@@ -493,7 +553,15 @@ def cli(
         identity = verify_chain_identity(
             profile, operation, redacted_rpc, read_chain_id
         )
-        sender = get_account(account, identity, operation)
+        sender = _resolve_sender(
+            account=account,
+            identity=identity,
+            operation=operation,
+            safe=safe,
+            ledger=ledger,
+            fork=fork,
+            rpc_url=redacted_rpc.value,
+        )
         paths = repository_paths(
             profile, operation, root=ROOT, identity=identity
         )
