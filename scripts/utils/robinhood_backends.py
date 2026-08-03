@@ -1124,6 +1124,8 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             )
 
         balance = int(pool.balanceOf(self.sender))
+        self.seed_minted_lp = minted
+        self.seed_custodian = custodian
         pool.transfer(custodian, balance, sender=self.sender)
         if int(pool.balanceOf(self.sender)) != 0:
             raise RobinhoodExecutionError(

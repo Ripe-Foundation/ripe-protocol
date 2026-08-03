@@ -167,6 +167,10 @@ def isGovernanceStandIn() -> bool:
     print(f"  actions executed        {len(executor.results)}")
     print(f"  production deployments  {len(backend.production_deployments)}")
     print(f"  handed off              {backend.handed_off}")
+    minted = getattr(backend, "seed_minted_lp", None)
+    if minted is not None:
+        print(f"  pool LP minted          {minted / 10**18:.6f}")
+        print(f"  LP custodian            {getattr(backend, 'seed_custodian', '?')}")
 
     hq = backend.contracts["address:RIPE_HQ"]
     print(f"  RipeHq governance       {backend._address(hq.governance())}")

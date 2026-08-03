@@ -1248,9 +1248,12 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        # Base passed 0. Kept at 0 for parity; raise it if slippage protection on
-        # the seeding transaction is wanted.
-        "pool.minimum_minted_lp", 0,
+        # Seeding 100 USDG (6dp) + 100 GREEN (18dp) into an empty StableSwap-NG
+        # pool mints LP equal to the invariant D, so ~200e18 at a 1:1 peg. 199e18
+        # is a ~0.5% floor: enough to absorb rounding and a small peg deviation,
+        # tight enough to abort if the pool is not what we think it is.
+        # Base passed 0; this is deliberately stricter.
+        "pool.minimum_minted_lp", 199 * 10**18,
         "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
