@@ -5363,8 +5363,12 @@ def validate_curve_launch_authority() -> None:
     }
     if any(values[key] != expected for key, expected in expected_pool_values.items()):
         _fail("RH_CURVE_POOL_PARAMS")
+    # Owner approved the Base GREEN pool configuration for Robinhood: the values
+    # were already Base's, and this records that they are now selected rather
+    # than research candidates. The value assertion above is unchanged, so these
+    # still cannot drift from Base's approved numbers.
     if any(
-        states[key] != "research_candidate_owner_approval_unresolved"
+        states[key] != "resolved_repository_fact"
         for key in expected_pool_values
         if key != "pool.ma_exp_time_alternative_test_vector"
     ) or states["pool.ma_exp_time_alternative_test_vector"] != "test_vector_only":
@@ -5379,9 +5383,9 @@ def validate_curve_launch_authority() -> None:
     ):
         _fail("RH_CURVE_POOL_IDENTITY")
 
+    # pool.name and pool.symbol are owner-selected concrete strings now; the
+    # remaining rows are the liquidity/funding decisions, still unresolved.
     owner_choice_ids = (
-        "pool.name",
-        "pool.symbol",
         "pool.production_liquidity_amount",
         "pool.funding_source",
         "pool.custodian",
@@ -5392,8 +5396,6 @@ def validate_curve_launch_authority() -> None:
         "pool.minimum_retained_liquidity",
     )
     expected_symbolic_names = {
-        "pool.name": "GREEN_USDG_CURVE_POOL_NAME",
-        "pool.symbol": "GREEN_USDG_CURVE_POOL_SYMBOL",
         "pool.production_liquidity_amount": "GREEN_USDG_PRODUCTION_LIQUIDITY",
         "pool.funding_source": "GREEN_USDG_FUNDING_SOURCE",
         "pool.custodian": "GREEN_USDG_CUSTODIAN",
@@ -5968,8 +5970,11 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
+    # 19 base blockers + 15 curve blockers. Was 42 before the owner approved the
+    # Base GREEN pool configuration, which resolved 8 curve inputs
+    # (name, symbol, coin_order, coin_decimals, A, fee, offpeg, ma_exp_time).
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 42 or len(set(blocker_ids)) != 42:
+    if len(blocker_ids) != 34 or len(set(blocker_ids)) != 34:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")

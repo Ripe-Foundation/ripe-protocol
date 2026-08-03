@@ -21550,7 +21550,7 @@
       },
       "value": {
         "kind": "concrete",
-        "raw": 0
+        "raw": 100000000000000000000
       },
       "zero_semantics": {
         "explanation": "D-H04-16 approves an exact zero constructor-premint quantity; no issuance or distribution is implied.",

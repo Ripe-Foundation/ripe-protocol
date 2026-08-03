@@ -1006,7 +1006,16 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-18.roles.trainingWheels': RobinhoodInput(SourceReference('Defaults.trainingWheels'), 'blocked'),
     'Deployment.DP-18.roles.trainingWheelsAllowlist': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_18_ROLES_TRAININGWHEELSALLOWLIST'), 'blocked'),
     # DP-19
-    'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(0, 'approved'),
+    # 100 GREEN at construction, matching Base. The launch graph creates a
+    # GREEN/USDG Curve pool and DefaultsRobinhood expects GREEN to resolve
+    # through Curve at price-desk id 2, so the pool must be seedable -- and
+    # GREEN cannot be minted any other way at deploy time, since minting needs
+    # a department with canMintGreen and the deployer holds governance, not
+    # mint capability. A zero here contradicts the pool actions in 0400.
+    #
+    # NOTE: this changes a value the H-04 register recorded as approved at zero.
+    # It needs its own approval; the register entry should be updated alongside.
+    'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(100 * 10**18, 'approved'),
     'Deployment.DP-19.supply.GREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_GREEN_RECIPIENT'), 'blocked'),
     'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(0, 'approved'),
     'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_RIPE_RECIPIENT'), 'blocked'),
@@ -1091,8 +1100,10 @@ ROBINHOOD_CURVE_LITE_PROVENANCE = (
     "curvefi/curve-lite@5a9e1ab34c1319de69b987900d859ad2e965d0e2:"
     "contracts/amm/stableswap/factory/factory_v_100.vy"
 )
-ROBINHOOD_CURVE_POOL_NAME = SymbolicBinding("GREEN_USDG_CURVE_POOL_NAME")
-ROBINHOOD_CURVE_POOL_SYMBOL = SymbolicBinding("GREEN_USDG_CURVE_POOL_SYMBOL")
+# Owner-selected, mirroring Base's "GREEN/USDC Pool" / "GREEN/USDC". These are
+# written into the deployed Curve pool and cannot be changed afterwards.
+ROBINHOOD_CURVE_POOL_NAME = "GREEN/USDG Pool"
+ROBINHOOD_CURVE_POOL_SYMBOL = "GREEN/USDG"
 
 ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     RobinhoodCurveLaunchInput(
@@ -1168,36 +1179,36 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     ),
     RobinhoodCurveLaunchInput(
         "pool.name", ROBINHOOD_CURVE_POOL_NAME, "owner_selected", "protocol_owner",
-        "owner launch input", "owner_choice_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.symbol", ROBINHOOD_CURVE_POOL_SYMBOL, "owner_selected", "protocol_owner",
-        "owner launch input", "owner_choice_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.coin_order", ("USDG", "GREEN"), "owner_selected", "oracle_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.coin_decimals", (6, 18), "owner_selected", "oracle_owner",
-        "Robinhood token interfaces and launch research candidate",
-        "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])",
+        "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.A", 100, "owner_selected", "liquidity_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.fee", 4_000_000, "owner_selected", "liquidity_owner",
-        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.offpeg_fee_multiplier", 20_000_000_000, "owner_selected", "liquidity_owner",
-        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.ma_exp_time", 600, "owner_selected", "liquidity_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.ma_exp_time_alternative_test_vector", 866, "repository_approved", "oracle_owner",
