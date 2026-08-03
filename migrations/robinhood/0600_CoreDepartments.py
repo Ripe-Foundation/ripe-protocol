@@ -65,6 +65,39 @@ MIGRATION_STAGE = {
                 "reward-plan-hash-grants-no-lifecycle-authority",
             ),
         },
+        {
+            # Seeds the pool, mirroring Base's 2001_CurvePools.py: approve both
+            # coins, add_liquidity in the pool's coin order (USDG, GREEN), then
+            # transfer the whole LP balance to the custodian so the deployer
+            # retains none of it.
+            #
+            # Runs AFTER validate-green-usdg-pool on purpose: seeding a pool
+            # whose coin order or decimals were wrong would be unrecoverable, so
+            # the runtime assertions gate the transfer of real value.
+            #
+            # The funding account must already hold the USDG. Nothing here mints
+            # or acquires it; a short balance aborts the run rather than
+            # seeding a partial pool.
+            "semantic_action_id": "seed-green-usdg-pool",
+            "kind": "configuration",
+            "operation": "seed-pool-and-transfer-lp",
+            "component_id": "CM-017",
+            "requires": (
+                "address:GREEN_USDG_CURVE_POOL",
+                "address:USDG",
+                "address:GREEN_TOKEN",
+                "curve:pool.production_liquidity_amount",
+                "curve:pool.funding_source",
+                "curve:pool.custodian",
+                "curve:pool.approving_account",
+                "curve:pool.minimum_minted_lp",
+            ),
+            "postconditions": (
+                "pool-seeded-with-approved-amounts",
+                "lp-held-by-custodian",
+                "deployer-retains-no-lp",
+            ),
+        },
     ),
 }
 
