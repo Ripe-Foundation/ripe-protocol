@@ -763,6 +763,11 @@ def _clean_committed_fixture(tmp_path: Path) -> Path:
             "user.email=fixture@example.invalid",
             "commit",
             "--quiet",
+            # The copy loop above is a no-op when the working tree is clean, so
+            # there is nothing staged and git would exit 1. That is the case
+            # this fixture most wants to cover: HEAD's tree already equals the
+            # working state, which is exactly what it is trying to construct.
+            "--allow-empty",
             "-m",
             "fixture",
         ],
