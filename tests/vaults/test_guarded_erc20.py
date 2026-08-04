@@ -246,7 +246,7 @@ def balanceOf(_holder: address) -> Bytes[33]:
     ):
         if self.lie_after_change:
             return slice(convert(self.balances[_holder] - 1, bytes32), 0, 32)
-        return concat(convert(self.balances[_holder], bytes32), b"x")
+        raise
     return slice(convert(self.balances[_holder], bytes32), 0, 32)
 
 @external
@@ -370,30 +370,13 @@ G1_MUTATIONS = {
         ),
         "replacement": "@external\ndef transferBalanceWithinVault(",
         "sha256": (
-            "71905639a3544e8bd896a49509292865"
-            "ac5b1ab72050f09ed0f4cbe8f509c1bb"
+            "51f770400e388202a6ffb0b0b605f66c"
+            "a761781455c378bb829cffedd3ae3856"
         ),
         "description": (
             "delete transferBalanceWithinVault participation in the shared "
             "module mutex"
         ),
-    },
-    "exact_returndata_length": {
-        "needle": (
-            "    assert len(response) == 32 "
-            "# dev: malformed token transfer return\n"
-            "    assert abi_decode(response, bool) "
-            "# dev: token transfer failed\n"
-        ),
-        "replacement": (
-            "    assert abi_decode(slice(response, 0, 32), bool) "
-            "# dev: token transfer failed\n"
-        ),
-        "sha256": (
-            "eb779f2d67150dc493cedeb8f63efb634"
-            "a64bcdc831d83f05769c19671714ac7"
-        ),
-        "description": "delete the exact 32-byte transfer returndata guard",
     },
     "recipient_delta": {
         "needle": (
@@ -402,8 +385,8 @@ G1_MUTATIONS = {
         ),
         "replacement": "",
         "sha256": (
-            "71e386853c134126f4fe85dbeb17fddef"
-            "060cea5e6887f54de6ecb36bd51cf53"
+            "6234b3013ee232a80f92e6ebf0025dc0"
+            "580a781bec219349fd6004ecb5edfe1e"
         ),
         "description": "delete the exact recipient-delivery delta guard",
     },
@@ -414,8 +397,8 @@ G1_MUTATIONS = {
         ),
         "replacement": "",
         "sha256": (
-            "72b909ec6369f6b6d06660d11706d826"
-            "9c52460e430f699c232fa7adb99b3e29"
+            "cf92c45a3efc570016423b9e3510a1c3"
+            "545f96eaca3917158be79ea85dceee70"
         ),
         "description": "delete the exact vault-outflow delta guard",
     },
@@ -426,42 +409,61 @@ G1_MUTATIONS = {
         ),
         "replacement": "",
         "sha256": (
-            "6b4eb0ac18b9320c4db6454587d23b69"
-            "dd832b2344bfd179642b105e4c8ecc29"
+            "cc84566ee32a005c0e238dc8b32adc59"
+            "f97c2d9d7b0335bc7c7172ad4f15fc95"
         ),
         "description": "delete the explicit post-withdraw solvency assertion",
     },
     "internal_custody_neutrality": {
         "needle": (
-            "    isKnown, custodyAfter = self._observeExactBalance(_asset, self)\n"
-            "    assert isKnown and custodyAfter == custodyBefore "
+            "    custodyAfter: uint256 = "
+            "staticcall IERC20(_asset).balanceOf(self)\n"
+            "    assert custodyAfter == custodyBefore "
             "# dev: vault backing changed\n"
             "    assert custodyAfter >= nominalBefore "
             "# dev: insufficient post-transfer backing\n"
         ),
         "replacement": (
-            "    isKnown, custodyAfter = self._observeExactBalance(_asset, self)\n"
-            "    assert isKnown # dev: unknown vault backing\n"
+            "    custodyAfter: uint256 = "
+            "staticcall IERC20(_asset).balanceOf(self)\n"
             "    assert custodyAfter >= nominalBefore "
             "# dev: insufficient post-transfer backing\n"
         ),
         "sha256": (
-            "c8ef54c3552479746da40006238b87db"
-            "6c425473150284bb96d778162320149e"
+            "c255f34a4790e4482a4fc5d85db6fda1"
+            "4f4b8835e6f993f41a1c5a6f17904778"
         ),
         "description": "delete equality from the internal custody-neutrality guard",
     },
-    "backing_aware_views": {
+    "backing_aware_index_view": {
         "needle": (
-            "    return isKnown and custody >= "
-            "vaultData.totalBalances[_asset]\n"
+            "    if staticcall IERC20(asset).balanceOf(self) < "
+            "vaultData.totalBalances[asset]:\n"
+            "        return asset, 0\n"
         ),
-        "replacement": "    return True\n",
+        "replacement": "",
         "sha256": (
-            "ce56a23a5cea32a9e0a4a7cf702128d"
-            "aff3376500a5d05630832ba7477f3f530"
+            "8b781cb31a367464f934a715c46fedcca"
+            "d4408ef2c8dee808c724cff8f863f40"
         ),
-        "description": "replace the shared backing-aware view predicate with true",
+        "description": "delete the indexed getter's backing comparison",
+    },
+    "backing_aware_total_view": {
+        "needle": (
+            "    if nominalAmount == 0 or "
+            "staticcall IERC20(_asset).balanceOf(self) < "
+            "vaultData.totalBalances[_asset]:\n"
+            "        return 0\n"
+        ),
+        "replacement": (
+            "    if nominalAmount == 0:\n"
+            "        return 0\n"
+        ),
+        "sha256": (
+            "1829cb1add3748f31483d2edad781862"
+            "4f2fa79205980a2bed5a354ee2520c3b"
+        ),
+        "description": "delete the total getter's backing comparison",
     },
     "withdrawal_request_bound": {
         "needle": (
@@ -475,8 +477,8 @@ G1_MUTATIONS = {
             "_user, _asset, max_value(uint256), True)\n"
         ),
         "sha256": (
-            "14443395477bb0ef97819dc4b5cebb595"
-            "dd76b27df729822db03327e029857a5"
+            "f664e3ffa15ca57c415a189ea065ae50"
+            "a5f8bea24d61e9d6f034acbd0d9301f7"
         ),
         "description": "bypass the caller-request bound before withdrawal",
     },
@@ -587,10 +589,10 @@ def test_deficit_blocks_deposit_without_allocating_new_nominal(
 
 @pytest.mark.parametrize(
     "balance_mode",
-    (1, 2, 3, 4, 5, 6),
-    ids=("revert", "empty", "one-byte", "short-31", "long-33", "long-64"),
+    (1, 2, 3, 4),
+    ids=("revert", "empty", "one-byte", "short-31"),
 )
-def test_unknown_backing_blocks_mutation_and_zeroes_usable_views(
+def test_invalid_typed_balance_read_reverts_views_and_mutations(
     balance_mode,
     guarded_erc20_vault,
     adversarial_token,
@@ -603,11 +605,10 @@ def test_unknown_backing_blocks_mutation_and_zeroes_usable_views(
     _credit(guarded_erc20_vault, adversarial_token, bob, amount, teller)
     adversarial_token.configure_balance(guarded_erc20_vault, balance_mode, 0, False)
 
-    assert guarded_erc20_vault.getTotalAmountForUser(bob, adversarial_token) == 0
-    assert guarded_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
-        adversarial_token.address,
-        0,
-    )
+    with boa.reverts():
+        guarded_erc20_vault.getTotalAmountForUser(bob, adversarial_token)
+    with boa.reverts():
+        guarded_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1)
 
     with boa.reverts():
         guarded_erc20_vault.depositTokensInVault(
@@ -635,6 +636,23 @@ def test_unknown_backing_blocks_mutation_and_zeroes_usable_views(
 
     assert guarded_erc20_vault.userBalances(bob, adversarial_token) == amount
     assert guarded_erc20_vault.totalBalances(adversarial_token) == amount
+
+
+def test_typed_balance_read_accepts_trailing_returndata(
+    guarded_erc20_vault,
+    adversarial_token,
+    teller,
+    bob,
+):
+    amount = 100
+    _credit(guarded_erc20_vault, adversarial_token, bob, amount, teller)
+    adversarial_token.configure_balance(guarded_erc20_vault, 5, 0, False)
+
+    assert guarded_erc20_vault.getTotalAmountForUser(bob, adversarial_token) == amount
+    assert guarded_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        adversarial_token.address,
+        amount,
+    )
 
 
 def test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal(
@@ -1167,9 +1185,11 @@ def test_authorization_reverts_before_unknown_balance_observation(
     (
         pytest.param(1, id="empty"),
         pytest.param(0, id="exact-true"),
+        pytest.param(5, id="oversized-33-true-prefix"),
+        pytest.param(6, id="oversized-64-true-prefix"),
     ),
 )
-def test_compatible_transfer_returndata_succeeds(
+def test_typed_transfer_compatible_returndata_succeeds(
     return_mode,
     guarded_erc20_vault,
     adversarial_token,
@@ -1201,8 +1221,6 @@ def test_compatible_transfer_returndata_succeeds(
         pytest.param(2, 0, id="exact-false"),
         pytest.param(3, 0, id="malformed-boolean"),
         pytest.param(4, 0, id="short-nonempty"),
-        pytest.param(5, 0, id="oversized-33"),
-        pytest.param(6, 0, id="oversized-large"),
         pytest.param(0, 7, id="token-revert"),
     ),
 )
@@ -1272,7 +1290,7 @@ def test_nonexact_external_delivery_reverts_all_vault_and_token_state(
 
 
 @pytest.mark.parametrize("target", ("vault", "recipient"))
-@pytest.mark.parametrize("post_mode", (1, 2, 4, 5, 6))
+@pytest.mark.parametrize("post_mode", (1, 2, 3, 4, 6))
 def test_post_transfer_unknown_balance_reverts_atomically(
     target,
     post_mode,
@@ -1430,45 +1448,6 @@ def test_g1_shared_mutex_mutant_allows_authorized_nested_movement(
         assert router.completed()
         assert mutant.userBalances(bob, adversarial_token) == 59
         assert mutant.userBalances(alice, adversarial_token) == 1
-
-
-def test_g1_exact_returndata_length_mutant_accepts_33_byte_sentinel(
-    guarded_erc20_vault,
-    adversarial_token,
-    teller,
-    ripe_hq_deploy,
-    bob,
-    alice,
-):
-    with boa.env.anchor():
-        _credit(
-            guarded_erc20_vault,
-            adversarial_token,
-            bob,
-            100,
-            teller,
-        )
-        adversarial_token.configure_transfer_return(5)
-        with boa.reverts():
-            guarded_erc20_vault.withdrawTokensFromVault(
-                bob,
-                adversarial_token,
-                40,
-                alice,
-                sender=teller.address,
-            )
-
-    with boa.env.anchor():
-        mutant = _g1_mutant("exact_returndata_length", ripe_hq_deploy)
-        _credit(mutant, adversarial_token, bob, 100, teller)
-        adversarial_token.configure_transfer_return(5)
-        assert mutant.withdrawTokensFromVault(
-            bob,
-            adversarial_token,
-            40,
-            alice,
-            sender=teller.address,
-        ) == (40, False)
 
 
 def test_g1_recipient_delta_mutant_accepts_short_delivery(
@@ -1645,7 +1624,7 @@ def test_g1_internal_custody_neutrality_mutant_accepts_changed_observation(
         assert mutant.totalBalances(token) == 100
 
 
-def test_g1_backing_aware_view_mutant_restores_phantom_value(
+def test_g1_backing_aware_view_mutants_restore_phantom_value(
     guarded_erc20_vault,
     guarded_token,
     deploy3r,
@@ -1677,14 +1656,24 @@ def test_g1_backing_aware_view_mutant_restores_phantom_value(
         ) == (guarded_token.address, 0)
 
     with boa.env.anchor():
-        mutant = _g1_mutant("backing_aware_views", ripe_hq_deploy)
-        _credit(mutant, guarded_token, bob, 100, teller, deploy3r)
-        guarded_token.adminBurn(mutant, 1, sender=deploy3r)
-        assert mutant.getTotalAmountForUser(bob, guarded_token) == 100
-        assert mutant.getUserAssetAndAmountAtIndex(
+        index_mutant = _g1_mutant("backing_aware_index_view", ripe_hq_deploy)
+        _credit(index_mutant, guarded_token, bob, 100, teller, deploy3r)
+        guarded_token.adminBurn(index_mutant, 1, sender=deploy3r)
+        assert index_mutant.getTotalAmountForUser(bob, guarded_token) == 0
+        assert index_mutant.getUserAssetAndAmountAtIndex(
             bob,
             1,
         ) == (guarded_token.address, 100)
+
+    with boa.env.anchor():
+        total_mutant = _g1_mutant("backing_aware_total_view", ripe_hq_deploy)
+        _credit(total_mutant, guarded_token, bob, 100, teller, deploy3r)
+        guarded_token.adminBurn(total_mutant, 1, sender=deploy3r)
+        assert total_mutant.getTotalAmountForUser(bob, guarded_token) == 100
+        assert total_mutant.getUserAssetAndAmountAtIndex(
+            bob,
+            1,
+        ) == (guarded_token.address, 0)
 
 
 def test_real_teller_batch_routes_partial_exact_and_over_request_through_guarded(
