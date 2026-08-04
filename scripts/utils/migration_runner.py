@@ -665,6 +665,14 @@ def _constructor_shape_checks(root: Path, stages: Sequence[Mapping[str, Any]]) -
             matches = tuple((root / "contracts").rglob(f"{artifact}.vy"))
             if len(matches) != 1:
                 raise MigrationPlanError("H05_ARTIFACT_SOURCE_IDENTITY")
+            if action["operation"] == "deploy-blueprint":
+                # A blueprint stores initcode; its constructor never runs, so
+                # there are no arguments to shape-check. Requiring none is the
+                # check: passing any would mean the action expects a live
+                # deployment.
+                if action.get("constructor"):
+                    raise MigrationPlanError("H05_CONSTRUCTOR_ARGUMENT_COUNT")
+                continue
             expected_count = _constructor_argument_count(
                 matches[0].read_text(encoding="utf-8")
             )
@@ -1340,9 +1348,17 @@ def build_robinhood_plan(
                     raise MigrationPlanError(
                         "H05_COMPONENT_ARTIFACT_MISMATCH"
                     )
-                deployment_counts[component_id] = deployment_counts.get(component_id, 0) + 1
-                if component_rows[component_id].selection_state in {"omitted", "deferred"}:
-                    raise MigrationPlanError("H05_UNAVAILABLE_COMPONENT_DEPLOYED")
+                if action["operation"] == "deploy-blueprint":
+                    # A blueprint stores initcode; it instantiates nothing. The
+                    # Contributor template is deployed exactly as Base does it
+                    # while CM-005 stays omitted, because no live contributor
+                    # contract results. Counting it as a component deployment
+                    # would assert the opposite of what it proves.
+                    pass
+                else:
+                    deployment_counts[component_id] = deployment_counts.get(component_id, 0) + 1
+                    if component_rows[component_id].selection_state in {"omitted", "deferred"}:
+                        raise MigrationPlanError("H05_UNAVAILABLE_COMPONENT_DEPLOYED")
             registry_data = None
             registry_ref = action.get("registry_ref")
             if registry_ref is not None:
@@ -1514,11 +1530,13 @@ def build_robinhood_plan(
         "deployment_action_ids": deployment_action_ids,
         "registration_action_ids": registration_action_ids,
     }
-    # 118 since the Base-parity pool seed action was added to 0400. Deployment
-    # and registration counts are unchanged: seeding is a configuration action.
+    # 118 since the Base-parity pool seed action was added to 0400; seeding is
+    # a configuration action, so it did not move the deployment count. 38
+    # deployments since the Contributor template became an in-flow blueprint
+    # deployment instead of an owner-supplied address, matching Base.
     if action_census["total"] != 118:
         raise MigrationPlanError("H05_ACTION_CENSUS")
-    if action_census["deployments"] != 37:
+    if action_census["deployments"] != 38:
         raise MigrationPlanError("H05_DEPLOYMENT_CENSUS")
     if action_census["registrations"] != 33:
         raise MigrationPlanError("H05_REGISTRATION_CENSUS")

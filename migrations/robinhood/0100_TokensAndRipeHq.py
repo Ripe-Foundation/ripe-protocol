@@ -116,13 +116,22 @@ MIGRATION_STAGE = {
             "postconditions": ("training-wheels-deployed",),
         },
         {
-            "semantic_action_id": "bind-contributor-template",
-            "kind": "configuration",
-            "operation": "bind-approved-preexisting-or-produced-address",
-            "component_id": "CM-049",
-            "requires": ("binding:contributor-template",),
+            # Base deploys this in-flow with migration.deploy_bp("Contributor")
+            # rather than binding a pre-existing address, so Robinhood does the
+            # same. It is an ERC-5202 blueprint: initcode that Contributor
+            # clones are created from, never a live contract.
+            "semantic_action_id": "deploy-contributor-template",
+            "kind": "deployment",
+            "operation": "deploy-blueprint",
+            "component_id": "CM-005",
+            "artifact": "Contributor",
             "provides": ("address:CONTRIBUTOR_TEMPLATE",),
-            "postconditions": ("contributor-component-remains-omitted",),
+            "postconditions": (
+                "contributor-template-blueprint-deployed",
+                # CM-005 stays omitted: a blueprint is initcode, not a live
+                # contributor. No contributor contract exists after this.
+                "contributor-component-remains-omitted",
+            ),
         },
         {
             "semantic_action_id": "deploy-defaults-robinhood",

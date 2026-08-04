@@ -146,6 +146,11 @@ def isGovernanceStandIn() -> bool:
             "address",
             ZERO_ADDRESS,
         ),
+        # Empty at launch by owner decision; Base seeded four addresses here.
+        "input:Deployment.DP-18.roles.trainingWheelsAllowlist": (
+            "address-array",
+            [],
+        ),
         # Take the CREATE path, not the BIND path. create_or_bind_pool binds to
         # a pre-existing pool when this is a non-zero address, and requires code
         # there. No GREEN/USDG pool can exist on Robinhood yet -- GREEN is

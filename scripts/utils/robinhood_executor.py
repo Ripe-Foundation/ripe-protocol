@@ -85,6 +85,7 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
         "declare-extension-seam",
         "declare-future-owner-action",
         "deploy",
+        "deploy-blueprint",
         "finalize-timelocks",
         "finish-token-setup",
         "irreversible-final-authority-handoff",
@@ -423,6 +424,10 @@ def _bind(context: ActionContext) -> BackendOutcome:
     return context.backend.bind_value(context)
 
 
+def _deploy_blueprint(context: ActionContext) -> BackendOutcome:
+    return context.backend.deploy_blueprint(context)
+
+
 def _assert(context: ActionContext) -> BackendOutcome:
     return context.backend.assert_condition(context)
 
@@ -432,11 +437,15 @@ def _non_executing(context: ActionContext) -> BackendOutcome:
 
 
 def build_handler_registry() -> HandlerRegistry:
-    """Build the exact 47-operation registry without a fallback handler."""
+    """Build the exact 48-operation registry without a fallback handler."""
 
     registry = HandlerRegistry()
     rows = (
         (_contract("deploy", "deployment", "address,binding,blueprint,curve,curve-binding,input", "address", transactional=True), _deploy),
+        # ERC-5202 blueprint deployment. Distinct from "deploy" because the
+        # Contributor template is deployed as a blueprint, not as a live
+        # contract -- Base does the same with migration.deploy_bp("Contributor").
+        (_contract("deploy-blueprint", "deployment", "", "address", transactional=True), _deploy_blueprint),
         (_contract("register-and-confirm", "registration", "action,address", transactional=True), _register),
         (_contract("assert-constructor-registration", "registration"), _constructor_registration),
         (_contract("add-and-confirm-chainlink-feed", "configuration", "address,input", transactional=True), _chainlink),

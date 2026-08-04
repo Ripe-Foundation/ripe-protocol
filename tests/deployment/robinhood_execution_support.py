@@ -109,6 +109,11 @@ def build_fully_bound_envelope(
                 values[reference] = _typed(reference, "address", ZERO)
             elif any(marker in lowered for marker in (".guardian", ".recipient")):
                 values[reference] = _typed(reference, "address", OWNER)
+            elif key == "Deployment.DP-18.roles.trainingWheelsAllowlist":
+                # Empty at launch by owner decision. Base seeded four addresses
+                # here; Robinhood starts with none and adds them afterwards
+                # through the normal governed path.
+                values[reference] = _typed(reference, "address-array", [])
             elif "allowlist" in lowered or lowered.endswith("litesigners"):
                 values[reference] = _typed(reference, "address-array", [OWNER])
             elif key in {

@@ -435,6 +435,44 @@ class DeterministicRobinhoodBackend:
             transactional=True,
         )
 
+    def deploy_blueprint(self, context: ActionContext) -> BackendOutcome:
+        """Deterministic counterpart of the boa blueprint deployment.
+
+        Modelled as a deployment with a distinct identity domain so a blueprint
+        can never collide with a live contract deployed by the same action id.
+        """
+        reference = context.action["provides"][0]
+        existing = self.deployments.get(reference)
+        source = f"contracts/{context.action['artifact']}.vy"
+        if existing is not None:
+            return self._run(
+                context,
+                outputs={reference: existing},
+                deployed_address=existing,
+                artifact=ArtifactIdentity(
+                    source,
+                    hashlib.sha256(source.encode("ascii")).hexdigest(),
+                    hashlib.sha256(existing.encode("ascii")).hexdigest(),
+                ),
+                transactional=True,
+                mutated=False,
+            )
+        address = "0x" + hashlib.sha256(
+            f"blueprint:{context.action['action_id']}".encode("ascii")
+        ).hexdigest()[-40:]
+        self.deployments[reference] = address
+        return self._run(
+            context,
+            outputs={reference: address},
+            deployed_address=address,
+            artifact=ArtifactIdentity(
+                source,
+                hashlib.sha256(source.encode("ascii")).hexdigest(),
+                hashlib.sha256(address.encode("ascii")).hexdigest(),
+            ),
+            transactional=True,
+        )
+
     def register_and_confirm(self, context: ActionContext) -> BackendOutcome:
         row = context.action["registry"]
         target = next(item.value for item in context.inputs if item.reference.startswith("address:"))
@@ -903,6 +941,45 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
             outputs={reference: address},
             deployed_address=address,
             artifact=identity,
+            transactional=True,
+        )
+
+    def deploy_blueprint(self, context: ActionContext) -> BackendOutcome:
+        """Deploy an ERC-5202 blueprint, as Base's migration.deploy_bp does.
+
+        Distinct from deploy(): the Contributor template is never a live
+        contract, it is initcode that Contributor clones are created from.
+        """
+        artifact_name = context.action["artifact"]
+        reference = context.action["provides"][0]
+        try:
+            source_path = self.files[artifact_name]
+        except KeyError as error:
+            raise RobinhoodExecutionError(
+                "RHX_ARTIFACT_UNKNOWN", action_id=context.action["action_id"]
+            ) from error
+        deployer = self.boa.load_partial(source_path)
+        contract = deployer.deploy_as_blueprint(
+            name=f"robinhood_{context.action['semantic_action_id']}"
+        )
+        address = self._address(contract)
+        self.contracts[reference] = contract
+        self.contracts_by_address[address] = contract
+        self.production_deployments.append(artifact_name)
+        runtime = bytes(self.boa.env.get_code(address))
+        if not runtime:
+            raise RobinhoodExecutionError(
+                "RHX_BLUEPRINT_EMPTY", action_id=context.action["action_id"]
+            )
+        return self._boa_outcome(
+            context,
+            outputs={reference: address},
+            deployed_address=address,
+            artifact=ArtifactIdentity(
+                self._repository_relative_source(context, source_path),
+                hashlib.sha256(Path(source_path).read_bytes()).hexdigest(),
+                hashlib.sha256(runtime).hexdigest(),
+            ),
             transactional=True,
         )
 
