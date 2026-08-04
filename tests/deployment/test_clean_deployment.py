@@ -216,13 +216,13 @@ def test_profiles_share_source_but_bind_isolated_plan_and_history_identities(
     assert testnet["profile"]["expected_chain_id"] == 46630
     assert EXPECTED_NAMESPACE_COUNTS == {
         "action": 7,
-        "address": 141,
-        "binding": 58,
+        "address": 144,
+        "binding": 59,
         "blueprint": 6,
-        "curve": 40,
+        "curve": 45,
         "curve-binding": 2,
         "defaults": 7,
-        "input": 73,
+        "input": 72,
         "input-prefix": 2,
         "registry": 36,
         "stock": 16,
@@ -288,7 +288,19 @@ def deployment_authority_marker():
         boa.env.set_balance(sender, 10**24)
         mock_erc20 = root / "contracts/mock/MockErc20.vy"
         mock_feed = root / "contracts/mock/MockChainlinkFeed.vy"
-        usdg = boa.load(str(mock_erc20), sender, "USDG", "USDG", 6, 0)
+        # The deployer must hold the USDG it seeds the pool with, exactly as on
+        # the real chain. MockErc20 credits `_supply * 10 ** decimals` to the
+        # deployer, and the approved seed is 100 USDG (6dp), so pass 100 whole
+        # units. Leaving this at 0 makes the seed action fail closed with
+        # RHX_SEED_FUNDING_INSUFFICIENT, which is the guard working, not a bug.
+        seed_usdg, _seed_green = next(
+            row.value
+            for row in source_blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
+            if row.input_id == "pool.production_liquidity_amount"
+        )
+        usdg = boa.load(
+            str(mock_erc20), sender, "USDG", "USDG", 6, seed_usdg // 10**6
+        )
         weth = boa.load(str(mock_erc20), sender, "Wrapped Ether", "WETH", 18, 0)
         steakhouse = boa.load(str(mock_erc20), sender, "Steakhouse USDG", "sUSDG", 18, 0)
         eth_feed = boa.load(str(mock_feed), 3_000 * 10**18)
@@ -303,6 +315,18 @@ def deployment_authority_marker():
         ).read_text().replace(
             "if _id == 7 or _id == 12:",
             "if _id in [7, 11, 12, 13]:",
+        ).replace(
+            "coin0: public(address)",
+            # Declared in the header because Vyper resolves module-level
+            # declarations before function bodies.
+            "interface SeedToken:\n"
+            "    def transferFrom("
+            "_f: address, _t: address, _v: uint256) -> bool: nonpayable\n"
+            "\n"
+            "lpBalanceOf: public(HashMap[address, uint256])\n"
+            "lpTotalSupply: public(uint256)\n"
+            "coin0: public(address)",
+            1,
         ) + """
 
 @external
@@ -334,6 +358,42 @@ def deploy_plain_pool(
     self.registeredPool = self
     self.isPoolRegistered = True
     return self
+
+
+@external
+def add_liquidity(
+    # DynArray, not uint256[2]: StableSwap-NG's ABI is
+    # add_liquidity(uint256[],uint256) and a fixed-size array would compile to
+    # a different selector, so the call would find no function and revert empty.
+    _amounts: DynArray[uint256, 2], _min_mint_amount: uint256
+) -> uint256:
+    assert not self.shouldRevert, "pool revert"
+    assert extcall SeedToken(self.coin0).transferFrom(
+        msg.sender, self, _amounts[0]
+    )
+    assert extcall SeedToken(self.coin1).transferFrom(
+        msg.sender, self, _amounts[1]
+    )
+    # coin0 is USDG at 6 decimals, coin1 is GREEN at 18.
+    minted: uint256 = _amounts[0] * 10**12 + _amounts[1]
+    assert minted >= _min_mint_amount, "slippage"
+    self.lpBalanceOf[msg.sender] += minted
+    self.lpTotalSupply += minted
+    return minted
+
+
+@view
+@external
+def balanceOf(_owner: address) -> uint256:
+    return self.lpBalanceOf[_owner]
+
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    assert self.lpBalanceOf[msg.sender] >= _value, "insufficient lp"
+    self.lpBalanceOf[msg.sender] -= _value
+    self.lpBalanceOf[_to] += _value
+    return True
 """
         curve_system = boa.loads(
             curve_source,
@@ -371,6 +431,14 @@ def deploy_plain_pool(
             "binding:contributor-template": ("address", address(contributor)),
             "binding:initial-ripe-hq": ("address", ZERO_ADDRESS),
             "binding:temporary-local-governance": (
+                "address",
+                str(sender).lower(),
+            ),
+            # The deployer receives the initial GREEN because the deployer is
+            # what seeds the pool in 0600. This must be the real local sender,
+            # not the fixture's placeholder, or the GREEN is minted to an
+            # account the seed cannot spend from.
+            "binding:green-supply-recipient": (
                 "address",
                 str(sender).lower(),
             ),

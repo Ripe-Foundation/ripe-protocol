@@ -126,10 +126,13 @@ def build_fully_bound_envelope(
                     reference, "address", TEMPORARY_GOVERNANCE
                 )
             elif key == "green-supply-recipient":
-                # Receives the initial GREEN supply, so it must be an address.
-                # The fork harness binds this to the deployer, which then seeds
-                # the pool; OWNER is the fixture's equivalent stand-in.
-                values[reference] = _typed(reference, "address", OWNER)
+                # Receives the initial GREEN supply, so it must be an address --
+                # and it must be the DEPLOYER, because the deployer is what
+                # seeds the pool later in 0600. Binding this to any other
+                # account mints the GREEN somewhere the seed cannot spend it.
+                values[reference] = _typed(
+                    reference, "address", TEMPORARY_GOVERNANCE
+                )
             elif key == "contributor-template" or "identity" in key:
                 values[reference] = _typed(reference, "address", OWNER)
             elif key == "approved-capability-set":

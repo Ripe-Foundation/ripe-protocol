@@ -71,6 +71,18 @@ def _current_git_identity() -> tuple[str, str]:
     return identities[0], identities[1]
 
 
+def _working_tree_is_dirty() -> bool:
+    result = subprocess.run(
+        ["/usr/bin/git", "status", "--porcelain"],
+        cwd=ROOT,
+        env={"LANG": "C", "LC_ALL": "C"},
+        capture_output=True,
+        check=True,
+        encoding="utf-8",
+    )
+    return bool(result.stdout.strip())
+
+
 def _assert_current_report_preview_identity(report) -> None:
     current_commit, current_tree = _current_git_identity()
     expected_tree = build_robinhood_plan(
@@ -80,7 +92,13 @@ def _assert_current_report_preview_identity(report) -> None:
     assert report["source_base_commit"] == current_commit
     assert report["source_base_tree"] == current_tree
     assert report["source_tree"] == expected_tree
-    assert report["source_tree"] != current_tree
+    # The preview tree is built from the WORKING state, so it differs from
+    # HEAD's tree only when there is something uncommitted to differ by. On a
+    # clean checkout the two are legitimately identical, and demanding
+    # inequality would fail precisely when the repository is in the state a
+    # production plan requires.
+    if _working_tree_is_dirty():
+        assert report["source_tree"] != current_tree
     for identity in (
         report["source_base_commit"],
         report["source_base_tree"],
