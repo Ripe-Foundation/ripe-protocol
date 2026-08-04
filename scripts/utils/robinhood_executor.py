@@ -1346,7 +1346,7 @@ class RobinhoodStageExecutor:
         self.stage_cursor += 1
         if self.stage_cursor == len(self.plan["stages"]):
             final_id = "0900:000005:handoff-governance-and-relinquish-deployer"
-            if list(self.results)[-1] != final_id or len(self.results) != 118:
+            if list(self.results)[-1] != final_id or len(self.results) != 119:
                 raise RobinhoodExecutionError("RHX_FINAL_HANDOFF_ORDER")
             if self.history is not None and terminal_record is not None:
                 self.history.promote(terminal_record)
