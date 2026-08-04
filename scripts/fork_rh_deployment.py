@@ -163,7 +163,10 @@ def isGovernanceStandIn() -> bool:
         # would shadow exactly what we want this run to prove.
     }
 
+    import time as _time
+    _t = _time.monotonic()
     plan = build_bound_plan(ROOT, overrides=overrides)
+    print(f"  plan build {_time.monotonic() - _t:.1f}s")
     backend = BoaRobinhoodBackend(
         boa_module=boa,
         files=_production_files(ROOT),
@@ -177,9 +180,16 @@ def isGovernanceStandIn() -> bool:
 
     print(f"\nExecuting {sum(len(s['actions']) for s in plan['stages'])} actions "
           f"across {len(plan['stages'])} stages against forked state\n")
+    import time as _time
+    started = _time.monotonic()
     for stage in plan["stages"]:
+        stage_started = _time.monotonic()
         executor(MigrationHandoff(), stage)
-        print(f"  {stage['migration_id']} {stage['semantic_id']:<34} ok")
+        print(
+            f"  {stage['migration_id']} {stage['semantic_id']:<34} ok"
+            f"  {_time.monotonic() - stage_started:6.1f}s"
+        )
+    print(f"\n  execution total {_time.monotonic() - started:.1f}s")
 
     print("\nEnd state:")
     print(f"  actions executed        {len(executor.results)}")
