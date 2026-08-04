@@ -107,6 +107,21 @@ DELEVERAGE_OVERAGE_BPS = 100
 DELEVERAGE_DUST_THRESHOLD = 0  # disabled pending governance policy approval
 DELEVERAGE_DUST_BPS = 0  # disabled pending governance policy approval
 
+# --- endaoment PSM ----------------------------------------------------------
+# Deployed DISABLED: the constructor hard-sets canMint and canRedeem to False,
+# and activation is a separate governed step. These fees and caps are
+# scaffolding, not approved policy -- they are nonzero only because the
+# constructor rejects a zero interval and a zero or max cap, and they are inert
+# while mint and redeem are false. Values from the rh-deploy branch.
+PSM_NUM_BLOCKS_PER_INTERVAL = 7_200  # 1 day on Robinhood
+PSM_MINT_FEE = 0
+PSM_MAX_INTERVAL_MINT = 100_000 * 10**18
+PSM_REDEEM_FEE = 0
+PSM_MAX_INTERVAL_REDEEM = 100_000 * 10**18
+# Yield position disabled: lego id 0 and a zero vault token leave it unset.
+PSM_YIELD_LEGO_ID = 0
+PSM_YIELD_VAULT_TOKEN = ZERO_ADDRESS
+
 # --- price sources ----------------------------------------------------------
 # CurvePrices takes a price-change timelock band. Robinhood has no separate
 # PRICE_DESK_*_REG_TIMELOCK, so all three price sources share the approved

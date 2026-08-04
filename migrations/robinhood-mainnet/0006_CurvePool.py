@@ -35,7 +35,9 @@ def migrate(migration: Migration):
         '"outputs":[{"name":"","type":"bool"}]},'
         '{"type":"function","name":"balanceOf","stateMutability":"view",'
         '"inputs":[{"name":"o","type":"address"}],'
-        '"outputs":[{"name":"","type":"uint256"}]}]'
+        '"outputs":[{"name":"","type":"uint256"}]},'
+        '{"type":"function","name":"totalSupply","stateMutability":"view",'
+        '"inputs":[],"outputs":[{"name":"","type":"uint256"}]}]'
     ).at(address("USDG"))
 
     log.h1("Deploying GREEN/USDG Curve pool")
@@ -95,7 +97,20 @@ def migrate(migration: Migration):
 
     log.h1("Seeding GREEN/USDG pool")
 
-    assert int(usdg.balanceOf(deployer)) >= POOL_SEED_USDG, "deployer holds no USDG"
+    held = int(usdg.balanceOf(deployer))
+    if held < POOL_SEED_USDG:
+        # On a fork the balance can be written directly; on a live chain it
+        # cannot, so this fails loudly rather than leaving a pool nobody can
+        # seed. boa.deal adjusts totalSupply too, which is why the ABI carries
+        # it -- dealt balances never exceed supply.
+        try:
+            boa.deal(usdg, deployer, POOL_SEED_USDG)
+        except Exception as error:
+            raise AssertionError(
+                f"deployer {deployer} holds {held} USDG but needs "
+                f"{POOL_SEED_USDG}. Fund it before running this migration."
+            ) from error
+        log.h2(f"fork-only: dealt {POOL_SEED_USDG / 10**6:.2f} USDG to deployer")
 
     migration.execute(usdg.approve, pool_address, POOL_SEED_USDG)
     migration.execute(green_token.approve, pool_address, POOL_SEED_GREEN)

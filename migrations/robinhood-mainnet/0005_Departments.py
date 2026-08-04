@@ -1,7 +1,15 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
+from tests.constants import ZERO_ADDRESS
 
 from config.robinhood_launch import (
+    PSM_MAX_INTERVAL_MINT,
+    PSM_MAX_INTERVAL_REDEEM,
+    PSM_MINT_FEE,
+    PSM_NUM_BLOCKS_PER_INTERVAL,
+    PSM_REDEEM_FEE,
+    PSM_YIELD_LEGO_ID,
+    PSM_YIELD_VAULT_TOKEN,
     DELEVERAGE_BUFFER,
     DELEVERAGE_COOLDOWN,
     DELEVERAGE_DUST_BPS,
@@ -111,4 +119,27 @@ def migrate(migration: Migration):
     register(migration.deploy("CreditRedeem", hq), "CreditRedeem", 19)
     register(migration.deploy("TellerUtils", hq), "TellerUtils", 20)
     register(migration.deploy("EndaomentFunds", hq), "EndaomentFunds", 21)
-    register(migration.deploy("EndaomentPSM", hq), "EndaomentPSM", 22)
+
+    # Deployed DISABLED: the constructor hard-sets canMint and canRedeem False.
+    # The fees and caps are inert scaffolding -- nonzero only because the
+    # constructor rejects a zero interval and a zero or max cap.
+    reserve_asset = address("USDG")
+    assert reserve_asset != ZERO_ADDRESS  # dev: psm reserve asset unresolved
+    endaoment_psm = migration.deploy(
+        "EndaomentPSM",
+        hq,
+        PSM_NUM_BLOCKS_PER_INTERVAL,
+        PSM_MINT_FEE,
+        PSM_MAX_INTERVAL_MINT,
+        PSM_REDEEM_FEE,
+        PSM_MAX_INTERVAL_REDEEM,
+        reserve_asset,
+        PSM_YIELD_LEGO_ID,
+        PSM_YIELD_VAULT_TOKEN,
+    )
+    register(endaoment_psm, "EndaomentPSM", 22)
+
+    # The HQ-level mint capability stays withheld while the PSM is disabled;
+    # granting it is part of activation, not deployment.
+    assert not bool(migration.execute(endaoment_psm.canMint))
+    assert not bool(migration.execute(endaoment_psm.canRedeem))
