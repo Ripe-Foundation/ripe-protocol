@@ -122,21 +122,24 @@ def main() -> int:
         address = row["address"]
         src = sources.get(name)
         if src is None:
-            print(f"  {name:22} SKIP  no .vy source (blueprint or external)")
+            print(f"  {name:22} SKIP  no .vy source (blueprint or external)", flush=True)
             skipped += 1
             continue
         if not args.force and is_verified(address):
-            print(f"  {name:22} ok    already verified")
+            print(f"  {name:22} ok    already verified", flush=True)
             skipped += 1
             continue
         if args.dry_run:
             print(f"  {name:22} would submit {src.relative_to(ROOT)} @ {address}")
             continue
+        # Printed before the slow part so the run never looks hung: a submit
+        # plus polling can take a minute per contract.
+        print(f"  {name:22} submitting (up to 60s)...", flush=True)
         try:
             ok, detail = submit(address, src, version)
         except Exception as error:
             ok, detail = False, f"{type(error).__name__}: {error}"
-        print(f"  {name:22} {'SENT ' if ok else 'FAIL '} {detail}")
+        print(f"  {name:22} {'OK   ' if ok else 'FAIL '} {detail}", flush=True)
         done += ok
         failed += not ok
 
