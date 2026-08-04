@@ -217,7 +217,7 @@ def test_profiles_share_source_but_bind_isolated_plan_and_history_identities(
     assert EXPECTED_NAMESPACE_COUNTS == {
         "action": 7,
         "address": 144,
-        "binding": 59,
+        "binding": 58,
         "blueprint": 6,
         "curve": 45,
         "curve-binding": 2,

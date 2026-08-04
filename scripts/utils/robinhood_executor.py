@@ -101,7 +101,9 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
 EXPECTED_NAMESPACE_COUNTS = {
     "action": 7,
     "address": 144,
-    "binding": 59,
+    # 58 since binding:contributor-template was replaced by an in-flow
+    # blueprint deployment.
+    "binding": 58,
     "blueprint": 6,
     "curve": 45,
     "curve-binding": 2,
@@ -1199,7 +1201,7 @@ class RobinhoodStageExecutor:
             raise RobinhoodExecutionError("RHX_STAGE_CENSUS_DRIFT")
         actions = [action for stage in stages for action in stage["actions"]]
         census = self.plan["action_census"]
-        if (len(actions), census["deployments"], census["registrations"]) != (118, 37, 33):
+        if (len(actions), census["deployments"], census["registrations"]) != (118, 38, 33):
             raise RobinhoodExecutionError("RHX_ACTION_CENSUS_DRIFT")
         operations = {action["operation"] for action in actions}
         self.registry.validate_vocabulary(operations)
