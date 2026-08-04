@@ -894,53 +894,66 @@ ROBINHOOD_COMPONENTS = {
     "profile_1_omissions": ("GREEN_USDG_LP", "RIPE_WETH_LP"),
 }
 
+# Block-count constants, mirroring contracts/config/DefaultsRobinhood.vy so the
+# deployment inputs and the Defaults contract read in the same units.
+#
+# BLOCKS_PER_MINUTE is 5, not 600: on this Arbitrum L2 `block.number` is the L1
+# ancestor estimate advancing roughly every 12 seconds, not the child block
+# height. Timelocks below are therefore wall-clock durations on that clock.
+BLOCKS_PER_MINUTE = 5
+HOUR_IN_BLOCKS = 60 * BLOCKS_PER_MINUTE
+DAY_IN_BLOCKS = 24 * HOUR_IN_BLOCKS
+WEEK_IN_BLOCKS = 7 * DAY_IN_BLOCKS
+MONTH_IN_BLOCKS = 30 * DAY_IN_BLOCKS
+YEAR_IN_BLOCKS = 365 * DAY_IN_BLOCKS
+
 ROBINHOOD_DEPLOYMENT_INPUTS = {
     # DP-04
     'Deployment.DP-04.ledger.actionBlockSourceBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_04_LEDGER_ACTIONBLOCKSOURCEBINDING'), 'blocked'),
     # DP-05
-    'Deployment.DP-05.timelocks.TokenHq.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.TokenHq.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.TokenHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.actionTimeLock': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.minTimeLock': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.actionTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardAlpha.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardBravo.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardCharlie.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardDelta.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardEcho.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.Chainlink.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.expiration': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.expiration': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.Contributor.delay': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.addDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.updateDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.disableDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.minDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.maxDelay': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.Contributor.delay': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.addDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.updateDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.disableDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.minDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.maxDelay': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     # DP-07
     'Deployment.DP-07.psm.constructor.canMint': RobinhoodInput(False, 'disabled'),
     'Deployment.DP-07.psm.constructor.canRedeem': RobinhoodInput(False, 'disabled'),
@@ -1042,9 +1055,9 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-21.endaoment.nativeName': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVENAME'), 'blocked'),
     'Deployment.DP-21.endaoment.nativeDecimals': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVEDECIMALS'), 'blocked'),
     # DP-22
-    'Deployment.DP-22.bondBooster.maxBoostRatio': RobinhoodInput(20000, 'approved'),
-    'Deployment.DP-22.bondBooster.maxUnits': RobinhoodInput(25000, 'approved'),
-    'Deployment.DP-22.bondBooster.minLockDuration': RobinhoodInput(1296000, 'approved'),
+    'Deployment.DP-22.bondBooster.maxBoostRatio': RobinhoodInput(200_00, 'approved'),  # 200%
+    'Deployment.DP-22.bondBooster.maxUnits': RobinhoodInput(25_000, 'approved'),  # a count, not a ratio
+    'Deployment.DP-22.bondBooster.minLockDuration': RobinhoodInput(DAY_IN_BLOCKS * 180, 'approved'),
     # DP-23
     'Deployment.DP-23.external.chainlink.ethUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_ETH_USD"], 'external_fact'),
     'Deployment.DP-23.external.chainlink.btcUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_BTC_USD"], 'external_fact'),
