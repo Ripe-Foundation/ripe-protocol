@@ -130,6 +130,31 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows):
                 blueprint.ROBINHOOD_GOVERNANCE,
                 "owner decision: evidentiary role, the Safe holds the powers it names",
             )
+        if key.startswith("lootbox-"):
+            # Every Lootbox parameter is an Underscore reward, and Underscore is
+            # intentionally absent on Robinhood (UNDERSCORE_REGISTRY is zero).
+            # The floor must still be nonzero: the constructor asserts
+            # _minUnderscoreSendInterval is neither 0 nor max_value.
+            if key == "lootbox-min-send-interval":
+                return "uint256", 1, "Underscore absent; nonzero floor required by constructor"
+            return "uint256", 0, "Underscore intentionally absent on Robinhood"
+        if key.startswith("deleverage-"):
+            # Fresh-deployment values recorded in
+            # docs/chains/rh/deleverage-cooldown-security-decision.md, plus the
+            # literals Base passed in 2026072800_DeleverageAuctionHouse.py.
+            fresh = {
+                "deleverage-min-bps": (0, "fresh Deleverage default (RH cooldown decision doc)"),
+                "deleverage-buffer": (0, "fresh Deleverage default (RH cooldown decision doc)"),
+                "deleverage-underscore-spread": (100, "fresh Deleverage default (RH cooldown decision doc)"),
+                "deleverage-full-payoff-buffer": (10**15, "Base 2026072800 literal"),
+                "deleverage-overage-bps": (100, "Base 2026072800 literal"),
+                "deleverage-dust-threshold": (0, "Base 2026072800: disabled pending governance policy"),
+                "deleverage-dust-bps": (0, "Base 2026072800: disabled pending governance policy"),
+            }
+            if key in fresh:
+                value, authority = fresh[key]
+                return "uint256", value, authority
+            raise Unjustified("unmapped deleverage parameter")
         if key.startswith("bluechip-"):
             # Only Morpho V2 exists on Robinhood, and it is bound separately as
             # a DP-23 external fact. A zero registry fails closed: Vyper checks
