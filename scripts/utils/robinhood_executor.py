@@ -77,7 +77,6 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
         "assert-state-import-absent",
         "assert-topology-authority",
         "assert-typed-input",
-        "bind-approved-preexisting-or-produced-address",
         "bind-approved-product-packet-and-operational-gates",
         "bind-role-identities",
         "bind-selected-tooling-component",
@@ -439,7 +438,7 @@ def _non_executing(context: ActionContext) -> BackendOutcome:
 
 
 def build_handler_registry() -> HandlerRegistry:
-    """Build the exact 48-operation registry without a fallback handler."""
+    """Build the exact 47-operation registry without a fallback handler."""
 
     registry = HandlerRegistry()
     rows = (
@@ -465,7 +464,6 @@ def build_handler_registry() -> HandlerRegistry:
         (_contract("apply-exact-capability-set", "configuration", "binding", transactional=True), _capabilities),
         (_contract("finalize-timelocks", "configuration", "input-prefix", transactional=True), _timelocks),
         (_contract("irreversible-final-authority-handoff", "handoff", "action,binding", transactional=True), _handoff),
-        (_contract("bind-approved-preexisting-or-produced-address", "configuration", "binding", "address"), _bind),
         (_contract("bind-role-identities", "configuration", "address,binding,input"), _bind),
     )
     assertion_rows = {
