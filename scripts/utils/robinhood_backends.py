@@ -959,9 +959,7 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
                 "RHX_ARTIFACT_UNKNOWN", action_id=context.action["action_id"]
             ) from error
         deployer = self.boa.load_partial(source_path)
-        contract = deployer.deploy_as_blueprint(
-            name=f"robinhood_{context.action['semantic_action_id']}"
-        )
+        contract = deployer.deploy_as_blueprint()
         address = self._address(contract)
         self.contracts[reference] = contract
         self.contracts_by_address[address] = contract
