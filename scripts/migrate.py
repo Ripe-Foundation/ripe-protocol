@@ -32,6 +32,29 @@ def _rpc_from_env(chain):
     return os.environ.get(f"{chain.replace('-', '_').upper()}_RPC_URL")
 
 
+def _local_account(account_name):
+    """Load the deployer key from {ACCOUNT}_PRIVATE_KEY, e.g. DEPLOYER.
+
+    scripts.utils.migration_helpers.get_account now requires a verified
+    network identity for the H-02 path, so this keeps the plain key route
+    without changing a helper that other callers depend on. There is no
+    fallback test key: deploying from a well-known key is never what anyone
+    wants, and a missing key should say so rather than pick one.
+    """
+    from eth_account import Account
+
+    log.h1(f"Connecting to deployer account {account_name}")
+    key = os.environ.get(f"{account_name}_PRIVATE_KEY")
+    if not key:
+        raise click.ClickException(
+            f"{account_name}_PRIVATE_KEY is not set. Export it, put it in "
+            ".env, or pass --ledger <index> to sign with a device."
+        )
+    account = Account.from_key(key)
+    log.h2(f"Deployer account {account_name} connected")
+    return account
+
+
 CLICK_PROMPTS = {
     "safe": {
         "prompt": "What is the safe address?",
@@ -298,7 +321,7 @@ def cli(
         if fork:
             sender = MockAccount(sender.address)
     else:
-        sender = get_account(account)
+        sender = _local_account(account)
 
     deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
 
