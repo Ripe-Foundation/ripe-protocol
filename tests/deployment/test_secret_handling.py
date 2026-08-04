@@ -227,7 +227,9 @@ def test_rpc_env_read_only_for_required_operation():
     with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
         resolve_rpc_reference(
             get_profile("robinhood-mainnet"),
-            Operation.MIGRATION_LIVE,
+            # MIGRATION_LIVE is owner-approved now; CONSOLE_EVIDENCE is the
+            # remaining blocked operation that still requires RPC.
+            Operation.CONSOLE_EVIDENCE,
             blocked_environment,
         )
     assert blocked_environment.accesses == []
@@ -416,13 +418,16 @@ def test_wrong_chain_prevents_private_key_mapping_access(monkeypatch):
             "H02_PROFILE_UNKNOWN",
         ),
         (
+            # MIGRATION_FORK is owner-approved for Robinhood now. CONSOLE_EVIDENCE
+            # is the remaining blocked operation, so identity validation still has
+            # a blocked case to precede key access for.
             VerifiedNetworkIdentity(
                 "robinhood-mainnet",
-                Operation.MIGRATION_FORK,
+                Operation.CONSOLE_EVIDENCE,
                 4663,
                 4663,
             ),
-            Operation.MIGRATION_FORK,
+            Operation.CONSOLE_EVIDENCE,
             "H02_OPERATION_BLOCKED",
         ),
         (

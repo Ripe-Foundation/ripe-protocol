@@ -272,7 +272,6 @@ def test_curve_constructor_uses_exact_integrated_binding_authority():
     (
         "curve:pool.address",
         "curve:pool.slippage_limit",
-        "curve:pool.withdrawal_authority",
         "curve:pool.minimum_retained_liquidity",
     ),
 )

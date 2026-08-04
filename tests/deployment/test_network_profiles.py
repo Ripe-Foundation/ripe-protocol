@@ -342,8 +342,11 @@ def test_unsupported_and_blocked_pending_policy_are_distinct():
     sepolia = operation_decision(
         get_profile("base-sepolia"), Operation.MIGRATION_LIVE
     )
+    # MIGRATION_LIVE is owner-approved for Robinhood now, so it is no longer a
+    # blocked example. CONSOLE_EVIDENCE still is, and carries the same rpc and
+    # identity requirements, so the distinction under test is unchanged.
     robinhood = operation_decision(
-        get_profile("robinhood-mainnet"), Operation.MIGRATION_LIVE
+        get_profile("robinhood-mainnet"), Operation.CONSOLE_EVIDENCE
     )
     assert sepolia.outcome is OperationOutcome.UNSUPPORTED
     assert robinhood.outcome is OperationOutcome.BLOCKED_PENDING_POLICY
