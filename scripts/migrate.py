@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from contextlib import ExitStack, contextmanager
 import importlib
@@ -231,6 +232,17 @@ def _resolve_sender(
         return MockAccount(sender.address) if fork else sender
 
     return get_account(account, identity, operation)
+
+
+def _redact_urls(text: str) -> str:
+    """Strip provider URLs from text that will be shown or logged.
+
+    Transport errors quote the endpoint they failed against, and those carry an
+    API key in the path or query. Everything after the host goes.
+    """
+    return re.sub(
+        r"(https?://[^/\s]+)[^\s]*", r"\1/<redacted>", str(text)
+    )
 
 
 def _require_static_assertions(profile, environment, blueprint) -> str:
@@ -511,7 +523,10 @@ def cli(
         )
         require_operation(profile, operation)
 
-        is_robinhood = profile.identity.profile_id.startswith("robinhood-")
+        # Keyed off the SOURCE, not the profile name. The plan/envelope pair
+        # belongs to the declarative migrations/robinhood source; a profile with
+        # its own imperative directory runs the plain path, exactly like Base.
+        is_robinhood = str(profile.repository.migration_dir) == "migrations/robinhood"
         execution_values = (
             execution_plan,
             execution_envelope,
@@ -523,11 +538,11 @@ def cli(
             raise MigrationPlanError("H05_EXECUTION_PROFILE_REQUIRED")
 
         # The Ledger is the approved Robinhood deployer -- it is also RipeHq
-        # governance until the 0900 handoff, exactly as on Base. A Safe is not:
+        # governance until the final handoff, exactly as on Base. A Safe is not:
         # the Safe RECEIVES governance at the handoff and never signs a
-        # deployment transaction, so selecting it here would mean the sender is
-        # not the account the plan binds as temporary governance.
-        if safe and is_robinhood:
+        # deployment transaction, so selecting it would mean the sender is not
+        # the account that governs the run. True for either Robinhood source.
+        if safe and profile.identity.profile_id.startswith("robinhood-"):
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
                 profile_id=profile.identity.profile_id,
@@ -677,17 +692,37 @@ def cli(
             failure_timestamp = str(error.failure_timestamp)
             if not failure_timestamp.isdigit():
                 failure_timestamp = "<invalid>"
+            if os.environ.get("RIPE_MIGRATE_TRACE"):
+                raise
+            # MigrationError is raised `from` the real failure, so the cause is
+            # the only thing that says WHICH call broke. Without it the operator
+            # gets a timestamp and has to bisect the migration by hand.
+            cause = error.__cause__
+            detail = (
+                _redact_urls(f"{type(cause).__name__}: {cause}")
+                if cause is not None
+                else "<unknown>"
+            )
             raise click.ClickException(
                 "H02_MIGRATION_EXECUTION_FAILED "
                 f"profile={profile.identity.profile_id} "
                 f"operation={operation.value} "
-                f"failure_timestamp={failure_timestamp}"
+                f"failure_timestamp={failure_timestamp} "
+                f"cause={detail}"
             ) from None
-        except Exception:
+        except Exception as error:
+            # Report WHAT failed. The bare code alone makes a failed run
+            # undebuggable, which is the opposite of what a fork run is for.
+            # The cause is redacted the same way the RPC reference is, because
+            # a provider URL can appear in a transport error.
+            detail = _redact_urls(f"{type(error).__name__}: {error}")
+            if os.environ.get("RIPE_MIGRATE_TRACE"):
+                raise
             raise click.ClickException(
                 "H02_MIGRATION_EXECUTION_FAILED "
                 f"profile={profile.identity.profile_id} "
-                f"operation={operation.value}"
+                f"operation={operation.value} "
+                f"cause={detail}"
             ) from None
 
     log.info(f"Total gas used: {total_gas}")

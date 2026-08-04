@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 import hashlib
+import importlib.util
 import os
 from pathlib import Path, PurePosixPath
 import re

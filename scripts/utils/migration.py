@@ -20,8 +20,11 @@ from scripts.utils.migration_runner import (
 )
 
 
+# Histories written by the DECLARATIVE migrations/robinhood source, which
+# records H-06 manifest v2 and forbids the legacy transaction path. Only
+# robinhood-testnet still uses that source; robinhood-mainnet has its own
+# imperative directory and writes an ordinary manifest, like base-mainnet.
 _ROBINHOOD_HISTORY_SUFFIXES = (
-    PurePosixPath("migration_history/robinhood-mainnet/v1"),
     PurePosixPath("migration_history/robinhood-testnet/v1"),
 )
 

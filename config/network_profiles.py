@@ -441,15 +441,16 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ROBINHOOD_MAINNET_RPC_URL", _ROBINHOOD_OPERATIONS
         ),
         repository=RepositoryPolicy(
-            # Named so migration_fork/live can assert the profile's blueprint;
-            # it was None, which reads as "no repository" and blocks execution.
-            # migration_state stays PROPOSED: the registry requires it for the
-            # source both Robinhood profiles share.
+            # Its own migration directory, like base-mainnet. While this shared
+            # migrations/robinhood with the testnet profile, two invariants were
+            # mutually exclusive: a named blueprint requires EXISTING, and a
+            # SHARED source requires PROPOSED -- so a Robinhood migration could
+            # never both name its blueprint and be executable.
             "robinhood",
-            PurePosixPath("migrations/robinhood"),
-            PathState.PROPOSED,
+            PurePosixPath("migrations/robinhood-mainnet"),
+            PathState.EXISTING,
             PurePosixPath("migration_history/robinhood-mainnet/v1"),
-            PathState.PROPOSED,
+            PathState.EXISTING,
         ),
         fork=ForkPolicy(True, True, True, True),
         # The Ledger is the approved deployer; env-private-key stays for the
@@ -472,8 +473,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ROBINHOOD_TESTNET_RPC_URL", _ROBINHOOD_OPERATIONS
         ),
         repository=RepositoryPolicy(
-            # Same shared source, so the same blueprint identity as mainnet.
-            "robinhood",
+            # The testnet profile keeps the declarative source; only mainnet
+            # moved to its own imperative directory. Nothing shares a source
+            # now, so the PROPOSED-for-shared rule no longer applies to either.
+            None,
             PurePosixPath("migrations/robinhood"),
             PathState.PROPOSED,
             PurePosixPath("migration_history/robinhood-testnet/v1"),
