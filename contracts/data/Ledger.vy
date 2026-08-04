@@ -191,11 +191,6 @@ def __init__(_ripeHq: address, _defaults: address, _actionBlockSource: address):
     assert _actionBlockSource in [empty(address), ARB_SYS] # dev: invalid action block source
     ACTION_BLOCK_SOURCE = _actionBlockSource
 
-    # Fail construction if the selected external source cannot execute and
-    # decode the exact approved ABI. Native mode makes no external call.
-    if _actionBlockSource == ARB_SYS:
-        _: uint256 = self._getArbActionBlock()
-
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
@@ -206,6 +201,12 @@ def __init__(_ripeHq: address, _defaults: address, _actionBlockSource: address):
 
 
 # one action per block
+
+
+@view
+@external
+def getArbActionBlock() -> uint256:
+    return self._getArbActionBlock()
 
 
 @view

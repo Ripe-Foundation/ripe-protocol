@@ -1,7 +1,7 @@
 {
   "contracts": {
     "VaultBook": {
-      "address": "0x3f67b2ec379A94398029994e48ea1421E933103A",
+      "address": "0x8DBd00caA2e13dC1A32aA2F726711b97A046e964",
       "abi": [
         {
           "name": "GovChangeTimeLockModified",
@@ -1663,11 +1663,11 @@
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "fa21bbef591074acc22c13eb353e81dedd2c496b8ee8a7cba27189a7475c4862"
       },
-      "args": "00000000000000000000000088dd242155c50c2b91f288391b4d8d4c93e0552a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0",
+      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0",
       "file": "contracts/registries/VaultBook.vy"
     },
     "StabilityPool": {
-      "address": "0xE1fb055fE1Fad2D5f980a7954Ebf1539CA676D1e",
+      "address": "0x3E194C470f8B045743EFF0a7a3A804fEc8475201",
       "abi": [
         {
           "name": "StabilityPoolDeposit",
@@ -3788,11 +3788,11 @@
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "d9ac8494c784a4cff862bf89130fd64d4ed10651c0d9e942083688ade54c1de3"
       },
-      "args": "00000000000000000000000088dd242155c50c2b91f288391b4d8d4c93e0552a",
+      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
       "file": "contracts/vaults/StabilityPool.vy"
     },
     "RipeGov": {
-      "address": "0x94D287b679c9eB26067b1Aa59D230B2D559e66bb",
+      "address": "0xF3cde399a598ed200759982658F84a0D4202d6A7",
       "abi": [
         {
           "name": "RipeGovVaultDeposit",
@@ -6215,11 +6215,11 @@
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "48f5b351a1b469c7a06f86ed39dbab6c1b9aaddcae2aad24cb93c654384b945f"
       },
-      "args": "00000000000000000000000088dd242155c50c2b91f288391b4d8d4c93e0552a",
+      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
       "file": "contracts/vaults/RipeGov.vy"
     },
     "SimpleErc20": {
-      "address": "0x09437b00357c02a30B9aFB30292B087eC2E36983",
+      "address": "0xc2af4F8A81eA246630DBbe9f9e34d062d68ee2c8",
       "abi": [
         {
           "name": "SimpleErc20VaultDeposit",
@@ -7384,7 +7384,7 @@
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "fc671164a1205fd7114846fe09973ba752af94be2179a629ea19ddadbe80b34b"
       },
-      "args": "00000000000000000000000088dd242155c50c2b91f288391b4d8d4c93e0552a",
+      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
       "file": "contracts/vaults/SimpleErc20.vy"
     }
   }

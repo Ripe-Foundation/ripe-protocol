@@ -153,7 +153,15 @@ def execute_transaction(transaction, *args, **kwargs):
                 + (" (Trying again in 3 seconds)")
 
             )
-            log.error("\tH02_TRANSACTION_FAILED\n")
+            # Report WHY. Retrying twenty times on a deterministic revert with
+            # only a fixed error code leaves the operator with nothing to act
+            # on, mid-deployment. Provider URLs are stripped: a transport error
+            # quotes the endpoint, and that carries an API key.
+            detail = re.sub(
+                r"(https?://[^/\s]+)[^\s]*", r"\1/<redacted>",
+                f"{type(exception).__name__}: {exception}",
+            )
+            log.error(f"\tH02_TRANSACTION_FAILED {detail}\n")
             if attempts == max_attempts:
                 log.error(f"\tMax attempts reached. Exiting.\n")
                 break
