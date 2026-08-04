@@ -68,7 +68,34 @@ def _production_files(root: Path) -> dict[str, str]:
     return files
 
 
-def main() -> int:
+def _ledger_address(index: int) -> str:
+    """Read the deployer address from a connected Ledger, nothing more.
+
+    Deliberately does NOT construct LedgerAccount: that opens a Web3 connection
+    and prints balances, and we need no RPC here. get_account_by_path talks to
+    the dongle alone, so this prompts for nothing and leaks no endpoint.
+
+    Signing is not part of this: boa.fork() runs an in-process EVM, so no
+    transaction is ever serialised, signed, or broadcast. What this proves is
+    that the derivation index resolves to the address you expect and that the
+    whole launch graph executes with that address as deployer and governance.
+    """
+    try:
+        from ledgerblue.comm import getDongle
+        from ledgereth.accounts import get_account_by_path
+    except ImportError as error:
+        raise SystemExit(
+            "Ledger support unavailable -- the native hidapi library is "
+            f"missing. On macOS: brew install hidapi. ({error})"
+        ) from None
+    dongle = getDongle(False)
+    try:
+        return get_account_by_path(f"44'/60'/0'/0/{index}", dongle=dongle).address
+    finally:
+        dongle.close()
+
+
+def main(ledger_index: int | None = None) -> int:
     print("Forking Robinhood mainnet (URL withheld -- may contain a key)")
     boa.fork(_rpc_url())
     # NOTE: boa.env.evm.chain.chain_id reports boa's own local chain id (1), not
@@ -85,7 +112,11 @@ def main() -> int:
         )
     print(f"  verified fork identity: USDG at canonical address returns {symbol!r}")
 
-    sender = boa.env.generate_address()
+    if ledger_index is None:
+        sender = boa.env.generate_address()
+    else:
+        sender = _ledger_address(ledger_index)
+        print(f"  Ledger account {ledger_index} resolved: {sender}")
     boa.env.set_balance(sender, 10**20)
 
     # The final governance stand-in must be a CONTRACT, not an EOA:
@@ -225,4 +256,18 @@ def isGovernanceStandIn() -> bool:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--ledger",
+        type=int,
+        default=None,
+        metavar="INDEX",
+        help=(
+            "Read the deployer address from a connected Ledger at this account "
+            "index instead of generating one. Reads only -- the device is never "
+            "asked to sign, because a boa fork signs nothing."
+        ),
+    )
+    raise SystemExit(main(parser.parse_args().ledger))
