@@ -57,7 +57,7 @@ STALE_WINDOW_USDG = 86_400  # 1 day
 
 # --- initial supply ---------------------------------------------------------
 GREEN_INITIAL_SUPPLY = 100 * 10**18  # to the deployer, which seeds the pool
-RIPE_INITIAL_SUPPLY = 100_000 * 10**18  # to the governance Safe
+RIPE_INITIAL_SUPPLY = 10_000 * 10**18  # to the governance Safe
 SGREEN_INITIAL_SUPPLY = 0
 
 # --- misc -------------------------------------------------------------------

@@ -66,8 +66,12 @@ def migrate(migration: Migration):
     )
     migration.execute(chainlink.confirmNewPriceFeed, usdg)
 
-    log.h1("Deploying CurvePrices")
+    # PriceDesk ids 1 and 2. CurvePrices MUST be id 2: Teller, Endaoment and
+    # CreditEngine all hard-code CURVE_PRICES_ID = 2.
+    migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "ChainlinkPrices")
+    assert int(migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)) == 1
 
+    log.h1("Deploying CurvePrices")
     curve_prices = migration.deploy(
         "CurvePrices",
         hq,
@@ -78,11 +82,6 @@ def migrate(migration: Migration):
         PRICE_CHANGE_MIN_TIMELOCK,
         PRICE_CHANGE_MAX_TIMELOCK,
     )
-
-    # PriceDesk ids 1 and 2. CurvePrices MUST be id 2: Teller, Endaoment and
-    # CreditEngine all hard-code CURVE_PRICES_ID = 2.
-    migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "ChainlinkPrices")
-    assert int(migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)) == 1
     migration.execute(price_desk.startAddNewAddressToRegistry, curve_prices, "CurvePrices")
     assert int(migration.execute(price_desk.confirmNewAddressToRegistry, curve_prices)) == 2
 
@@ -91,27 +90,27 @@ def migrate(migration: Migration):
     migration.execute(hq.startAddNewAddressToRegistry, price_desk, "PriceDesk")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
 
-    log.h1("Deploying BlueChipYieldPrices")
+    # log.h1("Deploying BlueChipYieldPrices")
 
-    # Only Morpho V2 exists on Robinhood; the other six registries are zero and
-    # fail closed, because Vyper checks extcodesize before an external call.
-    blue_chip = migration.deploy(
-        "BlueChipYieldPrices",
-        hq,
-        ZERO_ADDRESS,
-        PRICE_MIN_TIMELOCK,
-        PRICE_MAX_TIMELOCK,
-        BLUECHIP_MORPHO_FACTORIES,
-        BLUECHIP_EULER_FACTORIES,
-        BLUECHIP_FLUID_RESOLVER,
-        BLUECHIP_COMPOUND_CONFIGURATOR,
-        BLUECHIP_MOONWELL_COMPTROLLER,
-        BLUECHIP_AAVE_PROVIDER,
-        address("MORPHO_V2_FACTORY"),
-    )
-    migration.execute(
-        price_desk.startAddNewAddressToRegistry, blue_chip, "BlueChipYieldPrices"
-    )
-    assert int(
-        migration.execute(price_desk.confirmNewAddressToRegistry, blue_chip)
-    ) == 3
+    # # Only Morpho V2 exists on Robinhood; the other six registries are zero and
+    # # fail closed, because Vyper checks extcodesize before an external call.
+    # blue_chip = migration.deploy(
+    #     "BlueChipYieldPrices",
+    #     hq,
+    #     ZERO_ADDRESS,
+    #     PRICE_MIN_TIMELOCK,
+    #     PRICE_MAX_TIMELOCK,
+    #     BLUECHIP_MORPHO_FACTORIES,
+    #     BLUECHIP_EULER_FACTORIES,
+    #     BLUECHIP_FLUID_RESOLVER,
+    #     BLUECHIP_COMPOUND_CONFIGURATOR,
+    #     BLUECHIP_MOONWELL_COMPTROLLER,
+    #     BLUECHIP_AAVE_PROVIDER,
+    #     address("MORPHO_V2_FACTORY"),
+    # )
+    # migration.execute(
+    #     price_desk.startAddNewAddressToRegistry, blue_chip, "BlueChipYieldPrices"
+    # )
+    # assert int(
+    #     migration.execute(price_desk.confirmNewAddressToRegistry, blue_chip)
+    # ) == 3
