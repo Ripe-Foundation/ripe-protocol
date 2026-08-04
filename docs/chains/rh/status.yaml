@@ -54,16 +54,16 @@ migration_readiness:
     configuration_consistent: true
     deployment_ready: false
   executable_plan:
-    blockers: 88
+    blockers: 87
     categories:
-      binding: 40
+      binding: 39
       curve: 10
       external_address: 5
       deployment_input: 17
       reservation: 4
       stock: 12
   relationship: >
-    The 88 executable-plan blockers layer migration-specific bindings,
+    The 87 executable-plan blockers layer migration-specific bindings,
     reservations, and Stock inputs on top of the 67 source/configuration
     readiness blockers. Neither count replaces the other.
 

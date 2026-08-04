@@ -38,12 +38,12 @@ Ready to begin deployment preparation.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
   readiness blocker count is 67: the remaining 57 non-Curve blockers plus 10
   typed Curve launch inputs.
-- The executable migration graph is separately typed blocked by 88 keys:
-  40 execution bindings (37 deployment-produced identities plus the distinct
+- The executable migration graph is separately typed blocked by 87 keys:
+  39 execution bindings (37 deployment-produced identities plus the distinct
   temporary local-governance authority, the zero local-governance authority,
   and the GREEN supply recipient), 10 Curve inputs, 5 external addresses,
   17 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
-  88-key plan census layers migration-specific bindings, reservations, and
+  87-key plan census layers migration-specific bindings, reservations, and
   Stock inputs on top of the 67-key source/configuration readiness state;
   neither count replaces the other.
 - DP15 and P-H04-399 are approved product/configuration decisions. The exact
@@ -56,7 +56,7 @@ Ready to begin deployment preparation.
   RIPE/WETH remains only a separately authorized external canary possibility;
   PSM reserves cannot fund either venue.
 - The shared `migrations/robinhood/` source exists as 17 ordered stages through
-  `0900`; it contains 118 plan actions and 33 registrations. Stage `1000`
+  `0900`; it contains 119 plan actions and 33 registrations. Stage `1000`
   remains deferred with no executable source file.
 - H-05 deterministic offline planning now consumes that shared source for both
   Robinhood profiles; it does not authorize execution or deployment.

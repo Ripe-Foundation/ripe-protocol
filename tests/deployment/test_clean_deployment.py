@@ -56,8 +56,8 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
     assert accepted_temporary_governance["evidence_sha256"]
     assert tuple(stage["migration_id"] for stage in plan["stages"]) == EXPECTED_STAGE_IDS
     actions = [action for stage in plan["stages"] for action in stage["actions"]]
-    assert len(actions) == 118
-    assert Counter(action["kind"] for action in actions)["deployment"] == 37
+    assert len(actions) == 119
+    assert Counter(action["kind"] for action in actions)["deployment"] == 38
     assert Counter(action["kind"] for action in actions)["registration"] == 33
     assert {action["operation"] for action in actions} == EXPECTED_OPERATION_VOCABULARY
 

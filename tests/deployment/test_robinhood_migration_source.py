@@ -87,7 +87,7 @@ def test_fully_bound_synthetic_plan_is_complete_and_deterministic():
     second = _synthetic()
     assert first == second
     assert first["status"] == "proof-complete"
-    assert len(first["blockers"]) == 88
+    assert len(first["blockers"]) == 87
     assert first["plan_hash"] is None
     assert len(first["proof_hash"]) == 64
     assert first["artifact"] == {
@@ -992,7 +992,7 @@ def test_assertion_derivation_rejects_ledger_omission_extra_action_and_census_dr
 
     wrong_census = copy.deepcopy(proof)
     wrong_census["action_census"]["deployments"] = 36
-    with pytest.raises(DeploymentAssertionInputError, match="117/37/33"):
+    with pytest.raises(DeploymentAssertionInputError, match="119/38/33"):
         expectations_from_plan(wrong_census)
 
 
@@ -1006,7 +1006,7 @@ def test_assertion_derivation_rejects_blocked_disposition_suppression():
         expectations_from_plan(proof)
 
 
-def test_67_source_readiness_and_88_plan_blockers_cannot_drift():
+def test_67_source_readiness_and_87_plan_blockers_cannot_drift():
     plan = build_robinhood_plan(
         "robinhood-mainnet", repository_root=ROOT, preview=True
     )
@@ -1018,9 +1018,9 @@ def test_67_source_readiness_and_88_plan_blockers_cannot_drift():
         "reservation": sum(key.startswith("B-") for key in plan["blockers"]),
         "stock": sum(key.startswith("H05_STOCK_") for key in plan["blockers"]),
     }
-    assert len(plan["blockers"]) == 88
+    assert len(plan["blockers"]) == 87
     assert census == {
-        "binding": 40,
+        "binding": 39,
         "curve": 10,
         "external_address": 5,
         "deployment_input": 17,
@@ -1036,7 +1036,7 @@ def test_67_source_readiness_and_88_plan_blockers_cannot_drift():
         "deployment_ready": False,
     }
     assert readiness["executable_plan"] == {
-        "blockers": 88,
+        "blockers": 87,
         "categories": census,
     }
     assert "Neither count replaces the other" in readiness["relationship"]
@@ -1048,8 +1048,8 @@ def test_67_source_readiness_and_88_plan_blockers_cannot_drift():
         text = (ROOT / relative).read_text()
         for phrase in (
             "67",
-            "88",
-            "40",
+            "87",
+            "39",
             "10 Curve",
             "5 external",
             "17 deployment",

@@ -376,7 +376,7 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
     }
     if dict(census) != expected_census:
         raise DeploymentAssertionInputError(
-            "plan action census does not exactly account for 117/37/33 actions"
+            "plan action census does not exactly account for 119/38/33 actions"
         )
     ledger = components.get("CM-008")
     if ledger is None or ledger.get("authority_selection_state") != "blocked":
