@@ -5358,15 +5358,14 @@ def validate_curve_launch_authority() -> None:
         "pool.A": 100,
         "pool.fee": 4_000_000,
         "pool.offpeg_fee_multiplier": 20_000_000_000,
-        "pool.ma_exp_time": 600,
+        "pool.ma_exp_time": 866,
         "pool.ma_exp_time_alternative_test_vector": 866,
     }
     if any(values[key] != expected for key, expected in expected_pool_values.items()):
         _fail("RH_CURVE_POOL_PARAMS")
-    # Owner approved the Base GREEN pool configuration for Robinhood: the values
-    # were already Base's, and this records that they are now selected rather
-    # than research candidates. The value assertion above is unchanged, so these
-    # still cannot drift from Base's approved numbers.
+    # Owner approved the Base GREEN pool configuration for Robinhood, with one
+    # deliberate exception: ma_exp_time is 866, not Base's 600, giving a
+    # 10-minute EMA half-life rather than a 10-minute time constant.
     if any(
         states[key] != "resolved_repository_fact"
         for key in expected_pool_values

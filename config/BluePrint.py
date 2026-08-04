@@ -1233,8 +1233,13 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.ma_exp_time", 600, "owner_selected", "liquidity_owner",
-        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
+        "pool.ma_exp_time", 866, "owner_selected", "liquidity_owner",
+        # Deliberately NOT Base's 600. Curve's ma_exp_time is the exponential
+        # time constant, so a 10-minute EMA half-life is 600 / ln(2) = 866.
+        # Base's 600 makes the time constant ten minutes and the half-life
+        # about seven. 866 was carried alongside as a test vector before the
+        # owner selected it.
+        "owner-selected 10 minute EMA half-life (600 / ln 2)", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.ma_exp_time_alternative_test_vector", 866, "repository_approved", "oracle_owner",

@@ -98,5 +98,4 @@ def migrate(migration: Migration):
         savings_green,
         address("USDG"),
         address("WETH"),
-        address("STEAKHOUSE_USDG_VAULT"),
     )
