@@ -1359,9 +1359,10 @@ class RobinhoodStageExecutor:
         action: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         # Every other action must already have completed before the irreversible
-        # handoff: 117 of 118, the handoff itself being the last. Was 116 before
+        # handoff: 118 of 119, the handoff itself being the last. Was 117 before
+        # the SteakHouse USDG blue-chip feed was added to 0400, and 116 before
         # the pool seed action was added to 0600.
-        if action["kind"] == "handoff" and len(self.results) != 117:
+        if action["kind"] == "handoff" and len(self.results) != 118:
             raise RobinhoodExecutionError("RHX_FINAL_HANDOFF_PRECONDITION", action_id=action["action_id"])
         references = [*action.get("constructor", []), *action.get("requires", [])]
         if action["kind"] in NON_EXECUTING_KINDS:
