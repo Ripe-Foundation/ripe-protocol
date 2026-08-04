@@ -307,19 +307,18 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
             component_id = action.get("component_id")
             if action.get("kind") == "deployment":
                 _require_string(component_id, "plan.action.component_id")
+                if action.get("operation") == "deploy-blueprint":
+                    # A blueprint stores initcode and instantiates nothing, so
+                    # it contributes no deployed component to assert against.
+                    # Listing it would claim CM-005 Contributor is present when
+                    # the omission it asserts is precisely that it is not.
+                    continue
                 authority = _require_mapping(
                     action.get("component_authority"),
                     "plan.action.component_authority",
                 )
                 selection_state = authority.get("selection_state")
-                # A blueprint stores initcode and instantiates nothing, so it
-                # may deploy for an omitted component: the Contributor template
-                # is deployed exactly as Base does it while CM-005 stays
-                # omitted, because no live contributor contract results.
-                if (
-                    selection_state not in {"selected", "blocked"}
-                    and action.get("operation") != "deploy-blueprint"
-                ):
+                if selection_state not in {"selected", "blocked"}:
                     raise DeploymentAssertionInputError(
                         "plan deployment action has unavailable authority: "
                         f"{component_id}"
