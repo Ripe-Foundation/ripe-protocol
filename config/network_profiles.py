@@ -441,11 +441,14 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ROBINHOOD_MAINNET_RPC_URL", _ROBINHOOD_OPERATIONS
         ),
         repository=RepositoryPolicy(
-            None,
+            # Both paths exist now: migrations/robinhood holds the 17 shared
+            # stages, and the history root holds the bound production plan and
+            # envelope. PROPOSED described the state before either was written.
+            "robinhood",
             PurePosixPath("migrations/robinhood"),
-            PathState.PROPOSED,
+            PathState.EXISTING,
             PurePosixPath("migration_history/robinhood-mainnet/v1"),
-            PathState.PROPOSED,
+            PathState.EXISTING,
         ),
         fork=ForkPolicy(True, True, True, True),
         # The Ledger is the approved deployer; env-private-key stays for the
