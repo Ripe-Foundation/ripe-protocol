@@ -4,7 +4,8 @@
 
 The corrected shared `AuctionHouse` source entered `rh` at historical import
 ancestor `ad831669943ccfe7b9ed57454995dfce51630a66`. Current `master` and
-current `rh` (`5f5d22b7…`, tree `7454b545…`) both resolve
+current `rh` (`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`) both resolve
 [`AuctionHouse.vy`](../../../../contracts/core/AuctionHouse.vy) to Git blob
 `48cbbbca22c87e490ef0f88aae4f643ab5b87987`, SHA-256
 `e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921`.

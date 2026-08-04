@@ -2,12 +2,12 @@
 
 ## Current disposition
 
-The current candidate baseline is
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The corrected shared
+The current repository baseline is
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The corrected shared
 `Deleverage` source entered `rh` at historical import ancestor
-`ad831669943ccfe7b9ed57454995dfce51630a66`. Current `master` and the candidate
-baseline both resolve [`Deleverage.vy`](../../../../contracts/core/Deleverage.vy)
+`ad831669943ccfe7b9ed57454995dfce51630a66`. Current `master` and current `rh`
+both resolve [`Deleverage.vy`](../../../../contracts/core/Deleverage.vy)
 to Git blob `b43d373039b352d6eab240be714134764901b947`, so this is a
 historical/shared-source rationale rather than a current `master..rh` delta.
 The current source SHA-256 is

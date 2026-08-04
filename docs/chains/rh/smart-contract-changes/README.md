@@ -1,10 +1,10 @@
 # Robinhood smart-contract change rationale
 
-This directory is the contract-centric explanation of every Vyper source
-change represented by the current Robinhood (`rh`) branch. It separates current
-`master..rh` production deltas from configuration, archival prototypes,
-supporting/test-only sources, and historical changes whose source bytes are now
-shared by `master` and `rh`.
+This directory is the contract-centric explanation of every Vyper and Solidity
+contract-language source change represented by the current Robinhood (`rh`)
+branch. It separates current `master..rh` production deltas from configuration,
+archival prototypes, supporting/test-only sources, documentation examples, and
+historical changes whose source bytes are now shared by `master` and `rh`.
 
 > [!IMPORTANT]
 > Source integration, selected repository configuration, deployment,
@@ -23,22 +23,37 @@ meaning. Source rationale does not expand owner authority.
 ## Current authority and ancestry
 
 This refresh is bound to the following independently verified identities on
-1 August 2026:
+3 August 2026:
 
 | Ref or role | Commit | Tree | Meaning |
 | --- | --- | --- | --- |
-| Current local/cached/live `rh` | `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353` | `7454b5456ebb6cd02d716a64b408629ab501629e` | Authority for every current claim in this directory |
+| Current local/cached/live `rh` | `0642f086d19e3cc62faaf67da096b6511e405320` | `d869d4149380b368f9678ed03efc0b59a6c804e2` | Authority for every current claim in this directory |
 | Current local/cached/live `master` | `91eda49ccd34a25090582aff0695075c4c806011` | `fbd958bec234081f70769045abd8f9bb638f6dd7` | Comparison point and merge base for `master..rh` |
 | Configuration-source ancestor | `e4473ce6485888f1b747761a5ee8693443108877` | `33b705690007bda9b11900b5775bd9230e79f09e` | Ancestor that last changed `DefaultsRobinhood.vy`; not the current `rh` tip |
 | Shared-source import ancestor | `ad831669943ccfe7b9ed57454995dfce51630a66` | `3467f4a75aa37203d615407d5baf9c5fc9035639` | Historical `rh` import of corrected Deleverage work |
+
+### Related authority drift outside this directory
+
+[`status.yaml`](../status.yaml#L6-L15) remains dated 1 August and binds its
+program subject to `5f5d22b7…`. Later edits updated its candidate metadata, but
+its H-05 workstream still labels the transaction executor
+[`candidate_not_integrated`](../status.yaml#L778-L789), even though
+`27f21ccc…` is now an ancestor of current `rh`. The file remains consistent on
+the controlling lifecycle boundary—80 source/configuration blockers, 100
+executable-plan blockers, and no deployment, migration execution,
+configuration, activation, or release—but it is not current for post-snapshot
+source/integration identity. This directory therefore binds current source
+claims directly to the verified Git identities above. Reconciliation of the
+separate dashboard authority is outside this folder refresh.
 
 The live ref checks establish repository identity only. They do not establish a
 Robinhood deployment or live protocol state.
 
 ## Complete current production-source delta
 
-The following six production contracts differ between current `master` and
-current `rh`:
+The following seven production source paths differ between current `master`
+and current `rh`. Six are deployable contract sources; the seventh is the
+shared ERC-20 module whose change alters four compiled token artifacts:
 
 | Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
 | --- | --- | --- | --- | ---: | --- |
@@ -48,13 +63,14 @@ current `rh`:
 | `contracts/data/Ledger.vy` | [`ledger.md`](ledger.md) | `590341e3f9091105036c1cc497bd862ea3769248` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` | 26,492 | Immutable native/ArbSys action-block selection |
 | `contracts/core/Lootbox.vy` | [`lootbox.md`](lootbox.md) | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | 47,731 | Per-deployment immutable Underscore interval floor |
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
+| `contracts/tokens/modules/Erc20Token.vy` | [`erc20-token.md`](erc20-token.md) | `f00e5655567612e3f8c95182de75701424eeea2b` | `54ffb5d2dcdf5dd2c5990e0bcd3a67b0ebcbae32b8dc3ef6c00d2e84ea447af7` | 17,435 | Adds governance-backed `getCCIPAdmin()` discovery to GREEN, RIPE, and sGREEN compiler outputs; owner authorization is unresolved, committed ABIs are stale, direct tests are missing, and the final LF was removed |
 
 These are integrated source facts. None proves that the corresponding contract
 has been deployed, registered, configured, or activated on Robinhood.
 
 ## Configuration contract
 
-[`DefaultsRobinhood.vy`](../../../../contracts/config/DefaultsRobinhood.vy) is
+[`contracts/config/DefaultsRobinhood.vy`](../../../../contracts/config/DefaultsRobinhood.vy) is
 a production-intended configuration contract, but its values and mere presence
 in source are not deployment or onchain configuration:
 
@@ -69,7 +85,7 @@ ledger is derived evidence, not a third value authority.
 
 ## Archival, non-admitted prototype
 
-[`RobinhoodUniswapV2RipePrices.vy`](../../../../contracts/priceSources/RobinhoodUniswapV2RipePrices.vy)
+[`contracts/priceSources/RobinhoodUniswapV2RipePrices.vy`](../../../../contracts/priceSources/RobinhoodUniswapV2RipePrices.vy)
 is present in `master..rh`, but it is not an admitted production price source:
 
 | Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
@@ -98,9 +114,10 @@ and release remain separate.
 
 ## Relevant current artifact identities
 
-The repository artifact checker was rerun against the current bytes. BlueChip
-and the archival Uniswap prototype were also freshly compiled with
-Vyper `0.4.3+commit.bff19ea2` and their outputs hashed.
+The central nine-contract artifact checker was rerun against the current bytes.
+BlueChip, the archival Uniswap prototype, the changed token module, and its
+three transitive token consumers were also freshly compiled with Vyper
+`0.4.3+commit.bff19ea2` and their outputs hashed.
 
 | Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | --- | --- |
@@ -115,14 +132,24 @@ Vyper `0.4.3+commit.bff19ea2` and their outputs hashed.
 | Teller | 24,152 | 424 | `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
 | BlueChipYieldPrices | 22,054 | 2,522 | `84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578` | `d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73` |
 | RobinhoodUniswapV2RipePrices | 20,556 | 4,020 | `d36fe90fb011e2fbed546c5a0c576c7e5346e90ec34947c7be079884b2ca9c58` | `3dc0dcfe1a130a5911f2b97f106c963ebe9dca17efdad943a0a9c9609bcc837e` |
+| Erc20Token module | 6,767 | 17,809 | `d13a59c2961a981a444ce6defd59a2d4c4d0a0b079f5cb322dc2c4fc2715c7fb` | `49c87121ab8eec9d6472e7e7401e54d78bf47022d54346ae1020dce01f546f39` |
+| GreenToken | 7,085 | 17,491 | `74f3f1c818d951f6c5c2e755e0b1667f3f1b13f91cc483da7923809bb7038f16` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
+| RipeToken | 7,085 | 17,491 | `0338e28a3787286430139234127c9953945bca3fd7d4084cbd19fdfc62943962` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
+| SavingsGreen | 10,602 | 13,974 | `214218d00cc1cce8fa32160769e73c686c532bc13790f42ad4a4f83c14e6fc92` | `9234529ab0fc8a20a1b78ff1c1609a43629f5f6fd756debbe89b6606031f19cd` |
 
 Runtime templates with constructor-bound immutables are compiler artifacts,
 not final deployed-runtime identities.
 
+The repository-wide deterministic ABI export check is not green: the committed
+`Erc20Token.json`, `GreenToken.json`, `RipeToken.json`, and `SavingsGreen.json`
+files omit `getCCIPAdmin()`. The source commit added no direct test for the new
+selector. The green central artifact gate does not cover those token artifacts;
+see [`erc20-token.md`](erc20-token.md) for exact expected and committed hashes.
+
 ## Supporting and test-only Vyper delta
 
 Every remaining Vyper path in `master..rh` is explicitly classified below.
-None is a production component or launch authority.
+None is a production component, documentation example, or launch authority.
 
 | Path | Classification | Git blob | SHA-256 | Source bytes |
 | --- | --- | --- | --- | ---: |
@@ -136,13 +163,40 @@ None is a production component or launch authority.
 | `contracts/mock/MockUniswapV2QuotePriceDesk.vy` | Quote-source/recursive-call test double | `978000acc79cfd1a7c12547896232602f35233f2` | `12d2046240189462486f7b2925228b31f369f83c7f4827faf4857b3de59a4d1f` | 1,540 |
 | `contracts/mock/MockProbeErc20.vy` | Stock-token transferability probe double | `a367fbd89f3fc7d5dbafa3a5c118cabbc70e696b` | `7d84c3f995c7f06588cabda1c8a12d8376217c653a9c4371a69ac8e559bf6a48` | 3,069 |
 | `contracts/mock/MockStockTokenControls.vy` | Stock-control adversarial double | `b9ed997df86bffe529b93bf9b6b00a5d0a9ca331` | `5d1527262aad66642a6e0f6dfdaad03458abdc4085a0445ebff0af8969614ef7` | 4,971 |
+| `contracts/mock/MockRobinhoodCurveSystem.vy` | Test-only Curve address-provider, registry, factory, and pool double for launch-route assertions | `1420dbf2999405783726d64c64eb3c5007b95e37` | `6d180087f56b68ed7387cce91f391fddf6ae9845a1ab78fef095423d0f4279ea` | 2,666 |
 | `contracts/testing/ActionBlockIdentityProbe.vy` | Test-only action-block probe | `82a56a6770d07b6330ca19d55df10f05bef5e105` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` | 1,203 |
 | `contracts/testing/StockTokenTransferProbe.vy` | Test-only Stock transfer probe | `1460f97591ac2a98e244f37fd66ce540d3408391` | `dcf632f75def3d55203731856e5c2813237235bf72c6b8586400c9f858c3046a` | 4,602 |
-| `docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy` | Documentation example; not an admitted or deployable production component | `742f8ce4c41ed18a7fabcd51fa42864433355880` | `7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18` | 34,600 |
 
 The committed ABI files and Python tests are supporting artifacts rather than
 additional Vyper production deltas. Their current paths are linked from the
 individual rationale pages.
+
+## Documentation-example contract delta
+
+These two changed contract-language files are review references, not admitted
+production components. The Solidity file contains the active thin-inheritance
+reference; the Vyper file is its frozen superseded comparison.
+
+| Path | Rationale | Language / disposition | Git blob | SHA-256 | Source bytes |
+| --- | --- | --- | --- | --- | ---: |
+| `docs/chains/rh/examples/RipeCcipBurnMintTokenPools.sol` | [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) | Solidity; exact-hash reviewed GREEN and RIPE reference subclasses, not production-ready or deployment-authorized | `9914be95aab65e48438b5be9e3e7defa221696b7` | `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77` | 1,784 |
+| `docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy` | [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) | Vyper; frozen superseded comparison, not the selected architecture | `742f8ce4c41ed18a7fabcd51fa42864433355880` | `7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18` | 34,600 |
+
+The 27 July Round-3 review reproduced the Solidity reference's pinned compiler,
+dependency, runtime, layout, ABI-delta, and isolated integration evidence. That
+environment is not a committed repository build package, so the results remain
+dated exact-hash review evidence rather than a fresh current compilation.
+
+## Automated enforcement boundary
+
+The repository currently contains one GitHub Actions workflow:
+[`rh-handoff-dashboard.yml`](../../../../.github/workflows/rh-handoff-dashboard.yml).
+It builds, tests, and lints the Robinhood dashboard only. It does not run the
+Python/Vyper contract suites, central artifact checker, block-clock inventory,
+Defaults generator, deterministic ABI export check, or any Solidity build/test
+package. The red four-file token ABI discrepancy and the Solidity reference
+gaps therefore have no repository CI enforcement. Every validation result in
+this directory is explicit audit evidence, not a continuously enforced gate.
 
 ## Complete rationale page inventory
 
@@ -155,6 +209,11 @@ individual rationale pages.
 - [`lootbox.md`](lootbox.md) — per-deployment reward interval floor;
 - [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) — Morpho V2 yield
   pricing and compatibility;
+- [`erc20-token.md`](erc20-token.md) — shared `getCCIPAdmin()` source change,
+  transitive token artifacts, and current ABI/test discrepancy;
+- [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) — changed
+  GREEN/RIPE thin-Solidity reference subclasses and their production-package
+  boundary;
 - [`robinhood-uniswap-v2-ripe-prices.md`](robinhood-uniswap-v2-ripe-prices.md)
   — archival, PriceDesk-inert monitoring prototype;
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
@@ -182,22 +241,43 @@ No later state follows automatically from an earlier one. In particular,
 PriceDesk slot-3 selection for BlueChipYield is not deployment or registration,
 and source-level Defaults values are not onchain configuration.
 
-At this exact baseline, AAPL launch inclusion, LP launch admission, reward
-promotion, Curve activation, and the new Robinhood migration implementation are
-not integrated into `rh`. Published or local feature branches are not current
-`rh` authority.
+At this exact baseline, the AAPL launch-input authority, qualified non-admission
+of launch LP tokens, owner-approved reward product packet, bounded Curve launch
+topology, deterministic Robinhood migration sources, and transaction executor
+are integrated repository facts. Their unresolved bindings keep the deployment
+plan non-executable; there is no migration history, execution, deployment,
+onchain configuration, registration, activation, or release.
+
+The shared `Erc20Token.getCCIPAdmin()` hook is also integrated. It does not
+establish CCIP registration, pools, remotes, rate limits, or mint/burn
+capabilities. The recorded Track-1 precondition and owner decision remain
+unresolved, its four transitive committed ABI files are stale, and direct tests
+are missing. Nine CCIP planning documents outside this directory contain a mix
+of still-current Base facts, governing conditions, neutral inventory, and
+stale Robinhood source premises; [`erc20-token.md`](erc20-token.md) records the
+complete disposition map. Ratification and reversion are both separately
+controlled source decisions; this folder selects neither.
 
 ## Mechanical coverage rule
 
-The discovery set is reproducible with:
+The repository's current contract-language inventory contains `.vy`, `.vyi`,
+and `.sol` files. The discovery set checks all three extensions and is
+reproducible with:
 
 ```text
 git diff --name-status \
   91eda49ccd34a25090582aff0695075c4c806011..\
-  5f5d22b7ee78cbb904c4fe3c6e46599c330c4353 -- '*.vy'
+  0642f086d19e3cc62faaf67da096b6511e405320 -- \
+  '*.vy' '*.vyi' '*.sol'
 ```
 
-It yields 21 Vyper paths: six current production sources, one configuration
-contract, one archival prototype, and thirteen supporting/test-only paths. The
-three historical/shared rationale sources have identical `master` and `rh` Git
-blobs and therefore do not appear in that delta.
+It yields 24 contract-language paths: 23 Vyper and one Solidity, with no changed
+`.vyi` path. They classify as seven current production source paths, one
+configuration contract, one archival prototype, thirteen supporting/test-only
+Vyper paths, and two documentation examples. The three historical/shared
+rationale sources have identical `master` and `rh` Git blobs and therefore do
+not appear in that delta.
+
+Future reviews must first re-enumerate the repository's contract-language
+extensions and then update this command if a new language appears; extension-
+specific discovery must not be assumed complete by convention.

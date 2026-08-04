@@ -3,8 +3,8 @@
 ## Current `rh` rebind
 
 This rationale is bound to current `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`.
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`.
 [`DefaultsRobinhood.vy`](../../../../contracts/config/DefaultsRobinhood.vy) last
 changed at ancestral configuration-source commit `e4473ce…`; that ancestor is
 not the current branch tip.
@@ -48,17 +48,24 @@ editable authority.
 
 [`config/robinhood-parameters.json`](../../../../config/robinhood-parameters.json)
 is synchronized derived evidence. The generator compiles and reads both source
-authorities, validates their topology and assertions, and writes only the JSON
-ledger when explicitly run in write mode. It never renders or overwrites
-`DefaultsRobinhood.vy` and never uses RPC.
+authorities and validates their topology and assertions. A bare invocation is
+the write path: it atomically synchronizes the JSON ledger. `--check` is the
+explicit read-only path used by this audit. Neither path renders or overwrites
+`DefaultsRobinhood.vy` or uses RPC.
 
 ## Fail-closed readiness
 
-The current network-free check reported:
+The current network-free read-only check:
+
+```sh
+python scripts/params/generate_robinhood_defaults.py --check
+```
+
+reported:
 
 ```text
-H04_OK sha256=0750856092889476e3ec8e54305e74dc0152c576dfa687a8c08934fc85c0893c
-configuration_consistent=true deployment_ready=false blockers=58
+H04_OK sha256=e5323f5e4eca86773c097a1e6e20c8f9df8dc96556f3d98cb79fb5e66915fea3
+configuration_consistent=true deployment_ready=false blockers=80
 ```
 
 `configuration_consistent=true` means the two readable authorities and their
@@ -66,6 +73,13 @@ derived ledger reconcile. It is not a deployment-ready result. Symbolic or
 unresolved identities remain blockers; the generator must not substitute zero,
 a placeholder, a Base address, or an inferred value merely to produce a ready
 status.
+
+The 80 rows are source/configuration-readiness blockers. The separately
+integrated deterministic migration planner adds migration bindings and reports
+100 executable-plan blockers. The migration sources and deterministic
+transaction executor exist in the repository, but no plan has been made
+executable and no migration, deployment, history publication, or onchain
+configuration has occurred.
 
 This is the required fail-closed boundary:
 
@@ -81,13 +95,18 @@ The principal current evidence paths are:
 
 | Path | Git blob | SHA-256 | Responsibility |
 | --- | --- | --- | --- |
-| [`tests/config/test_defaults_robinhood.py`](../../../../tests/config/test_defaults_robinhood.py) | `d5a5061e2414516d9f23ee8ea71b31ee5e8daad7` | `d20b52b9ef66f35d4ab2a0daa8506be4cf3d8f3148d918fe2717e923558fe956` | Source derivation, compiler extraction, authority split, deterministic ledger, unresolved-input and mutation failures |
-| [`tests/deployment/test_robinhood_blueprint.py`](../../../../tests/deployment/test_robinhood_blueprint.py) | `82d2ee133ab7b2e56183cc4a807cdb28f09a04cd` | `43c80d4516b203e64301bf00001928518624da43ea838939464e7ac1ba69465e` | Component, registry, constructor, and lifecycle topology |
-| [`tests/deployment/test_robinhood_omissions.py`](../../../../tests/deployment/test_robinhood_omissions.py) | `5b1fc4a502820c4df2668b6f1c69a7bf14511d90` | `4ac1d402147315c07e1d7f370388239eff085d3dbd4f10f75d8cae46a970c473` | Required omissions and fail-closed capability/activation surfaces |
-| [`tests/inventory/test_contract_artifacts.py`](../../../../tests/inventory/test_contract_artifacts.py) | `3eb4a93c0d5bd400586a1b1aa980432ac2aa0284` | `ecbd803c2e002eac39a565e3d2bbf419af16319952a0c7ef0867e5c50b61ac86` | Source, compiler, ABI, layout, and bytecode identity |
+| [`tests/config/test_defaults_robinhood.py`](../../../../tests/config/test_defaults_robinhood.py) | `c5e8995cabcdc2ac7a8247861af5a713603b8253` | `730086ae75a138913ba1a27805190ad308cf2951799fccfb688095c581125c29` | Source derivation, compiler extraction, authority split, deterministic ledger, current launch inputs, unresolved-input and mutation failures |
+| [`tests/deployment/test_robinhood_blueprint.py`](../../../../tests/deployment/test_robinhood_blueprint.py) | `b7d6234f346fbc9ad68a644d65e37b5d377dae19` | `3b6a179fd3f7d4be9485e5e020901b3f75d7ed5de3e0cf58386d8a05f49ccd72` | Current component, registry, constructor, launch-input, and lifecycle topology |
+| [`tests/deployment/test_robinhood_omissions.py`](../../../../tests/deployment/test_robinhood_omissions.py) | `187454dee85fe69f964324479f068f66ce7bca99` | `9d807dce53c3f135baf1fe772f2e9a8e25b2a9c976be78e25ae07200efaa320a` | Required omissions and fail-closed capability/activation surfaces, including deferred CCIP promotion |
+| [`tests/inventory/test_contract_artifacts.py`](../../../../tests/inventory/test_contract_artifacts.py) | `30e56a30e803e6030abb321b7dd593f08ac83f04` | `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` | Frozen source, compiler, ABI, layout, and bytecode identity for the central contract set |
 
-The current artifact checker reconciles the committed ABI and compiler outputs.
-No protocol suite was rerun for this documentation refresh.
+The central nine-contract artifact checker reconciles the frozen Defaults and
+other covered contract identities. The repository-wide ABI export check is not
+green at this baseline: the newly integrated shared `Erc20Token.getCCIPAdmin()`
+method makes the committed `Erc20Token`, `GreenToken`, `RipeToken`, and
+`SavingsGreen` ABI files stale. That separate current discrepancy is documented
+in [`erc20-token.md`](erc20-token.md). No protocol suite was rerun for this
+documentation refresh.
 
 ## Deployment and release boundary
 

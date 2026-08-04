@@ -4,7 +4,8 @@
 
 The corrected shared `SwitchboardDelta` source entered `rh` at historical
 import ancestor `ad831669943ccfe7b9ed57454995dfce51630a66`. Current `master`
-and current `rh` (`5f5d22b7…`, tree `7454b545…`) both resolve
+and current `rh` (`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`) both resolve
 [`SwitchboardDelta.vy`](../../../../contracts/config/SwitchboardDelta.vy) to
 Git blob `4e234df7626eb332836aceb5cbca2daaef2a0390`, SHA-256
 `12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79`.

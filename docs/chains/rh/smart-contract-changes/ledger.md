@@ -12,8 +12,8 @@
 ## Current `rh` rebind
 
 The current authority for this page is `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July review remains dated
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The 28 July review remains dated
 historical evidence below.
 
 | Current identity | Value |
@@ -21,7 +21,7 @@ historical evidence below.
 | Ledger source Git blob / SHA-256 | `590341e3f9091105036c1cc497bd862ea3769248` / `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
 | Runtime template | 13,125 bytes; SHA-256 `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7`; 11,451 bytes EIP-170 headroom |
 | [`test_ledger_action_block.py`](../../../../tests/data/test_ledger_action_block.py) | Git blob `800988b23656e47287b5ea752b1f46dd37f169bc`; SHA-256 `5d631ef7e6e97f31367222a74b150f829330756f8ce34765ba2b6d755b3b9b23` |
-| [Teller action-block test](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `25b249342e7edc9efa30da50a9f5cdee8810857a`; SHA-256 `974ac5f7bb47185f29ad4f57e1db91ec0d852ae6f9bf3b13112f48ad72a3741f` |
+| [Teller action-block test](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `cbc0bbf77dbeeec4d45cd03f16948fd754704ee7`; SHA-256 `1b28378d68836caae0ffd2cf0cfc2bf649ff1592a65a45b0a3e00e8146da5323` |
 | [Robinhood profile test](../../../../tests/deployment_profiles/test_ledger_robinhood_profile.py) | Git blob `8c946bab5b5a867a9d0e68f457bf0f6d7a632d21`; SHA-256 `1df761c09b0f1d9f0dcc3ffcc4b6281437978a01ceef6a96e5bbc3417f3f2ab2` |
 | [Artifact-bundle test](../../../../tests/deployment_profiles/test_ledger_artifact_bundle.py) | Git blob `7b7e89750576d9e7c6ceab44b14a96737c1ca91a`; SHA-256 `0645965c6a5b8df67545a59ca69f414c381e9e2621f1901f11d499ed3e45ad5c` |
 
@@ -637,7 +637,7 @@ All named tests below are in
 | [`classification matrix`](../../../../tests/core/teller/test_teller_action_block.py#L31) | All Teller housekeeping callsites, user identity, risk and debt flags | Static callsite contract remains exact | Strong against reclassification; source-shape evidence |
 | [`external housekeeping`](../../../../tests/core/teller/test_teller_action_block.py#L80) | Valid/invalid caller, selected victim/risk/Addys, zero user | Touch/write or complete rollback | Detects authority and propagation changes; also exposes separate broad-caller concern |
 | [`Underscore writes`](../../../../tests/core/teller/test_teller_action_block.py#L143) | Equality exemption only | Repeated call succeeds but touch updates | Detects skipping the entire Ledger call |
-| [`deposit arms`](../../../../tests/core/teller/test_teller_deposit.py#L343) | Lower-risk deposit | Repeats; arms current identity | Detects removal of unchecked write |
+| [`deposit arms`](../../../../tests/core/teller/test_teller_deposit.py#L634) | Lower-risk deposit | Repeats; arms current identity | Detects removal of unchecked write |
 | [`deposit then withdrawal`](../../../../tests/core/teller/test_teller_withdraw.py#L90) | Low-risk then checked | Withdrawal rejects in same identity | Directly proves arming across routes |
 | [`checked withdrawal`](../../../../tests/core/teller/test_teller_withdraw.py#L130) | High-risk twice | Second rejects; economic state rolls back | Detects missing equality guard |
 | [`withdrawMany`](../../../../tests/core/teller/test_teller_withdraw.py#L373) | Batch withdrawal in held child identity | Second batch rejects | Detects missing batch guard |
@@ -646,7 +646,7 @@ All named tests below are in
 | [`repay ordering`](../../../../tests/core/creditEngine/test_credit_repay.py#L58) | Low-risk repay between checked actions | Repay succeeds and rearms; later checked rejects | Detects changing repay classification/write |
 | [`Stability claim`](../../../../tests/vaults/modules/test_stab_vault_claims.py#L450) | Checked single claim after effects | Second claim rejects and rolls back | Detects missing post-claim guard/rollback |
 | [`claimMany`](../../../../tests/vaults/modules/test_stab_vault_claims.py#L717) | Checked batch claim | Second same-child call rejects | Detects missing batch classification |
-| [`external-route rollback`](../../../../tests/core/deleverage/test_deleverage_swap_collateral.py#L187) | Integrated caller reaches external housekeeping | Later failure restores all earlier effects | Cited only for Ledger guard coverage; Deleverage itself is out of scope |
+| [`external-route rollback`](../../../../tests/core/deleverage/test_deleverage_swap_collateral.py#L210) | Integrated caller reaches external housekeeping | Later failure restores all earlier effects | Cited only for Ledger guard coverage; Deleverage itself is out of scope |
 
 Existing baseline tests in
 [`test_ledger.py:1484-1653`](../../../../tests/data/test_ledger.py#L1484)
@@ -938,8 +938,8 @@ authorized live evidence at release time.
 - [`ledger-action-block-mainnet-fork.json`](../evidence/ledger-action-block-mainnet-fork.json)
 - [`ledger-action-block-testnet-fork.json`](../evidence/ledger-action-block-testnet-fork.json)
 - [`Ledger ABI`](../../../../scripts/abis/Ledger.json)
-- [`block-clock inventory`](../../../../config/block-clock-inventory.json#L95)
-- [`inventory checker`](../../../../scripts/check_block_clock_inventory.py#L110)
+- [`block-clock inventory`](../../../../config/block-clock-inventory.json#L180)
+- [`inventory checker`](../../../../scripts/check_block_clock_inventory.py#L336)
 
 ### Primary external sources
 
