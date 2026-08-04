@@ -63,7 +63,7 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
 
     executor, backend, migration = _execute(plan, root)
     assert len(executor.results) == len(migration.results) == 118
-    assert len(backend.deployments) == 37
+    assert len(backend.deployments) == 38
     assert sum(len(rows) for rows in backend.registries.values()) == 33
     assert backend.sequence[-1] == "0900:000005:handoff-governance-and-relinquish-deployer"
     assert backend.handed_off is True
@@ -511,7 +511,7 @@ def transfer(_to: address, _value: uint256) -> bool:
 
         assert len(executor.results) == 118
         assert len(backend.sequence) == 118
-        assert len(backend.production_deployments) == 37
+        assert len(backend.production_deployments) == 38
         assert backend.handed_off is True
         handoff = executor.results[
             "0900:000005:handoff-governance-and-relinquish-deployer"

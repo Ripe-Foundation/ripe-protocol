@@ -1837,7 +1837,7 @@ def _validate_artifact_action_census(plan: Mapping[str, Any]) -> None:
         raise MigrationPlanError("H05_ACTION_CENSUS") from None
     expected = {
         "total": 118,
-        "deployments": 37,
+        "deployments": 38,
         "registrations": 33,
         "all_action_ids": action_ids,
         "deployment_action_ids": deployment_ids,

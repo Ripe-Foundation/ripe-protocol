@@ -368,7 +368,7 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
     ]
     expected_census = {
         "total": 118,
-        "deployments": 37,
+        "deployments": 38,
         "registrations": 33,
         "all_action_ids": action_ids,
         "deployment_action_ids": deployment_action_ids,

@@ -108,7 +108,7 @@ def test_fully_bound_synthetic_plan_is_complete_and_deterministic():
     )
     assert sum(
         action["kind"] == "deployment" for action in _actions(first)
-    ) == 37
+    ) == 38
     assert len(first["registry_coverage"]) == 33
 
 
