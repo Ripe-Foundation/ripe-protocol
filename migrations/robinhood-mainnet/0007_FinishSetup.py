@@ -44,20 +44,20 @@ def migrate(migration: Migration):
     )
     assert bool(migration.execute(sb_alpha.executePendingAction, int(action_id)))
 
-    log.h1("Setting time locks after setup")
+    # log.h1("Setting time locks after setup")
 
-    for board in (sb_alpha, sb_bravo, sb_charlie, sb_delta, sb_echo):
-        migration.execute(board.setActionTimeLockAfterSetup)
+    # for board in (sb_alpha, sb_bravo, sb_charlie, sb_delta, sb_echo):
+    #     migration.execute(board.setActionTimeLockAfterSetup)
 
-    migration.execute(chainlink.setActionTimeLockAfterSetup)
-    migration.execute(curve_prices.setActionTimeLockAfterSetup)
-    migration.execute(blue_chip.setActionTimeLockAfterSetup)
-    migration.execute(human_resources.setActionTimeLockAfterSetup)
+    # migration.execute(chainlink.setActionTimeLockAfterSetup)
+    # migration.execute(curve_prices.setActionTimeLockAfterSetup)
+    # migration.execute(blue_chip.setActionTimeLockAfterSetup)
+    # migration.execute(human_resources.setActionTimeLockAfterSetup)
 
-    assert migration.execute(switchboard.setRegistryTimeLockAfterSetup)
-    assert migration.execute(price_desk.setRegistryTimeLockAfterSetup)
-    assert migration.execute(vault_book.setRegistryTimeLockAfterSetup)
-    assert migration.execute(hq.setRegistryTimeLockAfterSetup)
+    # assert migration.execute(switchboard.setRegistryTimeLockAfterSetup)
+    # assert migration.execute(price_desk.setRegistryTimeLockAfterSetup)
+    # assert migration.execute(vault_book.setRegistryTimeLockAfterSetup)
+    # assert migration.execute(hq.setRegistryTimeLockAfterSetup)
 
     log.h1("Handing governance to the Safe")
 

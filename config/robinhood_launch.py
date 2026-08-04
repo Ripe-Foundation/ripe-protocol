@@ -11,24 +11,60 @@ import their values from config/ and scripts/.
 
 import os
 
-from config.BluePrint import PARAMS, ROBINHOOD_ADDRESSES, ROBINHOOD_GOVERNANCE
-
-_INPUTS = PARAMS["robinhood"]["DEPLOYMENT_INPUTS"]
+from config.BluePrint import ROBINHOOD_ADDRESSES, ROBINHOOD_GOVERNANCE
 
 ZERO_ADDRESS = "0x" + "0" * 40
-
-
-def approved(key):
-    """Read an owner-approved value from the blueprint."""
-    row = _INPUTS[key]
-    if row.disposition not in {"approved", "external_fact", "disabled"}:
-        raise ValueError(f"{key} is {row.disposition}, not an approved value")
-    return row.value
 
 
 def address(key):
     """Read a verified external address from the blueprint."""
     return ROBINHOOD_ADDRESSES[key]
+
+
+# --- block units ------------------------------------------------------------
+# Same constants as contracts/config/DefaultsRobinhood.vy. BLOCKS_PER_MINUTE is
+# 5 because on this Arbitrum L2 `block.number` is the L1 ancestor estimate,
+# advancing about every 12 seconds -- not the child block height.
+BLOCKS_PER_MINUTE = 5
+HOUR_IN_BLOCKS = 60 * BLOCKS_PER_MINUTE
+DAY_IN_BLOCKS = 24 * HOUR_IN_BLOCKS
+WEEK_IN_BLOCKS = 7 * DAY_IN_BLOCKS
+
+# --- timelocks (blocks) -----------------------------------------------------
+TOKEN_HQ_MIN_TIMELOCK = DAY_IN_BLOCKS
+TOKEN_HQ_MAX_TIMELOCK = WEEK_IN_BLOCKS
+LOCAL_GOV_MIN_TIMELOCK = DAY_IN_BLOCKS
+LOCAL_GOV_MAX_TIMELOCK = WEEK_IN_BLOCKS
+RIPE_HQ_MIN_TIMELOCK = HOUR_IN_BLOCKS * 12
+RIPE_HQ_MAX_TIMELOCK = WEEK_IN_BLOCKS
+REGISTRY_MIN_DELAY = HOUR_IN_BLOCKS * 12
+REGISTRY_MAX_DELAY = WEEK_IN_BLOCKS
+PRICE_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
+PRICE_MAX_TIMELOCK = WEEK_IN_BLOCKS
+# All five switchboards share one band.
+SWITCHBOARD_MIN_TIMELOCK = HOUR_IN_BLOCKS * 2
+SWITCHBOARD_MAX_TIMELOCK = WEEK_IN_BLOCKS
+HR_MIN_TIMELOCK = DAY_IN_BLOCKS
+HR_MAX_TIMELOCK = WEEK_IN_BLOCKS
+
+# --- stale windows (SECONDS, not blocks) ------------------------------------
+# Deliberately plain integers: these are wall-clock seconds passed to price
+# feeds. Writing DAY_IN_BLOCKS here would make every staleness check 12x tighter.
+STALE_WINDOW_MIN = 300  # 5 minutes
+STALE_WINDOW_MAX = 604_800  # 7 days
+STALE_WINDOW_DEFAULT = 86_400  # 1 day
+STALE_WINDOW_USDG = 86_400  # 1 day
+
+# --- initial supply ---------------------------------------------------------
+GREEN_INITIAL_SUPPLY = 100 * 10**18  # to the deployer, which seeds the pool
+RIPE_INITIAL_SUPPLY = 100_000 * 10**18  # to the governance Safe
+SGREEN_INITIAL_SUPPLY = 0
+
+# --- misc -------------------------------------------------------------------
+TELLER_SHOULD_PAUSE = True  # Teller launches paused
+BOND_BOOSTER_MAX_BOOST_RATIO = 200_00  # 200%
+BOND_BOOSTER_MAX_UNITS = 25_000  # a count, not a ratio
+BOND_BOOSTER_MIN_LOCK_DURATION = DAY_IN_BLOCKS * 180
 
 
 # --- governance -------------------------------------------------------------
@@ -126,8 +162,8 @@ PSM_YIELD_VAULT_TOKEN = ZERO_ADDRESS
 # CurvePrices takes a price-change timelock band. Robinhood has no separate
 # PRICE_DESK_*_REG_TIMELOCK, so all three price sources share the approved
 # Chainlink band.
-PRICE_CHANGE_MIN_TIMELOCK = approved("Deployment.DP-05.timelocks.Chainlink.minTimeLock")
-PRICE_CHANGE_MAX_TIMELOCK = approved("Deployment.DP-05.timelocks.Chainlink.maxTimeLock")
+PRICE_CHANGE_MIN_TIMELOCK = PRICE_MIN_TIMELOCK
+PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
 
 # --- curve pool -------------------------------------------------------------
 # 100 USDG (6dp) + 100 GREEN (18dp), matching Base's GREEN pool seed.

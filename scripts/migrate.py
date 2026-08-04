@@ -16,6 +16,21 @@ import os
 MIGRATION_SCRIPTS_DIR = "./migrations"
 MIGRATION_HISTORY_DIR = "./migration_history"
 
+# Read .env so the RPC and keys are available without exporting them by hand.
+# override=False: a variable already in the environment wins, so an explicit
+# `FOO=bar python -m scripts.migrate ...` is never silently overridden by .env.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(override=False)
+except ImportError:
+    pass
+
+
+def _rpc_from_env(chain):
+    """Per-chain RPC override, e.g. ROBINHOOD_MAINNET_RPC_URL."""
+    return os.environ.get(f"{chain.replace('-', '_').upper()}_RPC_URL")
+
 
 CLICK_PROMPTS = {
     "safe": {
@@ -255,8 +270,16 @@ def cli(
     `.migration_history/network-219183`.
     """
 
-    final_rpc = rpc if rpc else (
+    final_rpc = rpc or _rpc_from_env(chain) or (
         'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
+
+    # A fork cannot execute ArbSys: it is a node-implemented precompile, so
+    # `arbBlockNumber()` reverts and the Ledger constructor refuses to deploy.
+    # Default fork runs to native so they just work, and leave live runs on
+    # ArbSys -- the action block source is an IMMUTABLE constructor argument,
+    # so a live run that silently picked native could not be corrected.
+    if fork and not os.environ.get("RIPE_LEDGER_BLOCK_SOURCE"):
+        os.environ["RIPE_LEDGER_BLOCK_SOURCE"] = "native"
 
     if safe != "":
         if fork:

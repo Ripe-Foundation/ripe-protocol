@@ -3,13 +3,9 @@ from scripts.utils.migration import Migration
 from tests.constants import ZERO_ADDRESS
 
 from config.robinhood_launch import (
-    PSM_MAX_INTERVAL_MINT,
-    PSM_MAX_INTERVAL_REDEEM,
-    PSM_MINT_FEE,
-    PSM_NUM_BLOCKS_PER_INTERVAL,
-    PSM_REDEEM_FEE,
-    PSM_YIELD_LEGO_ID,
-    PSM_YIELD_VAULT_TOKEN,
+    BOND_BOOSTER_MAX_BOOST_RATIO,
+    BOND_BOOSTER_MAX_UNITS,
+    BOND_BOOSTER_MIN_LOCK_DURATION,
     DELEVERAGE_BUFFER,
     DELEVERAGE_COOLDOWN,
     DELEVERAGE_DUST_BPS,
@@ -18,12 +14,21 @@ from config.robinhood_launch import (
     DELEVERAGE_MIN_BPS,
     DELEVERAGE_OVERAGE_BPS,
     DELEVERAGE_UNDERSCORE_SPREAD,
+    HR_MAX_TIMELOCK,
+    HR_MIN_TIMELOCK,
     LOOTBOX_DEPOSIT_REWARD,
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
     LOOTBOX_YIELD_BONUS,
+    PSM_MAX_INTERVAL_MINT,
+    PSM_MAX_INTERVAL_REDEEM,
+    PSM_MINT_FEE,
+    PSM_NUM_BLOCKS_PER_INTERVAL,
+    PSM_REDEEM_FEE,
+    PSM_YIELD_LEGO_ID,
+    PSM_YIELD_VAULT_TOKEN,
+    TELLER_SHOULD_PAUSE,
     address,
-    approved,
 )
 
 
@@ -46,9 +51,9 @@ def migrate(migration: Migration):
     bond_booster = migration.deploy(
         "BondBooster",
         hq,
-        approved("Deployment.DP-22.bondBooster.maxBoostRatio"),
-        approved("Deployment.DP-22.bondBooster.maxUnits"),
-        approved("Deployment.DP-22.bondBooster.minLockDuration"),
+        BOND_BOOSTER_MAX_BOOST_RATIO,
+        BOND_BOOSTER_MAX_UNITS,
+        BOND_BOOSTER_MIN_LOCK_DURATION,
     )
     register(migration.deploy("BondRoom", hq, bond_booster), "BondRoom", 12)
 
@@ -57,7 +62,7 @@ def migrate(migration: Migration):
         migration.deploy(
             "Endaoment",
             hq,
-            approved("Deployment.DP-21.endaoment.wethIdentity"),
+            address("WETH"),
             address("NATIVE_ETH_SENTINEL"),
         ),
         "Endaoment",
@@ -67,8 +72,8 @@ def migrate(migration: Migration):
         migration.deploy(
             "HumanResources",
             hq,
-            approved("Deployment.DP-05.timelocks.HumanResources.minTimeLock"),
-            approved("Deployment.DP-05.timelocks.HumanResources.maxTimeLock"),
+            HR_MIN_TIMELOCK,
+            HR_MAX_TIMELOCK,
         ),
         "HumanResources",
         15,
@@ -93,7 +98,7 @@ def migrate(migration: Migration):
     # Teller launches paused.
     register(
         migration.deploy(
-            "Teller", hq, approved("Deployment.DP-20.teller.shouldPause")
+            "Teller", hq, TELLER_SHOULD_PAUSE
         ),
         "Teller",
         17,

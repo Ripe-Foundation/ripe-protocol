@@ -4,9 +4,17 @@ from tests.constants import ZERO_ADDRESS
 
 from config.robinhood_launch import (
     GOVERNANCE,
+    GREEN_INITIAL_SUPPLY,
+    REGISTRY_MAX_DELAY,
+    REGISTRY_MIN_DELAY,
+    RIPE_HQ_MAX_TIMELOCK,
+    RIPE_HQ_MIN_TIMELOCK,
+    RIPE_INITIAL_SUPPLY,
+    SGREEN_INITIAL_SUPPLY,
     SGREEN_SUPPLY_RECIPIENT,
+    TOKEN_HQ_MAX_TIMELOCK,
+    TOKEN_HQ_MIN_TIMELOCK,
     TRAINING_WHEELS_ALLOWLIST,
-    approved,
     address,
 )
 
@@ -23,9 +31,9 @@ def migrate(migration: Migration):
         "GreenToken",
         ZERO_ADDRESS,
         deployer,
-        approved("Deployment.DP-05.timelocks.TokenHq.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.TokenHq.maxTimeLock"),
-        approved("Deployment.DP-19.supply.GREEN.amount"),
+        TOKEN_HQ_MIN_TIMELOCK,
+        TOKEN_HQ_MAX_TIMELOCK,
+        GREEN_INITIAL_SUPPLY,
         deployer,
     )
 
@@ -33,9 +41,9 @@ def migrate(migration: Migration):
         "RipeToken",
         ZERO_ADDRESS,
         deployer,
-        approved("Deployment.DP-05.timelocks.TokenHq.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.TokenHq.maxTimeLock"),
-        approved("Deployment.DP-19.supply.RIPE.amount"),
+        TOKEN_HQ_MIN_TIMELOCK,
+        TOKEN_HQ_MAX_TIMELOCK,
+        RIPE_INITIAL_SUPPLY,
         GOVERNANCE,
     )
 
@@ -44,9 +52,9 @@ def migrate(migration: Migration):
         green_token,
         ZERO_ADDRESS,
         deployer,
-        approved("Deployment.DP-05.timelocks.TokenHq.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.TokenHq.maxTimeLock"),
-        approved("Deployment.DP-19.supply.SGREEN.amount"),
+        TOKEN_HQ_MIN_TIMELOCK,
+        TOKEN_HQ_MAX_TIMELOCK,
+        SGREEN_INITIAL_SUPPLY,
         SGREEN_SUPPLY_RECIPIENT,
     )
 
@@ -58,10 +66,10 @@ def migrate(migration: Migration):
         savings_green,
         ripe_token,
         deployer,
-        approved("Deployment.DP-05.timelocks.RipeHq.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.RipeHq.maxTimeLock"),
-        approved("Deployment.DP-05.timelocks.AddressRegistry.minDelay"),
-        approved("Deployment.DP-05.timelocks.AddressRegistry.maxDelay"),
+        RIPE_HQ_MIN_TIMELOCK,
+        RIPE_HQ_MAX_TIMELOCK,
+        REGISTRY_MIN_DELAY,
+        REGISTRY_MAX_DELAY,
     )
 
     # Registry ids 1-3 are assigned in this exact order by AddressRegistry.

@@ -2,7 +2,15 @@ from scripts.utils import log
 from scripts.utils.migration import Migration
 from tests.constants import ZERO_ADDRESS
 
-from config.robinhood_launch import approved
+from config.robinhood_launch import (
+    LOCAL_GOV_MAX_TIMELOCK,
+    LOCAL_GOV_MIN_TIMELOCK,
+    STALE_WINDOW_MAX,
+    STALE_WINDOW_MIN,
+    SWITCHBOARD_MAX_TIMELOCK,
+    SWITCHBOARD_MIN_TIMELOCK,
+)
+
 
 # The switchboards, in the exact order they take Switchboard registry ids 1-5.
 BOARDS = ("Alpha", "Bravo", "Charlie", "Delta", "Echo")
@@ -20,8 +28,8 @@ def migrate(migration: Migration):
         "Switchboard",
         hq,
         ZERO_ADDRESS,
-        approved("Deployment.DP-05.timelocks.LocalGov.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.LocalGov.maxTimeLock"),
+        LOCAL_GOV_MIN_TIMELOCK,
+        LOCAL_GOV_MAX_TIMELOCK,
     )
 
     for index, name in enumerate(BOARDS, start=1):
@@ -30,12 +38,12 @@ def migrate(migration: Migration):
         if name == "Alpha":
             # Alpha alone takes the stale-window band before its timelocks.
             args += [
-                approved("Deployment.DP-17.staleWindows.alphaMinimum"),
-                approved("Deployment.DP-17.staleWindows.alphaMaximum"),
+                STALE_WINDOW_MIN,
+                STALE_WINDOW_MAX,
             ]
         args += [
-            approved(f"Deployment.DP-05.timelocks.Switchboard{name}.minTimeLock"),
-            approved(f"Deployment.DP-05.timelocks.Switchboard{name}.maxTimeLock"),
+            SWITCHBOARD_MIN_TIMELOCK,
+            SWITCHBOARD_MAX_TIMELOCK,
         ]
         board = migration.deploy(f"Switchboard{name}", *args)
 

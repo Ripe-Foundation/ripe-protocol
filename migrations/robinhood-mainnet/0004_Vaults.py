@@ -2,7 +2,8 @@ from scripts.utils import log
 from scripts.utils.migration import Migration
 from tests.constants import ZERO_ADDRESS
 
-from config.robinhood_launch import approved
+from config.robinhood_launch import REGISTRY_MAX_DELAY, REGISTRY_MIN_DELAY
+
 
 # VaultBook ids 1-3, in this exact order.
 VAULTS = ("StabilityPool", "RipeGov", "SimpleErc20")
@@ -17,8 +18,8 @@ def migrate(migration: Migration):
         "VaultBook",
         hq,
         ZERO_ADDRESS,
-        approved("Deployment.DP-05.timelocks.AddressRegistry.minDelay"),
-        approved("Deployment.DP-05.timelocks.AddressRegistry.maxDelay"),
+        REGISTRY_MIN_DELAY,
+        REGISTRY_MAX_DELAY,
     )
 
     for index, name in enumerate(VAULTS, start=1):

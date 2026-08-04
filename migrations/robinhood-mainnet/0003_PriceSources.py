@@ -11,8 +11,13 @@ from config.robinhood_launch import (
     BLUECHIP_MORPHO_FACTORIES,
     PRICE_CHANGE_MAX_TIMELOCK,
     PRICE_CHANGE_MIN_TIMELOCK,
+    PRICE_MAX_TIMELOCK,
+    PRICE_MIN_TIMELOCK,
+    REGISTRY_MAX_DELAY,
+    REGISTRY_MIN_DELAY,
+    STALE_WINDOW_DEFAULT,
+    STALE_WINDOW_USDG,
     address,
-    approved,
 )
 
 
@@ -28,8 +33,8 @@ def migrate(migration: Migration):
         hq,
         ZERO_ADDRESS,
         address("NATIVE_ETH_SENTINEL"),
-        approved("Deployment.DP-05.timelocks.AddressRegistry.minDelay"),
-        approved("Deployment.DP-05.timelocks.AddressRegistry.maxDelay"),
+        REGISTRY_MIN_DELAY,
+        REGISTRY_MAX_DELAY,
     )
 
     log.h1("Deploying ChainlinkPrices")
@@ -38,14 +43,14 @@ def migrate(migration: Migration):
         "ChainlinkPrices",
         hq,
         ZERO_ADDRESS,
-        approved("Deployment.DP-05.timelocks.Chainlink.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.Chainlink.maxTimeLock"),
+        PRICE_MIN_TIMELOCK,
+        PRICE_MAX_TIMELOCK,
         address("WETH"),
         address("NATIVE_ETH_SENTINEL"),
         address("BTC_SENTINEL"),
-        approved("Deployment.DP-23.external.chainlink.ethUsdFeed"),
-        approved("Deployment.DP-23.external.chainlink.btcUsdFeed"),
-        approved("Deployment.DP-17.staleWindows.chainlinkDefault"),
+        address("CHAINLINK_ETH_USD"),
+        address("CHAINLINK_BTC_USD"),
+        STALE_WINDOW_DEFAULT,
     )
 
     # USDG prices through Chainlink only. Every other price route depends on
@@ -54,8 +59,8 @@ def migrate(migration: Migration):
     migration.execute(
         chainlink.addNewPriceFeed,
         usdg,
-        approved("Deployment.DP-23.external.chainlink.usdgUsdFeed"),
-        approved("Deployment.DP-17.staleWindows.usdgCeiling"),
+        address("CHAINLINK_USDG_USD"),
+        STALE_WINDOW_USDG,
         False,
         False,
     )
@@ -94,15 +99,15 @@ def migrate(migration: Migration):
         "BlueChipYieldPrices",
         hq,
         ZERO_ADDRESS,
-        approved("Deployment.DP-05.timelocks.Chainlink.minTimeLock"),
-        approved("Deployment.DP-05.timelocks.Chainlink.maxTimeLock"),
+        PRICE_MIN_TIMELOCK,
+        PRICE_MAX_TIMELOCK,
         BLUECHIP_MORPHO_FACTORIES,
         BLUECHIP_EULER_FACTORIES,
         BLUECHIP_FLUID_RESOLVER,
         BLUECHIP_COMPOUND_CONFIGURATOR,
         BLUECHIP_MOONWELL_COMPTROLLER,
         BLUECHIP_AAVE_PROVIDER,
-        approved("Deployment.DP-23.external.blueChipYield.morphoV2Factory"),
+        address("MORPHO_V2_FACTORY"),
     )
     migration.execute(
         price_desk.startAddNewAddressToRegistry, blue_chip, "BlueChipYieldPrices"

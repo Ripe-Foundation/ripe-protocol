@@ -1,7 +1,7 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
 
-from config.robinhood_launch import LEDGER_ACTION_BLOCK_SOURCE, approved
+from config.robinhood_launch import LEDGER_ACTION_BLOCK_SOURCE
 
 
 def migrate(migration: Migration):
