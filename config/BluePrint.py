@@ -1017,10 +1017,18 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     # It needs its own approval; the register entry should be updated alongside.
     'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(100 * 10**18, 'approved'),
     'Deployment.DP-19.supply.GREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_GREEN_RECIPIENT'), 'blocked'),
-    'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_RIPE_RECIPIENT'), 'blocked'),
+    # Base minted 10,000,000 RIPE to the governance Safe at deployment
+    # (migrations/base-mainnet/0000_TokensAndHq.py). Robinhood mints the
+    # same way to the same multi-chain Safe, at the owner-approved smaller
+    # launch supply of 100,000.
+    'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(100_000 * 10**18, 'approved'),
+    'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(ROBINHOOD_GOVERNANCE, 'approved'),
     'Deployment.DP-19.supply.SGREEN.amount': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_SGREEN_RECIPIENT'), 'blocked'),
+    # Supply is 0, and Erc20Token only credits a recipient when the supply
+    # is nonzero, so this address is never read. Base passed ZERO_ADDRESS
+    # here for exactly the same reason; matching it keeps the mint
+    # impossible rather than merely unused.
+    'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput('0x' + '0' * 40, 'approved'),
     # DP-20
     'Deployment.DP-20.teller.shouldPause': RobinhoodInput(True, 'approved'),
     # DP-21
