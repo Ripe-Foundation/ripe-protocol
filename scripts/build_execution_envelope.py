@@ -40,14 +40,26 @@ ZERO = "0x" + "0" * 40
 ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 
+def _slug(authority: str) -> str:
+    """Reduce a prose authority to the envelope's permitted reference charset.
+
+    The schema requires `[A-Za-z0-9][A-Za-z0-9._:/-]*`, so the readable
+    rationale lives in this file's comments and the record carries a stable
+    slug of it. The slug still names its source -- it is evidence, not a label.
+    """
+    slug = re.sub(r"[^A-Za-z0-9._:/-]+", "-", authority).strip("-")
+    return slug or "unattributed"
+
+
 def _typed(reference: str, type_name: str, value, authority: str):
     """Stamp one accepted value with the authority that justifies it."""
+    slug = _slug(authority)
     return {
         "type": type_name,
         "value": value,
-        "authority_ref": authority,
+        "authority_ref": slug,
         "evidence_sha256": hashlib.sha256(
-            f"{authority}:{reference}:{value!r}".encode("utf-8")
+            f"{slug}:{reference}:{value!r}".encode("utf-8")
         ).hexdigest(),
     }
 
