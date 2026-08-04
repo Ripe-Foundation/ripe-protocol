@@ -109,6 +109,18 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows, attest):
             return "string", "Ether", "Robinhood native currency"
         if lowered.endswith("nativedecimals"):
             return "uint256", 18, "Robinhood native currency"
+        if key == "Deployment.DP-04.ledger.actionBlockSourceBinding":
+            # ARB_SYS, not native. Robinhood is an Arbitrum L2 where
+            # block.number is the L1 ancestor estimate and REPEATS across child
+            # blocks -- native mode would let the Ledger's one-action-per-block
+            # guard treat several child blocks as one. arbBlockNumber() is the
+            # true child height, and the constructor refuses to deploy unless it
+            # can execute and decode it.
+            return (
+                "address",
+                blueprint.ROBINHOOD_ADDRESSES["ARB_SYS"],
+                "Arbitrum child-block height; native block.number repeats on L2",
+            )
         if key.startswith("Deployment.DP-08.psm."):
             # Stage 0800 deploys the PSM disabled. Zero fees and zero caps mean
             # that even if it were enabled by mistake, nothing can be minted or
@@ -138,6 +150,12 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows, attest):
                 blueprint.ROBINHOOD_GOVERNANCE,
                 "owner decision: evidentiary role, the Safe holds the powers it names",
             )
+        if key == "approved-capability-set":
+            # Empty: Robinhood launches with no capabilities beyond those each
+            # department's own registration grants. That trivially satisfies
+            # the action's postconditions -- psm-green-mint-withheld and
+            # ccip-capabilities-absent -- rather than enabling anything extra.
+            return "json", [], "no capabilities beyond per-department registration"
         if key in ATTESTATION_KEYS or key.startswith(ATTESTATION_PREFIXES):
             # Acceptance records for assertion and blocked-seam actions. They
             # carry no chain value; they record that the owner attests to a
@@ -185,6 +203,23 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows, attest):
 
     if namespace == "curve":
         row = curve_rows[key]
+        if key == "pool.slippage_limit":
+            # Base passed min_mint_amount=0 to add_liquidity. Robinhood's real
+            # protection is minimum_minted_lp=199e18, which is strictly tighter
+            # than anything Base had, so this policy row stays at Base parity.
+            return "uint256", 0, "Base 2001_CurvePools.py add_liquidity(min_mint=0)"
+        if key == "pool.minimum_retained_liquidity":
+            # Base transferred its entire LP balance to Endaoment and retained
+            # none. Robinhood transfers the whole balance to EndaomentFunds.
+            return "uint256", 0, "Base 2001_CurvePools.py transfers the full LP balance"
+        if key == "pool.production_observation":
+            # An observation of the deployed pool: it cannot exist before the
+            # pool does. The envelope records that it will be taken and
+            # asserted by validate-green-usdg-pool, not a pre-invented reading.
+            return (
+                "boolean", True,
+                "observation recorded post-deploy by assert-pool-runtime",
+            )
         if key == "pool.address":
             return "address", ZERO, "create path: no GREEN/USDG pool can pre-exist"
         if "address_provider_binding_" in key:
