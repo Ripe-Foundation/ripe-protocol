@@ -94,6 +94,19 @@ def build_fully_bound_envelope(
                 values[reference] = _typed(reference, "address", row.value)
             elif "sourcebinding" in lowered:
                 values[reference] = _typed(reference, "address", ZERO)
+            elif key == "Deployment.DP-19.supply.RIPE.recipient":
+                # Base minted RIPE to the governance Safe; Robinhood mints the
+                # approved 100,000 to the same multi-chain Safe.
+                values[reference] = _typed(
+                    reference,
+                    "address",
+                    source_blueprint.ROBINHOOD_GOVERNANCE,
+                )
+            elif key == "Deployment.DP-19.supply.SGREEN.recipient":
+                # Supply is 0 and Erc20Token skips the credit entirely when the
+                # supply is zero, so zero here makes the mint impossible rather
+                # than merely unused. Base passed the same.
+                values[reference] = _typed(reference, "address", ZERO)
             elif any(marker in lowered for marker in (".guardian", ".recipient")):
                 values[reference] = _typed(reference, "address", OWNER)
             elif "allowlist" in lowered or lowered.endswith("litesigners"):

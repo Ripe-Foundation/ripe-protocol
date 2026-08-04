@@ -133,6 +133,19 @@ def isGovernanceStandIn() -> bool:
         # The deployer seeds the pool, so it receives the initial GREEN.
         "binding:green-supply-recipient": ("address", str(sender)),
         "input:Deployment.DP-18.roles.governance": ("address", str(final_sender)),
+        # 100,000 RIPE is minted to the governance Safe, as Base minted its
+        # supply to blueprint.ADDYS["GOVERNANCE"]. On the fork the Safe is the
+        # stand-in contract, so the mint lands there and can be checked.
+        "input:Deployment.DP-19.supply.RIPE.recipient": (
+            "address",
+            str(final_sender),
+        ),
+        # sGREEN has a zero supply; a zero recipient makes the credit
+        # impossible rather than merely unused.
+        "input:Deployment.DP-19.supply.SGREEN.recipient": (
+            "address",
+            ZERO_ADDRESS,
+        ),
         # Take the CREATE path, not the BIND path. create_or_bind_pool binds to
         # a pre-existing pool when this is a non-zero address, and requires code
         # there. No GREEN/USDG pool can exist on Robinhood yet -- GREEN is
@@ -167,6 +180,16 @@ def isGovernanceStandIn() -> bool:
     print(f"  actions executed        {len(executor.results)}")
     print(f"  production deployments  {len(backend.production_deployments)}")
     print(f"  handed off              {backend.handed_off}")
+    ripe = backend.contracts["address:RIPE_TOKEN"]
+    ripe_supply = int(ripe.totalSupply())
+    ripe_held = int(ripe.balanceOf(final_sender))
+    print(f"  RIPE total supply       {ripe_supply / 10**18:,.0f}")
+    print(f"  RIPE held by governance {ripe_held / 10**18:,.0f}")
+    assert ripe_supply == 100_000 * 10**18, ripe_supply
+    assert ripe_held == ripe_supply, ripe_held
+    sgreen = backend.contracts["address:SGREEN_TOKEN"]
+    assert int(sgreen.totalSupply()) == 0
+    print("  sGREEN total supply     0")
     minted = getattr(backend, "seed_minted_lp", None)
     if minted is not None:
         print(f"  pool LP minted          {minted / 10**18:.6f}")

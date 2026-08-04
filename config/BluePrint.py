@@ -1022,13 +1022,18 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     # same way to the same multi-chain Safe, at the owner-approved smaller
     # launch supply of 100,000.
     'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(100_000 * 10**18, 'approved'),
-    'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(ROBINHOOD_GOVERNANCE, 'approved'),
+    # Bound at execution to ROBINHOOD_GOVERNANCE, mirroring Base's
+    # blueprint.ADDYS['GOVERNANCE']. Kept 'blocked' rather than flipped to
+    # 'approved' because the H-04 ledger status is the approval record, and
+    # editing it to force a blueprint change through is what the ledger
+    # explicitly must not be used for.
+    'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_RIPE_RECIPIENT'), 'blocked'),
     'Deployment.DP-19.supply.SGREEN.amount': RobinhoodInput(0, 'approved'),
     # Supply is 0, and Erc20Token only credits a recipient when the supply
     # is nonzero, so this address is never read. Base passed ZERO_ADDRESS
     # here for exactly the same reason; matching it keeps the mint
     # impossible rather than merely unused.
-    'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput('0x' + '0' * 40, 'approved'),
+    'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_SGREEN_RECIPIENT'), 'blocked'),
     # DP-20
     'Deployment.DP-20.teller.shouldPause': RobinhoodInput(True, 'approved'),
     # DP-21
