@@ -48,6 +48,7 @@ EXPECTED_STAGE_IDS = (
 )
 EXPECTED_OPERATION_VOCABULARY = frozenset(
     {
+        "add-and-confirm-blue-chip-feed",
         "add-and-confirm-chainlink-feed",
         "add-and-confirm-curve-feed-after-id-two",
         "apply-defaults-asset-configs",
@@ -98,8 +99,10 @@ EXPECTED_OPERATION_VOCABULARY = frozenset(
     }
 )
 EXPECTED_NAMESPACE_COUNTS = {
-    "action": 7,
-    "address": 144,
+    # 9 action / 147 address references since the SteakHouse USDG blue-chip
+    # feed was added to 0400.
+    "action": 9,
+    "address": 147,
     # 58 since binding:contributor-template was replaced by an in-flow
     # blueprint deployment.
     "binding": 58,
@@ -425,6 +428,10 @@ def _bind(context: ActionContext) -> BackendOutcome:
     return context.backend.bind_value(context)
 
 
+def _blue_chip_feed(context: ActionContext) -> BackendOutcome:
+    return context.backend.add_and_confirm_blue_chip_feed(context)
+
+
 def _deploy_blueprint(context: ActionContext) -> BackendOutcome:
     return context.backend.deploy_blueprint(context)
 
@@ -438,7 +445,7 @@ def _non_executing(context: ActionContext) -> BackendOutcome:
 
 
 def build_handler_registry() -> HandlerRegistry:
-    """Build the exact 47-operation registry without a fallback handler."""
+    """Build the exact 48-operation registry without a fallback handler."""
 
     registry = HandlerRegistry()
     rows = (
@@ -450,6 +457,10 @@ def build_handler_registry() -> HandlerRegistry:
         (_contract("register-and-confirm", "registration", "action,address", transactional=True), _register),
         (_contract("assert-constructor-registration", "registration"), _constructor_registration),
         (_contract("add-and-confirm-chainlink-feed", "configuration", "address,input", transactional=True), _chainlink),
+        # Morpho V2 vault pricing. Needs only the vault address and the
+        # protocol flag: the underlying asset and both decimals are derived
+        # from the vault, and every other field defaults.
+        (_contract("add-and-confirm-blue-chip-feed", "configuration", "action,address", transactional=True), _blue_chip_feed),
         (_contract("validate-external-identities", "configuration", "curve"), _external_identities),
         (_contract("create-or-bind-pool", "configuration", "curve", "address", transactional=True), _pool),
         (_contract("assert-pool-runtime", "assertion", "address,curve"), _pool_assertion),
@@ -1199,7 +1210,7 @@ class RobinhoodStageExecutor:
             raise RobinhoodExecutionError("RHX_STAGE_CENSUS_DRIFT")
         actions = [action for stage in stages for action in stage["actions"]]
         census = self.plan["action_census"]
-        if (len(actions), census["deployments"], census["registrations"]) != (118, 38, 33):
+        if (len(actions), census["deployments"], census["registrations"]) != (119, 38, 33):
             raise RobinhoodExecutionError("RHX_ACTION_CENSUS_DRIFT")
         operations = {action["operation"] for action in actions}
         self.registry.validate_vocabulary(operations)

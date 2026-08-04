@@ -215,8 +215,8 @@ def test_profiles_share_source_but_bind_isolated_plan_and_history_identities(
     assert mainnet["profile"]["expected_chain_id"] == 4663
     assert testnet["profile"]["expected_chain_id"] == 46630
     assert EXPECTED_NAMESPACE_COUNTS == {
-        "action": 7,
-        "address": 144,
+        "action": 9,
+        "address": 147,
         "binding": 58,
         "blueprint": 6,
         "curve": 45,

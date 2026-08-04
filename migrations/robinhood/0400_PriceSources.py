@@ -267,6 +267,30 @@ MIGRATION_STAGE = {
             "postconditions": ("returned-registry-id-matches-authority",),
         },
         {
+            # SteakHouse USDG is the one Morpho V2 vault on Robinhood. It needs
+            # no new owner input: the vault address is an approved external
+            # fact, and the underlying (USDG) already prices through the
+            # Chainlink feed configured earlier in this stage. Ordered after the
+            # PriceDesk registration because BlueChipYieldPrices validates the
+            # config by asking PriceDesk for the underlying price.
+            "semantic_action_id": "configure-steakhouse-usdg-feed",
+            "kind": "configuration",
+            "operation": "add-and-confirm-blue-chip-feed",
+            "component_id": "CM-018",
+            "requires": (
+                "address:STEAKHOUSE_USDG_VAULT",
+                "address:BLUE_CHIP_YIELD_PRICES",
+                "address:PRICE_DESK",
+                "action:register-blue-chip-yield-prices",
+                "action:register-price-desk-in-ripe-hq",
+            ),
+            "abort_if": ("blue-chip-feed-confirmation-failed",),
+            "postconditions": (
+                "steakhouse-usdg-priced-through-morpho-v2",
+                "underlying-usdg-prices-through-chainlink",
+            ),
+        },
+        {
             "semantic_action_id": "apply-price-desk-priority",
             "kind": "configuration",
             "operation": "set-priority-price-source-ids",

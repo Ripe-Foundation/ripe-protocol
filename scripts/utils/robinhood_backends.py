@@ -500,6 +500,11 @@ class DeterministicRobinhoodBackend:
     def add_and_confirm_chainlink_feed(self, context: ActionContext) -> BackendOutcome:
         return self._configuration(context)
 
+    def add_and_confirm_blue_chip_feed(self, context: ActionContext) -> BackendOutcome:
+        # State-machine double: the real registry, PriceDesk and timelock checks
+        # live in BoaRobinhoodBackend against actual contracts.
+        return self._configuration(context)
+
     def validate_external_identities(self, context: ActionContext) -> BackendOutcome:
         return self._run(context)
 
@@ -1084,6 +1089,38 @@ class BoaRobinhoodBackend(DeterministicRobinhoodBackend):
                 self.boa.env.time_travel(blocks=delay + 1)
             if not chainlink.confirmNewPriceFeed(usdg, sender=self.sender):
                 raise RobinhoodExecutionError("RHX_CHAINLINK_CONFIG_FAILED", action_id=context.action["action_id"])
+        return self._boa_outcome(context, transactional=True)
+
+    def add_and_confirm_blue_chip_feed(self, context: ActionContext) -> BackendOutcome:
+        """Register the SteakHouse USDG vault with BlueChipYieldPrices.
+
+        Only the vault address and the protocol flag are supplied. The vault's
+        underlying asset and both decimals are read back from the Morpho V2
+        registry, and BlueChipYieldPrices refuses the config unless PriceDesk
+        already returns a nonzero price for that underlying -- which is what
+        the USDG Chainlink feed configured earlier in this stage provides.
+        """
+        blue_chip = self._contract_for_reference("address:BLUE_CHIP_YIELD_PRICES")
+        vault = self._address(context.value("address:STEAKHOUSE_USDG_VAULT"))
+        # Protocol.MORPHO_V2 is the 8th flag member, so bit 7.
+        morpho_v2 = 1 << 7
+        if not blue_chip.addNewPriceFeed(vault, morpho_v2, sender=self.sender):
+            raise RobinhoodExecutionError(
+                "RHX_BLUE_CHIP_CONFIG_FAILED", action_id=context.action["action_id"]
+            )
+        delay = int(blue_chip.actionTimeLock())
+        if delay:
+            self.boa.env.time_travel(blocks=delay + 1)
+        if not blue_chip.confirmNewPriceFeed(vault, sender=self.sender):
+            raise RobinhoodExecutionError(
+                "RHX_BLUE_CHIP_CONFIG_FAILED", action_id=context.action["action_id"]
+            )
+        price_desk = self._contract_for_reference("address:PRICE_DESK")
+        if int(price_desk.getPrice(vault, False)) == 0:
+            raise RobinhoodExecutionError(
+                "RHX_BLUE_CHIP_PRICE_UNAVAILABLE",
+                action_id=context.action["action_id"],
+            )
         return self._boa_outcome(context, transactional=True)
 
     def validate_external_identities(self, context: ActionContext) -> BackendOutcome:

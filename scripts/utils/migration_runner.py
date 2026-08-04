@@ -1534,7 +1534,7 @@ def build_robinhood_plan(
     # a configuration action, so it did not move the deployment count. 38
     # deployments since the Contributor template became an in-flow blueprint
     # deployment instead of an owner-supplied address, matching Base.
-    if action_census["total"] != 118:
+    if action_census["total"] != 119:
         raise MigrationPlanError("H05_ACTION_CENSUS")
     if action_census["deployments"] != 38:
         raise MigrationPlanError("H05_DEPLOYMENT_CENSUS")
@@ -1836,7 +1836,7 @@ def _validate_artifact_action_census(plan: Mapping[str, Any]) -> None:
     except (KeyError, TypeError):
         raise MigrationPlanError("H05_ACTION_CENSUS") from None
     expected = {
-        "total": 118,
+        "total": 119,
         "deployments": 38,
         "registrations": 33,
         "all_action_ids": action_ids,
