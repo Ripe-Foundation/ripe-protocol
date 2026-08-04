@@ -152,8 +152,14 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows, attest):
             return "address", deployer, "owner decision: the Ledger deploys and governs until handoff"
         if key == "green-supply-recipient":
             return "address", deployer, "the deployer seeds the GREEN/USDG pool in 0600"
-        if key in {"no-local-governance", "initial-ripe-hq"}:
-            return "address", ZERO, "LocalGov asserts _initialGov != hqGov; departments hold none"
+        if key == "no-local-governance":
+            # A marker, not an address: the envelope schema only permits an
+            # address for the identity bindings. It records that the 11
+            # departments are constructed holding no local governance, because
+            # LocalGov asserts _initialGov != hqGov and the deployer IS hqGov.
+            return "boolean", True, "departments constructed with zero local governance"
+        if key == "initial-ripe-hq":
+            return "address", ZERO, "RipeHq is deployed, not bound to a prior instance"
         if key == "reward-qualified-lite-signer-identity-if-used":
             return "address", ZERO, "not used; psm-lite-signer-posture-zero is asserted alongside"
         if key in {"operator-identity", "release-signer-identity", "reward-governance-identity"}:
