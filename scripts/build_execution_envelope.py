@@ -56,7 +56,15 @@ class Unjustified(Exception):
     """Raised when a reference has no value this script may legitimately set."""
 
 
-def _resolve(reference, blueprint, deployer, curve_rows, stock_rows):
+ATTESTATION_PREFIXES = ("reward-",)
+ATTESTATION_KEYS = {
+    "artifact-capacity-freeze",
+    "release-proof",
+    "final-handoff-authorization",
+}
+
+
+def _resolve(reference, blueprint, deployer, curve_rows, stock_rows, attest):
     """Return (type, value, authority) for one blocked reference.
 
     Raises Unjustified when the value is a genuine owner decision that has not
@@ -130,6 +138,16 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows):
                 blueprint.ROBINHOOD_GOVERNANCE,
                 "owner decision: evidentiary role, the Safe holds the powers it names",
             )
+        if key in ATTESTATION_KEYS or key.startswith(ATTESTATION_PREFIXES):
+            # Acceptance records for assertion and blocked-seam actions. They
+            # carry no chain value; they record that the owner attests to a
+            # process step. Gated behind --accept-attestations so signing them
+            # is a deliberate act, not a side effect of running this script.
+            if not attest:
+                raise Unjustified(
+                    "owner attestation (re-run with --accept-attestations)"
+                )
+            return "boolean", True, "owner attestation via --accept-attestations"
         if key.startswith("lootbox-"):
             # Every Lootbox parameter is an Underscore reward, and Underscore is
             # intentionally absent on Robinhood (UNDERSCORE_REGISTRY is zero).
@@ -176,7 +194,21 @@ def _resolve(reference, blueprint, deployer, curve_rows, stock_rows):
         raise Unjustified("owner curve decision")
 
     if namespace == "stock":
-        raise Unjustified("AAPL stock lane is deferred and not part of this launch")
+        # The only consumer is 0500 preserve-stock-extension-seam, whose
+        # operation is assert-atomic-aapl-qualification-remains-blocked and
+        # whose kind is "blocked" -- a non-executing assertion that the AAPL
+        # lane stays unresolved. Binding the recorded candidate where one
+        # exists, and an attestation otherwise, records exactly that.
+        if not attest:
+            raise Unjustified(
+                "AAPL lane stays blocked (re-run with --accept-attestations)"
+            )
+        candidate = stock_rows[key].candidate
+        if isinstance(candidate, str) and ADDRESS_RE.match(candidate):
+            return "address", candidate, "recorded AAPL candidate; lane remains blocked"
+        if isinstance(candidate, int) and not isinstance(candidate, bool):
+            return "uint256", candidate, "recorded AAPL candidate; lane remains blocked"
+        return "boolean", True, "AAPL lane remains blocked; 0500 asserts it"
 
     raise Unjustified(f"unknown namespace {namespace}")
 
@@ -188,6 +220,17 @@ def main() -> int:
         "--deployer",
         required=True,
         help="The Ledger address that deploys and holds governance until 0900.",
+    )
+    parser.add_argument(
+        "--accept-attestations",
+        action="store_true",
+        help=(
+            "Record the owner's attestation for process acceptance entries: the "
+            "reward H-06/H-08/H-09/H-10 records, the artifact capacity freeze, "
+            "the release proof, the final-handoff authorization, and the AAPL "
+            "lane remaining blocked. These carry no chain value. Product "
+            "decisions are never covered by this flag."
+        ),
     )
     parser.add_argument("--out", default=None, help="Output directory.")
     args = parser.parse_args()
@@ -215,7 +258,12 @@ def main() -> int:
     for reference in references:
         try:
             type_name, value, authority = _resolve(
-                reference, blueprint, args.deployer, curve_rows, stock_rows
+                reference,
+                blueprint,
+                args.deployer,
+                curve_rows,
+                stock_rows,
+                args.accept_attestations,
             )
         except Unjustified as reason:
             unjustified.append((reference, str(reason)))
