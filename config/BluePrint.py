@@ -1,3 +1,9 @@
+from typing import Any
+import subprocess
+from pathlib import Path
+import json
+import hashlib
+from dataclasses import dataclass
 ADDYS = {
     "base": {
         "RIPE_WETH_POOL": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
@@ -251,12 +257,6 @@ YIELD_TOKENS = {
 # non-Defaults deployment inputs live here. Defaults-interface values live only
 # in contracts/config/DefaultsRobinhood.vy. The JSON ledger is derived evidence.
 
-from dataclasses import dataclass
-import hashlib
-import json
-from pathlib import Path
-import subprocess
-from typing import Any
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
@@ -531,35 +531,50 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("ripe_hq", 7, "Price Desk", "source_hard_coded", "CM-015", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 8, "Vault Book", "source_hard_coded", "CM-021", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 9, "Auction House", "source_hard_coded", "CM-026", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 10, "Auction House NFT", "source_hard_coded", "CM-027", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 10, "Auction House NFT",
+                               "source_hard_coded", "CM-027", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 11, "Boardroom", "source_hard_coded", "CM-028", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 12, "Bond Room", "source_hard_coded", "CM-029", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 13, "Credit Engine", "source_hard_coded", "CM-030", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 14, "Endaoment", "source_hard_coded", "CM-031", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 15, "Human Resources", "source_hard_coded", "CM-032", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 15, "Human Resources", "source_hard_coded",
+                               "CM-032", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 16, "Lootbox", "source_hard_coded", "CM-033", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 17, "Teller", "source_hard_coded", "CM-034", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 18, "Deleverage", "source_hard_coded", "CM-044", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 19, "Credit Redeem", "source_hard_coded", "CM-043", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 20, "Teller Utils", "source_hard_coded", "CM-045", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded", "CM-047", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded",
+                               "CM-047", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool", "provisional_reservation", "CM-051", "deferred", "reserved"),
-    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool", "provisional_reservation", "CM-052", "deferred", "reserved"),
-    RobinhoodRegistrySelection("vault_book", 1, "Stability Pool", "source_hard_coded", "CM-022", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault", "source_hard_coded", "CM-023", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault", "registration_order", "CM-024", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault", "registration_order", "CM-025", "omitted", "omitted"),
+    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool",
+                               "provisional_reservation", "CM-051", "deferred", "reserved"),
+    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool",
+                               "provisional_reservation", "CM-052", "deferred", "reserved"),
+    RobinhoodRegistrySelection("vault_book", 1, "Stability Pool",
+                               "source_hard_coded", "CM-022", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault",
+                               "source_hard_coded", "CM-023", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault",
+                               "registration_order", "CM-024", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault",
+                               "registration_order", "CM-025", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 1, "Chainlink", "registration_order", "CM-016", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "required", "selected"),
-    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order", "CM-018", "required", "selected"),
+    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order",
+                               "CM-018", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 4, "Pyth", "source_hard_coded", "CM-019", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 5, "Stork", "registration_order", "CM-020", "omitted", "omitted"),
-    RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha", "source_hard_coded", "CM-011", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo", "registration_order", "CM-012", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 3, "Switchboard Charlie", "registration_order", "CM-013", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta", "registration_order", "CM-014", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo", "registration_order", "CM-046", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha",
+                               "source_hard_coded", "CM-011", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo",
+                               "registration_order", "CM-012", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 3, "Switchboard Charlie",
+                               "registration_order", "CM-013", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta",
+                               "registration_order", "CM-014", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo",
+                               "registration_order", "CM-046", "required", "selected"),
 )
 
 
@@ -1069,6 +1084,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-23.blueChipYield.morphoV2Support': RobinhoodInput(True, 'approved'),
 }
 
+
 @dataclass(frozen=True)
 class RobinhoodCurveLaunchInput:
     input_id: str
@@ -1382,7 +1398,6 @@ ROBINHOOD_CURVE_BLOCKING_STATES = frozenset(
 )
 
 
-
 def validate_robinhood_stock_launch_qualification(
     qualifications: tuple[RobinhoodStockInputQualification, ...] = (
         ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
@@ -1663,23 +1678,22 @@ _ROBINHOOD_CURVE_VALUES = {
     row.input_id: row.value for row in ROBINHOOD_CURVE_LAUNCH_INPUTS
 }
 CURVE_PARAMS["robinhood"] = {
-    "GREEN_POOL_NAME": _ROBINHOOD_CURVE_VALUES["pool.name"],
-    "GREEN_POOL_SYMBOL": _ROBINHOOD_CURVE_VALUES["pool.symbol"],
+    # green pool parameters
+    "GREEN_POOL_NAME": "GREEN/USDG Pool",
+    "GREEN_POOL_SYMBOL": "GREEN/USDG",
     "GREEN_POOL_COINS": (
         ROBINHOOD_ADDRESSES["USDG"],
-        ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+        ROBINHOOD_ADDRESSES["GREEN_TOKEN"],  # deployment-produced
     ),
-    "GREEN_POOL_COIN_DECIMALS": _ROBINHOOD_CURVE_VALUES["pool.coin_decimals"],
-    "GREEN_POOL_A": _ROBINHOOD_CURVE_VALUES["pool.A"],
-    "GREEN_POOL_FEE": _ROBINHOOD_CURVE_VALUES["pool.fee"],
-    "GREEN_POOL_OFFPEG_MULTIPLIER": _ROBINHOOD_CURVE_VALUES[
-        "pool.offpeg_fee_multiplier"
-    ],
-    "GREEN_POOL_MA_EXP_TIME": _ROBINHOOD_CURVE_VALUES["pool.ma_exp_time"],
-    "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": _ROBINHOOD_CURVE_VALUES[
-        "pool.ma_exp_time_alternative_test_vector"
-    ],
-    "GREEN_POOL_ADDRESS": _ROBINHOOD_CURVE_VALUES["pool.address"],
+    "GREEN_POOL_COIN_DECIMALS": (6, 18),
+    "GREEN_POOL_A": 100,
+    "GREEN_POOL_FEE": 4_000_000,
+    "GREEN_POOL_OFFPEG_MULTIPLIER": 20_000_000_000,
+    # 866, not Base's 600: Curve's ma_exp_time is the exponential time
+    # constant, so a 10 minute EMA half-life is 600 / ln(2) = 866.
+    "GREEN_POOL_MA_EXP_TIME": 866,
+    "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": 866,
+    "GREEN_POOL_ADDRESS": _ROBINHOOD_CURVE_VALUES["pool.address"],  # deployed
 }
 CORE_TOKENS["robinhood"] = {
     "USDG": ROBINHOOD_ADDRESSES["USDG"],
