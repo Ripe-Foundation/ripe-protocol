@@ -8,8 +8,8 @@
 ## Current `rh` rebind
 
 The current authority for this page is `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The dated 28 July snapshot and
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The dated 28 July snapshot and
 its validation counts remain historical evidence below; they are not the
 current branch identity.
 
@@ -18,7 +18,7 @@ current branch identity.
 | Teller source Git blob / SHA-256 | `7019b6c47dde03151acc1952944dd19301c83328` / `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` |
 | Runtime template | 24,152 bytes; SHA-256 `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81`; 424 bytes EIP-170 headroom |
 | [`test_teller_deposit.py`](../../../../tests/core/teller/test_teller_deposit.py) | Git blob `22ee55ab035400d2ede8c9ea5e1130a711b05550`; SHA-256 `c58c8fde3158ce16f02ab409408e83533c7e9cd81dc78c5025bec6b4f026dda0` |
-| [`test_teller_action_block.py`](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `25b249342e7edc9efa30da50a9f5cdee8810857a`; SHA-256 `974ac5f7bb47185f29ad4f57e1db91ec0d852ae6f9bf3b13112f48ad72a3741f` |
+| [`test_teller_action_block.py`](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `cbc0bbf77dbeeec4d45cd03f16948fd754704ee7`; SHA-256 `1b28378d68836caae0ffd2cf0cfc2bf649ff1592a65a45b0a3e00e8146da5323` |
 | [`test_teller_rebalance.py`](../../../../tests/core/teller/test_teller_rebalance.py) | Git blob `e176bfe64c32514fcce45fba930ded42ff16458d`; SHA-256 `959ad5961e525d7fd2711b0e268026c3783e47ddae52be136cbf50388e352261` |
 | [Stock comparison test](../../../../tests/vaults/test_stock_token_vault_comparison.py) | Git blob `b8c33f0df312d1ed1e04343337685c4f8c88a377`; SHA-256 `288f8d3fb5cc5de902e4d3918f1ab0c1b7946af243148af34dc6f084e681191c` |
 
@@ -417,9 +417,9 @@ The producer owns tokens, approves Teller, Teller pulls and measures, and the
 producer resets approval after return. Reviewed production callers do not catch
 a Teller failure, so upstream minting, approvals, transfers, and accounting
 roll back. The M1 parameterized trusted-producer test begins at
-[`test_teller_deposit.py:1475`](../../../../tests/core/teller/test_teller_deposit.py#L1475);
+[`test_teller_deposit.py:1831`](../../../../tests/core/teller/test_teller_deposit.py#L1831);
 the real CreditEngine callback case begins at
-[`test_teller_deposit.py:1761`](../../../../tests/core/teller/test_teller_deposit.py#L1761).
+[`test_teller_deposit.py:2444`](../../../../tests/core/teller/test_teller_deposit.py#L2444).
 
 ## Exact-transfer and vault-result policy
 
@@ -477,19 +477,19 @@ attributed to M1.
 
 | Test or group | Invariant and assertions | Mutation sensitivity / limitation |
 | --- | --- | --- |
-| [Nonexact direct receipt, line 1240](../../../../tests/core/teller/test_teller_deposit.py#L1240) | Zero, short, fee, excess, false-return, and reverting transfers leave custody, Ledger, and events unchanged | Receipt modes are exact-delta sensitive; false/revert were already rejected by the Boolean check |
-| [Custody decrease, line 1270](../../../../tests/core/teller/test_teller_deposit.py#L1270) | Checked unsigned subtraction rejects `C1 < C0` and rolls back | Directly sensitive to subtraction/receipt enforcement |
-| [Balance observation failures, line 1309](../../../../tests/core/teller/test_teller_deposit.py#L1309) | Revert, empty, 1-, 31-, 33-, and 64-byte responses are atomic failures | The 33-byte case fails if `_exactBalance` is replaced by the typed call |
-| [Vault mismatch, line 1352](../../../../tests/core/teller/test_teller_deposit.py#L1352) | Vault results `0`, `Q-1`, `Q+1`, or revert roll back exact transfer | Directly sensitive to `V == Q`; false return of exactly `Q` is undetectable |
-| [Locked-vault mismatch, line 1383](../../../../tests/core/teller/test_teller_deposit.py#L1383) | Nonzero-lock endpoint also requires `Q` | Adversarial test vault |
-| [Batch rollback, line 1425](../../../../tests/core/teller/test_teller_deposit.py#L1425) | Bad first or later row reverts the entire batch | Proves transaction atomicity; does not isolate flag release between successful rows |
-| [Trusted producers, line 1475](../../../../tests/core/teller/test_teller_deposit.py#L1475) | Authorized producer addresses succeed exactly and short receipt is atomic | Most cases impersonate the producer rather than execute its full upstream flow |
-| [Callback/recovery, line 1524](../../../../tests/core/teller/test_teller_deposit.py#L1524) | Nested public deposit reverts and a later deposit succeeds | **Not mutex-sensitive:** ordinary nonreentrancy rejects first; recovery manually clears transient state |
-| [Governance vault, line 1583](../../../../tests/core/teller/test_teller_deposit.py#L1583) | Exact receipt, event, shares, authorization, and min/exact/max locks | Supported RipeGov implementation only |
-| [Teller-held sGREEN, line 1712](../../../../tests/core/teller/test_teller_deposit.py#L1712) | Failure rolls back GREEN transfer, ERC-4626 mint, balances, approvals, and claims | Replaceable adversarial test token |
-| [CreditEngine callback, line 1761](../../../../tests/core/teller/test_teller_deposit.py#L1761) | Real first trusted callback remains live | Success path only |
-| [Dormant CreditRedeem route, line 1813](../../../../tests/core/teller/test_teller_deposit.py#L1813) | Reviewed route refunds rather than deposits | Does not prove an active trusted deposit |
-| [Runtime guard, line 1890](../../../../tests/core/teller/test_teller_deposit.py#L1890) | Enforces EIP-170 and the accepted 24,152-byte ceiling | Does not itself guard ABI or layout |
+| [Nonexact direct receipt, lines 1531-1558](../../../../tests/core/teller/test_teller_deposit.py#L1531-L1558) | Zero, short, fee, excess, false-return, and reverting transfers leave custody, Ledger, and events unchanged | Receipt modes are exact-delta sensitive; false/revert were already rejected by the Boolean check |
+| [Custody decrease, lines 1561-1585](../../../../tests/core/teller/test_teller_deposit.py#L1561-L1585) | Checked unsigned subtraction rejects `C1 < C0` and rolls back | Directly sensitive to subtraction/receipt enforcement |
+| [Balance observation failures, lines 1600-1631](../../../../tests/core/teller/test_teller_deposit.py#L1600-L1631) | Revert, empty, 1-, 31-, 33-, and 64-byte responses are atomic failures | The 33-byte case fails if `_exactBalance` is replaced by the typed call |
+| [Vault mismatch, lines 1643-1671](../../../../tests/core/teller/test_teller_deposit.py#L1643-L1671) | Vault results `0`, `Q-1`, `Q+1`, or revert roll back exact transfer | Directly sensitive to `V == Q`; false return of exactly `Q` is undetectable |
+| [Locked-vault mismatch, lines 1739-1777](../../../../tests/core/teller/test_teller_deposit.py#L1739-L1777) | Nonzero-lock endpoint also requires `Q` | Adversarial test vault |
+| [Batch rollback, lines 1781-1816](../../../../tests/core/teller/test_teller_deposit.py#L1781-L1816) | Bad first or later row reverts the entire batch | Proves transaction atomicity; does not isolate flag release between successful rows |
+| [Trusted producers, lines 1831-1877](../../../../tests/core/teller/test_teller_deposit.py#L1831-L1877) | Authorized producer addresses succeed exactly and short receipt is atomic | Most cases impersonate the producer rather than execute its full upstream flow |
+| [Callback/recovery, lines 1880-1928](../../../../tests/core/teller/test_teller_deposit.py#L1880-L1928) | Nested public deposit reverts and a later deposit succeeds | **Not mutex-sensitive:** ordinary nonreentrancy rejects first; recovery manually clears transient state |
+| [Governance vault, lines 2266-2308](../../../../tests/core/teller/test_teller_deposit.py#L2266-L2308) | Exact receipt, event, shares, authorization, and min/exact/max locks | Supported RipeGov implementation only |
+| [Teller-held sGREEN, lines 2395-2441](../../../../tests/core/teller/test_teller_deposit.py#L2395-L2441) | Failure rolls back GREEN transfer, ERC-4626 mint, balances, approvals, and claims | Replaceable adversarial test token |
+| [CreditEngine callback, lines 2444-2493](../../../../tests/core/teller/test_teller_deposit.py#L2444-L2493) | Real first trusted callback remains live | Success path only |
+| [Dormant CreditRedeem route, lines 2496-2570](../../../../tests/core/teller/test_teller_deposit.py#L2496-L2570) | Reviewed route refunds rather than deposits | Does not prove an active trusted deposit |
+| [Runtime guard, lines 3124-3145](../../../../tests/core/teller/test_teller_deposit.py#L3124-L3145) | Enforces EIP-170 and the accepted 24,152-byte ceiling | Does not itself guard ABI or layout |
 | [Rebalance rollback, line 1309](../../../../tests/core/teller/test_teller_rebalance.py#L1309) | Short deposit leaves both legs, claims, debt, and events unchanged | Proves deposit-first ordering and whole-operation rollback |
 | [Donation masking, line 639](../../../../tests/vaults/test_stock_token_vault_comparison.py#L639) | Prior donation cannot substitute for short receipt in Simple or share vault | Directly sensitive to pre/post Teller measurement |
 
@@ -745,7 +745,7 @@ composability requirements change.
   complete `_deposit` flow.
 - [`Teller.vy:1012-1022`](../../../../contracts/core/Teller.vy#L1012-L1022):
   exact-return helper.
-- [`test_teller_deposit.py:1240`](../../../../tests/core/teller/test_teller_deposit.py#L1240):
+- [`test_teller_deposit.py:1531`](../../../../tests/core/teller/test_teller_deposit.py#L1531):
   start of M1 adversarial deposit cases.
 - [`test_teller_rebalance.py:1309`](../../../../tests/core/teller/test_teller_rebalance.py#L1309):
   rebalance rollback.

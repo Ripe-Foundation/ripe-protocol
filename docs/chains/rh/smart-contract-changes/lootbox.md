@@ -13,8 +13,8 @@
 ## Current `rh` rebind
 
 The current authority for this page is `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July snapshot and
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The 28 July snapshot and
 validation results remain dated historical evidence below.
 
 | Current identity | Value |
@@ -24,15 +24,23 @@ validation results remain dated historical evidence below.
 | Runtime template | 21,569 bytes; SHA-256 `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097`; 3,007 bytes EIP-170 headroom |
 | [`test_underscore_rewards.py`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Git blob `b2b23f3b7683534c7a492d1461bc8991d0d65050`; SHA-256 `e670b36ae68f2ceeee1b3c0c6a0e663213172b1aa27b7203e02ab6a400e0b7d3` |
 | [Deployment-profile test](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Git blob `d082c315a12f4fdb6136b34925e335250fec9a91`; SHA-256 `e929e6c7f91e6d73ba0b2c96bd7cdb4d69d28db2ad0def700863190d86245a6c` |
-| [Contract-artifact test](../../../../tests/inventory/test_contract_artifacts.py) | Git blob `3eb4a93c0d5bd400586a1b1aa980432ac2aa0284`; SHA-256 `ecbd803c2e002eac39a565e3d2bbf419af16319952a0c7ef0867e5c50b61ac86` |
+| [Contract-artifact test](../../../../tests/inventory/test_contract_artifacts.py) | Git blob `30e56a30e803e6030abb321b7dd593f08ac83f04`; SHA-256 `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` |
 
 Later integrated tests now pin exact five-argument manifest order, both local
 deployment postures and readbacks, historical Base arity incompatibility,
 initially-disabled/later-enabled first-send behavior, and the accepted
-max-minus-one checked-addition overflow boundary. These close the old missing
-profile and edge-case evidence gaps. They do not create a Robinhood migration
-or deployment. No behavioral suite was rerun for this documentation-only
-refresh.
+max-minus-one checked-addition overflow boundary. Current `rh` also integrates
+a deterministic Lootbox deployment/registration migration source and the
+transaction executor, but the plan remains blocked and non-executable. These
+facts do not establish migration execution, deployment, registration, reward
+activation, or release. No behavioral suite was rerun for this
+documentation-only refresh.
+
+The owner-approved launch product values and reward packet are now integrated:
+DP15 and P-H04-399 are approved, Stock rewards remain disabled, and
+`B-REWARD-PROMOTION` remains open for identities, initial checkpoints,
+monitoring, rehearsal, and release prerequisites. Product-value approval is not
+an onchain configuration or activation record.
 
 ## Reviewed implementation snapshot
 
@@ -73,10 +81,12 @@ silently promoted to present-day chain facts.
    future deployment can preserve prior cadence with floor `43_200`, but needs a
    new explicit five-argument deployment path; the historical migrations were
    deliberately not rewritten.
-6. **What happens to Robinhood?** The owner-approved S3 posture is floor `7_200`,
-   initial mutable interval `0`, and rewards disabled. The actual deployment
-   manifest, exact remaining constructor inputs, migration, authority sequence,
-   and post-deployment evidence are not integrated here.
+6. **What happens to Robinhood?** The floor remains `7_200` and the initial
+   mutable Underscore interval remains `0`. The repository now contains the
+   deterministic deployment source and owner-approved general reward product
+   values, while the executable plan, exact runtime bindings, authority
+   sequence, initial checkpoint procedure, monitoring, migration execution,
+   and post-deployment evidence remain blocked or absent.
 7. **Can a bad floor be fixed in place?** No. The mutable interval can be raised
    or lowered no further than the floor, but the floor itself requires redeployment.
 8. **Is the checked-in ABI correct?** Yes for the integrated source. It is not a
@@ -328,17 +338,19 @@ hasUnderscoreRewards        = false
 
 The specification also requires the Underscore route to be absent and reward mint
 capability disabled at launch
-([component row](../robinhood-deployment-support-specification.md#L1076)).
+([component row](../robinhood-deployment-support-specification.md#L1098)).
 The constructor’s reward-amount arguments are still required ABI inputs, but when
 the initial interval is zero the constructor deliberately leaves both stored
 amounts at zero.
 
 **Current fact.** `DefaultsRobinhood.vy`, `config/BluePrint.py`, the derived
-parameter ledger, and local Lootbox deployment-profile evidence now exist.
-There is still no integrated Robinhood Lootbox deployment migration or onchain
-deployment. The historical reserved `0010_Track6S3LootboxFloor.py` name is a
-planning assertion, not an onchain upgrade or integrated migration
-([reservation](../robinhood-deployment-support-specification.md#L1185-L1192)).
+parameter ledger, Lootbox deployment-profile evidence, and a deterministic
+Robinhood deployment/registration migration source now exist. The migration
+plan remains blocked and non-executable, and there is no migration history,
+execution, onchain deployment, or registration. The reserved
+`0010_Track6S3LootboxFloor.py` step is a planning assertion rather than an
+onchain upgrade
+([reservation](../robinhood-deployment-support-specification.md#L1213)).
 
 > **Deployment or release gate.** The deployment owner must supply and approve
 > every constructor input in exact order, bind it to the reviewed creation
@@ -382,7 +394,7 @@ All four Base migration call sites were inspected:
 | [`2025112500_New_Endaoment_Features.py`](../../../../migrations/base-mainnet/2025112500_New_Endaoment_Features.py#L80-L86) | Old four-argument constructor | Missing the new floor argument |
 
 The migration helper loads the currently mapped source and forwards the script’s
-arguments ([deployment helper](../../../../scripts/utils/migration.py#L132-L142)).
+arguments ([deployment helper](../../../../scripts/utils/migration.py#L166-L176)).
 Therefore, loading current `Lootbox.vy` through those old Python call sites is not
 a reproducible deployment: constructor arity is wrong. Historical execution can
 only be reproduced from its pinned historical source/artifact/manifest context.
@@ -392,26 +404,27 @@ policy. It does not make them forward-compatible.
 
 > **Deployment or release gate.** A future Base replacement and the initial
 > Robinhood deployment each need a new explicit current-constructor path. Local
-> profile tests now prove constructor order and readback, but no integrated
-> migration executes those profiles.
+> profile tests prove constructor order and readback, and the integrated
+> Robinhood migration source consumes the five bindings. Unresolved plan inputs
+> prevent execution, and no migration has run.
 
 ## Test-to-invariant matrix
 
 | Invariant | Exact test evidence | Genuine sensitivity and result |
 | --- | --- | --- |
-| Zero/max floors reject; Base/RH below/exact/above cases; constructor preserves values | [`test_constructor_floor_interval_matrix`](../../../../tests/core/lootbox/test_underscore_rewards.py#L75-L125) | Reads both getters/flag and expects exact reverts; sensitive to validation, argument order, and immutable preservation. Passed inside current 175-test run. |
+| Zero/max floors reject; Base/RH below/exact/above cases; constructor preserves values | [`test_constructor_floor_interval_matrix`](../../../../tests/core/lootbox/test_underscore_rewards.py#L75-L125) | Reads both getters/flag and expects exact reverts; sensitive to validation, argument order, and immutable preservation. Passed inside the reviewed-snapshot 175-test run. |
 | Robinhood interval zero retains floor and disables rewards | [`test_robinhood_disabled_deployment_retains_floor_without_rewards`](../../../../tests/core/lootbox/test_underscore_rewards.py#L128-L159) | Proves floor `7_200`, zero interval/amounts, false flag, rejected distribution, bounded later setter, and no implicit enable. Passed. |
 | Both floors bind later governance updates | [`test_setter_matrix_uses_deployment_floor`](../../../../tests/core/lootbox/test_underscore_rewards.py#L162-L230) | Covers unauthorized, floor-minus-one, max, exact floor, floor-plus-one, no-change, paused, state, and event. Sensitive to replacing immutable check with a global constant. Passed. |
 | One-before and equality fail; plus one succeeds for Base and RH | [`test_distribution_strict_boundary_under_both_parameter_profiles`](../../../../tests/core/lootbox/test_underscore_rewards.py#L232-L341) | Directly kills a `>` to `>=` mutation, checks state/event observation, and rejects repeated number. Passed. |
 | Representative/stress jumps do not bypass the interval and later succeed | [`test_representative_and_stress_jumps_do_not_bypass_interval`](../../../../tests/core/lootbox/test_underscore_rewards.py#L344-L428) | Tests `+2/+4` and `+60` synthetic profiles under both floors; post-review commit `3c1fea8` added the success landing. Passed. |
 | First send uses zero initial checkpoint | [`test_first_distribution_timing`](../../../../tests/core/lootbox/test_underscore_rewards.py#L752-L775) | Checks `last = 0` and advances to `interval + 1`; sensitive to first-send boundary. Passed. It does not cover later enablement of an initially disabled deployment at a high chain number. |
 | The gate is NUMBER, not timestamp | [independent clock control](../../../../tests/clock/test_clock_profiles.py#L329-L347) plus [strict matrix](../../../../tests/core/lootbox/test_underscore_rewards.py#L259-L341) | Boundary tests move NUMBER explicitly while the harness proves timestamp independence. A timestamp substitution would not satisfy the observed state/event expectations. All 57 harness tests passed. |
-| Governance forwarding preserves rejected action/state | [`test_switchboard_three_forwards_below_floor_rejection`](../../../../tests/config/test_switchboard_charlie.py#L1797-L1823) | Executes the timelocked forwarded value, expects Lootbox revert, and checks interval plus pending action remain intact. Passed in a two-test current run. |
-| Authorized timelocked interval update still works | [`test_switchboard_three_set_underscore_send_interval_timelock`](../../../../tests/config/test_switchboard_charlie.py#L1746-L1794) | Covers caller, pending action, timelock, execution, state, event, and cleanup. Passed in the same current run. |
-| Claims, deposit/borrow points, and RIPE rewards remain unchanged | [borrow points](../../../../tests/core/lootbox/test_loot_borrow_points.py#L6-L49), [claims](../../../../tests/core/lootbox/test_loot_claim.py#L7-L61), [deposit points](../../../../tests/core/lootbox/test_loot_deposit_points.py#L7-L64), [RIPE rewards](../../../../tests/core/lootbox/test_loot_ripe_rewards.py#L9-L56) | These suites do not isolate the new floor, but they are meaningful regression coverage because all compile/deploy the changed shared contract. All are included in 175 current passes. |
-| Inventory classifies and content-pins production source | [path/content pin](../../../../config/block-clock-inventory.json#L12161-L12170), [BN-025 rows](../../../../config/block-clock-inventory.json#L1437-L1469) | Checker validates exact path/hash/occurrences. Current checker is green. |
-| Floor discovery fails on delete/rename/move | [exact pattern and mutations](../../../../tests/inventory/test_block_clock_inventory.py#L700-L748) | Explicit mutation-sensitive tests; all four cases passed within the current 95-test inventory run. |
-| Local deployment profile supplies five correct arguments | [`test_lootbox_deployment_profiles.py`](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Current tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. No Robinhood migration is integrated. |
+| Governance forwarding preserves rejected action/state | [`test_switchboard_three_forwards_below_floor_rejection`](../../../../tests/config/test_switchboard_charlie.py#L1797-L1823) | Executes the timelocked forwarded value, expects Lootbox revert, and checks interval plus pending action remain intact. Passed in the reviewed-snapshot two-test run. |
+| Authorized timelocked interval update still works | [`test_switchboard_three_set_underscore_send_interval_timelock`](../../../../tests/config/test_switchboard_charlie.py#L1746-L1794) | Covers caller, pending action, timelock, execution, state, event, and cleanup. Passed in the same reviewed-snapshot run. |
+| Claims, deposit/borrow points, and RIPE rewards remain unchanged by the floor source change | [borrow points](../../../../tests/core/lootbox/test_loot_borrow_points.py#L6-L49), [claims](../../../../tests/core/lootbox/test_loot_claim.py#L7-L61), [deposit points](../../../../tests/core/lootbox/test_loot_deposit_points.py#L7-L64), [RIPE rewards](../../../../tests/core/lootbox/test_loot_ripe_rewards.py#L9-L56) | These suites do not isolate the new floor. They were included in the reviewed-snapshot 175-pass run; later reward-launch tests changed the current suite and were not rerun for this refresh. |
+| Inventory classifies and content-pins production source | [path/content pin](../../../../config/block-clock-inventory.json#L15669-L15678), [BN-025 rows](../../../../config/block-clock-inventory.json#L1523-L1555) | Checker validates exact path/hash/occurrences. Current checker is green. |
+| Floor discovery fails on delete/rename/move | [exact pattern and mutations](../../../../tests/inventory/test_block_clock_inventory.py#L1666-L1714) | Explicit mutation-sensitive tests; all four cases passed within the reviewed-snapshot 95-test inventory run. |
+| Local deployment profile supplies five correct arguments | [`test_lootbox_deployment_profiles.py`](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. Current `rh` now also has a deterministic Robinhood migration source; no migration has executed. |
 | Max-minus-one interval overflows `last + interval` | [`test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Current test establishes the accepted fail-closed checked-addition boundary; a sane upper limit would require a separate source/configuration decision. |
 | General mutation testing | No mutation framework run | **Gap:** boundary and inventory tests are demonstrably mutation-sensitive, but there is no broad compiler/source mutation score. |
 
@@ -438,7 +451,7 @@ They are not current integrated inventory or full-suite results.
 
 **Independently reproduced result.**
 
-| Current command scope | Result |
+| Reviewed-snapshot command scope | Result |
 | --- | --- |
 | `tests/core/lootbox/` | `175 passed` in 121.92 s |
 | `tests/clock/test_clock_profiles.py` | `57 passed` in 106.66 s |
@@ -536,10 +549,10 @@ runtime hash cannot be known until that input is owner-approved and bound.
 | Strict-`>` misunderstanding | Monitoring/documentation concern | Equality fails; runbook and post-deploy probe must use `last + interval + 1` |
 | Extreme interval checked-add overflow | Covered accepted boundary / configuration gate | Max-minus-one remains allowed and its checked-addition revert is pinned; an approved sane maximum would be a separate source decision |
 | Historical migration replay | Deployment/configuration gate | Old scripts are intentionally immutable but incompatible with current constructor; use new forward paths |
-| Missing executable deployment path | Deployment/configuration gate | Local draft profiles and readback tests exist, but no Robinhood deployment migration or new Base migration is integrated |
+| Blocked executable deployment path | Deployment/configuration gate | Robinhood migration source and a deterministic executor are integrated, but unresolved bindings keep the plan non-executable; there is no migration history, execution, deployment, or new Base migration |
 | Inadequate monitoring | Monitoring concern | Observe immutable, mutable state, feature flag, capability, registry, distribution events, and elapsed wall time |
 | Future-chain reuse | Future hardening | New chain needs approved empirical/model evidence and explicit constructor value; do not reuse `7_200` by analogy |
-| Stale test/evidence counts | Monitoring/documentation concern | Pin commit and command output; historical 60/2,722 and current 95/99-94-17 must not be mixed |
+| Stale test/evidence counts | Monitoring/documentation concern | Pin commit and command output; the reviewed-snapshot 95-test/99-94-17 evidence must not be presented as the current inventory. The fresh current checker reports 102 production occurrences, 97 production lines, 18 production files, and 640 cadence candidates. |
 | Deleverage, CCIP, zero-backing settlement | Not applicable / owner-parked | Outside Lootbox scope and not Lootbox blockers |
 
 No residual listed here grants authority to modify Lootbox source in this task.
@@ -563,8 +576,9 @@ No residual listed here grants authority to modify Lootbox source in this task.
    separate owner gates close.
 6. If Base convergence is pursued, use a new forward migration and a separately
    approved state-window, authority, registry, rollback, and temporary-drift plan.
-7. Add migration-specific execution tests when an actual deployment path is
-   separately authorized; the current draft-profile tests do not replace them.
+7. Retain the integrated migration/executor tests and add exact-runtime
+   Lootbox execution evidence only when a fully bound plan and rehearsal are
+   separately authorized; draft-profile tests do not replace that evidence.
 
 ### Recommended hardening
 
@@ -595,8 +609,8 @@ No residual listed here grants authority to modify Lootbox source in this task.
 - Do not infer a Robinhood address, signer, role, reward amount, or final runtime.
 - Do not treat a green source/test review as deployment, activation, or release
   approval.
-- Do not claim H-04, H-06, M4, or another feature is integrated unless it is
-  present in the exact reviewed baseline.
+- Do not turn integrated planning, configuration, or test evidence into a claim
+  of migration execution, deployment, activation, or release.
 
 ## Primary sources and reproducible commands
 
@@ -605,12 +619,12 @@ Primary repository evidence:
 - [Production source](../../../../contracts/core/Lootbox.vy#L193-L215)
 - [Distribution gate and state update](../../../../contracts/core/Lootbox.vy#L1203-L1258)
 - [Checked-in ABI](../../../../scripts/abis/Lootbox.json#L1510-L1521)
-- [Central Base fixture](../../../../tests/conf_core.py#L415-L428)
+- [Central Base fixture](../../../../tests/conf_core.py#L428-L438)
 - [Underscore floor/boundary tests](../../../../tests/core/lootbox/test_underscore_rewards.py#L70-L428)
 - [Clock profiles and evidence labels](../../../../tests/utils/clock_profiles.py#L29-L93)
 - [Clock harness tests](../../../../tests/clock/test_clock_profiles.py#L109-L222)
-- [Inventory checker pattern](../../../../scripts/check_block_clock_inventory.py#L339-L354)
-- [Inventory expected counts](../../../../config/block-clock-inventory.json#L36-L40)
+- [Inventory checker pattern](../../../../scripts/check_block_clock_inventory.py#L813-L819)
+- [Current-state inventory bindings](../../../../config/block-clock-inventory.json#L29-L40)
 - [Lootbox implementation record](../lootbox-floor-implementation-record.md)
 - [Shared clock specification](../shared-block-clock-specification.md)
 - [Track 6 source specification](../track-6-shared-block-clock-specification.md)

@@ -10,8 +10,8 @@
 ## Current `rh` rebind
 
 The current authority for this page is `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The dated 28 July snapshot and
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The dated 28 July snapshot and
 results below remain historical evidence.
 
 | Current identity | Value |
@@ -28,9 +28,13 @@ Later integrated safety tests now cover named source mutants, deficits and
 surpluses, bounded withdrawals, cross-user/cross-vault isolation, malformed and
 oversized returns, atomic retry, and inherited surplus recovery. Later
 AuctionHouse and Deleverage tests cover composed Stock delivery. These close
-the prior mutation/recovery/composition gaps; they do not prove a final asset
-binding or launch inclusion. No behavioral suite was rerun for this
-documentation-only refresh.
+the prior mutation/recovery/composition gaps; they do not by themselves prove a
+final asset binding or activation. Current repository launch authority
+separately selects AAPL as the sole initial Stock symbol and GuardedErc20 as its
+exclusive vault capability, while the token/feed verification, price and cap
+freeze, exact risk and auction tuple, fresh VaultBook slot, deployed address,
+and atomic M5 activation binding remain unresolved. No behavioral suite was
+rerun for this documentation-only refresh.
 
 The integrated Deleverage source and composition tests were inspected for the
 current package without reopening further Deleverage work. CCIP work is
@@ -99,9 +103,11 @@ before describing later repository state.
    custody/position migration.
 7. **What is the intended Robinhood role?** The guarded capability is intended
    for admitted Stock assets while Simple remains the ordinary non-Stock
-   nominal vault. At the current baseline, the separate AAPL launch-inclusion
-   implementation is not integrated into `rh`; no exact asset, VaultBook slot,
-   configuration, or live activation follows from this source.
+   nominal vault. Current `rh` integrates the AAPL launch-input authority and
+   selects GuardedErc20 for the sole initial Stock symbol. It still leaves the
+   external token/feed facts, exact risk/cap/auction values, fresh VaultBook
+   slot, deployed address, and atomic activation packet unresolved; no live
+   configuration or activation follows from source or selection alone.
 
 ## Executive verdict
 
@@ -324,7 +330,7 @@ adopt Guarded behavior.
 
 | Asset class | Reviewed direction/status |
 | --- | --- |
-| Potential admitted Stock asset | Guarded capability exists, but AAPL launch inclusion is not integrated at the current baseline; exact artifact, slot/ID, token identity, configuration, and activation remain separate |
+| Initial Stock candidate | Current repository launch authority selects AAPL and the exact Guarded artifact, but token/feed verification, exact risk/cap/auction values, fresh slot/ID, deployed identity, atomic configuration, and activation remain separate unresolved gates |
 | Later Stock assets | No automatic assignment; token-specific review required |
 | Ordinary non-Stock nominal assets / approved LP routes | SimpleErc20 remains the documented ordinary nominal role |
 | Rebase/share assets | Rebase semantic slot is reserved but omitted from the initial Robinhood plan |
@@ -348,27 +354,27 @@ The focused file is
 
 | Test | Invariant, adversary, and rollback evidence |
 | --- | --- |
-| [`test_exact_deposit_preserves_units_layout_and_event`, 341](../../../../tests/vaults/test_guarded_erc20.py#L341) | Real Teller deposit produces exact user/total delta and event; Teller supplies call-local receipt proof. |
-| [`test_preexisting_surplus_remains_uncredited_and_live`, 366](../../../../tests/vaults/test_guarded_erc20.py#L366) | Donation stays surplus; user receives only the request. |
-| [`test_deficit_blocks_deposit_without_allocating_new_nominal`, 387](../../../../tests/vaults/test_guarded_erc20.py#L387) | Issuer burn creates deficit; deposit reverts with token and nominal state unchanged. |
-| [`test_unknown_backing_blocks_mutation_and_zeroes_usable_views`, 418](../../../../tests/vaults/test_guarded_erc20.py#L418) | Revert/empty/1/31/33/64-byte `balanceOf` blocks mutations and zeroes usable views without erasing position identity. |
-| [`test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal`, 465](../../../../tests/vaults/test_guarded_erc20.py#L465) | Deficit, restoration, exact backing, and surplus follow the selected view semantics. |
-| [`test_true_empty_and_zero_nominal_index_returns_empty_zero`, 491](../../../../tests/vaults/test_guarded_erc20.py#L491) | True empty `(zero, 0)` remains distinct from nonempty unsafe `(asset, 0)`. |
-| [`test_internal_movement_is_exact_partial_or_full_and_custody_neutral`, 525](../../../../tests/vaults/test_guarded_erc20.py#L525) | Partial/full/over-request amounts preserve exact seller/buyer deltas, custody, and total liability. |
-| [`test_internal_movement_ignores_token_transfer_controls`, 560](../../../../tests/vaults/test_guarded_erc20.py#L560) | Documents intentional custody-neutral behavior: pause/blocklist transfer controls are not consulted because no token transfer occurs. |
-| [`test_internal_failure_on_deficit_or_self_transfer_is_atomic`, 585](../../../../tests/vaults/test_guarded_erc20.py#L585) | Deficit or self-transfer reverts every nominal/index/custody effect. |
-| [`test_internal_unknown_post_read_reverts_all_nominal_changes`, 631](../../../../tests/vaults/test_guarded_erc20.py#L631) | Malformed/reverting post-read rolls back earlier nominal movement. |
-| [`test_external_partial_and_full_withdrawals_match_outflow_delivery_and_report`, 669](../../../../tests/vaults/test_guarded_erc20.py#L669) | Partial/full/over-request withdrawal matches nominal reduction, vault outflow, recipient delivery, and depletion flag. |
-| [`test_external_withdrawal_preserves_surplus_without_assigning_it`, 704](../../../../tests/vaults/test_guarded_erc20.py#L704) | Donation remains after nominal withdrawal. |
-| [`test_compatible_transfer_returndata_succeeds`, 734](../../../../tests/vaults/test_guarded_erc20.py#L734) | Empty and exact true-return transfers remain live. |
-| [`test_rejected_transfer_returndata_rolls_back_every_observable_effect`, 771](../../../../tests/vaults/test_guarded_erc20.py#L771) | Revert/false/short/33/64/malformed Boolean rejects and rolls back nominal, token, index, and log effects. |
-| [`test_nonexact_external_delivery_reverts_all_vault_and_token_state`, 810](../../../../tests/vaults/test_guarded_erc20.py#L810) | Fee/burn/reflection-style delta mismatch reverts all token and vault state. |
-| [`test_post_transfer_unknown_balance_reverts_atomically`, 838](../../../../tests/vaults/test_guarded_erc20.py#L838) | Successful transfer followed by unknown post-read rolls back transfer and nominal reduction. |
-| [`test_shared_mutex_rejects_authorized_callback_and_rolls_back_outer_withdrawal`, 864](../../../../tests/vaults/test_guarded_erc20.py#L864) | Actually authorized nested caller reaches the shared mutex; outer withdrawal and token effects roll back. |
-| [`test_real_teller_batch_routes_partial_exact_and_over_request_through_guarded`, 921](../../../../tests/vaults/test_guarded_erc20.py#L921) | Real Teller batch preserves amount/depletion behavior. |
-| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, 1035](../../../../tests/vaults/test_guarded_erc20.py#L1035) | Later failure restores every earlier nominal/token/purchaser/event effect in the transaction. |
-| [`test_current_endaoment_endpoints_are_rejected_before_delivery`, 1164](../../../../tests/vaults/test_guarded_erc20.py#L1164) | Current nonzero Endaoment Funds/PSM recipients reject before delivery. |
-| [`test_roles_pause_and_normal_recipient_behavior_remain_live`, 1222](../../../../tests/vaults/test_guarded_erc20.py#L1222) | Unauthorized/paused paths reject while authorized ordinary recipients remain live. |
+| [`test_exact_deposit_preserves_units_layout_and_event`, 516-538](../../../../tests/vaults/test_guarded_erc20.py#L516-L538) | Real Teller deposit produces exact user/total delta and event; Teller supplies call-local receipt proof. |
+| [`test_preexisting_surplus_remains_uncredited_and_live`, 541-559](../../../../tests/vaults/test_guarded_erc20.py#L541-L559) | Donation stays surplus; user receives only the request. |
+| [`test_deficit_blocks_deposit_without_allocating_new_nominal`, 562-585](../../../../tests/vaults/test_guarded_erc20.py#L562-L585) | Issuer burn creates deficit; deposit reverts with token and nominal state unchanged. |
+| [`test_unknown_backing_blocks_mutation_and_zeroes_usable_views`, 593-637](../../../../tests/vaults/test_guarded_erc20.py#L593-L637) | Revert/empty/1/31/33/64-byte `balanceOf` blocks mutations and zeroes usable views without erasing position identity. |
+| [`test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal`, 640-663](../../../../tests/vaults/test_guarded_erc20.py#L640-L663) | Deficit, restoration, exact backing, and surplus follow the selected view semantics. |
+| [`test_true_empty_and_zero_nominal_index_returns_empty_zero`, 691-714](../../../../tests/vaults/test_guarded_erc20.py#L691-L714) | True empty `(zero, 0)` remains distinct from nonempty unsafe `(asset, 0)`. |
+| [`test_internal_movement_is_exact_partial_or_full_and_custody_neutral`, 725-757](../../../../tests/vaults/test_guarded_erc20.py#L725-L757) | Partial/full/over-request amounts preserve exact seller/buyer deltas, custody, and total liability. |
+| [`test_internal_movement_ignores_token_transfer_controls`, 760-782](../../../../tests/vaults/test_guarded_erc20.py#L760-L782) | Documents intentional custody-neutral behavior: pause/blocklist transfer controls are not consulted because no token transfer occurs. |
+| [`test_internal_failure_on_deficit_or_self_transfer_is_atomic`, 785-828](../../../../tests/vaults/test_guarded_erc20.py#L785-L828) | Deficit or self-transfer reverts every nominal/index/custody effect. |
+| [`test_internal_unknown_post_read_reverts_all_nominal_changes`, 831-866](../../../../tests/vaults/test_guarded_erc20.py#L831-L866) | Malformed/reverting post-read rolls back earlier nominal movement. |
+| [`test_external_partial_and_full_withdrawals_match_outflow_delivery_and_report`, 869-901](../../../../tests/vaults/test_guarded_erc20.py#L869-L901) | Partial/full/over-request withdrawal matches nominal reduction, vault outflow, recipient delivery, and depletion flag. |
+| [`test_external_withdrawal_preserves_surplus_without_assigning_it`, 904-924](../../../../tests/vaults/test_guarded_erc20.py#L904-L924) | Donation remains after nominal withdrawal. |
+| [`test_compatible_transfer_returndata_succeeds`, 1172-1195](../../../../tests/vaults/test_guarded_erc20.py#L1172-L1195) | Empty and exact true-return transfers remain live. |
+| [`test_rejected_transfer_returndata_rolls_back_every_observable_effect`, 1209-1232](../../../../tests/vaults/test_guarded_erc20.py#L1209-L1232) | Revert/false/short/33/64/malformed Boolean rejects and rolls back nominal, token, index, and log effects. |
+| [`test_nonexact_external_delivery_reverts_all_vault_and_token_state`, 1248-1271](../../../../tests/vaults/test_guarded_erc20.py#L1248-L1271) | Fee/burn/reflection-style delta mismatch reverts all token and vault state. |
+| [`test_post_transfer_unknown_balance_reverts_atomically`, 1276-1299](../../../../tests/vaults/test_guarded_erc20.py#L1276-L1299) | Successful transfer followed by unknown post-read rolls back transfer and nominal reduction. |
+| [`test_shared_mutex_rejects_authorized_callback_and_rolls_back_outer_withdrawal`, 1302-1356](../../../../tests/vaults/test_guarded_erc20.py#L1302-L1356) | Actually authorized nested caller reaches the shared mutex; outer withdrawal and token effects roll back. |
+| [`test_real_teller_batch_routes_partial_exact_and_over_request_through_guarded`, 1690-1801](../../../../tests/vaults/test_guarded_erc20.py#L1690-L1801) | Real Teller batch preserves amount/depletion behavior. |
+| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, 1804-1925](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925) | Later failure restores every earlier nominal/token/purchaser/event effect in the transaction. |
+| [`test_current_endaoment_endpoints_are_rejected_before_delivery`, 1933-1989](../../../../tests/vaults/test_guarded_erc20.py#L1933-L1989) | Current nonzero Endaoment Funds/PSM recipients reject before delivery. |
+| [`test_roles_pause_and_normal_recipient_behavior_remain_live`, 1992-2051](../../../../tests/vaults/test_guarded_erc20.py#L1992-L2051) | Unauthorized/paused paths reject while authorized ordinary recipients remain live. |
 
 The real batch tests use Teller's fungible-auction batch path with an
 AuctionHouse-compatible endpoint. The current package also inspects the later
@@ -464,13 +470,14 @@ implementation:
    with Guarded's aggregate-backing checks.
 4. Revalidate the relevant Teller, AuctionHouse, CreditEngine, and Guarded
    routes against the exact deployment artifacts and configuration.
-5. Preserve the capability boundary without claiming AAPL launch inclusion:
-   no guessed asset or slot and no automatic later-Stock or future-chain
-   adoption.
+5. Preserve the capability boundary: describe the integrated AAPL launch-input
+   selection as repository configuration, not a completed asset/slot/deployment
+   binding, and infer no automatic later-Stock or future-chain adoption.
 
-This class does **not** authorize further Deleverage work, CCIP, settlement,
-loss allocation, bad debt, or launch inclusion. Current M4 composition evidence
-is integrated and inspected as supporting evidence only.
+This class does **not** authorize further Deleverage work, CCIP operations,
+settlement, loss allocation, bad debt, deployment, configuration, or Stock
+activation. Current M4 composition evidence and the AAPL launch-input selection
+are integrated facts, not lifecycle authorization.
 
 ### Recommended hardening
 
@@ -625,15 +632,16 @@ Operational rollback is correspondingly staged:
 | Reviewed `rh` Guarded suite | **Independently reproduced:** `tests/vaults/test_guarded_erc20.py` — 55 passed |
 | Guarded inventory selection | **Independently reproduced:** 8 passed, 87 deselected |
 | Full integrated inventory module | **Reviewed-snapshot count:** 95 collected tests at `cca60bb…`; this harmonization did not rerun or relabel the full module |
-| Inventory checker | **Independently reproduced:** `CLOCK_INVENTORY_OK`; 99 production occurrences, 94 production lines, 17 files, 95 classified Vyper paths, 59 post-S5 production records |
+| Reviewed-snapshot inventory checker | **Independently reproduced at the dated review:** `CLOCK_INVENTORY_OK`; 99 production occurrences, 94 production lines, 17 files, 95 classified Vyper paths, 59 post-S5 production records |
+| Current inventory checker | **Fresh current check:** `CLOCK_INVENTORY_OK`; 102 production occurrences, 97 production lines, 18 files, 96 classified Vyper paths, 60 post-S5 production records |
 | Full repository suite | Not rerun for this review; no current full-suite claim is made |
 
 The production record at
-[`config/block-clock-inventory.json:12753`](../../../../config/block-clock-inventory.json#L12753)
+[`config/block-clock-inventory.json:16260`](../../../../config/block-clock-inventory.json#L16260)
 pins the Guarded path and source hash. The checker identifies Guarded at
-[`check_block_clock_inventory.py:92`](../../../../scripts/check_block_clock_inventory.py#L92)
+[`check_block_clock_inventory.py:207`](../../../../scripts/check_block_clock_inventory.py#L207)
 and fails on source drift near
-[`check_block_clock_inventory.py:1746`](../../../../scripts/check_block_clock_inventory.py#L1746).
+[`check_block_clock_inventory.py:3581`](../../../../scripts/check_block_clock_inventory.py#L3581).
 Inventory identity is path-plus-bytes, not inode identity; identical bytes at
 the approved path are equivalent for Git review.
 

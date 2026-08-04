@@ -9,8 +9,8 @@
 ## Current `rh` rebind
 
 The current authority for this page is `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`. The 28 July snapshot and its
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`. The 28 July snapshot and its
 test counts remain dated historical evidence below.
 
 | Current identity | Value |
@@ -196,7 +196,7 @@ The complete relevant flow is:
    deficit, internal delivery rejects before nominal movement
    ([`GuardedErc20.vy:140-179`](../../../../contracts/vaults/GuardedErc20.vy#L140-L179));
    the real multi-row test proves purchase rollback
-   ([`test_guarded_erc20.py:1109-1156`](../../../../tests/vaults/test_guarded_erc20.py#L1109-L1156)).
+   ([`test_guarded_erc20.py:1804-1925`](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925)).
 
 ## Why this was selected
 
@@ -336,16 +336,16 @@ tests.
 
 | Primary test evidence | Invariant proved | Path and mutation sensitivity | Known limit |
 | --- | --- | --- | --- |
-| [`test_unsafe_backing_failures_keep_terms_with_zero_capacity`, lines 200-299](../../../../tests/core/creditEngine/test_stock_backing.py#L200-L299) | Deficit, missing, failed, and malformed backing yield zero value/capacity while all configured terms remain and debt becomes unhealthy/liquidatable | Synthetic vault plus real CreditEngine; reintroducing the `amount == 0` skip or pricing the unsafe asset fails the assertions | Does not prove live token truth or settlement |
-| [`test_true_zero_nominal_position_remains_absent`, lines 302-348](../../../../tests/core/creditEngine/test_stock_backing.py#L302-L348) | `(empty address, 0)` remains absent with zero terms | Synthetic true-empty producer; merging empty and nonempty zero handling fails | Does not enumerate every legacy vault |
-| [`test_safe_backing_surplus_values_only_nominal_user_amount`, lines 351-395](../../../../tests/core/creditEngine/test_stock_backing.py#L351-L395) | Surplus does not create extra user value or capacity | Synthetic backing observer plus real pricing/CreditEngine | Vault, not CreditEngine, owns surplus policy |
-| [`test_mixed_safe_collateral_remains_exact_and_liquidatable`, lines 397-484](../../../../tests/core/creditEngine/test_stock_backing.py#L397-L484) | Healthy co-collateral remains priced; unsafe zero amount is not priced; preview, health, and stored refresh agree | Real ordinary deposit plus synthetic unsafe vault and a PriceDesk that reverts if the unsafe asset is queried | Uses homogeneous terms; does not cover parked heterogeneous `lowestLtv` research |
-| [`test_backing_observation_mutation_fails_closed`, lines 520-569](../../../../tests/core/creditEngine/test_stock_backing.py#L520-L569) | A position can move from safe to failed observation without stale positive capacity | Runtime mutation of the observer plus real CreditEngine | Proves current observation, not a malicious truthful-looking report |
+| [`test_unsafe_backing_failures_keep_terms_with_zero_capacity`, lines 327-417](../../../../tests/core/creditEngine/test_stock_backing.py#L327-L417) | Deficit, missing, failed, and malformed backing yield zero value/capacity while all configured terms remain and debt becomes unhealthy/liquidatable | Synthetic vault plus real CreditEngine; reintroducing the `amount == 0` skip or pricing the unsafe asset fails the assertions | Does not prove live token truth or settlement |
+| [`test_true_zero_nominal_position_remains_absent`, lines 420-466](../../../../tests/core/creditEngine/test_stock_backing.py#L420-L466) | `(empty address, 0)` remains absent with zero terms | Synthetic true-empty producer; merging empty and nonempty zero handling fails | Does not enumerate every legacy vault |
+| [`test_safe_backing_surplus_values_only_nominal_user_amount`, lines 469-512](../../../../tests/core/creditEngine/test_stock_backing.py#L469-L512) | Surplus does not create extra user value or capacity | Synthetic backing observer plus real pricing/CreditEngine | Vault, not CreditEngine, owns surplus policy |
+| [`test_mixed_safe_collateral_remains_exact_and_liquidatable`, lines 515-602](../../../../tests/core/creditEngine/test_stock_backing.py#L515-L602) | Healthy co-collateral remains priced; unsafe zero amount is not priced; preview, health, and stored refresh agree | Real ordinary deposit plus synthetic unsafe vault and a PriceDesk that reverts if the unsafe asset is queried | Uses homogeneous terms; does not cover parked heterogeneous `lowestLtv` research |
+| [`test_backing_observation_mutation_fails_closed`, lines 638-687](../../../../tests/core/creditEngine/test_stock_backing.py#L638-L687) | A position can move from safe to failed observation without stale positive capacity | Runtime mutation of the observer plus real CreditEngine | Proves current observation, not a malicious truthful-looking report |
 | [`test_get_user_borrow_terms_asset_with_zero_amount`, lines 1208-1252](../../../../tests/core/creditEngine/test_credit_borrow.py#L1208-L1252) | A real SharesVault total-loss `(asset, 0)` retains terms with zero capacity | Integrated Rebase/SharesVault path | Not the GuardedErc20 custody classifier |
 | [`test_repay_uses_safe_collateral_without_pricing_zero_amount_position`, lines 803-896](../../../../tests/core/creditEngine/test_credit_repay.py#L803-L896) | Repayment stays live with healthy collateral and an unsafe zero-amount position | Real borrow/repay; replacement PriceDesk reverts on any unsafe-asset lookup | Does not decide parked post-loss interest policy |
-| [`test_auction_started_after_total_issuer_loss`, lines 1586-1663](../../../../tests/vaults/test_stock_token_vault_comparison.py#L1586-L1663) | Eligibility can become an actual liquidation transaction and auction; failed later purchase rolls back GREEN/debt/state | Real Teller, AuctionHouse, Ledger, CreditEngine, token control, and legacy comparison vault | Settlement behavior remains vault-specific |
-| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, lines 1035-1156](../../../../tests/vaults/test_guarded_erc20.py#L1035-L1156) | A later deficient Guarded row rolls back earlier batch purchases, debt, GREEN, balances, events, and auction state | Real Teller batch and integrated contracts | Proves atomic failure, not a future loss-resolution policy |
-| [`test_zero_amount_containment_path_has_bounded_gas`, lines 572-621](../../../../tests/core/creditEngine/test_stock_backing.py#L572-L621) | One zero path is cheaper than its priced comparator and below an arbitrary one-million-gas smoke ceiling | One synthetic position | Not a scalability, block-budget, or marginal-per-position bound |
+| [`test_auction_started_after_total_issuer_loss`, lines 1606-1695](../../../../tests/vaults/test_stock_token_vault_comparison.py#L1606-L1695) | Eligibility can become an actual liquidation transaction and auction; failed later purchase rolls back GREEN/debt/state | Real Teller, AuctionHouse, Ledger, CreditEngine, token control, and legacy comparison vault | Settlement behavior remains vault-specific |
+| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, lines 1804-1925](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925) | A later deficient Guarded row rolls back earlier batch purchases, debt, GREEN, balances, events, and auction state | Real Teller batch and integrated contracts | Proves atomic failure, not a future loss-resolution policy |
+| [`test_zero_amount_containment_path_has_bounded_gas`, lines 690-739](../../../../tests/core/creditEngine/test_stock_backing.py#L690-L739) | One zero path is cheaper than its priced comparator and below an arbitrary one-million-gas smoke ceiling | One synthetic position | Not a scalability, block-budget, or marginal-per-position bound |
 
 The suite is strongly mutation-sensitive to the two core properties: retaining
 terms for `(asset, 0)` and skipping its oracle call. It is not mutation-complete

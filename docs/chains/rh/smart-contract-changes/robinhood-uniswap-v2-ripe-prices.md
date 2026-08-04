@@ -3,8 +3,8 @@
 ## Current classification and identity
 
 This rationale is bound to current `rh` commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`.
+`0642f086d19e3cc62faaf67da096b6511e405320`, tree
+`d869d4149380b368f9678ed03efc0b59a6c804e2`.
 
 [`RobinhoodUniswapV2RipePrices.vy`](../../../../contracts/priceSources/RobinhoodUniswapV2RipePrices.vy)
 is an archival research and monitoring prototype. It is not a launch price
@@ -95,8 +95,8 @@ launch authority.
 | --- | --- | --- | --- |
 | [`tests/priceSources/uniswap/test_correctness.py`](../../../../tests/priceSources/uniswap/test_correctness.py) | `99bd415b531a0a4adf094edd06edb2cb9c446f18` | `d7a794a65dc3fe1a3923bd12bb4d06b14b589c1dd2b40b79803a98ad85ecd584` | Direct TWAP/checkpoint correctness, orientation, decimals, boundaries, pair operations |
 | [`tests/priceSources/uniswap/test_adversarial.py`](../../../../tests/priceSources/uniswap/test_adversarial.py) | `bd79fc8e6dafcd19ca891da9897af6d6f5af38e7` | `3c7fc02b70fec1eb7a74abb54efb0187571bd94cc7ed181a760665b2846dae1f` | Manipulation, stale, reserve, malformed-return, recursive, pause, and recovery cases |
-| [`tests/priceSources/uniswap/test_governance_economics.py`](../../../../tests/priceSources/uniswap/test_governance_economics.py) | `b86162bba37c2370305426157934806234a65cf3` | `e4240ea6c8af3c3f46c52ca46c2eff26a518da52e0d4b5d011b1d9f90ff5d02b` | Timelocks, lifecycle, reserve/economic bounds, real PriceDesk inertness, and Blueprint non-admission |
-| [`tests/inventory/test_block_clock_inventory.py`](../../../../tests/inventory/test_block_clock_inventory.py) | `8a4f7af0e3f4b8c18c01196edde27f8967228284` | `313acf48eca4694cbc7e577eb51fde49ede81232bf2bd1c91027f26857fcf798` | Timestamp/block inventory classification |
+| [`tests/priceSources/uniswap/test_governance_economics.py`](../../../../tests/priceSources/uniswap/test_governance_economics.py) | `b7bfbc14c20d9a67c219988dedec7266b282263c` | `1c184a479a66cb133ddff4b1ef2c1966a4e924c917709d3d644b4a4205223eb6` | Timelocks, lifecycle, reserve/economic bounds, real PriceDesk inertness, and current Blueprint non-admission |
+| [`tests/inventory/test_block_clock_inventory.py`](../../../../tests/inventory/test_block_clock_inventory.py) | `69ea74bb547db961b28fc090044cf8ded0fa4037` | `6f64d3917ce3debce002fcfbdf9d870abc0d3a1dd4fd95eb1e0b32b00cc22f08` | Timestamp/block inventory classification and current post-S5 bindings |
 | [`tests/deployment/test_abi_export.py`](../../../../tests/deployment/test_abi_export.py) | `a7187f7020273207a7b9643fbe70c83c708d6364` | `dfd904fb2bac83771999c0547216388b28b78659980beff7a22481de1371759f` | Committed ABI export inventory |
 
 The Uniswap V2 Vyper mocks are
