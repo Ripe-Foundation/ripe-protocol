@@ -5387,12 +5387,10 @@ def validate_curve_launch_authority() -> None:
     # remaining rows are the liquidity/funding decisions, still unresolved.
     owner_choice_ids = (
         "pool.slippage_limit",
-        "pool.withdrawal_authority",
         "pool.minimum_retained_liquidity",
     )
     expected_symbolic_names = {
         "pool.slippage_limit": "GREEN_USDG_SLIPPAGE_LIMIT",
-        "pool.withdrawal_authority": "GREEN_USDG_WITHDRAWAL_AUTHORITY",
         "pool.minimum_retained_liquidity": "GREEN_USDG_MIN_RETAINED_LIQUIDITY",
     }
     if any(
@@ -5414,6 +5412,12 @@ def validate_curve_launch_authority() -> None:
         "pool.custodian",
         "pool.approving_account",
     )
+    if (
+        not isinstance(values["pool.withdrawal_authority"], str)
+        or not values["pool.withdrawal_authority"].startswith("0x")
+        or states["pool.withdrawal_authority"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
     if any(
         not isinstance(values[input_id], str)
         or not values[input_id]

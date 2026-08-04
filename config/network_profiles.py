@@ -338,9 +338,11 @@ _ROBINHOOD_OPERATIONS = _operations(
     _policy(
         Operation.REPOSITORY_READ, _BLOCKED, repository=True
     ),
+    # Owner-approved for launch. Robinhood is deployed from a Ledger that is
+    # also RipeHq governance until the 0900 handoff, exactly as Base was.
     _policy(
         Operation.MIGRATION_FORK,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -348,7 +350,7 @@ _ROBINHOOD_OPERATIONS = _operations(
     ),
     _policy(
         Operation.MIGRATION_LIVE,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -446,6 +448,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             PathState.PROPOSED,
         ),
         fork=ForkPolicy(True, True, True, True),
+        # The Ledger is the approved deployer; env-private-key stays for the
+        # deterministic fixtures. No Safe: the Safe RECEIVES governance at the
+        # 0900 handoff, it does not sign the deployment.
+        live_account_backend_ids=("env-private-key", "ledger"),
         verifier=VerifierPolicy(
             VerifierProvider.BLOCKSCOUT,
             "blockscout",
@@ -469,6 +475,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             PathState.PROPOSED,
         ),
         fork=ForkPolicy(True, True, True, True),
+        # The Ledger is the approved deployer; env-private-key stays for the
+        # deterministic fixtures. No Safe: the Safe RECEIVES governance at the
+        # 0900 handoff, it does not sign the deployment.
+        live_account_backend_ids=("env-private-key", "ledger"),
         verifier=VerifierPolicy(
             VerifierProvider.BLOCKSCOUT,
             "blockscout",

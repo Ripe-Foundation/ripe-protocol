@@ -1274,8 +1274,11 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.withdrawal_authority", SymbolicBinding("GREEN_USDG_WITHDRAWAL_AUTHORITY"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        # The seed transfers LP to ENDAOMENT_FUNDS, which the Safe governs, so
+        # the Safe is the authority that can actually withdraw it. Recording
+        # anything else would document an authority nothing honours.
+        "pool.withdrawal_authority", ROBINHOOD_GOVERNANCE,
+        "owner_selected", "security_owner", "owner launch input", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.minimum_retained_liquidity", SymbolicBinding("GREEN_USDG_MIN_RETAINED_LIQUIDITY"),

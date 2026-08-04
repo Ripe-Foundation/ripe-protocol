@@ -522,10 +522,12 @@ def cli(
         if not is_robinhood and any(value is not None for value in execution_values):
             raise MigrationPlanError("H05_EXECUTION_PROFILE_REQUIRED")
 
-        # Hardware and Safe backends are approved for Base only. Robinhood
-        # signing is governed by the execution-envelope path, so a Ledger or
-        # Safe there would bypass it entirely.
-        if (safe or ledger != -1) and is_robinhood:
+        # The Ledger is the approved Robinhood deployer -- it is also RipeHq
+        # governance until the 0900 handoff, exactly as on Base. A Safe is not:
+        # the Safe RECEIVES governance at the handoff and never signs a
+        # deployment transaction, so selecting it here would mean the sender is
+        # not the account the plan binds as temporary governance.
+        if safe and is_robinhood:
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
                 profile_id=profile.identity.profile_id,

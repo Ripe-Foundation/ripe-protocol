@@ -107,6 +107,13 @@ def build_fully_bound_envelope(
                 # supply is zero, so zero here makes the mint impossible rather
                 # than merely unused. Base passed the same.
                 values[reference] = _typed(reference, "address", ZERO)
+            elif lowered.endswith(".guardian"):
+                # Evidentiary: no contract reads a guardian, and the Safe holds
+                # every power the role describes -- including the unpause that
+                # lite signers deliberately cannot do.
+                values[reference] = _typed(
+                    reference, "address", source_blueprint.ROBINHOOD_GOVERNANCE
+                )
             elif any(marker in lowered for marker in (".guardian", ".recipient")):
                 values[reference] = _typed(reference, "address", OWNER)
             elif key == "Deployment.DP-18.roles.trainingWheelsAllowlist":
@@ -150,6 +157,21 @@ def build_fully_bound_envelope(
                 # account mints the GREEN somewhere the seed cannot spend it.
                 values[reference] = _typed(
                     reference, "address", TEMPORARY_GOVERNANCE
+                )
+            elif key == "reward-qualified-lite-signer-identity-if-used":
+                # "if used" -- and the same action asserts
+                # psm-lite-signer-posture-zero, so it is not.
+                values[reference] = _typed(reference, "address", ZERO)
+            elif key in {
+                "operator-identity",
+                "release-signer-identity",
+                "reward-governance-identity",
+            }:
+                # Evidentiary records, not on-chain grants: their actions have
+                # no `provides`, so nothing is written. The Safe is the
+                # authority that actually holds these powers.
+                values[reference] = _typed(
+                    reference, "address", source_blueprint.ROBINHOOD_GOVERNANCE
                 )
             elif key == "contributor-template" or "identity" in key:
                 values[reference] = _typed(reference, "address", OWNER)
