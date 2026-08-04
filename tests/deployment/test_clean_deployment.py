@@ -62,7 +62,7 @@ def test_fully_bound_production_plan_executes_exact_shared_source(
     assert {action["operation"] for action in actions} == EXPECTED_OPERATION_VOCABULARY
 
     executor, backend, migration = _execute(plan, root)
-    assert len(executor.results) == len(migration.results) == 118
+    assert len(executor.results) == len(migration.results) == 119
     assert len(backend.deployments) == 38
     assert sum(len(rows) for rows in backend.registries.values()) == 33
     assert backend.sequence[-1] == "0900:000005:handoff-governance-and-relinquish-deployer"
@@ -302,11 +302,24 @@ def deployment_authority_marker():
             str(mock_erc20), sender, "USDG", "USDG", 6, seed_usdg // 10**6
         )
         weth = boa.load(str(mock_erc20), sender, "Wrapped Ether", "WETH", 18, 0)
-        steakhouse = boa.load(str(mock_erc20), sender, "Steakhouse USDG", "sUSDG", 18, 0)
+        # A Morpho V2 vault, not a plain ERC20: 0400 registers this with
+        # BlueChipYieldPrices, which reads asset(), decimals(), totalSupply()
+        # and convertToAssets() off it. It is never registered as a Ripe asset
+        # -- its only other use is as a DefaultsRobinhood constructor argument.
+        steakhouse = boa.load(
+            str(root / "contracts/mock/MockMorphoV2Vault.vy"),
+            usdg.address,
+            18,
+            1_000 * 10**18,
+            10**18,
+        )
         eth_feed = boa.load(str(mock_feed), 3_000 * 10**18)
         btc_feed = boa.load(str(mock_feed), 100_000 * 10**18)
         usdg_feed = boa.load(str(mock_feed), 10**18)
         morpho_v2 = boa.load(str(root / "contracts/mock/MockMorphoV2Factory.vy"))
+        # The factory must claim the vault, or the feed registration fails
+        # closed exactly as it should for a vault Morpho does not recognise.
+        morpho_v2.setVault(steakhouse.address, True)
         contributor = boa.load_partial(
             str(root / "contracts/modules/Contributor.vy")
         ).deploy_as_blueprint()
@@ -509,8 +522,8 @@ def transfer(_to: address, _value: uint256) -> bool:
         for stage in plan["stages"]:
             executor(MigrationHandoff(), stage)
 
-        assert len(executor.results) == 118
-        assert len(backend.sequence) == 118
+        assert len(executor.results) == 119
+        assert len(backend.sequence) == 119
         assert len(backend.production_deployments) == 38
         assert backend.handed_off is True
         handoff = executor.results[

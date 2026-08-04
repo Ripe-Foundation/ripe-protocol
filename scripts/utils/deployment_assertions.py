@@ -312,7 +312,14 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
                     "plan.action.component_authority",
                 )
                 selection_state = authority.get("selection_state")
-                if selection_state not in {"selected", "blocked"}:
+                # A blueprint stores initcode and instantiates nothing, so it
+                # may deploy for an omitted component: the Contributor template
+                # is deployed exactly as Base does it while CM-005 stays
+                # omitted, because no live contributor contract results.
+                if (
+                    selection_state not in {"selected", "blocked"}
+                    and action.get("operation") != "deploy-blueprint"
+                ):
                     raise DeploymentAssertionInputError(
                         "plan deployment action has unavailable authority: "
                         f"{component_id}"
