@@ -76,7 +76,7 @@ def test_current_integrated_authority_builds_all_steps_with_canonical_curve_bloc
         for detail in plan["blocker_details"]
         if detail["key"].startswith("H05_CURVE_")
     ]
-    assert len(curve_blockers) == 10
+    assert len(curve_blockers) == 9
     assert len(blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS) == 39
     assert [stage["migration_id"] for stage in plan["stages"]] == STAGE_IDS
     assert all(stage["actions"] for stage in plan["stages"])
@@ -87,7 +87,7 @@ def test_fully_bound_synthetic_plan_is_complete_and_deterministic():
     second = _synthetic()
     assert first == second
     assert first["status"] == "proof-complete"
-    assert len(first["blockers"]) == 87
+    assert len(first["blockers"]) == 86
     assert first["plan_hash"] is None
     assert len(first["proof_hash"]) == 64
     assert first["artifact"] == {
@@ -334,7 +334,7 @@ def test_curve_stage_consumes_every_canonical_input_without_local_value_aliases(
     assert sum(
         row.resolution_state in blueprint.ROBINHOOD_CURVE_BLOCKING_STATES
         for row in blueprint.ROBINHOOD_CURVE_LAUNCH_INPUTS
-    ) == 10
+    ) == 9
 
 
 def test_aapl_seam_binds_schema_v2_but_produces_no_launch_action():
@@ -1006,7 +1006,7 @@ def test_assertion_derivation_rejects_blocked_disposition_suppression():
         expectations_from_plan(proof)
 
 
-def test_67_source_readiness_and_87_plan_blockers_cannot_drift():
+def test_66_source_readiness_and_86_plan_blockers_cannot_drift():
     plan = build_robinhood_plan(
         "robinhood-mainnet", repository_root=ROOT, preview=True
     )
@@ -1018,10 +1018,10 @@ def test_67_source_readiness_and_87_plan_blockers_cannot_drift():
         "reservation": sum(key.startswith("B-") for key in plan["blockers"]),
         "stock": sum(key.startswith("H05_STOCK_") for key in plan["blockers"]),
     }
-    assert len(plan["blockers"]) == 87
+    assert len(plan["blockers"]) == 86
     assert census == {
         "binding": 39,
-        "curve": 10,
+        "curve": 9,
         "external_address": 5,
         "deployment_input": 17,
         "reservation": 4,
@@ -1031,12 +1031,12 @@ def test_67_source_readiness_and_87_plan_blockers_cannot_drift():
     status = yaml.safe_load((ROOT / "docs/chains/rh/status.yaml").read_text())
     readiness = status["migration_readiness"]
     assert readiness["source_configuration"] == {
-        "blockers": 67,
+        "blockers": 66,
         "configuration_consistent": True,
         "deployment_ready": False,
     }
     assert readiness["executable_plan"] == {
-        "blockers": 87,
+        "blockers": 86,
         "categories": census,
     }
     assert "Neither count replaces the other" in readiness["relationship"]
@@ -1047,10 +1047,10 @@ def test_67_source_readiness_and_87_plan_blockers_cannot_drift():
     ):
         text = (ROOT / relative).read_text()
         for phrase in (
-            "67",
-            "87",
+            "66",
+            "86",
             "39",
-            "10 Curve",
+            "9 Curve",
             "5 external",
             "17 deployment",
             "4 stage" if relative.endswith("quickstart.md") else "4 reservation",

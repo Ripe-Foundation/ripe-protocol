@@ -492,7 +492,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.EXTERNAL_ARTIFACT: 3,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 51
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 29
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -689,7 +689,7 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
+def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
     expected_core = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
@@ -721,7 +721,7 @@ def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
         if row.resolution_state
         in blueprint_source.ROBINHOOD_CURVE_BLOCKING_STATES
     }
-    assert len(expected_curve) == 10
+    assert len(expected_curve) == 9
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
     assert set(blockers) == expected_core | expected_curve
     assert "B-H02-AUDIT" not in blockers

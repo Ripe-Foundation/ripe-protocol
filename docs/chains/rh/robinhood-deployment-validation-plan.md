@@ -6,11 +6,11 @@
 > `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`. PR #61, Morpho V2 and
 > BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
 > planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
-> the derived ledger. Source/configuration readiness reports exactly 67
+> the derived ledger. Source/configuration readiness reports exactly 66
 > blockers with `configuration_consistent=true` and
 > `deployment_ready=false`. The executable migration plan separately reports
-> 87 blockers: 39 binding, 10 Curve, 5 external-address, 17 deployment-input,
-> 4 reservation, and 12 Stock keys. The 87-key plan adds migration-specific
+> 86 blockers: 39 binding, 9 Curve, 5 external-address, 17 deployment-input,
+> 4 reservation, and 12 Stock keys. The 86-key plan adds migration-specific
 > bindings, reservations, and Stock inputs on top of source/configuration
 > readiness; neither count replaces the other. H-06 is a
 > class qualification only. Repository configuration is prepared and

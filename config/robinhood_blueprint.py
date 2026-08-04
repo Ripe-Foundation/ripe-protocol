@@ -6001,12 +6001,14 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
-    # 19 base blockers + 10 curve blockers. Was 42: the owner approved the Base
-    # GREEN pool configuration (8 params) and the Base seed path (5 funding
-    # inputs), leaving address-provider verification, the deployment-produced
-    # pool address, and the slippage/withdrawal/retained-liquidity policy rows.
+    # 19 base blockers + 9 curve blockers. Was 42: the owner approved the Base
+    # GREEN pool configuration (8 params), the Base seed path (5 funding
+    # inputs), and the withdrawal authority (the Safe, which governs the
+    # EndaomentFunds custodian holding the LP), leaving address-provider
+    # verification, the deployment-produced pool address, and the
+    # slippage/retained-liquidity policy rows.
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 29 or len(set(blocker_ids)) != 29:
+    if len(blocker_ids) != 28 or len(set(blocker_ids)) != 28:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")

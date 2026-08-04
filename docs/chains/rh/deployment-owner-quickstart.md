@@ -32,19 +32,19 @@ Ready to begin deployment preparation.
 - `DefaultsRobinhood.vy` exists, compiles, and is source-authoritative.
 - The derived parameter ledger is synchronized.
 - The current H-04 register has 22 rows: 21 approved and operative, one
-  retired and non-operative, and zero open. 29 canonical H-03 blockers remain
-  open; the 13 approved Curve pool and funding inputs are now resolved
-  repository facts, leaving 10 Curve-specific typed inputs.
+  retired and non-operative, and zero open. 28 canonical H-03 blockers remain
+  open; the 14 approved Curve pool and funding inputs are now resolved
+  repository facts, leaving 9 Curve-specific typed inputs.
 - `configuration_consistent=true`; `deployment_ready=false`; the current
-  readiness blocker count is 67: the remaining 57 non-Curve blockers plus 10
+  readiness blocker count is 66: the remaining 57 non-Curve blockers plus 9
   typed Curve launch inputs.
-- The executable migration graph is separately typed blocked by 87 keys:
+- The executable migration graph is separately typed blocked by 86 keys:
   39 execution bindings (37 deployment-produced identities plus the distinct
   temporary local-governance authority, the zero local-governance authority,
-  and the GREEN supply recipient), 10 Curve inputs, 5 external addresses,
+  and the GREEN supply recipient), 9 Curve inputs, 5 external addresses,
   17 deployment inputs, 4 stage reservations, and 12 Stock inputs. This
-  87-key plan census layers migration-specific bindings, reservations, and
-  Stock inputs on top of the 67-key source/configuration readiness state;
+  86-key plan census layers migration-specific bindings, reservations, and
+  Stock inputs on top of the 66-key source/configuration readiness state;
   neither count replaces the other.
 - DP15 and P-H04-399 are approved product/configuration decisions. The exact
   reward values remain points enabled, `0.009 RIPE/block`, 10% borrower / 90%
@@ -252,7 +252,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=67
+configuration_consistent=true deployment_ready=false blockers=66
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:
@@ -271,7 +271,7 @@ owner binding to be resolved. Never collapse those gates.
 ### 1. Close inputs and authorities
 
 Bind the exact baseline, preserve a clean isolated worktree, classify each of
-the 67 readiness blockers, and obtain its named external verification,
+the 66 readiness blockers, and obtain its named external verification,
 deployment-produced identity, or owner decision. Freeze governance, Safe,
 Guardian, TrainingWheels, lite signers, operators, emergency roles, and signer
 policy as reviewed inputs. Separately bind `temporary-local-governance` to the
