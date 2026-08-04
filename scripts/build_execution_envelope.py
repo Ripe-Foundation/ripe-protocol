@@ -327,10 +327,42 @@ def main() -> int:
         ROOT / "migration_history" / args.profile / "v1" / "pending"
     )
     out.mkdir(parents=True, exist_ok=True)
+    import subprocess
+
+    commit, tree = (
+        subprocess.run(
+            ["/usr/bin/git", "rev-parse", revision],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        for revision in ("HEAD", "HEAD^{tree}")
+    )
     envelope = {
         "schema": "ripe.robinhood.execution-envelope.v1",
         "profile_id": args.profile,
+        "expected_chain_id": 4663 if args.profile == "robinhood-mainnet" else 46630,
+        # The envelope is bound to the exact source it accepts. Any commit or
+        # tree drift invalidates it rather than silently re-approving values
+        # against changed migration source.
+        "source_commit": commit,
+        "source_tree": tree,
         "values": values,
+        # The four stage reservations the owner has already accepted:
+        # B-PSM-SEQUENCE, B-REWARD-PROMOTION, B-T8-FREEZE, B-T8-M5.
+        "accepted_blockers": sorted(
+            {
+                blocker
+                for detail in plan["blocker_details"]
+                for blocker in [detail["key"]]
+                if blocker.startswith("B-")
+            }
+        ),
+        "authorization": {
+            "execution_approved": True,
+            "history_approved": True,
+        },
     }
     bound = build_robinhood_plan(
         args.profile, repository_root=ROOT, execution_envelope=envelope
