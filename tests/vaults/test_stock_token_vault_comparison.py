@@ -35,12 +35,6 @@ VAULT_CASES = (
     pytest.param("rebase", 4, id="rebase-erc20"),
 )
 
-AUCTION_AFTER_TOTAL_LOSS_CASES = (
-    pytest.param("simple", 3, False, id="simple-erc20"),
-    pytest.param("rebase", 4, False, id="rebase-erc20"),
-)
-
-
 @pytest.fixture(autouse=True)
 def isolate_boa_storage_diagnostics():
     """Avoid Boa repr crashes from stale address/type trace metadata."""
@@ -1110,6 +1104,26 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
         assert stock_token.balanceOf(alice) == 0
         assert vault.getTotalAmountForUser(alice, stock_token) == 0
         assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+
+        # Keeping the auction active is intentional: if issuer backing returns
+        # before expiry, the same auction recovers without a Switchboard call.
+        stock_token.mint(
+            vault,
+            100 * EIGHTEEN_DECIMALS,
+            sender=deploy3r,
+        )
+        assert teller.buyFungibleAuction(
+            bob,
+            vault_id,
+            stock_token,
+            payment,
+            False,
+            should_transfer_balance,
+            False,
+            sender=alice,
+        ) == payment
+        assert green_token.balanceOf(alice) == green_before - payment
+        assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
         return
 
     green_spent = teller.buyFungibleAuction(
@@ -1548,7 +1562,7 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     if vault_kind == "simple":
         assert liquidation_result == 0
         assert not ledger.hasFungibleAuction(bob, vault_id, stock_token)
-        assert ledger.userDebt(bob).inLiquidation
+        assert not ledger.userDebt(bob).inLiquidation
         return
     assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
 
@@ -1579,13 +1593,12 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
 
 
 @pytest.mark.parametrize(
-    ("vault_kind", "vault_id", "can_create_auction_after_loss"),
-    AUCTION_AFTER_TOTAL_LOSS_CASES,
+    ("vault_kind", "vault_id"),
+    VAULT_CASES,
 )
 def test_auction_started_after_total_issuer_loss(
     vault_kind,
     vault_id,
-    can_create_auction_after_loss,
     stock_token,
     simple_erc20_vault,
     rebase_erc20_vault,
@@ -1627,37 +1640,20 @@ def test_auction_started_after_total_issuer_loss(
 
     assert credit_engine.canLiquidateUser(bob)
     liquidation_result = teller.liquidateUser(bob, False, sender=sally)
-    assert (
-        ledger.hasFungibleAuction(bob, vault_id, stock_token)
-        is can_create_auction_after_loss
-    )
-    if not can_create_auction_after_loss:
-        assert liquidation_result == 0
-        assert ledger.userDebt(bob).inLiquidation
-        return
+    assert liquidation_result == 0
+    assert not ledger.hasFungibleAuction(bob, vault_id, stock_token)
+    assert not ledger.userDebt(bob).inLiquidation
 
-    payment = 20 * EIGHTEEN_DECIMALS
-    green_token.transfer(alice, payment, sender=whale)
-    green_token.approve(teller, payment, sender=alice)
-    alice_green_before = green_token.balanceOf(alice)
-    debt_before = credit_engine.getUserDebtAmount(bob)
-    with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
-            bob,
-            vault_id,
-            stock_token,
-            payment,
-            False,
-            True,
-            False,
-            sender=alice,
-        )
-    assert green_token.balanceOf(alice) == alice_green_before
-    assert credit_engine.getUserDebtAmount(bob) == debt_before
-    assert vault.getTotalAmountForUser(alice, stock_token) == 0
-    assert stock_token.balanceOf(alice) == 0
-    assert stock_token.balanceOf(vault) == 0
+    # Restoring issuer backing makes the same permissionless liquidation call
+    # usable again; governance is not required to clear a permanent latch.
+    stock_token.mint(vault, deposit_amount, sender=deploy3r)
+    assert credit_engine.canLiquidateUser(bob)
+    # Titanoboa 0.2.7 retains EIP-1153 values between simulated top-level
+    # transactions; production EVMs clear them before this second call.
+    boa.env.evm.vm.state.clear_transient_storage()
+    teller.liquidateUser(bob, False, sender=sally)
     assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+    assert ledger.userDebt(bob).inLiquidation
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)

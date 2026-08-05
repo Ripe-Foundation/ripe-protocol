@@ -47,6 +47,7 @@ IMPLEMENTATION_RECORD_RELATIVE = Path(
     "docs/chains/rh/ledger-guard-implementation-record.md"
 )
 SHARED_BASIC_VAULT_RELATIVE = "contracts/vaults/modules/BasicVault.vy"
+SHARED_STAB_VAULT_RELATIVE = "contracts/vaults/modules/StabVault.vy"
 M3_CREDIT_RELATIVE = "contracts/core/CreditEngine.vy"
 H04_MANIFEST_RELATIVE = "config/robinhood-parameters.json"
 H04_GENERATOR_RELATIVE = "scripts/params/generate_robinhood_defaults.py"
@@ -851,7 +852,7 @@ def test_source_authoritative_defaults_has_exact_production_admission(
         "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
     )
     assert checker.CURRENT_PRODUCTION_INVENTORY_SHA256 == (
-        "714ed717d349bc5835b7d045497d818d8023a0192ebcbf6a5ff6d3f2a1001ef6"
+        "36034f6e8e66fe972b752105a352f36fb0b8cd7176629e125ff2fc6b288781d5"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
@@ -1215,6 +1216,39 @@ def test_shared_basic_vault_source_content_drift_fails_exact_pin(
         fixture_repo,
         "INV-PATH-BASIC-VAULT-CONTENT",
         path=SHARED_BASIC_VAULT_RELATIVE,
+    )
+
+
+def test_shared_stab_vault_record_is_exact_and_content_pinned(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == SHARED_STAB_VAULT_RELATIVE
+    )
+    assert checker._is_reviewed_shared_stab_vault_record(record)
+    assert record["classification"] == "production"
+    assert record["contentSha256"] == checker.SHARED_STAB_VAULT_SHA256
+    assert (
+        hashlib.sha256(
+            (fixture_repo / SHARED_STAB_VAULT_RELATIVE).read_bytes()
+        ).hexdigest()
+        == checker.SHARED_STAB_VAULT_SHA256
+    )
+    result = checker.check_repository(fixture_repo)
+    assert result.ok, result.output
+
+
+def test_shared_stab_vault_source_content_drift_fails_exact_pin(
+    fixture_repo: Path,
+) -> None:
+    _append(fixture_repo / SHARED_STAB_VAULT_RELATIVE, "\n# drift fixture\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-STAB-VAULT-CONTENT",
+        path=SHARED_STAB_VAULT_RELATIVE,
     )
 
 

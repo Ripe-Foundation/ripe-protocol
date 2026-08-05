@@ -136,16 +136,13 @@ def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, 
     if asset == empty(address):
         return empty(address), 0
 
-    # user has no balance
     nominalAmount: uint256 = vaultData.userBalances[_user][asset]
-    if nominalAmount == 0:
-        return empty(address), 0
 
-    # user has balance, but not enough vault backing
+    # preserve the registered asset even when its nominal amount is zero so
+    # CreditEngine continues to include its configured debt terms
     if staticcall IERC20(asset).balanceOf(self) < vaultData.totalBalances[asset]:
         return asset, 0
 
-    # user has balance and enough vault backing
     return asset, nominalAmount
 
 

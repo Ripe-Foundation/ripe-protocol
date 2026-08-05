@@ -716,7 +716,7 @@ def _getUserBorrowTerms(
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
-        if vaultAddr == empty(address):
+        if vaultId == STABILITY_POOL_ID or vaultAddr == empty(address): # stability positions are never collateral
             continue
 
         # iterate thru each user asset
@@ -1312,4 +1312,4 @@ def setBuybackRatio(_ratio: uint256):
 ########  ##     ## ########  ########  ##     ## ##  ##  ## 
 ##     ## ##     ## ##   ##   ##   ##   ##     ## ##  ##  ## 
 ##     ## ##     ## ##    ##  ##    ##  ##     ## ##  ##  ## 
-########   #######  ##     ## ##     ##  #######   ###  ###  
+########   #######  ##     ## ##     ##  #######   ###  ###

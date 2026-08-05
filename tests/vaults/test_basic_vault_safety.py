@@ -404,6 +404,64 @@ def test_typed_balance_read_accepts_trailing_returndata(
     )
 
 
+def test_dynamic_shaped_balance_read_is_exercised_in_views_and_pre_ops(
+    safe_simple_erc20_vault,
+    adversarial_token,
+    teller,
+    auction_house,
+    bob,
+    alice,
+):
+    """A 64-byte return is ABI-decoded from word one on every Basic boundary."""
+
+    amount = 100
+    _credit(safe_simple_erc20_vault, adversarial_token, bob, amount, teller)
+    adversarial_token.configure_balance(
+        safe_simple_erc20_vault,
+        6,
+        0,
+        False,
+    )
+
+    # Mode 6 reports 32 in its first ABI word. Against 100 nominal units this
+    # is treated as deficient by both backing-aware views.
+    assert safe_simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        adversarial_token,
+    ) == 0
+    assert safe_simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        adversarial_token.address,
+        0,
+    )
+
+    with boa.reverts("insufficient vault backing"):
+        safe_simple_erc20_vault.depositTokensInVault(
+            alice,
+            adversarial_token,
+            1,
+            sender=teller.address,
+        )
+    with boa.reverts("insufficient vault backing"):
+        safe_simple_erc20_vault.withdrawTokensFromVault(
+            bob,
+            adversarial_token,
+            1,
+            alice,
+            sender=teller.address,
+        )
+    with boa.reverts("insufficient vault backing"):
+        safe_simple_erc20_vault.transferBalanceWithinVault(
+            adversarial_token,
+            bob,
+            alice,
+            1,
+            sender=auction_house.address,
+        )
+
+    assert safe_simple_erc20_vault.userBalances(bob, adversarial_token) == amount
+    assert safe_simple_erc20_vault.totalBalances(adversarial_token) == amount
+
+
 def test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal(
     safe_simple_erc20_vault,
     vault_token,
@@ -455,7 +513,7 @@ def test_deficit_preserves_position_and_reward_getter_asymmetry(
     assert safe_simple_erc20_vault.doesUserHaveBalance(bob, vault_token)
 
 
-def test_true_empty_and_zero_nominal_index_returns_empty_zero(
+def test_true_empty_and_zero_nominal_index_preserves_registered_asset(
     safe_simple_erc20_vault,
     vault_token,
     deploy3r,
@@ -476,7 +534,7 @@ def test_true_empty_and_zero_nominal_index_returns_empty_zero(
         sender=teller.address,
     )
     assert safe_simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
-        "0x0000000000000000000000000000000000000000",
+        vault_token.address,
         0,
     )
 

@@ -614,11 +614,11 @@ ROBINHOOD_STOCK_ARTIFACT_BINDING = (
     ),
     (
         "creationSha256",
-        "d6cca5f074b5395f7f1dbde6e42639cfc9b89a84068c4bb577f92d36e345f0ac",
+        "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
     ),
     (
         "runtimeTemplateSha256",
-        "3e21a9c930c878bb84883f66fab1f3cff0a9abf173034d927d3d660b020f0da1",
+        "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
     ),
     (
         "abiCanonicalSha256",
@@ -629,7 +629,7 @@ ROBINHOOD_STOCK_ARTIFACT_BINDING = (
         "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
     ),
     ("selectorCount", 34),
-    ("runtimeTemplateSize", 9_390),
+    ("runtimeTemplateSize", 9_368),
 )
 
 ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
@@ -677,10 +677,10 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
         RobinhoodArtifactApplicabilityIdentity(
             "AuctionHouse",
             "contracts/core/AuctionHouse.vy",
-            "ffd98c032171dfd8b4ef357aab57bae82fce5ca7",
-            "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
-            "9c4f1941effad2a029f16bda9256903840af98f61e635ab82be8502d9af4db96",
-            "687bb68c747d5ec802db1333a8cbb8f842b4423e90dbdc01277699aaf1e4dfc8",
+            "2241f8cb38f4f69c68e9da535119b525256af8dc",
+            "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
+            "bbb6bbb460645ea1391ccdd7f4f576788e32cf962f6c540bcf6e68ab805408da",
+            "f9d1f719d28f0fd48f98317307b366aa261a607328335d81869eed6c0fd384a6",
             "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
             "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         ),
@@ -699,8 +699,8 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/vaults/SimpleErc20.vy",
             "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
             "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "d6cca5f074b5395f7f1dbde6e42639cfc9b89a84068c4bb577f92d36e345f0ac",
-            "3e21a9c930c878bb84883f66fab1f3cff0a9abf173034d927d3d660b020f0da1",
+            "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
+            "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
             "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
             "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
         ),

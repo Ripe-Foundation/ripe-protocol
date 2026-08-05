@@ -30,8 +30,8 @@ a custody reader
 
 | Field | Frozen value and derivation |
 | --- | --- |
-| Repository baseline | `a86650b187c523f27c92f05bfe959d06840025a6` |
-| CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` |
+| Reviewed implementation parent | `fdf19226f0d8f4b42741f2ce324f8ccb9ba20336`; the source hash below binds the subsequent reviewer-fix revision |
+| CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` |
 | Environment | exact-lock venv `/private/tmp/ripe-rh-final-gate2.uZCfBL/venv`; canonical environment manifest SHA-256 `f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d` |
 | Compiler | `Vyper 0.4.3+commit.bff19ea2`; CreditEngine source pragma governs `codesize`; no `-O` override |
 | EVM harness | Titanoboa from the exact-lock environment; local ephemeral deployment only |
@@ -93,16 +93,14 @@ The measurement test must also assert:
 
 ## Results
 
-The protocol was committed first as `d44ab68`. The accepted run then completed
-with `1 passed, 3 warnings in 106.94s`. All warnings were pytest
+The original measurement protocol was committed as `d44ab68`. After the
+reviewer-fix revision added an explicit Stability Pool exclusion, the same
+protocol was rerun against the source hash above. That accepted follow-up run
+completed with `1 passed, 3 warnings in 114.40s`. All warnings were pytest
 already-imported assertion-rewrite warnings for Hypothesis and Boa; no test was
 skipped, xfailed, or deselected.
-
-An initial collection attempt was rejected at the first priced cell because
-the trace counter counted two frames sharing the PriceDesk code address. No
-partial observation from that attempt is included. The accepted harness counts
-only PriceDesk frames whose calldata selector is exactly
-`getUsdValue(address,uint256,bool)`; the frozen protocol itself was unchanged.
+The accepted harness counts only PriceDesk frames whose calldata selector is
+exactly `getUsdValue(address,uint256,bool)`.
 
 ### Raw observations
 
@@ -111,32 +109,32 @@ recorded top-level calls.
 
 | Positions | Path | Seven observations | Median | PriceDesk calls per observation |
 | ---: | --- | --- | ---: | ---: |
-| 1 | priced | `[37637, 37637, 37637, 37637, 37637, 37637, 37637]` | 37,637 | 1 |
-| 1 | zero-amount containment | `[21950, 21950, 21950, 21950, 21950, 21950, 21950]` | 21,950 | 0 |
-| 2 | priced | `[56681, 56681, 56681, 56681, 56681, 56681, 56681]` | 56,681 | 2 |
-| 2 | zero-amount containment | `[25411, 25411, 25411, 25411, 25411, 25411, 25411]` | 25,411 | 0 |
-| 4 | priced | `[94769, 94769, 94769, 94769, 94769, 94769, 94769]` | 94,769 | 4 |
-| 4 | zero-amount containment | `[32333, 32333, 32333, 32333, 32333, 32333, 32333]` | 32,333 | 0 |
-| 8 | priced | `[170945, 170945, 170945, 170945, 170945, 170945, 170945]` | 170,945 | 8 |
-| 8 | zero-amount containment | `[46177, 46177, 46177, 46177, 46177, 46177, 46177]` | 46,177 | 0 |
-| 16 | priced | `[325068, 325068, 325068, 325068, 325068, 325068, 325068]` | 325,068 | 16 |
-| 16 | zero-amount containment | `[75636, 75636, 75636, 75636, 75636, 75636, 75636]` | 75,636 | 0 |
-| 50 | priced | `[977877, 977877, 977877, 977877, 977877, 977877, 977877]` | 977,877 | 50 |
-| 50 | zero-amount containment | `[198623, 198623, 198623, 198623, 198623, 198623, 198623]` | 198,623 | 0 |
+| 1 | priced | `[37782, 37782, 37782, 37782, 37782, 37782, 37782]` | 37,782 | 1 |
+| 1 | zero-amount containment | `[21977, 21977, 21977, 21977, 21977, 21977, 21977]` | 21,977 | 0 |
+| 2 | priced | `[56944, 56944, 56944, 56944, 56944, 56944, 56944]` | 56,944 | 2 |
+| 2 | zero-amount containment | `[25438, 25438, 25438, 25438, 25438, 25438, 25438]` | 25,438 | 0 |
+| 4 | priced | `[95268, 95268, 95268, 95268, 95268, 95268, 95268]` | 95,268 | 4 |
+| 4 | zero-amount containment | `[32360, 32360, 32360, 32360, 32360, 32360, 32360]` | 32,360 | 0 |
+| 8 | priced | `[171916, 171916, 171916, 171916, 171916, 171916, 171916]` | 171,916 | 8 |
+| 8 | zero-amount containment | `[46204, 46204, 46204, 46204, 46204, 46204, 46204]` | 46,204 | 0 |
+| 16 | priced | `[327010, 327010, 327010, 327010, 327010, 327010, 327010]` | 327,010 | 16 |
+| 16 | zero-amount containment | `[75690, 75690, 75690, 75690, 75690, 75690, 75690]` | 75,690 | 0 |
+| 50 | priced | `[983912, 983912, 983912, 983912, 983912, 983912, 983912]` | 983,912 | 50 |
+| 50 | zero-amount containment | `[198758, 198758, 198758, 198758, 198758, 198758, 198758]` | 198,758 | 0 |
 
 ### Marginal calculations
 
 | Positions | Priced median | Zero median | Priced minus zero | Added positions | Priced marginal | Priced per added position | Zero marginal | Zero per added position |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 37,637 | 21,950 | 15,687 | — | — | — | — | — |
-| 2 | 56,681 | 25,411 | 31,270 | 1 | 19,044 | 19,044.000 | 3,461 | 3,461.000 |
-| 4 | 94,769 | 32,333 | 62,436 | 2 | 38,088 | 19,044.000 | 6,922 | 3,461.000 |
-| 8 | 170,945 | 46,177 | 124,768 | 4 | 76,176 | 19,044.000 | 13,844 | 3,461.000 |
-| 16 | 325,068 | 75,636 | 249,432 | 8 | 154,123 | 19,265.375 | 29,459 | 3,682.375 |
-| 50 | 977,877 | 198,623 | 779,254 | 34 | 652,809 | 19,200.265 | 122,987 | 3,617.265 |
+| 1 | 37,782 | 21,977 | 15,805 | — | — | — | — | — |
+| 2 | 56,944 | 25,438 | 31,506 | 1 | 19,162 | 19,162.000 | 3,461 | 3,461.000 |
+| 4 | 95,268 | 32,360 | 62,908 | 2 | 38,324 | 19,162.000 | 6,922 | 3,461.000 |
+| 8 | 171,916 | 46,204 | 125,712 | 4 | 76,648 | 19,162.000 | 13,844 | 3,461.000 |
+| 16 | 327,010 | 75,690 | 251,320 | 8 | 155,094 | 19,386.750 | 29,486 | 3,685.750 |
+| 50 | 983,912 | 198,758 | 785,154 | 34 | 656,902 | 19,320.647 | 123,068 | 3,619.647 |
 
 The one-, two-, four-, and eight-position cells have exact marginal slopes of
-19,044 gas per priced position and 3,461 per contained zero position in this
+19,162 gas per priced position and 3,461 per contained zero position in this
 harness. The later cells cross synthetic-vault boundaries, so their marginal
 figures also include additional Ledger/VaultBook/vault-call overhead. At the
 fixture-derived 50-position ceiling, the containment path remains below the

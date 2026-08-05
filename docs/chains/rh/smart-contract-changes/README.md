@@ -58,10 +58,11 @@ shared ERC-20 modules alter their transitive compiled artifacts:
 | Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
 | --- | --- | --- | --- | ---: | --- |
 | `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `7019b6c47dde03151acc1952944dd19301c83328` | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` | 41,106 | Exact call-local receipt and vault-return policy |
-| `contracts/vaults/modules/BasicVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `9c8299accd5a65cbfbc96c4cdc1849bb125523b8` | `0b13c91ef72cfc139de1d4c036e01e3d371349ba549b144d1aa0ff47cc855044` | 5,597 | Shared nominal-vault fail-closed backing and exact delivery |
-| `contracts/core/AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `ffd98c032171dfd8b4ef357aab57bae82fce5ca7` | `2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c` | 53,377 | Skips deficient collateral at liquidation, auction, purchase, and deleverage boundaries |
+| `contracts/vaults/modules/BasicVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `a5a51ee20c598e9bf40908fc6c38f1c0634bf665` | `6a6abdde4887fb5339125c7268e0258175e3b66c9f060b6ab6e8262f58269ea8` | 5,552 | Shared nominal-vault fail-closed backing and exact delivery |
+| `contracts/vaults/modules/StabVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `e9c0bb1e67bdcfa0df4c9116d5a6298446b9df68` | `b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e` | 39,669 | Truthful indexed Stability Pool positions for non-borrow consumers |
+| `contracts/core/AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `2241f8cb38f4f69c68e9da535119b525256af8dc` | `2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89` | 53,520 | Skips deficient collateral and keeps empty liquidations retryable |
 | `contracts/core/CreditRedeem.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `447a945b7bb052837412fb15a7f22875f44b9ee9` | `62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd` | 14,166 | Soft-skips deficient redemption entries so healthy batch entries can continue |
-| `contracts/core/CreditEngine.vy` | [`credit-engine.md`](credit-engine.md) | `a98d2522a16708e887a5a8aad78171843d413baf` | `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` | 46,812 | Retains terms for nonempty zero-backed positions without pricing zero |
+| `contracts/core/CreditEngine.vy` | [`credit-engine.md`](credit-engine.md) | `ef7724393d3b9f30f6e4281a1a465c5d2cc49895` | `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` | 46,886 | Retains terms for zero amounts and explicitly excludes Stability Pool collateral |
 | `contracts/data/Ledger.vy` | [`ledger.md`](ledger.md) | `590341e3f9091105036c1cc497bd862ea3769248` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` | 26,492 | Immutable native/ArbSys action-block selection |
 | `contracts/core/Lootbox.vy` | [`lootbox.md`](lootbox.md) | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | 47,731 | Per-deployment immutable Underscore interval floor |
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
@@ -121,11 +122,12 @@ three transitive token consumers were also freshly compiled with Vyper
 
 | Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | --- | --- |
-| AuctionHouse | 24,432 | 144 | `687bb68c747d5ec802db1333a8cbb8f842b4423e90dbdc01277699aaf1e4dfc8` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
-| CreditEngine | 24,132 | 444 | `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| AuctionHouse | 24,436 | 140 | `f9d1f719d28f0fd48f98317307b366aa261a607328335d81869eed6c0fd384a6` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,151 | 425 | `082c3f6c124447a43bcd4835237c134864ba3036f9a8d190ef6b16ac6e8e3696` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
 | Deleverage | 24,473 | 103 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
 | DefaultsRobinhood | 2,687 | 21,889 | `aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99` | `a2b3232606060b9b296666a2cfbc6a328c2b92897ac6e1dcf9f82920a449bddb` |
-| SimpleErc20 | 9,390 | 15,186 | `3e21a9c930c878bb84883f66fab1f3cff0a9abf173034d927d3d660b020f0da1` | `cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57` |
+| SimpleErc20 | 9,368 | 15,208 | `750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6` | `cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57` |
+| StabilityPool | 23,960 | 616 | `2417f094a3ae75fb4c6c9d742b8fbaafadb977a04d7d3485cb2a4e27206d3a58` | `16267810e14746f1091d6343187ffff1b2144fb90aa0dfe150add68515cd146f` |
 | Ledger | 13,125 | 11,451 | `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7` | `69f5e1c1cccf0f8bfbfa0cae30879635bca241d40af1e95615026b264658fb32` |
 | Lootbox | 21,569 | 3,007 | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
 | SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |

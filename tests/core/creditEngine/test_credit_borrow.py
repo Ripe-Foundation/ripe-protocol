@@ -1252,6 +1252,69 @@ def test_get_user_borrow_terms_asset_with_zero_amount(
     assert terms.debtTerms.daowry == 1_00
 
 
+def test_zero_balance_registered_asset_keeps_borrow_term_floor(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    simple_erc20_vault,
+):
+    """Withdrawing to zero must not silently remove configured debt terms."""
+
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    bravo_terms = createDebtTerms(
+        _ltv=10_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=alpha_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_terms)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, amount, bravo_token, bravo_token_whale)
+    assert teller.withdraw(
+        bravo_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 2) == (
+        bravo_token.address,
+        0,
+    )
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == amount
+    assert terms.totalMaxDebt == amount // 2
+    assert terms.lowestLtv == 10_00
+    assert terms.debtTerms.liqThreshold == 79_99
+
+
 def test_get_user_borrow_terms_asset_with_no_price(
     alpha_token,
     alpha_token_whale,

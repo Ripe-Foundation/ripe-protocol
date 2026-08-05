@@ -4,14 +4,14 @@
 
 This worktree extends the historically shared `AuctionHouse` source with
 backing-aware BasicVault consumer boundaries. The candidate source is Git blob
-`ffd98c032171dfd8b4ef357aab57bae82fce5ca7`, SHA-256
-`2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c`.
+`2241f8cb38f4f69c68e9da535119b525256af8dc`, SHA-256
+`2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89`.
 It is not integrated into `rh`, deployed, configured, or activated.
 
-The runtime template is 24,432 bytes, with 144 bytes of template headroom and
+The runtime template is 24,436 bytes, with 140 bytes of template headroom and
 SHA-256
-`687bb68c747d5ec802db1333a8cbb8f842b4423e90dbdc01277699aaf1e4dfc8`.
-The constructor-bound deployed runtime is 24,528 bytes, leaving 48 bytes below
+`f9d1f719d28f0fd48f98317307b366aa261a607328335d81869eed6c0fd384a6`.
+The constructor-bound deployed runtime is 24,532 bytes, leaving 44 bytes below
 the EIP-170 limit.
 
 ## Why the change exists
@@ -53,6 +53,12 @@ creation. Manual auction creation rejects a deficient position. If an existing
 auction becomes deficient, its purchase returns zero without mutating auction,
 debt, GREEN, or collateral state, allowing a batch to preserve earlier healthy
 purchases.
+
+An all-deficient liquidation now leaves `inLiquidation` false when it seizes
+nothing and creates no auction, so backing restoration can be followed by a
+permissionless retry. Stability Pool's truthful indexed getter also restores
+phase-2 visibility for eligible positions; CreditEngine separately excludes
+stability vault ID `1` from borrowing power.
 
 The Deleverage withdrawal wrapper and collateral-transfer helper also return a
 soft-zero/skip result for deficient collateral. Deleverage can therefore

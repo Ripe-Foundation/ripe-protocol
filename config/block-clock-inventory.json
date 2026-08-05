@@ -1712,7 +1712,7 @@
       "function": "_createOrUpdateFungAuction",
       "normalizedExpression": "block.number",
       "ordinalInFunction": 1,
-      "reviewedLine": 923,
+      "reviewedLine": 924,
       "reviewedColumn": 27,
       "reviewedSnippet": "startBlock: uint256 = block.number + params.delay",
       "category": "configurable economic duration",
@@ -1729,7 +1729,7 @@
       "function": "_buyFungibleAuction",
       "normalizedExpression": "block.number",
       "ordinalInFunction": 1,
-      "reviewedLine": 1106,
+      "reviewedLine": 1107,
       "reviewedColumn": 8,
       "reviewedSnippet": "if block.number < auc.startBlock or block.number >= auc.endBlock:",
       "category": "configurable economic duration",
@@ -1746,7 +1746,7 @@
       "function": "_buyFungibleAuction",
       "normalizedExpression": "block.number",
       "ordinalInFunction": 2,
-      "reviewedLine": 1106,
+      "reviewedLine": 1107,
       "reviewedColumn": 41,
       "reviewedSnippet": "if block.number < auc.startBlock or block.number >= auc.endBlock:",
       "category": "configurable economic duration",
@@ -1763,7 +1763,7 @@
       "function": "_buyFungibleAuction",
       "normalizedExpression": "block.number",
       "ordinalInFunction": 3,
-      "reviewedLine": 1125,
+      "reviewedLine": 1126,
       "reviewedColumn": 33,
       "reviewedSnippet": "auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)",
       "category": "configurable economic duration",
@@ -15558,7 +15558,7 @@
     {
       "path": "contracts/core/AuctionHouse.vy",
       "classification": "production",
-      "contentSha256": "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
+      "contentSha256": "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
@@ -15598,7 +15598,7 @@
     {
       "path": "contracts/core/CreditEngine.vy",
       "classification": "production",
-      "contentSha256": "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d",
+      "contentSha256": "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
@@ -16299,7 +16299,7 @@
     {
       "path": "contracts/vaults/modules/BasicVault.vy",
       "classification": "production",
-      "contentSha256": "0b13c91ef72cfc139de1d4c036e01e3d371349ba549b144d1aa0ff47cc855044",
+      "contentSha256": "6a6abdde4887fb5339125c7268e0258175e3b66c9f060b6ab6e8262f58269ea8",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
@@ -16319,7 +16319,7 @@
     {
       "path": "contracts/vaults/modules/StabVault.vy",
       "classification": "production",
-      "contentSha256": "4779448a8eef01363a697efc2cdd2eaec345afdb51349a57de220f743bb0e847",
+      "contentSha256": "b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",

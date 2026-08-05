@@ -15,8 +15,8 @@ test counts remain dated historical evidence below.
 
 | Current identity | Value |
 | --- | --- |
-| CreditEngine source Git blob / SHA-256 | `a98d2522a16708e887a5a8aad78171843d413baf` / `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` |
-| Runtime template | 24,132 bytes; SHA-256 `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de`; 444 bytes EIP-170 headroom |
+| CreditEngine source Git blob / SHA-256 | `ef7724393d3b9f30f6e4281a1a465c5d2cc49895` / `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` |
+| Runtime template | 24,151 bytes; SHA-256 `082c3f6c124447a43bcd4835237c134864ba3036f9a8d190ef6b16ac6e8e3696`; 425 bytes EIP-170 headroom |
 | [`test_stock_backing.py`](../../../../tests/core/creditEngine/test_stock_backing.py) | Git blob `2e72b0cffc1a11e47fd962c11b31cc5459b40fcd`; SHA-256 `6c2362f1074acbe05fa2a6b7f2b14919f484eaf176eef80507cfefea86f2d099` |
 | [`test_credit_borrow.py`](../../../../tests/core/creditEngine/test_credit_borrow.py) | Git blob `1139615df45f201dc401d9c68b3f075853d9394d`; SHA-256 `3d0e45f8cc6441d086766f09018bd1bbbc025e83c30e25f433b8ce2ea5310bd0` |
 | [`test_credit_repay.py`](../../../../tests/core/creditEngine/test_credit_repay.py) | Git blob `0c6390fcb54480cfe1376af1958c2ee97071e9cb`; SHA-256 `a65e733eb632dc74d1e69c42062ed7fda49dc60de322dd56d58aa13592490d91` |
@@ -72,6 +72,7 @@ treated as permanently synonymous with whatever `rh` may contain later.
 | What was the rationale? | Give the unsafe position zero value and borrowing capacity without making existing debt invisible or blocking healthy co-collateral and repayment with an unnecessary zero-amount price lookup. |
 | What does the change actually do? | It skips only an empty asset address, retains configured terms for a nonempty position, values a zero amount at zero, and calls PriceDesk only for a nonzero amount. |
 | Does CreditEngine inspect token custody? | No. The selected vault owns backing classification and reports the `(asset, amount)` pair. CreditEngine consumes that canonical vault result. |
+| Can Stability Pool positions affect borrowing terms? | No. CreditEngine explicitly skips vault ID `1`; the Stability Pool getter remains truthful so non-borrow consumers such as AuctionHouse can enumerate positions. |
 | Why is `raw_call` used? | It is not used by this CreditEngine change. Strict raw custody observations belong to Teller and GuardedErc20; adding a second custody reader here would duplicate policy and create two sources of truth. |
 | Does zero backing automatically liquidate a user? | No. It can immediately change computed value, health, and eligibility. An authorized transaction must still pass Teller and AuctionHouse gates before liquidation state or auctions change, and later settlement remains vault-dependent. |
 | Is a CreditEngine source correction currently recommended? | No active Wave 1 correction is recommended or authorized by this record. `lowestLtv`, interest treatment, settlement, loss allocation, and bad-debt ideas are unapproved, owner-parked research findings. |

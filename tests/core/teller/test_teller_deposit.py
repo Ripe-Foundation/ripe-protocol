@@ -1753,6 +1753,52 @@ def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
         ]
 
 
+def test_t6_real_basic_vault_blocks_short_report_without_teller_equality(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    """BasicVault remains a defense if Teller's receipt equality is removed."""
+
+    mutant = boa.loads(
+        _t6_receipt_equality_bypass_mutant_source(),
+        ripe_hq,
+        False,
+        name="t6_real_vault_without_receipt_equality",
+        override_address=T6_RECEIPT_EQUALITY_MUTANT_ADDRESS,
+    )
+    _m1_replace_hq_address(ripe_hq, governance, 17, mutant)
+    setGeneralConfig()
+    token = _caller_sensitive_balance_token()
+    setAssetConfig(token)
+    token.configure_vault_observation(simple_erc20_vault, 1)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(credit_engine, amount)
+    token.approve(mutant, amount, sender=credit_engine.address)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    with boa.reverts("insufficient vault backing"):
+        mutant.depositFromTrusted(
+            bob,
+            vault_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+
+    assert token.balanceValue(credit_engine) == amount
+    assert token.balanceValue(simple_erc20_vault) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+
+
 def test_m1_lock_duration_vault_mismatch_reverts_atomically(
     vault_book,
     governance,
@@ -2074,6 +2120,55 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_receipt(
             nested_amount,
             amount,
         ]
+
+
+def test_t1_real_basic_vault_blocks_offsetting_receipt_without_teller_mutex(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    vault_book,
+):
+    """BasicVault also rejects the offsetting-receipt Teller mutant."""
+
+    mutant = boa.loads(
+        _t1_mutex_removal_mutant_source(),
+        ripe_hq,
+        False,
+        name="t1_real_vault_without_receipt_mutex",
+        override_address=boa.env.generate_address(),
+    )
+    token, amount, _, vault_id = _t1_setup_mutex_sensitive_trusted_callback(
+        mutant,
+        teller,
+        ripe_hq,
+        governance,
+        credit_engine,
+        simple_erc20_vault,
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        vault_book,
+    )
+
+    with boa.reverts("insufficient vault backing"):
+        mutant.depositFromTrusted(
+            bob,
+            vault_id,
+            token,
+            amount,
+            0,
+            sender=credit_engine.address,
+        )
+
+    assert token.balanceValue(credit_engine) == amount
+    assert token.balanceValue(simple_erc20_vault) == 0
+    assert ledger.getNumUserVaults(bob) == 0
 
 
 def test_t2_vault_callback_mode_five_is_blocked_after_custody_read(

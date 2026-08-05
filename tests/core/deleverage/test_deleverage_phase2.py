@@ -2867,16 +2867,12 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     deleverage_size = len(boa.env.get_code(deleverage.address))
     auction_house_size = len(boa.env.get_code(auction_house.address))
 
-    # Measured at this revision: Deleverage 24,569 bytes (7 bytes headroom),
-    # AuctionHouse 24,528 bytes (48 bytes headroom).
-    assert deleverage_size <= EIP170_LIMIT, (
-        f"Deleverage runtime is {deleverage_size} bytes; "
-        f"EIP-170 limit is {EIP170_LIMIT} bytes"
-    )
-    assert auction_house_size <= EIP170_LIMIT, (
-        f"AuctionHouse runtime is {auction_house_size} bytes; "
-        f"EIP-170 limit is {EIP170_LIMIT} bytes"
-    )
+    # Pin the deployed measurements, not only the legal ceiling. This catches
+    # code-size creep before either contract silently consumes its final bytes.
+    assert deleverage_size == 24_569
+    assert auction_house_size == 24_532
+    assert EIP170_LIMIT - deleverage_size == 7
+    assert EIP170_LIMIT - auction_house_size == 44
 
 
 @pytest.mark.parametrize(

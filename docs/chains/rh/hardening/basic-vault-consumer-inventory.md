@@ -6,11 +6,10 @@
 
 This is the G4 inventory rooted at feature baseline
 `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`
-read in CreditEngine, AuctionHouse, CreditRedeem, the reviewed-baseline
-Deleverage source, Lootbox, and Teller whose result is an amount, a position
-discovery input, or a vault-capability input. The machine test verifies the
-source hashes, call sites, function names, getter names, classifications, and
-policy below
+read anywhere in the complete production `contracts/**/*.vy` tree whose result
+is an amount, a position-discovery input, or a vault-capability input. The
+machine test discovers the callers before comparing the source hashes, call
+sites, function names, getter names, classifications, and policy below
 ([inventory test](../../../../tests/vaults/test_basic_vault_consumer_inventory.py)).
 
 ## Policy
@@ -44,10 +43,11 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
-    "contracts/core/CreditEngine.vy": "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d",
+    "contracts/core/AuctionHouse.vy": "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
+    "contracts/core/CreditEngine.vy": "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb",
     "contracts/core/CreditRedeem.vy": "62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd",
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
+    "contracts/core/HumanResources.vy": "5f5712002ae22fed15829b8488c1cdf2e17cfef4f82ce66903b04fa562c749cb",
     "contracts/core/Lootbox.vy": "669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65",
     "contracts/core/Teller.vy": "4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909"
   },
@@ -64,9 +64,9 @@ source review and test update.
   ],
   "rows": [
     {
-      "id": "AH-420",
+      "id": "AH-421",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 420,
+      "line": 421,
       "function": "_performLiquidationPhases",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -74,9 +74,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-502",
+      "id": "AH-503",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 502,
+      "line": 503,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -84,9 +84,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-516",
+      "id": "AH-517",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 516,
+      "line": 517,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -94,9 +94,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-651",
+      "id": "AH-652",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 651,
+      "line": 652,
       "function": "_swapWithSpecificStabPool",
       "getter": "isSupportedVaultAsset",
       "classification": "capability_discovery_nominal_allowed",
@@ -104,9 +104,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-892",
+      "id": "AH-893",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 892,
+      "line": 893,
       "function": "_canStartAuction",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -114,9 +114,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-1200",
+      "id": "AH-1201",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1200,
+      "line": 1201,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -124,9 +124,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-1228",
+      "id": "AH-1229",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1228,
+      "line": 1229,
       "function": "_transferCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -244,6 +244,16 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
+      "id": "HR-390",
+      "path": "contracts/core/HumanResources.vy",
+      "line": 390,
+      "function": "hasRipeBalance",
+      "getter": "doesUserHaveBalance",
+      "classification": "position_discovery_nominal_allowed",
+      "reason": "Checks whether a contributor has a RIPE governance-vault position; it neither values BasicVault collateral nor grants borrowing power.",
+      "evidence_test": "test_hr_has_ripe_balance_no_balance"
+    },
+    {
       "id": "LB-298",
       "path": "contracts/core/Lootbox.vy",
       "line": 298,
@@ -320,7 +330,9 @@ source review and test update.
 
 ## Test-to-consumer result
 
-The machine inventory test is exhaustive over the getter scope above. It also
+The machine inventory test is exhaustive over the getter scope across every
+production Vyper source, including HumanResources rather than only the six
+initially reviewed consumers. It also
 requires every `value_backing_required` row to use one of the two
 backing-aware getters and every nominally allowed row to carry nonempty
 included/excluded reasoning. The BasicVault safety suite independently proves

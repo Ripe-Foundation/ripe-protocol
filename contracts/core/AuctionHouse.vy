@@ -18,8 +18,8 @@
 
 # @version 0.4.3
 # pragma optimize codesize
-# At this source revision, the deployed runtime is 24,528 bytes including
-# Vyper's 96-byte immutables section: 48 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 24,532 bytes including
+# Vyper's 96-byte immutables section: 44 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
@@ -322,8 +322,9 @@ def _liquidateUser(
     if bt.collateralVal > collateralLiqThreshold:
         return 0
 
-    # set liquidation mode
-    userDebt.inLiquidation = True
+    # set liquidation mode only when there is usable collateral to process;
+    # this leaves a zero-collateral position retryable if backing is restored
+    userDebt.inLiquidation = bt.collateralVal != 0
 
     # liquidation fees
     baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT

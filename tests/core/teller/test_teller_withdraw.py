@@ -370,6 +370,51 @@ def test_teller_withdraw_many(
     assert bravo_token.balanceOf(bob) == deposit_amount
 
 
+def test_protected_vault_max_withdraw_batch_stays_below_gas_ceiling(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+    performDeposit,
+):
+    """Exercise all 20 slots with BasicVault's four custody/delivery reads."""
+
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    unit = EIGHTEEN_DECIMALS
+    batch_size = 20
+    performDeposit(
+        bob,
+        batch_size * unit,
+        alpha_token,
+        alpha_token_whale,
+    )
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    withdrawals = [
+        (
+            alpha_token.address,
+            unit,
+            simple_erc20_vault.address,
+            vault_id,
+        )
+        for _ in range(batch_size)
+    ]
+
+    gas_before = boa.env.get_gas_used()
+    assert teller.withdrawMany(bob, withdrawals, sender=bob) == batch_size
+    gas_used = boa.env.get_gas_used() - gas_before
+
+    # A local-EVM regression ceiling for the maximum public batch, not a claim
+    # about a Robinhood block gas limit or production gas estimate.
+    assert gas_used < 6_000_000, f"20-row withdrawal used {gas_used} gas"
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+    assert alpha_token.balanceOf(bob) == batch_size * unit
+
+
 def test_withdraw_many_arb_sys_rejects_second_same_action_block(
     simple_erc20_vault,
     alpha_token,

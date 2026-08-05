@@ -38,21 +38,21 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_528, "headroom": 48},
+    "AuctionHouse": {"size": 24_532, "headroom": 44},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
 CREATION_BINDING_FACTS = {
     "AuctionHouse": {
-        "prefix_size": 24_556,
-        "prefix_sha256": "c83d5253b929c1847a5639018f78dee88cb00809a9ab6daea672a97318309379",
+        "prefix_size": 24_560,
+        "prefix_sha256": "f0670fb85cf1c51bfd777dc843130de8f18774c61c212ec4fb31af8a26ddfbcf",
         "metadata_size": 59,
-        "metadata_sha256": "bd1b73d34f5f90101855837d42cbbed46dde5ae0ba5076ffd8f8f007607ad56e",
+        "metadata_sha256": "9092466c47aa68795834055fef38cc7ff6b857218ebac7d8e6667f0e60783ecd",
     },
     "CreditEngine": {
-        "prefix_size": 24_266,
-        "prefix_sha256": "5e27e6db4d007533d5d3c38dc50acb79209a53bd44962dfa69b5195bff0ff736",
+        "prefix_size": 24_285,
+        "prefix_sha256": "1365baa8fdef4d72548ee249e07f78593705912fdca702a6fc0f1bc00b106fdb",
         "metadata_size": 70,
-        "metadata_sha256": "0677fbc6cf3571701c7f82afa6fb521df7beaadea383c945e871bda1338b5132",
+        "metadata_sha256": "814120fa169f33d4bfb65836f33ff2b9977238826be60db4aa6b5e0807126543",
     },
     "Deleverage": {
         "prefix_size": 24_833,
@@ -67,10 +67,10 @@ CREATION_BINDING_FACTS = {
         "metadata_sha256": "e900bfb673577092d576a12fd2cd757791ac09fd5620297d355cc3eee4e47f39",
     },
     "SimpleErc20": {
-        "prefix_size": 9_501,
-        "prefix_sha256": "b0ee35efacfdc84ead26ba8f9f180562b7e1c889ea4884a98ec9bac40a5ae833",
+        "prefix_size": 9_479,
+        "prefix_sha256": "ee58a1eea39f21f6b4babfe3f36473ffff4374fa319af11b16457fb15c37727e",
         "metadata_size": 56,
-        "metadata_sha256": "0cef5425de095ae1889b68e471bdec6971b9613a38e0bbbe6b20f9ae0ab642c9",
+        "metadata_sha256": "f32154b61566126645ceff1ca70fff36b4d9868253e102da3f1920163b2dbf09",
     },
     "Ledger": {
         "prefix_size": 13_674,
