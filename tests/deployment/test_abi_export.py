@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.export_abis import AbiExportError, check_abis, export_abis
+from scripts.export_abis import AbiExportError, _compile_abi, check_abis, export_abis
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -142,15 +142,17 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 53
-    assert {path.name for path in report.exported} >= {
+    assert len(report.exported) == 52
+    exported_names = {path.name for path in report.exported}
+    assert exported_names >= {
         "Addys.json",
         "Contributor.json",
         "DefaultsRobinhood.json",
         "Erc20Token.json",
         "LocalGov.json",
-        "RobinhoodUniswapV2RipePrices.json",
+        "UniswapV2Prices.json",
     }
+    assert "GuardedErc20.json" not in exported_names
     assert "DefaultsBaseSepolia.json" in {
         path.name for path in report.exported
     }
@@ -169,3 +171,13 @@ def test_repository_default_abi_directory_is_byte_current():
         "vaults/modules/StabVault.vy",
         "vaults/modules/VaultData.vy",
     }
+
+
+def test_uniswap_v2_abi_is_independently_byte_current_and_old_abi_is_absent():
+    contracts = ROOT / "contracts"
+    source = contracts / "priceSources" / "UniswapV2Prices.vy"
+    abi = ROOT / "scripts" / "abis" / "UniswapV2Prices.json"
+    assert abi.read_bytes() == _compile_abi(source, contracts)
+    assert not (
+        ROOT / "scripts" / "abis" / "RobinhoodUniswapV2RipePrices.json"
+    ).exists()

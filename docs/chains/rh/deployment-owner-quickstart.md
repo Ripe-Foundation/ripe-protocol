@@ -231,7 +231,7 @@ value rows.
 
 Do not open PSM activation, LP admission, any Curve feed or consumer beyond
 GREEN, dynamic rates, Teller reference snapshots, Endaoment stabilization,
-Uniswap prototype admission, Deleverage, CreditEngine zero-backing, CCIP, or
+UniswapV2Prices candidate admission, Deleverage, CreditEngine zero-backing, CCIP, or
 Sites work through an otherwise valid configuration edit.
 
 ## Synchronize and check

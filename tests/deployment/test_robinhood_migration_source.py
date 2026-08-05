@@ -355,9 +355,13 @@ def test_aapl_seam_binds_schema_v2_but_produces_no_launch_action():
         "Deployment.DP-11.stock.m3CreditContainment",
         "Deployment.DP-11.stock.m4ComposedProof",
     }
+    assert [
+        action["semantic_action_id"]
+        for action in _actions(plan)
+        if action.get("artifact") == "SimpleErc20"
+    ] == ["deploy-simple-erc20-vault"]
     assert all(
-        action.get("artifact") != "GuardedErc20"
-        and not action["semantic_action_id"].startswith(
+        not action["semantic_action_id"].startswith(
             ("deploy-aapl", "register-aapl", "configure-aapl")
         )
         for action in _actions(plan)
@@ -796,6 +800,7 @@ def _clean_committed_fixture(tmp_path: Path) -> Path:
             "-c",
             "user.email=fixture@example.invalid",
             "commit",
+            "--allow-empty",
             "--quiet",
             # The copy loop above is a no-op when the working tree is clean, so
             # there is nothing staged and git would exit 1. That is the case

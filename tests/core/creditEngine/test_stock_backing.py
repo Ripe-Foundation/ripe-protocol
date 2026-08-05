@@ -861,7 +861,7 @@ def test_c2_marginal_gas_protocol(
         Path("contracts/core/CreditEngine.vy").read_bytes()
     ).hexdigest()
     assert source_sha256 == (
-        "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d"
+        "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb"
     )
     manifest_rows = sorted(
         (

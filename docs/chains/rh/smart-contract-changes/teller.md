@@ -5,19 +5,21 @@
 > a source change, deployment, activation, migration, release, or parked work.
 > Controlling evidence and owner decisions remain in their designated records.
 
-## Current `rh` rebind
+## Current review candidate
 
-The current authority for this page is `rh` commit
-`0642f086d19e3cc62faaf67da096b6511e405320`, tree
-`d869d4149380b368f9678ed03efc0b59a6c804e2`. The dated 28 July snapshot and
-its validation counts remain historical evidence below; they are not the
-current branch identity.
+This uncommitted review candidate is based on `rh` commit
+`1ac64deb5f65fc39f4362f02ed86a118d7554deb`. It preserves Teller's exact
+custody-delta, vault-return, mutex, and rollback requirements while replacing
+the two strict raw balance observations with direct typed Vyper `balanceOf`
+calls. The dated 28 July snapshot and its validation counts remain historical
+evidence below; they do not describe the candidate's source or artifacts.
 
-| Current identity | Value |
+| Candidate identity | Value |
 | --- | --- |
-| Teller source Git blob / SHA-256 | `7019b6c47dde03151acc1952944dd19301c83328` / `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` |
-| Runtime template | 24,152 bytes; SHA-256 `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81`; 424 bytes EIP-170 headroom |
-| [`test_teller_deposit.py`](../../../../tests/core/teller/test_teller_deposit.py) | Git blob `22ee55ab035400d2ede8c9ea5e1130a711b05550`; SHA-256 `c58c8fde3158ce16f02ab409408e83533c7e9cd81dc78c5025bec6b4f026dda0` |
+| Teller source Git blob / SHA-256 | `dea818cde0901b02248e3824158e5c422ed02a80` / `f2e01e1cc9cf4cdfca380f329836732fd2d6d0201565828093257a0df8451b9a` |
+| Runtime template | 24,082 bytes; SHA-256 `76abbbfc443f0e7ff84d9800df0145858344096d4342e9a9e3941887f2055502`; 494 bytes EIP-170 headroom |
+| Creation bytecode | 24,317 bytes; SHA-256 `9ebd4682ea6fd0eaf73f5124bd131d240fa6f9d6f4c91ee5f1a28c05643a12cb` |
+| [`test_teller_deposit.py`](../../../../tests/core/teller/test_teller_deposit.py) | Git blob `ccdc62c9e37e9430b14cd43d3d67a6d9ad3e9b29`; SHA-256 `56e914d0e7aef661a5342f339a1ad09ae6365cae301aa2db4ca4cfd37ab148f9`; preserves short/reverting failures and accepts 33-byte trailing returndata |
 | [`test_teller_action_block.py`](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `cbc0bbf77dbeeec4d45cd03f16948fd754704ee7`; SHA-256 `1b28378d68836caae0ffd2cf0cfc2bf649ff1592a65a45b0a3e00e8146da5323` |
 | [`test_teller_rebalance.py`](../../../../tests/core/teller/test_teller_rebalance.py) | Git blob `e176bfe64c32514fcce45fba930ded42ff16458d`; SHA-256 `959ad5961e525d7fd2711b0e268026c3783e47ddae52be136cbf50388e352261` |
 | [Stock comparison test](../../../../tests/vaults/test_stock_token_vault_comparison.py) | Git blob `b8c33f0df312d1ed1e04343337685c4f8c88a377`; SHA-256 `288f8d3fb5cc5de902e4d3918f1ab0c1b7946af243148af34dc6f084e681191c` |
@@ -25,9 +27,10 @@ current branch identity.
 Later integrated tests close the former mutex and rollback gaps: the current
 suite uses vault callback mode 5, a mutex-removal mutant, three typed
 balance-return policies, undecorated-route reentrancy composition, and a
-caught nested rejection that preserves the exact outer receipt. The remaining
-trust boundary is a token that returns an exact 32-byte but dishonest balance.
-No behavioral test was rerun for this documentation-only refresh.
+caught nested rejection that preserves the exact outer receipt. The candidate
+also accepts trailing returndata and decodes the first word, matching Vyper's
+typed ABI behavior. The remaining trust boundary is any token that reports a
+dishonest decoded balance value.
 
 ## Reviewed implementation snapshot
 
@@ -41,7 +44,7 @@ No behavioral test was rerun for this documentation-only refresh.
 | Review date | 28 July 2026 |
 | Production source | [`contracts/core/Teller.vy`](../../../../contracts/core/Teller.vy) |
 | Source SHA-256 | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` |
-| Integration status | **Integrated fact:** the implementation commit is contained in the reviewed snapshot, and Teller matches the implementation hash |
+| Integration status | **Historical integrated fact:** the implementation commit is contained in the reviewed snapshot; the current review candidate intentionally changes its balance-reading policy |
 | Deployment/activation status | **Not established here:** source integration does not prove deployment, upgrade, asset enablement, route activation, or release approval |
 
 The commit and tree above are a dated reviewed snapshot, not a permanent claim
@@ -110,26 +113,28 @@ start with a fresh `C0`. If protected work reverts, EVM frame rollback restores
 the transient value that existed before the call; transaction completion also
 clears all transient storage.
 
-### Why does `_exactBalance` use `raw_call` rather than typed Vyper `balanceOf`?
+### Why does Teller now call typed `balanceOf` directly?
 
 Pinned Vyper `0.4.3+commit.bff19ea2` accepts a typed `uint256` result when
-returndata is at least 32 bytes; it decodes the first word and tolerates
-trailing data. Teller instead requires exactly one word in
-[`_exactBalance`](../../../../contracts/core/Teller.vy#L1012-L1022).
+returndata is at least 32 bytes, decodes the first word, and tolerates trailing
+data. The candidate deliberately adopts that normal typed behavior instead of
+maintaining a one-function raw-call wrapper solely to reject oversized output.
 
-The 33-byte buffer is a sentinel. A response of 33 bytes or more is captured
-or truncated to 33 and rejected. A 32-byte buffer could not distinguish a
-canonical response from an oversized response truncated to one word.
-
-This is a strict fail-closed compatibility choice. It rejects malformed output
-but cannot prove that a malicious token's canonical 32-byte value is truthful.
+This matches `BasicVault` and the protocol's ordinary ERC-20 observation
+policy, removes custom decoding code, and reclaims 70 runtime bytes. It does
+not change the meaningful receipt invariant: the decoded post-transfer balance
+minus the decoded pre-transfer balance must still equal `Q`. A dishonest token
+could already return a well-shaped 32-byte lie, so token truthfulness remains
+an asset-admission and monitoring assumption rather than a property that
+returndata-length enforcement can prove.
 
 ## Executive verdict
 
-- **Integrated source:** technically justified for an exact-transfer-only
-  policy and effective against the stated call-local receipt failure.
-- **Source correction:** none currently recommended. This conclusion is
-  scoped to Teller source, not the complete Stock workflow or release.
+- **Review candidate:** preserves the exact-transfer-only policy and the
+  protection against the stated call-local receipt failure while simplifying
+  balance observations to direct typed calls.
+- **Source status:** uncommitted and awaiting owner review; this page does not
+  claim integration, deployment, activation, or release.
 - **Before deployment or activation:** bind and verify the exact artifact,
   compiler, token, vault, configuration, size, and composed route; obtain the
   applicable owner release decision.
@@ -191,12 +196,12 @@ alone cannot attribute custody to the current call.
 
 ## Exact source delta and complete execution flow
 
-The implementation adds the transient declaration at
+The historical implementation added the transient declaration at
 [`Teller.vy:217`](../../../../contracts/core/Teller.vy#L217), replaces
 vault-selected amount assignment with exact receipt and return assertions at
-[`Teller.vy:289-305`](../../../../contracts/core/Teller.vy#L289-L305), and adds
-the strict helper at
-[`Teller.vy:1012-1022`](../../../../contracts/core/Teller.vy#L1012-L1022).
+[`Teller.vy:289-305`](../../../../contracts/core/Teller.vy#L289-L305). This
+review candidate replaces the helper calls at lines 291 and 297 with direct
+typed `IERC20.balanceOf` static calls and removes the helper.
 Reconstruct the exact implementation patch with:
 
 ```text
@@ -214,9 +219,9 @@ read Ledger participation data
 Q = TellerUtils.validateOnDeposit(...)
 assert receiptMeasurementActive is false
 receiptMeasurementActive = true
-C0 = _exactBalance(asset, vault)
+C0 = typed IERC20(asset).balanceOf(vault)
 transfer(vault,Q) if Teller holds funds; otherwise transferFrom(depositor,vault,Q)
-C1 = _exactBalance(asset, vault)
+C1 = typed IERC20(asset).balanceOf(vault)
 assert checked(C1 - C0) == Q
 V = ordinary deposit if lockDuration=0; otherwise locked RipeGov deposit
 assert V == Q
@@ -335,7 +340,7 @@ transient slot 1. Explicitly writing false shortens the critical section inside
 the transaction; automatic end-of-transaction clearing supplies the outer
 lifetime bound.
 
-## Exact `balanceOf` behavior
+## Typed `balanceOf` behavior
 
 For a typed external call returning one `uint256`, Vyper 0.4.3 computes a
 minimum return size and accepts:
@@ -344,28 +349,25 @@ minimum return size and accepts:
 assert returndatasize >= 32
 ```
 
-It decodes the first word, so 32, 33, and 64 bytes are accepted; trailing bytes
-are ignored, and a dynamic-shaped first word can be interpreted as the balance.
-This was independently confirmed from pinned compiler source, generated
-behavior, and a disposable behavioral probe.
+It decodes the first word, so 32, 33, and 64 bytes are accepted and trailing
+bytes are ignored. A dynamic-shaped first word can be interpreted as the
+balance. This was independently confirmed from pinned compiler source,
+generated behavior, and repository tests.
 
-`raw_call(max_outsize=33)` instead reports
-`min(33, actual returndata size)`:
+| Token behavior | Teller result |
+| --- | --- |
+| Revert | Revert |
+| Empty return | Reject |
+| 1–31 bytes | Reject |
+| Exactly 32 bytes | Decode first word as `uint256` |
+| Exactly 33 bytes | Decode first word; ignore trailing byte |
+| More than 33 bytes | Decode first word; ignore trailing bytes |
+| 64-byte dynamic-shaped data | Decode the first word, including an ABI offset if present |
 
-| Token behavior | Captured length | Teller result |
-| --- | ---: | --- |
-| Revert | n/a | Revert |
-| Empty return | 0 | Reject |
-| 1–31 bytes | actual length | Reject |
-| Exactly 32 bytes | 32 | Decode `uint256` |
-| Exactly 33 bytes | 33 | Reject |
-| More than 33 bytes | 33 | Reject |
-| 64-byte dynamic-shaped data | 33 | Reject |
-
-After the length check, any 32-byte word safely decodes as `uint256`.
-`is_static_call=True` prevents state writes, transient writes, logs, creation,
-and value transfer throughout the call tree; it does not prevent computation,
-gas grief, read-only subcalls, deliberate revert, or a false canonical value.
+The compiler emits a static call, preventing state writes, transient writes,
+logs, creation, and value transfer throughout the observation call tree. It
+does not prevent computation, gas grief, read-only subcalls, deliberate
+revert, or a false decoded value.
 
 The accepted truthful-token boundary is therefore:
 
@@ -417,9 +419,9 @@ The producer owns tokens, approves Teller, Teller pulls and measures, and the
 producer resets approval after return. Reviewed production callers do not catch
 a Teller failure, so upstream minting, approvals, transfers, and accounting
 roll back. The M1 parameterized trusted-producer test begins at
-[`test_teller_deposit.py:1831`](../../../../tests/core/teller/test_teller_deposit.py#L1831);
+[`test_teller_deposit.py:1928`](../../../../tests/core/teller/test_teller_deposit.py#L1928);
 the real CreditEngine callback case begins at
-[`test_teller_deposit.py:2444`](../../../../tests/core/teller/test_teller_deposit.py#L2444).
+[`test_teller_deposit.py:2599`](../../../../tests/core/teller/test_teller_deposit.py#L2599).
 
 ## Exact-transfer and vault-result policy
 
@@ -477,21 +479,21 @@ attributed to M1.
 
 | Test or group | Invariant and assertions | Mutation sensitivity / limitation |
 | --- | --- | --- |
-| [Nonexact direct receipt, lines 1531-1558](../../../../tests/core/teller/test_teller_deposit.py#L1531-L1558) | Zero, short, fee, excess, false-return, and reverting transfers leave custody, Ledger, and events unchanged | Receipt modes are exact-delta sensitive; false/revert were already rejected by the Boolean check |
-| [Custody decrease, lines 1561-1585](../../../../tests/core/teller/test_teller_deposit.py#L1561-L1585) | Checked unsigned subtraction rejects `C1 < C0` and rolls back | Directly sensitive to subtraction/receipt enforcement |
-| [Balance observation failures, lines 1600-1631](../../../../tests/core/teller/test_teller_deposit.py#L1600-L1631) | Revert, empty, 1-, 31-, 33-, and 64-byte responses are atomic failures | The 33-byte case fails if `_exactBalance` is replaced by the typed call |
-| [Vault mismatch, lines 1643-1671](../../../../tests/core/teller/test_teller_deposit.py#L1643-L1671) | Vault results `0`, `Q-1`, `Q+1`, or revert roll back exact transfer | Directly sensitive to `V == Q`; false return of exactly `Q` is undetectable |
-| [Locked-vault mismatch, lines 1739-1777](../../../../tests/core/teller/test_teller_deposit.py#L1739-L1777) | Nonzero-lock endpoint also requires `Q` | Adversarial test vault |
-| [Batch rollback, lines 1781-1816](../../../../tests/core/teller/test_teller_deposit.py#L1781-L1816) | Bad first or later row reverts the entire batch | Proves transaction atomicity; does not isolate flag release between successful rows |
-| [Trusted producers, lines 1831-1877](../../../../tests/core/teller/test_teller_deposit.py#L1831-L1877) | Authorized producer addresses succeed exactly and short receipt is atomic | Most cases impersonate the producer rather than execute its full upstream flow |
-| [Callback/recovery, lines 1880-1928](../../../../tests/core/teller/test_teller_deposit.py#L1880-L1928) | Nested public deposit reverts and a later deposit succeeds | **Not mutex-sensitive:** ordinary nonreentrancy rejects first; recovery manually clears transient state |
-| [Governance vault, lines 2266-2308](../../../../tests/core/teller/test_teller_deposit.py#L2266-L2308) | Exact receipt, event, shares, authorization, and min/exact/max locks | Supported RipeGov implementation only |
-| [Teller-held sGREEN, lines 2395-2441](../../../../tests/core/teller/test_teller_deposit.py#L2395-L2441) | Failure rolls back GREEN transfer, ERC-4626 mint, balances, approvals, and claims | Replaceable adversarial test token |
-| [CreditEngine callback, lines 2444-2493](../../../../tests/core/teller/test_teller_deposit.py#L2444-L2493) | Real first trusted callback remains live | Success path only |
-| [Dormant CreditRedeem route, lines 2496-2570](../../../../tests/core/teller/test_teller_deposit.py#L2496-L2570) | Reviewed route refunds rather than deposits | Does not prove an active trusted deposit |
-| [Runtime guard, lines 3124-3145](../../../../tests/core/teller/test_teller_deposit.py#L3124-L3145) | Enforces EIP-170 and the accepted 24,152-byte ceiling | Does not itself guard ABI or layout |
+| [Nonexact direct receipt](../../../../tests/core/teller/test_teller_deposit.py#L1541) | Zero, short, fee, excess, false-return, and reverting transfers leave custody, Ledger, and events unchanged | Receipt modes are exact-delta sensitive; false/revert were already rejected by the Boolean check |
+| [Custody decrease](../../../../tests/core/teller/test_teller_deposit.py#L1571) | Checked unsigned subtraction rejects `C1 < C0` and rolls back | Directly sensitive to subtraction/receipt enforcement |
+| [Balance observation policy](../../../../tests/core/teller/test_teller_deposit.py#L1598) | Revert, empty, 1-, and 31-byte responses fail atomically; a dynamic-shaped first-word mismatch fails the receipt delta; 33-byte trailing returndata is accepted before or after transfer | Directly pins Vyper typed first-word decoding without weakening `R == Q` |
+| [Vault mismatch](../../../../tests/core/teller/test_teller_deposit.py#L1687) | Vault results `0`, `Q-1`, `Q+1`, or revert roll back exact transfer | Directly sensitive to `V == Q`; false return of exactly `Q` is undetectable |
+| [Locked-vault mismatch](../../../../tests/core/teller/test_teller_deposit.py#L1836) | Nonzero-lock endpoint also requires `Q` | Adversarial test vault |
+| [Batch rollback](../../../../tests/core/teller/test_teller_deposit.py#L1878) | Bad first or later row reverts the entire batch | Proves transaction atomicity; does not isolate flag release between successful rows |
+| [Trusted producers](../../../../tests/core/teller/test_teller_deposit.py#L1928) | Authorized producer addresses succeed exactly and short receipt is atomic | Most cases impersonate the producer rather than execute its full upstream flow |
+| [Callback/recovery](../../../../tests/core/teller/test_teller_deposit.py#L1977) | Nested public deposit reverts and a later deposit succeeds | Historical case is not mutex-sensitive; later T1/T3 cases close that gap |
+| [Governance vault](../../../../tests/core/teller/test_teller_deposit.py#L2421) | Exact receipt, event, shares, authorization, and min/exact/max locks | Supported RipeGov implementation only |
+| [Teller-held sGREEN](../../../../tests/core/teller/test_teller_deposit.py#L2550) | Failure rolls back GREEN transfer, ERC-4626 mint, balances, approvals, and claims | Replaceable adversarial test token |
+| [CreditEngine callback](../../../../tests/core/teller/test_teller_deposit.py#L2599) | Real first trusted callback remains live | Success path only |
+| [Dormant CreditRedeem route](../../../../tests/core/teller/test_teller_deposit.py#L2651) | Reviewed route refunds rather than deposits | Does not prove an active trusted deposit |
+| [Runtime guard](../../../../tests/core/teller/test_teller_deposit.py#L3268) | Enforces EIP-170 and the accepted 24,082-byte ceiling | Does not itself guard ABI or layout |
 | [Rebalance rollback, line 1309](../../../../tests/core/teller/test_teller_rebalance.py#L1309) | Short deposit leaves both legs, claims, debt, and events unchanged | Proves deposit-first ordering and whole-operation rollback |
-| [Donation masking, line 639](../../../../tests/vaults/test_stock_token_vault_comparison.py#L639) | Prior donation cannot substitute for short receipt in Simple or share vault | Directly sensitive to pre/post Teller measurement |
+| [Donation masking](../../../../tests/vaults/test_stock_token_vault_comparison.py#L616) | Prior donation cannot substitute for short receipt in Simple or share vault | Directly sensitive to pre/post Teller measurement |
 
 ### Current limitations after later integrated hardening
 
@@ -502,11 +504,11 @@ a nested rejection while proving the outer exact receipt remains valid.
 
 Genuine residual limits remain:
 
-- exact 32-byte `balanceOf` returndata can still be dishonest;
+- any successfully decoded `balanceOf` first word can still be dishonest;
 - producer parameterization does not execute every possible upstream call
   chain;
-- malformed-length tests select representative shapes rather than every byte
-  length at every observation site; and
+- short-return tests select representative shapes rather than every byte
+  length at every observation site, while oversized data follows typed decoding;
 - artifact compatibility is enforced by the central current artifact gate,
   not solely by the Teller unit file.
 
@@ -532,6 +534,12 @@ variables were unset, and no external protocol state was accessed.
 No full suite was rerun for that audit or this editorial revision. Historical
 S2 counts such as 60, 69, 76, or 84 are neither substituted for the results
 above nor presented as current.
+
+**Current review-candidate validation — focused only:** 12 typed-balance policy
+cases passed (`12 passed, 132 deselected in 33.65s`), followed by the runtime
+dual guard and machine-readable exact-receipt policy checks (`2 passed in
+29.41s`). The standalone Teller artifact checker also returned
+`CONTRACT_ARTIFACTS_OK`. No full suite was run.
 
 ## ABI, storage, constructor, runtime, gas, and compatibility
 
@@ -565,25 +573,24 @@ state initialization.
 
 ### Bytecode
 
-The exact reviewed Teller source independently reproduced:
+The current review candidate independently compiled to:
 
 ```text
-deployed runtime bytes    24,152
-runtime SHA-256           39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81
-EIP-170 headroom          424 bytes
-creation bytecode bytes   24,387
-creation SHA-256          b94a58ac0faa6cad71e58f451cb9aea27a7152bf63bfc65798103d3b97704e5a
+runtime template bytes    24,082
+runtime SHA-256           76abbbfc443f0e7ff84d9800df0145858344096d4342e9a9e3941887f2055502
+EIP-170 headroom          494 bytes
+creation bytecode bytes   24,317
+creation SHA-256          9ebd4682ea6fd0eaf73f5124bd131d240fa6f9d6f4c91ee5f1a28c05643a12cb
 ```
 
-The 424-byte reserve is approximately 1.7% of the EIP-170 runtime limit.
-Any later Teller source change requires fresh compilation and size review. The
-implementation diff also removed several blank lines and added a final
-newline; that nonfunctional churn was unnecessary but should not be
-retroactively “fixed” by changing the sealed Teller source hash.
+The direct typed calls reclaim 70 runtime bytes and increase headroom from 424
+to 494 bytes. Any later Teller source change requires fresh compilation and
+size review.
 
 ### Compiler-estimated gas delta
 
-Pinned compiler estimates for the implementation parent and M1 source:
+The following pinned compiler estimates are historical M1 evidence and were
+not regenerated for this review candidate:
 
 | Route | Parent estimate | M1 estimate | Increase |
 | --- | ---: | ---: | ---: |
@@ -602,7 +609,7 @@ transactions. Actual cost depends on cold/warm access and token behavior.
 
 | Alternative | Assessment |
 | --- | --- |
-| Typed Vyper `balanceOf` | Smaller and numerically sufficient for canonical returns, but accepts trailing returndata under pinned 0.4.3 |
+| Typed Vyper `balanceOf` | **Selected in this candidate:** smaller, consistent with current vault observations, and accepts trailing returndata under pinned 0.4.3 |
 | Trust transfer Boolean | Does not prove the amount received |
 | Trust vault result | A vault result is program output, not custody evidence |
 | Observe post-transfer custody only | Cannot separate old custody from the current call |
@@ -618,10 +625,10 @@ transactions. Actual cost depends on cold/warm access and token behavior.
 
 ## Guarantees
 
-The integrated Teller change guarantees, subject to truthful canonical token
+The Teller review candidate guarantees, subject to truthful decoded token
 balance reports:
 
-- a successful deposit observed exact-length pre- and post-transfer balances;
+- a successful deposit observed typed pre- and post-transfer balances;
 - the vault's net custody increase during that window was exactly `Q`;
 - a donation or prior user custody cannot mask a short current receipt;
 - the selected vault endpoint returned exactly `Q`;
@@ -634,7 +641,7 @@ balance reports:
 
 | Concern | Classification | Consequence |
 | --- | --- | --- |
-| Canonical but false `balanceOf` | Accepted residual | A malicious token can fabricate an apparent exact delta |
+| False decoded `balanceOf` value | Accepted residual | A malicious token can fabricate an apparent exact delta with or without trailing returndata |
 | Offsetting transfer-time rebase/reflection | Accepted residual | Teller proves net delta, not the causal source of each unit |
 | Direct custody movement after `C1` | Outside M1 | No post-vault `C2` or post-housekeeping `C3` reread |
 | Vault returns `Q` without accounting | Trusted-vault boundary | Teller validates the interface result, not arbitrary vault internals |
@@ -642,7 +649,7 @@ balance reports:
 | Expensive or reverting `balanceOf` | Fail-closed availability risk | Deposits for that asset can be gas-griefed or denied |
 | Fee, short, recipient-burn, excess, or transfer-time rebase tokens | Intentionally unsupported when net receipt differs from `Q` | Deposits revert |
 | Weak mutex regression test | Test defect | Future flag removal could pass the reviewed callback test |
-| 424-byte runtime reserve | Maintenance risk | Small future Teller growth can breach EIP-170 |
+| 494-byte runtime reserve | Maintenance risk | Small future Teller growth can breach EIP-170 |
 
 ## Next actions
 
@@ -652,7 +659,8 @@ authorization, or a deployment decision.
 
 ### Currently required
 
-No Teller production-source correction is currently required.
+The direct typed-balance source change is a review candidate. It is not yet
+committed, integrated, deployed, activated, or released.
 
 Before anyone claims this Teller implementation is ready for deployment or
 activation, the release process must:
@@ -660,8 +668,8 @@ activation, the release process must:
 - bind the deployed artifact to the reviewed source and pinned Vyper compiler;
 - recheck runtime size, ABI/selectors/events/constructor, persistent layout,
   and transient layout;
-- qualify each exact token implementation and configuration for canonical,
-  truthful `balanceOf`, exact net receipt, transfer return/revert behavior, and
+- qualify each exact token implementation and configuration for truthful
+  decoded `balanceOf` values, exact net receipt, transfer return/revert behavior, and
   reasonable gas;
 - review each supported vault and composed route for callbacks, custody
   movement during deposit, and truthful accounting; and
@@ -682,7 +690,7 @@ The following are **agent recommendations — not owner-approved**:
 3. Retain focused post-clear liveness coverage, and name or remove opaque fixture
    modes such as constant `balance_mode == 7` and exact-transfer alias
    `transfer_mode == 8`.
-4. Retain the 24,576-byte EIP-170 test and stricter 24,152-byte accepted
+4. Retain the 24,576-byte EIP-170 test and stricter 24,082-byte accepted
    ceiling. For every later Teller source change, run one reproducible
    pinned-compiler artifact comparison; prefer an existing central artifact
    gate over duplicate unit-test constants.
@@ -708,7 +716,6 @@ current Teller work items or current Wave 1 blockers.
 
 ### Explicitly not recommended
 
-- replacing `_exactBalance` with typed Vyper `balanceOf`;
 - removing the dedicated transient mutex or clearing it before `V == Q`;
 - replacing transient storage with a persistent mutex/checkpoint;
 - removing the vault-result equality check because it is redundant for current
@@ -724,16 +731,15 @@ demonstrated requirement.
 
 ## Technical verdict
 
-The Teller change is technically justified for an exact-transfer-only product
-policy. It solves the stated call-local receipt problem and is the smallest
-credible shared enforcement boundary without changing custody routing,
-external interfaces, or persistent storage.
+The Teller candidate remains technically justified for an exact-transfer-only
+product policy. Direct typed balance observations simplify the implementation
+and align it with current vault policy while preserving the call-local receipt
+invariant, custody routing, external interfaces, and persistent storage.
 
-There is no identified release-blocking defect in the reviewed Teller source.
-That conclusion does not clear the whole Stock workflow, deployment,
-activation, or release. Leave `Teller.vy` unchanged; strengthen evidence and
-reconsider source only if the supported-vault trust boundary or demonstrated
-composability requirements change.
+No release-readiness conclusion is made for this uncommitted candidate. Its
+source, artifacts, targeted behavior, and documentation must be reviewed before
+any separate integration decision; that review still does not clear the whole
+Stock workflow, deployment, activation, or release.
 
 ## Primary sources and reproducible commands
 
@@ -743,13 +749,13 @@ composability requirements change.
   transient declaration.
 - [`Teller.vy:267-322`](../../../../contracts/core/Teller.vy#L267-L322):
   complete `_deposit` flow.
-- [`Teller.vy:1012-1022`](../../../../contracts/core/Teller.vy#L1012-L1022):
-  exact-return helper.
-- [`test_teller_deposit.py:1531`](../../../../tests/core/teller/test_teller_deposit.py#L1531):
+- [`Teller.vy:289-297`](../../../../contracts/core/Teller.vy#L289-L297):
+  mutex acquisition and direct typed pre/post balance observations.
+- [`test_teller_deposit.py:1541`](../../../../tests/core/teller/test_teller_deposit.py#L1541):
   start of M1 adversarial deposit cases.
 - [`test_teller_rebalance.py:1309`](../../../../tests/core/teller/test_teller_rebalance.py#L1309):
   rebalance rollback.
-- [`test_stock_token_vault_comparison.py:639`](../../../../tests/vaults/test_stock_token_vault_comparison.py#L639):
+- [`test_stock_token_vault_comparison.py:616`](../../../../tests/vaults/test_stock_token_vault_comparison.py#L616):
   donation masking.
 - [`stock-token-m1-exact-receipt.md`](../evidence/stock-token-m1-exact-receipt.md):
   sealed historical evidence.
@@ -761,8 +767,6 @@ composability requirements change.
 ### Primary external specifications
 
 - [Vyper 0.4.3 external-call decoding](https://github.com/vyperlang/vyper/blob/v0.4.3/vyper/codegen/external_call.py)
-- [Vyper 0.4.3 `raw_call` implementation](https://github.com/vyperlang/vyper/blob/v0.4.3/vyper/builtins/functions.py)
-- [Vyper 0.4.3 built-in function documentation](https://docs.vyperlang.org/en/v0.4.3/built-in-functions.html#raw-call)
 - [ERC-20](https://eips.ethereum.org/EIPS/eip-20)
 - [EIP-1153: transient storage](https://eips.ethereum.org/EIPS/eip-1153)
 - [EIP-214: static-call context](https://eips.ethereum.org/EIPS/eip-214)

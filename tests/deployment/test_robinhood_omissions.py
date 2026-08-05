@@ -799,7 +799,7 @@ def test_psm_reserve_graph_has_no_lp_or_dex_liquidity_capital_edge():
     )
 
 
-def test_stock_activation_stays_parked_without_the_atomic_guarded_tuple():
+def test_stock_activation_stays_parked_without_the_atomic_protected_tuple():
     manifest = json.loads(
         (ROOT / "config" / "robinhood-parameters.json").read_text()
     )
@@ -859,7 +859,7 @@ def test_teller_exact_receipt_policy_covers_every_producer():
     for required in (
         "R == Q",
         "vaultResult == Q",
-        "exact-length reads",
+        "typed balance reads",
         "one mutex policy",
         "atomic rollback",
     ):

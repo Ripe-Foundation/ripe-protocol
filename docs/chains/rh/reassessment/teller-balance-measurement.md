@@ -4,6 +4,23 @@ Status: architectural research only. This report does not authorize a contract,
 interface, ABI, configuration, migration, deployment, activation, or release
 change.
 
+## Superseding review-candidate direction — 5 August 2026
+
+The owner has requested an uncommitted candidate that replaces Teller's
+contract-local exact-length `_exactBalance` wrapper with direct typed Vyper
+`IERC20.balanceOf` calls. This supersedes only the earlier return-shape choice
+recorded below. The candidate preserves `R == Q`, `vaultResult == Q`, the
+global transient receipt-measurement mutex, and atomic rollback.
+
+Under pinned Vyper 0.4.3, typed calls reject reverting or shorter-than-32-byte
+responses but accept trailing returndata and decode the first word. Token
+truthfulness remains an admission assumption because the prior exact-length
+helper could not distinguish an honest balance from a well-shaped 32-byte lie.
+This direction authorizes preparation for review only; it does not establish
+integration, deployment, activation, or release authority. The dated analysis
+and owner disposition below remain historical provenance for the strict
+implementation that preceded this candidate.
+
 ## 1. Executive recommendation
 
 **Preserve the current Teller deposit design. Do not replace the strict

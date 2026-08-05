@@ -89,5 +89,5 @@ authenticated owner access unless it is verified under existing credentials.
 
 The current owner priorities are in
 [`../current-owner-priorities.md`](../current-owner-priorities.md): CCIP,
-zero-backing settlement/bad-debt policy, Deleverage, Uniswap TWAP, Sites
+zero-backing settlement/bad-debt policy, Deleverage, UniswapV2Prices admission and deployment, Sites
 recovery, and dashboard deployment are the six parked, nonblocking lanes.

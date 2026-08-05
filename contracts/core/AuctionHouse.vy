@@ -18,9 +18,6 @@
 
 # @version 0.4.3
 # pragma optimize codesize
-# At this source revision, the deployed runtime is 24,469 bytes including
-# Vyper's 96-byte immutables section: 107 bytes of EIP-170 headroom.
-# Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
 
@@ -322,9 +319,6 @@ def _liquidateUser(
     if bt.collateralVal > collateralLiqThreshold:
         return 0
 
-    # set liquidation mode
-    userDebt.inLiquidation = True
-
     # liquidation fees
     baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
     totalLiqFees: uint256 = baseLiqFee
@@ -363,6 +357,10 @@ def _liquidateUser(
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
+
+    # Latch for usable borrowing collateral or a queued auction asset, including
+    # Stability Pool positions; fully deficient positions remain retryable.
+    userDebt.inLiquidation = (bt.collateralVal | self.numUserAssetsForAuction[_liqUser]) != 0
 
     # check if liq fees were already covered (stability pool swaps)
     liqFeesUnpaid: uint256 = totalLiqFees
@@ -417,7 +415,7 @@ def _performLiquidationPhases(
             if remainingToRepay <= ONE_CENT:
                 break
 
-            if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_liqUser, pData.asset):
+            if staticcall Vault(pData.vaultAddr).getTotalAmountForUser(_liqUser, pData.asset) == 0:
                 continue
 
             remainingToRepay, collateralValueOut = self._handleSpecificLiqAsset(_liqUser, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
@@ -512,9 +510,9 @@ def _iterateThruAssetsWithinVault(
 
         # check if user still has balance in this asset
         liqAsset: address = empty(address)
-        hasBalance: bool = False
-        liqAsset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_liqUser, y)
-        if liqAsset == empty(address) or not hasBalance:
+        liqAmount: uint256 = 0
+        liqAsset, liqAmount = staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_liqUser, y)
+        if liqAsset == empty(address) or liqAmount == 0:
             continue
 
         # handle specific liq asset
@@ -889,7 +887,7 @@ def _canStartAuction(
     vaultAddr: address = staticcall AddressRegistry(_vaultBook).getAddr(_liqVaultId)
     if vaultAddr == empty(address):
         return False
-    if not staticcall Vault(vaultAddr).doesUserHaveBalance(_liqUser, _liqAsset):
+    if staticcall Vault(vaultAddr).getTotalAmountForUser(_liqUser, _liqAsset) == 0:
         return False
     return staticcall Ledger(_ledger).isUserInLiquidation(_liqUser)
 
@@ -1197,11 +1195,14 @@ def withdrawTokensFromVault(
     _a: addys.Addys,
 ) -> (uint256, bool):
     assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
+    totalAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
+    if totalAmount == 0:
+        return 0, False
     if _preflightSafeConversion:
         # Mirror BasicVault's user-ledger and token-balance clamps before it
         # mutates either state. Deleverage retains a post-withdraw consistency
         # assertion for any vault or asset behavior outside these known bounds.
-        withdrawableAmount: uint256 = min(_amount, staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset))
+        withdrawableAmount: uint256 = min(_amount, totalAmount)
         withdrawableAmount = min(withdrawableAmount, staticcall IERC20(_asset).balanceOf(_vaultAddr))
         if staticcall UnderscoreVault(_asset).convertToAssetsSafe(withdrawableAmount) == 0:
             return 0, False
@@ -1222,6 +1223,9 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool, bool):
+    if staticcall Vault(_vaultAddr).getTotalAmountForUser(_fromUser, _asset) == 0:
+        return 0, 0, False, True
+
     maxAssetAmount: uint256 = self._getAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxAssetAmount == 0:
         return 0, 0, False, True # skip if cannot get price for this asset

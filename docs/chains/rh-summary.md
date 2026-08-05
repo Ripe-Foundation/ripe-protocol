@@ -46,7 +46,7 @@ is the current coordination entry point for eight byte-identical source
 reports. It records one program package, not eight implementation trains.
 
 The accepted architecture preserves the current Ledger and Teller designs,
-keeps GuardedErc20 separate and Stock-specific, selects Chainlink at PriceDesk
+uses protected `SimpleErc20` through the shared `BasicVault` module, selects Chainlink at PriceDesk
 ID 1, unchanged CurvePrices at ID 2 for GREEN only, and BlueChipYield at ID 3,
 with IDs 4/5 empty and priorities `[1,3]`. USDG remains Chainlink-only, so the
 GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG route cannot recurse.

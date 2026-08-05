@@ -200,6 +200,8 @@ event UserDelegationSet:
     canClaimLoot: bool
     caller: indexed(address)
 
+receiptMeasurementActive: transient(bool)
+
 MAX_BALANCE_ACTION: constant(uint256) = 20
 MAX_CLAIM_USERS: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
@@ -214,17 +216,17 @@ STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 CURVE_PRICES_ID: constant(uint256) = 2
 
-receiptMeasurementActive: transient(bool)
-
 
 @deploy
 def __init__(_ripeHq: address, _shouldPause: bool):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
 
+
 ############
 # Deposits #
 ############
+
 
 @nonreentrant
 @external
@@ -239,6 +241,7 @@ def deposit(
     a: addys.Addys = addys._getAddys()
     return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, False, True, a)
 
+
 @nonreentrant
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
@@ -248,6 +251,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, False, a)
     self._performHousekeeping(False, _user, True, a)
     return len(_deposits)
+
 
 @external
 def depositFromTrusted(
@@ -262,7 +266,9 @@ def depositFromTrusted(
     a: addys.Addys = addys._getAddys(_a)
     return self._deposit(_asset, _amount, _user, empty(address), _vaultId, msg.sender, _lockDuration, True, False, False, a)
 
+
 # core logic
+
 
 @internal
 def _deposit(
@@ -286,22 +292,30 @@ def _deposit(
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
-    assert not self.receiptMeasurementActive
+
+    # block overlapping receipt measurements
+    assert not self.receiptMeasurementActive # dev: receipt measurement active
     self.receiptMeasurementActive = True
-    custodyBefore: uint256 = self._exactBalance(_asset, vaultAddr)
+
+    # measure custody before transfer
+    custodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(vaultAddr)
+
     # transfer tokens
     if _areFundsHereAlready:
         assert extcall IERC20(_asset).transfer(vaultAddr, amount, default_return_value=True) # dev: could not transfer
     else:
         assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
-    assert self._exactBalance(_asset, vaultAddr) - custodyBefore == amount
+
+    # verify custody after transfer
+    assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount # dev: custody mismatch
 
     # deposit tokens
     if _lockDuration == 0:
-        assert extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a) == amount
+        assert extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a) == amount # dev: deposit failed
     else:
-        assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount
+        assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount # dev: deposit failed
 
+    # disable receipt measurement
     self.receiptMeasurementActive = False
 
     # register vault participation
@@ -320,6 +334,7 @@ def _deposit(
 
     log TellerDeposit(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
     return amount
+
 
 ###############
 # Withdrawals #
@@ -1007,19 +1022,6 @@ def _performHousekeeping(
             assert extcall CreditEngine(_a.creditEngine).updateDebtForUser(_user, _a) # dev: bad debt health
         else:
             extcall CreditEngine(_a.creditEngine).updateDebtForUser(_user, _a)
-
-
-@view
-@internal
-def _exactBalance(_asset: address, _holder: address) -> uint256:
-    response: Bytes[33] = raw_call(
-        _asset,
-        abi_encode(_holder, method_id=method_id("balanceOf(address)")),
-        max_outsize=33,
-        is_static_call=True,
-    )
-    assert len(response) == 32
-    return abi_decode(response, uint256)
 
 
 # green payments

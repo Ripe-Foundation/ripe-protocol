@@ -1,135 +1,29 @@
 [
   {
-    "name": "CumulativePriceCheckpointUpdated",
+    "name": "PriceConfigUpdatePending",
     "inputs": [
       {
-        "name": "price0Cumulative",
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "minSnapshotDelay",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "price1Cumulative",
+        "name": "maxNumSnapshots",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "pairTimestamp",
+        "name": "maxUpsideDeviation",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "localTimestamp",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "reserve0",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "reserve1",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "CumulativePriceAverageUpdated",
-    "inputs": [
-      {
-        "name": "price0Average",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "price1Average",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "averagingPeriodSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "averageUpdatedAt",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "CumulativePriceCheckpointResynchronized",
-    "inputs": [
-      {
-        "name": "previousTimestamp",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "newTimestamp",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "reasonCode",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "OracleConfigUpdatePending",
-    "inputs": [
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "twapWindowSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAveragingPeriodSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAverageStalenessSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minRipeReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minQuoteReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxSpotToTwapDeviationBps",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "sequencerRestartGraceSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxQuoteStaleSeconds",
+        "name": "staleTime",
         "type": "uint256",
         "indexed": false
       },
@@ -137,128 +31,7 @@
         "name": "confirmationBlock",
         "type": "uint256",
         "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "OracleConfigUpdatePrevious",
-    "inputs": [
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
       },
-      {
-        "name": "twapWindowSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAveragingPeriodSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAverageStalenessSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minRipeReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minQuoteReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxSpotToTwapDeviationBps",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "sequencerRestartGraceSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxQuoteStaleSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "activated",
-        "type": "bool",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "OracleConfigUpdateConfirmed",
-    "inputs": [
-      {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "twapWindowSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAveragingPeriodSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxAverageStalenessSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minRipeReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "minQuoteReserve",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxSpotToTwapDeviationBps",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "sequencerRestartGraceSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "maxQuoteStaleSeconds",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "activated",
-        "type": "bool",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "OracleConfigUpdateCancelled",
-    "inputs": [
       {
         "name": "actionId",
         "type": "uint256",
@@ -269,15 +42,30 @@
     "type": "event"
   },
   {
-    "name": "OracleActivationPending",
+    "name": "PriceConfigUpdated",
     "inputs": [
       {
-        "name": "actionId",
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "minSnapshotDelay",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "confirmationBlock",
+        "name": "maxNumSnapshots",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxUpsideDeviation",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "staleTime",
         "type": "uint256",
         "indexed": false
       }
@@ -286,44 +74,32 @@
     "type": "event"
   },
   {
-    "name": "OracleActivated",
+    "name": "PriceConfigUpdateCancelled",
     "inputs": [
       {
-        "name": "actionId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "activationTimestamp",
-        "type": "uint256",
-        "indexed": false
+        "name": "asset",
+        "type": "address",
+        "indexed": true
       }
     ],
     "anonymous": false,
     "type": "event"
   },
   {
-    "name": "OracleDeactivated",
+    "name": "PriceSnapshotAdded",
     "inputs": [
       {
-        "name": "reasonCode",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "OracleDisablePending",
-    "inputs": [
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
       {
-        "name": "actionId",
+        "name": "price",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "confirmationBlock",
+        "name": "lastUpdate",
         "type": "uint256",
         "indexed": false
       }
@@ -1263,7 +1039,7 @@
         "type": "uint256"
       },
       {
-        "name": "_oracleRegistry",
+        "name": "_priceDesk",
         "type": "address"
       }
     ],
@@ -1334,7 +1110,7 @@
         "type": "uint256"
       },
       {
-        "name": "_oracleRegistry",
+        "name": "_priceDesk",
         "type": "address"
       }
     ],
@@ -1384,6 +1160,98 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUniswapV2RipePrice",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePriceConfig",
+    "inputs": [
+      {
+        "name": "_minSnapshotDelay",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxNumSnapshots",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxUpsideDeviation",
+        "type": "uint256"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidPriceConfig",
+    "inputs": [
+      {
+        "name": "_minSnapshotDelay",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxNumSnapshots",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxUpsideDeviation",
+        "type": "uint256"
+      },
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getWeightedPrice",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "addPriceSnapshot",
@@ -1401,53 +1269,40 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function",
-    "name": "update",
-    "inputs": [],
+    "name": "getLatestSnapshot",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "bool"
+        "type": "tuple",
+        "components": [
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
       }
     ]
   },
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "updateOracleConfig",
+    "name": "confirmNewPriceFeed",
     "inputs": [
       {
-        "name": "_twapWindowSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxAveragingPeriodSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxAverageStalenessSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_minRipeReserve",
-        "type": "uint256"
-      },
-      {
-        "name": "_minQuoteReserve",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxSpotToTwapDeviationBps",
-        "type": "uint256"
-      },
-      {
-        "name": "_sequencerRestartGraceSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxQuoteStaleSeconds",
-        "type": "uint256"
+        "name": "_asset",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -1458,41 +1313,13 @@
     ]
   },
   {
-    "stateMutability": "view",
+    "stateMutability": "nonpayable",
     "type": "function",
-    "name": "isValidOracleConfig",
+    "name": "cancelNewPendingPriceFeed",
     "inputs": [
       {
-        "name": "_twapWindowSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxAveragingPeriodSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxAverageStalenessSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_minRipeReserve",
-        "type": "uint256"
-      },
-      {
-        "name": "_minQuoteReserve",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxSpotToTwapDeviationBps",
-        "type": "uint256"
-      },
-      {
-        "name": "_sequencerRestartGraceSeconds",
-        "type": "uint256"
-      },
-      {
-        "name": "_maxQuoteStaleSeconds",
-        "type": "uint256"
+        "name": "_asset",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -1523,52 +1350,6 @@
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "cancelPriceFeedUpdate",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "initiateActivation",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "confirmNewPriceFeed",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "cancelNewPendingPriceFeed",
     "inputs": [
       {
         "name": "_asset",
@@ -1636,194 +1417,159 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getTwapQuotePerRipe",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getCurrentCumulativePrices",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getCheckpoint",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getReserveHealth",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getSafetyState",
+    "name": "priceConfigs",
     "inputs": [
       {
-        "name": "_oracleRegistry",
+        "name": "arg0",
         "type": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
+        "type": "tuple",
+        "components": [
+          {
+            "name": "minSnapshotDelay",
+            "type": "uint256"
+          },
+          {
+            "name": "maxNumSnapshots",
+            "type": "uint256"
+          },
+          {
+            "name": "maxUpsideDeviation",
+            "type": "uint256"
+          },
+          {
+            "name": "staleTime",
+            "type": "uint256"
+          },
+          {
+            "name": "lastSnapshot",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "price",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "nextIndex",
+            "type": "uint256"
+          }
+        ]
       }
     ]
   },
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getSafetyStateAtStaleTime",
+    "name": "snapShots",
     "inputs": [
       {
-        "name": "_staleTime",
-        "type": "uint256"
+        "name": "arg0",
+        "type": "address"
       },
       {
-        "name": "_oracleRegistry",
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPriceConfigs",
+    "inputs": [
+      {
+        "name": "arg0",
         "type": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
+        "type": "tuple",
+        "components": [
+          {
+            "name": "actionId",
+            "type": "uint256"
+          },
+          {
+            "name": "config",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minSnapshotDelay",
+                "type": "uint256"
+              },
+              {
+                "name": "maxNumSnapshots",
+                "type": "uint256"
+              },
+              {
+                "name": "maxUpsideDeviation",
+                "type": "uint256"
+              },
+              {
+                "name": "staleTime",
+                "type": "uint256"
+              },
+              {
+                "name": "lastSnapshot",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "price",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "lastUpdate",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "nextIndex",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
       }
     ]
   },
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "getModeConstants",
+    "name": "RIPE_WETH_POOL",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256"
+        "type": "address"
       }
     ]
   },
@@ -1840,328 +1586,6 @@
     ]
   },
   {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "QUOTE_TOKEN",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "PAIR",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "FACTORY",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "SEQUENCER_UPTIME_FEED",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "MODE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "RIPE_DECIMALS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "QUOTE_DECIMALS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "RIPE_IS_TOKEN0",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "oracleConfig",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "twapWindowSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "maxAveragingPeriodSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "maxAverageStalenessSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "minRipeReserve",
-            "type": "uint256"
-          },
-          {
-            "name": "minQuoteReserve",
-            "type": "uint256"
-          },
-          {
-            "name": "maxSpotToTwapDeviationBps",
-            "type": "uint256"
-          },
-          {
-            "name": "sequencerRestartGraceSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "maxQuoteStaleSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "activated",
-            "type": "bool"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "pendingOracleConfig",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "actionId",
-            "type": "uint256"
-          },
-          {
-            "name": "config",
-            "type": "tuple",
-            "components": [
-              {
-                "name": "twapWindowSeconds",
-                "type": "uint256"
-              },
-              {
-                "name": "maxAveragingPeriodSeconds",
-                "type": "uint256"
-              },
-              {
-                "name": "maxAverageStalenessSeconds",
-                "type": "uint256"
-              },
-              {
-                "name": "minRipeReserve",
-                "type": "uint256"
-              },
-              {
-                "name": "minQuoteReserve",
-                "type": "uint256"
-              },
-              {
-                "name": "maxSpotToTwapDeviationBps",
-                "type": "uint256"
-              },
-              {
-                "name": "sequencerRestartGraceSeconds",
-                "type": "uint256"
-              },
-              {
-                "name": "maxQuoteStaleSeconds",
-                "type": "uint256"
-              },
-              {
-                "name": "activated",
-                "type": "bool"
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "checkpoint",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "price0Cumulative",
-            "type": "uint256"
-          },
-          {
-            "name": "price1Cumulative",
-            "type": "uint256"
-          },
-          {
-            "name": "pairTimestamp",
-            "type": "uint256"
-          },
-          {
-            "name": "localTimestamp",
-            "type": "uint256"
-          },
-          {
-            "name": "reserve0",
-            "type": "uint256"
-          },
-          {
-            "name": "reserve1",
-            "type": "uint256"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "average",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "price0Average",
-            "type": "uint256"
-          },
-          {
-            "name": "price1Average",
-            "type": "uint256"
-          },
-          {
-            "name": "averagingPeriodSeconds",
-            "type": "uint256"
-          },
-          {
-            "name": "updatedAt",
-            "type": "uint256"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "activationActionId",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "disableActionId",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "feedPending",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "activationTimestamp",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
@@ -2174,19 +1598,11 @@
         "type": "address"
       },
       {
-        "name": "_factory",
+        "name": "_ripeWethPool",
         "type": "address"
       },
       {
         "name": "_ripeToken",
-        "type": "address"
-      },
-      {
-        "name": "_quoteToken",
-        "type": "address"
-      },
-      {
-        "name": "_pair",
         "type": "address"
       },
       {
@@ -2195,14 +1611,6 @@
       },
       {
         "name": "_maxPriceChangeTimeLock",
-        "type": "uint256"
-      },
-      {
-        "name": "_sequencerUptimeFeed",
-        "type": "address"
-      },
-      {
-        "name": "_mode",
         "type": "uint256"
       }
     ],

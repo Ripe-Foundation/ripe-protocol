@@ -66,7 +66,7 @@ The copied-report byte identities are:
 | Repository report | SHA-256 |
 | --- | --- |
 | `reassessment/ledger-chain-abstraction.md` | `7970f9bb2b921629a0b4dad1631f9ddcd4773ac362ec4974d10073420aec4361` |
-| `reassessment/teller-balance-measurement.md` | `b8227f76644ac5b249d34e2ca4dd61c58d12b8f21b883411eea2c9ddcab5113d` |
+| `reassessment/teller-balance-measurement.md` | `6a49fa2080034f6455dd3e86ae4edb97fab55cf3dde1c47c408e0d771bcf2b7e` |
 | `reassessment/guarded-erc20-vault-architecture.md` | `a77cd01bbd6df2262469cbd8a093308cc294330bd0f94519c9be542402c19251` |
 | `reassessment/uniswap-price-source-decision.md` | `d7057fb3c3e27d7b80d70850459b6ecafb5583447f0c12e1bf9d052a1467a622` |
 | `qualification/curve-profile2-qualification.md` | `8d450a8a27618553f3dd3d5cdb10fa07bfc7fe6fe43414b77d4e1e867151f102` |
@@ -281,9 +281,10 @@ owner explicitly reopens it:
    representation, configuration, tests, fork scenarios, documentation
    refreshes, bytecode size or EIP-170 headroom work, deployment planning, and
    operational work. Preserve current zero values and historical evidence.
-3. **Uniswap TWAP implementation.** The report's V2 cumulative-price design is
-   research-only. No adapter, PriceDesk row, checkpoint service, or
-   security-relevant DEX price belongs in launch.
+3. **Uniswap V2 candidate admission.** The old cumulative-price design and
+   implementation are deleted. The smaller `UniswapV2Prices` spot/snapshot
+   candidate exists under separate owner instruction, but no PriceDesk row,
+   deployment, or security-relevant DEX price belongs in launch.
 4. **CCIP.** Keep disabled and preserve historical evidence without new
    research, implementation, testing, packaging, testnet, or production work.
 5. **Sites recovery and dashboard publication.** Preserve provenance; do not
@@ -355,7 +356,8 @@ covers additional Curve feeds or consumers, optional dynamic rates, optional
 Teller snapshots, optional stabilizer use, and later LP admissions. No stage is
 implied by acceptance of the previous stage.
 
-Uniswap TWAP implementation remains excluded while deferred.
+UniswapV2Prices hardening, admission, and deployment remain excluded while
+deferred.
 
 ### Package F — H-10 live rehearsal and operational release
 

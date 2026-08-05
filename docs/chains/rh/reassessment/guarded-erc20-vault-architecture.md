@@ -1,5 +1,11 @@
 # GuardedErc20 vault architecture reassessment
 
+> **Superseded 4 August 2026.** This document is retained as historical
+> decision evidence. The current feature-branch decision moves the fail-closed
+> nominal protections into `BasicVault`, uses them through `SimpleErc20`, and
+> removes the separate `GuardedErc20` source and artifact. See
+> [`basic-vault-fail-closed.md`](../smart-contract-changes/basic-vault-fail-closed.md).
+
 Frozen authority: `rh` commit
 `0d5994aa78f9d6f35b59bd7a2bc70fa18706e693`, tree
 `b68dffdddbdc7c5ae8423db049099c1632b478c9`. Review date: 30 July
