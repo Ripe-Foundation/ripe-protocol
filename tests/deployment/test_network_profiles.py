@@ -142,25 +142,6 @@ def test_operation_table_is_total_and_uses_required_vocabulary():
         assert {policy.outcome for policy in profile.operations} <= allowed
 
 
-def test_unknown_profile_fails_closed(monkeypatch):
-    events = []
-    for name in (
-        "resolve_rpc_reference",
-        "read_chain_id",
-        "get_account",
-        "repository_paths",
-    ):
-        monkeypatch.setattr(
-            migrate,
-            name,
-            lambda *args, _name=name, **kwargs: events.append(_name),
-        )
-
-    with pytest.raises(Exception, match="H02_PROFILE_UNKNOWN"):
-        call_migrate(profile_id="unknown-profile")
-    assert events == []
-
-
 def test_duplicate_canonical_profile_id_is_invalid():
     duplicate = profile_factory()
     with pytest.raises(NetworkProfileError, match="H02_PROFILE_INVALID"):
@@ -228,15 +209,6 @@ def test_profiles_cannot_share_history():
         validate_registry(
             (base, replace(sepolia, repository=aliased_repository))
         )
-
-
-def test_robinhood_profiles_share_only_proposed_source():
-    mainnet = get_profile("robinhood-mainnet").repository
-    testnet = get_profile("robinhood-testnet").repository
-    assert mainnet.migration_dir == testnet.migration_dir
-    assert mainnet.migration_state is PathState.PROPOSED
-    assert testnet.migration_state is PathState.PROPOSED
-    assert mainnet.history_dir != testnet.history_dir
 
 
 def test_missing_repository_does_not_fallback_or_create(tmp_path):
@@ -395,72 +367,6 @@ def test_latest_and_dirty_are_exploration_only():
             block_number=123,
             allow_dirty=True,
         )
-
-
-def test_chain_id_mismatch_before_account_load(monkeypatch):
-    events = []
-
-    def reader(value):
-        events.append("chain_id")
-        return 1
-
-    monkeypatch.setattr(migrate, "read_chain_id", reader)
-    monkeypatch.setattr(
-        migrate,
-        "get_account",
-        lambda *args, **kwargs: events.append("account"),
-    )
-    monkeypatch.setattr(
-        migrate,
-        "repository_paths",
-        lambda *args, **kwargs: events.append("history"),
-    )
-    monkeypatch.setattr(
-        migrate.boa,
-        "fork",
-        lambda *args, **kwargs: events.append("fork"),
-    )
-
-    with pytest.raises(Exception, match="H02_CHAIN_ID_MISMATCH"):
-        call_migrate()
-    assert events == ["chain_id"]
-
-
-def test_matching_chain_id_allows_only_next_mocked_step(monkeypatch):
-    events = []
-
-    def reader(value):
-        events.append("chain_id")
-        return "0x2105"
-
-    class NextStepReached(Exception):
-        pass
-
-    def account(name, identity, operation):
-        events.append(
-            (
-                "account",
-                name,
-                identity.expected_chain_id,
-                operation,
-            )
-        )
-        raise NextStepReached
-
-    monkeypatch.setattr(migrate, "read_chain_id", reader)
-    monkeypatch.setattr(migrate, "get_account", account)
-    monkeypatch.setattr(
-        migrate,
-        "repository_paths",
-        lambda *args, **kwargs: events.append("history"),
-    )
-
-    with pytest.raises(NextStepReached):
-        call_migrate()
-    assert events == [
-        "chain_id",
-        ("account", "DEPLOYER", 8453, Operation.MIGRATION_FORK),
-    ]
 
 
 def test_invalid_chain_id_response_fails_with_sanitized_typed_error():

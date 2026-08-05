@@ -35,6 +35,19 @@ def _load_dotenv() -> None:
     load_dotenv(override=False)
 
 
+def _redact_rpc(url: str) -> str:
+    """Reduce a provider URL to scheme and host.
+
+    Everything after the host is dropped: Alchemy and friends put the key in
+    the path, and some providers use a query parameter.
+    """
+    if not url or "://" not in url:
+        return url or "<unset>"
+    scheme, _, rest = url.partition("://")
+    host = rest.split("/", 1)[0].split("?", 1)[0]
+    return f"{scheme}://{host}/<redacted>"
+
+
 def _rpc_from_env(chain):
     """Per-chain RPC override, e.g. ROBINHOOD_MAINNET_RPC_URL."""
     return os.environ.get(f"{chain.replace('-', '_').upper()}_RPC_URL")
@@ -310,8 +323,15 @@ def cli(
 
     _load_dotenv()
 
-    final_rpc = rpc or _rpc_from_env(chain) or (
-        'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
+    # No provider URL is assembled from a token here: a half-built URL with a
+    # missing key silently becomes a request to the wrong place. Supply the
+    # endpoint explicitly via --rpc or <CHAIN>_RPC_URL.
+    final_rpc = rpc or _rpc_from_env(chain) or ('boa' if chain == 'local' else None)
+    if not final_rpc:
+        raise click.ClickException(
+            f"No RPC for `{chain}`. Set {chain.replace('-', '_').upper()}_RPC_URL "
+            "in the environment or .env, or pass --rpc."
+        )
 
     # A fork cannot execute ArbSys: it is a node-implemented precompile, so
     # `arbBlockNumber()` reverts and the Ledger constructor refuses to deploy.
@@ -343,7 +363,10 @@ def cli(
     deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
 
     log.h1("Contract Migration")
-    log.info(f"Connected to rpc `{final_rpc}`.")
+    # The RPC value is never logged, not even redacted: the reference is what
+    # an operator needs, and a URL in scrollback or CI output is a key in
+    # scrollback or CI output.
+    log.info(f"RPC configured for chain `{chain}`.")
     log.info(f"Deployer account `{sender.address}`.")
     log.info(f"Manifests are stored in `{environment}`.")
     log.info(f"Deployment arguments: {deploy_args}")
