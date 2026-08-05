@@ -16,15 +16,23 @@ import os
 MIGRATION_SCRIPTS_DIR = "./migrations"
 MIGRATION_HISTORY_DIR = "./migration_history"
 
-# Read .env so the RPC and keys are available without exporting them by hand.
-# override=False: a variable already in the environment wins, so an explicit
-# `FOO=bar python -m scripts.migrate ...` is never silently overridden by .env.
-try:
-    from dotenv import load_dotenv
+def _load_dotenv() -> None:
+    """Read .env so the RPC and keys need not be exported by hand.
 
+    Called from cli(), never at import: importing a module must not pull
+    secrets into the process environment as a side effect, because anything
+    that merely imports this file would inherit them. Running the command is
+    an explicit act; importing it is not.
+
+    override=False so a variable already in the environment wins, and an
+    explicit `FOO=bar python -m scripts.migrate ...` is never silently
+    overridden by .env.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
     load_dotenv(override=False)
-except ImportError:
-    pass
 
 
 def _rpc_from_env(chain):
@@ -119,10 +127,17 @@ CLICK_PROMPTS = {
 }
 
 
-ETHERSCAN_API_KEYS = {
-    "base-mainnet": os.environ["BASESCAN_API_KEY"],
-    "base-sepolia": os.environ["BASESCAN_API_KEY"],
-}
+# Chains whose verifier key comes from BASESCAN_API_KEY. The key is read when
+# it is needed, never at import: importing this module must not require, or
+# capture, a credential -- and a missing key should not stop `--help` or a
+# deployment to a chain that has no explorer.
+_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia")
+
+
+def _etherscan_api_key(chain):
+    if chain not in _BASESCAN_CHAINS:
+        return None
+    return os.environ.get("BASESCAN_API_KEY")
 ETHERSCAN_URLS = {
     "eth-mainnet": "https://api.etherscan.io/api",
     "eth-goerli": "https://api-goerli.etherscan.io/api",
@@ -293,6 +308,8 @@ def cli(
     `.migration_history/network-219183`.
     """
 
+    _load_dotenv()
+
     final_rpc = rpc or _rpc_from_env(chain) or (
         'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
 
@@ -347,10 +364,9 @@ def cli(
     boa.deployments.set_deployments_db(boa.deployments.DeploymentsDB(":memory:"))
     # Robinhood has no Etherscan; it uses Blockscout, and nothing here needs a
     # verifier. Only configure one for chains that actually have an entry.
-    if chain in ETHERSCAN_API_KEYS and chain in ETHERSCAN_URLS:
-        boa.set_etherscan(
-            api_key=ETHERSCAN_API_KEYS[chain], uri=ETHERSCAN_URLS[chain]
-        )
+    api_key = _etherscan_api_key(chain)
+    if api_key and chain in ETHERSCAN_URLS:
+        boa.set_etherscan(api_key=api_key, uri=ETHERSCAN_URLS[chain])
 
     if final_rpc == 'boa':
         with boa.set_env(Env()) as env:
