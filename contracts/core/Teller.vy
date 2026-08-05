@@ -292,8 +292,8 @@ def _deposit(
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
-    
-    # disable receipt measurement for this deposit
+
+    # block overlapping receipt measurements
     assert not self.receiptMeasurementActive # dev: receipt measurement active
     self.receiptMeasurementActive = True
 
@@ -315,7 +315,7 @@ def _deposit(
     else:
         assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount # dev: deposit failed
 
-    # re-enable receipt measurement
+    # disable receipt measurement
     self.receiptMeasurementActive = False
 
     # register vault participation
