@@ -3,7 +3,7 @@
 This directory is the contract-centric explanation of every Vyper and Solidity
 contract-language source change represented by the current Robinhood (`rh`)
 branch. It separates current `master..rh` production deltas from configuration,
-archival prototypes, supporting/test-only sources, documentation examples, and
+non-admitted candidates, supporting/test-only sources, documentation examples, and
 historical changes whose source bytes are now shared by `master` and `rh`.
 
 > [!IMPORTANT]
@@ -83,17 +83,19 @@ are the two human-edited value authorities. The
 [`robinhood-parameters.json`](../../../../config/robinhood-parameters.json)
 ledger is derived evidence, not a third value authority.
 
-## Archival, non-admitted prototype
+## Non-admitted Uniswap V2 candidate
 
-[`contracts/priceSources/RobinhoodUniswapV2RipePrices.vy`](../../../../contracts/priceSources/RobinhoodUniswapV2RipePrices.vy)
-is present in `master..rh`, but it is not an admitted production price source:
+[`contracts/priceSources/UniswapV2Prices.vy`](../../../../contracts/priceSources/UniswapV2Prices.vy)
+replaces the deleted cumulative-price research prototype on this branch. It is
+not an admitted production price source:
 
 | Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
 | --- | --- | --- | ---: | --- |
-| [`robinhood-uniswap-v2-ripe-prices.md`](robinhood-uniswap-v2-ripe-prices.md) | `11fb790f04f782d7c3e7abcc66f78077c13434d9` | `56a6685442d8730922205f8fcd2893b542e12b7d5d0e1384bcc2f065b945b485` | 42,036 | Archival monitoring prototype; PriceDesk-inert, unregistered, unconfigured, non-admitted, without a repository deployment record, and unavailable for protocol accounting |
+| [`uniswap-v2-prices.md`](uniswap-v2-prices.md) | `866cc922d44fa44ef0fe8f3c3d8fcd745d72a1b4` | `5f783d681b919a1f42b266ac3bef881c90c0083b389b941652cdeebaaa2a5699` | 15,636 | Aero-derived candidate with the standard UndyVault/BlueChipYield configuration lifecycle; spot-reserve manipulation, approved-pair provenance, and liquidity floor remain unresolved; unregistered, unconfigured, non-admitted, undeployed, and unavailable for protocol accounting |
 
-No launch Uniswap oracle authority was approved. Its direct monitoring and
-update surfaces do not change its PriceDesk-facing zero/no-feed behavior.
+No launch Uniswap oracle authority was approved. The source and its tests do
+not authorize a migration, PriceDesk registration, configuration, deployment,
+or activation.
 
 ## Historical/shared-source rationale inventory
 
@@ -115,7 +117,7 @@ and release remain separate.
 ## Relevant current artifact identities
 
 The central nine-contract artifact checker was rerun against the current bytes.
-BlueChip, the archival Uniswap prototype, the changed token module, and its
+BlueChip, the non-admitted Uniswap candidate, the changed token module, and its
 three transitive token consumers were also freshly compiled with Vyper
 `0.4.3+commit.bff19ea2` and their outputs hashed.
 
@@ -131,7 +133,7 @@ three transitive token consumers were also freshly compiled with Vyper
 | SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
 | Teller | 24,152 | 424 | `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
 | BlueChipYieldPrices | 22,054 | 2,522 | `84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578` | `d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73` |
-| RobinhoodUniswapV2RipePrices | 20,556 | 4,020 | `d36fe90fb011e2fbed546c5a0c576c7e5346e90ec34947c7be079884b2ca9c58` | `3dc0dcfe1a130a5911f2b97f106c963ebe9dca17efdad943a0a9c9609bcc837e` |
+| UniswapV2Prices | 13,669 | 10,907 | `2dc8fa0469958bc4d829be6b10ede1210152dacfa3e2c95a847250cb286677d8` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
 | Erc20Token module | 6,767 | 17,809 | `d13a59c2961a981a444ce6defd59a2d4c4d0a0b079f5cb322dc2c4fc2715c7fb` | `49c87121ab8eec9d6472e7e7401e54d78bf47022d54346ae1020dce01f546f39` |
 | GreenToken | 7,085 | 17,491 | `74f3f1c818d951f6c5c2e755e0b1667f3f1b13f91cc483da7923809bb7038f16` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
 | RipeToken | 7,085 | 17,491 | `0338e28a3787286430139234127c9953945bca3fd7d4084cbd19fdfc62943962` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
@@ -156,11 +158,10 @@ None is a production component, documentation example, or launch authority.
 | `contracts/mock/MockMorphoV2Factory.vy` | Morpho V2 factory test double | `725a6f623705e223b891953208be952b77ca5242` | `d4afb38408b542ef123ba5df453de8ed8a871116e85f916be983c934a0f4da60` | 902 |
 | `contracts/mock/MockMorphoV2Vault.vy` | Morpho V2 vault/malformed-return test double | `3f41b99d9ec9ec98dc9484eecf7d0ae9095eb69d` | `d5c84d5c58f996b5cad7db1928de3fc8b144fd6322beccaad86396ab3cab5dac` | 2,735 |
 | `contracts/mock/MockYieldRegistry.vy` | Existing yield-registry test double extended for Morpho V2 | `29c23b8042e2271539a87d191a3c561b6c101e42` | `b645e1bc1f9fdb036da47a508f54dac43e000b362463e095ddb434b358de7c5d` | 1,070 |
-| `contracts/mock/MockUniswapV2Factory.vy` | Uniswap factory test double | `ea97d1930b72c41a99b909a2331a8fbd8d51c16e` | `ff4ba203e8e18d11a5738ef68a7f8fa9d677c2817e0f06a683c10c05e0ef83c5` | 828 |
 | `contracts/mock/MockUniswapV2Pair.vy` | Uniswap pair/cumulative-price test double | `30a75af4cab8e62de5ecf2caa8a8bdecf1c1ffc2` | `7c6bc92970be39fa8118c4000379b722bcb87592779c6cb3b45df1f5cab76350` | 7,683 |
 | `contracts/mock/MockUniswapV2Token.vy` | Uniswap token test double | `141137a97d6576d679314ff6366bd1a1659fb04d` | `0e109020f202db31e7a09c6e473b95aad39901f98acbf439fa11aeecacf0b588` | 604 |
-| `contracts/mock/MockUniswapV2FlashBorrower.vy` | Flash-swap test borrower | `812ece36f706b7177a34e0561799dd001b2db54b` | `39b2e4b0e8eebe55175d71465ba33d8430528f0fa221c0b27c3b0f44012d6d84` | 973 |
-| `contracts/mock/MockUniswapV2QuotePriceDesk.vy` | Quote-source/recursive-call test double | `978000acc79cfd1a7c12547896232602f35233f2` | `12d2046240189462486f7b2925228b31f369f83c7f4827faf4857b3de59a4d1f` | 1,540 |
+| `contracts/mock/MockUniswapV2QuotePriceDesk.vy` | Quote-source/recursive-call test double | `7ec9e348d2b01d86e715549a90c7d48c08cb734b` | `7b84dfaafb51e51b07dc725b739e422421bc419c56b51804164aeab231c6fdf5` | 1,634 |
+| `contracts/mock/MockUniswapV2RipeHq.vy` | Minimal RipeHq/governance test double | `003f80140e6f5cb1ee43bf4ef731d7af96fe3e07` | `4a696548ef6f130d227133d70b3b6ee93558d78a18cf253e4364a9c63af85d4d` | 1,162 |
 | `contracts/mock/MockProbeErc20.vy` | Stock-token transferability probe double | `a367fbd89f3fc7d5dbafa3a5c118cabbc70e696b` | `7d84c3f995c7f06588cabda1c8a12d8376217c653a9c4371a69ac8e559bf6a48` | 3,069 |
 | `contracts/mock/MockStockTokenControls.vy` | Stock-control adversarial double | `b9ed997df86bffe529b93bf9b6b00a5d0a9ca331` | `5d1527262aad66642a6e0f6dfdaad03458abdc4085a0445ebff0af8969614ef7` | 4,971 |
 | `contracts/mock/MockRobinhoodCurveSystem.vy` | Test-only Curve address-provider, registry, factory, and pool double for launch-route assertions | `1420dbf2999405783726d64c64eb3c5007b95e37` | `6d180087f56b68ed7387cce91f391fddf6ae9845a1ab78fef095423d0f4279ea` | 2,666 |
@@ -214,8 +215,8 @@ this directory is explicit audit evidence, not a continuously enforced gate.
 - [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) — changed
   GREEN/RIPE thin-Solidity reference subclasses and their production-package
   boundary;
-- [`robinhood-uniswap-v2-ripe-prices.md`](robinhood-uniswap-v2-ripe-prices.md)
-  — archival, PriceDesk-inert monitoring prototype;
+- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — tested, non-admitted
+  Uniswap V2 spot/snapshot candidate and its unresolved readiness boundary;
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
   rationale;
 - [`auction-house.md`](auction-house.md) — historical/shared safe conversion,
@@ -271,12 +272,12 @@ git diff --name-status \
   '*.vy' '*.vyi' '*.sol'
 ```
 
-It yields 24 contract-language paths: 23 Vyper and one Solidity, with no changed
-`.vyi` path. They classify as seven current production source paths, one
-configuration contract, one archival prototype, thirteen supporting/test-only
-Vyper paths, and two documentation examples. The three historical/shared
-rationale sources have identical `master` and `rh` Git blobs and therefore do
-not appear in that delta.
+That frozen historical range yields 24 contract-language paths: 23 Vyper and
+one Solidity, with no changed `.vyi` path. The current candidate branch deletes
+the range's archival Uniswap prototype and two old-only mocks, and adds the
+smaller `UniswapV2Prices` candidate plus one replacement test mock. The three
+historical/shared rationale sources have identical `master` and `rh` Git blobs
+and therefore do not appear in that frozen delta.
 
 Future reviews must first re-enumerate the repository's contract-language
 extensions and then update this command if a new language appears; extension-

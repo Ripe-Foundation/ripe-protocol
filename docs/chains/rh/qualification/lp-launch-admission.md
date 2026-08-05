@@ -31,7 +31,8 @@ No production Vyper, interface, ABI, `DefaultsRobinhood` constructor, artifact
 expectation, executable migration, or configuration-authority change is
 warranted. Both LP rows remain omitted from `DefaultsRobinhood`; PriceDesk
 priority IDs remain `[1, 3]`; unchanged `CurvePrices` is selected at PriceDesk
-slot 2 for GREEN only; and the Uniswap prototype remains interface-inert. Pool
+slot 2 for GREEN only; and the Uniswap candidate remains unregistered and
+unavailable to PriceDesk. Pool
 deployment and GREEN pricing selection do not admit the GREEN/USDG LP token as
 collateral or another valuation-dependent Ripe asset.
 
@@ -178,10 +179,12 @@ USD 25,000 within 1% and grant no capital authority.
 - thin liquidity and spot manipulation make the pair unsuitable for protocol
   valuation. There is no accepted Uniswap oracle.
 
-The existing `RobinhoodUniswapV2RipePrices` source remains useful only for
-research/monitoring: protocol-accounting construction raises, `getPrice`
-returns zero, `getPriceAndHasFeed` returns `(0, false)`, and `hasPriceFeed`
-returns false. It must not be registered in PriceDesk.
+The `UniswapV2Prices` candidate has direct unit and adversarial coverage, but
+it reads a manipulable spot reserve ratio and does not enforce approved-pair
+provenance or a minimum liquidity floor. Bootstrap and fully stale snapshot
+states now fail closed, but repeated manipulated snapshots remain unresolved.
+Those properties preserve the no-admission verdict. It must not be registered
+in PriceDesk.
 
 Verdict: the external V2 canary is conditionally supportable after its owner
 and external inputs are bound, but its LP token is not launch-admissible in

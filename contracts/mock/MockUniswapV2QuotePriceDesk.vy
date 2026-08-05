@@ -42,7 +42,7 @@ def consume(_source: address, _asset: address, _staleTime: uint256) -> uint256:
 @view
 @external
 @raw_return
-def getPrice(_asset: address, _shouldRaise: bool = False) -> Bytes[33]:
+def getPrice(_asset: address, _shouldRaise: bool = False) -> Bytes[96]:
     assert not self.shouldRevert
     value: uint256 = self.price
     if self.recursiveTarget != empty(address):
@@ -56,4 +56,6 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> Bytes[33]:
         return slice(encoded, 0, 31)
     if self.responseMode == 2:
         return concat(encoded, b"x")
+    if self.responseMode == 3:
+        return concat(encoded, empty(bytes32), empty(bytes32))
     return slice(encoded, 0, 32)

@@ -139,27 +139,25 @@ EXCLUDED_CCIP_EXAMPLE_SHA256 = (
 EXCLUDED_EXAMPLE_CONTENT_HASHES = {
     EXCLUDED_CCIP_EXAMPLE_PATH: EXCLUDED_CCIP_EXAMPLE_SHA256,
 }
-# Optional archival prototype sources are outside the admitted protocol clock
-# inventory. Exact reviewed bytes may be present without becoming a launch
-# dependency; any byte drift is rediscovered and fails closed as a new path.
+# Non-admitted Uniswap V2 candidate and test supports are outside the admitted
+# protocol clock inventory. Exact reviewed bytes may be present without
+# becoming a launch dependency; any byte drift is rediscovered and fails
+# closed as a new path.
 OPTIONAL_ARCHIVAL_VYPER_SHA256 = {
-    "contracts/mock/MockUniswapV2Factory.vy": (
-        "ff4ba203e8e18d11a5738ef68a7f8fa9d677c2817e0f06a683c10c05e0ef83c5"
-    ),
-    "contracts/mock/MockUniswapV2FlashBorrower.vy": (
-        "39b2e4b0e8eebe55175d71465ba33d8430528f0fa221c0b27c3b0f44012d6d84"
-    ),
     "contracts/mock/MockUniswapV2Pair.vy": (
         "7c6bc92970be39fa8118c4000379b722bcb87592779c6cb3b45df1f5cab76350"
     ),
     "contracts/mock/MockUniswapV2QuotePriceDesk.vy": (
-        "12d2046240189462486f7b2925228b31f369f83c7f4827faf4857b3de59a4d1f"
+        "7b84dfaafb51e51b07dc725b739e422421bc419c56b51804164aeab231c6fdf5"
+    ),
+    "contracts/mock/MockUniswapV2RipeHq.vy": (
+        "4a696548ef6f130d227133d70b3b6ee93558d78a18cf253e4364a9c63af85d4d"
     ),
     "contracts/mock/MockUniswapV2Token.vy": (
         "0e109020f202db31e7a09c6e473b95aad39901f98acbf439fa11aeecacf0b588"
     ),
-    "contracts/priceSources/RobinhoodUniswapV2RipePrices.vy": (
-        "56a6685442d8730922205f8fcd2893b542e12b7d5d0e1384bcc2f065b945b485"
+    "contracts/priceSources/UniswapV2Prices.vy": (
+        "5f783d681b919a1f42b266ac3bef881c90c0083b389b941652cdeebaaa2a5699"
     ),
 }
 EXPECTED_INTERFACE_ROOTS = ["interfaces"]

@@ -25,7 +25,7 @@ Robinhood machine-facing parameter/planning representation. Every Deleverage
 task is parked, and no Deleverage implementation track is open. The current
 six parked lanes match the canonical [`status.yaml`](status.yaml) inventory
 exactly: CCIP; CreditEngine zero-backing reassessment and policy; every
-Deleverage task; Uniswap TWAP implementation; Sites recovery; and dashboard
+Deleverage task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
 deployment. The S4 zero-cooldown decision remains closed. All six lanes are
 nonblocking until explicitly reopened.
 
@@ -354,7 +354,7 @@ program package. The controlling disposition is:
 - preserve current Ledger and Teller architecture;
 - keep GuardedErc20 separate and Stock-specific;
 - preserve the launch boundaries that RH-D021 does not change: no Uniswap
-  price-source contract and neither LP token admitted;
+  price source admitted or deployed and neither LP token admitted;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;
 - retain GREEN/USDG follow-on higher powers and both LP admissions as
   separately gated, subject to RH-D021's bounded GREEN pricing route;
@@ -365,7 +365,7 @@ program package. The controlling disposition is:
 - keep H-10 as the separate live-rehearsal lane.
 
 CreditEngine zero-backing reassessment, every Deleverage task including
-size/headroom work, Uniswap TWAP implementation, CCIP, Sites recovery, and live
+size/headroom work, UniswapV2Prices admission and deployment, CCIP, Sites recovery, and live
 deployment are deferred or separately unauthorized. Future work is grouped
 into the large packages defined by
 [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),

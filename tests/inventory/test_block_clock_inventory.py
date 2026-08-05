@@ -14,23 +14,22 @@ import pytest
 from scripts import check_block_clock_inventory as checker
 
 
-def test_optional_archival_uniswap_sources_are_excluded_only_at_exact_bytes(
+def test_non_admitted_uniswap_sources_are_excluded_only_at_exact_bytes(
     tmp_path,
 ):
     assert set(checker.OPTIONAL_ARCHIVAL_VYPER_SHA256) == {
-        "contracts/mock/MockUniswapV2Factory.vy",
-        "contracts/mock/MockUniswapV2FlashBorrower.vy",
         "contracts/mock/MockUniswapV2Pair.vy",
         "contracts/mock/MockUniswapV2QuotePriceDesk.vy",
+        "contracts/mock/MockUniswapV2RipeHq.vy",
         "contracts/mock/MockUniswapV2Token.vy",
-        "contracts/priceSources/RobinhoodUniswapV2RipePrices.vy",
+        "contracts/priceSources/UniswapV2Prices.vy",
     }
     for relative, expected in checker.OPTIONAL_ARCHIVAL_VYPER_SHA256.items():
         source = REPOSITORY_ROOT / relative
         assert hashlib.sha256(source.read_bytes()).hexdigest() == expected
         assert checker._has_exact_optional_archival_bytes(REPOSITORY_ROOT, relative)
 
-    relative = "contracts/priceSources/RobinhoodUniswapV2RipePrices.vy"
+    relative = "contracts/priceSources/UniswapV2Prices.vy"
     changed = tmp_path / relative
     changed.parent.mkdir(parents=True)
     changed.write_bytes((REPOSITORY_ROOT / relative).read_bytes() + b"\n")

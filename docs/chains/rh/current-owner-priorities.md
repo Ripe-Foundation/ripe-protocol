@@ -112,13 +112,16 @@ the four zero-valued controls.
   resealed.
 - Reopen only through explicit owner instruction.
 
-### 4. Uniswap TWAP admission and activation are parked
+### 4. Uniswap V2 price-source admission and activation are parked
 
-The archival `RobinhoodUniswapV2RipePrices` research/monitoring prototype
-source is present in the repository. It is not registered, configured,
-admitted, deployed, or activated and is unavailable for protocol accounting.
-No Uniswap launch price source is required; bounded launch behavior and
-PriceDesk priority source IDs `[1, 3]` remain unchanged.
+The smaller `UniswapV2Prices` candidate replaces the deleted cumulative-price
+prototype. Its tests are strong, but its spot-reserve input, unbound pair
+provenance, absent minimum-liquidity requirement, and repeatable snapshot
+poisoning remain unresolved. Bootstrap and fully stale snapshot states now fail
+closed to zero. It is not registered, configured, admitted, deployed, or
+activated and is unavailable for protocol accounting. No Uniswap launch
+price source is required; bounded launch behavior and PriceDesk priority source
+IDs `[1, 3]` remain unchanged.
 
 - Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
   pool address, liquidity amount, funding or custody authority, migration,
@@ -126,7 +129,7 @@ PriceDesk priority source IDs `[1, 3]` remain unchanged.
   activation.
 - An optional externally held RIPE/WETH V2 liquidity canary is operational
   preparation, not protocol oracle authority.
-- Reopen work beyond archival prototype maintenance only after an approved
+- Reopen work beyond candidate hardening only after an approved
   security-relevant RIPE-price consumer and separate owner, risk, security,
   custody, and exposure decisions exist.
 

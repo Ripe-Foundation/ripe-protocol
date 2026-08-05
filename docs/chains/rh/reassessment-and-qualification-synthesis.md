@@ -281,9 +281,10 @@ owner explicitly reopens it:
    representation, configuration, tests, fork scenarios, documentation
    refreshes, bytecode size or EIP-170 headroom work, deployment planning, and
    operational work. Preserve current zero values and historical evidence.
-3. **Uniswap TWAP implementation.** The report's V2 cumulative-price design is
-   research-only. No adapter, PriceDesk row, checkpoint service, or
-   security-relevant DEX price belongs in launch.
+3. **Uniswap V2 candidate admission.** The old cumulative-price design and
+   implementation are deleted. The smaller `UniswapV2Prices` spot/snapshot
+   candidate exists under separate owner instruction, but no PriceDesk row,
+   deployment, or security-relevant DEX price belongs in launch.
 4. **CCIP.** Keep disabled and preserve historical evidence without new
    research, implementation, testing, packaging, testnet, or production work.
 5. **Sites recovery and dashboard publication.** Preserve provenance; do not
@@ -355,7 +356,8 @@ covers additional Curve feeds or consumers, optional dynamic rates, optional
 Teller snapshots, optional stabilizer use, and later LP admissions. No stage is
 implied by acceptance of the previous stage.
 
-Uniswap TWAP implementation remains excluded while deferred.
+UniswapV2Prices hardening, admission, and deployment remain excluded while
+deferred.
 
 ### Package F — H-10 live rehearsal and operational release
 

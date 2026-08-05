@@ -669,11 +669,16 @@ separate implementation/security review. A V3 TWAP is the stronger native
 primitive only after a separate custody/wrapper architecture decision. There
 is no launch Chainlink-to-Uniswap fallback.
 
-## 8. Contract specification if warranted
+## 8. Historical contract specification (superseded)
 
-This section specifies the **future research-only**
-`RobinhoodUniswapV2RipePrices` design. It is deliberately narrow and is not a
-recommendation or authorization to implement in this tranche.
+This section records the **superseded future research-only** cumulative-price
+design that was formerly named `RobinhoodUniswapV2RipePrices`. That source has
+been deleted. The current `UniswapV2Prices` candidate instead reuses the
+`AeroRipePrices` snapshot shape with an Underscore-style Uniswap V2 reserve
+reader. It is documented separately in
+[`uniswap-v2-prices.md`](../smart-contract-changes/uniswap-v2-prices.md) and is
+also non-admitted. The historical specification below is retained as decision
+history, not as a description or authorization of the current contract.
 
 **Current deployability:** no security-relevant mode is deployable today under
 this specification. Robinhood recommends a sequencer check, but Chainlink's
