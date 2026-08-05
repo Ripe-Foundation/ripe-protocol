@@ -1602,8 +1602,7 @@ def test_m1_custody_decrease_reverts_atomically(
         pytest.param(2, id="empty"),
         pytest.param(3, id="one-byte"),
         pytest.param(4, id="thirty-one-byte"),
-        pytest.param(5, id="thirty-three-byte"),
-        pytest.param(6, id="dynamic-shaped"),
+        pytest.param(6, id="dynamic-shaped-first-word-mismatch"),
     ),
 )
 @pytest.mark.parametrize("phase", ("pre", "post"))
@@ -1639,6 +1638,41 @@ def test_m1_balance_observation_failures_are_atomic(
         bob,
         amount,
     )
+
+
+@pytest.mark.parametrize("phase", ("pre", "post"))
+def test_m1_typed_balance_observation_accepts_trailing_data(
+    phase,
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+    if phase == "pre":
+        token.configure_balance(simple_erc20_vault, 5, 0, False)
+    else:
+        token.configure_balance(simple_erc20_vault, 0, 5, True)
+
+    assert teller.deposit(
+        token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+
+    assert token.balanceValue(bob) == 0
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount
+    assert ledger.getNumUserVaults(bob) == 1
 
 
 @pytest.mark.parametrize(
@@ -3252,4 +3286,4 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    assert len(runtime) <= 24_152
+    assert len(runtime) <= 24_082

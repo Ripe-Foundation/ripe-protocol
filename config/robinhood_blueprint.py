@@ -1436,7 +1436,7 @@ _SURFACE_ROWS = (('S-001-CCIP-CAP',
  ('S-034-EXACT-RECEIPT',
   'CM-034',
   'behavioral_invariant',
-  'every external and trusted Teller producer requires R == Q, vaultResult == Q, exact-length '
+  'every external and trusted Teller producer requires R == Q, vaultResult == Q, typed balance '
   'reads, one mutex policy, and atomic rollback',
   'blocked',
   'pre_activation_configuration',

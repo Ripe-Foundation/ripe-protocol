@@ -288,13 +288,13 @@ def _deposit(
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
     assert not self.receiptMeasurementActive
     self.receiptMeasurementActive = True
-    custodyBefore: uint256 = self._exactBalance(_asset, vaultAddr)
+    custodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(vaultAddr)
     # transfer tokens
     if _areFundsHereAlready:
         assert extcall IERC20(_asset).transfer(vaultAddr, amount, default_return_value=True) # dev: could not transfer
     else:
         assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
-    assert self._exactBalance(_asset, vaultAddr) - custodyBefore == amount
+    assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount
 
     # deposit tokens
     if _lockDuration == 0:
@@ -1007,19 +1007,6 @@ def _performHousekeeping(
             assert extcall CreditEngine(_a.creditEngine).updateDebtForUser(_user, _a) # dev: bad debt health
         else:
             extcall CreditEngine(_a.creditEngine).updateDebtForUser(_user, _a)
-
-
-@view
-@internal
-def _exactBalance(_asset: address, _holder: address) -> uint256:
-    response: Bytes[33] = raw_call(
-        _asset,
-        abi_encode(_holder, method_id=method_id("balanceOf(address)")),
-        max_outsize=33,
-        is_static_call=True,
-    )
-    assert len(response) == 32
-    return abi_decode(response, uint256)
 
 
 # green payments

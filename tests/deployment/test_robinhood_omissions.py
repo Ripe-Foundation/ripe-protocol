@@ -859,7 +859,7 @@ def test_teller_exact_receipt_policy_covers_every_producer():
     for required in (
         "R == Q",
         "vaultResult == Q",
-        "exact-length reads",
+        "typed balance reads",
         "one mutex policy",
         "atomic rollback",
     ):

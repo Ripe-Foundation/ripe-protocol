@@ -20,14 +20,16 @@ deployment or release gates. Historical commits, counts, and hashes remain
 dated evidence; a current rebind is added rather than rewriting their original
 meaning. Source rationale does not expand owner authority.
 
-## Current authority and ancestry
+## Current review-candidate authority and ancestry
 
-This refresh is bound to the following independently verified identities on
-3 August 2026:
+This uncommitted review candidate is based on the following independently
+verified repository identities. Its Teller source and artifact rows include
+the direct typed-balance candidate and therefore are not claims about the
+unchanged `rh` ref.
 
 | Ref or role | Commit | Tree | Meaning |
 | --- | --- | --- | --- |
-| Current local/cached/live `rh` | `0642f086d19e3cc62faaf67da096b6511e405320` | `d869d4149380b368f9678ed03efc0b59a6c804e2` | Authority for every current claim in this directory |
+| Candidate base `rh` | `1ac64deb5f65fc39f4362f02ed86a118d7554deb` | `40fc7d00222659285b60fbde96155f255246c734` | Exact base for this uncommitted review candidate |
 | Current local/cached/live `master` | `91eda49ccd34a25090582aff0695075c4c806011` | `fbd958bec234081f70769045abd8f9bb638f6dd7` | Comparison point and merge base for `master..rh` |
 | Configuration-source ancestor | `e4473ce6485888f1b747761a5ee8693443108877` | `33b705690007bda9b11900b5775bd9230e79f09e` | Ancestor that last changed `DefaultsRobinhood.vy`; not the current `rh` tip |
 | Shared-source import ancestor | `ad831669943ccfe7b9ed57454995dfce51630a66` | `3467f4a75aa37203d615407d5baf9c5fc9035639` | Historical `rh` import of corrected Deleverage work |
@@ -49,7 +51,7 @@ separate dashboard authority is outside this folder refresh.
 The live ref checks establish repository identity only. They do not establish a
 Robinhood deployment or live protocol state.
 
-## Complete current production-source delta
+## Complete review-candidate production-source delta
 
 The following feature-candidate production source paths include the current
 Robinhood delta plus the BasicVault fail-closed changes in this worktree. The
@@ -57,7 +59,7 @@ shared ERC-20 modules alter their transitive compiled artifacts:
 
 | Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
 | --- | --- | --- | --- | ---: | --- |
-| `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `7019b6c47dde03151acc1952944dd19301c83328` | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` | 41,106 | Exact call-local receipt and vault-return policy |
+| `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `dea818cde0901b02248e3824158e5c422ed02a80` | `f2e01e1cc9cf4cdfca380f329836732fd2d6d0201565828093257a0df8451b9a` | 40,786 | Exact call-local receipt and vault-return policy with typed balance observations |
 | `contracts/vaults/modules/BasicVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `a5a51ee20c598e9bf40908fc6c38f1c0634bf665` | `6a6abdde4887fb5339125c7268e0258175e3b66c9f060b6ab6e8262f58269ea8` | 5,552 | Shared nominal-vault fail-closed backing and exact delivery |
 | `contracts/vaults/modules/StabVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `e9c0bb1e67bdcfa0df4c9116d5a6298446b9df68` | `b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e` | 39,669 | Truthful indexed Stability Pool positions for non-borrow consumers |
 | `contracts/core/AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `d0a2d45cae0128cbb6ed5508238c817dfd963482` | `3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3` | 53,566 | Skips deficient collateral, preserves eligible Stability Pool auctions, and keeps empty liquidations retryable |
@@ -68,8 +70,10 @@ shared ERC-20 modules alter their transitive compiled artifacts:
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
 | `contracts/tokens/modules/Erc20Token.vy` | [`erc20-token.md`](erc20-token.md) | `f00e5655567612e3f8c95182de75701424eeea2b` | `54ffb5d2dcdf5dd2c5990e0bcd3a67b0ebcbae32b8dc3ef6c00d2e84ea447af7` | 17,435 | Adds governance-backed `getCCIPAdmin()` discovery to GREEN, RIPE, and sGREEN compiler outputs; owner authorization is unresolved, committed ABIs are stale, direct tests are missing, and the final LF was removed |
 
-These are integrated source facts. None proves that the corresponding contract
-has been deployed, registered, configured, or activated on Robinhood.
+All rows other than Teller record integrated source facts. The Teller row is
+the uncommitted review candidate described above. No row proves that the
+corresponding contract has been deployed, registered, configured, or activated
+on Robinhood.
 
 ## Configuration contract
 
@@ -117,10 +121,9 @@ and release remain separate.
 
 ## Relevant current artifact identities
 
-The central nine-contract artifact checker was rerun against the current bytes.
-BlueChip, the non-admitted Uniswap candidate, the changed token module, and its
-three transitive token consumers were also freshly compiled with Vyper
-`0.4.3+commit.bff19ea2` and their outputs hashed.
+The Teller candidate was freshly compiled and passed the central artifact
+checker. Other rows preserve the previously recorded artifact evidence; the
+complete nine-contract checker was not rerun for this review candidate.
 
 | Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | --- | --- |
@@ -133,7 +136,7 @@ three transitive token consumers were also freshly compiled with Vyper
 | Ledger | 13,125 | 11,451 | `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7` | `69f5e1c1cccf0f8bfbfa0cae30879635bca241d40af1e95615026b264658fb32` |
 | Lootbox | 21,569 | 3,007 | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
 | SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
-| Teller | 24,152 | 424 | `39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
+| Teller | 24,082 | 494 | `76abbbfc443f0e7ff84d9800df0145858344096d4342e9a9e3941887f2055502` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
 | BlueChipYieldPrices | 22,054 | 2,522 | `84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578` | `d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73` |
 | UniswapV2Prices | 13,669 | 10,907 | `2dc8fa0469958bc4d829be6b10ede1210152dacfa3e2c95a847250cb286677d8` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
 | Erc20Token module | 6,767 | 17,809 | `d13a59c2961a981a444ce6defd59a2d4c4d0a0b079f5cb322dc2c4fc2715c7fb` | `49c87121ab8eec9d6472e7e7401e54d78bf47022d54346ae1020dce01f546f39` |

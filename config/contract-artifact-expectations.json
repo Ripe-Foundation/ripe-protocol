@@ -1142,12 +1142,12 @@
         "committed_path": "scripts/abis/Teller.json"
       },
       "artifacts": {
-        "accepted_runtime_ceiling": 24152,
-        "creation_sha256": "b94a58ac0faa6cad71e58f451cb9aea27a7152bf63bfc65798103d3b97704e5a",
-        "creation_size": 24387,
-        "eip170_headroom": 424,
-        "runtime_template_sha256": "39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81",
-        "runtime_template_size": 24152
+        "accepted_runtime_ceiling": 24082,
+        "creation_sha256": "9ebd4682ea6fd0eaf73f5124bd131d240fa6f9d6f4c91ee5f1a28c05643a12cb",
+        "creation_size": 24317,
+        "eip170_headroom": 494,
+        "runtime_template_sha256": "76abbbfc443f0e7ff84d9800df0145858344096d4342e9a9e3941887f2055502",
+        "runtime_template_size": 24082
       },
       "code_layout": {
         "addys": {
@@ -1201,9 +1201,9 @@
         "canonical_sha256": "48ff38c54c9879b56bb6c8b16774028b4b31e14c68d1a510e3d800bfe19a0a61",
         "count": 123
       },
-      "source_git_blob": "7019b6c47dde03151acc1952944dd19301c83328",
+      "source_git_blob": "dea818cde0901b02248e3824158e5c422ed02a80",
       "source_path": "contracts/core/Teller.vy",
-      "source_sha256": "4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909",
+      "source_sha256": "f2e01e1cc9cf4cdfca380f329836732fd2d6d0201565828093257a0df8451b9a",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -1225,7 +1225,7 @@
           "type": "bool"
         }
       },
-      "transitive_compiler_input_integrity": "1d734c3c0507c8508fa8d7fcfac8aa7dff850f9f0bd167b28d22129986f97fdd"
+      "transitive_compiler_input_integrity": "907ffffb286cead8be38684074d8d42bcf43b7aedcc08778e06e93ae35554a73"
     },
     "DefaultsRobinhood": {
       "abi": {

@@ -40,10 +40,18 @@ affected gates must consume that synthesis.
 The sole canonical deployment-owner handoff is
 [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md).
 
+## Pending Teller review candidate
+
+The owner requested an uncommitted candidate that preserves Teller's exact
+custody-delta, exact vault-return, mutex, and rollback boundaries while using
+direct typed `balanceOf` observations instead of the raw-call wrapper. This is
+prepared for review only and does not yet amend the accepted deployment,
+activation, or release posture below.
+
 ## Accepted synthesis posture
 
 - Preserve the current Ledger and Teller contracts and their reviewed
-  measurement/clock boundaries.
+  measurement/clock boundaries, subject to the pending Teller candidate above.
 - Use the protected shared `BasicVault` behavior through `SimpleErc20`; do not
   deploy or configure a separate `GuardedErc20` artifact.
 - Launch with Chainlink at PriceDesk slot 1, unchanged CurvePrices at slot 2
