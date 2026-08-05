@@ -286,14 +286,21 @@ def _deposit(
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
-    assert not self.receiptMeasurementActive
+    
+    # disable receipt measurement for this deposit
+    assert not self.receiptMeasurementActive # dev: receipt measurement active
     self.receiptMeasurementActive = True
+
+    # measure custody before transfer
     custodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(vaultAddr)
+
     # transfer tokens
     if _areFundsHereAlready:
         assert extcall IERC20(_asset).transfer(vaultAddr, amount, default_return_value=True) # dev: could not transfer
     else:
         assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
+
+    # verify custody after transfer
     assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount
 
     # deposit tokens
@@ -302,6 +309,7 @@ def _deposit(
     else:
         assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount
 
+    # re-enable receipt measurement
     self.receiptMeasurementActive = False
 
     # register vault participation
