@@ -200,6 +200,8 @@ event UserDelegationSet:
     canClaimLoot: bool
     caller: indexed(address)
 
+receiptMeasurementActive: transient(bool)
+
 MAX_BALANCE_ACTION: constant(uint256) = 20
 MAX_CLAIM_USERS: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
@@ -214,17 +216,17 @@ STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 CURVE_PRICES_ID: constant(uint256) = 2
 
-receiptMeasurementActive: transient(bool)
-
 
 @deploy
 def __init__(_ripeHq: address, _shouldPause: bool):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
 
+
 ############
 # Deposits #
 ############
+
 
 @nonreentrant
 @external
@@ -239,6 +241,7 @@ def deposit(
     a: addys.Addys = addys._getAddys()
     return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, False, True, a)
 
+
 @nonreentrant
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
@@ -248,6 +251,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, False, a)
     self._performHousekeeping(False, _user, True, a)
     return len(_deposits)
+
 
 @external
 def depositFromTrusted(
@@ -262,7 +266,9 @@ def depositFromTrusted(
     a: addys.Addys = addys._getAddys(_a)
     return self._deposit(_asset, _amount, _user, empty(address), _vaultId, msg.sender, _lockDuration, True, False, False, a)
 
+
 # core logic
+
 
 @internal
 def _deposit(
@@ -328,6 +334,7 @@ def _deposit(
 
     log TellerDeposit(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
     return amount
+
 
 ###############
 # Withdrawals #
