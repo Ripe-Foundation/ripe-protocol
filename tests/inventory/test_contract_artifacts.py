@@ -38,15 +38,15 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_532, "headroom": 44},
+    "AuctionHouse": {"size": 24_549, "headroom": 27},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
 CREATION_BINDING_FACTS = {
     "AuctionHouse": {
-        "prefix_size": 24_560,
-        "prefix_sha256": "f0670fb85cf1c51bfd777dc843130de8f18774c61c212ec4fb31af8a26ddfbcf",
+        "prefix_size": 24_577,
+        "prefix_sha256": "1236fcba166f50d861e9efe979242ebf5a0bbed88e5e754d7c1819c37d94492f",
         "metadata_size": 59,
-        "metadata_sha256": "9092466c47aa68795834055fef38cc7ff6b857218ebac7d8e6667f0e60783ecd",
+        "metadata_sha256": "6ca85b6a786c4434581874abdfc1fab2170611dcdaf6e7e583bb7f66b3c5b581",
     },
     "CreditEngine": {
         "prefix_size": 24_285,

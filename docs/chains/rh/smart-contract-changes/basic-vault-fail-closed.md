@@ -51,7 +51,9 @@ enough backing makes the vault usable again; no permanent brick flag is stored.
 - Deposit reward bookkeeping currently remains nominal during a custody
   deficit. This preserves the pre-existing Lootbox accounting model; changing
   it is an economic-policy decision because points already accrued before the
-  deficit is observed cannot be retroactively removed by a view change.
+  deficit is observed cannot be retroactively removed by a view change. The
+  owner decision on whether to stop future accrual during a deficit remains
+  open; this candidate does not silently change it.
 - Typed `balanceOf` observations and typed `transfer` calls are used directly;
   there are no raw token calls or token-call wrapper helpers in `BasicVault`.
 - Vyper's typed ABI decoder accepts trailing return data and reads the first
@@ -87,16 +89,16 @@ The public interface and persistent, transient, and immutable layouts remain
 the canonical `SimpleErc20` layouts. The runtime changes because the shared
 safety behavior is compiled into each future Simple deployment.
 
-AuctionHouse is separately pinned at 24,532 deployed runtime bytes, leaving
-44 bytes of EIP-170 headroom. The test asserts that exact measurement rather
+AuctionHouse is separately pinned at 24,549 deployed runtime bytes, leaving
+27 bytes of EIP-170 headroom. The test asserts that exact measurement rather
 than only `<= 24,576`.
 
 ## Baseline verification caveat
 
 The feature base `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80` was not a green
 test baseline. Its failures included a stale GuardedErc20 artifact identity,
-four stale token ABIs missing `getCCIPAdmin`, and deployment checks whose old
-assertions depended on the environment or a dirty prospective tree. The
+four stale token ABIs missing `getCCIPAdmin`, and two environment-dependent
+deployment checks. The
 candidate's green-suite result is therefore evidence that the candidate is
 internally healthy, not proof of “no regressions versus a green base.” Those
 artifact, ABI, and execution-plan repairs are disclosed ride-alongs; the old

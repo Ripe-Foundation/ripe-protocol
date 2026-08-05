@@ -852,7 +852,7 @@ def test_source_authoritative_defaults_has_exact_production_admission(
         "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
     )
     assert checker.CURRENT_PRODUCTION_INVENTORY_SHA256 == (
-        "36034f6e8e66fe972b752105a352f36fb0b8cd7176629e125ff2fc6b288781d5"
+        "184ff0b60a682a18338f80f3e7972c87d60abca3ed04882722768f657ec8caa0"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"

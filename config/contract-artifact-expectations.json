@@ -13,11 +13,11 @@
         "committed_path": "scripts/abis/AuctionHouse.json"
       },
       "artifacts": {
-        "creation_sha256": "bbb6bbb460645ea1391ccdd7f4f576788e32cf962f6c540bcf6e68ab805408da",
-        "creation_size": 24619,
-        "eip170_headroom": 140,
-        "runtime_template_sha256": "f9d1f719d28f0fd48f98317307b366aa261a607328335d81869eed6c0fd384a6",
-        "runtime_template_size": 24436
+        "creation_sha256": "0b58ea8c6aea0a7615315af80abcf5a06a03ba330e45e7334c4a5b168d0fe0b0",
+        "creation_size": 24636,
+        "eip170_headroom": 123,
+        "runtime_template_sha256": "cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f",
+        "runtime_template_size": 24453
       },
       "code_layout": {
         "addys": {
@@ -67,9 +67,9 @@
         "canonical_sha256": "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         "count": 28
       },
-      "source_git_blob": "2241f8cb38f4f69c68e9da535119b525256af8dc",
+      "source_git_blob": "d0a2d45cae0128cbb6ed5508238c817dfd963482",
       "source_path": "contracts/core/AuctionHouse.vy",
-      "source_sha256": "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
+      "source_sha256": "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -111,7 +111,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "56648a1ce468b6e732340859677efe6e1a53569c7aa0c7bf8c7dd0bc350757b5"
+      "transitive_compiler_input_integrity": "2564615ba13de1b57996eaad449398160d693fc0573d15f51aba82d58b113af1"
     },
     "CreditEngine": {
       "abi": {

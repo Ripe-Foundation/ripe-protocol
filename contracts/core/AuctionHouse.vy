@@ -18,8 +18,8 @@
 
 # @version 0.4.3
 # pragma optimize codesize
-# At this source revision, the deployed runtime is 24,532 bytes including
-# Vyper's 96-byte immutables section: 44 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 24,549 bytes including
+# Vyper's 96-byte immutables section: 27 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
@@ -322,10 +322,6 @@ def _liquidateUser(
     if bt.collateralVal > collateralLiqThreshold:
         return 0
 
-    # set liquidation mode only when there is usable collateral to process;
-    # this leaves a zero-collateral position retryable if backing is restored
-    userDebt.inLiquidation = bt.collateralVal != 0
-
     # liquidation fees
     baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
     totalLiqFees: uint256 = baseLiqFee
@@ -364,6 +360,10 @@ def _liquidateUser(
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
+
+    # Latch for usable borrowing collateral or a queued auction asset, including
+    # Stability Pool positions; fully deficient positions remain retryable.
+    userDebt.inLiquidation = (bt.collateralVal | self.numUserAssetsForAuction[_liqUser]) != 0
 
     # check if liq fees were already covered (stability pool swaps)
     liqFeesUnpaid: uint256 = totalLiqFees

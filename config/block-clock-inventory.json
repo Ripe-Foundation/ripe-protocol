@@ -15558,7 +15558,7 @@
     {
       "path": "contracts/core/AuctionHouse.vy",
       "classification": "production",
-      "contentSha256": "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
+      "contentSha256": "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",

@@ -96,6 +96,7 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     bravo_token_whale,
     mock_price_source,
     performDeposit,
+    simple_erc20_vault,
     stability_pool,
     teller,
     credit_engine,
@@ -162,13 +163,16 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     assert terms.lowestLtv == 50_00
 
     teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    alpha_token.burn(alpha_amount, sender=simple_erc20_vault.address)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.getCollateralValue(bob) == 0
     assert credit_engine.canLiquidateUser(bob)
     teller.liquidateUser(bob, False, sender=sally)
 
     stab_id = vault_book.getRegId(stability_pool)
     assert stab_id == 1
     assert ledger.hasFungibleAuction(bob, stab_id, bravo_token)
+    assert ledger.userDebt(bob).inLiquidation
 
 
 def test_ah_liquidation_with_stab_pool_both_assets_debug(

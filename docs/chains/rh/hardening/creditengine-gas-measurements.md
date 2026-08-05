@@ -32,9 +32,9 @@ a custody reader
 | --- | --- |
 | Reviewed implementation parent | `fdf19226f0d8f4b42741f2ce324f8ccb9ba20336`; the source hash below binds the subsequent reviewer-fix revision |
 | CreditEngine source | `contracts/core/CreditEngine.vy`, SHA-256 `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` |
-| Environment | exact-lock venv `/private/tmp/ripe-rh-final-gate2.uZCfBL/venv`; canonical environment manifest SHA-256 `f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d` |
+| Environment | validation venv `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312`; installed-distribution manifest SHA-256 `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92`; interpreter SHA-256 `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`; `requirements.txt` SHA-256 `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` |
 | Compiler | `Vyper 0.4.3+commit.bff19ea2`; CreditEngine source pragma governs `codesize`; no `-O` override |
-| EVM harness | Titanoboa from the exact-lock environment; local ephemeral deployment only |
+| EVM harness | Titanoboa from the validation environment above; local ephemeral deployment only |
 | Public subject | `credit_engine.getUserBorrowTerms(user, True)` |
 | Position counts | `1, 2, 4, 8, 16, 50` |
 | Largest-count derivation | fixture general configuration permits five user vaults and ten assets per vault, so `5 * 10 = 50` is the largest realistic configured per-user position count ([fixture](../../../../tests/conf_utils.py#L42)) |

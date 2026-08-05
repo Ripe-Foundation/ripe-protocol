@@ -4,14 +4,14 @@
 
 This worktree extends the historically shared `AuctionHouse` source with
 backing-aware BasicVault consumer boundaries. The candidate source is Git blob
-`2241f8cb38f4f69c68e9da535119b525256af8dc`, SHA-256
-`2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89`.
+`d0a2d45cae0128cbb6ed5508238c817dfd963482`, SHA-256
+`3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3`.
 It is not integrated into `rh`, deployed, configured, or activated.
 
-The runtime template is 24,436 bytes, with 140 bytes of template headroom and
+The runtime template is 24,453 bytes, with 123 bytes of template headroom and
 SHA-256
-`f9d1f719d28f0fd48f98317307b366aa261a607328335d81869eed6c0fd384a6`.
-The constructor-bound deployed runtime is 24,532 bytes, leaving 44 bytes below
+`cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f`.
+The constructor-bound deployed runtime is 24,549 bytes, leaving 27 bytes below
 the EIP-170 limit.
 
 ## Why the change exists
@@ -58,7 +58,9 @@ An all-deficient liquidation now leaves `inLiquidation` false when it seizes
 nothing and creates no auction, so backing restoration can be followed by a
 permissionless retry. Stability Pool's truthful indexed getter also restores
 phase-2 visibility for eligible positions; CreditEngine separately excludes
-stability vault ID `1` from borrowing power.
+stability vault ID `1` from borrowing power. If ordinary borrowing collateral
+is fully deficient but phase 2 queues a healthy Stability Pool asset for
+auction, `inLiquidation` remains true so that auction can start.
 
 The Deleverage withdrawal wrapper and collateral-transfer helper also return a
 soft-zero/skip result for deficient collateral. Deleverage can therefore

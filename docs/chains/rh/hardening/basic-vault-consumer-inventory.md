@@ -43,7 +43,7 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "2c2332d6e1a5fe1ad77c30554ecbb95e2ea78feec228ad56196aa663e251fe89",
+    "contracts/core/AuctionHouse.vy": "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3",
     "contracts/core/CreditEngine.vy": "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb",
     "contracts/core/CreditRedeem.vy": "62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd",
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
