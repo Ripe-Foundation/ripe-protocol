@@ -51,15 +51,18 @@ Robinhood deployment or live protocol state.
 
 ## Complete current production-source delta
 
-The following seven production source paths differ between current `master`
-and current `rh`. Six are deployable contract sources; the seventh is the
-shared ERC-20 module whose change alters four compiled token artifacts:
+The following feature-candidate production source paths include the current
+Robinhood delta plus the BasicVault fail-closed changes in this worktree. The
+shared ERC-20 modules alter their transitive compiled artifacts:
 
 | Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
 | --- | --- | --- | --- | ---: | --- |
 | `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `7019b6c47dde03151acc1952944dd19301c83328` | `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909` | 41,106 | Exact call-local receipt and vault-return policy |
-| `contracts/vaults/GuardedErc20.vy` | [`guarded-erc20.md`](guarded-erc20.md) | `713dab98bb9a08585e0c1f937425e8142cd600ab` | `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` | 9,977 | Nominal vault with fail-closed backing and exact delivery |
-| `contracts/core/CreditEngine.vy` | [`credit-engine.md`](credit-engine.md) | `a98d2522a16708e887a5a8aad78171843d413baf` | `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` | 46,812 | Retains terms for nonempty zero-backed positions without pricing zero |
+| `contracts/vaults/modules/BasicVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `a5a51ee20c598e9bf40908fc6c38f1c0634bf665` | `6a6abdde4887fb5339125c7268e0258175e3b66c9f060b6ab6e8262f58269ea8` | 5,552 | Shared nominal-vault fail-closed backing and exact delivery |
+| `contracts/vaults/modules/StabVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `e9c0bb1e67bdcfa0df4c9116d5a6298446b9df68` | `b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e` | 39,669 | Truthful indexed Stability Pool positions for non-borrow consumers |
+| `contracts/core/AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `d0a2d45cae0128cbb6ed5508238c817dfd963482` | `3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3` | 53,566 | Skips deficient collateral, preserves eligible Stability Pool auctions, and keeps empty liquidations retryable |
+| `contracts/core/CreditRedeem.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `447a945b7bb052837412fb15a7f22875f44b9ee9` | `62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd` | 14,166 | Soft-skips deficient redemption entries so healthy batch entries can continue |
+| `contracts/core/CreditEngine.vy` | [`credit-engine.md`](credit-engine.md) | `ef7724393d3b9f30f6e4281a1a465c5d2cc49895` | `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` | 46,886 | Retains terms for zero amounts and explicitly excludes Stability Pool collateral |
 | `contracts/data/Ledger.vy` | [`ledger.md`](ledger.md) | `590341e3f9091105036c1cc497bd862ea3769248` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` | 26,492 | Immutable native/ArbSys action-block selection |
 | `contracts/core/Lootbox.vy` | [`lootbox.md`](lootbox.md) | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | 47,731 | Per-deployment immutable Underscore interval floor |
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
@@ -100,14 +103,12 @@ or activation.
 ## Historical/shared-source rationale inventory
 
 The corrected Deleverage changes entered `rh` through `ad831669…`. Current
-`master` and current `rh` now contain identical production blobs for all three
-sources, so they are historical/shared-source rationales rather than current
-`master..rh` production deltas:
+`master` and current `rh` contain identical production blobs for the two
+unchanged sources below, so they remain historical/shared-source rationales:
 
 | Contract | Rationale | Shared Git blob | Current SHA-256 | Source bytes |
 | --- | --- | --- | --- | ---: |
 | `Deleverage.vy` | [`deleverage.md`](deleverage.md) | `b43d373039b352d6eab240be714134764901b947` | `d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138` | 56,068 |
-| `AuctionHouse.vy` | [`auction-house.md`](auction-house.md) | `48cbbbca22c87e490ef0f88aae4f643ab5b87987` | `e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921` | 53,173 |
 | `SwitchboardDelta.vy` | [`switchboard-delta.md`](switchboard-delta.md) | `4e234df7626eb332836aceb5cbca2daaef2a0390` | `12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79` | 53,713 |
 
 Their integration history and current shared bytes are established. Robinhood
@@ -123,11 +124,12 @@ three transitive token consumers were also freshly compiled with Vyper
 
 | Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | --- | --- |
-| AuctionHouse | 24,373 | 203 | `f91c53f0fbfe66b2f9e07003ba712cb976d6941a3b98ec0891918faa0bf6eead` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
-| CreditEngine | 24,132 | 444 | `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| AuctionHouse | 24,453 | 123 | `cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,151 | 425 | `082c3f6c124447a43bcd4835237c134864ba3036f9a8d190ef6b16ac6e8e3696` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
 | Deleverage | 24,473 | 103 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
 | DefaultsRobinhood | 2,687 | 21,889 | `aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99` | `a2b3232606060b9b296666a2cfbc6a328c2b92897ac6e1dcf9f82920a449bddb` |
-| GuardedErc20 | 10,524 | 14,052 | `e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14` | `453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a` |
+| SimpleErc20 | 9,368 | 15,208 | `750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6` | `cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57` |
+| StabilityPool | 23,960 | 616 | `2417f094a3ae75fb4c6c9d742b8fbaafadb977a04d7d3485cb2a4e27206d3a58` | `16267810e14746f1091d6343187ffff1b2144fb90aa0dfe150add68515cd146f` |
 | Ledger | 13,125 | 11,451 | `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7` | `69f5e1c1cccf0f8bfbfa0cae30879635bca241d40af1e95615026b264658fb32` |
 | Lootbox | 21,569 | 3,007 | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
 | SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
@@ -204,7 +206,8 @@ this directory is explicit audit evidence, not a continuously enforced gate.
 - [`defaults-robinhood.md`](defaults-robinhood.md) — configuration values and
   the two-source authority model;
 - [`teller.md`](teller.md) — exact deposit receipt, mutex, and return policy;
-- [`guarded-erc20.md`](guarded-erc20.md) — backing and delivery containment;
+- [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) — shared nominal
+  backing and exact-delivery containment;
 - [`credit-engine.md`](credit-engine.md) — zero-backing debt-term containment;
 - [`ledger.md`](ledger.md) — portable action-block identity;
 - [`lootbox.md`](lootbox.md) — per-deployment reward interval floor;

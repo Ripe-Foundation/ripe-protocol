@@ -71,6 +71,20 @@ def _current_git_identity() -> tuple[str, str]:
     return identities[0], identities[1]
 
 
+def _tracked_worktree_is_clean() -> bool:
+    result = subprocess.run(
+        ["/usr/bin/git", "diff", "--quiet", "HEAD", "--"],
+        cwd=ROOT,
+        env={"LANG": "C", "LC_ALL": "C"},
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode in (0, 1)
+    assert result.stdout == b""
+    assert result.stderr == b""
+    return result.returncode == 0
+
+
 def _assert_current_report_preview_identity(report) -> None:
     current_commit, current_tree = _current_git_identity()
     expected_tree = build_robinhood_plan(
@@ -80,7 +94,7 @@ def _assert_current_report_preview_identity(report) -> None:
     assert report["source_base_commit"] == current_commit
     assert report["source_base_tree"] == current_tree
     assert report["source_tree"] == expected_tree
-    assert report["source_tree"] != current_tree
+    assert (report["source_tree"] == current_tree) is _tracked_worktree_is_clean()
     for identity in (
         report["source_base_commit"],
         report["source_base_tree"],

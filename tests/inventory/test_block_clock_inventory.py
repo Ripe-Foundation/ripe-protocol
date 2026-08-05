@@ -45,7 +45,8 @@ ARTIFACT_EXPECTATIONS_RELATIVE = Path(
 IMPLEMENTATION_RECORD_RELATIVE = Path(
     "docs/chains/rh/ledger-guard-implementation-record.md"
 )
-M2_GUARDED_RELATIVE = "contracts/vaults/GuardedErc20.vy"
+SHARED_BASIC_VAULT_RELATIVE = "contracts/vaults/modules/BasicVault.vy"
+SHARED_STAB_VAULT_RELATIVE = "contracts/vaults/modules/StabVault.vy"
 M3_CREDIT_RELATIVE = "contracts/core/CreditEngine.vy"
 H04_MANIFEST_RELATIVE = "config/robinhood-parameters.json"
 H04_GENERATOR_RELATIVE = "scripts/params/generate_robinhood_defaults.py"
@@ -163,13 +164,13 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=70" in result.output
     assert "mixed_clock_functions=4" in result.output
-    assert "vyper_paths=96" in result.output
+    assert "vyper_paths=95" in result.output
     assert "current_bindings=5/4" in result.output
     assert (
         "current_state_sha256=" + checker.CURRENT_BINDINGS_STATE_SHA256
         in result.output
     )
-    assert "post_s5_production_records=60" in result.output
+    assert "post_s5_production_records=59" in result.output
     assert (
         "post_s5_production_sha256="
         + checker.CURRENT_PRODUCTION_INVENTORY_SHA256
@@ -850,7 +851,7 @@ def test_source_authoritative_defaults_has_exact_production_admission(
         "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
     )
     assert checker.CURRENT_PRODUCTION_INVENTORY_SHA256 == (
-        "ae441bf643004df3b308c8afc53cc663f5894e0c49c648aa43426499cff40a9e"
+        "184ff0b60a682a18338f80f3e7972c87d60abca3ed04882722768f657ec8caa0"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
@@ -1153,21 +1154,23 @@ def test_s5_review_artifact_scope_and_legacy_commits_are_exact(
     )
 
 
-def test_m2_production_record_is_exact_and_content_pinned(
+def test_shared_basic_vault_record_is_exact_and_content_pinned(
     fixture_repo: Path,
 ) -> None:
     inventory = _load_inventory(fixture_repo)
     record = next(
         item
         for item in inventory["vyperPathClassifications"]
-        if item["path"] == M2_GUARDED_RELATIVE
+        if item["path"] == SHARED_BASIC_VAULT_RELATIVE
     )
-    assert checker._is_reviewed_m2_production_record(record)
+    assert checker._is_reviewed_shared_basic_vault_record(record)
     assert record["classification"] == "production"
-    assert record["contentSha256"] == checker.M2_GUARDED_ERC20_SHA256
+    assert record["contentSha256"] == checker.SHARED_BASIC_VAULT_SHA256
     assert (
-        hashlib.sha256((fixture_repo / M2_GUARDED_RELATIVE).read_bytes()).hexdigest()
-        == checker.M2_GUARDED_ERC20_SHA256
+        hashlib.sha256(
+            (fixture_repo / SHARED_BASIC_VAULT_RELATIVE).read_bytes()
+        ).hexdigest()
+        == checker.SHARED_BASIC_VAULT_SHA256
     )
     result = checker.check_repository(fixture_repo)
     assert result.ok, result.output
@@ -1185,7 +1188,7 @@ def test_m2_production_record_is_exact_and_content_pinned(
         pytest.param("classification", "test", id="classification"),
     ],
 )
-def test_m2_inventory_identity_drift_fails_current_fingerprint(
+def test_shared_basic_vault_inventory_drift_fails_current_fingerprint(
     fixture_repo: Path,
     field: str,
     replacement: str,
@@ -1194,7 +1197,7 @@ def test_m2_inventory_identity_drift_fails_current_fingerprint(
     record = next(
         item
         for item in inventory["vyperPathClassifications"]
-        if item["path"] == M2_GUARDED_RELATIVE
+        if item["path"] == SHARED_BASIC_VAULT_RELATIVE
     )
     record[field] = replacement
     _write_inventory(fixture_repo, inventory)
@@ -1204,26 +1207,63 @@ def test_m2_inventory_identity_drift_fails_current_fingerprint(
     )
 
 
-def test_m2_source_content_drift_fails_exact_pin(fixture_repo: Path) -> None:
-    _append(fixture_repo / M2_GUARDED_RELATIVE, "\n# drift fixture\n")
+def test_shared_basic_vault_source_content_drift_fails_exact_pin(
+    fixture_repo: Path,
+) -> None:
+    _append(fixture_repo / SHARED_BASIC_VAULT_RELATIVE, "\n# drift fixture\n")
     _assert_failure(
         fixture_repo,
-        "INV-PATH-M2-CONTENT",
-        path=M2_GUARDED_RELATIVE,
+        "INV-PATH-BASIC-VAULT-CONTENT",
+        path=SHARED_BASIC_VAULT_RELATIVE,
     )
 
 
-def test_m2_source_deletion_fails(fixture_repo: Path) -> None:
-    (fixture_repo / M2_GUARDED_RELATIVE).unlink()
+def test_shared_stab_vault_record_is_exact_and_content_pinned(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == SHARED_STAB_VAULT_RELATIVE
+    )
+    assert checker._is_reviewed_shared_stab_vault_record(record)
+    assert record["classification"] == "production"
+    assert record["contentSha256"] == checker.SHARED_STAB_VAULT_SHA256
+    assert (
+        hashlib.sha256(
+            (fixture_repo / SHARED_STAB_VAULT_RELATIVE).read_bytes()
+        ).hexdigest()
+        == checker.SHARED_STAB_VAULT_SHA256
+    )
+    result = checker.check_repository(fixture_repo)
+    assert result.ok, result.output
+
+
+def test_shared_stab_vault_source_content_drift_fails_exact_pin(
+    fixture_repo: Path,
+) -> None:
+    _append(fixture_repo / SHARED_STAB_VAULT_RELATIVE, "\n# drift fixture\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-STAB-VAULT-CONTENT",
+        path=SHARED_STAB_VAULT_RELATIVE,
+    )
+
+
+def test_shared_basic_vault_source_deletion_fails(fixture_repo: Path) -> None:
+    (fixture_repo / SHARED_BASIC_VAULT_RELATIVE).unlink()
     _assert_failure(
         fixture_repo,
         "INV-PATH-MISSING",
-        path=M2_GUARDED_RELATIVE,
+        path=SHARED_BASIC_VAULT_RELATIVE,
     )
 
 
-def test_m2_sibling_production_path_fails(fixture_repo: Path) -> None:
-    relative = "contracts/vaults/FutureGuardedErc20.vy"
+def test_shared_basic_vault_sibling_production_path_fails(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/vaults/FutureProtectedErc20.vy"
     path = fixture_repo / relative
     path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
     result = checker.check_repository(fixture_repo)
@@ -1236,7 +1276,7 @@ def test_m2_sibling_production_path_fails(fixture_repo: Path) -> None:
 def test_future_production_admission_requires_new_controlling_fingerprint(
     fixture_repo: Path,
 ) -> None:
-    relative = "contracts/vaults/FutureGuardedErc20.vy"
+    relative = "contracts/vaults/FutureProtectedErc20.vy"
     path = fixture_repo / relative
     path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
     inventory = _load_inventory(fixture_repo)

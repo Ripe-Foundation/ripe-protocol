@@ -8,10 +8,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = (
-    ROOT / "docs/chains/rh/hardening/guarded-consumer-inventory.md"
+    ROOT / "docs/chains/rh/hardening/basic-vault-consumer-inventory.md"
 )
-BEGIN = "<!-- GUARDED_CONSUMER_INVENTORY_BEGIN -->"
-END = "<!-- GUARDED_CONSUMER_INVENTORY_END -->"
+BEGIN = "<!-- BASIC_VAULT_CONSUMER_INVENTORY_BEGIN -->"
+END = "<!-- BASIC_VAULT_CONSUMER_INVENTORY_END -->"
 FUNCTION_RE = re.compile(r"^def ([A-Za-z_][A-Za-z0-9_]*)\(", re.MULTILINE)
 
 BACKING_AWARE_GETTERS = {
@@ -68,16 +68,27 @@ def _scan_calls(path, getters):
     ]
 
 
-def test_guarded_consumer_inventory_matches_reviewed_sources():
+def test_basic_vault_consumer_inventory_matches_reviewed_sources():
     inventory = _load_inventory()
     assert inventory["schema"] == 1
-    assert inventory["baseline"] == "a86650b187c523f27c92f05bfe959d06840025a6"
+    assert inventory["baseline"] == "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80"
 
     actual_rows = []
-    for relative_path, expected_sha256 in inventory["sources"].items():
-        path = ROOT / relative_path
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_sha256
-        actual_rows.extend(_scan_calls(path, inventory["getter_scope"]))
+    actual_sources = {}
+    for path in sorted((ROOT / "contracts").rglob("*.vy")):
+        rows = _scan_calls(path, inventory["getter_scope"])
+        if not rows:
+            continue
+        relative_path = str(path.relative_to(ROOT))
+        actual_sources[relative_path] = hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
+        actual_rows.extend(rows)
+
+    # Discover callers across the complete production-contract tree first;
+    # a new consumer cannot evade review merely by living outside a frozen
+    # source allowlist.
+    assert actual_sources == inventory["sources"]
 
     expected_rows = [
         {
@@ -97,7 +108,7 @@ def test_guarded_consumer_inventory_matches_reviewed_sources():
     )
 
 
-def test_guarded_consumer_inventory_enforces_amount_policy():
+def test_basic_vault_consumer_inventory_enforces_amount_policy():
     inventory = _load_inventory()
     category_getters = {
         "value_backing_required": BACKING_AWARE_GETTERS,
@@ -131,9 +142,14 @@ def test_guarded_consumer_inventory_enforces_amount_policy():
         if row["classification"] == "value_backing_required"
     }
     assert required_paths == {
-        ("contracts/core/AuctionHouse.vy", 1204),
+        ("contracts/core/AuctionHouse.vy", 421),
+        ("contracts/core/AuctionHouse.vy", 517),
+        ("contracts/core/AuctionHouse.vy", 893),
+        ("contracts/core/AuctionHouse.vy", 1201),
+        ("contracts/core/AuctionHouse.vy", 1229),
         ("contracts/core/CreditEngine.vy", 729),
         ("contracts/core/CreditEngine.vy", 1252),
+        ("contracts/core/CreditRedeem.vy", 190),
         ("contracts/core/Deleverage.vy", 579),
         ("contracts/core/Deleverage.vy", 1086),
         ("contracts/core/Teller.vy", 381),

@@ -6,21 +6,22 @@
 > activation, migration, or release evidence, and it does not authorize any
 > source, test, configuration, or operational change.
 
-## Current `rh` rebind
+## Current candidate rebind
 
-The current authority for this page is `rh` commit
-`0642f086d19e3cc62faaf67da096b6511e405320`, tree
-`d869d4149380b368f9678ed03efc0b59a6c804e2`. The 28 July snapshot and its
-test counts remain dated historical evidence below.
+The candidate is rooted at feature baseline
+`1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`; the reviewer follow-up parent is
+`fdf19226f0d8f4b42741f2ce324f8ccb9ba20336`. The exact current source,
+artifact, and test identities are bound below. The 28 July snapshot and its
+test counts remain dated historical evidence.
 
 | Current identity | Value |
 | --- | --- |
-| CreditEngine source Git blob / SHA-256 | `a98d2522a16708e887a5a8aad78171843d413baf` / `7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d` |
-| Runtime template | 24,132 bytes; SHA-256 `764512326594fe5b0dc49fa3afc8528b02fa717f685beea4249629d22e0fc1de`; 444 bytes EIP-170 headroom |
-| [`test_stock_backing.py`](../../../../tests/core/creditEngine/test_stock_backing.py) | Git blob `2e72b0cffc1a11e47fd962c11b31cc5459b40fcd`; SHA-256 `6c2362f1074acbe05fa2a6b7f2b14919f484eaf176eef80507cfefea86f2d099` |
-| [`test_credit_borrow.py`](../../../../tests/core/creditEngine/test_credit_borrow.py) | Git blob `1139615df45f201dc401d9c68b3f075853d9394d`; SHA-256 `3d0e45f8cc6441d086766f09018bd1bbbc025e83c30e25f433b8ce2ea5310bd0` |
+| CreditEngine source Git blob / SHA-256 | `ef7724393d3b9f30f6e4281a1a465c5d2cc49895` / `05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb` |
+| Runtime template | 24,151 bytes; SHA-256 `082c3f6c124447a43bcd4835237c134864ba3036f9a8d190ef6b16ac6e8e3696`; 425 bytes EIP-170 headroom |
+| [`test_stock_backing.py`](../../../../tests/core/creditEngine/test_stock_backing.py) | Git blob `12725393abbc15c1c8ce3752894defa24ddac2a8`; SHA-256 `914b97141044c616187a1c96befdfcbf5bee5cc033476260416a4bb608003e4d` |
+| [`test_credit_borrow.py`](../../../../tests/core/creditEngine/test_credit_borrow.py) | Git blob `294afab81d3cbf012d1566c374efa082c7a1e9ee`; SHA-256 `5c43dff4e0c1aef5065f42807d25726c4e2c7fab42d151603205476bab35af44` |
 | [`test_credit_repay.py`](../../../../tests/core/creditEngine/test_credit_repay.py) | Git blob `0c6390fcb54480cfe1376af1958c2ee97071e9cb`; SHA-256 `a65e733eb632dc74d1e69c42062ed7fda49dc60de322dd56d58aa13592490d91` |
-| [Guarded integration test](../../../../tests/vaults/test_guarded_erc20.py) | Git blob `700d6c3857795cc2058d54668252b53168fdb738`; SHA-256 `45fb971f92987017fed5ea40e85f74a3f3bb41bfe3f0a2f367f57f76c5b248f9` |
+| [BasicVault safety test](../../../../tests/vaults/test_basic_vault_safety.py) | Git blob `d648347623a705fb039789b7b1b7952726897d11`; SHA-256 `12960d088b672fd1ec0065b0fa5134115b2f7f0d4d68502fd9663f0f505c6919` |
 
 Later integrated hardening closes the former withdrawal-surface and
 many-position-gas evidence gaps with
@@ -72,7 +73,8 @@ treated as permanently synonymous with whatever `rh` may contain later.
 | What was the rationale? | Give the unsafe position zero value and borrowing capacity without making existing debt invisible or blocking healthy co-collateral and repayment with an unnecessary zero-amount price lookup. |
 | What does the change actually do? | It skips only an empty asset address, retains configured terms for a nonempty position, values a zero amount at zero, and calls PriceDesk only for a nonzero amount. |
 | Does CreditEngine inspect token custody? | No. The selected vault owns backing classification and reports the `(asset, amount)` pair. CreditEngine consumes that canonical vault result. |
-| Why is `raw_call` used? | It is not used by this CreditEngine change. Strict raw custody observations belong to Teller and GuardedErc20; adding a second custody reader here would duplicate policy and create two sources of truth. |
+| Can Stability Pool positions affect borrowing terms? | No. CreditEngine explicitly skips vault ID `1`; the Stability Pool getter remains truthful so non-borrow consumers such as AuctionHouse can enumerate positions. |
+| Why is `raw_call` used? | It is not used. BasicVault calls typed `IERC20.balanceOf` directly, and CreditEngine consumes the vault's result rather than duplicating custody policy. |
 | Does zero backing automatically liquidate a user? | No. It can immediately change computed value, health, and eligibility. An authorized transaction must still pass Teller and AuctionHouse gates before liquidation state or auctions change, and later settlement remains vault-dependent. |
 | Is a CreditEngine source correction currently recommended? | No active Wave 1 correction is recommended or authorized by this record. `lowestLtv`, interest treatment, settlement, loss allocation, and bad-debt ideas are unapproved, owner-parked research findings. |
 
@@ -91,7 +93,7 @@ or authorize further Deleverage work. CCIP remains outside this analysis.
 
 ## Behavior before the change and the concrete failure mode
 
-GuardedErc20 distinguishes two superficially similar results:
+BasicVault distinguishes two superficially similar results:
 
 ```text
 (empty address, 0)  = no position exists
@@ -169,9 +171,9 @@ reported through the existing Vault interface.
 
 The complete relevant flow is:
 
-1. GuardedErc20 returns `(empty address, 0)` for a genuinely empty position and
+1. BasicVault returns `(empty address, 0)` for a genuinely empty index and
    `(asset, 0)` when a nominal position exists but backing is unusable
-   ([`GuardedErc20.vy:204-218`](../../../../contracts/vaults/GuardedErc20.vy#L204-L218)).
+   ([`BasicVault.vy:133-146`](../../../../contracts/vaults/modules/BasicVault.vy#L133-L146)).
 2. CreditEngine reads the pair, skips only the empty address, loads terms,
    still excludes configured LTV zero, bypasses PriceDesk for amount zero, and
    calculates value, capacity, fallback weight, and aggregates
@@ -192,11 +194,10 @@ The complete relevant flow is:
    health was not restored
    ([`AuctionHouse.vy:351-375`](../../../../contracts/core/AuctionHouse.vy#L351-L375),
    [`AuctionHouse.vy:789-807`](../../../../contracts/core/AuctionHouse.vy#L789-L807)).
-7. Auction creation is not settlement. Under a continuing GuardedErc20
-   deficit, internal delivery rejects before nominal movement
-   ([`GuardedErc20.vy:140-179`](../../../../contracts/vaults/GuardedErc20.vy#L140-L179));
-   the real multi-row test proves purchase rollback
-   ([`test_guarded_erc20.py:1804-1925`](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925)).
+7. Auction creation is not settlement. Under a continuing BasicVault deficit,
+   the deficient purchase returns zero before nominal movement while a batch
+   preserves earlier healthy purchases
+   ([`test_basic_vault_safety.py:1216-1337`](../../../../tests/vaults/test_basic_vault_safety.py#L1216-L1337)).
 
 ## Why this was selected
 
@@ -234,9 +235,10 @@ existing-liquidation gates still apply. Auction creation is separate from
 auction purchase, and purchase is separate from successful collateral
 delivery.
 
-For GuardedErc20 under a continuing deficit, settlement attempts revert
-atomically. Eligibility therefore does not imply successful settlement or
-bad-debt resolution.
+For BasicVault under a continuing deficit, AuctionHouse returns zero for the
+affected purchase. A single Teller purchase then reverts with no GREEN spent;
+a batch preserves earlier healthy rows and skips the deficient row. Eligibility
+therefore does not imply successful settlement or bad-debt resolution.
 
 ## Scenario summary
 
@@ -248,8 +250,8 @@ bad-debt resolution.
 | LTV-zero asset | Zero | Omitted | Excluded as before |
 | Healthy co-collateral sufficient | Healthy value/capacity retained | Mixed terms | Account can remain healthy |
 | Healthy co-collateral insufficient | Healthy value only | Mixed terms | Can become liquidatable |
-| Partial aggregate backing deficit in GuardedErc20 | Zero for the affected asset | Retained | Same fail-closed treatment as total deficit |
-| Missing or malformed backing observation | Zero for the affected asset | Retained | Same fail-closed treatment |
+| Partial aggregate backing deficit in BasicVault | Zero for the affected asset | Retained | Same fail-closed treatment as total deficit |
+| Reverting or ABI-invalid typed `balanceOf` | View reverts | No terms returned by that call | Fail-closed, but not soft-zero containment |
 | Nonzero amount with missing oracle price | Existing PriceDesk behavior | Depends on raising mode | Not changed by the zero-amount correction |
 
 ## Owner-parked research findings and one established null result
@@ -341,10 +343,10 @@ tests.
 | [`test_safe_backing_surplus_values_only_nominal_user_amount`, lines 469-512](../../../../tests/core/creditEngine/test_stock_backing.py#L469-L512) | Surplus does not create extra user value or capacity | Synthetic backing observer plus real pricing/CreditEngine | Vault, not CreditEngine, owns surplus policy |
 | [`test_mixed_safe_collateral_remains_exact_and_liquidatable`, lines 515-602](../../../../tests/core/creditEngine/test_stock_backing.py#L515-L602) | Healthy co-collateral remains priced; unsafe zero amount is not priced; preview, health, and stored refresh agree | Real ordinary deposit plus synthetic unsafe vault and a PriceDesk that reverts if the unsafe asset is queried | Uses homogeneous terms; does not cover parked heterogeneous `lowestLtv` research |
 | [`test_backing_observation_mutation_fails_closed`, lines 638-687](../../../../tests/core/creditEngine/test_stock_backing.py#L638-L687) | A position can move from safe to failed observation without stale positive capacity | Runtime mutation of the observer plus real CreditEngine | Proves current observation, not a malicious truthful-looking report |
-| [`test_get_user_borrow_terms_asset_with_zero_amount`, lines 1208-1252](../../../../tests/core/creditEngine/test_credit_borrow.py#L1208-L1252) | A real SharesVault total-loss `(asset, 0)` retains terms with zero capacity | Integrated Rebase/SharesVault path | Not the GuardedErc20 custody classifier |
+| [`test_get_user_borrow_terms_asset_with_zero_amount`, lines 1208-1252](../../../../tests/core/creditEngine/test_credit_borrow.py#L1208-L1252) | A real SharesVault total-loss `(asset, 0)` retains terms with zero capacity | Integrated Rebase/SharesVault path | Not the BasicVault custody classifier |
 | [`test_repay_uses_safe_collateral_without_pricing_zero_amount_position`, lines 803-896](../../../../tests/core/creditEngine/test_credit_repay.py#L803-L896) | Repayment stays live with healthy collateral and an unsafe zero-amount position | Real borrow/repay; replacement PriceDesk reverts on any unsafe-asset lookup | Does not decide parked post-loss interest policy |
 | [`test_auction_started_after_total_issuer_loss`, lines 1606-1695](../../../../tests/vaults/test_stock_token_vault_comparison.py#L1606-L1695) | Eligibility can become an actual liquidation transaction and auction; failed later purchase rolls back GREEN/debt/state | Real Teller, AuctionHouse, Ledger, CreditEngine, token control, and legacy comparison vault | Settlement behavior remains vault-specific |
-| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, lines 1804-1925](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925) | A later deficient Guarded row rolls back earlier batch purchases, debt, GREEN, balances, events, and auction state | Real Teller batch and integrated contracts | Proves atomic failure, not a future loss-resolution policy |
+| [`test_real_teller_batch_later_deficit_preserves_earlier_healthy_row`, lines 1216-1337](../../../../tests/vaults/test_basic_vault_safety.py#L1216-L1337) | A later deficient BasicVault row returns zero while earlier healthy batch purchases, debt repayment, GREEN spend, balances, and events are preserved | Real Teller batch and integrated contracts | Proves per-row containment, not a future loss-resolution policy |
 | [`test_zero_amount_containment_path_has_bounded_gas`, lines 690-739](../../../../tests/core/creditEngine/test_stock_backing.py#L690-L739) | One zero path is cheaper than its priced comparator and below an arbitrary one-million-gas smoke ceiling | One synthetic position | Not a scalability, block-budget, or marginal-per-position bound |
 
 The suite is strongly mutation-sensitive to the two core properties: retaining
@@ -486,12 +488,12 @@ full-suite result is described as independently rerun when it was not.
 Primary repository evidence:
 
 - [`CreditEngine.vy`](../../../../contracts/core/CreditEngine.vy)
-- [`GuardedErc20.vy`](../../../../contracts/vaults/GuardedErc20.vy)
+- [`BasicVault.vy`](../../../../contracts/vaults/modules/BasicVault.vy)
 - [`test_stock_backing.py`](../../../../tests/core/creditEngine/test_stock_backing.py)
 - [`test_credit_borrow.py`](../../../../tests/core/creditEngine/test_credit_borrow.py)
 - [`test_credit_repay.py`](../../../../tests/core/creditEngine/test_credit_repay.py)
 - [`test_stock_token_vault_comparison.py`](../../../../tests/vaults/test_stock_token_vault_comparison.py)
-- [`test_guarded_erc20.py`](../../../../tests/vaults/test_guarded_erc20.py)
+- [`test_basic_vault_safety.py`](../../../../tests/vaults/test_basic_vault_safety.py)
 - [`minimal-contract-change-reassessment.md`](../minimal-contract-change-reassessment.md#L249-L305)
 - [`stock-token-vault-change-validation-plan.md`](../stock-token-vault-change-validation-plan.md#L2152-L2167)
 - [`stock-token-vault-fix-recommendations.md`](../stock-token-vault-fix-recommendations.md#L181-L225)
@@ -567,7 +569,7 @@ python -c 'import os, sys; from boa.interpret import set_cache_dir; set_cache_di
 --basetemp /tmp/ripe-m3-audit.V2mDuB/run-vaults \
 -q -ra \
 tests/vaults/test_stock_token_vault_comparison.py \
-tests/vaults/test_guarded_erc20.py
+tests/vaults/test_basic_vault_safety.py
 ```
 
 Those test commands require the local session fixture to bind an ephemeral

@@ -464,7 +464,7 @@ or profile loaded, and the named path exposed the intended missing invariant.
 
 | Subject | Mutation and digest | Detecting test/gate | S2/S3 |
 | --- | --- | --- | --- |
-| Teller T1 | Delete the four dedicated receipt-measurement mutex constructs; `fdb1e2de2fb0617ba0d250e6380ce62a88107dcded80d718ffd994206270a6fd` | `test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit`; baseline rejects, mutant credits `Q+1` nominal from `Q` custody | S2 met |
+| Teller T1 | Delete the four dedicated receipt-measurement mutex constructs; `fdb1e2de2fb0617ba0d250e6380ce62a88107dcded80d718ffd994206270a6fd` | `test_t1_mutex_removal_mutant_exposes_offsetting_nested_receipt`; baseline rejects, while the mutant accepts an offsetting `Q-1` outer plus one-unit nested receipt against a deliberately permissive disposable vault | S2 met |
 | Guarded G1 | Remove shared mutex; `71905639a3544e8bd896a49509292865ac5b1ab72050f09ed0f4cbe8f509c1bb` | `test_g1_shared_mutex_mutant_allows_authorized_nested_movement` | S2 met |
 | Guarded G1 | Remove exact 32-byte returndata guard; `eb779f2d67150dc493cedeb8f63efb634a64bcdc831d83f05769c19671714ac7` | `test_g1_exact_returndata_length_mutant_accepts_33_byte_sentinel` | S2 met |
 | Guarded G1 | Remove recipient delta; `71e386853c134126f4fe85dbeb17fddef060cea5e6887f54de6ecb36bd51cf53` | `test_g1_recipient_delta_mutant_accepts_short_delivery` | S2 met |

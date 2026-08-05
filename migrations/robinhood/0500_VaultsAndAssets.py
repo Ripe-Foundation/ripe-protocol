@@ -125,7 +125,7 @@ MIGRATION_STAGE = {
                 "aapl-sixteen-input-census-bound",
                 "aapl-four-repository-facts-resolved",
                 "aapl-twelve-inputs-typed-blocked",
-                "aapl-guarded-only",
+                "aapl-protected-simple-only",
                 "aapl-stability-pool-excluded",
                 "aapl-auction-only",
                 "aapl-stock-rewards-disabled",

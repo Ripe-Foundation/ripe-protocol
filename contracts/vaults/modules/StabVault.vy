@@ -217,9 +217,12 @@ def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 @view
 @internal
 def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    # used in CreditEngine.vy
-    # NOTE: cannot borrow against stability pool positions, returning empty/0 to ensure this
-    return empty(address), 0
+    # AuctionHouse phase 2 needs a truthful position iterator. CreditEngine
+    # excludes the Stability Pool by vault ID rather than hiding positions here.
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), 0
+    return asset, self._getTotalAmountForUser(_user, asset)
 
 
 @view

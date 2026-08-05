@@ -352,7 +352,8 @@ The eight-report reassessment and qualification corpus is one consolidated
 program package. The controlling disposition is:
 
 - preserve current Ledger and Teller architecture;
-- keep GuardedErc20 separate and Stock-specific;
+- use the protected shared `BasicVault` behavior through `SimpleErc20` and
+  retire the separate `GuardedErc20` artifact;
 - preserve the launch boundaries that RH-D021 does not change: no Uniswap
   price source admitted or deployed and neither LP token admitted;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;

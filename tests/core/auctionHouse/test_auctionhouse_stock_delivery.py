@@ -5,9 +5,9 @@ import pytest
 
 from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS
-from tests.vaults.test_guarded_erc20 import (
-    _register_guarded_vault,
-    guarded_erc20_vault,
+from tests.vaults.test_basic_vault_safety import (
+    _register_safe_nominal_vault,
+    safe_simple_erc20_vault,
 )
 
 M4_WITHDRAWAL_GUARD_TOKEN_SOURCE = """
@@ -65,7 +65,7 @@ def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
 """
 
 
-def _configure_guarded_auction_assets(
+def _configure_safe_nominal_auction_assets(
     tokens,
     vault_id,
     setGeneralConfig,
@@ -106,7 +106,7 @@ def _configure_guarded_auction_assets(
     return debt_terms
 
 
-def _open_guarded_auctions(
+def _open_standard_auctions(
     deposits,
     debt_amount,
     vault,
@@ -196,7 +196,7 @@ def _auction_state(
     return tuple(state)
 
 
-def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_seller(
+def test_standard_internal_two_buyer_sequence_caps_over_request_and_depletes_seller(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -214,16 +214,16 @@ def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_sell
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
-    _configure_guarded_auction_assets(
+    _configure_safe_nominal_auction_assets(
         (alpha_token,),
         vault_id,
         setGeneralConfig,
@@ -236,10 +236,10 @@ def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_sell
     )
     deposit_amount = 200 * EIGHTEEN_DECIMALS
     debt_amount = 100 * EIGHTEEN_DECIMALS
-    _open_guarded_auctions(
+    _open_standard_auctions(
         ((alpha_token, alpha_token_whale, deposit_amount),),
         debt_amount,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
@@ -266,7 +266,7 @@ def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_sell
     assert first_spent == first_max
     assert green_token.balanceOf(alice) == alice_green_before - first_spent
     assert credit_engine.getUserDebtAmount(bob) == debt_before - first_spent
-    assert guarded_erc20_vault.userBalances(alice, alpha_token) == first_delivery
+    assert safe_simple_erc20_vault.userBalances(alice, alpha_token) == first_delivery
     assert alpha_token.balanceOf(alice) == 0
     assert ledger.isParticipatingInVault(alice, vault_id)
 
@@ -290,11 +290,11 @@ def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_sell
     assert second_spent < second_max
     assert green_token.balanceOf(sally) == sally_green_before - second_spent
     assert credit_engine.getUserDebtAmount(bob) == debt_before - second_spent
-    assert guarded_erc20_vault.userBalances(bob, alpha_token) == 0
-    assert guarded_erc20_vault.userBalances(alice, alpha_token) == first_delivery
-    assert guarded_erc20_vault.userBalances(sally, alpha_token) == second_delivery
-    assert guarded_erc20_vault.totalBalances(alpha_token) == deposit_amount
-    assert alpha_token.balanceOf(guarded_erc20_vault) == deposit_amount
+    assert safe_simple_erc20_vault.userBalances(bob, alpha_token) == 0
+    assert safe_simple_erc20_vault.userBalances(alice, alpha_token) == first_delivery
+    assert safe_simple_erc20_vault.userBalances(sally, alpha_token) == second_delivery
+    assert safe_simple_erc20_vault.totalBalances(alpha_token) == deposit_amount
+    assert alpha_token.balanceOf(safe_simple_erc20_vault) == deposit_amount
     assert alpha_token.balanceOf(sally) == 0
     assert not ledger.hasFungibleAuction(bob, vault_id, alpha_token)
 
@@ -306,7 +306,7 @@ def test_guarded_internal_two_buyer_sequence_caps_over_request_and_depletes_sell
     assert sally_terms.debtTerms.ltv == 50_00
 
 
-def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
+def test_standard_external_delivery_matches_recipient_vault_and_debt_deltas(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -324,16 +324,16 @@ def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
-    _configure_guarded_auction_assets(
+    _configure_safe_nominal_auction_assets(
         (alpha_token,),
         vault_id,
         setGeneralConfig,
@@ -345,10 +345,10 @@ def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
         green_token,
     )
     deposit_amount = 200 * EIGHTEEN_DECIMALS
-    _open_guarded_auctions(
+    _open_standard_auctions(
         ((alpha_token, alpha_token_whale, deposit_amount),),
         100 * EIGHTEEN_DECIMALS,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
@@ -361,9 +361,9 @@ def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
     _fund_buyer(green_token, whale, teller, alice, max_green)
     buyer_green_before = green_token.balanceOf(alice)
     buyer_token_before = alpha_token.balanceOf(alice)
-    vault_custody_before = alpha_token.balanceOf(guarded_erc20_vault)
-    vault_nominal_before = guarded_erc20_vault.totalBalances(alpha_token)
-    seller_nominal_before = guarded_erc20_vault.userBalances(bob, alpha_token)
+    vault_custody_before = alpha_token.balanceOf(safe_simple_erc20_vault)
+    vault_nominal_before = safe_simple_erc20_vault.totalBalances(alpha_token)
+    seller_nominal_before = safe_simple_erc20_vault.userBalances(bob, alpha_token)
     debt_before = credit_engine.getUserDebtAmount(bob)
 
     spent = teller.buyFungibleAuction(
@@ -382,22 +382,22 @@ def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
     assert credit_engine.getUserDebtAmount(bob) == debt_before - spent
     assert alpha_token.balanceOf(alice) - buyer_token_before == expected_delivery
     assert vault_custody_before - alpha_token.balanceOf(
-        guarded_erc20_vault
+        safe_simple_erc20_vault
     ) == expected_delivery
-    assert vault_nominal_before - guarded_erc20_vault.totalBalances(
+    assert vault_nominal_before - safe_simple_erc20_vault.totalBalances(
         alpha_token
     ) == expected_delivery
-    assert seller_nominal_before - guarded_erc20_vault.userBalances(
+    assert seller_nominal_before - safe_simple_erc20_vault.userBalances(
         bob,
         alpha_token,
     ) == expected_delivery
-    assert guarded_erc20_vault.userBalances(alice, alpha_token) == 0
+    assert safe_simple_erc20_vault.userBalances(alice, alpha_token) == 0
     assert not ledger.isParticipatingInVault(alice, vault_id)
 
     purchase = filter_logs(teller, "FungAuctionPurchased")
     withdrawal = filter_logs(
         teller,
-        "GuardedErc20VaultWithdrawal",
+        "SimpleErc20VaultWithdrawal",
     )
     assert len(purchase) == len(withdrawal) == 1
     assert purchase[0].greenSpent == spent
@@ -412,7 +412,7 @@ def test_guarded_external_delivery_matches_recipient_vault_and_debt_deltas(
         pytest.param(2, 0, id="exact-recipient-delivery"),
     ),
 )
-def test_guarded_external_route_distinguishes_m2_movement_checks(
+def test_standard_external_route_distinguishes_m2_movement_checks(
     transfer_mode,
     vault_surplus,
     setGeneralConfig,
@@ -432,7 +432,7 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
@@ -441,12 +441,12 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
         name=f"m4_withdrawal_guard_token_{transfer_mode}",
         override_address=boa.env.generate_address(),
     )
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
-    _configure_guarded_auction_assets(
+    _configure_safe_nominal_auction_assets(
         (token,),
         vault_id,
         setGeneralConfig,
@@ -459,10 +459,10 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
     )
     deposit_amount = 200 * EIGHTEEN_DECIMALS
     token.mint(alpha_token_whale, deposit_amount)
-    _open_guarded_auctions(
+    _open_standard_auctions(
         ((token, alpha_token_whale, deposit_amount),),
         100 * EIGHTEEN_DECIMALS,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
@@ -470,13 +470,13 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
         {"seller": bob, "caller": sally, "ledger": ledger},
     )
     if vault_surplus:
-        token.mint(guarded_erc20_vault, vault_surplus)
+        token.mint(safe_simple_erc20_vault, vault_surplus)
     token.configure_transfer(transfer_mode)
 
     max_green = 10 * EIGHTEEN_DECIMALS
     _fund_buyer(green_token, whale, teller, alice, max_green)
     before = _auction_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         (token,),
         green_token,
         teller,
@@ -501,7 +501,7 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
         )
 
     assert _auction_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         (token,),
         green_token,
         teller,
@@ -518,7 +518,7 @@ def test_guarded_external_route_distinguishes_m2_movement_checks(
     "should_transfer_balance",
     (
         pytest.param(False, id="external-delivery"),
-        pytest.param(True, id="guarded-internal"),
+        pytest.param(True, id="standard-internal"),
     ),
 )
 def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
@@ -541,16 +541,16 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
-    debt_terms = _configure_guarded_auction_assets(
+    debt_terms = _configure_safe_nominal_auction_assets(
         (alpha_token,),
         vault_id,
         setGeneralConfig,
@@ -561,19 +561,19 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
         mock_price_source,
         green_token,
     )
-    _open_guarded_auctions(
+    _open_standard_auctions(
         ((alpha_token, alpha_token_whale, 200 * EIGHTEEN_DECIMALS),),
         100 * EIGHTEEN_DECIMALS,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
         mock_price_source,
         {"seller": bob, "caller": sally, "ledger": ledger},
     )
-    alpha_token.burn(1, sender=guarded_erc20_vault.address)
+    alpha_token.burn(1, sender=safe_simple_erc20_vault.address)
 
-    assert guarded_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+    assert safe_simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
         alpha_token.address,
         0,
     )
@@ -589,7 +589,7 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
     max_green = 10 * EIGHTEEN_DECIMALS
     _fund_buyer(green_token, whale, teller, alice, max_green)
     before = _auction_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         (alpha_token,),
         green_token,
         teller,
@@ -614,7 +614,7 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
         )
 
     assert _auction_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         (alpha_token,),
         green_token,
         teller,
@@ -627,7 +627,7 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
     ) == before
 
 
-def test_guarded_external_batch_delivers_each_row_exactly(
+def test_standard_external_batch_delivers_each_row_exactly(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -647,17 +647,17 @@ def test_guarded_external_batch_delivers_each_row_exactly(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     tokens = (alpha_token, bravo_token)
-    _configure_guarded_auction_assets(
+    _configure_safe_nominal_auction_assets(
         tokens,
         vault_id,
         setGeneralConfig,
@@ -668,13 +668,13 @@ def test_guarded_external_batch_delivers_each_row_exactly(
         mock_price_source,
         green_token,
     )
-    _open_guarded_auctions(
+    _open_standard_auctions(
         (
             (alpha_token, alpha_token_whale, 100 * EIGHTEEN_DECIMALS),
             (bravo_token, bravo_token_whale, 150 * EIGHTEEN_DECIMALS),
         ),
         100 * EIGHTEEN_DECIMALS,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
@@ -693,7 +693,7 @@ def test_guarded_external_batch_delivers_each_row_exactly(
         for token in tokens
     }
     custody_before = {
-        token.address: token.balanceOf(guarded_erc20_vault)
+        token.address: token.balanceOf(safe_simple_erc20_vault)
         for token in tokens
     }
 
@@ -717,14 +717,14 @@ def test_guarded_external_batch_delivers_each_row_exactly(
             token.address
         ] == expected_per_row
         assert custody_before[token.address] - token.balanceOf(
-            guarded_erc20_vault
+            safe_simple_erc20_vault
         ) == expected_per_row
-        assert guarded_erc20_vault.userBalances(alice, token) == 0
+        assert safe_simple_erc20_vault.userBalances(alice, token) == 0
 
     purchase_events = filter_logs(teller, "FungAuctionPurchased")
     withdrawal_events = filter_logs(
         teller,
-        "GuardedErc20VaultWithdrawal",
+        "SimpleErc20VaultWithdrawal",
     )
     assert [event.collateralAmountSent for event in purchase_events] == [
         expected_per_row,
@@ -740,10 +740,10 @@ def test_guarded_external_batch_delivers_each_row_exactly(
     "should_transfer_balance",
     (
         pytest.param(False, id="external-delivery"),
-        pytest.param(True, id="guarded-internal"),
+        pytest.param(True, id="standard-internal"),
     ),
 )
-def test_guarded_batch_later_deficit_rolls_back_every_earlier_row(
+def test_standard_batch_later_deficit_preserves_earlier_healthy_purchase(
     should_transfer_balance,
     setGeneralConfig,
     setGeneralDebtConfig,
@@ -765,17 +765,17 @@ def test_guarded_batch_later_deficit_rolls_back_every_earlier_row(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     tokens = (alpha_token, bravo_token)
-    _configure_guarded_auction_assets(
+    _configure_safe_nominal_auction_assets(
         tokens,
         vault_id,
         setGeneralConfig,
@@ -786,64 +786,79 @@ def test_guarded_batch_later_deficit_rolls_back_every_earlier_row(
         mock_price_source,
         green_token,
     )
-    _open_guarded_auctions(
+    _open_standard_auctions(
         (
             (alpha_token, alpha_token_whale, 100 * EIGHTEEN_DECIMALS),
             (bravo_token, bravo_token_whale, 150 * EIGHTEEN_DECIMALS),
         ),
         100 * EIGHTEEN_DECIMALS,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         vault_id,
         performDeposit,
         teller,
         mock_price_source,
         {"seller": bob, "caller": sally, "ledger": ledger},
     )
-    bravo_token.burn(1, sender=guarded_erc20_vault.address)
+    bravo_token.burn(1, sender=safe_simple_erc20_vault.address)
 
     total_limit = 25 * EIGHTEEN_DECIMALS
     _fund_buyer(green_token, whale, teller, alice, total_limit)
-    before = _auction_state(
-        guarded_erc20_vault,
-        tokens,
-        green_token,
-        teller,
-        auction_house,
-        credit_engine,
-        ledger,
-        bob,
-        alice,
-        vault_id,
+    expected_spent = 10 * EIGHTEEN_DECIMALS
+    expected_alpha = 40 * EIGHTEEN_DECIMALS
+    green_before = green_token.balanceOf(alice)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    alpha_custody_before = alpha_token.balanceOf(safe_simple_erc20_vault)
+    alpha_recipient_before = alpha_token.balanceOf(alice)
+
+    spent = teller.buyManyFungibleAuctions(
+        [
+            (bob, vault_id, alpha_token, expected_spent),
+            (bob, vault_id, bravo_token, expected_spent),
+        ],
+        total_limit,
+        False,
+        should_transfer_balance,
+        False,
+        sender=alice,
     )
 
-    with boa.reverts():
-        teller.buyManyFungibleAuctions(
-            [
-                (bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS),
-                (bob, vault_id, bravo_token, 10 * EIGHTEEN_DECIMALS),
-            ],
-            total_limit,
-            False,
-            should_transfer_balance,
-            False,
-            sender=alice,
+    assert spent == expected_spent
+    assert green_token.balanceOf(alice) == green_before - expected_spent
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - expected_spent
+    assert safe_simple_erc20_vault.userBalances(bob, alpha_token) == (
+        100 * EIGHTEEN_DECIMALS - expected_alpha
+    )
+    assert safe_simple_erc20_vault.userBalances(bob, bravo_token) == (
+        150 * EIGHTEEN_DECIMALS
+    )
+    assert safe_simple_erc20_vault.userBalances(alice, bravo_token) == 0
+    assert bravo_token.balanceOf(safe_simple_erc20_vault) == (
+        150 * EIGHTEEN_DECIMALS - 1
+    )
+
+    if should_transfer_balance:
+        assert alpha_token.balanceOf(safe_simple_erc20_vault) == alpha_custody_before
+        assert alpha_token.balanceOf(alice) == alpha_recipient_before
+        assert safe_simple_erc20_vault.userBalances(alice, alpha_token) == expected_alpha
+        delivery_events = filter_logs(teller, "SimpleErc20VaultTransfer")
+    else:
+        assert alpha_token.balanceOf(safe_simple_erc20_vault) == (
+            alpha_custody_before - expected_alpha
         )
+        assert alpha_token.balanceOf(alice) == alpha_recipient_before + expected_alpha
+        assert safe_simple_erc20_vault.userBalances(alice, alpha_token) == 0
+        delivery_events = filter_logs(teller, "SimpleErc20VaultWithdrawal")
 
-    assert _auction_state(
-        guarded_erc20_vault,
-        tokens,
-        green_token,
-        teller,
-        auction_house,
-        credit_engine,
-        ledger,
-        bob,
-        alice,
-        vault_id,
-    ) == before
+    purchase_events = filter_logs(teller, "FungAuctionPurchased")
+    assert len(purchase_events) == len(delivery_events) == 1
+    assert purchase_events[0].liqAsset == alpha_token.address
+    assert purchase_events[0].greenSpent == expected_spent
+    assert purchase_events[0].collateralAmountSent == expected_alpha
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert ledger.hasFungibleAuction(bob, vault_id, bravo_token)
 
 
-def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
+def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -866,7 +881,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
     stability_pool,
     endaoment_funds,
     endaoment_psm,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     simple_erc20_vault,
     vault_book,
     governance,
@@ -878,10 +893,10 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         18,
         name="auction_only_stock_token",
     )
-    guarded_id = _register_guarded_vault(
+    safe_nominal_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     simple_id = vault_book.getRegId(simple_erc20_vault)
     stab_id = vault_book.getRegId(stability_pool)
@@ -901,7 +916,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         )
         setAssetConfig(
             stock_token,
-            _vaultIds=[guarded_id],
+            _vaultIds=[safe_nominal_id],
             _debtTerms=control_terms,
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
@@ -937,7 +952,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
             stock_token,
             amount,
             bob,
-            guarded_erc20_vault,
+            safe_simple_erc20_vault,
             sender=bob,
         ) == amount
         teller.borrow(40 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
@@ -948,7 +963,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         assert credit_engine.canLiquidateUser(bob)
         assert not auction_house.canStartAuction(
             bob,
-            guarded_id,
+            safe_nominal_id,
             stock_token,
         )
 
@@ -963,7 +978,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         )
         assert not ledger.hasFungibleAuction(
             bob,
-            guarded_id,
+            safe_nominal_id,
             stock_token,
         )
 
@@ -984,11 +999,11 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
     )
     setAssetConfig(
         stock_token,
-        _vaultIds=[guarded_id],
+        _vaultIds=[safe_nominal_id],
         _debtTerms=debt_terms,
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
-        _shouldSwapInStabPools=False,
+        _shouldSwapInStabPools=True,
         _shouldAuctionInstantly=True,
     )
     setAssetConfig(
@@ -1000,6 +1015,21 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         _shouldSwapInStabPools=False,
         _shouldAuctionInstantly=True,
     )
+    stab_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[stab_id],
+        _debtTerms=stab_terms,
+        _shouldBurnAsPayment=True,
+    )
+    mission_control.setPriorityLiqAssetVaults(
+        [(safe_nominal_id, stock_token.address)],
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setPriorityStabVaults(
+        [(stab_id, green_token)],
+        sender=switchboard_alpha.address,
+    )
     for token in (stock_token, bravo_token, green_token):
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
 
@@ -1009,7 +1039,7 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         stock_token,
         amount,
         bob,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         sender=bob,
     ) == amount
     performDeposit(
@@ -1019,21 +1049,31 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         bravo_token_whale,
         simple_erc20_vault,
     )
+    green_token.transfer(sally, amount, sender=whale)
+    green_token.approve(teller, amount, sender=sally)
+    teller.deposit(
+        green_token,
+        amount,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
     teller.borrow(80 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     stock_token.adminBurn(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         1,
         sender=deploy3r,
     )
 
     liq_config = mission_control.getAssetLiqConfig(stock_token)
-    assert not liq_config.shouldSwapInStabPools
+    assert liq_config.shouldSwapInStabPools
     assert not liq_config.shouldTransferToEndaoment
     assert liq_config.shouldAuctionInstantly
     assert credit_engine.canLiquidateUser(bob)
     assert not auction_house.canStartAuction(
         bob,
-        guarded_id,
+        safe_nominal_id,
         stock_token,
     )
     assert not auction_house.canStartAuction(
@@ -1044,11 +1084,11 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
 
     teller.liquidateUser(bob, False, sender=sally)
 
-    assert ledger.hasFungibleAuction(bob, guarded_id, stock_token)
+    assert not ledger.hasFungibleAuction(bob, safe_nominal_id, stock_token)
     assert ledger.hasFungibleAuction(bob, simple_id, bravo_token)
-    assert auction_house.canStartAuction(
+    assert not auction_house.canStartAuction(
         bob,
-        guarded_id,
+        safe_nominal_id,
         stock_token,
     )
     assert auction_house.canStartAuction(
@@ -1061,7 +1101,13 @@ def test_guarded_deficit_does_not_block_cross_vault_auction_only_liquidation(
         999_999,
         stock_token,
     )
-    assert stock_token.balanceOf(guarded_erc20_vault) == amount - 1
+    assert not auction_house.startAuction(
+        bob,
+        safe_nominal_id,
+        stock_token,
+        sender=switchboard_alpha.address,
+    )
+    assert stock_token.balanceOf(safe_simple_erc20_vault) == amount - 1
     assert bravo_token.balanceOf(simple_erc20_vault) == amount
     assert stock_token.balanceOf(stability_pool) == 0
     assert stock_token.balanceOf(endaoment_funds) == 0

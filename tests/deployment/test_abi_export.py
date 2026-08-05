@@ -142,8 +142,9 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 53
-    assert {path.name for path in report.exported} >= {
+    assert len(report.exported) == 52
+    exported_names = {path.name for path in report.exported}
+    assert exported_names >= {
         "Addys.json",
         "Contributor.json",
         "DefaultsRobinhood.json",
@@ -151,6 +152,7 @@ def test_repository_default_abi_directory_is_byte_current():
         "LocalGov.json",
         "UniswapV2Prices.json",
     }
+    assert "GuardedErc20.json" not in exported_names
     assert "DefaultsBaseSepolia.json" in {
         path.name for path in report.exported
     }

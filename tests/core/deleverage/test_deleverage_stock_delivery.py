@@ -4,9 +4,9 @@ import boa
 
 from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS
-from tests.vaults.test_guarded_erc20 import (
-    _register_guarded_vault,
-    guarded_erc20_vault,
+from tests.vaults.test_basic_vault_safety import (
+    _register_safe_nominal_vault,
+    safe_simple_erc20_vault,
 )
 
 
@@ -127,7 +127,7 @@ def _swap_state(
     )
 
 
-def test_guarded_swap_delivers_withdrawal_and_exact_teller_deposit(
+def test_standard_swap_delivers_withdrawal_and_exact_teller_deposit(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -143,14 +143,14 @@ def test_guarded_swap_delivers_withdrawal_and_exact_teller_deposit(
     deleverage,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     _configure_swap_assets(
         (alpha_token, bravo_token),
@@ -170,7 +170,7 @@ def test_guarded_swap_delivers_withdrawal_and_exact_teller_deposit(
         deposit_amount,
         alpha_token,
         alpha_token_whale,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     teller.borrow(debt_amount, bob, False, sender=bob)
     bravo_token.transfer(
@@ -186,8 +186,8 @@ def test_guarded_swap_delivers_withdrawal_and_exact_teller_deposit(
 
     governance_alpha_before = alpha_token.balanceOf(governance)
     governance_bravo_before = bravo_token.balanceOf(governance)
-    custody_alpha_before = alpha_token.balanceOf(guarded_erc20_vault)
-    custody_bravo_before = bravo_token.balanceOf(guarded_erc20_vault)
+    custody_alpha_before = alpha_token.balanceOf(safe_simple_erc20_vault)
+    custody_bravo_before = bravo_token.balanceOf(safe_simple_erc20_vault)
     touch_before = ledger.lastTouch(bob)
     boa.env.time_travel(blocks=1)
 
@@ -205,41 +205,41 @@ def test_guarded_swap_delivers_withdrawal_and_exact_teller_deposit(
     assert alpha_token.balanceOf(governance) - governance_alpha_before == withdrawn
     assert governance_bravo_before - bravo_token.balanceOf(governance) == deposited
     assert custody_alpha_before - alpha_token.balanceOf(
-        guarded_erc20_vault
+        safe_simple_erc20_vault
     ) == withdrawn
     assert bravo_token.balanceOf(
-        guarded_erc20_vault
+        safe_simple_erc20_vault
     ) - custody_bravo_before == deposited
-    assert guarded_erc20_vault.userBalances(
+    assert safe_simple_erc20_vault.userBalances(
         bob,
         alpha_token,
     ) == deposit_amount - withdrawn
-    assert guarded_erc20_vault.userBalances(bob, bravo_token) == deposited
+    assert safe_simple_erc20_vault.userBalances(bob, bravo_token) == deposited
     assert ledger.userDebt(bob).amount == debt_amount
     assert ledger.lastTouch(bob) > touch_before
 
     teller_deposits = filter_logs(deleverage, "TellerDeposit")
     withdrawals = filter_logs(
         deleverage,
-        "GuardedErc20VaultWithdrawal",
+        "SimpleErc20VaultWithdrawal",
     )
-    guarded_deposits = filter_logs(
+    standard_deposits = filter_logs(
         deleverage,
-        "GuardedErc20VaultDeposit",
+        "SimpleErc20VaultDeposit",
     )
     swaps = filter_logs(deleverage, "CollateralSwapped")
-    assert len(teller_deposits) == len(withdrawals) == len(guarded_deposits) == 1
+    assert len(teller_deposits) == len(withdrawals) == len(standard_deposits) == 1
     assert len(swaps) == 1
     assert teller_deposits[0].amount == deposited
-    assert teller_deposits[0].vaultAddr == guarded_erc20_vault.address
+    assert teller_deposits[0].vaultAddr == safe_simple_erc20_vault.address
     assert teller_deposits[0].vaultId == vault_id
     assert withdrawals[0].amount == withdrawn
-    assert guarded_deposits[0].amount == deposited
+    assert standard_deposits[0].amount == deposited
     assert swaps[0].withdrawAmount == withdrawn
     assert swaps[0].depositAmount == deposited
 
 
-def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
+def test_teller_exact_receipt_is_decisive_after_standard_withdrawal(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -253,7 +253,7 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
     deleverage,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     simple_erc20_vault,
     vault_book,
     governance,
@@ -264,10 +264,10 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
         override_address=boa.env.generate_address(),
     )
     short_token.configure_short_operator(teller)
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     simple_vault_id = vault_book.getRegId(simple_erc20_vault)
     setGeneralConfig()
@@ -306,7 +306,7 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
         deposit_amount,
         alpha_token,
         alpha_token_whale,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     teller.borrow(debt_amount, bob, False, sender=bob)
     short_token.mint(simple_erc20_vault, 1)
@@ -318,14 +318,14 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
     )
     debt = ledger.userDebt(bob)
     before = (
-        alpha_token.balanceOf(guarded_erc20_vault),
+        alpha_token.balanceOf(safe_simple_erc20_vault),
         alpha_token.balanceOf(governance),
         alpha_token.balanceOf(deleverage),
         short_token.balanceOf(simple_erc20_vault),
         short_token.balanceOf(governance),
         short_token.balanceOf(deleverage),
-        guarded_erc20_vault.userBalances(bob, alpha_token),
-        guarded_erc20_vault.totalBalances(alpha_token),
+        safe_simple_erc20_vault.userBalances(bob, alpha_token),
+        safe_simple_erc20_vault.totalBalances(alpha_token),
         simple_erc20_vault.userBalances(bob, short_token),
         simple_erc20_vault.totalBalances(short_token),
         debt.amount,
@@ -349,14 +349,14 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
 
     debt = ledger.userDebt(bob)
     assert (
-        alpha_token.balanceOf(guarded_erc20_vault),
+        alpha_token.balanceOf(safe_simple_erc20_vault),
         alpha_token.balanceOf(governance),
         alpha_token.balanceOf(deleverage),
         short_token.balanceOf(simple_erc20_vault),
         short_token.balanceOf(governance),
         short_token.balanceOf(deleverage),
-        guarded_erc20_vault.userBalances(bob, alpha_token),
-        guarded_erc20_vault.totalBalances(alpha_token),
+        safe_simple_erc20_vault.userBalances(bob, alpha_token),
+        safe_simple_erc20_vault.totalBalances(alpha_token),
         simple_erc20_vault.userBalances(bob, short_token),
         simple_erc20_vault.totalBalances(short_token),
         debt.amount,
@@ -368,7 +368,7 @@ def test_teller_exact_receipt_is_decisive_after_guarded_withdrawal(
     ) == before
 
 
-def test_guarded_destination_deficit_rolls_back_both_swap_legs(
+def test_standard_destination_deficit_rolls_back_both_swap_legs(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -386,14 +386,14 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
     credit_engine,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     debt_terms = _configure_swap_assets(
         (alpha_token, bravo_token),
@@ -413,18 +413,18 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
         deposit_amount,
         alpha_token,
         alpha_token_whale,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     performDeposit(
         alice,
         20 * EIGHTEEN_DECIMALS,
         bravo_token,
         bravo_token_whale,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     teller.borrow(debt_amount, bob, False, sender=bob)
-    bravo_token.burn(1, sender=guarded_erc20_vault.address)
-    assert guarded_erc20_vault.getUserAssetAndAmountAtIndex(alice, 1) == (
+    bravo_token.burn(1, sender=safe_simple_erc20_vault.address)
+    assert safe_simple_erc20_vault.getUserAssetAndAmountAtIndex(alice, 1) == (
         bravo_token.address,
         0,
     )
@@ -445,7 +445,7 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
         sender=governance.address,
     )
     before = _swap_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         alpha_token,
         bravo_token,
         deleverage,
@@ -453,7 +453,7 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
         bob,
         governance,
     ) + (
-        guarded_erc20_vault.userBalances(alice, bravo_token),
+        safe_simple_erc20_vault.userBalances(alice, bravo_token),
     )
 
     with boa.reverts():
@@ -468,7 +468,7 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
         )
 
     after = _swap_state(
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
         alpha_token,
         bravo_token,
         deleverage,
@@ -476,13 +476,13 @@ def test_guarded_destination_deficit_rolls_back_both_swap_legs(
         bob,
         governance,
     ) + (
-        guarded_erc20_vault.userBalances(alice, bravo_token),
+        safe_simple_erc20_vault.userBalances(alice, bravo_token),
     )
     assert after == before
     assert ledger.userDebt(bob).amount == debt_amount
 
 
-def test_guarded_volatile_deleverage_prohibited_recipient_cannot_reduce_debt(
+def test_safe_nominal_volatile_deleverage_can_deliver_to_endaoment_funds(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -498,15 +498,15 @@ def test_guarded_volatile_deleverage_prohibited_recipient_cannot_reduce_debt(
     switchboard_alpha,
     mock_price_source,
     ledger,
-    guarded_erc20_vault,
+    safe_simple_erc20_vault,
     vault_book,
     governance,
     endaoment_funds,
 ):
-    vault_id = _register_guarded_vault(
+    vault_id = _register_safe_nominal_vault(
         vault_book,
         governance,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     _configure_swap_assets(
         (alpha_token,),
@@ -525,32 +525,116 @@ def test_guarded_volatile_deleverage_prohibited_recipient_cannot_reduce_debt(
         deposit_amount,
         alpha_token,
         alpha_token_whale,
-        guarded_erc20_vault,
+        safe_simple_erc20_vault,
     )
     teller.borrow(debt_amount, bob, False, sender=bob)
-    before = (
-        alpha_token.balanceOf(guarded_erc20_vault),
-        alpha_token.balanceOf(endaoment_funds),
-        guarded_erc20_vault.userBalances(bob, alpha_token),
-        guarded_erc20_vault.totalBalances(alpha_token),
-        credit_engine.getUserDebtAmount(bob),
-        ledger.userDebt(bob).inLiquidation,
-        deleverage.lastDeleverageBlock(bob),
+    transfer_amount = 10 * EIGHTEEN_DECIMALS
+    funds_before = alpha_token.balanceOf(endaoment_funds)
+    assert deleverage.deleverageWithVolAssets(
+        bob,
+        [(vault_id, alpha_token, transfer_amount)],
+        sender=switchboard_alpha.address,
+    ) == transfer_amount
+
+    assert alpha_token.balanceOf(safe_simple_erc20_vault) == (
+        deposit_amount - transfer_amount
+    )
+    assert alpha_token.balanceOf(endaoment_funds) == funds_before + transfer_amount
+    assert safe_simple_erc20_vault.userBalances(bob, alpha_token) == (
+        deposit_amount - transfer_amount
+    )
+    assert safe_simple_erc20_vault.totalBalances(alpha_token) == (
+        deposit_amount - transfer_amount
+    )
+    assert credit_engine.getUserDebtAmount(bob) == debt_amount - transfer_amount
+    assert not ledger.userDebt(bob).inLiquidation
+    assert deleverage.lastDeleverageBlock(bob) == 0
+
+
+def test_safe_nominal_volatile_deleverage_skips_deficit_and_continues(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    bob,
+    teller,
+    deleverage,
+    credit_engine,
+    switchboard_alpha,
+    mock_price_source,
+    ledger,
+    safe_simple_erc20_vault,
+    vault_book,
+    governance,
+    endaoment_funds,
+):
+    vault_id = _register_safe_nominal_vault(
+        vault_book,
+        governance,
+        safe_simple_erc20_vault,
+    )
+    _configure_swap_assets(
+        (alpha_token, bravo_token),
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+        mock_price_source,
+        green_token,
+    )
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    for token, whale_addr in (
+        (alpha_token, alpha_token_whale),
+        (bravo_token, bravo_token_whale),
+    ):
+        performDeposit(
+            bob,
+            deposit_amount,
+            token,
+            whale_addr,
+            safe_simple_erc20_vault,
+        )
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    alpha_token.burn(1, sender=safe_simple_erc20_vault.address)
+    target = 10 * EIGHTEEN_DECIMALS
+    funds_before = bravo_token.balanceOf(endaoment_funds)
+
+    repaid = deleverage.deleverageWithVolAssets(
+        bob,
+        [
+            (vault_id, alpha_token.address, target),
+            (vault_id, bravo_token.address, target),
+        ],
+        sender=switchboard_alpha.address,
     )
 
-    with boa.reverts():
-        deleverage.deleverageWithVolAssets(
-            bob,
-            [(vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS)],
-            sender=switchboard_alpha.address,
-        )
+    assert repaid == target
+    assert credit_engine.getUserDebtAmount(bob) == debt_amount - target
+    assert safe_simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert safe_simple_erc20_vault.userBalances(bob, alpha_token) == deposit_amount
+    assert alpha_token.balanceOf(safe_simple_erc20_vault) == deposit_amount - 1
+    assert safe_simple_erc20_vault.userBalances(bob, bravo_token) == (
+        deposit_amount - target
+    )
+    assert bravo_token.balanceOf(safe_simple_erc20_vault) == (
+        deposit_amount - target
+    )
+    assert bravo_token.balanceOf(endaoment_funds) == funds_before + target
+    assert not ledger.userDebt(bob).inLiquidation
 
-    assert (
-        alpha_token.balanceOf(guarded_erc20_vault),
-        alpha_token.balanceOf(endaoment_funds),
-        guarded_erc20_vault.userBalances(bob, alpha_token),
-        guarded_erc20_vault.totalBalances(alpha_token),
-        credit_engine.getUserDebtAmount(bob),
-        ledger.userDebt(bob).inLiquidation,
-        deleverage.lastDeleverageBlock(bob),
-    ) == before
+    transfers = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    withdrawals = filter_logs(deleverage, "SimpleErc20VaultWithdrawal")
+    assert len(transfers) == len(withdrawals) == 1
+    assert transfers[0].asset == bravo_token.address
+    assert transfers[0].amountSent == target
+    assert withdrawals[0].asset == bravo_token.address
+    assert withdrawals[0].amount == target
