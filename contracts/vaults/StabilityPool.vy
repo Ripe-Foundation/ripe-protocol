@@ -15,12 +15,50 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Vault
 
 exports: addys.__interface__
-exports: vaultData.__interface__
-exports: stabVault.__interface__
+exports: (
+    vaultData.isPaused,
+    vaultData.userBalances,
+    vaultData.totalBalances,
+    vaultData.userAssets,
+    vaultData.indexOfUserAsset,
+    vaultData.numUserAssets,
+    vaultData.vaultAssets,
+    vaultData.indexOfAsset,
+    vaultData.numAssets,
+    vaultData.isUserInVaultAsset,
+    vaultData.doesUserHaveBalance,
+    vaultData.deregisterUserAsset,
+    vaultData.isSupportedVaultAsset,
+    vaultData.deregisterVaultAsset,
+    vaultData.doesVaultHaveAnyFunds,
+    vaultData.getNumUserAssets,
+    vaultData.getNumVaultAssets,
+    vaultData.pause,
+)
+exports: (
+    stabVault.claimableBalances,
+    stabVault.totalClaimableBalances,
+    stabVault.claimableAssets,
+    stabVault.indexOfClaimableAsset,
+    stabVault.numClaimableAssets,
+    stabVault.swapForLiquidatedCollateral,
+    stabVault.swapWithClaimableGreen,
+    stabVault.claimFromStabilityPool,
+    stabVault.claimManyFromStabilityPool,
+    stabVault.redeemFromStabilityPool,
+    stabVault.redeemManyFromStabilityPool,
+    stabVault.getTotalValue,
+    stabVault.getTotalUserValue,
+    stabVault.getNumActiveClaimAssets,
+    stabVault.getClaimAssetState,
+    stabVault.pruneClaimableAssets,
+    stabVault.activateClaimAssets,
+)
 
 initializes: addys
 initializes: vaultData[addys := addys]
@@ -53,6 +91,7 @@ event StabilityPoolTransfer:
     isFromUserDepleted: bool
     transferShares: uint256
 
+MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 @deploy
 def __init__(_ripeHq: address):
@@ -172,3 +211,29 @@ def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
 @external
 def getTotalAmountForVault(_asset: address) -> uint256:
     return stabVault._getTotalAmountForVault(_asset)
+
+
+#################
+# Recover Funds #
+#################
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    self._assertSwitchboard()
+    assert stabVault.totalClaimableBalances[_asset] == 0 # dev: claim liability exists
+    vaultData._recoverFunds(_recipient, _asset)
+
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):
+    self._assertSwitchboard()
+    for asset: address in _assets:
+        assert stabVault.totalClaimableBalances[asset] == 0 # dev: claim liability exists
+        vaultData._recoverFunds(_recipient, asset)
+
+
+@view
+@internal
+def _assertSwitchboard():
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms

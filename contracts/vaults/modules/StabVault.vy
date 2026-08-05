@@ -79,6 +79,26 @@ event AssetClaimedInStabilityPool:
     claimShares: uint256
     isDepleted: bool
 
+event ClaimAssetActivated:
+    stabAsset: indexed(address)
+    claimAsset: indexed(address)
+    balance: uint256
+    activeCount: uint256
+
+event ClaimAssetDeactivated:
+    stabAsset: indexed(address)
+    claimAsset: indexed(address)
+    balance: uint256
+    activeCount: uint256
+    reason: uint256
+
+event ClaimAssetLeftDormant:
+    stabAsset: indexed(address)
+    claimAsset: indexed(address)
+    balance: uint256
+    activeCount: uint256
+    reason: uint256
+
 # claimable balances
 claimableBalances: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> balance
 totalClaimableBalances: public(HashMap[address, uint256]) # claimable asset -> balance
@@ -90,15 +110,39 @@ numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claima
 
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 12
+MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
-DUST_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
+ACTIVATION_USD_THRESHOLD: constant(uint256) = 25 * 10 ** 16  # $0.25 in 18-decimal USD
+RETENTION_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
+
+CLAIM_ASSET_ABSENT: constant(uint256) = 0
+CLAIM_ASSET_DORMANT: constant(uint256) = 1
+CLAIM_ASSET_ACTIVE: constant(uint256) = 2
+
+DEACTIVATION_ZERO: constant(uint256) = 1
+DEACTIVATION_DUST: constant(uint256) = 2
+
+DORMANT_BELOW_FLOOR: constant(uint256) = 1
+DORMANT_NO_PRICE: constant(uint256) = 2
+DORMANT_CAPACITY: constant(uint256) = 3
+
+GREEN_TOKEN: immutable(address)
+SAVINGS_GREEN: immutable(address)
 
 
 @deploy
 def __init__():
-    pass
+    GREEN_TOKEN = addys._getGreenToken()
+    SAVINGS_GREEN = addys._getSavingsGreen()
+
+
+@view
+@internal
+def _getStabAddys() -> (address, address, address):
+    return GREEN_TOKEN, SAVINGS_GREEN, addys._getPriceDeskAddr()
 
 
 ########
@@ -117,12 +161,13 @@ def _depositTokensInVault(
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
+    assert _asset != GREEN_TOKEN # dev: green cannot be stab asset
     totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     depositAmount: uint256 = min(_amount, totalAssetBalance)
     assert depositAmount != 0 # dev: invalid deposit amount
 
     # calc usd values
-    totalStabValue: uint256 = self._getUsdValue(_asset, totalAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    totalStabValue: uint256 = self._getUsdValue(_asset, totalAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk, True)
     assert totalStabValue != 0 # dev: no price for stab asset
 
     newUserValue: uint256 = totalStabValue
@@ -263,13 +308,14 @@ def _getTotalAmountForVault(_asset: address) -> uint256:
     # NOTE: converting usd value to amount, even though vault may not actually have this asset balance!!
 
     # addys
-    greenToken: address = addys._getGreenToken()
-    savingsGreen: address = addys._getSavingsGreen()
-    priceDesk: address = addys._getPriceDeskAddr()
+    greenToken: address = empty(address)
+    savingsGreen: address = empty(address)
+    priceDesk: address = empty(address)
+    greenToken, savingsGreen, priceDesk = self._getStabAddys()
 
     # get total value of asset
     stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    totalStabValue: uint256 = self._getUsdValue(_asset, stabAssetBalance, greenToken, savingsGreen, priceDesk)
+    totalStabValue: uint256 = self._getUsdValue(_asset, stabAssetBalance, greenToken, savingsGreen, priceDesk, True)
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, greenToken, savingsGreen, priceDesk)
 
     # return amount if there is claimable value
@@ -288,14 +334,11 @@ def _getAssetAmount(
     _savingsGreen: address,
     _priceDesk: address,
 ) -> uint256:
-    amount: uint256 = 0
     if _asset == _greenToken:
-        amount = _targetUsdValue
-    elif _asset == _savingsGreen:
-        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    else:
-        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
-    return amount
+        return _targetUsdValue
+    if _asset == _savingsGreen:
+        return staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    return staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
 
 
 @view
@@ -306,15 +349,13 @@ def _getUsdValue(
     _greenToken: address,
     _savingsGreen: address,
     _priceDesk: address,
+    _shouldRaise: bool,
 ) -> uint256:
-    usdValue: uint256 = 0
     if _asset == _greenToken:
-        usdValue = _amount
-    elif _asset == _savingsGreen:
-        usdValue = staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
-    else:
-        usdValue = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
-    return usdValue
+        return _amount
+    if _asset == _savingsGreen:
+        return staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
+    return staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, _shouldRaise)
 
 
 ##########
@@ -339,7 +380,7 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalShares != 0 # dev: user has no shares
 
     # calc usd values
-    totalStabValue: uint256 = self._getUsdValue(_asset, totalStabAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    totalStabValue: uint256 = self._getUsdValue(_asset, totalStabAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk, True)
     assert totalStabValue != 0 # dev: no price for stab asset
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     totalValue: uint256 = totalStabValue + claimableValue
@@ -384,21 +425,7 @@ def _valueToShares(
     _totalUsdValue: uint256,
     _shouldRoundUp: bool,
 ) -> uint256:
-    totalUsdValue: uint256 = _totalUsdValue
-
-    # dead shares / decimal offset -- preventing donation attacks
-    totalUsdValue += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
-
-    # calc shares
-    numerator: uint256 = _usdValue * totalShares
-    shares: uint256 = numerator // totalUsdValue
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalUsdValue != 0):
-        shares += 1
-
-    return shares
+    return self._mulDiv(_usdValue, _totalShares + DECIMAL_OFFSET, _totalUsdValue + 1, _shouldRoundUp)
 
 
 # shares -> usd value
@@ -422,21 +449,22 @@ def _sharesToValue(
     _totalUsdValue: uint256,
     _shouldRoundUp: bool,
 ) -> uint256:
-    totalUsdValue: uint256 = _totalUsdValue
+    return self._mulDiv(_shares, _totalUsdValue + 1, _totalShares + DECIMAL_OFFSET, _shouldRoundUp)
 
-    # dead shares / decimal offset -- preventing donation attacks
-    totalUsdValue += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
 
-    # calc usd value
-    numerator: uint256 = _shares * totalUsdValue
-    usdValue: uint256 = numerator // totalShares
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalShares != 0):
-        usdValue += 1
-
-    return usdValue
+@view
+@internal
+def _mulDiv(
+    _amount: uint256,
+    _multiplier: uint256,
+    _denominator: uint256,
+    _shouldRoundUp: bool,
+) -> uint256:
+    numerator: uint256 = _amount * _multiplier
+    result: uint256 = numerator // _denominator
+    if _shouldRoundUp and numerator % _denominator != 0:
+        result += 1
+    return result
 
 
 ##################
@@ -454,15 +482,10 @@ def swapForLiquidatedCollateral(
     _greenToken: address,
     _savingsGreenToken: address,
 ) -> uint256:
-    assert not vaultData.isPaused # dev: contract paused
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
-
-    assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
-    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
-    assert _liqAsset != empty(address) # dev: invalid liq asset
+    self._validateLiquidationSwap(_stabAsset, _liqAsset, msg.sender)
 
     # add claimable balance
-    self._addClaimableBalance(_stabAsset, _liqAsset, _liqAmountSent)
+    self._addSwapClaimable(_stabAsset, _liqAsset, _liqAmountSent)
 
     # finalize amount
     amount: uint256 = min(_stabAssetAmount, staticcall IERC20(_stabAsset).balanceOf(self))
@@ -491,15 +514,10 @@ def swapWithClaimableGreen(
     _liqAmountSent: uint256,
     _greenToken: address,
 ) -> uint256:
-    assert not vaultData.isPaused # dev: contract paused
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
-
-    assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
-    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
-    assert _liqAsset != empty(address) # dev: invalid liq asset
+    self._validateLiquidationSwap(_stabAsset, _liqAsset, msg.sender)
 
     # add claimable balance
-    self._addClaimableBalance(_stabAsset, _liqAsset, _liqAmountSent)
+    self._addSwapClaimable(_stabAsset, _liqAsset, _liqAmountSent)
 
     # finalize amount
     maxClaimableGreen: uint256 = self.claimableBalances[_stabAsset][_greenToken]
@@ -515,26 +533,52 @@ def swapWithClaimableGreen(
     return amount
 
 
+@view
+@internal
+def _validateLiquidationSwap(_stabAsset: address, _liqAsset: address, _sender: address):
+    assert not vaultData.isPaused # dev: contract paused
+    assert _sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
+    assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
+    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
+    assert _liqAsset != empty(address) # dev: invalid liq asset
+    assert _stabAsset != GREEN_TOKEN # dev: green cannot be stab asset
+
+
+@internal
+def _addSwapClaimable(
+    _stabAsset: address,
+    _claimAsset: address,
+    _reportedAmount: uint256,
+):
+    priceDesk: address = addys._getPriceDeskAddr()
+    self._addClaimableBalance(_stabAsset, _claimAsset, _reportedAmount, priceDesk)
+
+
 # utilities
 
 
 @view
 @external
 def getTotalValue(_asset: address) -> uint256:
-    greenToken: address = addys._getGreenToken()
-    savingsGreen: address = addys._getSavingsGreen()
-    priceDesk: address = addys._getPriceDeskAddr()
-    return self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
+    return self._getCurrentTotalValue(_asset)
 
 
 @view
 @external
 def getTotalUserValue(_user: address, _asset: address) -> uint256:
-    greenToken: address = addys._getGreenToken()
-    savingsGreen: address = addys._getSavingsGreen()
-    priceDesk: address = addys._getPriceDeskAddr()
-    totalValue: uint256 = self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
+    totalValue: uint256 = self._getCurrentTotalValue(_asset)
     return self._sharesToValue(vaultData.userBalances[_user][_asset], vaultData.totalBalances[_asset], totalValue, False)
+
+
+@view
+@internal
+def _getCurrentTotalValue(_asset: address) -> uint256:
+    greenToken: address = empty(address)
+    savingsGreen: address = empty(address)
+    priceDesk: address = empty(address)
+    greenToken, savingsGreen, priceDesk = self._getStabAddys()
+    return self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
 
 
 @view
@@ -548,7 +592,7 @@ def _getTotalValue(
     totalStabValue: uint256 = 0
     stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     if stabAssetBalance != 0:
-        totalStabValue = self._getUsdValue(_asset, stabAssetBalance, _greenToken, _savingsGreen, _priceDesk)
+        totalStabValue = self._getUsdValue(_asset, stabAssetBalance, _greenToken, _savingsGreen, _priceDesk, True)
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _greenToken, _savingsGreen, _priceDesk)
     return totalStabValue + claimableValue
 
@@ -575,7 +619,7 @@ def _getValueOfClaimableAssets(
         if balance == 0:
             continue
 
-        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk)
+        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
         if claimValue == 0:
             continue
 
@@ -942,7 +986,7 @@ def _redeemFromStabilityPool(
 
         # add green to claimable (i.e. GREEN LP)
         else:
-            self._addClaimableBalance(stabAsset, _a.greenToken, redeemAmount)
+            self._addClaimableBalance(stabAsset, _a.greenToken, redeemAmount, _a.priceDesk)
 
         remainingRedeemValue -= redeemAmount
         greenSpent += redeemAmount
@@ -1020,6 +1064,130 @@ def _canPerformAutoDeposit(
 ##################
 
 
+# count and state
+
+
+@view
+@external
+def getNumActiveClaimAssets(_stabAsset: address) -> uint256:
+    return self._getNumActiveClaimAssets(_stabAsset)
+
+
+@view
+@internal
+def _getNumActiveClaimAssets(_stabAsset: address) -> uint256:
+    numAssets: uint256 = self.numClaimableAssets[_stabAsset]
+    return numAssets - convert(numAssets != 0, uint256)
+
+
+@view
+@external
+def getClaimAssetState(_stabAsset: address, _claimAsset: address) -> uint256:
+    if self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
+        return CLAIM_ASSET_ACTIVE
+    return CLAIM_ASSET_ABSENT if self.claimableBalances[_stabAsset][_claimAsset] == 0 else CLAIM_ASSET_DORMANT
+
+
+@view
+@external
+def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, uint256, uint256):
+    greenToken: address = empty(address)
+    savingsGreen: address = empty(address)
+    priceDesk: address = empty(address)
+    greenToken, savingsGreen, priceDesk = self._getStabAddys()
+    usdValue: uint256 = 0
+    capacityRemaining: uint256 = 0
+    usdValue, capacityRemaining = self._getClaimAssetActivationData(_stabAsset, _claimAsset, greenToken, savingsGreen, priceDesk)
+    return (usdValue >= ACTIVATION_USD_THRESHOLD and capacityRemaining != 0), usdValue, capacityRemaining
+
+
+@view
+@internal
+def _getClaimAssetActivationData(
+    _stabAsset: address,
+    _claimAsset: address,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> (uint256, uint256):
+    activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
+    capacityRemaining: uint256 = 0
+    if activeCount < MAX_ACTIVE_CLAIM_ASSETS:
+        capacityRemaining = MAX_ACTIVE_CLAIM_ASSETS - activeCount
+
+    pairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset]
+    if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
+        return 0, capacityRemaining
+
+    custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
+    priorLiability: uint256 = self.totalClaimableBalances[_claimAsset]
+    assert custody >= priorLiability # dev: claim custody deficit
+    return self._getUsdValue(_claimAsset, pairBalance, _greenToken, _savingsGreen, _priceDesk, False), capacityRemaining
+
+
+# maintenance
+
+
+@internal
+def _maintainClaimableAssets(
+    _stabAsset: address,
+    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
+    _shouldActivate: bool,
+):
+    greenToken: address = empty(address)
+    savingsGreen: address = empty(address)
+    priceDesk: address = empty(address)
+    greenToken, savingsGreen, priceDesk = self._getStabAddys()
+
+    for claimAsset: address in _claimAssets:
+        if _shouldActivate:
+            pairBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
+            if pairBalance == 0 or self.indexOfClaimableAsset[_stabAsset][claimAsset] != 0:
+                continue
+
+            custody: uint256 = staticcall IERC20(claimAsset).balanceOf(self)
+            priorLiability: uint256 = self.totalClaimableBalances[claimAsset]
+            assert custody >= priorLiability # dev: claim custody deficit
+
+            usdValue: uint256 = self._getUsdValue(claimAsset, pairBalance, greenToken, savingsGreen, priceDesk, False)
+            if usdValue < ACTIVATION_USD_THRESHOLD:
+                continue
+
+            if self._getNumActiveClaimAssets(_stabAsset) >= MAX_ACTIVE_CLAIM_ASSETS:
+                continue
+
+            self._registerClaimableAsset(_stabAsset, claimAsset)
+            continue
+
+        if self.indexOfClaimableAsset[_stabAsset][claimAsset] == 0:
+            continue
+
+        balance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
+        if balance == 0:
+            self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_ZERO)
+            continue
+
+        usdValue: uint256 = self._getUsdValue(claimAsset, balance, greenToken, savingsGreen, priceDesk, False)
+        if usdValue != 0 and usdValue < RETENTION_USD_THRESHOLD:
+            self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_DUST)
+
+
+@external
+def pruneClaimableAssets(
+    _stabAsset: address,
+    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
+):
+    self._maintainClaimableAssets(_stabAsset, _claimAssets, False)
+
+
+@external
+def activateClaimAssets(
+    _stabAsset: address,
+    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
+):
+    self._maintainClaimableAssets(_stabAsset, _claimAssets, True)
+
+
 # add claimable
 
 
@@ -1027,18 +1195,45 @@ def _canPerformAutoDeposit(
 def _addClaimableBalance(
     _stabAsset: address,
     _claimAsset: address,
-    _claimAmount: uint256,
+    _reportedAmount: uint256,
+    _priceDesk: address,
 ):
-    claimAmount: uint256 = min(_claimAmount, staticcall IERC20(_claimAsset).balanceOf(self))
-    assert claimAmount != 0 # dev: nothing received
+    assert _stabAsset != empty(address) # dev: invalid stab asset
+    assert _claimAsset != empty(address) # dev: invalid claim asset
+    assert _reportedAmount != 0 # dev: nothing received
+
+    # validate custody
+    custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
+    priorLiability: uint256 = self.totalClaimableBalances[_claimAsset]
+    assert custody >= priorLiability # dev: claim custody deficit
+    availableUnaccounted: uint256 = custody - priorLiability
+    assert _reportedAmount <= availableUnaccounted # dev: short claim receipt
 
     # update balances
-    self.claimableBalances[_stabAsset][_claimAsset] += claimAmount
-    self.totalClaimableBalances[_claimAsset] += claimAmount
+    newPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset] + _reportedAmount
+    newTotalLiability: uint256 = priorLiability + _reportedAmount
+    self.claimableBalances[_stabAsset][_claimAsset] = newPairBalance
+    self.totalClaimableBalances[_claimAsset] = newTotalLiability
 
-    # register claimable asset if not already registered
-    if self.indexOfClaimableAsset[_stabAsset][_claimAsset] == 0:
-        self._registerClaimableAsset(_stabAsset, _claimAsset)
+    # already active; do not reprice or emit dormant telemetry
+    if self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
+        return
+
+    usdValue: uint256 = self._getUsdValue(_claimAsset, newPairBalance, GREEN_TOKEN, SAVINGS_GREEN, _priceDesk, False)
+    activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
+    dormantReason: uint256 = 0
+    if usdValue == 0:
+        dormantReason = DORMANT_NO_PRICE
+    elif usdValue < ACTIVATION_USD_THRESHOLD:
+        dormantReason = DORMANT_BELOW_FLOOR
+    elif activeCount >= MAX_ACTIVE_CLAIM_ASSETS:
+        dormantReason = DORMANT_CAPACITY
+
+    if dormantReason != 0:
+        log ClaimAssetLeftDormant(stabAsset=_stabAsset, claimAsset=_claimAsset, balance=newPairBalance, activeCount=activeCount, reason=dormantReason)
+        return
+
+    self._registerClaimableAsset(_stabAsset, _claimAsset)
 
 
 # register claimable asset
@@ -1046,12 +1241,17 @@ def _addClaimableBalance(
 
 @internal
 def _registerClaimableAsset(_stabAsset: address, _assetReceived: address):
+    assert self.claimableBalances[_stabAsset][_assetReceived] != 0 # dev: no claimable balance
+    assert self.indexOfClaimableAsset[_stabAsset][_assetReceived] == 0 # dev: claim asset already active
+    assert self._getNumActiveClaimAssets(_stabAsset) < MAX_ACTIVE_CLAIM_ASSETS # dev: max active claim assets
+
     cid: uint256 = self.numClaimableAssets[_stabAsset]
     if cid == 0:
         cid = 1 # not using 0 index
     self.claimableAssets[_stabAsset][cid] = _assetReceived
     self.indexOfClaimableAsset[_stabAsset][_assetReceived] = cid
     self.numClaimableAssets[_stabAsset] = cid + 1
+    log ClaimAssetActivated(stabAsset=_stabAsset, claimAsset=_assetReceived, balance=self.claimableBalances[_stabAsset][_assetReceived], activeCount=self._getNumActiveClaimAssets(_stabAsset))
 
 
 # reduce claimable
@@ -1069,20 +1269,20 @@ def _reduceClaimableBalances(
     self.claimableBalances[_stabAsset][_claimAsset] = newClaimableBalance
     self.totalClaimableBalances[_claimAsset] -= _claimAmount
 
-    # remove claimable asset if depleted
     if newClaimableBalance == 0:
-        self._removeClaimableAsset(_stabAsset, _claimAsset)
+        self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
+        return
 
     # remove claimable asset if remaining USD value is dust (< $0.10) - only remove from iterable list
-    elif _remainingUsdValue != 0 and _remainingUsdValue < DUST_USD_THRESHOLD:
-        self._removeClaimableAsset(_stabAsset, _claimAsset)
+    if _remainingUsdValue != 0 and _remainingUsdValue < RETENTION_USD_THRESHOLD:
+        self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_DUST)
 
 
 # deregister claimable asset
 
 
 @internal
-def _removeClaimableAsset(_stabAsset: address, _asset: address):
+def _removeClaimableAsset(_stabAsset: address, _asset: address, _reason: uint256):
     numAssets: uint256 = self.numClaimableAssets[_stabAsset]
     if numAssets == 0:
         return
@@ -1093,11 +1293,13 @@ def _removeClaimableAsset(_stabAsset: address, _asset: address):
 
     # update data
     lastIndex: uint256 = numAssets - 1
-    self.numClaimableAssets[_stabAsset] = lastIndex
-    self.indexOfClaimableAsset[_stabAsset][_asset] = 0
-
     # shift to replace the one being removed
     if targetIndex != lastIndex:
         lastAsset: address = self.claimableAssets[_stabAsset][lastIndex]
         self.claimableAssets[_stabAsset][targetIndex] = lastAsset
         self.indexOfClaimableAsset[_stabAsset][lastAsset] = targetIndex
+
+    self.claimableAssets[_stabAsset][lastIndex] = empty(address)
+    self.indexOfClaimableAsset[_stabAsset][_asset] = 0
+    self.numClaimableAssets[_stabAsset] = lastIndex
+    log ClaimAssetDeactivated(stabAsset=_stabAsset, claimAsset=_asset, balance=self.claimableBalances[_stabAsset][_asset], activeCount=self._getNumActiveClaimAssets(_stabAsset), reason=_reason)
