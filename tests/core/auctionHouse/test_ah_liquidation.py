@@ -9,7 +9,7 @@ from conf_utils import filter_logs
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "6fe58c7c34b0320905033b9e17ee4933a4b0a745d091d0f6a329ae5842eb7d7e"
+    "7203aceb1557216e2ddfb1964f3edc8d68ab946b74589d4c2a4ce2baaa81180c"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -2667,4 +2667,3 @@ def test_ah_liquidation_normal_position_unaffected(
     liquidation_logs = filter_logs(teller, "LiquidateUser")
     assert len(liquidation_logs) == 1
     _test(expected_keeper_fee, liquidation_logs[0].keeperFee)
-

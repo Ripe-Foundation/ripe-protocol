@@ -272,6 +272,16 @@ def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnD
         totalBalance=0,
     )
 
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    return 0
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    return 0
+
 @internal
 def _deposit(_amount: uint256) -> uint256:
     mode: uint256 = self.mode
@@ -1674,41 +1684,47 @@ def test_m1_vault_result_mismatch_reverts_exact_transfer(
 def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
     ripe_hq,
     governance,
-    simple_erc20_vault,
+    credit_engine,
+    vault_book,
     bob,
     setGeneralConfig,
     setAssetConfig,
-    mock_price_source,
     teller,
     ledger,
 ):
     def setup(active_teller):
         setGeneralConfig()
-        token = _caller_sensitive_balance_token()
-        vault = simple_erc20_vault
-        vault_id = 3
+        token = _m1_token()
+        vault = boa.loads(
+            M1_ADVERSARIAL_VAULT_SOURCE,
+            name="t6_short_report_vault",
+            override_address=boa.env.generate_address(),
+        )
+        vault_id = _m1_register_vault(vault_book, governance, vault)
         setAssetConfig(token, _vaultIds=[vault_id])
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-        token.configure_vault_observation(vault, 1)
+        vault.configure(2, active_teller, b"")
         amount = 100 * EIGHTEEN_DECIMALS
-        token.mint(bob, amount)
-        token.approve(active_teller, amount, sender=bob)
+        token.mint(credit_engine, amount)
+        token.approve(active_teller, amount, sender=credit_engine.address)
         return token, vault, vault_id, amount
 
     with boa.env.anchor():
-        token, vault, _, amount = setup(teller)
+        token, vault, vault_id, amount = setup(teller)
         # Teller's equality assert has no dev reason. The succeeding SHA-pinned
         # mutant branch below isolates this bare revert to that exact guard.
         with boa.reverts():
-            teller.deposit(token, amount, bob, vault, sender=bob)
-        _m1_assert_no_deposit_effects(
-            teller,
-            ledger,
-            vault,
-            token,
-            bob,
-            amount,
-        )
+            teller.depositFromTrusted(
+                bob,
+                vault_id,
+                token,
+                amount,
+                0,
+                sender=credit_engine.address,
+            )
+        assert token.balanceValue(credit_engine) == amount
+        assert token.balanceValue(vault) == 0
+        assert ledger.getNumUserVaults(bob) == 0
+        assert filter_logs(teller, "TellerDeposit") == []
 
     with boa.env.anchor():
         mutant = boa.loads(
@@ -1721,15 +1737,16 @@ def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
         _m1_replace_hq_address(ripe_hq, governance, 17, mutant)
         token, vault, vault_id, amount = setup(mutant)
 
-        assert mutant.deposit(
+        assert mutant.depositFromTrusted(
+            bob,
+            vault_id,
             token,
             amount,
-            bob,
-            vault,
-            sender=bob,
+            0,
+            sender=credit_engine.address,
         ) == amount
         assert token.balanceValue(vault) == amount
-        assert vault.getTotalAmountForUser(bob, token) == amount - 1
+        assert vault.mode() == 2
         assert ledger.isParticipatingInVault(bob, vault_id)
         assert [log.amount for log in filter_logs(mutant, "TellerDeposit")] == [
             amount
@@ -1969,11 +1986,10 @@ def test_t1_trusted_callback_is_blocked_by_receipt_measurement_mutex(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
-def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
+def test_t1_mutex_removal_mutant_exposes_offsetting_nested_receipt(
     ripe_hq,
     governance,
     credit_engine,
-    simple_erc20_vault,
     bob,
     setGeneralConfig,
     setAssetConfig,
@@ -1981,20 +1997,42 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
     ledger,
     vault_book,
 ):
+    def setup(active_teller):
+        setGeneralConfig()
+        token = _m1_token()
+        vault = boa.loads(
+            M1_ADVERSARIAL_VAULT_SOURCE,
+            name="t1_offsetting_receipt_vault",
+            override_address=boa.env.generate_address(),
+        )
+        vault_id = _m1_register_vault(vault_book, governance, vault)
+        setAssetConfig(token, _vaultIds=[vault_id])
+        vault.configure(0, active_teller, b"")
+        if active_teller.address != teller.address:
+            _m1_replace_hq_address(ripe_hq, governance, 17, active_teller)
+        _m1_replace_hq_address(ripe_hq, governance, 15, token)
+
+        amount = 100 * EIGHTEEN_DECIMALS
+        nested_amount = 1
+        token.mint(credit_engine, amount)
+        token.approve(active_teller, amount, sender=credit_engine.address)
+        token.mint(token, nested_amount)
+        token.set_self_allowance(active_teller, nested_amount)
+        nested = active_teller.depositFromTrusted.prepare_calldata(
+            bob,
+            vault_id,
+            token,
+            nested_amount,
+            0,
+        )
+        token.configure_callback(active_teller, nested, True)
+        token.configure_callback_transfer_mode(0)
+        token.configure_transfer(2)
+        return token, vault, vault_id, amount, nested_amount
+
     # S2 baseline: the exact named scenario rejects with the reviewed source.
     with boa.env.anchor():
-        token, amount, _, vault_id = _t1_setup_mutex_sensitive_trusted_callback(
-            teller,
-            teller,
-            ripe_hq,
-            governance,
-            credit_engine,
-            simple_erc20_vault,
-            bob,
-            setGeneralConfig,
-            setAssetConfig,
-            vault_book,
-        )
+        token, _, vault_id, amount, _ = setup(teller)
         with boa.reverts():
             teller.depositFromTrusted(
                 bob,
@@ -2007,7 +2045,8 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
 
     # S2 mutant: all four dedicated-mutex constructs are removed exactly once.
     # The mutant compiles/deploys, reaches the same route, and incorrectly
-    # allows Q-1 outer receipt + one nested receipt to credit Q+1 nominal units.
+    # allows a Q-1 outer receipt plus one nested receipt to satisfy the outer
+    # Q measurement against a deliberately permissive disposable vault.
     with boa.env.anchor():
         mutant = boa.loads(
             _t1_mutex_removal_mutant_source(),
@@ -2016,20 +2055,7 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
             name="t1_teller_without_receipt_mutex",
             override_address=boa.env.generate_address(),
         )
-        token, amount, nested_amount, vault_id = (
-            _t1_setup_mutex_sensitive_trusted_callback(
-                mutant,
-                teller,
-                ripe_hq,
-                governance,
-                credit_engine,
-                simple_erc20_vault,
-                bob,
-                setGeneralConfig,
-                setAssetConfig,
-                vault_book,
-            )
-        )
+        token, vault, vault_id, amount, nested_amount = setup(mutant)
 
         assert (
             mutant.depositFromTrusted(
@@ -2042,12 +2068,12 @@ def test_t1_mutex_removal_mutant_exposes_offsetting_nested_credit(
             )
             == amount
         )
-        assert token.balanceValue(simple_erc20_vault) == amount
-        assert (
-            simple_erc20_vault.getTotalAmountForUser(bob, token)
-            == amount + nested_amount
-        )
+        assert token.balanceValue(vault) == amount
         assert ledger.getNumUserVaults(bob) == 1
+        assert [log.amount for log in filter_logs(mutant, "TellerDeposit")] == [
+            nested_amount,
+            amount,
+        ]
 
 
 def test_t2_vault_callback_mode_five_is_blocked_after_custody_read(
@@ -2582,7 +2608,6 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
 def test_predeployment_every_canonical_vault_deposit_rejects_non_teller(
     request,
     vault_fixture,
-    ripe_hq_deploy,
     alpha_token,
     alice,
     bob,
@@ -2590,20 +2615,6 @@ def test_predeployment_every_canonical_vault_deposit_rejects_non_teller(
     vault = request.getfixturevalue(vault_fixture)
     with boa.reverts("only Teller allowed"):
         vault.depositTokensInVault(
-            bob,
-            alpha_token,
-            1,
-            sender=alice,
-        )
-
-    guarded = boa.load(
-        "contracts/vaults/GuardedErc20.vy",
-        ripe_hq_deploy,
-        name=f"authorization_guarded_{vault_fixture}",
-        override_address=boa.env.generate_address(),
-    )
-    with boa.reverts("only Teller allowed"):
-        guarded.depositTokensInVault(
             bob,
             alpha_token,
             1,
@@ -2674,16 +2685,27 @@ def test_predeployment_legacy_clamp_is_closed_by_teller_equality_and_rollback(
     amount = 100 * EIGHTEEN_DECIMALS
     token.configure_vault_observation(vault, 1)
 
-    # Direct authorized vault entry records the legacy typed clamp itself.
+    # Protected Basic rejects a short observed balance; legacy share/stability
+    # helpers retain their direct-call clamp. Teller rolls either behavior back.
     with boa.env.anchor():
         token.mint(vault, amount)
-        assert vault.depositTokensInVault(
-            bob,
-            token,
-            amount,
-            sender=teller.address,
-        ) == amount - 1
-        assert vault.getTotalAmountForUser(bob, token) != 0
+        if vault_fixture == "simple_erc20_vault":
+            with boa.reverts("insufficient vault backing"):
+                vault.depositTokensInVault(
+                    bob,
+                    token,
+                    amount,
+                    sender=teller.address,
+                )
+            assert vault.getTotalAmountForUser(bob, token) == 0
+        else:
+            assert vault.depositTokensInVault(
+                bob,
+                token,
+                amount,
+                sender=teller.address,
+            ) == amount - 1
+            assert vault.getTotalAmountForUser(bob, token) != 0
 
     token.mint(bob, amount)
     token.approve(teller, amount, sender=bob)
@@ -2853,7 +2875,7 @@ def test_predeployment_caught_nested_rejection_preserves_exact_outer_receipt(
 
 @pytest.mark.parametrize(
     "vault_kind",
-    ("simple", "rebase", "stability", "governance", "guarded"),
+    ("simple", "rebase", "stability", "governance"),
 )
 @pytest.mark.parametrize(
     ("transfer_mode", "recipient_numerator", "recipient_offset"),
@@ -2875,9 +2897,6 @@ def test_predeployment_withdrawal_responsibility_matrix(
     transfer_mode,
     recipient_numerator,
     recipient_offset,
-    ripe_hq_deploy,
-    governance,
-    vault_book,
     simple_erc20_vault,
     rebase_erc20_vault,
     stability_pool,
@@ -2898,16 +2917,7 @@ def test_predeployment_withdrawal_responsibility_matrix(
         "stability": (stability_pool, 1),
         "governance": (ripe_gov_vault, 2),
     }
-    if vault_kind == "guarded":
-        vault = boa.load(
-            "contracts/vaults/GuardedErc20.vy",
-            ripe_hq_deploy,
-            name=f"withdrawal_matrix_guarded_{transfer_mode}",
-            override_address=boa.env.generate_address(),
-        )
-        vault_id = _m1_register_vault(vault_book, governance, vault)
-    else:
-        vault, vault_id = vaults[vault_kind]
+    vault, vault_id = vaults[vault_kind]
 
     if vault_kind == "governance":
         mission_control.setRipeGovVaultConfig(
@@ -2939,12 +2949,14 @@ def test_predeployment_withdrawal_responsibility_matrix(
             True,
         )
 
-    guarded_rejects_shape_or_delivery = (
-        vault_kind == "guarded"
-        and transfer_mode in (1, 3, 4, 11)
+    protected_simple_rejects_shape_or_delivery = (
+        vault_kind == "simple"
+        and transfer_mode in (1, 3, 4)
     )
     universally_rejected = transfer_mode in (6, 7, 10)
-    should_revert = guarded_rejects_shape_or_delivery or universally_rejected
+    should_revert = (
+        protected_simple_rejects_shape_or_delivery or universally_rejected
+    )
 
     if should_revert:
         with boa.reverts():
@@ -2986,7 +2998,7 @@ def test_predeployment_withdrawal_responsibility_matrix(
 @pytest.mark.parametrize(
     ("nested_action", "nested_succeeds"),
     (
-        pytest.param("guarded-withdrawal", True, id="guarded-withdrawal"),
+        pytest.param("protected-withdrawal", True, id="protected-withdrawal"),
         pytest.param("rebalance", False, id="rebalance"),
         pytest.param("redemption", False, id="redemption"),
         pytest.param("liquidation", True, id="liquidation"),
@@ -3010,16 +3022,16 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
 ):
     setGeneralConfig()
     token = _m1_token()
-    guarded = boa.load(
-        "contracts/vaults/GuardedErc20.vy",
+    protected_vault = boa.load(
+        "contracts/vaults/SimpleErc20.vy",
         ripe_hq_deploy,
-        name=f"reentrancy_guarded_{outer_route}_{nested_action}",
+        name=f"reentrancy_protected_{outer_route}_{nested_action}",
         override_address=boa.env.generate_address(),
     )
-    guarded_id = _m1_register_vault(
+    protected_id = _m1_register_vault(
         vault_book,
         governance,
-        guarded,
+        protected_vault,
     )
     simple_id = vault_book.getRegId(simple_erc20_vault)
 
@@ -3036,32 +3048,32 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
     else:
         outer_vault = simple_erc20_vault
         outer_id = simple_id
-    setAssetConfig(token, _vaultIds=[outer_id, guarded_id])
+    setAssetConfig(token, _vaultIds=[outer_id, protected_id])
 
     user = token.address
-    guarded_position = 10
-    token.mint(guarded, guarded_position)
-    assert guarded.depositTokensInVault(
+    protected_position = 10
+    token.mint(protected_vault, protected_position)
+    assert protected_vault.depositTokensInVault(
         user,
         token,
-        guarded_position,
+        protected_position,
         sender=teller.address,
-    ) == guarded_position
+    ) == protected_position
 
-    if nested_action == "guarded-withdrawal":
+    if nested_action == "protected-withdrawal":
         nested = teller.withdraw.prepare_calldata(
             token,
             1,
             user,
-            guarded,
-            guarded_id,
+            protected_vault,
+            protected_id,
         )
     elif nested_action == "rebalance":
         nested = teller.rebalance.prepare_calldata(
             token,
             simple_id,
             token,
-            guarded_id,
+            protected_id,
             1,
             1,
             user,
@@ -3069,7 +3081,7 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
     elif nested_action == "redemption":
         nested = teller.redeemCollateral.prepare_calldata(
             user,
-            guarded_id,
+            protected_id,
             token,
             1,
             False,
@@ -3113,11 +3125,14 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
     assert token.balanceValue(outer_vault) == amount
     assert outer_vault.getTotalAmountForUser(user, token) == amount
     nested_withdrawal_succeeds = (
-        nested_action == "guarded-withdrawal" and nested_succeeds
+        nested_action == "protected-withdrawal" and nested_succeeds
     )
-    expected_guarded = guarded_position - int(nested_withdrawal_succeeds)
-    assert guarded.getTotalAmountForUser(user, token) == expected_guarded
-    assert token.balanceValue(guarded) == expected_guarded
+    expected_protected = protected_position - int(nested_withdrawal_succeeds)
+    assert (
+        protected_vault.getTotalAmountForUser(user, token)
+        == expected_protected
+    )
+    assert token.balanceValue(protected_vault) == expected_protected
     assert token.balanceValue(token) == 1 + int(nested_withdrawal_succeeds)
 
 

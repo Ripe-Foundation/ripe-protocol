@@ -1,32 +1,28 @@
-# GuardedErc20 consumer inventory
+# BasicVault consumer inventory
 
-> **30 July 2026 currentness:** The PR #61 candidate described below entered
-> `rh` at historical import ancestor `ad831669…` and is retained by frozen
-> protocol/pause baseline `ae0cb49…`.
-> AuctionHouse safe-conversion preflight and downstream Deleverage consistency
-> are part of the current reviewed source. This inventory is validation
-> evidence only; no Robinhood deployment, configuration, activation, or release
-> has occurred.
+> **4 August 2026 candidate currentness:** the shared BasicVault safety change
+> is feature-branch source only. It does not modify an immutable deployed vault,
+> integrate into `rh`, configure an asset, or activate a launch route.
 
-This is the G4 inventory rooted at baseline
-`a86650b187c523f27c92f05bfe959d06840025a6` and reconciled for the
-PR #61 Gate 1 candidate. It covers every `Vault`
+This is the G4 inventory rooted at feature baseline
+`1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`
 read in CreditEngine, AuctionHouse, CreditRedeem, the reviewed-baseline
 Deleverage source, Lootbox, and Teller whose result is an amount, a position
 discovery input, or a vault-capability input. The machine test verifies the
 source hashes, call sites, function names, getter names, classifications, and
 policy below
-([inventory test](../../../../tests/vaults/test_guarded_consumer_inventory.py)).
+([inventory test](../../../../tests/vaults/test_basic_vault_consumer_inventory.py)).
 
 ## Policy
 
 Collateral valuation, borrowing-power calculation, withdrawal projection, and
 post-withdraw amount enforcement must consume either
-`getUserAssetAndAmountAtIndex` or `getTotalAmountForUser`. GuardedErc20 makes
-both getters backing-aware by returning zero usable amount when exact observed
-custody is unknown or below nominal liability
-([Guarded source](../../../../contracts/vaults/GuardedErc20.vy#L206),
-[backing-aware mutation test](../../../../tests/vaults/test_guarded_erc20.py)).
+`getUserAssetAndAmountAtIndex` or `getTotalAmountForUser`. BasicVault makes
+both getters backing-aware by returning zero usable amount when observed
+custody is below nominal liability. Invalid typed balance observations revert
+instead of being interpreted as usable backing
+([BasicVault source](../../../../contracts/vaults/modules/BasicVault.vy#L147),
+[backing-aware safety test](../../../../tests/vaults/test_basic_vault_safety.py)).
 
 Position discovery may remain nominal: a consumer may locate an asset or learn
 that a nominal balance exists, but it must obtain a backing-aware amount before
@@ -42,15 +38,15 @@ loot-share reads affect reward accounting, not CreditEngine collateral value
 Do not hand-edit line numbers or classifications without the corresponding
 source review and test update.
 
-<!-- GUARDED_CONSUMER_INVENTORY_BEGIN -->
+<!-- BASIC_VAULT_CONSUMER_INVENTORY_BEGIN -->
 ```json
 {
   "schema": 1,
-  "baseline": "a86650b187c523f27c92f05bfe959d06840025a6",
+  "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921",
+    "contracts/core/AuctionHouse.vy": "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
     "contracts/core/CreditEngine.vy": "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d",
-    "contracts/core/CreditRedeem.vy": "0567b9118868f7fc37a0e583580ab6c5cd1e85274747860a6394f1f1c4364c0e",
+    "contracts/core/CreditRedeem.vy": "62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd",
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
     "contracts/core/Lootbox.vy": "669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65",
     "contracts/core/Teller.vy": "4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909"
@@ -72,10 +68,10 @@ source review and test update.
       "path": "contracts/core/AuctionHouse.vy",
       "line": 420,
       "function": "_performLiquidationPhases",
-      "getter": "doesUserHaveBalance",
-      "classification": "position_discovery_nominal_allowed",
-      "reason": "Skips a stale liquidation position; no amount or USD value is derived from the Boolean.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "getter": "getTotalAmountForUser",
+      "classification": "value_backing_required",
+      "reason": "Skips a deficient priority asset before any stability-pool swap or auction attempt.",
+      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
       "id": "AH-502",
@@ -85,17 +81,17 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds position enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "AH-516",
       "path": "contracts/core/AuctionHouse.vy",
       "line": 516,
       "function": "_iterateThruAssetsWithinVault",
-      "getter": "getUserAssetAtIndexAndHasBalance",
-      "classification": "position_discovery_nominal_allowed",
-      "reason": "Discovers a nominal liquidation candidate; downstream collateral terms supply value.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "getter": "getUserAssetAndAmountAtIndex",
+      "classification": "value_backing_required",
+      "reason": "Enumerates only candidates with a nonzero backing-aware amount before liquidation handling.",
+      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
       "id": "AH-651",
@@ -105,27 +101,37 @@ source review and test update.
       "getter": "isSupportedVaultAsset",
       "classification": "capability_discovery_nominal_allowed",
       "reason": "Prevents a stability-pool asset routing collision; it does not value user collateral.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "AH-892",
       "path": "contracts/core/AuctionHouse.vy",
       "line": 892,
       "function": "_canStartAuction",
-      "getter": "doesUserHaveBalance",
-      "classification": "position_discovery_nominal_allowed",
-      "reason": "Checks nominal position existence before consulting liquidation state.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "getter": "getTotalAmountForUser",
+      "classification": "value_backing_required",
+      "reason": "Prevents creation of an auction whose collateral became deficient.",
+      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-1204",
+      "id": "AH-1200",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1204,
+      "line": 1200,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Clamps the Deleverage-requested withdrawal to the backing-aware user amount before safe conversion and mutation.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
+    },
+    {
+      "id": "AH-1228",
+      "path": "contracts/core/AuctionHouse.vy",
+      "line": 1228,
+      "function": "_transferCollateral",
+      "getter": "getTotalAmountForUser",
+      "classification": "value_backing_required",
+      "reason": "Soft-skips deficient collateral before internal transfer or external withdrawal settlement.",
+      "evidence_test": "test_safe_nominal_volatile_deleverage_skips_deficit_and_continues"
     },
     {
       "id": "CE-723",
@@ -135,7 +141,7 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds collateral position enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "CE-729",
@@ -162,10 +168,10 @@ source review and test update.
       "path": "contracts/core/CreditRedeem.vy",
       "line": 190,
       "function": "_redeemCollateral",
-      "getter": "doesUserHaveBalance",
-      "classification": "position_discovery_nominal_allowed",
-      "reason": "Short-circuits an absent nominal position; it does not compute collateral value.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "getter": "getTotalAmountForUser",
+      "classification": "value_backing_required",
+      "reason": "Soft-skips a deficient redemption entry before pricing or collateral movement.",
+      "evidence_test": "test_credit_redeem_many_skips_deficient_and_preserves_healthy_entry"
     },
     {
       "id": "DL-579",
@@ -175,7 +181,7 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "The amount feeds withdrawal USD value and projected post-withdraw collateral.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-823",
@@ -185,7 +191,7 @@ source review and test update.
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Skips a stale requested position without deriving value.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-898",
@@ -195,7 +201,7 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds deleverage position enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-911",
@@ -205,7 +211,7 @@ source review and test update.
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Discovers candidate assets; the selected path obtains value elsewhere.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-1073",
@@ -215,7 +221,7 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds deleverage information enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-1081",
@@ -225,7 +231,7 @@ source review and test update.
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Discovers a nominal position before the backing-aware amount read.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "DL-1086",
@@ -235,7 +241,7 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "The amount feeds PriceDesk and maximum deleveragable USD.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-298",
@@ -245,7 +251,7 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds cleanup enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-302",
@@ -255,7 +261,7 @@ source review and test update.
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Discovers nominal positions for reward cleanup, not collateral value.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-349",
@@ -265,7 +271,7 @@ source review and test update.
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Bounds claimable-reward enumeration only.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-351",
@@ -275,7 +281,7 @@ source review and test update.
       "getter": "userAssets",
       "classification": "position_discovery_nominal_allowed",
       "reason": "Retrieves an asset identity for reward accounting, not an amount.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-812",
@@ -285,7 +291,7 @@ source review and test update.
       "getter": "getUserLootBoxShare",
       "classification": "reward_accounting_nominal_allowed",
       "reason": "Computes configured deposit-reward share; it does not set collateral value or borrowing power.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "LB-830",
@@ -295,7 +301,7 @@ source review and test update.
       "getter": "getTotalAmountForVault",
       "classification": "reward_accounting_nominal_allowed",
       "reason": "Refreshes global deposit reward points; it is outside CreditEngine collateral valuation.",
-      "evidence_test": "test_guarded_consumer_inventory_enforces_amount_policy"
+      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
       "id": "TL-381",
@@ -305,22 +311,22 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Enforces the remaining minimum deposit balance after withdrawal.",
-      "evidence_test": "test_g1_backing_aware_view_mutant_restores_phantom_value"
+      "evidence_test": "test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal"
     }
   ]
 }
 ```
-<!-- GUARDED_CONSUMER_INVENTORY_END -->
+<!-- BASIC_VAULT_CONSUMER_INVENTORY_END -->
 
 ## Test-to-consumer result
 
 The machine inventory test is exhaustive over the getter scope above. It also
 requires every `value_backing_required` row to use one of the two
 backing-aware getters and every nominally allowed row to carry nonempty
-included/excluded reasoning. The Guarded mutation suite independently proves
-that replacing the shared backing predicate with `true` restores phantom
-amounts after a one-unit custody deficit
-([mutation test](../../../../tests/vaults/test_guarded_erc20.py)).
+included/excluded reasoning. The BasicVault safety suite independently proves
+that a one-unit custody deficit zeroes the value-bearing getter results while
+preserving the nominal position-discovery boundary
+([safety test](../../../../tests/vaults/test_basic_vault_safety.py)).
 
 This inventory is source evidence only. Corrected PR #61 entered `rh` at
 historical import ancestor `ad831669943ccfe7b9ed57454995dfce51630a66`; that

@@ -21,7 +21,7 @@ REQUIRED_CONTRACTS = frozenset(
         "CreditEngine",
         "Deleverage",
         "DefaultsRobinhood",
-        "GuardedErc20",
+        "SimpleErc20",
         "Ledger",
         "Lootbox",
         "SwitchboardDelta",
@@ -38,15 +38,15 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_469, "headroom": 107},
+    "AuctionHouse": {"size": 24_528, "headroom": 48},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
 CREATION_BINDING_FACTS = {
     "AuctionHouse": {
-        "prefix_size": 24_497,
-        "prefix_sha256": "dcd9dc89c963925e01679613aa03e1ab2229063c9b2e6446b1a3c91976476a45",
+        "prefix_size": 24_556,
+        "prefix_sha256": "c83d5253b929c1847a5639018f78dee88cb00809a9ab6daea672a97318309379",
         "metadata_size": 59,
-        "metadata_sha256": "f9c98ba80dfb11b6352093908bcf8ba4fc99ab1e4a4372488ef5dea4024a7b0e",
+        "metadata_sha256": "bd1b73d34f5f90101855837d42cbbed46dde5ae0ba5076ffd8f8f007607ad56e",
     },
     "CreditEngine": {
         "prefix_size": 24_266,
@@ -66,11 +66,11 @@ CREATION_BINDING_FACTS = {
         "metadata_size": 57,
         "metadata_sha256": "e900bfb673577092d576a12fd2cd757791ac09fd5620297d355cc3eee4e47f39",
     },
-    "GuardedErc20": {
-        "prefix_size": 10_635,
-        "prefix_sha256": "fc362fc65e3f5fb4cc2a5e8e5715580aa16f699f0af72f7567fc308eeb1a9c2d",
+    "SimpleErc20": {
+        "prefix_size": 9_501,
+        "prefix_sha256": "b0ee35efacfdc84ead26ba8f9f180562b7e1c889ea4884a98ec9bac40a5ae833",
         "metadata_size": 56,
-        "metadata_sha256": "1c2dced73bd886916233eaacbe6ed0399c6ca87c6a7e309cc7feb131bb133a90",
+        "metadata_sha256": "0cef5425de095ae1889b68e471bdec6971b9613a38e0bbbe6b20f9ae0ab642c9",
     },
     "Ledger": {
         "prefix_size": 13_674,
@@ -153,37 +153,6 @@ def test_frozen_contract_artifacts_are_current():
         "not a deployed-runtime identity; constructor immutables" in line
         for line in contract_lines
     )
-
-
-def test_guarded_and_simple_canonical_selectors_and_layout_match():
-    vyper = artifact_checker._vyper_path()
-    guarded = artifact_checker._compile(
-        ROOT / "contracts" / "vaults" / "GuardedErc20.vy",
-        vyper,
-    )
-    simple = artifact_checker._compile(
-        ROOT / "contracts" / "vaults" / "SimpleErc20.vy",
-        vyper,
-    )
-
-    assert guarded.method_identifiers == simple.method_identifiers
-    assert len(guarded.method_identifiers) == 34
-    assert guarded.storage_layout == simple.storage_layout
-    assert guarded.transient_storage_layout == simple.transient_storage_layout
-    assert guarded.code_layout == simple.code_layout
-
-    guarded_functions = [
-        entry for entry in guarded.abi if entry.get("type") == "function"
-    ]
-    simple_functions = [
-        entry for entry in simple.abi if entry.get("type") == "function"
-    ]
-    assert guarded_functions == simple_functions
-    assert [
-        entry for entry in guarded.abi if entry.get("type") == "constructor"
-    ] == [
-        entry for entry in simple.abi if entry.get("type") == "constructor"
-    ]
 
 
 @pytest.mark.parametrize("contract", NEW_CONTRACT_SOURCES)

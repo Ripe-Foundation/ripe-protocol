@@ -15558,7 +15558,7 @@
     {
       "path": "contracts/core/AuctionHouse.vy",
       "classification": "production",
-      "contentSha256": "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921",
+      "contentSha256": "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
@@ -15608,7 +15608,7 @@
     {
       "path": "contracts/core/CreditRedeem.vy",
       "classification": "production",
-      "contentSha256": "0567b9118868f7fc37a0e583580ab6c5cd1e85274747860a6394f1f1c4364c0e",
+      "contentSha256": "62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
@@ -16257,16 +16257,6 @@
       }
     },
     {
-      "path": "contracts/vaults/GuardedErc20.vy",
-      "classification": "production",
-      "contentSha256": "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
-      "semanticReview": {
-        "owner": "engineering/tooling",
-        "status": "reviewed",
-        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
-      }
-    },
-    {
       "path": "contracts/vaults/RebaseErc20.vy",
       "classification": "production",
       "contentSha256": "14fe0db39f96ffebbb8fa4b28fc6fe6fb173ab51095c2853885f4c37c8c41b42",
@@ -16309,7 +16299,7 @@
     {
       "path": "contracts/vaults/modules/BasicVault.vy",
       "classification": "production",
-      "contentSha256": "a21a33be9b805f5ce4fd42c66f976525032b92836149c74526be613dae79d89d",
+      "contentSha256": "0b13c91ef72cfc139de1d4c036e01e3d371349ba549b144d1aa0ff47cc855044",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",

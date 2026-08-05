@@ -578,7 +578,7 @@ ROBINHOOD_ASSERTION_INVARIANTS = {
     ),
     "aapl_cap_formula": "floor(D * 10^(18+8) / P8)",
     "aapl_cap_inputs": ("D target", "P8 freeze price"),
-    "stock_enabled_vaults": ("GuardedErc20",),
+    "stock_enabled_vaults": ("SimpleErc20",),
     "stock_excluded_from_stability_pool": True,
     "profile_2_lp_ltv": 0,
 }
@@ -593,7 +593,7 @@ ROBINHOOD_AAPL_TOKEN_CANDIDATE = "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9"
 ROBINHOOD_AAPL_FEED_CANDIDATE = "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0"
 
 ROBINHOOD_STOCK_ACTIVATION_POLICY = (
-    ("vault", "GuardedErc20"),
+    ("vault", "SimpleErc20"),
     ("exclusiveVaultAssignment", True),
     ("shouldSwapInStabPools", False),
     ("shouldTransferToEndaoment", False),
@@ -605,31 +605,31 @@ ROBINHOOD_STOCK_ACTIVATION_POLICY = (
 )
 
 ROBINHOOD_STOCK_ARTIFACT_BINDING = (
-    ("contract", "GuardedErc20"),
-    ("sourcePath", "contracts/vaults/GuardedErc20.vy"),
-    ("sourceGitBlob", "713dab98bb9a08585e0c1f937425e8142cd600ab"),
+    ("contract", "SimpleErc20"),
+    ("sourcePath", "contracts/vaults/SimpleErc20.vy"),
+    ("sourceGitBlob", "7525765d45f00aa9ef6b5a98857ce048db0cdc62"),
     (
         "sourceSha256",
-        "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
+        "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
     ),
     (
         "creationSha256",
-        "64e42e5402343c3ffc8ac67b3ab92d90c9d79447e3323660de09aee5c6d30805",
+        "d6cca5f074b5395f7f1dbde6e42639cfc9b89a84068c4bb577f92d36e345f0ac",
     ),
     (
         "runtimeTemplateSha256",
-        "e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14",
+        "3e21a9c930c878bb84883f66fab1f3cff0a9abf173034d927d3d660b020f0da1",
     ),
     (
         "abiCanonicalSha256",
-        "453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a",
+        "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
     ),
     (
         "selectorsCanonicalSha256",
         "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
     ),
     ("selectorCount", 34),
-    ("runtimeTemplateSize", 10_524),
+    ("runtimeTemplateSize", 9_390),
 )
 
 ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
@@ -654,18 +654,18 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
     current_test_identities=(
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_ah_auctions.py",
-            "d45629865f93e22dae240c319d393aed04ac8e82",
-            "ecda7d232bf17da43a511f9ac88d3a7ef58f3e4356e9b97edf9af44ab8a71d9a",
+            "8d4c9a46c89bd8b98a135790e83d78fdbb094ce0",
+            "c3a33ecfea6a1d266bb3eab0eb8a35984c91c738c6d30519c4003ed08046f997",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            "f19d5dcb1fcf7a6a37132ee1a0b0e02b3b70c3e7",
-            "2a0be15fe4241562bee5b3157a1f98d17ba9306c7403314c2a7e514df96a9546",
+            "398789cf7ed3513df39cb87fa953cc25e9227e8c",
+            "12d161d41eda9acf8cd61697b31b2870e360125e33dbd46f8e22dff4872864cb",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            "d8a0d95317b45ac7a20016945a05f14ae3eead6d",
-            "c74b1b0d8b22e5a064109c6f811b98010d40aa979600683d57d3d67e5a385d54",
+            "aba36f5e004ca6a7752118cf0f02d46c28cd5a54",
+            "f9b52e3f8854f87b6b614ef673ea9630a10daea518a411cab0550e4ae5bfe10e",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_swap_collateral.py",
@@ -677,10 +677,10 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
         RobinhoodArtifactApplicabilityIdentity(
             "AuctionHouse",
             "contracts/core/AuctionHouse.vy",
-            "48cbbbca22c87e490ef0f88aae4f643ab5b87987",
-            "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921",
-            "55c73a3c9f4a03b8fc1feb405e002b36e00ec1186ffb08398fee78d029a71609",
-            "f91c53f0fbfe66b2f9e07003ba712cb976d6941a3b98ec0891918faa0bf6eead",
+            "ffd98c032171dfd8b4ef357aab57bae82fce5ca7",
+            "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c",
+            "9c4f1941effad2a029f16bda9256903840af98f61e635ab82be8502d9af4db96",
+            "687bb68c747d5ec802db1333a8cbb8f842b4423e90dbdc01277699aaf1e4dfc8",
             "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
             "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         ),
@@ -695,13 +695,13 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
         ),
         RobinhoodArtifactApplicabilityIdentity(
-            "GuardedErc20",
-            "contracts/vaults/GuardedErc20.vy",
-            "713dab98bb9a08585e0c1f937425e8142cd600ab",
-            "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
-            "64e42e5402343c3ffc8ac67b3ab92d90c9d79447e3323660de09aee5c6d30805",
-            "e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14",
-            "453d702567897a4ec89f9ea25502deac64c0d86f9700c597140e5c044f51740a",
+            "SimpleErc20",
+            "contracts/vaults/SimpleErc20.vy",
+            "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
+            "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
+            "d6cca5f074b5395f7f1dbde6e42639cfc9b89a84068c4bb577f92d36e345f0ac",
+            "3e21a9c930c878bb84883f66fab1f3cff0a9abf173034d927d3d660b020f0da1",
+            "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
             "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
         ),
     ),
@@ -767,7 +767,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "deployment_identity_unresolved",
         None,
         (
-            "fresh deployment of the exact GuardedErc20 artifact binding",
+            "fresh deployment of the exact SimpleErc20 artifact binding",
             "exclusive AAPL assignment",
         ),
         ("B-T8-FREEZE", "B-H05-PLAN", "B-T8-M5"),
@@ -811,7 +811,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "repository_fact_integrated",
         ROBINHOOD_STOCK_ARTIFACT_BINDING,
         (
-            "canonical selectors and persistent transient and immutable layouts match SimpleErc20",
+            "canonical SimpleErc20 selectors and persistent transient and immutable layouts are frozen",
         ),
         (),
     ),
@@ -826,11 +826,11 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "Deployment.DP-11.stock.m2Movement",
         "repository_fact_integrated",
         (
-            ("source", "contracts/vaults/GuardedErc20.vy"),
-            ("gitBlob", "713dab98bb9a08585e0c1f937425e8142cd600ab"),
+            ("source", "contracts/vaults/modules/BasicVault.vy"),
+            ("gitBlob", "9c8299accd5a65cbfbc96c4cdc1849bb125523b8"),
             ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
         ),
-        ("preserve nominal internal movement and backing-aware external delivery",),
+        ("shared nominal vault movement remains fail-closed and external delivery stays exact",),
         (),
     ),
     RobinhoodStockInputQualification(
@@ -1363,7 +1363,7 @@ def validate_robinhood_stock_launch_qualification(
     if ROBINHOOD_INITIAL_STOCK_SYMBOLS != ("AAPL",):
         raise ValueError("RH_STOCK_SYMBOL_SCOPE")
     if dict(ROBINHOOD_STOCK_ACTIVATION_POLICY) != {
-        "vault": "GuardedErc20",
+        "vault": "SimpleErc20",
         "exclusiveVaultAssignment": True,
         "shouldSwapInStabPools": False,
         "shouldTransferToEndaoment": False,
@@ -1375,7 +1375,7 @@ def validate_robinhood_stock_launch_qualification(
     }:
         raise ValueError("RH_STOCK_POLICY")
     if ROBINHOOD_ASSERTION_INVARIANTS["stock_enabled_vaults"] != (
-        "GuardedErc20",
+        "SimpleErc20",
     ):
         raise ValueError("RH_STOCK_VAULT_SELECTION")
     if ROBINHOOD_ASSERTION_INVARIANTS[
@@ -1522,7 +1522,7 @@ def validate_robinhood_stock_m4_binding(
     expected_artifacts = (
         ("AuctionHouse", "contracts/core/AuctionHouse.vy"),
         ("Deleverage", "contracts/core/Deleverage.vy"),
-        ("GuardedErc20", "contracts/vaults/GuardedErc20.vy"),
+        ("SimpleErc20", "contracts/vaults/SimpleErc20.vy"),
     )
     artifact_identities = binding.current_artifact_identities
     if tuple(

@@ -2513,10 +2513,14 @@ def test_phase2_underscore_earn_vault_balance_clamp_safe_zero_skips_before_withd
 
     assert repaid == target_repay
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt - target_repay
-    assert simple_erc20_vault.getTotalAmountForUser(
+    assert simple_erc20_vault.userBalances(
         bob,
         alpha_token_vault_with_safe_gap,
     ) == pre_vault_shares
+    assert simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        alpha_token_vault_with_safe_gap,
+    ) == 0
     assert alpha_token_vault_with_safe_gap.balanceOf(simple_erc20_vault) == 1
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
 
@@ -2864,7 +2868,7 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     auction_house_size = len(boa.env.get_code(auction_house.address))
 
     # Measured at this revision: Deleverage 24,569 bytes (7 bytes headroom),
-    # AuctionHouse 24,469 bytes (107 bytes headroom).
+    # AuctionHouse 24,528 bytes (48 bytes headroom).
     assert deleverage_size <= EIP170_LIMIT, (
         f"Deleverage runtime is {deleverage_size} bytes; "
         f"EIP-170 limit is {EIP170_LIMIT} bytes"

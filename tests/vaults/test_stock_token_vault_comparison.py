@@ -11,7 +11,7 @@ L-02/B-02/B-03 -> total-loss debt health and new borrowing
 L-03 -> two-user withdrawal ordering
 L-04 -> partial/total-loss deregistration and recovery constraints
 Z-01/Z-02 -> donation/deposit after total loss
-I-01/I-05 -> guarded deposit and retry
+I-01/I-05 -> exact deposit and retry
 I-02/I-06/I-07 -> pause across direct, external, and internal paths
 I-03/I-04/I-08 -> role blocklists and external auction atomicity
 A-01/A-02/A-03/A-04 -> pre-loss auction initiation and settlement
@@ -35,9 +35,9 @@ VAULT_CASES = (
     pytest.param("rebase", 4, id="rebase-erc20"),
 )
 
-LIQUIDATION_AFTER_TOTAL_LOSS_CASES = (
-    pytest.param("simple", 3, True, id="simple-erc20"),
-    pytest.param("rebase", 4, True, id="rebase-erc20"),
+AUCTION_AFTER_TOTAL_LOSS_CASES = (
+    pytest.param("simple", 3, False, id="simple-erc20"),
+    pytest.param("rebase", 4, False, id="rebase-erc20"),
 )
 
 
@@ -105,14 +105,10 @@ def _direct_deposit(token, vault, teller, user, amount, admin):
     return vault.depositTokensInVault(user, token, amount, sender=teller.address)
 
 
-@pytest.mark.parametrize(
-    ("vault_kind", "vault_id", "can_liquidate_after_loss"),
-    LIQUIDATION_AFTER_TOTAL_LOSS_CASES,
-)
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
 def test_liquidation_eligibility_after_total_issuer_burn(
     vault_kind,
     vault_id,
-    can_liquidate_after_loss,
     stock_token,
     simple_erc20_vault,
     rebase_erc20_vault,
@@ -126,7 +122,7 @@ def test_liquidation_eligibility_after_total_issuer_burn(
     deploy3r,
     bob,
 ):
-    """Total custody loss produces phantom collateral only in SimpleErc20."""
+    """Total custody loss removes usable collateral from both vault models."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -151,11 +147,8 @@ def test_liquidation_eligibility_after_total_issuer_burn(
 
     assert stock_token.balanceOf(vault) == 0
     assert credit_engine.getUserDebtAmount(bob) == debt_amount
-    assert credit_engine.canLiquidateUser(bob) is can_liquidate_after_loss
-    if vault_kind == "simple":
-        assert credit_engine.getCollateralValue(bob) == 100 * EIGHTEEN_DECIMALS
-    else:
-        assert credit_engine.getCollateralValue(bob) == 0
+    assert credit_engine.canLiquidateUser(bob)
+    assert credit_engine.getCollateralValue(bob) == 0
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -221,8 +214,8 @@ def test_internal_auction_after_total_issuer_burn(
     alice_green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
 
-    if vault_kind == "simple":
-        green_spent = teller.buyFungibleAuction(
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
             bob,
             vault_id,
             stock_token,
@@ -233,39 +226,11 @@ def test_internal_auction_after_total_issuer_burn(
             sender=alice,
         )
 
-        assert green_spent == payment
-        assert green_token.balanceOf(alice) == alice_green_before - green_spent
-        assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
-        assert stock_token.balanceOf(vault) == 0
-        assert stock_token.balanceOf(alice) == 0
-        purchased_collateral = 40 * EIGHTEEN_DECIMALS
-        assert vault.getTotalAmountForUser(alice, stock_token) == purchased_collateral
-        assert credit_engine.getCollateralValue(alice) == 20 * EIGHTEEN_DECIMALS
-
-        # The purchased nominal claim is not deliverable.
-        with boa.reverts("no withdrawal amount"):
-            teller.withdraw(stock_token, MAX_UINT256, alice, vault, sender=alice)
-
-    else:
-        # SharesVault refuses to calculate a withdrawal/internal transfer when
-        # the live token balance is zero. Teller's prior GREEN transfer and all
-        # downstream debt/accounting changes therefore revert atomically.
-        with boa.reverts("no asset to withdraw"):
-            teller.buyFungibleAuction(
-                bob,
-                vault_id,
-                stock_token,
-                payment,
-                False,
-                True,
-                False,
-                sender=alice,
-            )
-
-        assert green_token.balanceOf(alice) == alice_green_before
-        assert credit_engine.getUserDebtAmount(bob) == debt_before
-        assert vault.getTotalAmountForUser(alice, stock_token) == 0
-        assert stock_token.balanceOf(vault) == 0
+    assert green_token.balanceOf(alice) == alice_green_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert vault.getTotalAmountForUser(alice, stock_token) == 0
+    assert stock_token.balanceOf(alice) == 0
+    assert stock_token.balanceOf(vault) == 0
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -282,7 +247,7 @@ def test_partial_loss_withdrawal_order(
     bob,
     alice,
 ):
-    """Partial custody loss is first-mover-takes-all only in SimpleErc20."""
+    """Simple freezes partial loss; Rebase continues pro-rata withdrawals."""
 
     del vault_id
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
@@ -295,6 +260,21 @@ def test_partial_loss_withdrawal_order(
 
     first = bob if bob_withdraws_first else alice
     second = alice if bob_withdraws_first else bob
+    if vault_kind == "simple":
+        for user in (first, second):
+            with boa.reverts("insufficient vault backing"):
+                vault.withdrawTokensFromVault(
+                    user,
+                    stock_token,
+                    MAX_UINT256,
+                    user,
+                    sender=teller.address,
+                )
+            assert vault.getTotalAmountForUser(user, stock_token) == 0
+            assert vault.userBalances(user, stock_token) == amount
+        assert stock_token.balanceOf(vault) == amount
+        return
+
     first_amount, first_depleted = vault.withdrawTokensFromVault(
         first,
         stock_token,
@@ -304,30 +284,17 @@ def test_partial_loss_withdrawal_order(
     )
     assert first_depleted
 
-    if vault_kind == "simple":
-        assert first_amount == amount
-        with boa.reverts("no withdrawal amount"):
-            vault.withdrawTokensFromVault(
-                second,
-                stock_token,
-                MAX_UINT256,
-                second,
-                sender=teller.address,
-            )
-        assert vault.getTotalAmountForUser(second, stock_token) == amount
-        assert stock_token.balanceOf(vault) == 0
-    else:
-        second_amount, second_depleted = vault.withdrawTokensFromVault(
-            second,
-            stock_token,
-            MAX_UINT256,
-            second,
-            sender=teller.address,
-        )
-        assert second_depleted
-        assert abs(first_amount - second_amount) <= 1
-        assert amount - 2 <= first_amount + second_amount <= amount
-        assert stock_token.balanceOf(vault) <= 2
+    second_amount, second_depleted = vault.withdrawTokensFromVault(
+        second,
+        stock_token,
+        MAX_UINT256,
+        second,
+        sender=teller.address,
+    )
+    assert second_depleted
+    assert abs(first_amount - second_amount) <= 1
+    assert amount - 2 <= first_amount + second_amount <= amount
+    assert stock_token.balanceOf(vault) <= 2
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -783,9 +750,7 @@ def test_external_auction_after_total_issuer_burn_reverts_atomically(
     green_token.approve(teller, payment, sender=alice)
     green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    expected_revert = "no withdrawal amount" if vault_kind == "simple" else "no asset to withdraw"
-
-    with boa.reverts(expected_revert):
+    with boa.reverts():
         teller.buyFungibleAuction(
             bob,
             vault_id,
@@ -909,7 +874,7 @@ def test_partial_issuer_reduction_updates_only_live_share_claims(
     assert vault.userBalances(bob, stock_token) == raw_before
     assert vault.getUserLootBoxShare(bob, stock_token) == loot_share_before
     if vault_kind == "simple":
-        assert vault.getTotalAmountForUser(bob, stock_token) == amount
+        assert vault.getTotalAmountForUser(bob, stock_token) == 0
         assert vault.getTotalAmountForVault(stock_token) == amount
     else:
         assert amount - loss - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= amount - loss
@@ -939,7 +904,7 @@ def test_donation_after_total_loss_revalues_only_share_claims(
     stock_token.mint(vault, donation, sender=deploy3r)
 
     if vault_kind == "simple":
-        assert vault.getTotalAmountForUser(bob, stock_token) == amount
+        assert vault.getTotalAmountForUser(bob, stock_token) == 0
         assert vault.getTotalAmountForVault(stock_token) == amount
     else:
         assert donation - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= donation
@@ -980,19 +945,23 @@ def test_new_deposit_after_total_loss_with_old_accounting(
     assert teller.deposit(stock_token, old_amount, bob, vault, sender=bob) == old_amount
     stock_token.adminBurn(vault, old_amount, sender=deploy3r)
 
-    stock_token.mint(alice, fresh_amount, sender=deploy3r)
-    stock_token.approve(teller, fresh_amount, sender=alice)
-    assert teller.deposit(stock_token, fresh_amount, alice, vault, sender=alice) == fresh_amount
-    assert stock_token.balanceOf(vault) == fresh_amount
-
     if vault_kind == "simple":
-        assert vault.getTotalAmountForUser(bob, stock_token) == old_amount
-        assert vault.getTotalAmountForUser(alice, stock_token) == fresh_amount
-        # The stale claimant can take the fresh depositor's entire live balance.
-        assert teller.withdraw(stock_token, MAX_UINT256, bob, vault, sender=bob) == fresh_amount
-        with boa.reverts("no withdrawal amount"):
-            teller.withdraw(stock_token, MAX_UINT256, alice, vault, sender=alice)
+        stock_token.mint(alice, fresh_amount, sender=deploy3r)
+        stock_token.approve(teller, fresh_amount, sender=alice)
+        with boa.reverts("insufficient vault backing"):
+            teller.deposit(stock_token, fresh_amount, alice, vault, sender=alice)
+        assert stock_token.balanceOf(alice) == fresh_amount
+        assert stock_token.balanceOf(vault) == 0
+        assert vault.getTotalAmountForUser(bob, stock_token) == 0
+        assert vault.getTotalAmountForUser(alice, stock_token) == 0
+        assert vault.userBalances(bob, stock_token) == old_amount
     else:
+        stock_token.mint(alice, fresh_amount, sender=deploy3r)
+        stock_token.approve(teller, fresh_amount, sender=alice)
+        assert teller.deposit(
+            stock_token, fresh_amount, alice, vault, sender=alice
+        ) == fresh_amount
+        assert stock_token.balanceOf(vault) == fresh_amount
         # With live assets at zero but old shares outstanding, the fresh deposit
         # mints against a virtual one-unit denominator. Old shares are diluted to
         # a zero-rounded claim and the fresh depositor owns the live balance.
@@ -1123,15 +1092,29 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
     debt_before = credit_engine.getUserDebtAmount(bob)
     vault_live_before = stock_token.balanceOf(vault)
 
+    if vault_kind == "simple":
+        with boa.reverts("no green spent"):
+            teller.buyFungibleAuction(
+                bob,
+                vault_id,
+                stock_token,
+                payment,
+                False,
+                should_transfer_balance,
+                False,
+                sender=alice,
+            )
+        assert green_token.balanceOf(alice) == green_before
+        assert credit_engine.getUserDebtAmount(bob) == debt_before
+        assert stock_token.balanceOf(vault) == vault_live_before
+        assert stock_token.balanceOf(alice) == 0
+        assert vault.getTotalAmountForUser(alice, stock_token) == 0
+        assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+        return
+
     green_spent = teller.buyFungibleAuction(
-        bob,
-        vault_id,
-        stock_token,
-        payment,
-        False,
-        should_transfer_balance,
-        False,
-        sender=alice,
+        bob, vault_id, stock_token, payment, False,
+        should_transfer_balance, False, sender=alice,
     )
     assert green_spent == payment
     assert green_token.balanceOf(alice) == green_before - payment
@@ -1188,6 +1171,17 @@ def test_deleverage_external_withdrawal_after_partial_and_total_loss(
 
     target = 20 * EIGHTEEN_DECIMALS
     debt_before = credit_engine.getUserDebtAmount(bob)
+    if vault_kind == "simple":
+        with boa.reverts():
+            deleverage.deleverageWithVolAssets(
+                bob,
+                [(vault_id, stock_token.address, target)],
+                sender=switchboard_alpha.address,
+            )
+        assert credit_engine.getUserDebtAmount(bob) == debt_before
+        assert stock_token.balanceOf(vault) == 100 * EIGHTEEN_DECIMALS
+        return
+
     assert deleverage.deleverageWithVolAssets(
         bob,
         [(vault_id, stock_token.address, target)],
@@ -1259,7 +1253,7 @@ def test_new_borrow_after_total_issuer_burn(
     deploy3r,
     bob,
 ):
-    """Only nominal accounting permits new debt against fully missing custody."""
+    """Neither protected nominal nor share accounting permits missing custody debt."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -1278,13 +1272,9 @@ def test_new_borrow_after_total_issuer_burn(
     teller.deposit(stock_token, amount, bob, vault, sender=bob)
     stock_token.adminBurn(vault, amount, sender=deploy3r)
 
-    if vault_kind == "simple":
+    with boa.reverts():
         teller.borrow(borrow_amount, bob, False, sender=bob)
-        assert credit_engine.getUserDebtAmount(bob) == borrow_amount
-    else:
-        with boa.reverts():
-            teller.borrow(borrow_amount, bob, False, sender=bob)
-        assert credit_engine.getUserDebtAmount(bob) == 0
+    assert credit_engine.getUserDebtAmount(bob) == 0
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -1509,7 +1499,7 @@ def test_vault_events_reconcile_amounts_shares_and_state(
     (True, False),
     ids=("internal-balance-transfer", "external-token-transfer"),
 )
-def test_auction_started_after_partial_issuer_loss_settles(
+def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     vault_kind,
     vault_id,
     should_transfer_balance,
@@ -1531,7 +1521,7 @@ def test_auction_started_after_partial_issuer_loss_settles(
     alice,
     sally,
 ):
-    """A-06: both settlement modes work when liquidation starts after partial loss."""
+    """A-06: deficient Simple is skipped while live Rebase collateral settles."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -1554,7 +1544,12 @@ def test_auction_started_after_partial_issuer_loss_settles(
     stock_token.adminBurn(vault, 100 * EIGHTEEN_DECIMALS, sender=deploy3r)
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
     assert credit_engine.canLiquidateUser(bob)
-    teller.liquidateUser(bob, False, sender=sally)
+    liquidation_result = teller.liquidateUser(bob, False, sender=sally)
+    if vault_kind == "simple":
+        assert liquidation_result == 0
+        assert not ledger.hasFungibleAuction(bob, vault_id, stock_token)
+        assert ledger.userDebt(bob).inLiquidation
+        return
     assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
 
     payment = 20 * EIGHTEEN_DECIMALS
@@ -1564,49 +1559,33 @@ def test_auction_started_after_partial_issuer_loss_settles(
     debt_before = credit_engine.getUserDebtAmount(bob)
     live_before = stock_token.balanceOf(vault)
     assert teller.buyFungibleAuction(
-        bob,
-        vault_id,
-        stock_token,
-        payment,
-        False,
-        should_transfer_balance,
-        False,
-        sender=alice,
+        bob, vault_id, stock_token, payment, False,
+        should_transfer_balance, False, sender=alice,
     ) == payment
     assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
 
     purchase_event = filter_logs(teller, "FungAuctionPurchased")
     assert len(purchase_event) == 1
     assert purchase_event[0].greenSpent == payment
-    if vault_kind == "simple":
-        assert purchase_event[0].collateralAmountSent == collateral
-    else:
-        assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
+    assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
     assert purchase_event[0].collateralUsdValueSent == 20 * EIGHTEEN_DECIMALS
     if should_transfer_balance:
         assert stock_token.balanceOf(alice) == 0
-        if vault_kind == "simple":
-            assert vault.getTotalAmountForUser(alice, stock_token) == collateral
-        else:
-            assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral
+        assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral
         assert stock_token.balanceOf(vault) == live_before
     else:
-        if vault_kind == "simple":
-            assert stock_token.balanceOf(alice) == collateral
-            assert stock_token.balanceOf(vault) == live_before - collateral
-        else:
-            assert collateral - 1 <= stock_token.balanceOf(alice) <= collateral
-            assert live_before - collateral <= stock_token.balanceOf(vault) <= live_before - collateral + 1
+        assert collateral - 1 <= stock_token.balanceOf(alice) <= collateral
+        assert live_before - collateral <= stock_token.balanceOf(vault) <= live_before - collateral + 1
 
 
 @pytest.mark.parametrize(
-    ("vault_kind", "vault_id", "can_start_after_loss"),
-    LIQUIDATION_AFTER_TOTAL_LOSS_CASES,
+    ("vault_kind", "vault_id", "can_create_auction_after_loss"),
+    AUCTION_AFTER_TOTAL_LOSS_CASES,
 )
 def test_auction_started_after_total_issuer_loss(
     vault_kind,
     vault_id,
-    can_start_after_loss,
+    can_create_auction_after_loss,
     stock_token,
     simple_erc20_vault,
     rebase_erc20_vault,
@@ -1625,7 +1604,7 @@ def test_auction_started_after_total_issuer_loss(
     alice,
     sally,
 ):
-    """A-07: both auctions start; settlement remains vault-dependent."""
+    """A-07: total-loss positions are liquidatable but create no empty auction."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -1646,12 +1625,15 @@ def test_auction_started_after_total_issuer_loss(
     stock_token.adminBurn(vault, deposit_amount, sender=deploy3r)
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
 
-    assert credit_engine.canLiquidateUser(bob) is can_start_after_loss
+    assert credit_engine.canLiquidateUser(bob)
     liquidation_result = teller.liquidateUser(bob, False, sender=sally)
-    assert ledger.hasFungibleAuction(bob, vault_id, stock_token) is can_start_after_loss
-    if not can_start_after_loss:
+    assert (
+        ledger.hasFungibleAuction(bob, vault_id, stock_token)
+        is can_create_auction_after_loss
+    )
+    if not can_create_auction_after_loss:
         assert liquidation_result == 0
-        assert not ledger.userDebt(bob).inLiquidation
+        assert ledger.userDebt(bob).inLiquidation
         return
 
     payment = 20 * EIGHTEEN_DECIMALS
@@ -1659,40 +1641,23 @@ def test_auction_started_after_total_issuer_loss(
     green_token.approve(teller, payment, sender=alice)
     alice_green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    if vault_kind == "rebase":
-        with boa.reverts("no asset to withdraw"):
-            teller.buyFungibleAuction(
-                bob,
-                vault_id,
-                stock_token,
-                payment,
-                False,
-                True,
-                False,
-                sender=alice,
-            )
-        assert green_token.balanceOf(alice) == alice_green_before
-        assert credit_engine.getUserDebtAmount(bob) == debt_before
-        assert vault.getTotalAmountForUser(alice, stock_token) == 0
-        assert stock_token.balanceOf(alice) == 0
-        assert stock_token.balanceOf(vault) == 0
-        assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
-        return
-
-    assert teller.buyFungibleAuction(
-        bob,
-        vault_id,
-        stock_token,
-        payment,
-        False,
-        True,
-        False,
-        sender=alice,
-    ) == payment
-    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
-    assert vault.getTotalAmountForUser(alice, stock_token) == 40 * EIGHTEEN_DECIMALS
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob,
+            vault_id,
+            stock_token,
+            payment,
+            False,
+            True,
+            False,
+            sender=alice,
+        )
+    assert green_token.balanceOf(alice) == alice_green_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert vault.getTotalAmountForUser(alice, stock_token) == 0
     assert stock_token.balanceOf(alice) == 0
     assert stock_token.balanceOf(vault) == 0
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
@@ -1996,7 +1961,7 @@ def test_lootbox_points_update_after_donation_and_total_loss(
 
 
 @pytest.mark.parametrize("first_buyer_name", ("alice", "sally"))
-def test_simple_internal_auction_two_buyer_withdrawal_order(
+def test_simple_internal_auction_two_buyer_order_freezes_after_loss(
     first_buyer_name,
     stock_token,
     simple_erc20_vault,
@@ -2015,7 +1980,7 @@ def test_simple_internal_auction_two_buyer_withdrawal_order(
     alice,
     sally,
 ):
-    """A-05: two buyers can acquire claims exceeding live Simple custody."""
+    """A-05: neither buyer can acquire a claim after Simple loses backing."""
 
     vault = simple_erc20_vault
     vault_id = 3
@@ -2040,29 +2005,26 @@ def test_simple_internal_auction_two_buyer_withdrawal_order(
     stock_token.adminBurn(vault, 100 * EIGHTEEN_DECIMALS, sender=deploy3r)
 
     payment = 40 * EIGHTEEN_DECIMALS
-    collateral_each = 80 * EIGHTEEN_DECIMALS
-    for buyer in (alice, sally):
-        green_token.transfer(buyer, payment, sender=whale)
-        green_token.approve(teller, payment, sender=buyer)
-        assert teller.buyFungibleAuction(
-            bob,
-            vault_id,
-            stock_token,
-            payment,
-            False,
-            True,
-            False,
-            sender=buyer,
-        ) == payment
-        assert vault.getTotalAmountForUser(buyer, stock_token) == collateral_each
-        assert stock_token.balanceOf(buyer) == 0
-
-    assert credit_engine.getUserDebtAmount(bob) == 20 * EIGHTEEN_DECIMALS
-    assert stock_token.balanceOf(vault) == 100 * EIGHTEEN_DECIMALS
     first = alice if first_buyer_name == "alice" else sally
     second = sally if first_buyer_name == "alice" else alice
-    assert teller.withdraw(stock_token, MAX_UINT256, first, vault, sender=first) == collateral_each
-    assert teller.withdraw(stock_token, MAX_UINT256, second, vault, sender=second) == 20 * EIGHTEEN_DECIMALS
-    assert stock_token.balanceOf(first) == collateral_each
-    assert stock_token.balanceOf(second) == 20 * EIGHTEEN_DECIMALS
-    assert stock_token.balanceOf(vault) == 0
+    for buyer in (first, second):
+        green_token.transfer(buyer, payment, sender=whale)
+        green_token.approve(teller, payment, sender=buyer)
+        with boa.reverts("no green spent"):
+            teller.buyFungibleAuction(
+                bob,
+                vault_id,
+                stock_token,
+                payment,
+                False,
+                True,
+                False,
+                sender=buyer,
+            )
+        assert green_token.balanceOf(buyer) == payment
+        assert vault.getTotalAmountForUser(buyer, stock_token) == 0
+        assert stock_token.balanceOf(buyer) == 0
+
+    assert credit_engine.getUserDebtAmount(bob) == 100 * EIGHTEEN_DECIMALS
+    assert stock_token.balanceOf(vault) == 100 * EIGHTEEN_DECIMALS
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)

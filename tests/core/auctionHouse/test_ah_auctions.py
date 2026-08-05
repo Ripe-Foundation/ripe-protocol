@@ -9,13 +9,13 @@ from conf_utils import filter_logs
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
 
-def test_m4_auction_house_source_abi_and_vault_interface_are_frozen():
-    """M4 adds proof only: consumer source, ABI, and shared interface stay exact."""
+def test_auction_house_source_abi_and_vault_interface_are_frozen():
+    """The current backing-aware consumer source keeps its public boundaries exact."""
 
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/AuctionHouse.vy": (
-            "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921"
+            "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c"
         ),
         "scripts/abis/AuctionHouse.json": (
             "97b39517f9b527e4bcdf9dc50b4f418d4036367e5f3f4d62a0ffdd68d29ee276"

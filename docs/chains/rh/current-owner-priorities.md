@@ -44,7 +44,8 @@ The sole canonical deployment-owner handoff is
 
 - Preserve the current Ledger and Teller contracts and their reviewed
   measurement/clock boundaries.
-- Keep GuardedErc20 separate and Stock-specific.
+- Use the protected shared `BasicVault` behavior through `SimpleErc20`; do not
+  deploy or configure a separate `GuardedErc20` artifact.
 - Launch with Chainlink at PriceDesk slot 1, unchanged CurvePrices at slot 2
   for GREEN only, and BlueChipYield at slot 3. USDG has no Curve feed, slots 4
   and 5 remain empty, neither LP token is admitted, and priority source IDs

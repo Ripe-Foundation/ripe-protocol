@@ -1,5 +1,12 @@
 # GuardedErc20: custody and delivery containment
 
+> **Superseded 4 August 2026.** This explainer is retained only as historical
+> evidence for the removed artifact. The current candidate puts the narrowed
+> fail-closed behavior in `BasicVault` and uses it through `SimpleErc20`; it
+> intentionally omits the redundant post-deposit checks and hard-coded
+> Endaoment recipient prohibition described below. See
+> [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md).
+
 > [!IMPORTANT]
 > **Draft explanatory synthesis.** This document is owner education and
 > independent technical analysis. It is not controlling approval, deployment,

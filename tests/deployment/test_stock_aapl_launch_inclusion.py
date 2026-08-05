@@ -116,14 +116,14 @@ def test_every_non_repository_fact_has_an_explicit_typed_blocker():
     )
 
 
-def test_guarded_artifact_binding_matches_frozen_artifacts_and_git_bytes():
+def test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes():
     binding = dict(source_authority.ROBINHOOD_STOCK_ARTIFACT_BINDING)
     expectations = json.loads(
         (ROOT / "config/contract-artifact-expectations.json").read_text()
-    )["contracts"]["GuardedErc20"]
+    )["contracts"]["SimpleErc20"]
     source = ROOT / binding["sourcePath"]
 
-    assert binding["contract"] == "GuardedErc20"
+    assert binding["contract"] == "SimpleErc20"
     assert binding["sourceGitBlob"] == expectations["source_git_blob"]
     assert binding["sourceGitBlob"] == _head_blob(binding["sourcePath"])
     assert binding["sourceSha256"] == expectations["source_sha256"]
@@ -188,7 +188,7 @@ def test_m4_binding_matches_exact_historical_tranche_and_current_bytes():
 
 @pytest.mark.parametrize(
     "mutation",
-    ("remove_path", "guarded_substitution", "extra_path", "status_drift"),
+    ("remove_path", "unrelated_substitution", "extra_path", "status_drift"),
 )
 def test_m4_historical_path_census_mutants_fail_closed(mutation):
     binding = _m4_binding()
@@ -196,13 +196,13 @@ def test_m4_historical_path_census_mutants_fail_closed(mutation):
     paths = historical.changed_paths
     if mutation == "remove_path":
         mutant_paths = paths[:-1]
-    elif mutation == "guarded_substitution":
+    elif mutation == "unrelated_substitution":
         mutant_paths = (
             *paths[:-1],
-            ("M", "tests/vaults/test_guarded_erc20.py"),
+            ("M", "tests/vaults/test_basic_vault_safety.py"),
         )
     elif mutation == "extra_path":
-        mutant_paths = (*paths, ("A", "tests/vaults/test_guarded_erc20.py"))
+        mutant_paths = (*paths, ("A", "tests/vaults/test_basic_vault_safety.py"))
     else:
         mutant_paths = (("A", paths[0][1]), *paths[1:])
     mutant = replace(
@@ -278,13 +278,13 @@ def test_m4_current_applicability_mutants_fail_closed(mutation, error):
         mutant = replace(
             binding,
             current_artifact_identities=(
-                *artifacts[:-1],
-                replace(
-                    artifacts[-1],
-                    source_path="contracts/vaults/SimpleErc20.vy",
+                    *artifacts[:-1],
+                    replace(
+                        artifacts[-1],
+                        source_path="contracts/vaults/RebaseErc20.vy",
+                    ),
                 ),
-            ),
-        )
+            )
     elif mutation == "source_blob_drift":
         mutant = replace(
             binding,
@@ -308,7 +308,7 @@ def test_m4_current_applicability_mutants_fail_closed(mutation, error):
 def test_atomic_policy_keeps_defaults_routes_and_rewards_fail_closed():
     policy = dict(source_authority.ROBINHOOD_STOCK_ACTIVATION_POLICY)
     assert policy == {
-        "vault": "GuardedErc20",
+        "vault": "SimpleErc20",
         "exclusiveVaultAssignment": True,
         "shouldSwapInStabPools": False,
         "shouldTransferToEndaoment": False,
@@ -320,7 +320,7 @@ def test_atomic_policy_keeps_defaults_routes_and_rewards_fail_closed():
     }
     assert source_authority.ROBINHOOD_ASSERTION_INVARIANTS[
         "stock_enabled_vaults"
-    ] == ("GuardedErc20",)
+    ] == ("SimpleErc20",)
     assert source_authority.ROBINHOOD_ASSERTION_INVARIANTS[
         "stock_excluded_from_stability_pool"
     ] is True

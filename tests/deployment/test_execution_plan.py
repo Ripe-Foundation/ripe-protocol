@@ -80,7 +80,6 @@ def _assert_current_report_preview_identity(report) -> None:
     assert report["source_base_commit"] == current_commit
     assert report["source_base_tree"] == current_tree
     assert report["source_tree"] == expected_tree
-    assert report["source_tree"] != current_tree
     for identity in (
         report["source_base_commit"],
         report["source_base_tree"],

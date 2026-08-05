@@ -186,8 +186,8 @@ def _redeemCollateral(
     if vaultAddr == empty(address):
         return 0
 
-    # user must have balance
-    if not staticcall Vault(vaultAddr).doesUserHaveBalance(_user, _asset):
+    # user must have a usable balance
+    if staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset) == 0:
         return 0
 
     # cannot redeem from underscore vaults

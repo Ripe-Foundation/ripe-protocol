@@ -45,7 +45,7 @@ PR61_PRODUCTION_SOURCE_SHA256 = {
         "12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79"
     ),
     "contracts/core/AuctionHouse.vy": (
-        "e5a1603d27e22abc3fa0bf98971dbc16732afe8647b1fe323916216036998921"
+        "2f6d9cfe42ef61be8d8448222ef5cf835ae8933bc580081cfc8368cd7e8ecd3c"
     ),
     "contracts/core/Deleverage.vy": (
         "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138"
@@ -76,7 +76,7 @@ PR61_SECONDS_RECORDS_SHA256 = (
 )
 PR61_PATH_RECORD_COUNT = 3
 PR61_PATH_RECORDS_SHA256 = (
-    "67ff2a2167be043054d066e81329c8ee260d2e64a395dba55a57a727f009343e"
+    "f178a58bc8383a68a015b65360d07b6be931c8e67e8d841e12fc851c3e5a6111"
 )
 H04_CADENCE_RECORD_COUNT = 116
 H04_CADENCE_RECORDS_SHA256 = (
@@ -204,9 +204,19 @@ S5_REVIEW_ARTIFACT_FIELD = "s5ReviewArtifactSha256"
 S5_LEGACY_INVENTORY_SHA256 = (
     "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
 )
-M2_GUARDED_ERC20_PATH = "contracts/vaults/GuardedErc20.vy"
-M2_GUARDED_ERC20_SHA256 = (
-    "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed"
+SHARED_BASIC_VAULT_PATH = "contracts/vaults/modules/BasicVault.vy"
+SHARED_BASIC_VAULT_SHA256 = (
+    "0b13c91ef72cfc139de1d4c036e01e3d371349ba549b144d1aa0ff47cc855044"
+)
+SHARED_BASIC_VAULT_BASELINE_SHA256 = (
+    "a21a33be9b805f5ce4fd42c66f976525032b92836149c74526be613dae79d89d"
+)
+SHARED_CREDIT_REDEEM_PATH = "contracts/core/CreditRedeem.vy"
+SHARED_CREDIT_REDEEM_SHA256 = (
+    "62f6aa664becc2df31702dcb88c28f2a1bbf749a5f9d665a3ea3d7bf69283bdd"
+)
+SHARED_CREDIT_REDEEM_BASELINE_SHA256 = (
+    "0567b9118868f7fc37a0e583580ab6c5cd1e85274747860a6394f1f1c4364c0e"
 )
 M3_CREDIT_ENGINE_PATH = "contracts/core/CreditEngine.vy"
 M3_CREDIT_ENGINE_SHA256 = (
@@ -222,7 +232,7 @@ POST_S5_PRODUCTION_INVENTORY_SHA256 = (
     "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
 )
 CURRENT_PRODUCTION_INVENTORY_SHA256 = (
-    "ae441bf643004df3b308c8afc53cc663f5894e0c49c648aa43426499cff40a9e"
+    "714ed717d349bc5835b7d045497d818d8023a0192ebcbf6a5ff6d3f2a1001ef6"
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
@@ -503,10 +513,10 @@ REVIEWER_REMEDIATION_CADENCE_KEYS_SHA256 = (
 )
 PR61_ARTIFACT_EXPECTATIONS_PATH = "config/contract-artifact-expectations.json"
 PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
-    "9f205beb9a1aadc2b4bab676d2c1e5277b576547a1e74e91818262f073815fe7"
+    "8ca52c03b977f52b1ec16a9ea2c164c1f0ecbc7566a21397eb3fe42cad81d3bc"
 )
 CURRENT_ARTIFACT_EXPECTATIONS_SHA256 = (
-    "325b8a9d922bf5c3feceeec2efe4ae7ff671bdf41ff32f95fbdc2b9460635f04"
+    "79bcfbffa77872fc763c992a1377df3261e614f828c8d83c3639e90825433ed8"
 )
 DEFAULTS_ROBINHOOD_ARTIFACT_RECORD_SHA256 = (
     "623171018b02c3b48d32094da0f6a0633b4825c7f56e0c547357baff91efd1e9"
@@ -1883,7 +1893,7 @@ def _is_exact_pr61_artifact_layout_metadata(
             "CreditEngine",
             "Deleverage",
             "DefaultsRobinhood",
-            "GuardedErc20",
+            "SimpleErc20",
             "Ledger",
             "Lootbox",
             "SwitchboardDelta",
@@ -2021,11 +2031,52 @@ def _exact_reviewed_h04_record_fingerprints(
     )
 
 
-def _is_reviewed_m2_production_record(record: Mapping[str, Any]) -> bool:
+def _is_reviewed_shared_basic_vault_record(record: Mapping[str, Any]) -> bool:
     return dict(record) == {
-        "path": M2_GUARDED_ERC20_PATH,
+        "path": SHARED_BASIC_VAULT_PATH,
         "classification": "production",
-        "contentSha256": M2_GUARDED_ERC20_SHA256,
+        "contentSha256": SHARED_BASIC_VAULT_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+def _baseline_basic_vault_record() -> dict[str, Any]:
+    return {
+        "path": SHARED_BASIC_VAULT_PATH,
+        "classification": "production",
+        "contentSha256": SHARED_BASIC_VAULT_BASELINE_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+def _is_reviewed_shared_credit_redeem_record(
+    record: Mapping[str, Any],
+) -> bool:
+    return dict(record) == {
+        "path": SHARED_CREDIT_REDEEM_PATH,
+        "classification": "production",
+        "contentSha256": SHARED_CREDIT_REDEEM_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+def _baseline_credit_redeem_record() -> dict[str, Any]:
+    return {
+        "path": SHARED_CREDIT_REDEEM_PATH,
+        "classification": "production",
+        "contentSha256": SHARED_CREDIT_REDEEM_BASELINE_SHA256,
         "semanticReview": {
             "owner": "engineering/tooling",
             "status": "reviewed",
@@ -2155,13 +2206,18 @@ def _s5_legacy_inventory_fingerprint(
                 if _record_fingerprint(site) not in exact_source_sites
             ]
     legacy["vyperPathClassifications"] = [
-        _m3_baseline_credit_engine_record()
-        if _is_reviewed_m3_production_record(record)
-        else record
+        (
+            _baseline_basic_vault_record()
+            if _is_reviewed_shared_basic_vault_record(record)
+            else _baseline_credit_redeem_record()
+            if _is_reviewed_shared_credit_redeem_record(record)
+            else _m3_baseline_credit_engine_record()
+            if _is_reviewed_m3_production_record(record)
+            else record
+        )
         for record in legacy["vyperPathClassifications"]
         if str(record.get("path", "")) not in S5_REVIEW_PATHS
         and not _is_reviewed_ccip_excluded_record(record)
-        and not _is_reviewed_m2_production_record(record)
         and _record_fingerprint(record) not in exact_source_paths
     ]
     encoded = (
@@ -3567,19 +3623,37 @@ def _check_path_classifications(
                 )
             )
         if (
-            path == M2_GUARDED_ERC20_PATH
-            and actual[path]["contentSha256"] != M2_GUARDED_ERC20_SHA256
+            path == SHARED_BASIC_VAULT_PATH
+            and actual[path]["contentSha256"] != SHARED_BASIC_VAULT_SHA256
         ):
             findings.append(
                 Finding(
-                    code="INV-PATH-M2-CONTENT",
+                    code="INV-PATH-BASIC-VAULT-CONTENT",
                     domain="classification",
                     path=path,
-                    expected=M2_GUARDED_ERC20_SHA256,
+                    expected=SHARED_BASIC_VAULT_SHA256,
                     actual=actual[path]["contentSha256"],
                     remediation=(
-                        "restore the exact reviewed GuardedErc20 source bytes; "
-                        "changing the M2 production identity requires new review"
+                        "restore the exact reviewed shared BasicVault source bytes; "
+                        "changing its production identity requires new review"
+                    ),
+                )
+            )
+        if (
+            path == SHARED_CREDIT_REDEEM_PATH
+            and actual[path]["contentSha256"] != SHARED_CREDIT_REDEEM_SHA256
+        ):
+            findings.append(
+                Finding(
+                    code="INV-PATH-CREDIT-REDEEM-CONTENT",
+                    domain="classification",
+                    path=path,
+                    expected=SHARED_CREDIT_REDEEM_SHA256,
+                    actual=actual[path]["contentSha256"],
+                    remediation=(
+                        "restore the exact reviewed backing-aware CreditRedeem "
+                        "source bytes; changing its production identity requires "
+                        "new review"
                     ),
                 )
             )

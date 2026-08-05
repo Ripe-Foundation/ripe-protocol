@@ -246,7 +246,7 @@ reassessment_and_qualification:
   accepted_architecture:
     ledger: preserve_current_shared_architecture
     teller: preserve_current_strict_balance_measurement
-    guarded_erc20: preserve_separate_stock_specific_vault
+    basic_vault: shared_fail_closed_nominal_protection_candidate
     launch_profile: bounded_curve_pricing
     launch_oracle_authority: Chainlink_slot_1_Curve_slot_2_GREEN_only_BlueChipYield_slot_3
     uniswap_launch_price_source: none
@@ -275,7 +275,7 @@ reassessment_and_qualification:
     - Sites recovery and dashboard publication
     - Live deployment, migration execution, production configuration, activation, and release
   future_packages:
-    - Shared-contract release-gate evidence for unchanged Ledger, Teller, and GuardedErc20
+    - Shared-contract release-gate evidence for unchanged Ledger and Teller plus the protected BasicVault and SimpleErc20 candidate
     - Immutable external-input and H-07/H-08 artifact closure
     - H-09 safe-default and opt-in archive-fork qualification
     - Bounded launch deterministic deployment-input closure and readiness qualification
@@ -442,7 +442,7 @@ deployment_owner:
   parallel_inputs:
     - name: Consolidated smart-contract reassessment corpus
       start_effect: integrated_documentation_input
-      gate_effect: Consume the synthesis's Ledger, Teller, GuardedErc20, and Uniswap conclusions before affected work closes.
+      gate_effect: Consume the synthesis's Ledger, Teller, historical GuardedErc20, and Uniswap conclusions before affected work closes; the BasicVault decision supersedes the historical separate-vault recommendation.
     - name: Consolidated fork and external-integration qualification corpus
       start_effect: integrated_documentation_input
       gate_effect: Consume the synthesis's bounded launch Curve route, follow-on higher-power and LP, PSM, network, oracle, H-09/H-10, and external-input gates before affected work closes.
@@ -451,8 +451,8 @@ overall:
   bottom_line: >
     Ready to continue bounded launch preparation under the consolidated
     reassessment and qualification disposition. Ledger, Teller, and
-    CurvePrices production source remain unchanged; GuardedErc20 remains
-    separate and Stock-specific. The candidate selects Chainlink slot 1,
+    CurvePrices production source remain unchanged; the feature candidate uses
+    protected SimpleErc20 through BasicVault and removes GuardedErc20. The candidate selects Chainlink slot 1,
     GREEN-only Curve slot 2, and source-compatible BlueChipYield slot 3 while
     preserving priority IDs [1, 3]. Both LP admissions and every Curve higher
     power remain separate. Every Deleverage task is deferred. Repository
@@ -472,8 +472,9 @@ s2_current_authority:
   production_files: 18
   historical_s5_fingerprint: 924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4
   current_production_fingerprint: a1f264788bf1189f554cd7a4952fada353c1d39afb02b032d6dfd145ae902ecb
-  current_production_admissions: ["contracts/vaults/GuardedErc20.vy (M2)", "contracts/core/CreditEngine.vy (M3)", "contracts/config/DefaultsRobinhood.vy (source authority)", "corrected PR #61 reviewed inventory batch", "BlueChipYield Morpho V2 current bindings"]
-  checker_result: CLOCK_INVENTORY_OK
+  reviewed_production_admissions_at_rh_baseline: ["contracts/vaults/GuardedErc20.vy (historical M2, now removed by candidate)", "contracts/core/CreditEngine.vy (M3)", "contracts/config/DefaultsRobinhood.vy (source authority)", "corrected PR #61 reviewed inventory batch", "BlueChipYield Morpho V2 current bindings"]
+  candidate_production_changes: ["contracts/vaults/modules/BasicVault.vy", "remove contracts/vaults/GuardedErc20.vy"]
+  checker_result: candidate_pending_block_clock_inventory_reseal
   historical_note: Historical 76-case checkpoints remain historical; no current 76-case or 84-case claim is valid.
 
 authorization_boundaries:
@@ -929,9 +930,9 @@ workstreams:
     plain_language_scope: Reject custody and settlement behavior that cannot prove deliverable live backing while preserving rollback.
     why_it_matters: Nominal balances can otherwise create paid claims that cannot deliver Stock after issuer loss.
     current_phase: integrated implementation
-    implementation_state: GuardedErc20 integrated
-    integration_state: integrated
-    review_state: reviewed and integrated
+    implementation_state: BasicVault candidate implemented; GuardedErc20 source and artifact removed
+    integration_state: feature_branch_candidate_not_integrated
+    review_state: candidate validation in progress; historical Guarded review retained only as provenance
     owner_decision_state: containment design approved for this scope
     remaining_blockers: [Registry/deployment binding and M5 remain separate gates; bad-debt policy follow-up is parked and nonblocking for current work.]
     deployment_release_state: does not activate Stock
