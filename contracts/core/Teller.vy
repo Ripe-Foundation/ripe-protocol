@@ -307,13 +307,13 @@ def _deposit(
         assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
 
     # verify custody after transfer
-    assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount
+    assert staticcall IERC20(_asset).balanceOf(vaultAddr) - custodyBefore == amount # dev: custody mismatch
 
     # deposit tokens
     if _lockDuration == 0:
-        assert extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a) == amount
+        assert extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a) == amount # dev: deposit failed
     else:
-        assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount
+        assert extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a) == amount # dev: deposit failed
 
     # re-enable receipt measurement
     self.receiptMeasurementActive = False

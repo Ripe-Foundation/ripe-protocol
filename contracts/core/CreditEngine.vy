@@ -747,6 +747,7 @@ def _getUserBorrowTerms(
             debtTermsWeight: uint256 = maxDebt
             if debtTermsWeight == 0:
                 debtTermsWeight = 1
+
             # debt terms sums -- weight is based on max debt (ltv)
             ltvSum += debtTermsWeight * debtTerms.ltv
             redemptionThresholdSum += debtTermsWeight * debtTerms.redemptionThreshold
@@ -755,6 +756,7 @@ def _getUserBorrowTerms(
             borrowRateSum += debtTermsWeight * debtTerms.borrowRate
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
+
             # lowest ltv
             if debtTerms.ltv != 0 and debtTerms.ltv < bt.lowestLtv:
                 bt.lowestLtv = debtTerms.ltv
