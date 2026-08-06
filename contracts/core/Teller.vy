@@ -46,6 +46,20 @@ interface TellerUtils:
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
 
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def shouldCheckLastTouch() -> bool: view
+
+interface RipeGovVault:
+    def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def exportPositionForMigration(_user: address, _asset: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
+    def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
+    def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def buyFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -58,12 +72,6 @@ interface StabVault:
     def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def shouldCheckLastTouch() -> bool: view
-
 interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _shouldEnterStabPool: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -73,11 +81,6 @@ interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-
-interface RipeGovVault:
-    def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
-    def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
@@ -102,7 +105,14 @@ interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface AddressRegistry:
+    def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
+
+struct RipeGovMigrationData:
+    amount: uint256
+    govPoints: uint256
+    unlock: uint256
+    lastTerms: cs.LockTerms
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -183,6 +193,18 @@ event TellerRebalance:
     withdrawAmount: uint256
     depositVaultId: uint256
     withdrawVaultId: uint256
+
+event RipeGovPositionMigrated:
+    user: indexed(address)
+    asset: indexed(address)
+    sourceVaultId: indexed(uint256)
+    targetVaultId: uint256
+    sourceVault: address
+    targetVault: address
+    amount: uint256
+    targetShares: uint256
+    govPoints: uint256
+    unlock: uint256
 
 event UserConfigSet:
     user: indexed(address)
@@ -454,6 +476,87 @@ def rebalance(
         withdrawVaultId=_withdrawVaultId
     )
     return withdrawnAmount, depositedAmount
+
+
+###############################
+# Ripe Gov Position Migration #
+###############################
+
+
+@nonreentrant
+@external
+def migrateRipeGovPosition(
+    _user: address,
+    _asset: address,
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    assert _sourceVaultId != _targetVaultId # dev: same vault
+
+    # validation
+    a: addys.Addys = addys._getAddys()
+    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
+    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
+    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
+    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
+    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
+
+    # get vault addresses
+    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
+    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
+    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
+    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
+    assert sourceVault != targetVault # dev: same vault
+    assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
+    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
+
+    # export position
+    targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
+    migration: RipeGovMigrationData = extcall RipeGovVault(sourceVault).exportPositionForMigration(
+        _user,
+        _asset,
+        targetVault,
+        a,
+    )
+    targetBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
+    assert targetBalanceAfter >= targetBalanceBefore # dev: invalid migration receipt
+    assert targetBalanceAfter - targetBalanceBefore == migration.amount # dev: inexact migration receipt
+
+    # import position
+    targetShares: uint256 = extcall RipeGovVault(targetVault).importPositionForMigration(
+        _user,
+        _asset,
+        sourceVault,
+        migration,
+    )
+
+    # update ledger
+    targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
+    if not targetLedgerData.isParticipatingInVault:
+        extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
+
+    # update lootbox points
+    # settle the source through this block and initialize the target at its intentionally
+    # non-core lootbox weight. Governance refreshes the target after switching the core pointer.
+    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
+    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _targetVaultId, targetVault, _asset, a)
+
+    log RipeGovPositionMigrated(
+        user=_user,
+        asset=_asset,
+        sourceVaultId=_sourceVaultId,
+        targetVaultId=_targetVaultId,
+        sourceVault=sourceVault,
+        targetVault=targetVault,
+        amount=migration.amount,
+        targetShares=targetShares,
+        govPoints=migration.govPoints,
+        unlock=migration.unlock,
+    )
+    return migration.amount
 
 
 ########
@@ -1055,4 +1158,4 @@ def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = emp
 ##     ## ######   ########  ##     ##  ######   ##     ##    
 ##     ## ##       ##        ##     ##       ##  ##     ##    
 ##     ## ##       ##        ##     ## ##    ##  ##     ##    
-########  ######## ##         #######   ######  ####    ##  
+########  ######## ##         #######   ######  ####    ##
