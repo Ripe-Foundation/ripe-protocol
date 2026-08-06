@@ -242,27 +242,6 @@ def __init__(_ripeHq: address, _shouldPause: bool):
     deptBasics.__init__(_shouldPause, False, False) # no minting
 
 
-#####################
-# Vault ID Pointers #
-#####################
-
-
-@view
-@internal
-def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
-
-
-@view
-@internal
-def _getPreferredStabVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
-
-
 ############
 # Deposits #
 ############
@@ -1013,6 +992,22 @@ def setUndyLegoAccess(_legoAddr: address) -> bool:
 #############
 # Utilities #
 #############
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
+
+
+@view
+@internal
+def _getPreferredStabVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 # housekeeping
