@@ -418,14 +418,19 @@ def test_deposit_gates_and_ripe_gov_pause_only_block_locked_path(lane_env):
 
     lane_env.setup_lock_terms(can_deposit=True)
     lane_env.ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
+    assert lane_env.ripe_gov_vault.isPaused()
     locked = lane_env.quote(amount, 500)
     assert locked.available
-    with boa.reverts("contract paused"):
+    paused_snapshot = settlement_snapshot(lane_env)
+    # RH Teller exact-receipt accounting wraps the nested vault call, so the
+    # inner Vyper reason string is no longer exposed by the outer transaction.
+    with boa.reverts():
         lane_env.buy(
             amount,
             requested_lock=500,
             expected_epoch=locked.epoch,
         )
+    assert settlement_snapshot(lane_env) == paused_snapshot
     lane_env.buy(amount, requested_lock=0, expected_epoch=locked.epoch)
 
     lane_env.ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
