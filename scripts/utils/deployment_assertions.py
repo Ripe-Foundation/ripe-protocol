@@ -307,6 +307,12 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
             component_id = action.get("component_id")
             if action.get("kind") == "deployment":
                 _require_string(component_id, "plan.action.component_id")
+                if action.get("operation") == "deploy-blueprint":
+                    # A blueprint stores initcode and instantiates nothing, so
+                    # it contributes no deployed component to assert against.
+                    # Listing it would claim CM-005 Contributor is present when
+                    # the omission it asserts is precisely that it is not.
+                    continue
                 authority = _require_mapping(
                     action.get("component_authority"),
                     "plan.action.component_authority",
@@ -367,8 +373,8 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
         if action.get("kind") == "registration"
     ]
     expected_census = {
-        "total": 117,
-        "deployments": 37,
+        "total": 119,
+        "deployments": 38,
         "registrations": 33,
         "all_action_ids": action_ids,
         "deployment_action_ids": deployment_action_ids,
@@ -376,7 +382,7 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
     }
     if dict(census) != expected_census:
         raise DeploymentAssertionInputError(
-            "plan action census does not exactly account for 117/37/33 actions"
+            "plan action census does not exactly account for 119/38/33 actions"
         )
     ledger = components.get("CM-008")
     if ledger is None or ledger.get("authority_selection_state") != "blocked":

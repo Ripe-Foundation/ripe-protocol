@@ -1,3 +1,9 @@
+from typing import Any
+import subprocess
+from pathlib import Path
+import json
+import hashlib
+from dataclasses import dataclass
 ADDYS = {
     "base": {
         "RIPE_WETH_POOL": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
@@ -251,12 +257,6 @@ YIELD_TOKENS = {
 # non-Defaults deployment inputs live here. Defaults-interface values live only
 # in contracts/config/DefaultsRobinhood.vy. The JSON ledger is derived evidence.
 
-from dataclasses import dataclass
-import hashlib
-import json
-from pathlib import Path
-import subprocess
-from typing import Any
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
@@ -531,35 +531,50 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("ripe_hq", 7, "Price Desk", "source_hard_coded", "CM-015", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 8, "Vault Book", "source_hard_coded", "CM-021", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 9, "Auction House", "source_hard_coded", "CM-026", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 10, "Auction House NFT", "source_hard_coded", "CM-027", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 10, "Auction House NFT",
+                               "source_hard_coded", "CM-027", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 11, "Boardroom", "source_hard_coded", "CM-028", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 12, "Bond Room", "source_hard_coded", "CM-029", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 13, "Credit Engine", "source_hard_coded", "CM-030", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 14, "Endaoment", "source_hard_coded", "CM-031", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 15, "Human Resources", "source_hard_coded", "CM-032", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 15, "Human Resources", "source_hard_coded",
+                               "CM-032", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 16, "Lootbox", "source_hard_coded", "CM-033", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 17, "Teller", "source_hard_coded", "CM-034", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 18, "Deleverage", "source_hard_coded", "CM-044", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 19, "Credit Redeem", "source_hard_coded", "CM-043", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 20, "Teller Utils", "source_hard_coded", "CM-045", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded", "CM-047", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded",
+                               "CM-047", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool", "provisional_reservation", "CM-051", "deferred", "reserved"),
-    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool", "provisional_reservation", "CM-052", "deferred", "reserved"),
-    RobinhoodRegistrySelection("vault_book", 1, "Stability Pool", "source_hard_coded", "CM-022", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault", "source_hard_coded", "CM-023", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault", "registration_order", "CM-024", "required", "selected"),
-    RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault", "registration_order", "CM-025", "omitted", "omitted"),
+    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool",
+                               "provisional_reservation", "CM-051", "deferred", "reserved"),
+    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool",
+                               "provisional_reservation", "CM-052", "deferred", "reserved"),
+    RobinhoodRegistrySelection("vault_book", 1, "Stability Pool",
+                               "source_hard_coded", "CM-022", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault",
+                               "source_hard_coded", "CM-023", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 3, "Simple ERC20 Vault",
+                               "registration_order", "CM-024", "required", "selected"),
+    RobinhoodRegistrySelection("vault_book", 4, "Rebase ERC20 Vault",
+                               "registration_order", "CM-025", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 1, "Chainlink", "registration_order", "CM-016", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 2, "Curve", "source_hard_coded", "CM-017", "required", "selected"),
-    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order", "CM-018", "required", "selected"),
+    RobinhoodRegistrySelection("price_desk", 3, "BlueChipYield", "registration_order",
+                               "CM-018", "required", "selected"),
     RobinhoodRegistrySelection("price_desk", 4, "Pyth", "source_hard_coded", "CM-019", "omitted", "omitted"),
     RobinhoodRegistrySelection("price_desk", 5, "Stork", "registration_order", "CM-020", "omitted", "omitted"),
-    RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha", "source_hard_coded", "CM-011", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo", "registration_order", "CM-012", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 3, "Switchboard Charlie", "registration_order", "CM-013", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta", "registration_order", "CM-014", "required", "selected"),
-    RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo", "registration_order", "CM-046", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 1, "Switchboard Alpha",
+                               "source_hard_coded", "CM-011", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 2, "Switchboard Bravo",
+                               "registration_order", "CM-012", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 3, "Switchboard Charlie",
+                               "registration_order", "CM-013", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 4, "Switchboard Delta",
+                               "registration_order", "CM-014", "required", "selected"),
+    RobinhoodRegistrySelection("switchboard", 5, "Switchboard Echo",
+                               "registration_order", "CM-046", "required", "selected"),
 )
 
 
@@ -894,53 +909,66 @@ ROBINHOOD_COMPONENTS = {
     "profile_1_omissions": ("GREEN_USDG_LP", "RIPE_WETH_LP"),
 }
 
+# Block-count constants, mirroring contracts/config/DefaultsRobinhood.vy so the
+# deployment inputs and the Defaults contract read in the same units.
+#
+# BLOCKS_PER_MINUTE is 5, not 600: on this Arbitrum L2 `block.number` is the L1
+# ancestor estimate advancing roughly every 12 seconds, not the child block
+# height. Timelocks below are therefore wall-clock durations on that clock.
+BLOCKS_PER_MINUTE = 5
+HOUR_IN_BLOCKS = 60 * BLOCKS_PER_MINUTE
+DAY_IN_BLOCKS = 24 * HOUR_IN_BLOCKS
+WEEK_IN_BLOCKS = 7 * DAY_IN_BLOCKS
+MONTH_IN_BLOCKS = 30 * DAY_IN_BLOCKS
+YEAR_IN_BLOCKS = 365 * DAY_IN_BLOCKS
+
 ROBINHOOD_DEPLOYMENT_INPUTS = {
     # DP-04
     'Deployment.DP-04.ledger.actionBlockSourceBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_04_LEDGER_ACTIONBLOCKSOURCEBINDING'), 'blocked'),
     # DP-05
-    'Deployment.DP-05.timelocks.TokenHq.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.TokenHq.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.TokenHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.LocalGov.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.actionTimeLock': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.minTimeLock': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.RipeHq.maxTimeLock': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.TokenHq.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.LocalGov.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.actionTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.RipeHq.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardAlpha.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardAlpha.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardAlpha.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardBravo.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardBravo.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardBravo.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardCharlie.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardCharlie.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardCharlie.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardDelta.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardDelta.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardDelta.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.SwitchboardEcho.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.SwitchboardEcho.expiration': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.SwitchboardEcho.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     'Deployment.DP-05.timelocks.Chainlink.actionTimeLock': RobinhoodInput(0, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.minTimeLock': RobinhoodInput(600, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.Chainlink.expiration': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.actionTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.minTimeLock': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.maxTimeLock': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.HumanResources.expiration': RobinhoodInput(50400, 'approved'),
-    'Deployment.DP-05.timelocks.Contributor.delay': RobinhoodInput(7200, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.addDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.updateDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.disableDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.minDelay': RobinhoodInput(3600, 'approved'),
-    'Deployment.DP-05.timelocks.AddressRegistry.maxDelay': RobinhoodInput(50400, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.minTimeLock': RobinhoodInput(HOUR_IN_BLOCKS * 2, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.Chainlink.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.actionTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.minTimeLock': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.maxTimeLock': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.HumanResources.expiration': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.Contributor.delay': RobinhoodInput(DAY_IN_BLOCKS, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.addDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.updateDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.disableDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.minDelay': RobinhoodInput(HOUR_IN_BLOCKS * 12, 'approved'),
+    'Deployment.DP-05.timelocks.AddressRegistry.maxDelay': RobinhoodInput(WEEK_IN_BLOCKS, 'approved'),
     # DP-07
     'Deployment.DP-07.psm.constructor.canMint': RobinhoodInput(False, 'disabled'),
     'Deployment.DP-07.psm.constructor.canRedeem': RobinhoodInput(False, 'disabled'),
@@ -1006,11 +1034,33 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-18.roles.trainingWheels': RobinhoodInput(SourceReference('Defaults.trainingWheels'), 'blocked'),
     'Deployment.DP-18.roles.trainingWheelsAllowlist': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_18_ROLES_TRAININGWHEELSALLOWLIST'), 'blocked'),
     # DP-19
-    'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(0, 'approved'),
+    # 100 GREEN at construction, matching Base. The launch graph creates a
+    # GREEN/USDG Curve pool and DefaultsRobinhood expects GREEN to resolve
+    # through Curve at price-desk id 2, so the pool must be seedable -- and
+    # GREEN cannot be minted any other way at deploy time, since minting needs
+    # a department with canMintGreen and the deployer holds governance, not
+    # mint capability. A zero here contradicts the pool actions in 0400.
+    #
+    # NOTE: this changes a value the H-04 register recorded as approved at zero.
+    # It needs its own approval; the register entry should be updated alongside.
+    'Deployment.DP-19.supply.GREEN.amount': RobinhoodInput(100 * 10**18, 'approved'),
     'Deployment.DP-19.supply.GREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_GREEN_RECIPIENT'), 'blocked'),
-    'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(0, 'approved'),
+    # Base minted 10,000,000 RIPE to the governance Safe at deployment
+    # (migrations/base-mainnet/0000_TokensAndHq.py). Robinhood mints the
+    # same way to the same multi-chain Safe, at the owner-approved smaller
+    # launch supply of 100,000.
+    'Deployment.DP-19.supply.RIPE.amount': RobinhoodInput(100_000 * 10**18, 'approved'),
+    # Bound at execution to ROBINHOOD_GOVERNANCE, mirroring Base's
+    # blueprint.ADDYS['GOVERNANCE']. Kept 'blocked' rather than flipped to
+    # 'approved' because the H-04 ledger status is the approval record, and
+    # editing it to force a blueprint change through is what the ledger
+    # explicitly must not be used for.
     'Deployment.DP-19.supply.RIPE.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_RIPE_RECIPIENT'), 'blocked'),
     'Deployment.DP-19.supply.SGREEN.amount': RobinhoodInput(0, 'approved'),
+    # Supply is 0, and Erc20Token only credits a recipient when the supply
+    # is nonzero, so this address is never read. Base passed ZERO_ADDRESS
+    # here for exactly the same reason; matching it keeps the mint
+    # impossible rather than merely unused.
     'Deployment.DP-19.supply.SGREEN.recipient': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_19_SUPPLY_SGREEN_RECIPIENT'), 'blocked'),
     # DP-20
     'Deployment.DP-20.teller.shouldPause': RobinhoodInput(True, 'approved'),
@@ -1020,9 +1070,9 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-21.endaoment.nativeName': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVENAME'), 'blocked'),
     'Deployment.DP-21.endaoment.nativeDecimals': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_21_ENDAOMENT_NATIVEDECIMALS'), 'blocked'),
     # DP-22
-    'Deployment.DP-22.bondBooster.maxBoostRatio': RobinhoodInput(20000, 'approved'),
-    'Deployment.DP-22.bondBooster.maxUnits': RobinhoodInput(25000, 'approved'),
-    'Deployment.DP-22.bondBooster.minLockDuration': RobinhoodInput(1296000, 'approved'),
+    'Deployment.DP-22.bondBooster.maxBoostRatio': RobinhoodInput(200_00, 'approved'),  # 200%
+    'Deployment.DP-22.bondBooster.maxUnits': RobinhoodInput(25_000, 'approved'),  # a count, not a ratio
+    'Deployment.DP-22.bondBooster.minLockDuration': RobinhoodInput(DAY_IN_BLOCKS * 180, 'approved'),
     # DP-23
     'Deployment.DP-23.external.chainlink.ethUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_ETH_USD"], 'external_fact'),
     'Deployment.DP-23.external.chainlink.btcUsdFeed': RobinhoodInput(ROBINHOOD_ADDRESSES["CHAINLINK_BTC_USD"], 'external_fact'),
@@ -1033,6 +1083,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-23.external.arbSys': RobinhoodInput(ROBINHOOD_ADDRESSES["ARB_SYS"], 'external_fact'),
     'Deployment.DP-23.blueChipYield.morphoV2Support': RobinhoodInput(True, 'approved'),
 }
+
 
 @dataclass(frozen=True)
 class RobinhoodCurveLaunchInput:
@@ -1091,8 +1142,10 @@ ROBINHOOD_CURVE_LITE_PROVENANCE = (
     "curvefi/curve-lite@5a9e1ab34c1319de69b987900d859ad2e965d0e2:"
     "contracts/amm/stableswap/factory/factory_v_100.vy"
 )
-ROBINHOOD_CURVE_POOL_NAME = SymbolicBinding("GREEN_USDG_CURVE_POOL_NAME")
-ROBINHOOD_CURVE_POOL_SYMBOL = SymbolicBinding("GREEN_USDG_CURVE_POOL_SYMBOL")
+# Owner-selected, mirroring Base's "GREEN/USDC Pool" / "GREEN/USDC". These are
+# written into the deployed Curve pool and cannot be changed afterwards.
+ROBINHOOD_CURVE_POOL_NAME = "GREEN/USDG Pool"
+ROBINHOOD_CURVE_POOL_SYMBOL = "GREEN/USDG"
 
 ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     RobinhoodCurveLaunchInput(
@@ -1168,36 +1221,41 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     ),
     RobinhoodCurveLaunchInput(
         "pool.name", ROBINHOOD_CURVE_POOL_NAME, "owner_selected", "protocol_owner",
-        "owner launch input", "owner_choice_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.symbol", ROBINHOOD_CURVE_POOL_SYMBOL, "owner_selected", "protocol_owner",
-        "owner launch input", "owner_choice_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.coin_order", ("USDG", "GREEN"), "owner_selected", "oracle_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.coin_decimals", (6, 18), "owner_selected", "oracle_owner",
-        "Robinhood token interfaces and launch research candidate",
-        "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])",
+        "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.A", 100, "owner_selected", "liquidity_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.fee", 4_000_000, "owner_selected", "liquidity_owner",
-        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.offpeg_fee_multiplier", 20_000_000_000, "owner_selected", "liquidity_owner",
-        ROBINHOOD_CURVE_LITE_PROVENANCE, "research_candidate_owner_approval_unresolved",
+        "matches approved Base GREEN pool deployment (CURVE_PARAMS[base])", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.ma_exp_time", 600, "owner_selected", "liquidity_owner",
-        "Robinhood Curve launch research candidate", "research_candidate_owner_approval_unresolved",
+        "pool.ma_exp_time", 866, "owner_selected", "liquidity_owner",
+        # Deliberately NOT Base's 600. Curve's ma_exp_time is the exponential
+        # time constant, so a 10-minute EMA half-life is 600 / ln(2) = 866.
+        # Base's 600 makes the time constant ten minutes and the half-life
+        # about seven. 866 was carried alongside as a test vector before the
+        # owner selected it.
+        "owner-selected 10 minute EMA half-life (600 / ln 2)", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.ma_exp_time_alternative_test_vector", 866, "repository_approved", "oracle_owner",
@@ -1214,32 +1272,47 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "resolved_no_predeployment_value",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.production_liquidity_amount", SymbolicBinding("GREEN_USDG_PRODUCTION_LIQUIDITY"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # (USDG, GREEN) in the pool coin order. 100 USDG at 6 decimals and 100
+        # GREEN at 18, the same seed Base used.
+        "pool.production_liquidity_amount", (100 * 10**6, 100 * 10**18),
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.funding_source", SymbolicBinding("GREEN_USDG_FUNDING_SOURCE"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # The deployer, which must already hold the USDG. GREEN comes from the
+        # 100 minted to it at construction (DP-19).
+        "pool.funding_source", "temporary-local-governance",
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.custodian", SymbolicBinding("GREEN_USDG_CUSTODIAN"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        # EndaomentFunds holds the LP. Base sent it to the Endaoment, but
+        # local custody moved to the dedicated EndaomentFunds department
+        # (RipeHq id 21) since then.
+        "pool.custodian", "ENDAOMENT_FUNDS",
+        "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.approving_account", SymbolicBinding("GREEN_USDG_APPROVING_ACCOUNT"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        "pool.approving_account", "temporary-local-governance",
+        "owner_selected", "security_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.minimum_minted_lp", SymbolicBinding("GREEN_USDG_MINIMUM_MINTED_LP"),
-        "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
+        # Seeding 100 USDG (6dp) + 100 GREEN (18dp) into an empty StableSwap-NG
+        # pool mints LP equal to the invariant D, so ~200e18 at a 1:1 peg. 199e18
+        # is a ~0.5% floor: enough to absorb rounding and a small peg deviation,
+        # tight enough to abort if the pool is not what we think it is.
+        # Base passed 0; this is deliberately stricter.
+        "pool.minimum_minted_lp", 199 * 10**18,
+        "owner_selected", "liquidity_owner", "mirrors Base 2001_CurvePools.py seed", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.slippage_limit", SymbolicBinding("GREEN_USDG_SLIPPAGE_LIMIT"),
         "owner_selected", "liquidity_owner", "owner launch input", "owner_choice_unresolved",
     ),
     RobinhoodCurveLaunchInput(
-        "pool.withdrawal_authority", SymbolicBinding("GREEN_USDG_WITHDRAWAL_AUTHORITY"),
-        "owner_selected", "security_owner", "owner launch input", "owner_choice_unresolved",
+        # The seed transfers LP to ENDAOMENT_FUNDS, which the Safe governs, so
+        # the Safe is the authority that can actually withdraw it. Recording
+        # anything else would document an authority nothing honours.
+        "pool.withdrawal_authority", ROBINHOOD_GOVERNANCE,
+        "owner_selected", "security_owner", "owner launch input", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
         "pool.minimum_retained_liquidity", SymbolicBinding("GREEN_USDG_MIN_RETAINED_LIQUIDITY"),
@@ -1323,7 +1396,6 @@ ROBINHOOD_CURVE_BLOCKING_STATES = frozenset(
         "external_observation_unverified",
     }
 )
-
 
 
 def validate_robinhood_stock_launch_qualification(
@@ -1606,23 +1678,22 @@ _ROBINHOOD_CURVE_VALUES = {
     row.input_id: row.value for row in ROBINHOOD_CURVE_LAUNCH_INPUTS
 }
 CURVE_PARAMS["robinhood"] = {
-    "GREEN_POOL_NAME": _ROBINHOOD_CURVE_VALUES["pool.name"],
-    "GREEN_POOL_SYMBOL": _ROBINHOOD_CURVE_VALUES["pool.symbol"],
+    # green pool parameters
+    "GREEN_POOL_NAME": "GREEN/USDG Pool",
+    "GREEN_POOL_SYMBOL": "GREEN/USDG",
     "GREEN_POOL_COINS": (
         ROBINHOOD_ADDRESSES["USDG"],
-        ROBINHOOD_ADDRESSES["GREEN_TOKEN"],
+        ROBINHOOD_ADDRESSES["GREEN_TOKEN"],  # deployment-produced
     ),
-    "GREEN_POOL_COIN_DECIMALS": _ROBINHOOD_CURVE_VALUES["pool.coin_decimals"],
-    "GREEN_POOL_A": _ROBINHOOD_CURVE_VALUES["pool.A"],
-    "GREEN_POOL_FEE": _ROBINHOOD_CURVE_VALUES["pool.fee"],
-    "GREEN_POOL_OFFPEG_MULTIPLIER": _ROBINHOOD_CURVE_VALUES[
-        "pool.offpeg_fee_multiplier"
-    ],
-    "GREEN_POOL_MA_EXP_TIME": _ROBINHOOD_CURVE_VALUES["pool.ma_exp_time"],
-    "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": _ROBINHOOD_CURVE_VALUES[
-        "pool.ma_exp_time_alternative_test_vector"
-    ],
-    "GREEN_POOL_ADDRESS": _ROBINHOOD_CURVE_VALUES["pool.address"],
+    "GREEN_POOL_COIN_DECIMALS": (6, 18),
+    "GREEN_POOL_A": 100,
+    "GREEN_POOL_FEE": 4_000_000,
+    "GREEN_POOL_OFFPEG_MULTIPLIER": 20_000_000_000,
+    # 866, not Base's 600: Curve's ma_exp_time is the exponential time
+    # constant, so a 10 minute EMA half-life is 600 / ln(2) = 866.
+    "GREEN_POOL_MA_EXP_TIME": 866,
+    "GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR": 866,
+    "GREEN_POOL_ADDRESS": _ROBINHOOD_CURVE_VALUES["pool.address"],  # deployed
 }
 CORE_TOKENS["robinhood"] = {
     "USDG": ROBINHOOD_ADDRESSES["USDG"],

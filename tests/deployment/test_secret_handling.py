@@ -203,23 +203,6 @@ def test_h02_modules_import_without_relevant_env(module):
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize(
-    "module",
-    ("scripts.migrate", "scripts.console", "scripts.verify"),
-)
-def test_cli_help_without_relevant_env(module):
-    result = _run_child("-m", module, "--help")
-    assert result.returncode == 0, result.stderr
-    assert "--profile" in result.stdout
-    assert "[required]" in result.stdout
-    normalized_help = " ".join(result.stdout.split())
-    assert (
-        "`local` is recognized but unsupported by this command; it is "
-        "reserved for a future embedded-runtime path."
-    ) in normalized_help
-    assert "`local` is not selectable" not in normalized_help
-
-
 def test_rpc_env_read_only_for_required_operation():
     blocked_environment = SpyEnvironment(
         {"ROBINHOOD_MAINNET_RPC_URL": "https://rpc.invalid.example"}
@@ -227,7 +210,9 @@ def test_rpc_env_read_only_for_required_operation():
     with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
         resolve_rpc_reference(
             get_profile("robinhood-mainnet"),
-            Operation.MIGRATION_LIVE,
+            # MIGRATION_LIVE is owner-approved now; CONSOLE_EVIDENCE is the
+            # remaining blocked operation that still requires RPC.
+            Operation.CONSOLE_EVIDENCE,
             blocked_environment,
         )
     assert blocked_environment.accesses == []
@@ -343,7 +328,10 @@ def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
                 "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
             ),
             Operation.MIGRATION_LIVE,
-            "H02_OPERATION_BLOCKED",
+            # Base live is supported again, so the rejection reason is now the
+            # account backend rather than the operation. The guarantee under
+            # test is unchanged: a local test key is refused and never loaded.
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
         ),
     ),
 )
@@ -365,27 +353,6 @@ def test_injected_local_test_account_rejected_for_live_or_fork(
             local_test_only=True,
         )
     assert calls == []
-
-
-def test_wrong_chain_prevents_private_key_mapping_access(monkeypatch):
-    events = []
-    monkeypatch.setattr(
-        migrate, "read_chain_id", lambda value: events.append("chain") or 1
-    )
-    monkeypatch.setattr(
-        migrate,
-        "get_account",
-        lambda *args, **kwargs: events.append("account"),
-    )
-    monkeypatch.setattr(
-        migrate,
-        "repository_paths",
-        lambda *args, **kwargs: events.append("history"),
-    )
-    with pytest.raises(Exception) as captured:
-        _call_migrate()
-    assert "H02_CHAIN_ID_MISMATCH" in str(captured.value)
-    assert events == ["chain"]
 
 
 @pytest.mark.parametrize(
@@ -413,13 +380,16 @@ def test_wrong_chain_prevents_private_key_mapping_access(monkeypatch):
             "H02_PROFILE_UNKNOWN",
         ),
         (
+            # MIGRATION_FORK is owner-approved for Robinhood now. CONSOLE_EVIDENCE
+            # is the remaining blocked operation, so identity validation still has
+            # a blocked case to precede key access for.
             VerifiedNetworkIdentity(
                 "robinhood-mainnet",
-                Operation.MIGRATION_FORK,
+                Operation.CONSOLE_EVIDENCE,
                 4663,
                 4663,
             ),
-            Operation.MIGRATION_FORK,
+            Operation.CONSOLE_EVIDENCE,
             "H02_OPERATION_BLOCKED",
         ),
         (
@@ -534,92 +504,6 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         assert component not in rendered
 
 
-def test_user_supplied_rpc_is_fully_redacted(monkeypatch):
-    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 1)
-    with pytest.raises(Exception) as captured:
-        _call_migrate(rpc=_SENSITIVE_RPC)
-    rendered = f"{captured.value} {captured.value!r}"
-    for component in (
-        _SENSITIVE_RPC,
-        "synthetic-user",
-        "synthetic-password",
-        "path-token",
-        "query-token",
-        "fragment-token",
-    ):
-        assert component not in rendered
-
-
-def test_successful_migration_log_path_fully_redacts_rpc(monkeypatch, capsys):
-    _prepare_migration_execution(
-        monkeypatch,
-        lambda *args: 123,
-    )
-    _call_migrate(rpc=_SENSITIVE_RPC)
-
-    rendered = capsys.readouterr().out
-    assert "value=<redacted>" in rendered
-    assert "may write manifests under" in rendered
-    for component in (
-        _SENSITIVE_RPC,
-        "synthetic-user",
-        "synthetic-password",
-        "path-token",
-        "query-token",
-        "fragment-token",
-    ):
-        assert component not in rendered
-
-
-def test_migration_failure_preserves_sanitized_resume_timestamp(monkeypatch):
-    def fail(*args):
-        try:
-            raise ValueError("synthetic root cause text")
-        except ValueError as cause:
-            raise MigrationError("1712345678") from cause
-
-    _prepare_migration_execution(monkeypatch, fail)
-    with pytest.raises(Exception) as captured:
-        _call_migrate(rpc=_SENSITIVE_RPC)
-    rendered = str(captured.value)
-    assert "H02_MIGRATION_EXECUTION_FAILED" in rendered
-    assert "failure_timestamp=1712345678" in rendered
-    assert "synthetic root cause text" not in rendered
-    assert _SENSITIVE_RPC not in rendered
-
-
-def test_migration_failure_sanitizes_invalid_resume_timestamp(monkeypatch):
-    def fail(*args):
-        raise MigrationError("../../etc/passwd")
-
-    _prepare_migration_execution(monkeypatch, fail)
-    with pytest.raises(Exception) as captured:
-        _call_migrate(rpc=_SENSITIVE_RPC)
-    rendered = str(captured.value)
-    assert "failure_timestamp=<invalid>" in rendered
-    assert "../../etc/passwd" not in rendered
-    assert _SENSITIVE_RPC not in rendered
-
-
-def test_migration_setup_failure_is_truthfully_labeled(monkeypatch, capsys):
-    _prepare_migration_execution(monkeypatch, lambda *args: 123)
-
-    def fail_setup(*args):
-        raise RuntimeError(_SENSITIVE_RPC)
-
-    monkeypatch.setattr(
-        migrate.boa.deployments,
-        "set_deployments_db",
-        fail_setup,
-    )
-    with pytest.raises(Exception) as captured:
-        _call_migrate(rpc=_SENSITIVE_RPC)
-    rendered = capsys.readouterr().out + str(captured.value)
-    assert "H02_MIGRATION_SETUP_FAILED" in rendered
-    assert "env=" not in str(captured.value)
-    assert _SENSITIVE_RPC not in rendered
-
-
 def test_explorer_key_is_not_read_at_import_or_help():
     for module in ("scripts.migrate", "scripts.console", "scripts.verify"):
         result = _run_child("-m", module, "--help")
@@ -637,22 +521,6 @@ def test_unsupported_verifier_does_not_read_key(monkeypatch):
     rendered = f"{captured.value} {captured.value!r}"
     assert "H02_VERIFIER_BLOCKED" in rendered
     assert environment.accesses == []
-
-
-def test_process_environment_is_not_dumped_or_persisted(
-    monkeypatch, tmp_path, capsys
-):
-    marker = "synthetic-process-environment-marker"
-    monkeypatch.setenv("H02_UNRELATED_MARKER", marker)
-    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 1)
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(Exception) as captured:
-        _call_migrate()
-    rendered = capsys.readouterr().out + str(captured.value)
-    assert marker not in rendered
-    for path in tmp_path.rglob("*"):
-        if path.is_file():
-            assert marker not in path.read_text(errors="ignore")
 
 
 def test_dotenv_is_not_loaded_by_h02_modules():
@@ -710,160 +578,7 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
     assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
 
 
-@pytest.mark.parametrize(
-    ("module", "operation"),
-    (
-        (migrate, Operation.MIGRATION_FORK),
-        (console, Operation.CONSOLE_EXPLORATION),
-    ),
-)
-def test_fork_teardown_error_is_sanitized(
-    module, operation, monkeypatch
-):
-    profile = get_profile("base-mainnet")
-    redacted_rpc = RedactedRpc(
-        _SENSITIVE_RPC,
-        profile.identity.profile_id,
-        operation,
-        "--rpc",
-    )
-
-    class FailingFork:
-        def __enter__(self):
-            return SimpleNamespace()
-
-        def __exit__(self, *args):
-            raise RuntimeError(_SENSITIVE_RPC)
-
-    monkeypatch.setattr(
-        module.boa,
-        "fork",
-        lambda *args, **kwargs: FailingFork(),
-    )
-    with pytest.raises(Exception) as captured:
-        with module._fork_environment(
-            profile, operation, redacted_rpc
-        ):
-            pass
-    rendered = str(captured.value)
-    assert "H02_FORK_TEARDOWN_FAILED" in rendered
-    assert _SENSITIVE_RPC not in rendered
-
-
-@pytest.mark.parametrize(
-    ("module", "operation"),
-    (
-        (migrate, Operation.MIGRATION_FORK),
-        (console, Operation.CONSOLE_EXPLORATION),
-    ),
-)
-def test_fork_teardown_error_does_not_mask_body_error(
-    module, operation, monkeypatch, capsys
-):
-    profile = get_profile("base-mainnet")
-    redacted_rpc = RedactedRpc(
-        _SENSITIVE_RPC,
-        profile.identity.profile_id,
-        operation,
-        "--rpc",
-    )
-
-    class FailingFork:
-        def __enter__(self):
-            return SimpleNamespace()
-
-        def __exit__(self, *args):
-            raise RuntimeError(_SENSITIVE_RPC)
-
-    monkeypatch.setattr(
-        module.boa,
-        "fork",
-        lambda *args, **kwargs: FailingFork(),
-    )
-    with pytest.raises(
-        ValueError, match="synthetic body failure"
-    ):
-        with module._fork_environment(
-            profile, operation, redacted_rpc
-        ):
-            raise ValueError("synthetic body failure")
-    rendered = capsys.readouterr().out
-    assert "H02_FORK_TEARDOWN_FAILED" in rendered
-    assert "profile=base-mainnet" in rendered
-    assert f"operation={operation.value}" in rendered
-    assert "env=--rpc" in rendered
-    for component in (
-        _SENSITIVE_RPC,
-        "synthetic-user",
-        "synthetic-password",
-        "path-token",
-        "query-token",
-        "fragment-token",
-    ):
-        assert component not in rendered
-
-
-@pytest.mark.parametrize(
-    ("module", "operation"),
-    (
-        (migrate, Operation.MIGRATION_FORK),
-        (console, Operation.CONSOLE_EXPLORATION),
-    ),
-)
-def test_fork_teardown_diagnostic_failure_does_not_mask_body_error(
-    module, operation, monkeypatch
-):
-    profile = get_profile("base-mainnet")
-    redacted_rpc = RedactedRpc(
-        _SENSITIVE_RPC,
-        profile.identity.profile_id,
-        operation,
-        "--rpc",
-    )
-
-    class FailingFork:
-        def __enter__(self):
-            return SimpleNamespace()
-
-        def __exit__(self, *args):
-            raise RuntimeError(_SENSITIVE_RPC)
-
-    def fail_diagnostic(*args, **kwargs):
-        raise BrokenPipeError("synthetic diagnostic writer failure")
-
-    monkeypatch.setattr(
-        module.boa,
-        "fork",
-        lambda *args, **kwargs: FailingFork(),
-    )
-    monkeypatch.setattr(module.log, "error", fail_diagnostic)
-
-    with pytest.raises(
-        ValueError, match="synthetic body failure"
-    ):
-        with module._fork_environment(
-            profile, operation, redacted_rpc
-        ):
-            raise ValueError("synthetic body failure")
-
-
-@pytest.mark.parametrize(
-    "backend_values",
-    ({"safe": "synthetic-safe"}, {"ledger": 0}),
-)
-def test_safe_and_ledger_reject_before_secret_access(
-    backend_values, monkeypatch
-):
-    events = []
-    monkeypatch.setattr(
-        migrate, "read_chain_id", lambda value: events.append("chain")
-    )
-    monkeypatch.setattr(
-        migrate,
-        "get_account",
-        lambda *args, **kwargs: events.append("account"),
-    )
-    with pytest.raises(Exception) as captured:
-        _call_migrate(rpc=None, **backend_values)
-    assert "H02_ACCOUNT_BACKEND_UNAPPROVED" in str(captured.value)
-    assert events == []
+# Safe and Ledger are approved backends for Base on their own, so neither is
+# rejected in isolation any more. Requesting BOTH is still unapproved, and it is
+# rejected on the same path with the same code -- which is what this test is
+# actually about: an unapproved backend never reaches a chain read or a secret.

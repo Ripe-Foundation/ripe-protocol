@@ -50,21 +50,21 @@ counts:
 
 migration_readiness:
   source_configuration:
-    blockers: 80
+    blockers: 66
     configuration_consistent: true
     deployment_ready: false
   executable_plan:
-    blockers: 100
+    blockers: 86
     categories:
-      binding: 38
-      curve: 23
+      binding: 39
+      curve: 9
       external_address: 5
-      deployment_input: 18
+      deployment_input: 17
       reservation: 4
       stock: 12
   relationship: >
-    The 100 executable-plan blockers layer migration-specific bindings,
-    reservations, and Stock inputs on top of the 80 source/configuration
+    The 86 executable-plan blockers layer migration-specific bindings,
+    reservations, and Stock inputs on top of the 66 source/configuration
     readiness blockers. Neither count replaces the other.
 
 post_freeze_reconciliation:

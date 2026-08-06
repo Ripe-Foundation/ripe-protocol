@@ -5358,13 +5358,16 @@ def validate_curve_launch_authority() -> None:
         "pool.A": 100,
         "pool.fee": 4_000_000,
         "pool.offpeg_fee_multiplier": 20_000_000_000,
-        "pool.ma_exp_time": 600,
+        "pool.ma_exp_time": 866,
         "pool.ma_exp_time_alternative_test_vector": 866,
     }
     if any(values[key] != expected for key, expected in expected_pool_values.items()):
         _fail("RH_CURVE_POOL_PARAMS")
+    # Owner approved the Base GREEN pool configuration for Robinhood, with one
+    # deliberate exception: ma_exp_time is 866, not Base's 600, giving a
+    # 10-minute EMA half-life rather than a 10-minute time constant.
     if any(
-        states[key] != "research_candidate_owner_approval_unresolved"
+        states[key] != "resolved_repository_fact"
         for key in expected_pool_values
         if key != "pool.ma_exp_time_alternative_test_vector"
     ) or states["pool.ma_exp_time_alternative_test_vector"] != "test_vector_only":
@@ -5379,28 +5382,14 @@ def validate_curve_launch_authority() -> None:
     ):
         _fail("RH_CURVE_POOL_IDENTITY")
 
+    # pool.name and pool.symbol are owner-selected concrete strings now; the
+    # remaining rows are the liquidity/funding decisions, still unresolved.
     owner_choice_ids = (
-        "pool.name",
-        "pool.symbol",
-        "pool.production_liquidity_amount",
-        "pool.funding_source",
-        "pool.custodian",
-        "pool.approving_account",
-        "pool.minimum_minted_lp",
         "pool.slippage_limit",
-        "pool.withdrawal_authority",
         "pool.minimum_retained_liquidity",
     )
     expected_symbolic_names = {
-        "pool.name": "GREEN_USDG_CURVE_POOL_NAME",
-        "pool.symbol": "GREEN_USDG_CURVE_POOL_SYMBOL",
-        "pool.production_liquidity_amount": "GREEN_USDG_PRODUCTION_LIQUIDITY",
-        "pool.funding_source": "GREEN_USDG_FUNDING_SOURCE",
-        "pool.custodian": "GREEN_USDG_CUSTODIAN",
-        "pool.approving_account": "GREEN_USDG_APPROVING_ACCOUNT",
-        "pool.minimum_minted_lp": "GREEN_USDG_MINIMUM_MINTED_LP",
         "pool.slippage_limit": "GREEN_USDG_SLIPPAGE_LIMIT",
-        "pool.withdrawal_authority": "GREEN_USDG_WITHDRAWAL_AUTHORITY",
         "pool.minimum_retained_liquidity": "GREEN_USDG_MIN_RETAINED_LIQUIDITY",
     }
     if any(
@@ -5410,6 +5399,49 @@ def validate_curve_launch_authority() -> None:
         for input_id in owner_choice_ids
     ):
         _fail("RH_CURVE_OWNER_INPUT")
+
+    # The seeding controls left `owner_choice_ids` when they were resolved to
+    # approved repository facts, so they need their own gate: without one, a
+    # bad edit here would silently reduce the blocker count and read as
+    # progress. The three role bindings stay ROLE NAMES rather than literal
+    # addresses because the custodian (EndaomentFunds) is deployment-produced
+    # and has no address at plan time; the executor resolves them at execution.
+    role_binding_ids = (
+        "pool.funding_source",
+        "pool.custodian",
+        "pool.approving_account",
+    )
+    if (
+        not isinstance(values["pool.withdrawal_authority"], str)
+        or not values["pool.withdrawal_authority"].startswith("0x")
+        or states["pool.withdrawal_authority"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+    if any(
+        not isinstance(values[input_id], str)
+        or not values[input_id]
+        or values[input_id].startswith("0x")
+        or states[input_id] != "resolved_repository_fact"
+        for input_id in role_binding_ids
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+    liquidity = values["pool.production_liquidity_amount"]
+    if (
+        not isinstance(liquidity, tuple)
+        or len(liquidity) != 2
+        or any(not isinstance(item, int) or item <= 0 for item in liquidity)
+        or states["pool.production_liquidity_amount"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+    minimum_lp = values["pool.minimum_minted_lp"]
+    if (
+        not isinstance(minimum_lp, int)
+        or isinstance(minimum_lp, bool)
+        or minimum_lp <= 0
+        or states["pool.minimum_minted_lp"] != "resolved_repository_fact"
+    ):
+        _fail("RH_CURVE_FUNDING_INPUT")
+
     if (
         type(values["pool.production_observation"]).__name__ != "SymbolicBinding"
         or values["pool.production_observation"].semantic_name
@@ -5968,8 +6000,14 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
+    # 19 base blockers + 9 curve blockers. Was 42: the owner approved the Base
+    # GREEN pool configuration (8 params), the Base seed path (5 funding
+    # inputs), and the withdrawal authority (the Safe, which governs the
+    # EndaomentFunds custodian holding the LP), leaving address-provider
+    # verification, the deployment-produced pool address, and the
+    # slippage/retained-liquidity policy rows.
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 42 or len(set(blocker_ids)) != 42:
+    if len(blocker_ids) != 28 or len(set(blocker_ids)) != 28:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")

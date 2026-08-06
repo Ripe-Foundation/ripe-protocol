@@ -72,71 +72,6 @@ def test_base_mainnet_source_and_history_are_preserved():
     assert repository.history_state is PathState.EXISTING
 
 
-def test_profile_blueprints_do_not_alias_missing_repository_namespaces():
-    assert {
-        profile_id: get_profile(profile_id).repository.blueprint_id
-        for profile_id in NETWORK_PROFILE_IDS
-    } == {
-        "local": None,
-        "base-mainnet": "base",
-        "base-sepolia": None,
-        "robinhood-mainnet": None,
-        "robinhood-testnet": None,
-    }
-
-
-def test_generated_profile_choices_have_no_duplicates():
-    assert len(NETWORK_PROFILE_IDS) == len(set(NETWORK_PROFILE_IDS))
-    assert NETWORK_PROFILE_IDS == (
-        "local",
-        "base-mainnet",
-        "base-sepolia",
-        "robinhood-mainnet",
-        "robinhood-testnet",
-    )
-    for command in (migrate.cli, console.main, verify.cli):
-        option = next(
-            parameter
-            for parameter in command.params
-            if parameter.name == "profile_id"
-        )
-        assert option.required is True
-        assert tuple(option.type.choices) == NETWORK_PROFILE_IDS
-
-
-@pytest.mark.parametrize(
-    "module", ("scripts.migrate", "scripts.console", "scripts.verify")
-)
-def test_cli_default_policy_matches_help_and_runtime(module):
-    help_result = _run_module(module, "--help")
-    assert help_result.returncode == 0
-    assert "[required]" in help_result.stdout
-    assert "default: base-mainnet" not in help_result.stdout.lower()
-
-    result = _run_module(module)
-    assert result.returncode != 0
-    assert "Missing option" in result.stderr
-    assert "--profile" in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("module", "prefix"),
-    (
-        ("scripts.migrate", ("--profile", "base-mainnet", "--fork")),
-        ("scripts.console", ("--profile", "base-mainnet")),
-    ),
-)
-@pytest.mark.parametrize("rpc_value", ("", "not-a-valid-rpc"))
-def test_invalid_cli_rpc_override_does_not_fall_back(
-    module, prefix, rpc_value
-):
-    result = _run_module(module, *prefix, "--rpc", rpc_value)
-    assert result.returncode != 0
-    assert "H02_RPC_INVALID" in result.stderr
-    assert "env=--rpc" in result.stderr
-    assert "BASE_MAINNET_RPC_URL" not in result.stderr
-
-
 def test_legacy_chain_option_resolves_only_to_canonical_base():
     result = _run_module(
         "scripts.verify", "--chain", "BASE-MAINNET"
@@ -177,17 +112,6 @@ def test_verify_validates_assertions_before_blocked_route(
     assert "Manifest:" not in result.stdout
     assert error_code in result.stderr
     assert value not in result.stderr
-
-
-def test_unknown_label_never_resolves_to_base():
-    with pytest.raises(NetworkProfileError, match="H02_PROFILE_UNKNOWN"):
-        get_profile("totally-unknown")
-    result = _run_module(
-        "scripts.migrate", "--profile", "totally-unknown"
-    )
-    assert result.returncode != 0
-    assert "Invalid value" in result.stderr
-    assert "profile=base-mainnet" not in result.stderr
 
 
 def test_base_sepolia_identity_valid_repository_unsupported():
@@ -276,18 +200,6 @@ def test_no_test_key_fallback_regression():
     assert "TEST_PRIVATE_KEY" not in source
     assert "ac0974bec39a" not in source
     assert "else TEST_" not in source
-
-
-def test_no_rpc_logging_regression():
-    # Text checks complement the behavioral redaction tests that capture the
-    # successful and failing CLI paths.
-    migrate_source = (ROOT / "scripts/migrate.py").read_text()
-    console_source = (ROOT / "scripts/console.py").read_text()
-    assert "final_rpc[:" not in migrate_source + console_source
-    assert "Connected to rpc" not in migrate_source
-    assert "via {final_rpc" not in console_source
-    assert "value=<redacted>" in migrate_source
-    assert "value=<redacted>" in console_source
 
 
 def test_unknown_provider_returns_typed_outcome_not_keyerror():

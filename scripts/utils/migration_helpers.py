@@ -153,7 +153,19 @@ def execute_transaction(transaction, *args, **kwargs):
                 + (" (Trying again in 3 seconds)")
 
             )
-            log.error("\tH02_TRANSACTION_FAILED\n")
+            # Exception text is NOT logged by default: it can carry provider
+            # URLs, keys, or calldata, and what a driver puts in a message
+            # cannot be enumerated in advance. Retrying twenty times on a
+            # deterministic revert with only a code is painful to debug, so
+            # RIPE_MIGRATE_TRACE=1 opts in to the cause, with URLs stripped.
+            if os.environ.get("RIPE_MIGRATE_TRACE"):
+                detail = re.sub(
+                    r"(https?://[^/\s]+)[^\s]*", r"\1/<redacted>",
+                    f"{type(exception).__name__}: {exception}",
+                )
+                log.error(f"\tH02_TRANSACTION_FAILED {detail}\n")
+            else:
+                log.error("\tH02_TRANSACTION_FAILED\n")
             if attempts == max_attempts:
                 log.error(f"\tMax attempts reached. Exiting.\n")
                 break

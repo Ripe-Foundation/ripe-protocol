@@ -287,9 +287,13 @@ _BASE_MAINNET_OPERATIONS = _operations(
         repository=True,
         account=True,
     ),
+    # Base has deployed and verified through this path since v1. The H-02
+    # profile work classed both as blocked while the Robinhood launch controls
+    # were being designed; that scope never included stopping Base releases.
+    # Robinhood stays blocked -- see _ROBINHOOD_OPERATIONS.
     _policy(
         Operation.MIGRATION_LIVE,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -309,6 +313,14 @@ _BASE_MAINNET_OPERATIONS = _operations(
         identity=True,
         repository=True,
     ),
+    # VERIFICATION stays blocked deliberately. scripts/verify.py has no
+    # submission path -- it selects a route, echoes the manifest, then raises
+    # H02_OPERATION_INVALID unconditionally. The real implementation lives in
+    # scripts/utils/verify_etherscan.py (verify_from_manifest) and is tested by
+    # tests/deployment/test_verifier_adapters.py, but nothing calls it.
+    # Marking this SUPPORTED would advertise a capability the CLI lacks and
+    # disclose the manifest path before dead-ending. Flip it only together with
+    # wiring verify.py to verify_from_manifest.
     _policy(Operation.VERIFICATION, _BLOCKED, verifier=True),
 )
 
@@ -326,9 +338,11 @@ _ROBINHOOD_OPERATIONS = _operations(
     _policy(
         Operation.REPOSITORY_READ, _BLOCKED, repository=True
     ),
+    # Owner-approved for launch. Robinhood is deployed from a Ledger that is
+    # also RipeHq governance until the 0900 handoff, exactly as Base was.
     _policy(
         Operation.MIGRATION_FORK,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -336,7 +350,7 @@ _ROBINHOOD_OPERATIONS = _operations(
     ),
     _policy(
         Operation.MIGRATION_LIVE,
-        _BLOCKED,
+        _SUPPORTED,
         rpc=True,
         identity=True,
         repository=True,
@@ -396,6 +410,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ETHERSCAN_API_KEY",
             _BLOCKED,
         ),
+        # Required whenever MIGRATION_LIVE is SUPPORTED: the registry refuses to
+        # enable live deployment without naming the approved signing backends.
+        # These are the three scripts/migrate.py can select between.
+        live_account_backend_ids=("env-private-key", "ledger", "safe"),
         operations=_BASE_MAINNET_OPERATIONS,
     ),
     NetworkProfile(
@@ -423,13 +441,22 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ROBINHOOD_MAINNET_RPC_URL", _ROBINHOOD_OPERATIONS
         ),
         repository=RepositoryPolicy(
-            None,
-            PurePosixPath("migrations/robinhood"),
-            PathState.PROPOSED,
+            # Its own migration directory, like base-mainnet. While this shared
+            # migrations/robinhood with the testnet profile, two invariants were
+            # mutually exclusive: a named blueprint requires EXISTING, and a
+            # SHARED source requires PROPOSED -- so a Robinhood migration could
+            # never both name its blueprint and be executable.
+            "robinhood",
+            PurePosixPath("migrations/robinhood-mainnet"),
+            PathState.EXISTING,
             PurePosixPath("migration_history/robinhood-mainnet/v1"),
-            PathState.PROPOSED,
+            PathState.EXISTING,
         ),
         fork=ForkPolicy(True, True, True, True),
+        # The Ledger is the approved deployer; env-private-key stays for the
+        # deterministic fixtures. No Safe: the Safe RECEIVES governance at the
+        # 0900 handoff, it does not sign the deployment.
+        live_account_backend_ids=("env-private-key", "ledger"),
         verifier=VerifierPolicy(
             VerifierProvider.BLOCKSCOUT,
             "blockscout",
@@ -446,6 +473,9 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             "ROBINHOOD_TESTNET_RPC_URL", _ROBINHOOD_OPERATIONS
         ),
         repository=RepositoryPolicy(
+            # The testnet profile keeps the declarative source; only mainnet
+            # moved to its own imperative directory. Nothing shares a source
+            # now, so the PROPOSED-for-shared rule no longer applies to either.
             None,
             PurePosixPath("migrations/robinhood"),
             PathState.PROPOSED,
@@ -453,6 +483,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
             PathState.PROPOSED,
         ),
         fork=ForkPolicy(True, True, True, True),
+        # The Ledger is the approved deployer; env-private-key stays for the
+        # deterministic fixtures. No Safe: the Safe RECEIVES governance at the
+        # 0900 handoff, it does not sign the deployment.
+        live_account_backend_ids=("env-private-key", "ledger"),
         verifier=VerifierPolicy(
             VerifierProvider.BLOCKSCOUT,
             "blockscout",

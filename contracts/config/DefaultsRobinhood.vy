@@ -39,7 +39,7 @@ GREEN_TOKEN: immutable(address)
 SGREEN_TOKEN: immutable(address)
 USDG_TOKEN: immutable(address)
 WETH_TOKEN: immutable(address)
-STEAKHOUSE_USDG_VAULT: immutable(address)
+
 
 @deploy
 def __init__(
@@ -50,7 +50,6 @@ def __init__(
     _sgreenToken: address,
     _usdgToken: address,
     _wethToken: address,
-    _steakhouseUsdgVault: address,
 ):
     CONTRIB_TEMPLATE = _contribTemplate
     TRAINING_WHEELS = _trainingWheels
@@ -59,7 +58,6 @@ def __init__(
     SGREEN_TOKEN = _sgreenToken
     USDG_TOKEN = _usdgToken
     WETH_TOKEN = _wethToken
-    STEAKHOUSE_USDG_VAULT = _steakhouseUsdgVault
 
 
 # general config
@@ -96,7 +94,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
         globalDebtLimit = 500 * EIGHTEEN_DECIMALS,
         minDebtAmount = 1 * EIGHTEEN_DECIMALS,
         numAllowedBorrowers = 20,
-        maxBorrowPerInterval = 50 * EIGHTEEN_DECIMALS,
+        maxBorrowPerInterval = 25 * EIGHTEEN_DECIMALS,
         numBlocksPerInterval = 1 * DAY_IN_BLOCKS,
         minDynamicRateBoost = 1 * HUNDRED_PERCENT,
         maxDynamicRateBoost = 5 * HUNDRED_PERCENT,
@@ -124,19 +122,19 @@ def genDebtConfig() -> cs.GenDebtConfig:
 @view
 @external
 def ripeAvailForRewards() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
+    return 1_000_000 * EIGHTEEN_DECIMALS
 
 
 @view
 @external
 def ripeAvailForHr() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
+    return 0
 
 
 @view
 @external
 def ripeAvailForBonds() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
+    return 1_000_000 * EIGHTEEN_DECIMALS
 
 
 # ripe bond config
@@ -147,14 +145,14 @@ def ripeAvailForBonds() -> uint256:
 def ripeBondConfig() -> cs.RipeBondConfig:
     return cs.RipeBondConfig(
         asset = USDG_TOKEN,
-        amountPerEpoch = 2000 * (10 ** 6),
+        amountPerEpoch = 100 * (10 ** 6),
         canBond = False,
         minRipePerUnit = 0,
-        maxRipePerUnit = 1 * EIGHTEEN_DECIMALS,
+        maxRipePerUnit = 50 * EIGHTEEN_DECIMALS,
         maxRipePerUnitLockBonus = 2 * HUNDRED_PERCENT,
         epochLength = 8 * HOUR_IN_BLOCKS,
         shouldAutoRestart = True,
-        restartDelayBlocks = 0,
+        restartDelayBlocks = 2 * HOUR_IN_BLOCKS,
     )
 
 
@@ -252,44 +250,6 @@ def shouldCheckLastTouch() -> bool:
 @external
 def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
     return [
-        # SteakHouse USDG (Morpho)
-        # USD Value: $114.3k
-        cs.AssetConfigEntry(asset=STEAKHOUSE_USDG_VAULT, config=cs.AssetConfig(
-            vaultIds=[3],
-            stakersPointsAlloc=0,
-            voterPointsAlloc=0,
-            perUserDepositLimit=5_000 * 10**18,  # $5.0k
-            globalDepositLimit=10_000 * 10**18,  # $10.0k
-            minDepositBalance=10**16,  # $0.1000
-            debtTerms=cs.DebtTerms(
-                ltv=70_00,
-                redemptionThreshold=77_00,
-                liqThreshold=80_00,
-                liqFee=10_00,
-                borrowRate=6_00,
-                daowry=25,
-            ),
-            shouldBurnAsPayment=False,
-            shouldTransferToEndaoment=True,
-            shouldSwapInStabPools=False,
-            shouldAuctionInstantly=False,
-            canDeposit=True,
-            canWithdraw=True,
-            canRedeemCollateral=False,
-            canRedeemInStabPool=True,
-            canBuyInAuction=True,
-            canClaimInStabPool=True,
-            specialStabPoolId=0,
-            customAuctionParams=cs.AuctionParams(
-                hasParams=False,
-                startDiscount=0,
-                maxDiscount=0,
-                delay=0,
-                duration=0,
-            ),
-            whitelist=empty(address),
-            isNft=False,
-        )),
         # WETH
         # USD Value: ~$2k
         cs.AssetConfigEntry(asset=WETH_TOKEN, config=cs.AssetConfig(
@@ -298,7 +258,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             voterPointsAlloc=0,
             perUserDepositLimit=25 * 10**17,  # ~$5.0k
             globalDepositLimit=5 * 10**18,  # ~$10.0k
-            minDepositBalance=10**14,  # $0.2000
+            minDepositBalance= 5 * 10**14,  # $1
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -450,8 +410,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
 @external
 def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
     return [
-    cs.VaultLite(vaultId=3, asset=STEAKHOUSE_USDG_VAULT), # SteakHouse USDG
-    cs.VaultLite(vaultId=3, asset=WETH_TOKEN), # WETH
+        cs.VaultLite(vaultId=3, asset=WETH_TOKEN), # WETH
     ]
 
 
@@ -466,7 +425,7 @@ def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
 @view
 @external
 def priorityPriceSourceIds() -> DynArray[uint256, 10]:
-    return [1, 3]
+    return [1, 2]
 
 # lite signers
 
