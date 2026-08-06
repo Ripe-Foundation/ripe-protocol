@@ -7,15 +7,15 @@
 > or release. Each lifecycle phase retains its own approval gate.
 
 > [!NOTE]
-> **Implementation status added 2026-08-05.** Tier A+B was selected and
+> **Implementation status refreshed 2026-08-06.** Tier A+B was selected and
 > implemented for the isolated candidate at
-> `e603dcee4a22c1c5100191c72ea1a23de1b40c22`. The forward-looking plan below
+> `a510891c26410ab28c3c326ecaa283f57b4aff66`. The forward-looking plan below
 > remains preserved as historical design context. The
-> [implementation specification's as-built outcome](implementation-specification.md#as-built-outcome-2026-08-05)
+> [implementation specification's as-built outcome](implementation-specification.md#as-built-outcome-2026-08-06)
 > records the final code, bytecode, validation evidence, and owner-approved
 > deviations. No deployment or later lifecycle phase is authorized here.
 
-## Implemented outcome (2026-08-05)
+## Implemented outcome (2026-08-06)
 
 Tier A+B is complete in the isolated candidate; Tier C remains deferred. The
 final implementation:
@@ -26,18 +26,24 @@ final implementation:
 - enforces aggregate custody against active and dormant claim liabilities;
 - keeps permissionless pruning available and restricts permissionless manual
   activation to the paused state;
+- marks unavailable-price and capacity-full dormancy as material and blocks new
+  deposits until activation or bounded resolution, closing both manual and
+  receipt-triggered dormant-NAV capture;
 - rejects GREEN as a Stability asset using the current `Addys` value on the
   deposit path;
-- retains Stability-specific recovery guards;
+- keeps the Vault recovery selectors but disables both implementations;
 - retains `getTotalValue` and `getTotalUserValue` for off-chain use while not
   exporting `valueToShares`, `sharesToValue`, or `canActivateClaimAsset`; and
-- deploys at `24,568` bytes, leaving `8` bytes below EIP-170.
+- deploys at `24,472` bytes, leaving `104` bytes below EIP-170.
 
 The original plan's broader ABI-removal and always-available manual activation
 language is therefore superseded as a description of the final candidate. The
 zero-raw-Stability-balance plus dormant-only claim exit remains an explicit
-deferred residual, and the repository-wide suite remains blocked by the
-unrelated ten-versus-eleven-argument BlueChipYieldPrices source/fixture drift.
+deferred residual. The eleven-argument Morpho V2
+`BlueChipYieldPrices.vy` source has been restored so source, fixture, ABI, and
+Robinhood migration expectations agree. Active-asset price loss remains
+fail-closed and requires the operational response recorded in the
+implementation specification; Tier C automatic quarantine remains deferred.
 
 ## 1. Scope and bound baseline
 

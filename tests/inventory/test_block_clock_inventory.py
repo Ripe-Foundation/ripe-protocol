@@ -165,7 +165,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "seconds_unit_candidates=70" in result.output
     assert "mixed_clock_functions=4" in result.output
     assert "vyper_paths=95" in result.output
-    assert "current_bindings=5/4" in result.output
+    assert "current_bindings=6/4" in result.output
     assert (
         "current_state_sha256=" + checker.CURRENT_BINDINGS_STATE_SHA256
         in result.output
@@ -200,7 +200,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
     assert bindings["timestampLines"] == list(
         checker.EXPECTED_CURRENT_TIMESTAMP_BINDINGS
     )
-    assert len({record["path"] for record in bindings["sourcePaths"]}) == 5
+    assert len({record["path"] for record in bindings["sourcePaths"]}) == 6
     assert len(
         {
             checker._current_binding_timestamp_key(record)
@@ -208,7 +208,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
         }
     ) == 4
     assert checker.CURRENT_BINDINGS_STATE_SHA256 == (
-        "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59"
+        "cc6ccb4d0d966306623b78444bff793ce48ab867c6f4656451cf74852802fb38"
     )
     assert checker._current_bindings_fingerprint(bindings) == (
         checker.CURRENT_BINDINGS_STATE_SHA256
@@ -540,6 +540,7 @@ def test_pr61_exact_artifact_layout_metadata_package_preserves_authority(
     )
     legacy_artifact = json.loads(artifact_bytes)
     legacy_artifact["contracts"].pop("DefaultsRobinhood")
+    checker._restore_pr61_artifact_expectations_legacy(legacy_artifact)
     legacy_bytes = (
         json.dumps(legacy_artifact, indent=2, sort_keys=True) + "\n"
     ).encode()
@@ -851,7 +852,7 @@ def test_source_authoritative_defaults_has_exact_production_admission(
         "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
     )
     assert checker.CURRENT_PRODUCTION_INVENTORY_SHA256 == (
-        "184ff0b60a682a18338f80f3e7972c87d60abca3ed04882722768f657ec8caa0"
+        "7e2333b58353a26f68ef91287fd169bf129ca72b083af3a3b232107df75e79d4"
     )
     assert checker.S5_LEGACY_INVENTORY_SHA256 == (
         "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"

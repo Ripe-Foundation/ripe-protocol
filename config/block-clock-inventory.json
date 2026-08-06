@@ -28,7 +28,7 @@
   },
   "currentBindings": {
     "schemaVersion": 1,
-    "currentStateSha256": "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59",
+    "currentStateSha256": "cc6ccb4d0d966306623b78444bff793ce48ab867c6f4656451cf74852802fb38",
     "sourcePaths": [
       {
         "path": "contracts/mock/MockMorphoV2Factory.vy",
@@ -59,6 +59,12 @@
         "classification": "production",
         "historicalContentSha256": "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56",
         "currentContentSha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+      },
+      {
+        "path": "contracts/vaults/StabilityPool.vy",
+        "classification": "production",
+        "historicalContentSha256": "04d0a7dddb8b562e8e384f61e6b83c76f5bc4a761070fd069f52d6ae8a4e22eb",
+        "currentContentSha256": "3fe9fb58a3b772a7266734178f6a11fd12edc581c333c685f8c7e106ba6807ed"
       }
     ],
     "timestampLines": [
@@ -16319,7 +16325,7 @@
     {
       "path": "contracts/vaults/modules/StabVault.vy",
       "classification": "production",
-      "contentSha256": "d8b40ec77714ff21b822963a069d4db2e411e733509a83efbd418b86aacd8c77",
+      "contentSha256": "4fb757b0ec0706f49ad84fd1ac5728057c755b5adecec1c4c60e050a1520f13a",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
