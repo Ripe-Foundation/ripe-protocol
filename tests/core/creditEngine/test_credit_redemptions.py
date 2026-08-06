@@ -46,6 +46,19 @@ def _setup_backing_aware_redemption_position(
     return vault_id, alpha_amount, bravo_amount, debt_amount
 
 
+@pytest.fixture(scope="module")
+def credit_redeem_pointer_harness(credit_redeem):
+    credit_redeem.inject_function(
+        """
+@external
+def testHandleGreenForUser(_recipient: address, _amount: uint256):
+    a: addys.Addys = addys._getAddys()
+    self._handleGreenForUser(_recipient, _amount, True, True, a)
+        """
+    )
+    return credit_redeem
+
+
 def test_credit_redemption_basic(
     alpha_token,
     alpha_token_whale,
@@ -2084,6 +2097,45 @@ def test_credit_redemption_stability_pool_entry(
 
     # Alice's sGREEN balance should now be 0 (deposited into pool)
     assert savings_green.balanceOf(alice) == 0
+
+
+def test_credit_redeem_green_handler_uses_preferred_stability_pool_pointer(
+    credit_redeem_pointer_harness,
+    credit_engine,
+    alternate_stability_pool,
+    stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    green_token,
+    savings_green,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    preferred_id = registerVault(alternate_stability_pool, "Preferred Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(savings_green, [preferred_id])
+    mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard_alpha.address)
+
+    amount = 10 * EIGHTEEN_DECIMALS
+    green_token.mint(
+        credit_redeem_pointer_harness.address,
+        amount,
+        sender=credit_engine.address,
+    )
+    credit_redeem_pointer_harness.inject.testHandleGreenForUser(alice, amount, sender=alice)
+    assert alternate_stability_pool.getTotalAmountForUser(alice, savings_green) > 0
+    assert stability_pool.getTotalAmountForUser(alice, savings_green) == 0
+
+    mission_control.eval("self.preferredStabVaultId = 0")
+    green_token.mint(
+        credit_redeem_pointer_harness.address,
+        amount,
+        sender=credit_engine.address,
+    )
+    with boa.reverts("invalid vault id"):
+        credit_redeem_pointer_harness.inject.testHandleGreenForUser(alice, amount, sender=alice)
 
 
 def test_credit_redemption_with_interest_accrual(

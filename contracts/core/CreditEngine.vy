@@ -52,6 +52,7 @@ interface MissionControl:
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def preferredStabVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface Teller:
@@ -1205,8 +1206,10 @@ def _handleGreenForUser(
 
         # put sGREEN into stability pool
         if _shouldEnterStabPool:
+            preferredStabVaultId: uint256 = staticcall MissionControl(_a.missionControl).preferredStabVaultId()
+            assert preferredStabVaultId != 0 # dev: invalid vault id
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, sGreenAmount, default_return_value=True) # dev: sgreen approval failed
-            extcall Teller(_a.teller).depositFromTrusted(_recipient, STABILITY_POOL_ID, _a.savingsGreen, sGreenAmount, 0, _a)
+            extcall Teller(_a.teller).depositFromTrusted(_recipient, preferredStabVaultId, _a.savingsGreen, sGreenAmount, 0, _a)
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, 0, default_return_value=True) # dev: sgreen approval failed
 
     else:

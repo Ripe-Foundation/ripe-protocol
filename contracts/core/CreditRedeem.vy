@@ -42,6 +42,7 @@ interface CreditEngine:
 
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
+    def preferredStabVaultId() -> uint256: view
     def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
 
@@ -107,7 +108,6 @@ event CollateralRedeemed:
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
-STABILITY_POOL_ID: constant(uint256) = 1
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 
 
@@ -289,8 +289,10 @@ def _handleGreenForUser(
 
         # put sGREEN into stability pool
         if _shouldEnterStabPool:
+            preferredStabVaultId: uint256 = staticcall MissionControl(_a.missionControl).preferredStabVaultId()
+            assert preferredStabVaultId != 0 # dev: invalid vault id
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, sGreenAmount, default_return_value=True) # dev: sgreen approval failed
-            extcall Teller(_a.teller).depositFromTrusted(_recipient, STABILITY_POOL_ID, _a.savingsGreen, sGreenAmount, 0, _a)
+            extcall Teller(_a.teller).depositFromTrusted(_recipient, preferredStabVaultId, _a.savingsGreen, sGreenAmount, 0, _a)
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, 0, default_return_value=True) # dev: sgreen approval failed
 
     else:

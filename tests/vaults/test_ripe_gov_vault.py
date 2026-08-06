@@ -2567,3 +2567,64 @@ def test_depositIntoGovVault_lock_duration_capped(
     expected_unlock = boa.env.evm.patch.block_number + 1000  # maxLockDuration
     assert userData.unlock == expected_unlock
 
+
+def test_teller_governance_routes_follow_core_vault_pointer(
+    teller,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    whale,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setupRipeGovVaultConfig()
+    setGeneralConfig()
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    assert teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        500,
+        whale,
+        sender=whale,
+    ) == deposit_amount
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == 0
+
+    teller.adjustLock(ripe_token, 800, whale, sender=whale)
+    adjusted = alternate_ripe_gov_vault.userGovData(whale, ripe_token)
+    assert adjusted.unlock == boa.env.evm.patch.block_number + 800
+
+    teller.releaseLock(ripe_token, whale, sender=whale)
+    released = alternate_ripe_gov_vault.userGovData(whale, ripe_token)
+    assert released.unlock == 0
+
+
+def test_teller_governance_routes_fail_closed_when_core_pointer_is_unset(
+    teller,
+    mission_control,
+    ripe_token,
+    whale,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+):
+    setupRipeGovVaultConfig()
+    setGeneralConfig()
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    with boa.reverts("invalid vault id"):
+        teller.depositIntoGovVault(ripe_token, deposit_amount, 0, whale, sender=whale)
+    with boa.reverts("invalid vault id"):
+        teller.adjustLock(ripe_token, 500, whale, sender=whale)
+    with boa.reverts("invalid vault id"):
+        teller.releaseLock(ripe_token, whale, sender=whale)

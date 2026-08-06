@@ -18,6 +18,7 @@ interface MissionControl:
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
     def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -29,6 +30,7 @@ interface PriceDesk:
 
 interface VaultBook:
     def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
+    def getRegId(_vaultAddr: address) -> uint256: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -114,7 +116,6 @@ MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
 ACTIVATION_USD_THRESHOLD: constant(uint256) = 25 * 10 ** 16  # $0.25 in 18-decimal USD
 RETENTION_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
 
@@ -786,12 +787,15 @@ def _handleClaimRewards(
     if ripeAvailable == 0:
         return
 
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(_a.missionControl).coreRipeGovVaultId()
+    assert coreRipeGovVaultId != 0 # dev: invalid vault id
+
     # mint ripe
     assert extcall VaultBook(_a.vaultBook).mintRipeForStabPoolClaims(ripeAvailable, _a.ripeToken, _a.ledger) # dev: mint failed
 
     # deposit into gov vault
     assert extcall IERC20(_a.ripeToken).approve(_a.teller, ripeAvailable, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(_a.teller).depositFromTrusted(_claimer, RIPE_GOV_VAULT_ID, _a.ripeToken, ripeAvailable, _lockDuration, _a)
+    extcall Teller(_a.teller).depositFromTrusted(_claimer, coreRipeGovVaultId, _a.ripeToken, ripeAvailable, _lockDuration, _a)
     assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
 
@@ -1027,7 +1031,7 @@ def _handleAssetForUser(
     vaultId: uint256 = staticcall MissionControl(_a.missionControl).getFirstVaultIdForAsset(_asset)
 
     # auto-deposit
-    if _shouldAutoDeposit and self._canPerformAutoDeposit(vaultId, _asset, _recipient, _a.missionControl):
+    if _shouldAutoDeposit and self._canPerformAutoDeposit(vaultId, _asset, _recipient, _a.missionControl, _a.vaultBook):
         assert extcall IERC20(_asset).approve(_a.teller, _amount, default_return_value=True) # dev: token approval failed
         extcall Teller(_a.teller).depositFromTrusted(_recipient, vaultId, _asset, _amount, 0, _a)
         assert extcall IERC20(_asset).approve(_a.teller, 0, default_return_value=True) # dev: token approval failed
@@ -1042,9 +1046,13 @@ def _canPerformAutoDeposit(
     _asset: address,
     _recipient: address,
     _missionControl: address,
+    _vaultBook: address,
 ) -> bool:
     # invalid vault or stability pool (can't deposit right back into it)
-    if _vaultId in [0, 1]:
+    if _vaultId == 0:
+        return False
+    selfVaultId: uint256 = staticcall VaultBook(_vaultBook).getRegId(self)
+    if _vaultId == selfVaultId:
         return False
     config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_vaultId, _asset, _recipient)
     return config.canDepositGeneral and config.canDepositAsset

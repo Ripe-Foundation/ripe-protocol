@@ -1525,3 +1525,66 @@ def test_loot_claim_auto_stake_configuration_updates(
     assert second_claim > 0
     assert ripe_token.balanceOf(bob) == first_claim  # Wallet unchanged from first claim
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0  # Second claim went to vault
+
+
+def test_lootbox_auto_stake_uses_core_governance_vault_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_alpha,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    source_vault_id = vault_book.getRegId(simple_erc20_vault)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        source_vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed > 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_lootbox_claim_routes_fail_closed_when_core_pointer_is_unset(
+    mission_control,
+    lootbox,
+    bob,
+    alpha_token,
+):
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    assert lootbox.getClaimableLoot(bob) == 0
+    with boa.reverts("invalid vault id"):
+        lootbox.getClaimableDepositLootForAsset(bob, 3, alpha_token)

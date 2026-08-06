@@ -3565,3 +3565,155 @@ def test_stab_vault_claims_dust_different_price_levels(
     # Balance should remain
     remaining = stability_pool.claimableBalances(alpha_token, bravo_token)
     assert remaining > 0
+
+
+def test_stability_pool_ripe_rewards_use_core_governance_vault_pointer(
+    stability_pool,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    setupStabPoolClaimsRewards(_ripePerDollar=EIGHTEEN_DECIMALS // 10)
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setAssetConfig(bravo_token)
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_stability_pool_ripe_rewards_fail_closed_when_core_pointer_is_unset(
+    stability_pool,
+    mission_control,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    setupStabPoolClaimsRewards(_ripePerDollar=EIGHTEEN_DECIMALS // 10)
+    setAssetConfig(bravo_token)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+    with boa.reverts("invalid vault id"):
+        teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+
+def test_stability_pool_auto_deposit_rejects_its_own_dynamic_vault_id(
+    alternate_stability_pool,
+    registerVault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    pool_id = registerVault(alternate_stability_pool, "Secondary Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(bravo_token, _vaultIds=[pool_id])
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alternate_stability_pool, deposit_amount, sender=alpha_token_whale)
+    alternate_stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(alternate_stability_pool, claimable_amount, sender=bravo_token_whale)
+    alternate_stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    teller.claimFromStabilityPool(
+        pool_id,
+        alpha_token,
+        bravo_token,
+        MAX_UINT256,
+        bob,
+        True,
+        sender=bob,
+    )
+    assert bravo_token.balanceOf(bob) > 0
+    assert alternate_stability_pool.getTotalAmountForUser(bob, bravo_token) == 0

@@ -106,6 +106,16 @@ def sample_ripe_rewards_config():
     )
 
 
+@pytest.fixture
+def fresh_mission_control(ripe_hq, defaults):
+    return boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        defaults,
+        name="fresh_mission_control",
+    )
+
+
 ####################
 # Initial State    #
 ####################
@@ -120,6 +130,59 @@ def test_mission_control_initial_state(mission_control):
     assert not mission_control.isPaused()
     assert not mission_control.canMintGreen()
     assert not mission_control.canMintRipe()
+
+
+def test_vault_id_pointers_initialize_to_zero(fresh_mission_control):
+    assert fresh_mission_control.coreRipeGovVaultId() == 0
+    assert fresh_mission_control.preferredStabVaultId() == 0
+
+
+def test_every_registered_switchboard_can_set_exact_nonzero_vault_ids(
+    fresh_mission_control,
+    switchboard_alpha,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_delta,
+    switchboard_echo,
+):
+    switchboards = [
+        switchboard_alpha,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_delta,
+        switchboard_echo,
+    ]
+
+    for offset, switchboard in enumerate(switchboards, start=1):
+        core_id = 100 + offset
+        preferred_id = 200 + offset
+        fresh_mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard.address)
+        assert fresh_mission_control.coreRipeGovVaultId() == core_id
+        assert fresh_mission_control.get_logs() == []
+
+        fresh_mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard.address)
+        assert fresh_mission_control.preferredStabVaultId() == preferred_id
+        assert fresh_mission_control.get_logs() == []
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_zero(
+    fresh_mission_control,
+    switchboard_charlie,
+    setter_name,
+):
+    with boa.reverts("invalid vault id"):
+        getattr(fresh_mission_control, setter_name)(0, sender=switchboard_charlie.address)
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_non_switchboards(
+    fresh_mission_control,
+    alice,
+    setter_name,
+):
+    with boa.reverts("no perms"):
+        getattr(fresh_mission_control, setter_name)(1, sender=alice)
 
 
 #######################
