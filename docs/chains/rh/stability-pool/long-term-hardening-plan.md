@@ -8,8 +8,8 @@
 
 > [!NOTE]
 > **Implementation status refreshed 2026-08-06.** Tier A+B was selected and
-> implemented for the isolated candidate at
-> `2a4acca37e8ad0e8fb36f399adeafa77d731a9bc`. The forward-looking plan below
+> implemented for the isolated candidate, with the active-cap amendment bound
+> at `3c7b1ff66e9167914cac4cff2da126e7d9964773`. The forward-looking plan below
 > remains preserved as historical design context. The
 > [implementation specification's as-built outcome](implementation-specification.md#as-built-outcome-2026-08-06)
 > records the final code, bytecode, validation evidence, and owner-approved
@@ -20,7 +20,8 @@
 Tier A+B is complete in the isolated candidate; Tier C remains deferred. The
 final implementation:
 
-- bounds each Stability asset to `12` active claim assets;
+- bounds each Stability asset to `20` active claim assets while keeping
+  permissionless maintenance batches capped at `15` candidates;
 - keeps priced sub-threshold receipts in dormant mapping accounting without
   losing claim or redemption rights;
 - enforces aggregate custody against active and dormant claim liabilities;
@@ -37,6 +38,11 @@ final implementation:
   exporting `valueToShares`, `sharesToValue`, or `canActivateClaimAsset`; and
 - deploys StabilityPool at `24,239` bytes, leaving `337` bytes below EIP-170;
   AuctionHouse deploys at `24,556` bytes, leaving `20` bytes.
+
+At the cap, local-EVM regression measurements are `450,120` gas for deposit,
+`387,151` for withdrawal, `917,456` for a 15-item activation, and `6,084,361`
+for the deliberately worst bounded 15-item claim batch. These measurements are
+not production gas estimates or Robinhood gas-limit assertions.
 
 The original plan's fail-to-dormant capacity/unpriced-receipt model, broader
 ABI-removal, and always-available manual activation language is therefore

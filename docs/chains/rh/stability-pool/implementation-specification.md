@@ -20,11 +20,11 @@ The final contract and test source is bound to this checkpoint:
 
 | Field | Final value |
 | --- | --- |
-| Source/test commit | `2a4acca37e8ad0e8fb36f399adeafa77d731a9bc` |
-| Source/test tree | `acac567bc7c50bd4f635f32d050fd58cf069bfd1` |
+| Source/test commit | `3c7b1ff66e9167914cac4cff2da126e7d9964773` |
+| Source/test tree | `9f305974d293bf9c3105ff093ece3abf8dd99a58` |
 | `AuctionHouse.vy` SHA-256 | `d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f` |
 | `StabilityPool.vy` SHA-256 | `c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158` |
-| `StabVault.vy` SHA-256 | `a1552126099ff00bbc363f019f62628f08fc07f018ea22d2ac04ec596d7456df` |
+| `StabVault.vy` SHA-256 | `c551901490d7982d2cd472bc6ea000284babdc5507c3115683dd63d2c4dfcb9d` |
 | Compiler | Vyper `0.4.3` with `# pragma optimize codesize` |
 
 The final owner decisions and security corrections are:
@@ -64,15 +64,20 @@ The final owner decisions and security corrections are:
    remain outside this Stability candidate. The deterministic BlueChip ABI is
    refreshed to match that ten-argument source; no BlueChip source was restored.
 9. Tier C automatic quarantine/retirement remains deferred.
+10. The owner subsequently increased the active claim-asset cap from `12` to
+    `20`. The independent maintenance batch remains capped at `15`; no
+    production logic beyond the active-cap constant changed. The original
+    cap-`12` prescriptive text below remains historical design context and is
+    superseded by this as-built decision.
 
 Final bytecode and ABI evidence is:
 
 | Measurement | Result |
 | --- | ---: |
 | Creation bytecode | `24,528` bytes |
-| Creation SHA-256 | `9f6c6e0756ea34892dd97ccd83bb218c85954629f9c5ac797f87e3f7b807e56c` |
+| Creation SHA-256 | `ad1289f9a6853595e3c3912f6040474db15789bc2f94ce828885dfc44a16312d` |
 | Runtime template | `24,143` bytes |
-| Runtime-template SHA-256 | `470da394bd6d2619b37a1dec839e99485a077a314ed5a1a0b2c707615d9b5f5d` |
+| Runtime-template SHA-256 | `6781574b846cd6fae0a4116173be348ce133df37109cc063540aea3da70bee91` |
 | Constructor-bound immutable data | `96` bytes |
 | Deployed runtime | `24,239` bytes |
 | EIP-170 headroom | `337` bytes |
@@ -106,11 +111,20 @@ Validation completed directly on the committed source/test tree includes:
 - explicit lifecycle regressions proving priced sub-floor dormancy remains
   claimable and deposit-nonblocking, inactive unpriced receipts revert
   atomically, and full registries skip new pairs before collateral transfer;
-- a transaction gas matrix at active counts `0, 1, 2, 4, 8, 12`, proving
-  monotonic bounded deposit and withdrawal cost and a local-EVM ceiling below
-  `400,000` gas at the cap; and
+- a transaction gas matrix at active counts `0, 1, 2, 4, 8, 12, 15, 20`,
+  proving monotonic bounded deposit and withdrawal cost; at the cap the local
+  EVM measured `450,120` gas for deposit and `387,151` for withdrawal; and
 - deterministic StabilityPool ABI comparison with only the intentionally
   removed recovery event changing from the prior checked ABI.
+
+The cap-`20` delta rerun passed all `185` selected Stability Vault module and
+affected AuctionHouse edge-case tests. The deterministic ABI, artifact, and
+EIP-170 selection passed all `3` checks. Additional local-EVM measurements at
+the new ceiling were `8,013` gas for an existing-pair receipt, `313,632` for a
+15-item prune, `917,456` for a 15-item activation, `430,226` for a single
+claim, and `6,084,361` for the deliberately worst bounded 15-item claim batch.
+These are regression measurements, not production gas estimates or a claim
+about the Robinhood transaction/block gas limit.
 
 The final post-simplification affected rerun covered `tests/vaults`,
 `tests/core/auctionHouse`, and `tests/core/deleverage`: `848 passed`, `2 failed`,
