@@ -55,7 +55,7 @@ CAPACITY_CASE_STRATEGY = st.tuples(
         min_value=ACTIVATION_THRESHOLD,
         max_value=3 * EIGHTEEN_DECIMALS,
     ),
-    PRICE_STRATEGY,
+    st.integers(min_value=1, max_value=3 * 10**17),
 )
 
 
@@ -174,7 +174,6 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
         stab_address = _asset_address(alpha_token)
         expected_pairs = {}
         active_assets = []
-        material_dormant_assets = set()
         expected_num_assets = 0
         is_paused = False
 
@@ -192,32 +191,39 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
-                _record_claim(
-                    stability_pool,
-                    alpha_token,
-                    token,
-                    alice,
-                    amount,
-                    bob,
-                    auction_house,
-                    green_token,
-                    savings_green,
-                )
-                expected_pairs[pair_key] = expected_pairs.get(pair_key, 0) + amount
-                usd_value = expected_pairs[pair_key] * price // EIGHTEEN_DECIMALS
                 active_addresses = [_asset_address(asset) for asset in active_assets]
-                if (
-                    token_address not in active_addresses
-                    and usd_value >= ACTIVATION_THRESHOLD
-                ):
-                    active_assets.append(token)
-                    material_dormant_assets.discard(token_address)
-                    expected_num_assets = len(active_assets) + 1
-                elif token_address not in active_addresses:
-                    if usd_value == 0:
-                        material_dormant_assets.add(token_address)
-                    else:
-                        material_dormant_assets.discard(token_address)
+                is_active = token_address in active_addresses
+                if not is_active and price == 0:
+                    with boa.env.anchor():
+                        with boa.reverts("no price for claim asset"):
+                            _record_claim(
+                                stability_pool,
+                                alpha_token,
+                                token,
+                                alice,
+                                amount,
+                                bob,
+                                auction_house,
+                                green_token,
+                                savings_green,
+                            )
+                else:
+                    _record_claim(
+                        stability_pool,
+                        alpha_token,
+                        token,
+                        alice,
+                        amount,
+                        bob,
+                        auction_house,
+                        green_token,
+                        savings_green,
+                    )
+                    expected_pairs[pair_key] = expected_pairs.get(pair_key, 0) + amount
+                    usd_value = expected_pairs[pair_key] * price // EIGHTEEN_DECIMALS
+                    if not is_active and usd_value >= ACTIVATION_THRESHOLD:
+                        active_assets.append(token)
+                        expected_num_assets = len(active_assets) + 1
 
             elif operation == "prune":
                 stability_pool.pruneClaimableAssets(
@@ -258,14 +264,7 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     and usd_value >= ACTIVATION_THRESHOLD
                 ):
                     active_assets.append(token)
-                    material_dormant_assets.discard(token_address)
                     expected_num_assets = len(active_assets) + 1
-                elif (
-                    pair_balance != 0
-                    and token_address not in active_addresses
-                    and usd_value != 0
-                ):
-                    material_dormant_assets.discard(token_address)
 
             elif operation == "deposit":
                 if is_paused:
@@ -275,9 +274,7 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
-                # Probe the share-minting boundary without changing the model.
-                # Any material dormant pair must block the whole deposit, while
-                # known sub-floor dust remains a bounded, non-blocking exception.
+                # Capacity and bounded dormant dust do not freeze deposits.
                 deposit_amount = max(amount, 10**15)
                 with boa.env.anchor():
                     alpha_token.transfer(
@@ -285,21 +282,12 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                         deposit_amount,
                         sender=alpha_token_whale,
                     )
-                    if material_dormant_assets:
-                        with boa.reverts("material dormant claims"):
-                            stability_pool.depositTokensInVault(
-                                alice,
-                                alpha_token,
-                                deposit_amount,
-                                sender=teller.address,
-                            )
-                    else:
-                        assert stability_pool.depositTokensInVault(
-                            alice,
-                            alpha_token,
-                            deposit_amount,
-                            sender=teller.address,
-                        ) == deposit_amount
+                    assert stability_pool.depositTokensInVault(
+                        alice,
+                        alpha_token,
+                        deposit_amount,
+                        sender=teller.address,
+                    ) == deposit_amount
 
             else:
                 if is_paused:
@@ -309,8 +297,8 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
                     )
                     is_paused = False
 
-                # Material dormancy blocks only new shares. Existing holders
-                # retain the ability to exit, including while the gate is set.
+                # Existing holders retain the ability to exit through every
+                # claim-data lifecycle state.
                 with boa.env.anchor():
                     withdrawn, _ = stability_pool.withdrawTokensFromVault(
                         bob,
@@ -339,7 +327,7 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
 @given(case=CAPACITY_CASE_STRATEGY)
-def test_fuzz_capacity_dormancy_gate_activation_and_readdition(
+def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     case,
     stability_pool,
     alpha_token,
@@ -349,12 +337,11 @@ def test_fuzz_capacity_dormancy_gate_activation_and_readdition(
     alice,
     teller,
     auction_house,
-    switchboard_alpha,
     mock_price_source,
     green_token,
     savings_green,
 ):
-    candidate_amount, maintenance_price = case
+    candidate_amount, active_increment = case
 
     with boa.env.anchor():
         _seed_stability_asset(
@@ -371,7 +358,7 @@ def test_fuzz_capacity_dormancy_gate_activation_and_readdition(
                 governance,
                 alice,
                 1_100 + index,
-                ACTIVATION_THRESHOLD,
+                ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
             )
             for index in range(12)
         ]
@@ -393,9 +380,74 @@ def test_fuzz_capacity_dormancy_gate_activation_and_readdition(
             governance,
             alice,
             1_200,
-            candidate_amount + 1,
+            candidate_amount,
         )
         mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, active_tokens[0])
+        assert not stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
+
+        with boa.env.anchor():
+            with boa.reverts("max active claim assets"):
+                _record_claim(
+                    stability_pool,
+                    alpha_token,
+                    candidate,
+                    alice,
+                    candidate_amount,
+                    bob,
+                    auction_house,
+                    green_token,
+                    savings_green,
+                )
+            assert stability_pool.claimableBalances(alpha_token, candidate) == 0
+            assert stability_pool.totalClaimableBalances(candidate) == 0
+
+        assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) == 0
+        assert stability_pool.claimableBalances(alpha_token, candidate) == 0
+
+        # A full active set does not freeze deposits.
+        with boa.env.anchor():
+            alpha_token.transfer(
+                stability_pool,
+                EIGHTEEN_DECIMALS,
+                sender=alpha_token_whale,
+            )
+            assert stability_pool.depositTokensInVault(
+                alice,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            ) == EIGHTEEN_DECIMALS
+
+        # Existing active claim assets remain consumable at the cap.
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            active_tokens[0],
+            alice,
+            active_increment,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        assert stability_pool.claimableBalances(
+            alpha_token,
+            active_tokens[0],
+        ) == ACTIVATION_THRESHOLD + active_increment
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+
+        # Pruning a different active asset frees one slot for the candidate.
+        mock_price_source.setPrice(active_tokens[1], 2 * 10**17)
+        stability_pool.pruneClaimableAssets(
+            alpha_token,
+            [active_tokens[1]],
+            sender=alice,
+        )
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 11
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
+
         _record_claim(
             stability_pool,
             alpha_token,
@@ -408,93 +460,9 @@ def test_fuzz_capacity_dormancy_gate_activation_and_readdition(
             savings_green,
         )
         assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
-        assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) == 0
-        assert stability_pool.claimableBalances(alpha_token, candidate) == (
-            candidate_amount
-        )
-
-        # Capacity dormancy is material and therefore blocks new shares.
-        with boa.env.anchor():
-            alpha_token.transfer(
-                stability_pool,
-                EIGHTEEN_DECIMALS,
-                sender=alpha_token_whale,
-            )
-            with boa.reverts("material dormant claims"):
-                stability_pool.depositTokensInVault(
-                    alice,
-                    alpha_token,
-                    EIGHTEEN_DECIMALS,
-                    sender=teller.address,
-                )
-
-        # Free one slot, then fuzz the candidate's oracle state at manual
-        # maintenance. A known sub-floor value clears the material gate; an
-        # unavailable price retains it; an eligible value activates.
-        mock_price_source.setPrice(active_tokens[0], 2 * 10**17)
-        stability_pool.pruneClaimableAssets(
-            alpha_token,
-            [active_tokens[0]],
-            sender=alice,
-        )
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 11
-
-        mock_price_source.setPrice(candidate, maintenance_price)
-        stability_pool.pause(True, sender=switchboard_alpha.address)
-        stability_pool.activateClaimAssets(
-            alpha_token,
-            [candidate, candidate, ZERO_ADDRESS],
-            sender=alice,
-        )
-        candidate_value = (
-            candidate_amount * maintenance_price // EIGHTEEN_DECIMALS
-        )
-        should_be_active = candidate_value >= ACTIVATION_THRESHOLD
-        assert (
-            stability_pool.indexOfClaimableAsset(alpha_token, candidate) != 0
-        ) == should_be_active
-
-        stability_pool.pause(False, sender=switchboard_alpha.address)
-        with boa.env.anchor():
-            alpha_token.transfer(
-                stability_pool,
-                EIGHTEEN_DECIMALS,
-                sender=alpha_token_whale,
-            )
-            if maintenance_price == 0 and not should_be_active:
-                with boa.reverts("material dormant claims"):
-                    stability_pool.depositTokensInVault(
-                        alice,
-                        alpha_token,
-                        EIGHTEEN_DECIMALS,
-                        sender=teller.address,
-                    )
-            else:
-                assert stability_pool.depositTokensInVault(
-                    alice,
-                    alpha_token,
-                    EIGHTEEN_DECIMALS,
-                    sender=teller.address,
-                ) == EIGHTEEN_DECIMALS
-
-        # A later permissionless receipt with restored pricing re-adds an
-        # inactive candidate and atomically clears any remaining deposit gate.
-        mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
-        _record_claim(
-            stability_pool,
-            alpha_token,
-            candidate,
-            alice,
-            1,
-            bob,
-            auction_house,
-            green_token,
-            savings_green,
-        )
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
         assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) != 0
         assert stability_pool.claimableBalances(alpha_token, candidate) == (
-            candidate_amount + 1
+            candidate_amount
         )
 
         with boa.env.anchor():

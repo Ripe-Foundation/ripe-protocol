@@ -56,6 +56,7 @@ exports: (
     stabVault.getTotalUserValue,
     stabVault.getNumActiveClaimAssets,
     stabVault.getClaimAssetState,
+    stabVault.canAcceptLiquidationAsset,
     stabVault.pruneClaimableAssets,
     stabVault.activateClaimAssets,
 )

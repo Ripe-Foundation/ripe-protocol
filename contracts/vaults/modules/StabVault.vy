@@ -108,10 +108,6 @@ claimableAssets: public(HashMap[address, HashMap[uint256, address]]) # stab asse
 indexOfClaimableAsset: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> index
 numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claimable assets
 
-# material dormant claims gate new shares until activation or resolution
-materialDormantClaims: HashMap[address, HashMap[address, bool]] # stab asset -> claim asset -> blocks deposits
-numMaterialDormantClaims: HashMap[address, uint256] # stab asset -> num material dormant claims
-
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 12
@@ -130,8 +126,6 @@ DEACTIVATION_ZERO: constant(uint256) = 1
 DEACTIVATION_DUST: constant(uint256) = 2
 
 DORMANT_BELOW_FLOOR: constant(uint256) = 1
-DORMANT_NO_PRICE: constant(uint256) = 2
-DORMANT_CAPACITY: constant(uint256) = 3
 
 GREEN_TOKEN: immutable(address)
 SAVINGS_GREEN: immutable(address)
@@ -166,7 +160,6 @@ def _depositTokensInVault(
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
     assert _asset != _a.greenToken # dev: green cannot be stab asset
-    assert self.numMaterialDormantClaims[_asset] == 0 # dev: material dormant claims
     totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     depositAmount: uint256 = min(_amount, totalAssetBalance)
     assert depositAmount != 0 # dev: invalid deposit amount
@@ -1088,6 +1081,19 @@ def getClaimAssetState(_stabAsset: address, _claimAsset: address) -> uint256:
 
 @view
 @external
+def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool:
+    return (
+        vaultData.indexOfAsset[_stabAsset] != 0
+        and vaultData.indexOfAsset[_claimAsset] == 0
+        and (
+            self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
+            or self._getNumActiveClaimAssets(_stabAsset) < MAX_ACTIVE_CLAIM_ASSETS
+        )
+    )
+
+
+@view
+@external
 def canActivateClaimAsset(_stabAsset: address, _claimAsset: address) -> (bool, uint256, uint256):
     greenToken: address = empty(address)
     savingsGreen: address = empty(address)
@@ -1149,8 +1155,6 @@ def _maintainClaimableAssets(
 
             usdValue: uint256 = self._getUsdValue(claimAsset, pairBalance, greenToken, savingsGreen, priceDesk, False)
             if usdValue < ACTIVATION_USD_THRESHOLD:
-                if usdValue != 0:
-                    self._setMaterialDormantClaim(_stabAsset, claimAsset, False)
                 continue
 
             if self._getNumActiveClaimAssets(_stabAsset) >= MAX_ACTIVE_CLAIM_ASSETS:
@@ -1209,28 +1213,26 @@ def _addClaimableBalance(
     assert custody >= priorLiability # dev: claim custody deficit
     assert _reportedAmount <= custody - priorLiability # dev: short claim receipt
 
-    # update balances
     newPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset] + _reportedAmount
+    isActive: bool = self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
+    usdValue: uint256 = 0
+    activeCount: uint256 = 0
+    if not isActive:
+        activeCount = self._getNumActiveClaimAssets(_stabAsset)
+        assert activeCount < MAX_ACTIVE_CLAIM_ASSETS # dev: max active claim assets
+        usdValue = self._getUsdValue(_claimAsset, newPairBalance, GREEN_TOKEN, SAVINGS_GREEN, _priceDesk, False)
+        assert usdValue != 0 # dev: no price for claim asset
+
+    # update balances
     self.claimableBalances[_stabAsset][_claimAsset] = newPairBalance
     self.totalClaimableBalances[_claimAsset] = priorLiability + _reportedAmount
 
-    # already active; do not reprice or emit dormant telemetry
-    if self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
+    # already active
+    if isActive:
         return
 
-    usdValue: uint256 = self._getUsdValue(_claimAsset, newPairBalance, GREEN_TOKEN, SAVINGS_GREEN, _priceDesk, False)
-    activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
-    dormantReason: uint256 = 0
-    if usdValue == 0:
-        dormantReason = DORMANT_NO_PRICE
-    elif usdValue < ACTIVATION_USD_THRESHOLD:
-        dormantReason = DORMANT_BELOW_FLOOR
-    elif activeCount >= MAX_ACTIVE_CLAIM_ASSETS:
-        dormantReason = DORMANT_CAPACITY
-
-    if dormantReason != 0:
-        self._setMaterialDormantClaim(_stabAsset, _claimAsset, dormantReason != DORMANT_BELOW_FLOOR)
-        log ClaimAssetLeftDormant(stabAsset=_stabAsset, claimAsset=_claimAsset, balance=newPairBalance, activeCount=activeCount, reason=dormantReason)
+    if usdValue < ACTIVATION_USD_THRESHOLD:
+        log ClaimAssetLeftDormant(stabAsset=_stabAsset, claimAsset=_claimAsset, balance=newPairBalance, activeCount=activeCount, reason=DORMANT_BELOW_FLOOR)
         return
 
     self._registerClaimableAsset(_stabAsset, _claimAsset)
@@ -1243,7 +1245,6 @@ def _addClaimableBalance(
 def _registerClaimableAsset(_stabAsset: address, _assetReceived: address):
     assert self.claimableBalances[_stabAsset][_assetReceived] != 0 # dev: no claimable balance
     assert self.indexOfClaimableAsset[_stabAsset][_assetReceived] == 0 # dev: claim asset already active
-    self._setMaterialDormantClaim(_stabAsset, _assetReceived, False)
 
     cid: uint256 = self.numClaimableAssets[_stabAsset]
     if cid == 0:
@@ -1274,9 +1275,6 @@ def _reduceClaimableBalances(
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_ZERO)
         return
 
-    if _remainingUsdValue != 0 and _remainingUsdValue < ACTIVATION_USD_THRESHOLD:
-        self._setMaterialDormantClaim(_stabAsset, _claimAsset, False)
-
     # remove claimable asset if remaining USD value is dust (< $0.10) - only remove from iterable list
     if _remainingUsdValue != 0 and _remainingUsdValue < RETENTION_USD_THRESHOLD:
         self._removeClaimableAsset(_stabAsset, _claimAsset, DEACTIVATION_DUST)
@@ -1287,9 +1285,6 @@ def _reduceClaimableBalances(
 
 @internal
 def _removeClaimableAsset(_stabAsset: address, _asset: address, _reason: uint256):
-    if self.claimableBalances[_stabAsset][_asset] == 0:
-        self._setMaterialDormantClaim(_stabAsset, _asset, False)
-
     numAssets: uint256 = self.numClaimableAssets[_stabAsset]
     targetIndex: uint256 = self.indexOfClaimableAsset[_stabAsset][_asset]
     if targetIndex == 0:
@@ -1307,15 +1302,3 @@ def _removeClaimableAsset(_stabAsset: address, _asset: address, _reason: uint256
     self.indexOfClaimableAsset[_stabAsset][_asset] = 0
     self.numClaimableAssets[_stabAsset] = lastIndex
     log ClaimAssetDeactivated(stabAsset=_stabAsset, claimAsset=_asset, balance=self.claimableBalances[_stabAsset][_asset], activeCount=lastIndex - 1, reason=_reason)
-
-
-@internal
-def _setMaterialDormantClaim(_stabAsset: address, _claimAsset: address, _shouldBlock: bool):
-    if self.materialDormantClaims[_stabAsset][_claimAsset] == _shouldBlock:
-        return
-
-    self.materialDormantClaims[_stabAsset][_claimAsset] = _shouldBlock
-    if _shouldBlock:
-        self.numMaterialDormantClaims[_stabAsset] += 1
-    else:
-        self.numMaterialDormantClaims[_stabAsset] -= 1

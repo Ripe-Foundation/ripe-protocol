@@ -1531,6 +1531,27 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canAcceptLiquidationAsset",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "pruneClaimableAssets",

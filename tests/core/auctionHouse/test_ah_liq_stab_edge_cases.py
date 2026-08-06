@@ -5,6 +5,13 @@ from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs
 
 
+ACTIVATION_THRESHOLD = 25 * 10**16
+
+
+def test_auction_house_deployed_runtime_fits_eip170(auction_house):
+    assert len(boa.env.get_code(auction_house.address)) <= 24_576
+
+
 # green lp token fixture
 @pytest.fixture(scope="session")
 def green_lp_token(governance):
@@ -220,6 +227,137 @@ def test_ah_liquidation_multiple_stab_pools(
     assert logs[0].stabAsset == green_lp_token.address
     # Second should be savings_green (priority 2)
     assert logs[1].stabAsset == savings_green.address
+
+
+def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
+    setupStabAssetConfig,
+    setAssetConfig,
+    green_lp_token,
+    green_lp_token_whale,
+    savings_green,
+    alpha_token,
+    alpha_token_whale,
+    governance,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    performDeposit,
+    green_token,
+    whale,
+):
+    """A full first pair is skipped before the next configured pair is used."""
+    setupStabAssetConfig()
+
+    debt_terms = createDebtTerms(
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    # Seed both configured stability assets. The first pair needs a small
+    # balance for the direct receipts that fill its active claim registry.
+    glp_deposit = EIGHTEEN_DECIMALS
+    green_lp_token.transfer(sally, glp_deposit, sender=green_lp_token_whale)
+    green_lp_token.approve(teller, glp_deposit, sender=sally)
+    teller.deposit(
+        green_lp_token,
+        glp_deposit,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+
+    sgreen_deposit = 200 * EIGHTEEN_DECIMALS
+    green_token.mint(sally, sgreen_deposit, sender=credit_engine.address)
+    green_token.approve(savings_green, sgreen_deposit, sender=sally)
+    sgreen_shares = savings_green.deposit(sgreen_deposit, sally, sender=sally)
+    savings_green.approve(teller, sgreen_shares, sender=sally)
+    teller.deposit(
+        savings_green,
+        sgreen_shares,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+
+    for index in range(12):
+        claim_asset = boa.load(
+            "contracts/mock/MockErc20.vy",
+            governance,
+            f"Capacity Claim {index}",
+            f"CC{index}",
+            18,
+            0,
+            name=f"capacity_claim_{index}",
+        )
+        claim_asset.mint(alice, ACTIVATION_THRESHOLD, sender=governance.address)
+        mock_price_source.setPrice(claim_asset, EIGHTEEN_DECIMALS)
+        claim_asset.transfer(
+            stability_pool,
+            ACTIVATION_THRESHOLD,
+            sender=alice,
+        )
+        stability_pool.swapForLiquidatedCollateral(
+            green_lp_token,
+            1,
+            claim_asset,
+            ACTIVATION_THRESHOLD,
+            bob,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+
+    assert stability_pool.getNumActiveClaimAssets(green_lp_token) == 12
+    assert not stability_pool.canAcceptLiquidationAsset(
+        green_lp_token,
+        alpha_token,
+    )
+    assert not stability_pool.canAcceptLiquidationAsset(
+        green_lp_token,
+        savings_green,
+    )
+    assert stability_pool.canAcceptLiquidationAsset(savings_green, alpha_token)
+
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    bob_green = green_token.balanceOf(bob)
+    green_token.transfer(whale, bob_green, sender=bob)
+
+    mock_price_source.setPrice(
+        alpha_token,
+        125 * EIGHTEEN_DECIMALS // 200,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    logs = filter_logs(teller, "CollateralSwappedWithStabPool")
+    assert len(logs) == 1
+    assert logs[0].stabAsset == savings_green.address
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
 
 
 def test_ah_liquidation_zero_price(
