@@ -308,7 +308,7 @@ def test_stab_vault_redemptions_green_token_restriction(
     setAssetConfig,
     whale,
 ):
-    """Test redemption restrictions when green token is a stability pool asset"""
+    """GREEN cannot be registered as a Stability asset."""
     setGeneralConfig()
     setAssetConfig(green_token)
     setAssetConfig(alpha_token)
@@ -320,32 +320,17 @@ def test_stab_vault_redemptions_green_token_restriction(
     mock_price_source.setPrice(green_token, price)
     mock_price_source.setPrice(charlie_token, price)
 
-    # First, deposit green token as a stability asset
+    # Deposit is rejected before GREEN can enter the Stability-asset registry.
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    green_token.transfer(stability_pool, deposit_amount, sender=whale)
-    stability_pool.depositTokensInVault(alice, green_token, deposit_amount, sender=teller.address)
-
-    # Also deposit another asset (making green NOT the only asset)
-    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
-    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
-
-    # Create claimable alpha tokens
-    charlie_amount = 100 * (10 ** charlie_token.decimals())
-    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
-    stability_pool.swapForLiquidatedCollateral(
-        green_token, deposit_amount, charlie_token, charlie_amount,
-        ZERO_ADDRESS, green_token, savings_green, sender=auction_house.address
-    )
-
-    vault_id = vault_book.getRegId(stability_pool)
-
-    # Try to redeem - should fail because green is a stab asset but not the ONLY asset
-    redeem_amount = 50 * EIGHTEEN_DECIMALS
-    green_token.transfer(bob, redeem_amount, sender=whale)
-    green_token.approve(teller, redeem_amount, sender=bob)
-    
-    with boa.reverts("redemptions not allowed"):
-        redeem_from_stability_pool(teller, vault_id, charlie_token, redeem_amount, bob, sender=bob)
+    with boa.reverts("green cannot be stab asset"):
+        stability_pool.depositTokensInVault(
+            alice,
+            green_token,
+            deposit_amount,
+            sender=teller.address,
+        )
+    assert stability_pool.indexOfAsset(green_token) == 0
+    assert stability_pool.userBalances(alice, green_token) == 0
 
 
 def test_stab_vault_redemptions_price_oracle_zero(
@@ -2024,8 +2009,8 @@ def test_stab_vault_redemptions_dust_removal_below_threshold(
     alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
     stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
 
-    # Add claimable assets - $0.15 worth (just above threshold)
-    claimable_amount = 15 * 10 ** 16  # 0.15 tokens at $1 = $0.15
+    # Add an active $0.30 balance.
+    claimable_amount = 30 * 10 ** 16
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token, deposit_amount, bravo_token, claimable_amount,
@@ -2038,8 +2023,8 @@ def test_stab_vault_redemptions_dust_removal_below_threshold(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Redeem enough to leave < $0.10 ($0.06 redemption, leaves $0.09)
-    redeem_amount = 6 * 10 ** 16  # $0.06
+    # Redeem $0.21, leaving $0.09.
+    redeem_amount = 21 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)
@@ -2344,9 +2329,9 @@ def test_stab_vault_redemptions_dust_multiple_stab_assets(
     charlie_token.transfer(stability_pool, charlie_deposit, sender=charlie_token_whale)
     stability_pool.depositTokensInVault(sally, charlie_token, charlie_deposit, sender=teller.address)
 
-    # Create bravo claimable for both - small amounts
-    bravo_for_alpha = 15 * 10 ** 16  # $0.15
-    bravo_for_charlie = 15 * 10 ** 16  # $0.15
+    # Create active $0.30 bravo balances for both Stability assets.
+    bravo_for_alpha = 30 * 10 ** 16
+    bravo_for_charlie = 30 * 10 ** 16
 
     bravo_token.transfer(stability_pool, bravo_for_alpha, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
@@ -2368,8 +2353,8 @@ def test_stab_vault_redemptions_dust_multiple_stab_assets(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Redeem $0.12 total - should leave dust in both
-    redeem_amount = 12 * 10 ** 16
+    # Redeem $0.21 so the first pair retains $0.09 dormant dust.
+    redeem_amount = 21 * 10 ** 16
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, bob, sender=bob)

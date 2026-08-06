@@ -52,6 +52,7 @@ interface MissionControl:
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def preferredStabVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface Teller:
@@ -716,7 +717,7 @@ def _getUserBorrowTerms(
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
-        if vaultAddr == empty(address):
+        if vaultId == STABILITY_POOL_ID or vaultAddr == empty(address): # stability positions are never collateral
             continue
 
         # iterate thru each user asset
@@ -727,7 +728,7 @@ def _getUserBorrowTerms(
             asset: address = empty(address)
             amount: uint256 = 0
             asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
-            if asset == empty(address) or amount == 0:
+            if asset == empty(address):
                 continue
 
             # debt terms
@@ -738,7 +739,9 @@ def _getUserBorrowTerms(
                 continue
 
             # collateral value, max debt
-            collateralVal: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
+            collateralVal: uint256 = 0
+            if amount != 0:
+                collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # need to return some debt terms, even if not getting any price
@@ -1203,8 +1206,10 @@ def _handleGreenForUser(
 
         # put sGREEN into stability pool
         if _shouldEnterStabPool:
+            preferredStabVaultId: uint256 = staticcall MissionControl(_a.missionControl).preferredStabVaultId()
+            assert preferredStabVaultId != 0 # dev: invalid vault id
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, sGreenAmount, default_return_value=True) # dev: sgreen approval failed
-            extcall Teller(_a.teller).depositFromTrusted(_recipient, STABILITY_POOL_ID, _a.savingsGreen, sGreenAmount, 0, _a)
+            extcall Teller(_a.teller).depositFromTrusted(_recipient, preferredStabVaultId, _a.savingsGreen, sGreenAmount, 0, _a)
             assert extcall IERC20(_a.savingsGreen).approve(_a.teller, 0, default_return_value=True) # dev: sgreen approval failed
 
     else:
@@ -1312,4 +1317,4 @@ def setBuybackRatio(_ratio: uint256):
 ########  ##     ## ########  ########  ##     ## ##  ##  ## 
 ##     ## ##     ## ##   ##   ##   ##   ##     ## ##  ##  ## 
 ##     ## ##     ## ##    ##  ##    ##  ##     ## ##  ##  ## 
-########   #######  ##     ## ##     ##  #######   ###  ###  
+########   #######  ##     ## ##     ##  #######   ###  ###

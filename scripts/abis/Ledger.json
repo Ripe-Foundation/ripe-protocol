@@ -1689,6 +1689,18 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "ACTION_BLOCK_SOURCE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "lastTouch",
     "inputs": [
       {
@@ -2476,6 +2488,10 @@
       },
       {
         "name": "_defaults",
+        "type": "address"
+      },
+      {
+        "name": "_actionBlockSource",
         "type": "address"
       }
     ],

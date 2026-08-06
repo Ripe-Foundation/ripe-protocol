@@ -1,4 +1,13 @@
-from config.BluePrint import PARAMS, ADDYS, CURVE_PARAMS, CORE_TOKENS, YIELD_TOKENS
+from config.BluePrint import (
+    ADDYS,
+    CORE_TOKENS,
+    CURVE_PARAMS,
+    PARAMS,
+    ROBINHOOD_ADDRESS_STATUS,
+    ROBINHOOD_DEFAULTS_CONSTRUCTOR,
+    SymbolicBinding,
+    YIELD_TOKENS,
+)
 
 
 class BluePrint:
@@ -10,6 +19,25 @@ class BluePrint:
         self.CORE_TOKENS = CORE_TOKENS[blueprint]
         self.YIELD_TOKENS = YIELD_TOKENS[blueprint]
 
+    def defaults_robinhood_constructor_args(self):
+        """Return the eight ordered inputs, failing on unresolved identities."""
+        if self.blueprint != "robinhood":
+            raise ValueError("DefaultsRobinhood constructor is Robinhood-only")
+        values = []
+        for semantic_name, key in ROBINHOOD_DEFAULTS_CONSTRUCTOR:
+            value = self.ADDYS[key]
+            status = ROBINHOOD_ADDRESS_STATUS[key]
+            if isinstance(value, SymbolicBinding):
+                raise ValueError(
+                    f"RH_DEPLOYMENT_BINDING_UNRESOLVED:{semantic_name}:{key}"
+                )
+            if status.endswith("unverified"):
+                raise ValueError(
+                    f"RH_EXTERNAL_FACT_UNVERIFIED:{semantic_name}:{key}"
+                )
+            values.append(value)
+        return tuple(values)
+
 
 class DeployArgs:
     def __init__(self, sender, chain, ignore_logs, blueprint, rpc):
@@ -18,6 +46,10 @@ class DeployArgs:
         self.ignore_logs = ignore_logs
         self.blueprint = BluePrint(blueprint)
         self.rpc = rpc
+        # Installed only by the post-gate Robinhood execution branch.
+        self.robinhood_execution_plan = None
+        self.robinhood_repository_root = None
+        self.robinhood_stage_executor = None
 
 
 class LegoType:

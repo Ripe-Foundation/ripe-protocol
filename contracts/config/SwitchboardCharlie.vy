@@ -38,12 +38,25 @@ interface Lootbox:
 interface MissionControl:
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def setTrainingWheels(_trainingWheels: address): nonpayable
+    def setPreferredStabVaultId(_vaultId: uint256): nonpayable
+    def setCoreRipeGovVaultId(_vaultId: uint256): nonpayable
     def deregisterAsset(_asset: address) -> bool: nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+
+interface RipeGovVault:
+    def totalGovPoints() -> uint256: view
+    def isPaused() -> bool: view
+
+interface StabilityPool:
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def isPaused() -> bool: view
 
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -74,6 +87,7 @@ interface VaultData:
     def deregisterVaultAsset(_asset: address) -> bool: nonpayable
 
 interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_vaultId: uint256) -> address: view
 
 interface RipeHq:
@@ -94,6 +108,8 @@ flag ActionType:
     DEREGISTER_VAULT_ASSET
     SET_USER_CONFIG
     SET_USER_DELEGATION
+    CORE_RIPE_GOV_VAULT
+    PREFERRED_STAB_VAULT
 
 flag AssetFlag:
     CAN_DEPOSIT
@@ -376,6 +392,30 @@ event UserDelegationSet:
     delegate: indexed(address)
     caller: indexed(address)
 
+event PendingCoreRipeGovVaultIdChange:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event CoreRipeGovVaultIdSet:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+
+event PendingPreferredStabVaultIdChange:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PreferredStabVaultIdSet:
+    previousVaultId: uint256
+    newVaultId: uint256
+    newVaultAddr: address
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingRecoverFundsActions: public(HashMap[uint256, RecoverFundsAction])
@@ -393,6 +433,8 @@ pendingDeregisterAsset: public(HashMap[uint256, address])
 pendingDeregisterVaultAsset: public(HashMap[uint256, DeregisterVaultAssetAction])
 pendingUserConfig: public(HashMap[uint256, UserConfigAction])
 pendingUserDelegation: public(HashMap[uint256, UserDelegationAction])
+pendingCoreRipeGovVaultId: public(HashMap[uint256, uint256])
+pendingPreferredStabVaultId: public(HashMap[uint256, uint256])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
@@ -400,6 +442,8 @@ MAX_TRAINING_WHEEL_ACCESS: constant(uint256) = 25
 MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 
+SAVINGS_GREEN_ID: constant(uint256) = 2
+RIPE_TOKEN_ID: constant(uint256) = 3
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 SWITCHBOARD_ID: constant(uint256) = 6
@@ -480,6 +524,101 @@ def _getVaultBookAddr() -> address:
 @internal
 def _getLedgerAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+##########################
+# Core Vault ID Pointers #
+##########################
+
+
+@view
+@internal
+def _validateCoreRipeGovVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    ripeToken: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_TOKEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, ripeToken) # dev: unsupported asset
+    na: uint256 = staticcall RipeGovVault(vaultAddr).totalGovPoints()
+    assert not staticcall RipeGovVault(vaultAddr).isPaused() # dev: vault paused
+    return vaultAddr, previousVaultId
+
+
+@view
+@internal
+def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
+    na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
+    assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
+    return vaultAddr, previousVaultId
+
+
+@external
+def setCoreRipeGovVaultId(
+    _newVaultId: uint256,
+    _missionControl: address = empty(address),
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    mc: address = self._resolveMissionControl(_missionControl)
+    newVaultAddr: address = empty(address)
+    previousVaultId: uint256 = 0
+    newVaultAddr, previousVaultId = self._validateCoreRipeGovVaultId(_newVaultId, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.CORE_RIPE_GOV_VAULT
+    self.pendingCoreRipeGovVaultId[aid] = _newVaultId
+    self.pendingMissionControl[aid] = mc
+    log PendingCoreRipeGovVaultIdChange(
+        previousVaultId=previousVaultId,
+        newVaultId=_newVaultId,
+        newVaultAddr=newVaultAddr,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setPreferredStabVaultId(
+    _newVaultId: uint256,
+    _missionControl: address = empty(address),
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    mc: address = self._resolveMissionControl(_missionControl)
+    newVaultAddr: address = empty(address)
+    previousVaultId: uint256 = 0
+    newVaultAddr, previousVaultId = self._validatePreferredStabVaultId(_newVaultId, mc)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.PREFERRED_STAB_VAULT
+    self.pendingPreferredStabVaultId[aid] = _newVaultId
+    self.pendingMissionControl[aid] = mc
+    log PendingPreferredStabVaultIdChange(
+        previousVaultId=previousVaultId,
+        newVaultId=_newVaultId,
+        newVaultAddr=newVaultAddr,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
 
 
 #################
@@ -1037,6 +1176,28 @@ def executePendingAction(_aid: uint256) -> bool:
             mc = self._getMissionControlAddr()
         extcall MissionControl(mc).setTrainingWheels(p)
         log TrainingWheelsSet(trainingWheels=p)
+
+    elif actionType == ActionType.CORE_RIPE_GOV_VAULT:
+        newVaultId: uint256 = self.pendingCoreRipeGovVaultId[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        newVaultAddr: address = empty(address)
+        previousVaultId: uint256 = 0
+        newVaultAddr, previousVaultId = self._validateCoreRipeGovVaultId(newVaultId, mc)
+        extcall MissionControl(mc).setCoreRipeGovVaultId(newVaultId)
+        log CoreRipeGovVaultIdSet(previousVaultId=previousVaultId, newVaultId=newVaultId, newVaultAddr=newVaultAddr)
+
+    elif actionType == ActionType.PREFERRED_STAB_VAULT:
+        newVaultId: uint256 = self.pendingPreferredStabVaultId[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        newVaultAddr: address = empty(address)
+        previousVaultId: uint256 = 0
+        newVaultAddr, previousVaultId = self._validatePreferredStabVaultId(newVaultId, mc)
+        extcall MissionControl(mc).setPreferredStabVaultId(newVaultId)
+        log PreferredStabVaultIdSet(previousVaultId=previousVaultId, newVaultId=newVaultId, newVaultAddr=newVaultAddr)
 
     elif actionType == ActionType.DEREGISTER_ASSET:
         asset: address = self.pendingDeregisterAsset[_aid]

@@ -61,6 +61,15 @@ def isMetaMorpho(_vault: address) -> bool:
     return True
 
 
+# morpho vaults v2
+
+
+@view
+@external
+def isVaultV2(_vault: address) -> bool:
+    return _vault in self.assets
+
+
 # sky
 
 

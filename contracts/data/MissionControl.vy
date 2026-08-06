@@ -193,6 +193,8 @@ rewardsConfig: public(cs.RipeRewardsConfig)
 totalPointsAllocs: public(TotalPointsAllocs)
 
 # vault cs
+coreRipeGovVaultId: public(uint256)
+preferredStabVaultId: public(uint256)
 ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs
 priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
@@ -389,6 +391,26 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
 ################
 # Vault Config #
 ################
+
+
+# core ripe gov vault id
+
+
+@external
+def setCoreRipeGovVaultId(_vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _vaultId != 0 # dev: invalid vault id
+    self.coreRipeGovVaultId = _vaultId
+
+
+# preferred stability pool vault id
+
+
+@external
+def setPreferredStabVaultId(_vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _vaultId != 0 # dev: invalid vault id
+    self.preferredStabVaultId = _vaultId
 
 
 # ripe gov vault

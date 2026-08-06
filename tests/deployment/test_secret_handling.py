@@ -1,0 +1,584 @@
+from __future__ import annotations
+
+import ast
+import os
+import socket
+import subprocess
+from contextlib import contextmanager
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import requests
+
+from config.network_profiles import (
+    NetworkProfileError,
+    Operation,
+    RedactedRpc,
+    VerifiedNetworkIdentity,
+    get_profile,
+    resolve_rpc_reference,
+    verify_chain_identity,
+)
+from scripts import console, migrate, verify
+from scripts.utils import migration_helpers
+from scripts.utils.migration_runner import MigrationError
+
+
+ROOT = Path(__file__).resolve().parents[2]
+PYTHON = Path(__import__("sys").executable)
+RELEVANT_ENV = (
+    "BASESCAN_API_KEY",
+    "ETHERSCAN_API_KEY",
+    "WEB3_ALCHEMY_API_KEY",
+    "BASE_MAINNET_RPC_URL",
+    "BASE_SEPOLIA_RPC_URL",
+    "ROBINHOOD_MAINNET_RPC_URL",
+    "ROBINHOOD_TESTNET_RPC_URL",
+    "DEPLOYER_PRIVATE_KEY",
+    "TEST_PRIVATE_KEY",
+)
+_PUBLIC_ANVIL_TEST_KEY = (
+    "0x"
+    "ac0974bec39a17e36ba4a6b4d238ff944"
+    "bacb478cbed5efcae784d7bf4f2ff80"
+)
+_SENSITIVE_RPC = (
+    "https://synthetic-user:synthetic-password@rpc.invalid.example/"
+    "path-token?api_key=query-token#fragment-token"
+)
+
+
+@pytest.fixture(scope="session")
+def ripe_hq():
+    yield None
+
+
+@pytest.fixture(autouse=True)
+def isolated_environment_and_network(monkeypatch):
+    for name in RELEVANT_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+    def blocked(*args, **kwargs):
+        raise AssertionError("external networking is disabled")
+
+    monkeypatch.setattr(socket, "create_connection", blocked)
+    monkeypatch.setattr(requests.sessions.Session, "request", blocked)
+
+
+class SpyEnvironment(dict):
+    def __init__(self, values=()):
+        super().__init__(values)
+        self.accesses = []
+
+    def __getitem__(self, name):
+        self.accesses.append(name)
+        return super().__getitem__(name)
+
+    def __contains__(self, name):
+        self.accesses.append(name)
+        return super().__contains__(name)
+
+    def get(self, name, default=None):
+        self.accesses.append(name)
+        return super().get(name, default)
+
+    def setdefault(self, name, default=None):
+        self.accesses.append(name)
+        return super().setdefault(name, default)
+
+    def copy(self):
+        self.accesses.append("<copy>")
+        return super().copy()
+
+
+def _child_environment():
+    return {
+        "PATH": os.defpath,
+        "PYTHONPATH": str(ROOT),
+    }
+
+
+def _run_child(*args):
+    return subprocess.run(
+        [str(PYTHON), *args],
+        cwd=ROOT,
+        env=_child_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _verified(profile_id, operation):
+    profile = get_profile(profile_id)
+    assert profile.identity.chain_id is not None
+    return VerifiedNetworkIdentity(
+        profile_id,
+        operation,
+        profile.identity.chain_id,
+        profile.identity.chain_id,
+    )
+
+
+def test_spy_environment_records_common_read_paths():
+    environment = SpyEnvironment({"KEY": "value"})
+    assert environment["KEY"] == "value"
+    assert environment.get("KEY") == "value"
+    assert "KEY" in environment
+    assert environment.setdefault("OTHER", "default") == "default"
+    assert environment.copy()["KEY"] == "value"
+    assert environment.accesses == [
+        "KEY",
+        "KEY",
+        "KEY",
+        "OTHER",
+        "<copy>",
+    ]
+
+
+def _call_migrate(**overrides):
+    values = {
+        "ask": False,
+        "safe": "",
+        "fork": True,
+        "is_retry": False,
+        "rpc": "https://rpc.invalid.example",
+        "single": False,
+        "environment": "v1",
+        "start_timestamp": "0",
+        "end_timestamp": "0",
+        "profile_id": "base-mainnet",
+        "blueprint": None,
+        "account": "DEPLOYER",
+        "ledger": -1,
+    }
+    values.update(overrides)
+    return migrate.cli.callback(**values)
+
+
+def _prepare_migration_execution(monkeypatch, run):
+    sender = SimpleNamespace(
+        address="0x0000000000000000000000000000000000000001"
+    )
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(migrate, "get_account", lambda *args: sender)
+    monkeypatch.setattr(migrate, "load_vyper_files", lambda: {})
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: SimpleNamespace(run=run),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "DeploymentsDB",
+        lambda *args: object(),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "set_deployments_db",
+        lambda *args: None,
+    )
+
+    @contextmanager
+    def fake_fork(rpc_url, **kwargs):
+        assert rpc_url == _SENSITIVE_RPC
+        yield SimpleNamespace(set_balance=lambda *args: None)
+
+    monkeypatch.setattr(migrate.boa, "fork", fake_fork)
+
+
+@pytest.mark.parametrize(
+    "module",
+    (
+        "config.network_profiles",
+        "scripts.migrate",
+        "scripts.console",
+        "scripts.verify",
+        "scripts.utils.migration_helpers",
+    ),
+)
+def test_h02_modules_import_without_relevant_env(module):
+    result = _run_child("-c", f"import {module}")
+    assert result.returncode == 0, result.stderr
+
+
+def test_rpc_env_read_only_for_required_operation():
+    blocked_environment = SpyEnvironment(
+        {"ROBINHOOD_MAINNET_RPC_URL": "https://rpc.invalid.example"}
+    )
+    with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
+        resolve_rpc_reference(
+            get_profile("robinhood-mainnet"),
+            # MIGRATION_LIVE is owner-approved now; CONSOLE_EVIDENCE is the
+            # remaining blocked operation that still requires RPC.
+            Operation.CONSOLE_EVIDENCE,
+            blocked_environment,
+        )
+    assert blocked_environment.accesses == []
+
+    required_environment = SpyEnvironment(
+        {"BASE_MAINNET_RPC_URL": "https://rpc.invalid.example"}
+    )
+    rpc = resolve_rpc_reference(
+        get_profile("base-mainnet"),
+        Operation.MIGRATION_FORK,
+        required_environment,
+    )
+    assert required_environment.accesses == ["BASE_MAINNET_RPC_URL"]
+    assert rpc.reference == "BASE_MAINNET_RPC_URL"
+
+
+@pytest.mark.parametrize("explicit_rpc", ("", "not-a-valid-rpc"))
+def test_invalid_explicit_rpc_never_reads_environment(explicit_rpc):
+    environment = SpyEnvironment(
+        {"BASE_MAINNET_RPC_URL": "https://fallback.invalid.example"}
+    )
+    with pytest.raises(NetworkProfileError, match="H02_RPC_INVALID"):
+        resolve_rpc_reference(
+            get_profile("base-mainnet"),
+            Operation.MIGRATION_FORK,
+            environment,
+            explicit_rpc=explicit_rpc,
+        )
+    assert environment.accesses == []
+
+
+def test_missing_rpc_env_fails_lazily():
+    environment = SpyEnvironment()
+    with pytest.raises(NetworkProfileError, match="H02_RPC_ENV_MISSING"):
+        resolve_rpc_reference(
+            get_profile("base-mainnet"),
+            Operation.MIGRATION_FORK,
+            environment,
+        )
+    assert environment.accesses == ["BASE_MAINNET_RPC_URL"]
+
+
+def test_missing_private_key_never_uses_public_fallback(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: calls.append(value),
+    )
+    with pytest.raises(NetworkProfileError, match="H02_PRIVATE_KEY_MISSING"):
+        migration_helpers.get_account(
+            "DEPLOYER",
+            _verified("base-mainnet", Operation.MIGRATION_FORK),
+            Operation.MIGRATION_FORK,
+            environ=SpyEnvironment(),
+        )
+    assert calls == []
+
+
+def test_public_local_key_is_test_only():
+    occurrences = []
+    # This scanner intentionally searches for the one contiguous production
+    # hazard; this test's fixture is split so it cannot itself satisfy the scan.
+    for directory in (ROOT / "config", ROOT / "scripts", ROOT / "tests"):
+        for path in directory.rglob("*.py"):
+            if _PUBLIC_ANVIL_TEST_KEY in path.read_text():
+                occurrences.append(path.relative_to(ROOT))
+    assert occurrences == [Path("tests/tokens/test_signatures.py")]
+
+    for directory in (ROOT / "config", ROOT / "scripts"):
+        for path in directory.rglob("*.py"):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    assert "tests.deployment.test_secret_handling" not in (
+                        ast.unparse(node)
+                    )
+
+
+def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
+    loaded = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: loaded.append(value) or object(),
+    )
+    local_identity = VerifiedNetworkIdentity(
+        "local", Operation.LOCAL_RUNTIME, 31337, 31337
+    )
+    account = migration_helpers.get_account(
+        "LOCAL_TEST",
+        local_identity,
+        Operation.LOCAL_RUNTIME,
+        private_key=_PUBLIC_ANVIL_TEST_KEY,
+        local_test_only=True,
+    )
+    assert account is not None
+    assert loaded == [_PUBLIC_ANVIL_TEST_KEY]
+
+
+@pytest.mark.parametrize(
+    ("identity", "operation", "error_code"),
+    (
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 8453, 8453
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
+            ),
+            Operation.MIGRATION_LIVE,
+            # Base live is supported again, so the rejection reason is now the
+            # account backend rather than the operation. The guarantee under
+            # test is unchanged: a local test key is refused and never loaded.
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+    ),
+)
+def test_injected_local_test_account_rejected_for_live_or_fork(
+    identity, operation, error_code, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: calls.append(value),
+    )
+    with pytest.raises(NetworkProfileError, match=error_code):
+        migration_helpers.get_account(
+            "LOCAL_TEST",
+            identity,
+            operation,
+            private_key=_PUBLIC_ANVIL_TEST_KEY,
+            local_test_only=True,
+        )
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("identity", "operation", "error_code"),
+    (
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 8453, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "unknown-profile", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_PROFILE_UNKNOWN",
+        ),
+        (
+            # MIGRATION_FORK is owner-approved for Robinhood now. CONSOLE_EVIDENCE
+            # is the remaining blocked operation, so identity validation still has
+            # a blocked case to precede key access for.
+            VerifiedNetworkIdentity(
+                "robinhood-mainnet",
+                Operation.CONSOLE_EVIDENCE,
+                4663,
+                4663,
+            ),
+            Operation.CONSOLE_EVIDENCE,
+            "H02_OPERATION_BLOCKED",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet",
+                Operation.REPOSITORY_READ,
+                8453,
+                8453,
+            ),
+            Operation.REPOSITORY_READ,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+    ),
+)
+def test_account_identity_validation_precedes_key_access(
+    identity, operation, error_code, monkeypatch
+):
+    environment = SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "not-read"})
+    account_calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: account_calls.append(value),
+    )
+
+    with pytest.raises(NetworkProfileError, match=error_code):
+        migration_helpers.get_account(
+            "DEPLOYER",
+            identity,
+            operation,
+            environ=environment,
+        )
+
+    assert environment.accesses == []
+    assert account_calls == []
+
+
+def test_console_wrong_chain_prevents_manifest_and_fork(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        console, "read_chain_id", lambda value: events.append("chain") or 1
+    )
+    monkeypatch.setattr(
+        console,
+        "Console",
+        lambda *args, **kwargs: events.append("manifest"),
+    )
+    monkeypatch.setattr(
+        console.boa,
+        "fork",
+        lambda *args, **kwargs: events.append("fork"),
+    )
+    with pytest.raises(Exception) as captured:
+        console.main.callback(
+            "base-mainnet",
+            None,
+            None,
+            "https://rpc.invalid.example",
+            "",
+            None,
+            False,
+        )
+    assert "H02_CHAIN_ID_MISMATCH" in str(captured.value)
+    assert events == ["chain"]
+
+
+def test_rpc_components_never_appear_in_logs_exceptions_or_repr():
+    profile = get_profile("base-mainnet")
+    operation = Operation.MIGRATION_FORK
+    rpc = RedactedRpc(_SENSITIVE_RPC, "base-mainnet", operation, "--rpc")
+
+    with pytest.raises(NetworkProfileError) as captured:
+        verify_chain_identity(
+            profile,
+            operation,
+            rpc,
+            lambda value: (_ for _ in ()).throw(RuntimeError(value)),
+        )
+    rendered = f"{rpc} {rpc!r} {captured.value} {captured.value!r}"
+    for component in (
+        _SENSITIVE_RPC,
+        "synthetic-user",
+        "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+def test_execute_transaction_failure_never_logs_exception_text(capsys):
+    failure_text = f"synthetic provider failure {_SENSITIVE_RPC}"
+
+    def fail():
+        raise RuntimeError(failure_text)
+
+    result = migration_helpers.execute_transaction(fail, no_retry=True)
+    rendered = capsys.readouterr().out
+
+    assert result is None
+    assert "H02_TRANSACTION_FAILED" in rendered
+    assert failure_text not in rendered
+    assert "synthetic provider failure" not in rendered
+    for component in (
+        _SENSITIVE_RPC,
+        "synthetic-user",
+        "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+def test_explorer_key_is_not_read_at_import_or_help():
+    for module in ("scripts.migrate", "scripts.console", "scripts.verify"):
+        result = _run_child("-m", module, "--help")
+        assert result.returncode == 0, result.stderr
+        assert "KeyError" not in result.stderr
+
+
+def test_unsupported_verifier_does_not_read_key(monkeypatch):
+    environment = SpyEnvironment(
+        {"ETHERSCAN_API_KEY": "synthetic-explorer-value"}
+    )
+    monkeypatch.setattr(os, "environ", environment)
+    with pytest.raises(Exception) as captured:
+        verify.cli.callback("base-mainnet", None, "current")
+    rendered = f"{captured.value} {captured.value!r}"
+    assert "H02_VERIFIER_BLOCKED" in rendered
+    assert environment.accesses == []
+
+
+def test_dotenv_is_not_loaded_by_h02_modules():
+    result = _run_child(
+        "-c",
+        (
+            "import dotenv\n"
+            "def fail(*args, **kwargs):\n"
+            "    raise AssertionError('dotenv loader called')\n"
+            "dotenv.load_dotenv = fail\n"
+            "import config.network_profiles\n"
+            "import scripts.migrate\n"
+            "import scripts.console\n"
+            "import scripts.verify\n"
+            "import scripts.utils.migration_helpers\n"
+        ),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
+    monkeypatch.setattr(console, "read_chain_id", lambda value: 8453)
+    fake_console = SimpleNamespace(
+        _profile_id="base-mainnet",
+        _mode="local exploration",
+        _manifest={},
+        c=object(),
+    )
+    monkeypatch.setattr(console, "Console", lambda *args: fake_console)
+
+    @contextmanager
+    def fake_fork(rpc_url, **kwargs):
+        yield SimpleNamespace()
+
+    monkeypatch.setattr(console.boa, "fork", fake_fork)
+
+    IPython = pytest.importorskip("IPython")
+
+    def fail_session(*args, **kwargs):
+        raise RuntimeError("synthetic session failure")
+
+    monkeypatch.setattr(IPython, "embed", fail_session)
+    with pytest.raises(
+        RuntimeError, match="synthetic session failure"
+    ) as error:
+        console.main.callback(
+            "base-mainnet",
+            None,
+            None,
+            "https://rpc.invalid.example",
+            "",
+            None,
+            False,
+        )
+    assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
+
+
+# Safe and Ledger are approved backends for Base on their own, so neither is
+# rejected in isolation any more. Requesting BOTH is still unapproved, and it is
+# rejected on the same path with the same code -- which is what this test is
+# actually about: an unapproved backend never reaches a chain read or a secret.

@@ -1,9 +1,32 @@
+from hashlib import sha256
+from pathlib import Path
+
 import boa
 
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import buy_fungible_auction, filter_logs
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
+
+
+def test_auction_house_source_abi_and_vault_interface_are_frozen():
+    """The current backing-aware consumer source keeps its public boundaries exact."""
+
+    repo_root = Path(__file__).resolve().parents[3]
+    expected = {
+        "contracts/core/AuctionHouse.vy": (
+            "d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f"
+        ),
+        "scripts/abis/AuctionHouse.json": (
+            "97b39517f9b527e4bcdf9dc50b4f418d4036367e5f3f4d62a0ffdd68d29ee276"
+        ),
+        "interfaces/Vault.vyi": (
+            "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"
+        ),
+    }
+
+    for path, expected_digest in expected.items():
+        assert sha256((repo_root / path).read_bytes()).hexdigest() == expected_digest
 
 
 def test_ah_liquidation_auction_creation(

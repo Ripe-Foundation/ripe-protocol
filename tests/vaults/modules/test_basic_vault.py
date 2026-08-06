@@ -32,8 +32,14 @@ def test_basic_vault_deposit_validation(
     large_amount = 1000000 * EIGHTEEN_DECIMALS
     small_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(simple_erc20_vault, small_amount, sender=alpha_token_whale)
-    deposited = simple_erc20_vault.depositTokensInVault(bob, alpha_token, large_amount, sender=teller.address)
-    assert deposited == small_amount  # Should only deposit what's available
+    with boa.reverts("insufficient vault backing"):
+        simple_erc20_vault.depositTokensInVault(
+            bob,
+            alpha_token,
+            large_amount,
+            sender=teller.address,
+        )
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
 
 
 def test_basic_vault_withdrawal_validation(
@@ -157,4 +163,4 @@ def test_basic_vault_utility_functions(
     # Test getUserAssetAtIndexAndHasBalance
     asset, has_balance = simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1)
     assert asset == alpha_token.address
-    assert has_balance 
+    assert has_balance
