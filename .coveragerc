@@ -1,0 +1,13 @@
+[run]
+plugins = boa.coverage
+branch = True
+
+[report]
+show_missing = True
+precision = 1
+fail_under = 85
+include =
+    contracts/core/InstantBondLane.vy
+    contracts/config/SwitchboardFoxtrot.vy
+partial_branches =
+    pragma: no branch
