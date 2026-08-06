@@ -196,7 +196,7 @@ def __init__(
     assert paymentDecimals <= MAX_PAYMENT_DECIMALS_CONST  # dev: invalid payment decimals
 
     addys.__init__(_ripeHq)
-    assert _paymentToken != addys._getRipeToken()  # dev: invalid payment token
+    assert _paymentToken != addys._getRipeToken()  # dev: payment token is ripe
     deptBasics.__init__(True, False, True)
 
     PAYMENT_TOKEN = _paymentToken

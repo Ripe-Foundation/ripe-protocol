@@ -120,7 +120,7 @@ def test_constructor_rejects_reverting_or_excessive_decimals(ripe_hq, governance
 
 def test_constructor_rejects_ripe_as_payment_token(ripe_hq, ripe_token):
     with boa.env.anchor():
-        with boa.reverts("invalid payment token"):
+        with boa.reverts("payment token is ripe"):
             boa.load(
                 "contracts/core/InstantBondLane.vy",
                 ripe_hq,

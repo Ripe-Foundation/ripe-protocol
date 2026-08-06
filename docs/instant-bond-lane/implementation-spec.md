@@ -1,13 +1,13 @@
 # Instant Bond Lane — Implementation Specification
 
-**Mechanism version:** v1 · **Specification revision:** 16
+**Mechanism version:** v1 · **Specification revision:** 17
 
 **Status:** Implementation-ready specification. Economic calibration remains a
 deployment input. This document does **not** authorize deployment, production
 configuration, RIPE minting, activation, or publication.
 
-**Prepared:** 5 August 2026 · **Revised:** 6 August 2026 (pre-merge security
-hardening and reproducibility reconciliation)
+**Prepared:** 5 August 2026 · **Revised:** 6 August 2026 (committed-candidate
+portability, coverage isolation, and authorization reconciliation)
 
 **Companion:** pricing rationale in [`pricing-design.md`](pricing-design.md). This
 specification is authoritative wherever the documents differ.
@@ -44,6 +44,12 @@ specification is authoritative wherever the documents differ.
     consistently in lifecycle and purchase events. The owner explicitly ratified that
     final topic allocation after Phase 2 review; `liveConfigVersion` remains present as
     non-indexed purchase-event data.
+15. RIPE is the sole hardcoded payment-token exclusion because accepting the minted
+    asset would create a self-referential mint path. GREEN may be a legitimate
+    dollar-stable payment asset. Savings GREEN and other yield-bearing or
+    value-accruing wrappers are not assumed to remain worth one dollar per token and
+    require explicit valuation-aware calibration and owner approval; v1 deliberately
+    does not hardcode a chain-specific asset allowlist.
 
 ## Final engineering decisions
 
@@ -72,9 +78,10 @@ specification is authoritative wherever the documents differ.
   modified. `Foxtrot` follows the repository's NATO phonetic sequence after the
   already-existing `SwitchboardEcho`.
 - Delivery is owner-gated. Phase 1 source work is complete and Phase 2 tests and local
-  validation were separately authorized. The exact current scope and validation
-  commands are recorded in §20. Phase 3 fork/testnet work and every deployment,
-  publication, or Git action remain unauthorized.
+  validation were separately authorized. The owner later authorized local wrap-up and
+  commits on the existing `instant-bond-lane` branch; that authority does not include
+  merge, push, pull-request publication, Phase 3 fork/testnet work, deployment, or
+  activation. The exact current scope and validation commands are recorded in §20.
 
 ---
 
@@ -192,7 +199,7 @@ def __init__(
     assert paymentDecimals <= MAX_PAYMENT_DECIMALS_CONST    # dev: invalid payment decimals
 
     addys.__init__(_ripeHq)
-    assert _paymentToken != addys._getRipeToken()           # dev: invalid payment token
+    assert _paymentToken != addys._getRipeToken()           # dev: payment token is ripe
     deptBasics.__init__(True, False, True)  # paused, no GREEN mint, RIPE mint
 
     PAYMENT_TOKEN = _paymentToken
@@ -1373,11 +1380,18 @@ multiple decimal counts.
 - run the focused suite and complete local suite in the repository environment, then
   repeat the focused suite in the pinned Python 3.12 validation environment before
   Phase 3 review;
-- when `boa.coverage` instrumentation is active, the root test configuration rebinds
-  Boa to a unique empty compiler cache before contracts are loaded. Coverage therefore
-  retains Boa's required source-map materialization while remaining a cold-compile
-  measurement even if the runner has a populated default or explicitly configured
-  cache;
+- when `boa.coverage` instrumentation is active through the explicitly selected
+  `.coveragerc-instant-bond`, the root test configuration rebinds Boa to a unique,
+  platform-default, self-cleaning temporary compiler cache before contracts are
+  loaded. Coverage therefore retains Boa's required source-map materialization while
+  remaining a cold-compile measurement even if the runner has a populated default or
+  explicitly configured cache. Other repository coverage runs do not activate this
+  feature gate or inherit its include list and threshold;
+- the coverage gate is serial. If a future runner opts into pytest-xdist, each worker
+  receives its own unique self-cleaning compiler cache; this deliberately favors
+  instrumentation correctness over cross-worker cache reuse and must be budgeted as a
+  cold compile per worker. The feature-specific slowdown does not apply to unrelated
+  coverage invocations;
 - keep Python, pytest, Hypothesis, Boa, and coverage artifacts outside the worktree.
 
 ### Deployment rehearsal
@@ -1553,7 +1567,7 @@ The agreed editable scope is limited to:
 1. the owner-approved RIPE-payment constructor guard and defensive-only reachability
    comment in `contracts/core/InstantBondLane.vy`;
 2. this normative specification;
-3. `.coveragerc`;
+3. `.coveragerc-instant-bond`;
 4. the cache-safety hook in `tests/conftest.py`;
 5. `tests/core/instantBondLane/conftest.py` and the feature tests in that directory;
 6. `tests/config/test_switchboard_foxtrot.py`.
@@ -1567,7 +1581,8 @@ paths. They comprise:
 - directly affected BondRoom, RipeGov, SwitchboardDelta, and timelock regressions;
 - the complete default-local `tests/` suite;
 - Vyper line/branch coverage for `InstantBondLane.vy` and `SwitchboardFoxtrot.vy`
-  through `boa.coverage`;
+  through `boa.coverage`, invoked with
+  `--cov-config=.coveragerc-instant-bond`;
 - Hypothesis rule-based stateful differential fuzzing against an independent model of
   lazy epoch transitions, controller arithmetic, versioned pricing snapshots, payout
   math, availability, settlement accounting, and transaction rollback;
@@ -1575,7 +1590,7 @@ paths. They comprise:
 - a focused-suite repeat with the pinned
   `ripe-protocol-validation-envs/rh-wave2-py312` interpreter.
 
-The reconciled Phase 2 evidence through 6 August 2026 is:
+The reconciled local evidence through specification revision 17 on 6 August 2026 is:
 
 - 78 focused feature/configuration tests passed with the pinned interpreter;
 - the state machine passed a clean direct run configured for 50 examples and 20
@@ -1586,9 +1601,12 @@ The reconciled Phase 2 evidence through 6 August 2026 is:
 - combined Boa coverage for the two feature contracts was 86.9% with branch
   coverage enabled (`InstantBondLane.vy`: 85.6%; `SwitchboardFoxtrot.vy`: 96.2%),
   satisfying the configured 85% minimum while retaining a missing-branch report;
-- a plain `pytest --cov` run deliberately pointed at an already-populated Boa cache
-  reproduced the same 86.9% result because the root coverage hook rebound compilation
-  to a unique empty temporary cache;
+- a `pytest --cov --cov-config=.coveragerc-instant-bond` run deliberately pointed at
+  an already-populated Boa cache reproduced the same 86.9% result because the root
+  coverage hook rebound compilation to a unique empty temporary cache;
+- that dedicated run left no `ripe-boa-coverage.*` directory after pytest exited,
+  while an unrelated targeted BondRoom test invoked with plain `--cov` passed without
+  inheriting the Instant Bond Lane include list or 85% threshold;
 - pinned runtime bytecode measured 8,398 bytes for `InstantBondLane.vy` and 5,069
   bytes for `SwitchboardFoxtrot.vy`, below the respective 9,000-byte and 5,500-byte
   regression ceilings and the 24,576-byte EIP-170 limit; and
@@ -1599,11 +1617,36 @@ testnet or production interaction, calibration artifacts, staging, committing,
 pushing, pull requests, deployment, activation, or publication. After local evidence
 is reconciled, work stops for owner review.
 
-Before merge, the owner must separately authorize Git actions and establish an exact
-source baseline covering both contracts, the normative specification, coverage
-configuration, root cache hook, and feature tests. The final merge review must compare
-that baseline byte-for-byte with the merge candidate; any later source change
-invalidates prior hash, bytecode, coverage, and test evidence until it is regenerated.
+### Post-Phase 2 local wrap-up and Git authorization
+
+After reviewing the reconciled Phase 2 evidence, the owner explicitly authorized the
+agent to finish this specific feature workflow in the same worktree and commit it on
+the existing `instant-bond-lane` branch, without merging it into another branch. That
+authorization covered the two contracts, normative specification, feature tests,
+feature-scoped coverage configuration, shared test-cache hook, and the optional
+`pricing-design.md` terminology reconciliation. The owner subsequently instructed the
+agent to incorporate the committed-candidate review findings, including the narrow
+`.gitignore` coverage-data entries and related test/config corrections, as part of the
+same local wrap-up.
+
+The resulting baseline commit was
+`020a4f1da397ad9ac9c617000053609eb44fa209` with tree
+`3b0399c997427e454ef4ef5d8ca636abdf6154c6`; its parent was the original bound
+baseline `91eda49ccd34a25090582aff0695075c4c806011`. The commit patch was recorded as
+SHA-256 `9bcf1e43549733ea08f5f6db3eaa81a1f4a6e26a64fbbe2175113ea4dad6ef33`, computed
+from the exact bytes emitted by `git diff HEAD^1 HEAD --binary`.
+
+This local authorization does **not** authorize merging, pushing, opening a pull
+request, fork or testnet work, production configuration, deployment, activation, or
+publication. Phases 3 and 4 still require fresh, explicit owner authorization.
+
+The local Git authorization above establishes committed source baselines covering both
+contracts, the normative specification, coverage configuration, root cache hook,
+feature tests, and the explicitly recorded supporting files. Before any merge, the
+owner must separately authorize the merge action. The final merge review must compare
+the latest committed baseline byte-for-byte with the merge candidate; any later source
+change invalidates prior hash, bytecode, coverage, and test evidence until it is
+regenerated.
 
 ### Phase 3 — fork and testnet rehearsal (not authorized)
 
@@ -1637,3 +1680,4 @@ actions.
 | 14 | 5 August 2026 | Recorded Phase 2 authorization and exact scope; explicitly ratified pricing-version topic allocation; corrected the defensive-only empty-state specification; added contract-backed controller properties, branch coverage, settlement safety-net, event-topic, boundary, and pinned-environment requirements. |
 | 15 | 6 August 2026 | Added owner-authorized rule-based stateful differential fuzzing over mixed lifecycle, governance, settlement, and rollback sequences; reconciled the focused, coverage, and complete-suite evidence without changing contract code. |
 | 16 | 6 August 2026 | Rejected RIPE as the immutable payment token; made coverage cold-cache-safe; recorded owner-selected non-hard-coded issuance gates, epoch-frequency calibration, four-budget supply monitoring, and the pre-merge baseline requirement. |
+| 17 | 6 August 2026 | Recorded the owner-authorized local commit and pricing-rationale reconciliation; made the dedicated coverage gate platform-neutral, self-cleaning, fail-safe, and inert for unrelated coverage runs; added coverage-data ignores and a distinct RIPE-payment diagnostic. |
