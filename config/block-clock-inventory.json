@@ -16319,7 +16319,7 @@
     {
       "path": "contracts/vaults/modules/StabVault.vy",
       "classification": "production",
-      "contentSha256": "b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e",
+      "contentSha256": "edaa1b1836fe99810d7ed049f9230d6b8aceadb2f8037d811c3baf620030d69f",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
