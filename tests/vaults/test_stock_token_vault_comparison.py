@@ -27,7 +27,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import buy_fungible_auction, filter_logs
 
 
 VAULT_CASES = (
@@ -209,7 +209,7 @@ def test_internal_auction_after_total_issuer_burn(
     debt_before = credit_engine.getUserDebtAmount(bob)
 
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             stock_token,
@@ -745,7 +745,7 @@ def test_external_auction_after_total_issuer_burn_reverts_atomically(
     green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
     with boa.reverts():
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             stock_token,
@@ -1088,7 +1088,7 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
 
     if vault_kind == "simple":
         with boa.reverts("no green spent"):
-            teller.buyFungibleAuction(
+            buy_fungible_auction(teller,
                 bob,
                 vault_id,
                 stock_token,
@@ -1112,7 +1112,7 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
             100 * EIGHTEEN_DECIMALS,
             sender=deploy3r,
         )
-        assert teller.buyFungibleAuction(
+        assert buy_fungible_auction(teller,
             bob,
             vault_id,
             stock_token,
@@ -1126,7 +1126,7 @@ def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
         assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
         return
 
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
     )
@@ -1343,7 +1343,7 @@ def test_paused_external_auction_purchase_is_atomic_and_retryable(
     debt_before = credit_engine.getUserDebtAmount(bob)
 
     with boa.reverts("token paused"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             stock_token,
@@ -1358,7 +1358,7 @@ def test_paused_external_auction_purchase_is_atomic_and_retryable(
     assert stock_token.balanceOf(alice) == 0
 
     stock_token.setPaused(False, sender=deploy3r)
-    assert teller.buyFungibleAuction(
+    assert buy_fungible_auction(teller,
         bob,
         vault_id,
         stock_token,
@@ -1572,7 +1572,7 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     green_token.approve(teller, payment, sender=alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
     live_before = stock_token.balanceOf(vault)
-    assert teller.buyFungibleAuction(
+    assert buy_fungible_auction(teller,
         bob, vault_id, stock_token, payment, False,
         should_transfer_balance, False, sender=alice,
     ) == payment
@@ -1705,7 +1705,7 @@ def test_paused_internal_auction_purchase_charges_green_but_blocks_withdrawal(
     stock_token.setPaused(True, sender=deploy3r)
     green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    assert teller.buyFungibleAuction(
+    assert buy_fungible_auction(teller,
         bob,
         vault_id,
         stock_token,
@@ -1797,7 +1797,7 @@ def test_blocklisted_external_auction_purchase_is_atomic_and_retryable(
     live_before = stock_token.balanceOf(vault)
 
     with boa.reverts(revert_reason):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             stock_token,
@@ -1814,7 +1814,7 @@ def test_blocklisted_external_auction_purchase_is_atomic_and_retryable(
     assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
 
     setter(blocked, False, sender=deploy3r)
-    assert teller.buyFungibleAuction(
+    assert buy_fungible_auction(teller,
         bob,
         vault_id,
         stock_token,
@@ -2007,7 +2007,7 @@ def test_simple_internal_auction_two_buyer_order_freezes_after_loss(
         green_token.transfer(buyer, payment, sender=whale)
         green_token.approve(teller, payment, sender=buyer)
         with boa.reverts("no green spent"):
-            teller.buyFungibleAuction(
+            buy_fungible_auction(teller,
                 bob,
                 vault_id,
                 stock_token,

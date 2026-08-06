@@ -2,6 +2,7 @@ import boa
 from hypothesis import HealthCheck, given, settings, strategies as st
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from conf_utils import redeem_from_stability_pool
 from test_stab_vault_hardening import (
     ACTIVATION_THRESHOLD,
     MAX_ACTIVE_CLAIM_ASSETS,
@@ -748,7 +749,7 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
             green_token.transfer(bob, payment, sender=whale)
             green_token.approve(teller, payment, sender=bob)
             assert (
-                teller.redeemFromStabilityPool(
+                redeem_from_stability_pool(teller,
                     vault_id,
                     claim,
                     payment,

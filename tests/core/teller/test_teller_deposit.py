@@ -7,7 +7,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import filter_logs, redeem_collateral
 
 
 M1_ADVERSARIAL_TOKEN_SOURCE = """
@@ -2757,7 +2757,7 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
         savings_green,
     )
 
-    spent = teller.redeemCollateral(
+    spent = redeem_collateral(teller,
         bob,
         vault_id,
         alpha_token,

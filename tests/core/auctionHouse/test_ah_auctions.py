@@ -4,7 +4,7 @@ from pathlib import Path
 import boa
 
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import buy_fungible_auction, filter_logs
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
@@ -176,7 +176,7 @@ def test_ah_liquidation_auction_discount_calculation(
     # Test auction purchase at start (minimum discount)
     # Auction starts immediately (delay=0), so we're already at start
     green_to_spend = 10 * EIGHTEEN_DECIMALS
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -187,7 +187,7 @@ def test_ah_liquidation_auction_discount_calculation(
     middle_blocks = duration // 2
     boa.env.time_travel(blocks=middle_blocks)
     
-    green_spent_middle = teller.buyFungibleAuction(
+    green_spent_middle = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
 
@@ -197,7 +197,7 @@ def test_ah_liquidation_auction_discount_calculation(
     near_end_blocks = middle_blocks - 1  # 2 blocks before end
     boa.env.time_travel(blocks=near_end_blocks)
     
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     _test(green_spent_end, green_to_spend)
@@ -205,7 +205,7 @@ def test_ah_liquidation_auction_discount_calculation(
     # Verify auction expires and reverts
     boa.env.time_travel(blocks=5)  # Move to end block
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
         )
 
@@ -379,7 +379,7 @@ def test_ah_liquidation_auction_position_depletion(
     assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
 
     # Buy enough to deplete position
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_amount, False, sender=alice
     )
 
@@ -527,7 +527,7 @@ def test_ah_auction_buy_config_restrictions(
     setGeneralConfig(_canBuyInAuction=False)
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -543,7 +543,7 @@ def test_ah_auction_buy_config_restrictions(
     )
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -566,7 +566,7 @@ def test_ah_auction_buy_config_restrictions(
     
     # Alice is not on whitelist, should fail
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -574,7 +574,7 @@ def test_ah_auction_buy_config_restrictions(
     mock_whitelist.setAllowed(alice, alpha_token, True, sender=alice)
     
     # Test 4: Now buying should work
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent > 0  # Should succeed
@@ -658,7 +658,7 @@ def test_ah_auction_time_boundary_edge_cases(
     # Test 1: Before auction starts (should fail gracefully)
     # We're currently at liquidation_block, auction starts at liquidation_block + 5
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -666,7 +666,7 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=5)  # Move to start block
     assert boa.env.evm.patch.block_number == start_block
     
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     # At start of auction (0% discount), should spend exactly what we requested
@@ -678,7 +678,7 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=blocks_to_move)
     assert boa.env.evm.patch.block_number == end_block - 1
     
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     # At end of auction, should get some discount (spend less than at start)
@@ -691,7 +691,7 @@ def test_ah_auction_time_boundary_edge_cases(
     assert boa.env.evm.patch.block_number == end_block
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
@@ -699,7 +699,7 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=5)  # Move past end block
     
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
         )
 
@@ -760,7 +760,7 @@ def test_ah_auction_insufficient_green_scenarios(
     
     # user has no green
     with boa.reverts("cannot transfer 0 amount"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, False, sender=alice
         )
    
@@ -871,19 +871,19 @@ def test_ah_auction_discount_calculation_edge_cases(
 
     # Test discount at start (should be 25%)
     green_to_spend = 10 * EIGHTEEN_DECIMALS
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
     # Test discount at middle (should still be 25%)
     boa.env.time_travel(blocks=50)  # Middle of auction
-    green_spent_middle = teller.buyFungibleAuction(
+    green_spent_middle = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
     # Test discount near end (should still be 25%)
     boa.env.time_travel(blocks=49)  # Near end of auction
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -958,7 +958,7 @@ def test_ah_auction_payment_validation_edge_cases(
 
     # Test 1: Very small payment (1 wei)
     tiny_amount = 1  # 1 wei
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, tiny_amount, False, sender=alice
     )
     # Should spend exactly the tiny amount (no discount at start)
@@ -966,7 +966,7 @@ def test_ah_auction_payment_validation_edge_cases(
     
     # Test 2: Odd number that might cause rounding issues
     odd_amount = 123456789  # Odd number in wei
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, odd_amount, False, sender=alice
     )
     # Should spend exactly the odd amount (no discount at start)
@@ -974,7 +974,7 @@ def test_ah_auction_payment_validation_edge_cases(
     
     # Test 3: Large payment amount
     large_amount = 100 * EIGHTEEN_DECIMALS
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, large_amount, False, sender=alice
     )
     # Should spend exactly the large amount (no discount at start)
@@ -1092,19 +1092,19 @@ def test_ah_auction_multiple_asset_coordination(
 
     # Test coordinated auction purchases
     # Buy from alpha auction (available immediately)
-    green_spent_alpha = teller.buyFungibleAuction(
+    green_spent_alpha = buy_fungible_auction(teller,
         bob, alpha_auction.vaultId, alpha_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_alpha > 0  # Should successfully purchase from alpha auction
     
     # Try to buy from bravo auction (should fail - not started yet due to delay)
     with boa.reverts("no green spent"):
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
         )
     
     # Buy from charlie auction (available immediately)
-    green_spent_charlie = teller.buyFungibleAuction(
+    green_spent_charlie = buy_fungible_auction(teller,
         bob, charlie_auction.vaultId, charlie_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_charlie > 0  # Should successfully purchase from charlie auction
@@ -1113,7 +1113,7 @@ def test_ah_auction_multiple_asset_coordination(
     boa.env.time_travel(blocks=5)
     
     # Now bravo auction should work
-    green_spent_bravo = teller.buyFungibleAuction(
+    green_spent_bravo = buy_fungible_auction(teller,
         bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
     assert green_spent_bravo > 0  # Should successfully purchase from bravo auction
@@ -1186,7 +1186,7 @@ def test_ah_auction_savings_green_preferences(
     alice_savings_before = savings_green.balanceOf(alice)
     
     # Spend less than available to create leftover
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_amount, False, True, sender=alice  # True = wants savings GREEN
     )
     assert green_spent != 0
@@ -1389,7 +1389,7 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     green_token.approve(teller, amount_to_repay, sender=alice)
 
     # Purchase auction with amount to restore health
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, amount_to_repay, False, sender=alice
     )
     
@@ -1482,7 +1482,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     green_to_spend = 10 * EIGHTEEN_DECIMALS
     alice_alpha_before = alpha_token.balanceOf(alice)
     
-    green_spent_start = teller.buyFungibleAuction(
+    green_spent_start = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1498,7 +1498,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to 25% through auction (25 blocks)
     boa.env.time_travel(blocks=25)
     
-    green_spent_quarter = teller.buyFungibleAuction(
+    green_spent_quarter = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1516,7 +1516,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to 50% through auction (25 more blocks = 50 total)
     boa.env.time_travel(blocks=25)
     
-    green_spent_half = teller.buyFungibleAuction(
+    green_spent_half = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1534,7 +1534,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
     # Move to end of auction (50 more blocks = 100 total)
     boa.env.time_travel(blocks=49)  # 99 blocks total (1 before end)
     
-    green_spent_end = teller.buyFungibleAuction(
+    green_spent_end = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
     )
     
@@ -1639,7 +1639,7 @@ def test_ah_auction_buy_with_balance_transfer_basic(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Buy auction with _shouldTransferBalance=True
-    green_spent = teller.buyFungibleAuction(
+    green_spent = buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount, 
         False,  # _isPaymentSavingsGreen
         True,   # _shouldTransferBalance
@@ -1888,7 +1888,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Buy with balance transfer
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice
@@ -1915,7 +1915,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
     
     # Buy with intent to deplete Bob's position
-    teller.buyFungibleAuction(
+    buy_fungible_auction(teller,
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice

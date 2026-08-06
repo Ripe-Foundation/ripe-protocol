@@ -1,6 +1,6 @@
 import boa
 
-from conf_utils import filter_logs
+from conf_utils import claim_from_stability_pool, filter_logs, redeem_from_stability_pool
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
@@ -554,7 +554,7 @@ def test_zero_raw_balance_with_only_dormant_claim_is_explicit_exit_residual(
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
     shares_before = stability_pool.userBalances(bob, alpha_token)
     with boa.reverts("nothing claimed"):
-        teller.claimFromStabilityPool(
+        claim_from_stability_pool(teller,
             vault_book.getRegId(stability_pool),
             alpha_token,
             bravo_token,
@@ -1724,7 +1724,7 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
     first_redemption = 4 * 10**17
     green_token.transfer(bob, first_redemption, sender=whale)
     green_token.approve(teller, first_redemption, sender=bob)
-    assert teller.redeemFromStabilityPool(
+    assert redeem_from_stability_pool(teller,
         vault_id,
         claim,
         first_redemption,
@@ -1756,7 +1756,7 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
     second_redemption = 15 * 10**16
     green_token.transfer(bob, second_redemption, sender=whale)
     green_token.approve(teller, second_redemption, sender=bob)
-    assert teller.redeemFromStabilityPool(
+    assert redeem_from_stability_pool(teller,
         vault_id,
         claim,
         second_redemption,

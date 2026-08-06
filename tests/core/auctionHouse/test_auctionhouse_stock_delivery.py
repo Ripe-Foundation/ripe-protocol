@@ -3,7 +3,7 @@
 import boa
 import pytest
 
-from conf_utils import filter_logs
+from conf_utils import buy_fungible_auction, filter_logs
 from constants import EIGHTEEN_DECIMALS
 from tests.vaults.test_basic_vault_safety import (
     _register_safe_nominal_vault,
@@ -274,7 +274,7 @@ def test_standard_internal_two_buyer_sequence_caps_over_request_and_depletes_sel
     _fund_buyer(green_token, whale, teller, alice, first_max)
     alice_green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    first_spent = teller.buyFungibleAuction(
+    first_spent = buy_fungible_auction(teller,
         bob,
         vault_id,
         alpha_token,
@@ -297,7 +297,7 @@ def test_standard_internal_two_buyer_sequence_caps_over_request_and_depletes_sel
     _fund_buyer(green_token, whale, teller, sally, second_max)
     sally_green_before = green_token.balanceOf(sally)
     debt_before = credit_engine.getUserDebtAmount(bob)
-    second_spent = teller.buyFungibleAuction(
+    second_spent = buy_fungible_auction(teller,
         bob,
         vault_id,
         alpha_token,
@@ -389,7 +389,7 @@ def test_standard_external_delivery_matches_recipient_vault_and_debt_deltas(
     seller_nominal_before = safe_simple_erc20_vault.userBalances(bob, alpha_token)
     debt_before = credit_engine.getUserDebtAmount(bob)
 
-    spent = teller.buyFungibleAuction(
+    spent = buy_fungible_auction(teller,
         bob,
         vault_id,
         alpha_token,
@@ -512,7 +512,7 @@ def test_standard_external_route_distinguishes_m2_movement_checks(
     )
 
     with boa.reverts():
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             token,
@@ -625,7 +625,7 @@ def test_one_unit_deficit_preserves_terms_and_rolls_back_auction_roots(
     )
 
     with boa.reverts():
-        teller.buyFungibleAuction(
+        buy_fungible_auction(teller,
             bob,
             vault_id,
             alpha_token,
