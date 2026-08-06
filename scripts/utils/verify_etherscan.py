@@ -1,115 +1,409 @@
-import requests
+"""Deterministic Etherscan-v2 verification adapter.
+
+The adapter intentionally supports only chains that Etherscan documents as
+supported. Robinhood identities are recorded here, but provider selection
+fails closed until an official provider contract is implemented and tested.
+"""
+
+from __future__ import annotations
+
 import json
 import time
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Mapping
 
-api_url = "https://api.etherscan.io/v2/api"
+import requests
 
-chain_ids = {
-    "eth-mainnet": 1,
-    "eth-goerli": 5,
-    "eth-sepolia": 11155111,
-    "base-mainnet": 8453,
-    "base-goerli": 84532,
-    "base-sepolia": 84532,
+
+API_URL = "https://api.etherscan.io/v2/api"
+DEFAULT_TIMEOUT_SECONDS = 15.0
+
+
+class VerificationStatus(str, Enum):
+    SUCCESS = "success"
+    PENDING = "pending"
+    UNVERIFIED = "unverified"
+    RATE_LIMIT = "rate_limit"
+    TIMEOUT = "timeout"
+    PROVIDER_ERROR = "provider_error"
+
+
+class KeyPolicy(str, Enum):
+    REQUIRED = "required"
+    KEYLESS = "keyless"
+
+
+class VerifierConfigurationError(ValueError):
+    """Raised before HTTP when provider or input policy is unsupported."""
+
+
+@dataclass(frozen=True)
+class ChainSpec:
+    chain_id: int
+    explorer_address_url: str | None
+    provider: str | None
+
+
+@dataclass(frozen=True)
+class ProviderPolicy:
+    name: str
+    key_policy: KeyPolicy
+    api_url: str
+
+
+@dataclass(frozen=True)
+class VerificationResult:
+    status: VerificationStatus
+    detail: str
+    guid: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status is VerificationStatus.SUCCESS
+
+
+CHAIN_SPECS: Mapping[str, ChainSpec] = {
+    "eth-mainnet": ChainSpec(1, "https://etherscan.io/address/", "etherscan"),
+    "eth-goerli": ChainSpec(5, None, None),
+    "eth-sepolia": ChainSpec(
+        11155111, "https://sepolia.etherscan.io/address/", "etherscan"
+    ),
+    "base-mainnet": ChainSpec(
+        8453, "https://basescan.org/address/", "etherscan"
+    ),
+    # Base Goerli and Base Sepolia are distinct networks. Goerli is retired.
+    "base-goerli": ChainSpec(84531, None, None),
+    "base-sepolia": ChainSpec(
+        84532, "https://sepolia.basescan.org/address/", "etherscan"
+    ),
+    "robinhood-mainnet": ChainSpec(4663, None, None),
+    "robinhood-testnet": ChainSpec(46630, None, None),
 }
 
+PROVIDER_POLICIES: Mapping[str, ProviderPolicy] = {
+    "etherscan": ProviderPolicy(
+        name="etherscan",
+        key_policy=KeyPolicy.REQUIRED,
+        api_url=API_URL,
+    )
+}
 
+# Compatibility aliases for existing importers.
+chain_ids = {name: spec.chain_id for name, spec in CHAIN_SPECS.items()}
 contract_base_url = {
-    "eth-mainnet": "https://etherscan.io/address/",
-    "eth-goerli": "https://goerli.etherscan.io/address/",
-    "eth-sepolia": "https://sepolia.etherscan.io/address/",
-    "base-mainnet": "https://basescan.org/address/",
-    "base-goerli": "https://goerli.basescan.org/address/",
-    "base-sepolia": "https://sepolia.basescan.org/address/",
+    name: spec.explorer_address_url
+    for name, spec in CHAIN_SPECS.items()
+    if spec.explorer_address_url is not None
 }
 
 
-def is_contract_verified(api_key: str, contract_address: str, chain: str) -> bool:
-    """Check if contract is already verified"""
-    chain_id = chain_ids.get(chain, chain_ids["eth-mainnet"])
-
-    params = {
-        "chainid": chain_id,
-        "apikey": api_key,
-        "module": "contract",
-        "action": "getabi",
-        "address": contract_address,
-    }
-
-    response = requests.get(api_url, params=params)
-    result = response.json()
-
-    return result.get("status") == "1"
-
-
-def verify_from_manifest(api_key: str, contract_name: str, manifest_data: dict, chain: str) -> bool:
-    """Verify contract using manifest data"""
-
-    print("Address: ", manifest_data["address"], 'url: ', contract_base_url[chain] + manifest_data["address"])
-
-    # Check if already verified
-    if is_contract_verified(api_key, manifest_data["address"], chain):
-        return True
-
-    # Prepare verification request
-    contract_file = next(iter(manifest_data["solc_json"]["sources"].keys()))
-
-    chain_id = chain_ids.get(chain, chain_ids["eth-mainnet"])
-    params = {
-        "apikey": api_key,
-        "module": "contract",
-        "action": "verifysourcecode",
-        "sourceCode": json.dumps(manifest_data["solc_json"]),
-        "contractaddress": manifest_data["address"],
-        "codeformat": "vyper-json",
-        "contractname": f"{contract_file}:{contract_name}",  # Format: contractfile.vy:contractname
-        "compilerversion": "vyper:0.4.3",
-        "constructorArguements": manifest_data.get("args", ""),
-        "optimizationUsed": "1",
-        "runs": "200",
-        "evmversion": ""
-    }
-
+def _chain_spec(chain: str) -> ChainSpec:
     try:
-        # Submit verification request
-        response = requests.post(api_url, params={"chainid": chain_id}, data=params)
-        result = response.json()
+        return CHAIN_SPECS[chain]
+    except KeyError as exc:
+        raise VerifierConfigurationError(f"unsupported chain: {chain}") from exc
 
-        if result["status"] != "1":
-            print(f"Verification submission failed: {result['result']}")
-            return False
 
-        guid = result["result"]
-        print(f"Verification submitted. GUID: {guid}")
+def _api_key_for_policy(
+    policy: ProviderPolicy, api_key: str | None
+) -> str:
+    if policy.key_policy is KeyPolicy.REQUIRED:
+        if not api_key or not api_key.strip():
+            raise VerifierConfigurationError(
+                f"{policy.name} provider requires an API key; "
+                "keyless use is unsupported"
+            )
+        return api_key
+    if policy.key_policy is KeyPolicy.KEYLESS:
+        if api_key and api_key.strip():
+            raise VerifierConfigurationError(
+                f"{policy.name} provider is keyless and must not receive an API key"
+            )
+        return ""
+    raise VerifierConfigurationError(
+        f"unsupported key policy for provider: {policy.name}"
+    )
 
-        # Check verification status
+
+def _response_text(payload: Mapping[str, Any]) -> str:
+    return " ".join(
+        str(payload.get(field, "")) for field in ("message", "result")
+    ).strip()
+
+
+def classify_payload(payload: Mapping[str, Any]) -> VerificationResult:
+    detail = _response_text(payload)
+    normalized = detail.lower()
+    # Provider status is authoritative. A successful ABI or GUID can contain
+    # arbitrary source text that happens to resemble an error phrase.
+    if payload.get("status") == "1":
+        return VerificationResult(VerificationStatus.SUCCESS, detail)
+    if "rate limit" in normalized or "max rate" in normalized:
+        return VerificationResult(VerificationStatus.RATE_LIMIT, detail)
+    if "pending in queue" in normalized or normalized == "pending":
+        return VerificationResult(VerificationStatus.PENDING, detail)
+    if "not verified" in normalized or "unable to locate contractcode" in normalized:
+        return VerificationResult(VerificationStatus.UNVERIFIED, detail)
+    return VerificationResult(
+        VerificationStatus.PROVIDER_ERROR,
+        detail or "provider returned an unclassified response",
+    )
+
+
+class EtherscanVerifier:
+    def __init__(
+        self,
+        *,
+        chain: str,
+        api_key: str | None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        session: Any = requests,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        spec = _chain_spec(chain)
+        if spec.provider != "etherscan":
+            raise VerifierConfigurationError(
+                f"no supported official verifier provider for chain: {chain}"
+            )
+        policy = PROVIDER_POLICIES[spec.provider]
+        normalized_api_key = _api_key_for_policy(policy, api_key)
+        if timeout <= 0:
+            raise VerifierConfigurationError("request timeout must be positive")
+
+        self.chain = chain
+        self.spec = spec
+        self.policy = policy
+        self.api_key = normalized_api_key
+        self.timeout = timeout
+        self.session = session
+        self.sleep = sleep
+
+    def _request(
+        self,
+        method: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+        data: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any] | VerificationResult:
+        try:
+            response = self.session.request(
+                method,
+                self.policy.api_url,
+                params=params,
+                data=data,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except requests.Timeout as exc:
+            return VerificationResult(VerificationStatus.TIMEOUT, str(exc))
+        except (requests.RequestException, ValueError) as exc:
+            return VerificationResult(VerificationStatus.PROVIDER_ERROR, str(exc))
+
+        if not isinstance(payload, Mapping):
+            return VerificationResult(
+                VerificationStatus.PROVIDER_ERROR,
+                "provider returned a non-object JSON response",
+            )
+        return payload
+
+    def lookup(self, contract_address: str) -> VerificationResult:
+        payload = self._request(
+            "GET",
+            params={
+                "chainid": self.spec.chain_id,
+                "apikey": self.api_key,
+                "module": "contract",
+                "action": "getabi",
+                "address": contract_address,
+            },
+        )
+        if isinstance(payload, VerificationResult):
+            return payload
+        return classify_payload(payload)
+
+    def _validate_manifest(
+        self,
+        contract_name: str,
+        manifest_data: Mapping[str, Any],
+    ) -> tuple[str, Mapping[str, Any]]:
+        language = str(manifest_data.get("language", "vyper")).lower()
+        code_format = str(manifest_data.get("code_format", "vyper-json")).lower()
+        if language != "vyper":
+            raise VerifierConfigurationError(
+                f"unsupported verification language: {language}"
+            )
+        if code_format != "vyper-json":
+            raise VerifierConfigurationError(
+                f"unsupported verification format: {code_format}"
+            )
+        if not contract_name:
+            raise VerifierConfigurationError("contract name is required")
+
+        standard_json = manifest_data.get("solc_json")
+        if not isinstance(standard_json, Mapping):
+            raise VerifierConfigurationError("manifest solc_json must be an object")
+        sources = standard_json.get("sources")
+        if not isinstance(sources, Mapping) or not sources:
+            raise VerifierConfigurationError(
+                "manifest solc_json.sources must be a nonempty object"
+            )
+        source_path = manifest_data.get("source_path")
+        if source_path is None:
+            source_path = sorted(str(path) for path in sources)[0]
+        if source_path not in sources:
+            raise VerifierConfigurationError(
+                f"manifest source_path is not in solc_json.sources: {source_path}"
+            )
+        compiler_version = manifest_data.get("compiler_version")
+        if (
+            not isinstance(compiler_version, str)
+            or not compiler_version.startswith("vyper:")
+            or not compiler_version.removeprefix("vyper:")
+        ):
+            raise VerifierConfigurationError(
+                "manifest compiler_version must be an explicit vyper:<version> string"
+            )
+        return str(source_path), standard_json
+
+    def verify_manifest(
+        self,
+        contract_name: str,
+        manifest_data: Mapping[str, Any],
+        *,
+        wait: bool = True,
+        max_polls: int = 10,
+        poll_interval: float = 5.0,
+    ) -> VerificationResult:
+        source_path, standard_json = self._validate_manifest(
+            contract_name, manifest_data
+        )
+        address = str(manifest_data.get("address", ""))
+        if not address:
+            raise VerifierConfigurationError("manifest address is required")
+
+        current = self.lookup(address)
+        if current.status is VerificationStatus.SUCCESS:
+            return current
+        if current.status is not VerificationStatus.UNVERIFIED:
+            return current
+
+        payload = self._request(
+            "POST",
+            params={"chainid": self.spec.chain_id},
+            data={
+                "chainid": self.spec.chain_id,
+                "apikey": self.api_key,
+                "module": "contract",
+                "action": "verifysourcecode",
+                "sourceCode": json.dumps(
+                    standard_json,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
+                "contractaddress": address,
+                "codeformat": "vyper-json",
+                "contractname": f"{source_path}:{contract_name}",
+                "compilerversion": manifest_data["compiler_version"],
+                "constructorArguements": str(manifest_data.get("args", "")),
+            },
+        )
+        if isinstance(payload, VerificationResult):
+            return payload
+        submitted = classify_payload(payload)
+        if submitted.status is not VerificationStatus.SUCCESS:
+            return submitted
+
+        guid = str(payload.get("result", ""))
+        if not guid:
+            return VerificationResult(
+                VerificationStatus.PROVIDER_ERROR,
+                "verification submission omitted its GUID",
+            )
+        if not wait:
+            return VerificationResult(
+                VerificationStatus.PENDING,
+                "verification submitted",
+                guid=guid,
+            )
+        if max_polls < 1:
+            raise VerifierConfigurationError(
+                "max_polls must be positive when wait=True"
+            )
+
         check_params = {
-            "chainid": chain_id,
-            "apikey": api_key,
+            "chainid": self.spec.chain_id,
+            "apikey": self.api_key,
             "module": "contract",
             "action": "checkverifystatus",
             "guid": guid,
         }
+        for attempt in range(max_polls):
+            if attempt:
+                self.sleep(poll_interval)
+            check_payload = self._request("GET", params=check_params)
+            if isinstance(check_payload, VerificationResult):
+                return check_payload
+            result = classify_payload(check_payload)
+            if result.status is VerificationStatus.PENDING:
+                continue
+            return VerificationResult(result.status, result.detail, guid=guid)
 
-        # Poll for verification result
-        for _ in range(10):  # Try 10 times
-            time.sleep(5)  # Wait 5 seconds between checks
-            check_response = requests.get(api_url, params=check_params)
-            check_result = check_response.json()
+        return VerificationResult(
+            VerificationStatus.TIMEOUT,
+            "verification remained pending after polling budget",
+            guid=guid,
+        )
 
-            if check_result["result"] == "Pass - Verified":
-                print(f"{contract_name} verified successfully!")
-                return True
-            elif check_result["result"] != "Pending in queue":
-                print(f"Verification failed: {check_result['result']}")
-                # Print more details if available
-                if "message" in check_result:
-                    print(f"Error message: {check_result['message']}")
-                return False
 
-        print("Verification timed out")
-        return False
+def create_verifier(
+    *,
+    chain: str,
+    api_key: str | None,
+    provider: str = "auto",
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    session: Any = requests,
+    sleep: Callable[[float], None] = time.sleep,
+) -> EtherscanVerifier:
+    spec = _chain_spec(chain)
+    selected = spec.provider if provider == "auto" else provider
+    if provider == "auto" and selected is None:
+        raise VerifierConfigurationError(
+            f"no supported official verifier provider for chain: {chain}"
+        )
+    if selected not in PROVIDER_POLICIES:
+        raise VerifierConfigurationError(
+            f"unsupported verifier provider: {selected or 'none'}"
+        )
+    if selected != spec.provider:
+        raise VerifierConfigurationError(
+            f"provider {selected} is not supported for chain: {chain}"
+        )
+    return EtherscanVerifier(
+        chain=chain,
+        api_key=api_key,
+        timeout=timeout,
+        session=session,
+        sleep=sleep,
+    )
 
-    except Exception as e:
-        print(f"Error during verification: {str(e)}")
-        return False
+
+def is_contract_verified(api_key: str, contract_address: str, chain: str) -> bool:
+    """Compatibility wrapper over the testable adapter."""
+    return create_verifier(chain=chain, api_key=api_key).lookup(
+        contract_address
+    ).ok
+
+
+def verify_from_manifest(
+    api_key: str,
+    contract_name: str,
+    manifest_data: Mapping[str, Any],
+    chain: str,
+) -> bool:
+    """Compatibility wrapper over the testable adapter."""
+    return create_verifier(chain=chain, api_key=api_key).verify_manifest(
+        contract_name, manifest_data
+    ).ok

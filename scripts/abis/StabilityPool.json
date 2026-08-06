@@ -108,20 +108,89 @@
     "type": "event"
   },
   {
-    "name": "VaultFundsRecovered",
+    "name": "ClaimAssetActivated",
     "inputs": [
       {
-        "name": "asset",
+        "name": "stabAsset",
         "type": "address",
         "indexed": true
       },
       {
-        "name": "recipient",
+        "name": "claimAsset",
         "type": "address",
         "indexed": true
       },
       {
         "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "activeCount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ClaimAssetLeftDormant",
+    "inputs": [
+      {
+        "name": "stabAsset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "claimAsset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "activeCount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "reason",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ClaimAssetDeactivated",
+    "inputs": [
+      {
+        "name": "stabAsset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "claimAsset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "activeCount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "reason",
         "type": "uint256",
         "indexed": false
       }
@@ -268,188 +337,6 @@
         "type": "address"
       }
     ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "isUserInVaultAsset",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "doesUserHaveBalance",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "deregisterUserAsset",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "isSupportedVaultAsset",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "deregisterVaultAsset",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "doesVaultHaveAnyFunds",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getNumUserAssets",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getNumVaultAssets",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "pause",
-    "inputs": [
-      {
-        "name": "_shouldPause",
-        "type": "bool"
-      }
-    ],
-    "outputs": []
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "recoverFunds",
-    "inputs": [
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": []
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "recoverFundsMany",
-    "inputs": [
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_assets",
-        "type": "address[]"
-      }
-    ],
-    "outputs": []
   },
   {
     "stateMutability": "view",
@@ -609,148 +496,7 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "valueToShares",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_usdValue",
-        "type": "uint256"
-      },
-      {
-        "name": "_shouldRoundUp",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "sharesToValue",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_shares",
-        "type": "uint256"
-      },
-      {
-        "name": "_shouldRoundUp",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "swapForLiquidatedCollateral",
-    "inputs": [
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_stabAssetAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_liqAsset",
-        "type": "address"
-      },
-      {
-        "name": "_liqAmountSent",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_greenToken",
-        "type": "address"
-      },
-      {
-        "name": "_savingsGreenToken",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "swapWithClaimableGreen",
-    "inputs": [
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_greenAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_liqAsset",
-        "type": "address"
-      },
-      {
-        "name": "_liqAmountSent",
-        "type": "uint256"
-      },
-      {
-        "name": "_greenToken",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getTotalValue",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "getTotalUserValue",
+    "name": "isUserInVaultAsset",
     "inputs": [
       {
         "name": "_user",
@@ -764,469 +510,106 @@
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
+        "type": "bool"
       }
     ]
   },
   {
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function",
-    "name": "claimFromStabilityPool",
+    "name": "doesUserHaveBalance",
     "inputs": [
       {
-        "name": "_claimer",
+        "name": "_user",
         "type": "address"
       },
       {
-        "name": "_stabAsset",
+        "name": "_asset",
         "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_maxUsdValue",
-        "type": "uint256"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
+        "type": "bool"
       }
     ]
   },
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "claimFromStabilityPool",
+    "name": "deregisterUserAsset",
     "inputs": [
       {
-        "name": "_claimer",
+        "name": "_user",
         "type": "address"
       },
       {
-        "name": "_stabAsset",
+        "name": "_asset",
         "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_maxUsdValue",
-        "type": "uint256"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_a",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "hq",
-            "type": "address"
-          },
-          {
-            "name": "greenToken",
-            "type": "address"
-          },
-          {
-            "name": "savingsGreen",
-            "type": "address"
-          },
-          {
-            "name": "ripeToken",
-            "type": "address"
-          },
-          {
-            "name": "ledger",
-            "type": "address"
-          },
-          {
-            "name": "missionControl",
-            "type": "address"
-          },
-          {
-            "name": "switchboard",
-            "type": "address"
-          },
-          {
-            "name": "priceDesk",
-            "type": "address"
-          },
-          {
-            "name": "vaultBook",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouse",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouseNft",
-            "type": "address"
-          },
-          {
-            "name": "boardroom",
-            "type": "address"
-          },
-          {
-            "name": "bondRoom",
-            "type": "address"
-          },
-          {
-            "name": "creditEngine",
-            "type": "address"
-          },
-          {
-            "name": "endaoment",
-            "type": "address"
-          },
-          {
-            "name": "humanResources",
-            "type": "address"
-          },
-          {
-            "name": "lootbox",
-            "type": "address"
-          },
-          {
-            "name": "teller",
-            "type": "address"
-          }
-        ]
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "claimManyFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_claimer",
-        "type": "address"
-      },
-      {
-        "name": "_claims",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "stabAsset",
-            "type": "address"
-          },
-          {
-            "name": "claimAsset",
-            "type": "address"
-          },
-          {
-            "name": "maxUsdValue",
-            "type": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
         "type": "bool"
       }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
     ]
   },
   {
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function",
-    "name": "claimManyFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_claimer",
-        "type": "address"
-      },
-      {
-        "name": "_claims",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "stabAsset",
-            "type": "address"
-          },
-          {
-            "name": "claimAsset",
-            "type": "address"
-          },
-          {
-            "name": "maxUsdValue",
-            "type": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_a",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "hq",
-            "type": "address"
-          },
-          {
-            "name": "greenToken",
-            "type": "address"
-          },
-          {
-            "name": "savingsGreen",
-            "type": "address"
-          },
-          {
-            "name": "ripeToken",
-            "type": "address"
-          },
-          {
-            "name": "ledger",
-            "type": "address"
-          },
-          {
-            "name": "missionControl",
-            "type": "address"
-          },
-          {
-            "name": "switchboard",
-            "type": "address"
-          },
-          {
-            "name": "priceDesk",
-            "type": "address"
-          },
-          {
-            "name": "vaultBook",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouse",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouseNft",
-            "type": "address"
-          },
-          {
-            "name": "boardroom",
-            "type": "address"
-          },
-          {
-            "name": "bondRoom",
-            "type": "address"
-          },
-          {
-            "name": "creditEngine",
-            "type": "address"
-          },
-          {
-            "name": "endaoment",
-            "type": "address"
-          },
-          {
-            "name": "humanResources",
-            "type": "address"
-          },
-          {
-            "name": "lootbox",
-            "type": "address"
-          },
-          {
-            "name": "teller",
-            "type": "address"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
+    "name": "isSupportedVaultAsset",
     "inputs": [
       {
         "name": "_asset",
         "type": "address"
-      },
-      {
-        "name": "_greenAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256"
+        "type": "bool"
       }
     ]
   },
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "redeemFromStabilityPool",
+    "name": "deregisterVaultAsset",
     "inputs": [
       {
         "name": "_asset",
         "type": "address"
-      },
+      }
+    ],
+    "outputs": [
       {
-        "name": "_greenAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
+        "name": "",
         "type": "bool"
-      },
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "doesVaultHaveAnyFunds",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "_shouldRefundSavingsGreen",
+        "name": "",
         "type": "bool"
-      },
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getNumUserAssets",
+    "inputs": [
       {
-        "name": "_a",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "hq",
-            "type": "address"
-          },
-          {
-            "name": "greenToken",
-            "type": "address"
-          },
-          {
-            "name": "savingsGreen",
-            "type": "address"
-          },
-          {
-            "name": "ripeToken",
-            "type": "address"
-          },
-          {
-            "name": "ledger",
-            "type": "address"
-          },
-          {
-            "name": "missionControl",
-            "type": "address"
-          },
-          {
-            "name": "switchboard",
-            "type": "address"
-          },
-          {
-            "name": "priceDesk",
-            "type": "address"
-          },
-          {
-            "name": "vaultBook",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouse",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouseNft",
-            "type": "address"
-          },
-          {
-            "name": "boardroom",
-            "type": "address"
-          },
-          {
-            "name": "bondRoom",
-            "type": "address"
-          },
-          {
-            "name": "creditEngine",
-            "type": "address"
-          },
-          {
-            "name": "endaoment",
-            "type": "address"
-          },
-          {
-            "name": "humanResources",
-            "type": "address"
-          },
-          {
-            "name": "lootbox",
-            "type": "address"
-          },
-          {
-            "name": "teller",
-            "type": "address"
-          }
-        ]
+        "name": "_user",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -1237,45 +620,10 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function",
-    "name": "redeemManyFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_redemptions",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "claimAsset",
-            "type": "address"
-          },
-          {
-            "name": "maxGreenAmount",
-            "type": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_greenAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      }
-    ],
+    "name": "getNumVaultAssets",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -1286,127 +634,14 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "redeemManyFromStabilityPool",
+    "name": "pause",
     "inputs": [
       {
-        "name": "_redemptions",
-        "type": "tuple[]",
-        "components": [
-          {
-            "name": "claimAsset",
-            "type": "address"
-          },
-          {
-            "name": "maxGreenAmount",
-            "type": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_greenAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
+        "name": "_shouldPause",
         "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_a",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "hq",
-            "type": "address"
-          },
-          {
-            "name": "greenToken",
-            "type": "address"
-          },
-          {
-            "name": "savingsGreen",
-            "type": "address"
-          },
-          {
-            "name": "ripeToken",
-            "type": "address"
-          },
-          {
-            "name": "ledger",
-            "type": "address"
-          },
-          {
-            "name": "missionControl",
-            "type": "address"
-          },
-          {
-            "name": "switchboard",
-            "type": "address"
-          },
-          {
-            "name": "priceDesk",
-            "type": "address"
-          },
-          {
-            "name": "vaultBook",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouse",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouseNft",
-            "type": "address"
-          },
-          {
-            "name": "boardroom",
-            "type": "address"
-          },
-          {
-            "name": "bondRoom",
-            "type": "address"
-          },
-          {
-            "name": "creditEngine",
-            "type": "address"
-          },
-          {
-            "name": "endaoment",
-            "type": "address"
-          },
-          {
-            "name": "humanResources",
-            "type": "address"
-          },
-          {
-            "name": "lootbox",
-            "type": "address"
-          },
-          {
-            "name": "teller",
-            "type": "address"
-          }
-        ]
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
+    "outputs": []
   },
   {
     "stateMutability": "view",
@@ -1504,6 +739,849 @@
         "type": "uint256"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "swapForLiquidatedCollateral",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_stabAssetAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqAsset",
+        "type": "address"
+      },
+      {
+        "name": "_liqAmountSent",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_greenToken",
+        "type": "address"
+      },
+      {
+        "name": "_savingsGreenToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "swapWithClaimableGreen",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_liqAsset",
+        "type": "address"
+      },
+      {
+        "name": "_liqAmountSent",
+        "type": "uint256"
+      },
+      {
+        "name": "_greenToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_claimer",
+        "type": "address"
+      },
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      },
+      {
+        "name": "_maxUsdValue",
+        "type": "uint256"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_claimer",
+        "type": "address"
+      },
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      },
+      {
+        "name": "_maxUsdValue",
+        "type": "uint256"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimManyFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_claimer",
+        "type": "address"
+      },
+      {
+        "name": "_claims",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "stabAsset",
+            "type": "address"
+          },
+          {
+            "name": "claimAsset",
+            "type": "address"
+          },
+          {
+            "name": "maxUsdValue",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimManyFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_claimer",
+        "type": "address"
+      },
+      {
+        "name": "_claims",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "stabAsset",
+            "type": "address"
+          },
+          {
+            "name": "claimAsset",
+            "type": "address"
+          },
+          {
+            "name": "maxUsdValue",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "redeemFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "redeemFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "redeemManyFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_redemptions",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "claimAsset",
+            "type": "address"
+          },
+          {
+            "name": "maxGreenAmount",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "redeemManyFromStabilityPool",
+    "inputs": [
+      {
+        "name": "_redemptions",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "claimAsset",
+            "type": "address"
+          },
+          {
+            "name": "maxGreenAmount",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getTotalValue",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getTotalUserValue",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getNumActiveClaimAssets",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getClaimAssetState",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canAcceptLiquidationAsset",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pruneClaimableAssets",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAssets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "activateClaimAssets",
+    "inputs": [
+      {
+        "name": "_stabAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimAssets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
   },
   {
     "stateMutability": "nonpayable",
@@ -2068,6 +2146,38 @@
         "type": "uint256"
       }
     ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
   },
   {
     "stateMutability": "nonpayable",

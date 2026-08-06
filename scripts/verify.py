@@ -1,75 +1,85 @@
 import click
-import json
-import os
-from scripts.migrate import param_prompt, CLICK_PROMPTS
-from scripts.utils.verify_etherscan import verify_from_manifest
-import time
 
-MIGRATION_HISTORY_DIR = "./migration_history"
+from config.network_profiles import (
+    NETWORK_PROFILE_IDS,
+    NetworkProfileError,
+    Operation,
+    OperationOutcome,
+    get_profile,
+    operation_decision,
+    static_manifest_path,
+    validate_manifest_assertions,
+)
 
 
 @click.command()
 @click.option(
-    "--environment",
-    default=CLICK_PROMPTS["environment"]["default"],
-    help=CLICK_PROMPTS["environment"]["help"],
-    callback=param_prompt,
+    "--profile",
+    "--chain",
+    "profile_id",
+    required=True,
+    type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
+    help=(
+        "Required canonical network profile. `--chain` is a deprecated "
+        "equivalent spelling. `local` is recognized but unsupported by this "
+        "command; it is reserved for a future embedded-runtime path."
+    ),
 )
 @click.option(
-    "--chain",
-    default=CLICK_PROMPTS["chain"]["default"],
-    help=CLICK_PROMPTS["chain"]["help"],
-    callback=param_prompt,
+    "--environment",
+    default=None,
+    help=(
+        "Optional profile history-namespace assertion, validated before the "
+        "verification route outcome."
+    ),
 )
 @click.option(
     "--manifest",
-    default=CLICK_PROMPTS["manifest"]["default"],
-    help=CLICK_PROMPTS["manifest"]["help"],
-    callback=param_prompt,
+    default="current",
+    show_default=True,
+    help=(
+        "Manifest-name assertion validated before route selection. This "
+        "command does not submit verification."
+    ),
 )
-def cli(environment, chain, manifest):
-    """Verify contracts on Etherscan/Basescan"""
-    print(f"Verifying contracts from environment: {environment}")
-    print(f"Verifying contracts from chain: {chain}")
-    print(f"Verifying contracts from manifest: {manifest}")
-    # Load manifest
-    manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/{manifest}-manifest.json"
-    print(f"Manifest path: {manifest_path}")
-    if not os.path.exists(manifest_path):
-        print(f"No manifest found at {manifest_path}")
-        return
-
-    with open(manifest_path, "r") as f:
-        manifest = json.load(f)
-
-    # Get API key based on chain
-    if "base" in chain:
-        api_key = os.getenv("ETHERSCAN_API_KEY")
-        if not api_key:
-            print("ETHERSCAN_API_KEY environment variable not set")
-            return
-    else:
-        api_key = os.getenv("ETHERSCAN_API_KEY")
-        if not api_key:
-            print("ETHERSCAN_API_KEY environment variable not set")
-            return
-
-    # Verify each contract
-    for contract_name, contract_data in manifest["contracts"].items():
-        print(f"\nVerifying {contract_name}...")
-        success = verify_from_manifest(
-            api_key=api_key,
-            contract_name=contract_name,
-            manifest_data=contract_data,
-            chain=chain
+def cli(profile_id, environment, manifest):
+    """Select a verification route without submitting verification."""
+    try:
+        profile = get_profile(profile_id)
+        validate_manifest_assertions(
+            profile,
+            manifest,
+            operation=Operation.VERIFICATION,
+            environment=environment,
         )
-        if success:
-            print(f"✅ {contract_name} verified successfully")
-        else:
-            print(f"❌ {contract_name} verification failed")
+        decision = operation_decision(profile, Operation.VERIFICATION)
 
-        # Add delay between verifications to avoid rate limits
-        time.sleep(1)  # Wait 1 second between contracts
+        if decision.outcome is OperationOutcome.BLOCKED_PENDING_POLICY:
+            raise NetworkProfileError(
+                "H02_VERIFIER_BLOCKED",
+                profile_id=profile.identity.profile_id,
+                operation=Operation.VERIFICATION,
+            )
+        if decision.outcome is OperationOutcome.UNSUPPORTED:
+            raise NetworkProfileError(
+                "H02_VERIFIER_UNSUPPORTED",
+                profile_id=profile.identity.profile_id,
+                operation=Operation.VERIFICATION,
+            )
+        selected_manifest = static_manifest_path(
+            profile,
+            manifest,
+            operation=Operation.VERIFICATION,
+            environment=environment,
+        )
+        click.echo(f"Manifest: {selected_manifest}")
+        raise NetworkProfileError(
+            "H02_OPERATION_INVALID",
+            profile_id=profile.identity.profile_id,
+            operation=Operation.VERIFICATION,
+        )
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
 
 
 if __name__ == "__main__":

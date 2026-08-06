@@ -57,6 +57,17 @@ interface EndaomentPSM:
     def setCanMint(_canMint: bool): nonpayable
     def setMintFee(_fee: uint256): nonpayable
 
+interface RipeGovVault:
+    def disableGovPointAccrualForUser(_user: address): nonpayable
+    def disableGovPointAccrualGlobally(): nonpayable
+
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
+interface Teller:
+    def migrateRipeGovPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
 
@@ -84,6 +95,8 @@ flag ActionType:
     PSM_SET_USDC_YIELD_POSITION
     PSM_SET_NUM_BLOCKS_PER_INTERVAL
     PSM_SET_SHOULD_AUTO_DEPOSIT
+    DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL
+    DISABLE_RIPE_GOV_POINT_ACCRUAL_USER
 
 struct EndaoLiquidityAction:
     legoId: uint256
@@ -161,6 +174,17 @@ struct PsmSetNumBlocksPerIntervalAction:
 
 struct PsmSetShouldAutoDepositAction:
     shouldAutoDeposit: bool
+
+struct RipeGovPointAccrualDisableAction:
+    vaultId: uint256
+    vaultAddr: address
+    user: address
+
+struct RipeGovMigration:
+    user: address
+    asset: address
+    sourceVaultId: uint256
+    targetVaultId: uint256
 
 event EndaomentDepositPerformed:
     legoId: uint256
@@ -333,6 +357,19 @@ event PendingPsmSetShouldAutoDepositAction:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingRipeGovPointAccrualGlobalDisable:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeGovPointAccrualUserDisable:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    user: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
 event EndaoTransferExecuted:
     asset: indexed(address)
     amount: uint256
@@ -409,6 +446,23 @@ event PsmSetNumBlocksPerIntervalExecuted:
 event PsmSetShouldAutoDepositExecuted:
     shouldAutoDeposit: bool
 
+event RipeGovPointAccrualGlobalDisableExecuted:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+
+event RipeGovPointAccrualUserDisableExecuted:
+    vaultId: indexed(uint256)
+    vaultAddr: indexed(address)
+    user: indexed(address)
+
+event RipeGovPositionMigrationExecuted:
+    user: indexed(address)
+    asset: indexed(address)
+    sourceVaultId: indexed(uint256)
+    targetVaultId: uint256
+    amount: uint256
+    caller: address
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingEndaoSwapActions: public(HashMap[uint256, DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
@@ -431,13 +485,17 @@ pendingPsmUpdateRedeemAllowlistActions: public(HashMap[uint256, PsmUpdateRedeemA
 pendingPsmSetUsdcYieldPositionActions: public(HashMap[uint256, PsmSetUsdcYieldPositionAction])
 pendingPsmSetNumBlocksPerIntervalActions: public(HashMap[uint256, PsmSetNumBlocksPerIntervalAction])
 pendingPsmSetShouldAutoDepositActions: public(HashMap[uint256, PsmSetShouldAutoDepositAction])
+pendingRipeGovPointAccrualDisableActions: public(HashMap[uint256, RipeGovPointAccrualDisableAction])
 
 MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
+MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
 
 MISSION_CONTROL_ID: constant(uint256) = 5
+VAULT_BOOK_ID: constant(uint256) = 8
 ENDAOMENT_ID: constant(uint256) = 14
+TELLER_ID: constant(uint256) = 17
 ENDAOMENT_PSM_ID: constant(uint256) = 22
 
 
@@ -477,6 +535,18 @@ def _getMissionControlAddr() -> address:
 
 @view
 @internal
+def _getVaultBookAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
+
+
+@view
+@internal
+def _getTellerAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(TELLER_ID)
+
+
+@view
+@internal
 def _getEndaomentAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(ENDAOMENT_ID)
 
@@ -485,6 +555,154 @@ def _getEndaomentAddr() -> address:
 @internal
 def _getEndaomentPsmAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(ENDAOMENT_PSM_ID)
+
+
+##################################
+# RipeGov Point-Accrual Disables #
+##################################
+
+
+@view
+@external
+def isValidRipeGovPointAccrualDisable(_vaultId: uint256, _user: address) -> bool:
+    return self._isValidRipeGovPointAccrualDisable(_vaultId, _user)
+
+
+@view
+@internal
+def _isValidRipeGovPointAccrualDisable(_vaultId: uint256, _user: address) -> bool:
+    if _vaultId == 0:
+        return False
+
+    vaultBookAddr: address = self._getVaultBookAddr()
+    if vaultBookAddr == empty(address) or not vaultBookAddr.is_contract:
+        return False
+
+    vaultBook: VaultBook = VaultBook(vaultBookAddr)
+    if not staticcall vaultBook.isValidRegId(_vaultId):
+        return False
+
+    vaultAddr: address = staticcall vaultBook.getAddr(_vaultId)
+    if vaultAddr == empty(address) or not vaultAddr.is_contract:
+        return False
+
+    isValidResponse: bool = False
+    disabledBlock: uint256 = 0
+    isValidResponse, disabledBlock = self._tryReadRipeGovUint256(
+        vaultAddr,
+        method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
+    )
+    if not isValidResponse or disabledBlock != 0:
+        return False
+
+    if _user != empty(address):
+        isValidResponse, disabledBlock = self._tryReadRipeGovUint256(
+            vaultAddr,
+            concat(
+                method_id("userGovPointAccrualDisabledBlock(address)", output_type=Bytes[4]),
+                convert(_user, bytes32),
+            ),
+        )
+        if not isValidResponse or disabledBlock != 0:
+            return False
+
+    return True
+
+
+@view
+@internal
+def _tryReadRipeGovUint256(_target: address, _callData: Bytes[36]) -> (bool, uint256):
+    success: bool = False
+    response: Bytes[32] = b""
+    success, response = raw_call(
+        _target,
+        _callData,
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+    return True, abi_decode(response, uint256)
+
+
+@external
+def disableRipeGovPointAccrualGlobally(_vaultId: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidRipeGovPointAccrualDisable(_vaultId, empty(address)) # dev: invalid disable
+
+    vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL
+    self.pendingRipeGovPointAccrualDisableActions[aid] = RipeGovPointAccrualDisableAction(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=empty(address),
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeGovPointAccrualGlobalDisable(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def disableRipeGovPointAccrualForUser(_vaultId: uint256, _user: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert self._isValidRipeGovPointAccrualDisable(_vaultId, _user) # dev: invalid disable
+
+    vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_USER
+    self.pendingRipeGovPointAccrualDisableActions[aid] = RipeGovPointAccrualDisableAction(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=_user,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeGovPointAccrualUserDisable(
+        vaultId=_vaultId,
+        vaultAddr=vaultAddr,
+        user=_user,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def migrateRipeGovPositions(
+    _migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS],
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_migrations) != 0 # dev: no migrations
+
+    teller: Teller = Teller(self._getTellerAddr())
+    for migration: RipeGovMigration in _migrations:
+        amount: uint256 = extcall teller.migrateRipeGovPosition(
+            migration.user,
+            migration.asset,
+            migration.sourceVaultId,
+            migration.targetVaultId,
+        )
+        log RipeGovPositionMigrationExecuted(
+            user=migration.user,
+            asset=migration.asset,
+            sourceVaultId=migration.sourceVaultId,
+            targetVaultId=migration.targetVaultId,
+            amount=amount,
+            caller=msg.sender,
+        )
+
+    return len(_migrations)
 
 
 ######################
@@ -1163,6 +1381,26 @@ def executePendingAction(_aid: uint256) -> bool:
         p: PsmSetShouldAutoDepositAction = self.pendingPsmSetShouldAutoDepositActions[_aid]
         extcall EndaomentPSM(self._getEndaomentPsmAddr()).setShouldAutoDeposit(p.shouldAutoDeposit)
         log PsmSetShouldAutoDepositExecuted(shouldAutoDeposit=p.shouldAutoDeposit)
+
+    elif actionType == ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_GLOBAL:
+        p: RipeGovPointAccrualDisableAction = self.pendingRipeGovPointAccrualDisableActions[_aid]
+        assert p.user == empty(address) # dev: invalid global action
+        assert self._isValidRipeGovPointAccrualDisable(p.vaultId, empty(address)) # dev: invalid disable
+        vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
+        assert vaultAddr == p.vaultAddr # dev: vault binding changed
+
+        extcall RipeGovVault(vaultAddr).disableGovPointAccrualGlobally()
+        log RipeGovPointAccrualGlobalDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr)
+
+    elif actionType == ActionType.DISABLE_RIPE_GOV_POINT_ACCRUAL_USER:
+        p: RipeGovPointAccrualDisableAction = self.pendingRipeGovPointAccrualDisableActions[_aid]
+        assert p.user != empty(address) # dev: invalid user action
+        assert self._isValidRipeGovPointAccrualDisable(p.vaultId, p.user) # dev: invalid disable
+        vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(p.vaultId)
+        assert vaultAddr == p.vaultAddr # dev: vault binding changed
+
+        extcall RipeGovVault(vaultAddr).disableGovPointAccrualForUser(p.user)
+        log RipeGovPointAccrualUserDisableExecuted(vaultId=p.vaultId, vaultAddr=vaultAddr, user=p.user)
 
     self.actionType[_aid] = empty(ActionType)
     return True

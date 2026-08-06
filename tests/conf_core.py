@@ -40,6 +40,7 @@ def ripe_hq(
     human_resources,
     mission_control,
     switchboard,
+    switchboard_charlie,
     credit_engine,
     deleverage,
     endaoment,
@@ -183,6 +184,10 @@ def ripe_hq(
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
     assert ripe_hq_deploy.finishRipeHqSetup(governance, sender=deploy3r)
 
+    # Canonical vault pointers used by the default local test deployment.
+    mission_control.setCoreRipeGovVaultId(2, sender=switchboard_charlie.address)
+    mission_control.setPreferredStabVaultId(1, sender=switchboard_charlie.address)
+
     return ripe_hq_deploy
 
 
@@ -253,6 +258,7 @@ def ledger(ripe_hq_deploy, defaults):
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
         defaults,
+        ZERO_ADDRESS,
         name="ledger",
     )
 
@@ -428,6 +434,7 @@ def lootbox(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Lootbox.vy",
         ripe_hq_deploy,
+        43_200, # minimum interval floor: 1 day in Base blocks
         43_200, # 1 day in blocks
         100 * EIGHTEEN_DECIMALS, # deposit rewards amount
         100 * EIGHTEEN_DECIMALS, # yield bonus amount
@@ -724,6 +731,15 @@ def stability_pool(ripe_hq_deploy):
     )
 
 
+@pytest.fixture(scope="function")
+def alternate_stability_pool(ripe_hq):
+    return boa.load(
+        "contracts/vaults/StabilityPool.vy",
+        ripe_hq,
+        name="alternate_stability_pool",
+    )
+
+
 # ripe gov vault
 
 
@@ -733,6 +749,15 @@ def ripe_gov_vault(ripe_hq_deploy):
         "contracts/vaults/RipeGov.vy",
         ripe_hq_deploy,
         name="ripe_gov_vault",
+    )
+
+
+@pytest.fixture(scope="function")
+def alternate_ripe_gov_vault(ripe_hq):
+    return boa.load(
+        "contracts/vaults/RipeGov.vy",
+        ripe_hq,
+        name="alternate_ripe_gov_vault",
     )
 
 
@@ -887,6 +912,7 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
 def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     MORPHO_A = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
     MORPHO_B = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+    MORPHO_V2 = mock_yield_registry if fork == "local" else ZERO_ADDRESS
     EULER_A = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EVAULT_FACTORY"]
     EULER_B = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EARN_FACTORY"]
     FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]

@@ -59,6 +59,48 @@ def test_loot_claim_basic(
     assert claimable == 0
 
 
+def test_accrued_loot_buckets_remain_claimable_while_new_points_are_disabled(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setRipeRewardsConfig(True)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    stored_points = ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints
+    claimable_before_disable = lootbox.getClaimableLoot(bob)
+    assert stored_points > 0
+    assert claimable_before_disable > 0
+
+    setRipeRewardsConfig(False)
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == stored_points
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed == claimable_before_disable
+    assert ripe_token.balanceOf(bob) == claimed
+
+
+
 def test_loot_claim_multiple_users(
     bob,
     alice,
@@ -1483,3 +1525,196 @@ def test_loot_claim_auto_stake_configuration_updates(
     assert second_claim > 0
     assert ripe_token.balanceOf(bob) == first_claim  # Wallet unchanged from first claim
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0  # Second claim went to vault
+
+
+def test_lootbox_auto_stake_uses_core_governance_vault_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_alpha,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    source_vault_id = vault_book.getRegId(simple_erc20_vault)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        source_vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed > 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_lootbox_claim_routes_fail_closed_when_core_pointer_is_unset(
+    mission_control,
+    lootbox,
+    bob,
+    alpha_token,
+):
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    assert lootbox.getClaimableLoot(bob) == 0
+    with boa.reverts("invalid vault id"):
+        lootbox.getClaimableDepositLootForAsset(bob, 3, alpha_token)
+
+
+def test_lootbox_borrow_auto_stake_uses_core_governance_vault_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    lootbox,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    ripe_token,
+    mission_control,
+    switchboard_alpha,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Borrow Loot Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setRipeRewardsConfig(
+        True,
+        _autoStakeRatio=100_00,
+        _autoStakeDurationRatio=50_00,
+    )
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    debt_terms = createDebtTerms()
+    user_debt = (
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        debt_terms,
+        0,
+        False,
+    )
+    ledger.setUserDebt(bob, user_debt, 0, (0, 0), sender=credit_engine.address)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+
+    claimable = lootbox.getClaimableBorrowLoot(bob)
+    assert claimable > 0
+    assert lootbox.claimBorrowLoot(bob, sender=teller.address) == claimable
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+        == claimable
+    )
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_token.balanceOf(bob) == 0
+
+
+def test_lootbox_borrow_claim_unset_pointer_reverts_without_state_changes(
+    bob,
+    setGeneralConfig,
+    setRipeRewardsConfig,
+    ledger,
+    lootbox,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    ripe_token,
+    mission_control,
+):
+    setGeneralConfig()
+    setRipeRewardsConfig(
+        True,
+        _autoStakeRatio=100_00,
+        _autoStakeDurationRatio=50_00,
+    )
+
+    debt_terms = createDebtTerms()
+    user_debt = (
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        debt_terms,
+        0,
+        False,
+    )
+    ledger.setUserDebt(bob, user_debt, 0, (0, 0), sender=credit_engine.address)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+
+    claimable_before = lootbox.getClaimableBorrowLoot(bob)
+    user_points_before = ledger.userBorrowPoints(bob)
+    global_points_before = ledger.globalBorrowPoints()
+    rewards_available_before = ledger.ripeAvailForRewards()
+    supply_before = ripe_token.totalSupply()
+    user_balance_before = ripe_token.balanceOf(bob)
+    allowance_before = ripe_token.allowance(lootbox, teller)
+    assert claimable_before > 0
+
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+    with boa.reverts("invalid vault id"):
+        lootbox.claimBorrowLoot(bob, sender=teller.address)
+
+    user_points_after = ledger.userBorrowPoints(bob)
+    global_points_after = ledger.globalBorrowPoints()
+    assert lootbox.getClaimableBorrowLoot(bob) == claimable_before
+    assert (
+        user_points_after.lastPrincipal,
+        user_points_after.points,
+        user_points_after.lastUpdate,
+    ) == (
+        user_points_before.lastPrincipal,
+        user_points_before.points,
+        user_points_before.lastUpdate,
+    )
+    assert (
+        global_points_after.lastPrincipal,
+        global_points_after.points,
+        global_points_after.lastUpdate,
+    ) == (
+        global_points_before.lastPrincipal,
+        global_points_before.points,
+        global_points_before.lastUpdate,
+    )
+    assert ledger.ripeAvailForRewards() == rewards_available_before
+    assert ripe_token.totalSupply() == supply_before
+    assert ripe_token.balanceOf(bob) == user_balance_before
+    assert ripe_token.allowance(lootbox, teller) == allowance_before

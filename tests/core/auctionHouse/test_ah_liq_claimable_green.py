@@ -1,6 +1,6 @@
 import pytest
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
-from conf_utils import filter_logs
+from conf_utils import filter_logs, redeem_from_stability_pool
 
 
 def test_ah_liquidation_with_claimable_green_basic(
@@ -101,7 +101,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     redeem_amount = target_repay_amount * 200 // 100  # 100% extra buffer for conservative formula
     green_token.transfer(alice, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, charlie_token, redeem_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, charlie_token, redeem_amount, sender=alice)
     
     # Verify claimable green exists and is more than enough
     claimable_green_before = stability_pool.claimableBalances(bravo_token, green_token)
@@ -233,7 +233,7 @@ def test_ah_liquidation_claimable_green_insufficient(
     redeem_amount = 20 * EIGHTEEN_DECIMALS  # Small amount - insufficient for liquidation
     green_token.transfer(alice, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, charlie_token, redeem_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, charlie_token, redeem_amount, sender=alice)
     
     claimable_green_before = stability_pool.claimableBalances(bravo_token, green_token)
     assert claimable_green_before == redeem_amount, "Must have correct claimable GREEN setup"
@@ -379,7 +379,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     redeem_amount = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, charlie_token, redeem_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, charlie_token, redeem_amount, sender=alice)
     
     # Verify setup
     assert stability_pool.claimableBalances(bravo_token, green_token) == redeem_amount
@@ -546,7 +546,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     # Redeem generous amount of GREEN to ensure our conservative formula has enough
     green_token.transfer(alice, generous_green_amount, sender=whale)
     green_token.approve(teller, generous_green_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, bravo_token, generous_green_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, bravo_token, generous_green_amount, sender=alice)
     
     # Verify setup - we have more than enough claimable GREEN
     claimable_green_before = stability_pool.claimableBalances(charlie_token, green_token)
@@ -789,7 +789,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     generous_green_amount = target_repay_amount * 150 // 100  # 50% extra
     green_token.transfer(alice, generous_green_amount, sender=whale)
     green_token.approve(teller, generous_green_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, charlie_token, generous_green_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, charlie_token, generous_green_amount, sender=alice)
     
     # Change green price AFTER redemption (should not affect liquidation)
     mock_price_source.setPrice(green_token, 2 * EIGHTEEN_DECIMALS)  # Green at $2 (IGNORED by liquidation)
@@ -907,7 +907,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     small_redeem_amount = 5 * EIGHTEEN_DECIMALS  # Only 5 GREEN available
     green_token.transfer(alice, small_redeem_amount, sender=whale)
     green_token.approve(teller, small_redeem_amount, sender=alice)
-    teller.redeemFromStabilityPool(stab_id, charlie_token, small_redeem_amount, sender=alice)
+    redeem_from_stability_pool(teller, stab_id, charlie_token, small_redeem_amount, sender=alice)
     
     # Verify small amount of claimable green
     claimable_green_before = stability_pool.claimableBalances(bravo_token, green_token)

@@ -37,6 +37,7 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def rewardsConfig() -> cs.RipeRewardsConfig: view
     def genDebtConfig() -> cs.GenDebtConfig: view
+    def coreRipeGovVaultId() -> uint256: view
     def genConfig() -> cs.GenConfig: view
 
 interface VaultBook:
@@ -1368,6 +1369,7 @@ def setRipeGovVaultConfig(
     _missionControl: address = empty(address),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
+    mc: address = self._resolveMissionControl(_missionControl)
 
     lockTerms: cs.LockTerms = cs.LockTerms(
         minLockDuration=_minLockDuration,
@@ -1376,7 +1378,7 @@ def setRipeGovVaultConfig(
         canExit=_canExit,
         exitFee=_exitFee,
     )
-    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms) # dev: invalid ripe vault config
+    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms, mc) # dev: invalid ripe vault config
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_VAULT_CONFIG
@@ -1386,7 +1388,7 @@ def setRipeGovVaultConfig(
         shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
         lockTerms=lockTerms,
     )
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingMissionControl[aid] = mc
 
     log PendingRipeGovVaultConfigChange(
         asset=_asset,
@@ -1405,16 +1407,17 @@ def setRipeGovVaultConfig(
 
 @view
 @internal
-def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: cs.LockTerms) -> bool:
+def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: cs.LockTerms, _missionControl: address) -> bool:
     if _asset == empty(address):
         return False
 
-    mc: address = self._getMissionControlAddr()
-    if not staticcall MissionControl(mc).isSupportedAsset(_asset):
+    if not staticcall MissionControl(_missionControl).isSupportedAsset(_asset):
         return False
 
-    # NOTE: this assumes that vault id 2 is ripe gov vault !!
-    if not staticcall MissionControl(mc).isSupportedAssetInVault(2, _asset):
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    if coreRipeGovVaultId == 0:
+        return False
+    if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(coreRipeGovVaultId, _asset):
         return False
 
     if _assetWeight > 500_00: # max 500%

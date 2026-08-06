@@ -1,4 +1,5 @@
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from conf_utils import filter_logs
@@ -56,6 +57,51 @@ def test_basic_borrow(
 
     # check balance
     assert green_token.balanceOf(bob) == borrow_amount
+
+
+def test_borrow_guard_runs_before_credit_effects_and_rejects_second_action(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
+    teller.borrow(10 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    debt = ledger.userDebt(bob).amount
+    balance = green_token.balanceOf(bob)
+    touch = ledger.lastTouch(bob)
+
+    with boa.reverts("one action per block"):
+        teller.borrow(1 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    assert ledger.userDebt(bob).amount == debt
+    assert green_token.balanceOf(bob) == balance
+    assert ledger.lastTouch(bob) == touch
 
 
 def test_borrow_protocol_disabled(
@@ -852,6 +898,194 @@ def test_borrow_savings_green_enter_stab_pool(
     assert final_stab_pool_balance > 0  # should have sGREEN deposited in stability pool
 
 
+def test_borrow_savings_green_uses_preferred_stability_pool_pointer(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    savings_green,
+    stability_pool,
+    alternate_stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+):
+    preferred_id = registerVault(alternate_stability_pool, "Preferred Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [preferred_id])
+    setGeneralDebtConfig()
+    mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=bob)
+    assert alternate_stability_pool.getTotalAmountForUser(bob, savings_green) > 0
+    assert stability_pool.getTotalAmountForUser(bob, savings_green) == 0
+
+
+def test_borrow_terms_exclude_current_and_retired_stability_pools(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    stability_pool,
+    alternate_stability_pool,
+    simple_erc20_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+):
+    alternate_id = registerVault(alternate_stability_pool, "Alternate Stability Pool")
+    assert mission_control.preferredStabVaultId() == 1
+    assert mission_control.isStabVaultId(1)
+
+    # Rotate away from vault 1 and remove all priority entries. Vault 1 must
+    # remain classified because users can still have balances there.
+    mission_control.setPriorityStabVaults([], sender=switchboard_alpha.address)
+    mission_control.setPreferredStabVaultId(
+        alternate_id,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.isStabVaultId(1)
+    assert mission_control.isStabVaultId(alternate_id)
+    assert not mission_control.isStabVaultId(3)
+
+    setGeneralConfig()
+    setAssetConfig(alpha_token, [1, 3, alternate_id])
+    setGeneralDebtConfig()
+    amount = 100 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, amount, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(bob, amount, alpha_token, alpha_token_whale, stability_pool)
+    performDeposit(bob, amount, alpha_token, alpha_token_whale, alternate_stability_pool)
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == amount
+    assert terms.totalMaxDebt == amount // 2
+
+
+@pytest.mark.parametrize("registration_source", ["preferred", "priority", "special"])
+def test_borrow_terms_exclude_retired_stab_vault_from_every_registry_source(
+    registration_source,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    alternate_stability_pool,
+    simple_erc20_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+):
+    alternate_id = registerVault(
+        alternate_stability_pool,
+        f"{registration_source.title()} Stability Pool",
+    )
+    special_id = alternate_id if registration_source == "special" else 0
+
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        [3, alternate_id],
+        _specialStabPoolId=special_id,
+    )
+    setGeneralDebtConfig()
+
+    if registration_source == "preferred":
+        mission_control.setPreferredStabVaultId(
+            alternate_id,
+            sender=switchboard_alpha.address,
+        )
+    elif registration_source == "priority":
+        mission_control.setPriorityStabVaults(
+            [(alternate_id, alpha_token.address)],
+            sender=switchboard_alpha.address,
+        )
+
+    assert mission_control.isStabVaultId(alternate_id)
+
+    # Remove the active reference. Classification must remain fail-closed while
+    # users can still hold balances in the retired stability pool.
+    if registration_source == "preferred":
+        mission_control.setPreferredStabVaultId(1, sender=switchboard_alpha.address)
+    elif registration_source == "priority":
+        mission_control.setPriorityStabVaults([], sender=switchboard_alpha.address)
+    else:
+        setAssetConfig(
+            alpha_token,
+            [3, alternate_id],
+            _specialStabPoolId=0,
+        )
+
+    assert mission_control.isStabVaultId(alternate_id)
+    assert not mission_control.isStabVaultId(3)
+
+    regular_amount = 100 * EIGHTEEN_DECIMALS
+    stab_amount = 200 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        regular_amount,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+    )
+    performDeposit(
+        bob,
+        stab_amount,
+        alpha_token,
+        alpha_token_whale,
+        alternate_stability_pool,
+    )
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == regular_amount
+    assert terms.totalMaxDebt == regular_amount // 2
+
+
+def test_borrow_savings_green_fails_closed_when_preferred_pointer_is_unset(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    savings_green,
+    mission_control,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [1])
+    setGeneralDebtConfig()
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.eval("self.preferredStabVaultId = 0")
+
+    with boa.reverts("invalid vault id"):
+        teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=bob)
+
+
 def test_borrow_savings_green_no_stab_pool(
     alpha_token,
     alpha_token_whale,
@@ -1162,25 +1396,112 @@ def test_get_user_borrow_terms_multiple_assets_some_zero_ltv(
 
 def test_get_user_borrow_terms_asset_with_zero_amount(
     alpha_token,
+    alpha_token_whale,
     bob,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
+    performDeposit,
     credit_engine,
     createDebtTerms,
+    rebase_erc20_vault,
 ):
     setGeneralConfig()
     debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
-    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setAssetConfig(alpha_token, _vaultIds=[4], _debtTerms=debt_terms)
     setGeneralDebtConfig()
-    # Manually ensure user has a vault but zero amount (simulate)
-    # This requires direct manipulation or a fixture that allows it; here we just check that zero amount is ignored
-    # (Assume the vault returns zero for getUserAssetAndAmountAtIndex)
-    # So, no deposit is made
+
+    # SharesVault preserves a nonempty position after total loss.
+    nominal_amount = 1 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        nominal_amount,
+        alpha_token,
+        alpha_token_whale,
+        rebase_erc20_vault,
+    )
+    alpha_token.transfer(
+        alpha_token_whale,
+        nominal_amount,
+        sender=rebase_erc20_vault.address,
+    )
+    assert rebase_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
+
     terms = credit_engine.getUserBorrowTerms(bob, True)
     assert terms.collateralVal == 0
     assert terms.totalMaxDebt == 0
-    assert terms.debtTerms.ltv == 0
+    assert terms.debtTerms.ltv == 50_00
+    assert terms.debtTerms.redemptionThreshold == 60_00
+    assert terms.debtTerms.liqThreshold == 70_00
+    assert terms.debtTerms.liqFee == 10_00
+    assert terms.debtTerms.borrowRate == 5_00
+    assert terms.debtTerms.daowry == 1_00
+
+
+def test_zero_balance_registered_asset_keeps_borrow_term_floor(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    simple_erc20_vault,
+):
+    """Withdrawing to zero must not silently remove configured debt terms."""
+
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    bravo_terms = createDebtTerms(
+        _ltv=10_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=alpha_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_terms)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, amount, bravo_token, bravo_token_whale)
+    assert teller.withdraw(
+        bravo_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 2) == (
+        bravo_token.address,
+        0,
+    )
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == amount
+    assert terms.totalMaxDebt == amount // 2
+    assert terms.lowestLtv == 10_00
+    assert terms.debtTerms.liqThreshold == 79_99
 
 
 def test_get_user_borrow_terms_asset_with_no_price(
