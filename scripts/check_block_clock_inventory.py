@@ -241,7 +241,7 @@ CURRENT_PRODUCTION_INVENTORY_SHA256 = (
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
-    "cc6ccb4d0d966306623b78444bff793ce48ab867c6f4656451cf74852802fb38"
+    "6e864a6827e75749767f6be722c3900e3cde573fff835e20a01c288660f3d326"
 )
 EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
     {
@@ -285,7 +285,7 @@ EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
             "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
         ),
         "currentContentSha256": (
-            "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+            "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
         ),
     },
     {
@@ -307,7 +307,7 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 787,
-        "currentLine": 914,
+        "currentLine": 787,
         "currentLineText": (
             "    if config.lastSnapshot.lastUpdate == block.timestamp:"
         ),
@@ -322,12 +322,12 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 2,
         "historicalReviewedLine": 791,
-        "currentLine": 922,
+        "currentLine": 791,
         "currentLineText": (
-            "        if not didAdd or nextSnapshotAt > block.timestamp:"
+            "    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:"
         ),
         "currentLineSha256": (
-            "79164ed349a9ccb009cbc82ebc610255a02514ebacc2f8582bce5ffd12da51d9"
+            "9496e63ce369b3249e87b60800f54147307e6d432a1c571388ed02a6e14e2d97"
         ),
     },
     {
@@ -337,10 +337,10 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 848,
-        "currentLine": 960,
-        "currentLineText": "    currentTimestamp: uint256 = block.timestamp",
+        "currentLine": 848,
+        "currentLineText": "        lastUpdate=block.timestamp,",
         "currentLineSha256": (
-            "65ce5080501ffbf935fe37b404bdfb79352808b02a346518e3fd6324216c42a6"
+            "b790e6c99e32877e29bc8e8c9a143cb4fded60811624a57026d77621f7423f4b"
         ),
     },
     {
@@ -350,10 +350,13 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 750,
-        "currentLine": 868,
-        "currentLineText": "            if block.timestamp > staleAt:",
+        "currentLine": 750,
+        "currentLineText": (
+            "        if _config.staleTime != 0 and block.timestamp > "
+            "snapShot.lastUpdate + _config.staleTime:"
+        ),
         "currentLineSha256": (
-            "9d3d995977312a61f6a54cde9bc61e19ccdc4d13b32aa06d5fde76125c52c174"
+            "0c3f079fdf151069ce95b4011f908f24ceb6d0f05b14241765b88d703ac19794"
         ),
     },
 )

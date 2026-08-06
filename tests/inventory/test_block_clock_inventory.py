@@ -208,7 +208,7 @@ def test_current_bindings_are_exact_and_preserve_historical_fingerprint(
         }
     ) == 4
     assert checker.CURRENT_BINDINGS_STATE_SHA256 == (
-        "cc6ccb4d0d966306623b78444bff793ce48ab867c6f4656451cf74852802fb38"
+        "6e864a6827e75749767f6be722c3900e3cde573fff835e20a01c288660f3d326"
     )
     assert checker._current_bindings_fingerprint(bindings) == (
         checker.CURRENT_BINDINGS_STATE_SHA256

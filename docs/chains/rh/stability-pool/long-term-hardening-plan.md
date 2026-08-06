@@ -9,7 +9,7 @@
 > [!NOTE]
 > **Implementation status refreshed 2026-08-06.** Tier A+B was selected and
 > implemented for the isolated candidate at
-> `a510891c26410ab28c3c326ecaa283f57b4aff66`. The forward-looking plan below
+> `e5cc4f53dc45eba97906bcbefef8e1b14142a3d2`. The forward-looking plan below
 > remains preserved as historical design context. The
 > [implementation specification's as-built outcome](implementation-specification.md#as-built-outcome-2026-08-06)
 > records the final code, bytecode, validation evidence, and owner-approved
@@ -39,10 +39,10 @@ final implementation:
 The original plan's broader ABI-removal and always-available manual activation
 language is therefore superseded as a description of the final candidate. The
 zero-raw-Stability-balance plus dormant-only claim exit remains an explicit
-deferred residual. The eleven-argument Morpho V2
-`BlueChipYieldPrices.vy` source has been restored so source, fixture, ABI, and
-Robinhood migration expectations agree. Active-asset price loss remains
-fail-closed and requires the operational response recorded in the
+deferred residual. The earlier, unrelated `BlueChipYieldPrices.vy` restoration
+has been removed; its ten-argument source and fixture match the owner-selected
+`rh` version and remain outside this Stability candidate. Active-asset price
+loss remains fail-closed and requires the operational response recorded in the
 implementation specification; Tier C automatic quarantine remains deferred.
 
 ## 1. Scope and bound baseline

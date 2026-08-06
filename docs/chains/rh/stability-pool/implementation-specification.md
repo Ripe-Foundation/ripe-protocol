@@ -20,11 +20,10 @@ The final contract and test source is bound to this checkpoint:
 
 | Field | Final value |
 | --- | --- |
-| Source/test commit | `a510891c26410ab28c3c326ecaa283f57b4aff66` |
-| Source/test tree | `1c323fc63d34aea82f607f119733d58a1d254d34` |
+| Source/test commit | `e5cc4f53dc45eba97906bcbefef8e1b14142a3d2` |
+| Source/test tree | `d00046b62defecc82a9e3ce0a761439eea3e29c9` |
 | `StabilityPool.vy` SHA-256 | `3fe9fb58a3b772a7266734178f6a11fd12edc581c333c685f8c7e106ba6807ed` |
 | `StabVault.vy` SHA-256 | `4fb757b0ec0706f49ad84fd1ac5728057c755b5adecec1c4c60e050a1520f13a` |
-| `BlueChipYieldPrices.vy` SHA-256 | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` |
 | Compiler | Vyper `0.4.3` with `# pragma optimize codesize` |
 
 The final owner decisions and security corrections are:
@@ -57,9 +56,9 @@ The final owner decisions and security corrections are:
 6. `recoverFunds` and `recoverFundsMany` remain as interface-compatible
    selectors but unconditionally revert. StabilityPool emits no recovery event
    and exposes no generic token-recovery path.
-7. The exact reviewed eleven-argument Morpho V2 version of
-   `BlueChipYieldPrices.vy` is restored. The fixture, ABI, migration input, and
-   `morpho-v2-identity-exact` postcondition now describe the same contract.
+7. The earlier, unrelated `BlueChipYieldPrices.vy` restoration is removed. Its
+   ten-argument source and fixture match the owner-selected `rh` version and
+   remain outside this Stability candidate.
 8. Tier C automatic quarantine/retirement remains deferred.
 
 Final bytecode and ABI evidence is:
@@ -84,9 +83,6 @@ Validation completed directly on the committed source/test tree includes:
   selection: `90 passed`;
 - frozen production-artifact suite after mechanical AuctionHouse, CreditEngine,
   and Teller identity refresh: `26 passed`;
-- BlueChip functional selection: `80 passed`, `16 deselected`; the combined
-  inventory assertion separately exposed the legacy metadata issue recorded
-  below;
 - four deterministic Hypothesis properties: `140` generated examples covering
   add, prune, activate, deposit, withdraw, claim reductions, redemption,
   capacity exhaustion, price changes, and re-addition;
@@ -96,18 +92,28 @@ Validation completed directly on the committed source/test tree includes:
 - a transaction gas matrix at active counts `0, 1, 2, 4, 8, 12`, proving
   monotonic bounded deposit and withdrawal cost and a local-EVM ceiling below
   `400,000` gas at the cap; and
-- deterministic ABI regeneration/check with only the intentionally removed
-  recovery event changing from the prior checked ABI.
+- deterministic StabilityPool ABI comparison with only the intentionally
+  removed recovery event changing from the prior checked ABI.
 
-The exact-tree repository pass completed in `32m20s`: `4,313 passed`, `144`
-deselected, `1 xfailed`, and `14 failed`. None of the 14 failures exercises
-StabilityPool or StabVault behavior. Thirteen are stale identity or
-format-sensitive bindings in inherited CreditEngine, Teller, Robinhood stock,
-and BasicVault inventory tests. The remaining BasicVault comparison reaches
-the expected `insufficient vault backing` guard, but Boa does not propagate the
-inner module reason through Teller's external-call failure, so its reason-text
-matcher fails. These failures are recorded rather than attributed to this
-candidate or hidden by weakening the complete-suite selection.
+The complete repository pass on the Stability implementation commit
+`a510891c26410ab28c3c326ecaa283f57b4aff66`, before the unrelated BlueChip
+correction, completed in `32m20s`: `4,313 passed`, `144` deselected, `1 xfailed`,
+and `14 failed`. None of the 14 failures exercises StabilityPool or StabVault
+behavior. Thirteen are stale identity or format-sensitive bindings in inherited
+CreditEngine, Teller, Robinhood stock, and BasicVault inventory tests. The
+remaining BasicVault comparison reaches the expected `insufficient vault
+backing` guard, but Boa does not propagate the inner module reason through
+Teller's external-call failure, so its reason-text matcher fails. These failures
+are recorded rather than attributed to this candidate or hidden by weakening
+the complete-suite selection.
+
+After the corrective commit, the exact owner-selected ten-argument BlueChip
+source and fixture passed all `44` focused local tests, the Stability Vault
+module suites again passed all `176` tests, and all `14` current-binding
+structural and fail-closed tests passed. The complete block-clock inventory
+suite retains `8` failures caused solely by the same `12` inherited
+AuctionHouse, CreditEngine, and Teller findings recorded below; no BlueChip or
+Stability binding finding remains.
 
 The Stability closeout preserves the frozen PR #61 and S5 hashes while binding
 the current StabilityPool source and current artifact file separately. The
