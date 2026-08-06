@@ -139,15 +139,19 @@ source and fixture passed all `44` focused local tests, the Stability Vault
 module suites again passed all `176` tests, and all `14` then-current binding
 structural and fail-closed tests passed.
 
-The final capacity-preflight source changes leave three expected candidate
-findings in the security-controlled block-clock inventory: the current
-StabilityPool source binding, the current AuctionHouse artifact-metadata
-fingerprint, and the S5 legacy-reconstruction fingerprint affected by the new
-AuctionHouse runtime fields. Those historical/provenance records have not been
-rewritten without a separate explicit owner approval. This is a metadata-closeout
-item, not a contract failure: the deterministic frozen-contract artifact checker
-passes the current AuctionHouse expectation, and the exact StabilityPool
-source/runtime pin tests pass.
+The owner separately approved the three security-controlled block-clock
+closeout bindings. The current StabilityPool source and AuctionHouse artifact
+file are now rebound, while the frozen PR #61 artifact projection and S5 legacy
+inventory fingerprints remain byte-identical. The checker gets past all three
+capacity-preflight metadata findings and then reports 13 separate findings: the
+12 previously documented AuctionHouse, CreditEngine, and Teller line/content
+drifts plus the current StabVault source differing from its older reviewed-source
+record. That fourth semantic-review record is intentionally not rewritten under
+the three-binding approval. The complete inventory test file therefore records
+`172 passed, 8 failed`; all eight failing tests are consequences of those 13
+reported findings. The deterministic frozen-contract artifact checker passes
+the current AuctionHouse expectation, and the exact StabilityPool source/runtime
+pin tests pass.
 
 ### Operational residuals and oracle response
 

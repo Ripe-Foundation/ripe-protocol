@@ -28,7 +28,7 @@
   },
   "currentBindings": {
     "schemaVersion": 1,
-    "currentStateSha256": "6e864a6827e75749767f6be722c3900e3cde573fff835e20a01c288660f3d326",
+    "currentStateSha256": "6799942a48f496f51c5e74aa36f200636ec3eec3efd81ab9e019f9f920c27ebc",
     "sourcePaths": [
       {
         "path": "contracts/mock/MockMorphoV2Factory.vy",
@@ -64,7 +64,7 @@
         "path": "contracts/vaults/StabilityPool.vy",
         "classification": "production",
         "historicalContentSha256": "04d0a7dddb8b562e8e384f61e6b83c76f5bc4a761070fd069f52d6ae8a4e22eb",
-        "currentContentSha256": "3fe9fb58a3b772a7266734178f6a11fd12edc581c333c685f8c7e106ba6807ed"
+        "currentContentSha256": "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158"
       }
     ],
     "timestampLines": [

@@ -241,7 +241,7 @@ CURRENT_PRODUCTION_INVENTORY_SHA256 = (
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
-    "6e864a6827e75749767f6be722c3900e3cde573fff835e20a01c288660f3d326"
+    "6799942a48f496f51c5e74aa36f200636ec3eec3efd81ab9e019f9f920c27ebc"
 )
 EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
     {
@@ -295,7 +295,7 @@ EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
             "04d0a7dddb8b562e8e384f61e6b83c76f5bc4a761070fd069f52d6ae8a4e22eb"
         ),
         "currentContentSha256": (
-            "3fe9fb58a3b772a7266734178f6a11fd12edc581c333c685f8c7e106ba6807ed"
+            "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158"
         ),
     },
 )
@@ -534,7 +534,7 @@ PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
     "87237f98d3becdd3941e7f8146195f5d29b4cfabe8b34ca3c95f06c755a9feb6"
 )
 CURRENT_ARTIFACT_EXPECTATIONS_SHA256 = (
-    "af97a87fdd535283d0bc4c55f9edf8f63e227fb798ab1654ca851d61a10ed07b"
+    "3cf3077a50fae00733f511653f369d95d91d52edc7cc035676fda1c78b98c397"
 )
 DEFAULTS_ROBINHOOD_ARTIFACT_RECORD_SHA256 = (
     "623171018b02c3b48d32094da0f6a0633b4825c7f56e0c547357baff91efd1e9"
@@ -1890,6 +1890,16 @@ def _restore_pr61_artifact_expectations_legacy(
     contracts = artifact_data["contracts"]
     contracts["AuctionHouse"]["artifacts"]["creation_sha256"] = (
         "0b58ea8c6aea0a7615315af80abcf5a06a03ba330e45e7334c4a5b168d0fe0b0"
+    )
+    contracts["AuctionHouse"]["artifacts"].update(
+        {
+            "creation_size": 24_636,
+            "eip170_headroom": 123,
+            "runtime_template_sha256": (
+                "cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f"
+            ),
+            "runtime_template_size": 24_453,
+        }
     )
     contracts["AuctionHouse"]["source_git_blob"] = (
         "d0a2d45cae0128cbb6ed5508238c817dfd963482"
