@@ -889,7 +889,6 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
 def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     MORPHO_A = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
     MORPHO_B = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
-    MORPHO_V2 = mock_yield_registry if fork == "local" else ZERO_ADDRESS
     EULER_A = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EVAULT_FACTORY"]
     EULER_B = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EARN_FACTORY"]
     FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]
@@ -909,7 +908,6 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         COMPOUND_V3,
         MOONWELL,
         AAVE_V3,
-        MORPHO_V2,
         name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

@@ -184,7 +184,7 @@ def test_stab_vault_share_calculations(
     teller,
     mock_price_source,
 ):
-    """Test share calculation utilities"""
+    """Test share accounting through the retained total-value views."""
     # Set mock price
     price = 1 * EIGHTEEN_DECIMALS
     mock_price_source.setPrice(alpha_token, price)
@@ -195,13 +195,10 @@ def test_stab_vault_share_calculations(
     deposited = stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
     assert deposited == deposit_amount
 
-    # Test valueToShares
-    shares = stability_pool.valueToShares(alpha_token, deposit_amount, False)
+    shares = stability_pool.userBalances(bob, alpha_token)
     assert shares != 0
-
-    # Test sharesToValue
-    value = stability_pool.sharesToValue(alpha_token, shares, False)
-    assert value == deposit_amount
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == deposit_amount
+    assert stability_pool.getTotalValue(alpha_token) == deposit_amount
 
 
 def test_stab_vault_share_value_with_claimable_assets(
@@ -265,11 +262,13 @@ def test_stab_vault_share_calculation_edge_cases(
     stability_pool,
     alpha_token,
     alpha_token_whale,
+    bob,
+    teller,
     price_desk,
     mock_price_source,
     _test,
 ):
-    """Test share calculation edge cases"""
+    """Test share accounting edge cases through deposits and value views."""
     # Set mock price
     price = 1 * EIGHTEEN_DECIMALS
     mock_price_source.setPrice(alpha_token, price)
@@ -278,26 +277,26 @@ def test_stab_vault_share_calculation_edge_cases(
     tiny_amount = 1  # 1 wei
     alpha_token.transfer(stability_pool, tiny_amount, sender=alpha_token_whale)
     tiny_value = price_desk.getUsdValue(alpha_token, tiny_amount)
-    shares = stability_pool.valueToShares(alpha_token, tiny_value, False)
-    value = stability_pool.sharesToValue(alpha_token, shares, False)
-    _test(tiny_value, value)
+    stability_pool.depositTokensInVault(bob, alpha_token, tiny_amount, sender=teller.address)
+    _test(tiny_value, stability_pool.getTotalUserValue(bob, alpha_token))
 
     # Test with very large amounts
     large_amount = 1000000 * EIGHTEEN_DECIMALS
     alpha_token.transfer(stability_pool, large_amount, sender=alpha_token_whale)
     large_value = price_desk.getUsdValue(alpha_token, large_amount)
-    shares = stability_pool.valueToShares(alpha_token, large_value, False)
-    value = stability_pool.sharesToValue(alpha_token, shares, False)
-    _test(large_value, value)
+    stability_pool.depositTokensInVault(bob, alpha_token, large_amount, sender=teller.address)
+    expected_value = tiny_value + large_value
+    _test(expected_value, stability_pool.getTotalUserValue(bob, alpha_token))
+    _test(expected_value, stability_pool.getTotalValue(alpha_token))
 
     # Test rounding behavior
     odd_amount = 123456789
     alpha_token.transfer(stability_pool, odd_amount, sender=alpha_token_whale)
     odd_value = price_desk.getUsdValue(alpha_token, odd_amount)
-    shares_down = stability_pool.valueToShares(alpha_token, odd_value, False)
-    shares_up = stability_pool.valueToShares(alpha_token, odd_value, True)
-    assert shares_up >= shares_down
-    assert shares_up - shares_down <= 1  # Should only differ by at most 1
+    stability_pool.depositTokensInVault(bob, alpha_token, odd_amount, sender=teller.address)
+    expected_value += odd_value
+    _test(expected_value, stability_pool.getTotalUserValue(bob, alpha_token))
+    _test(expected_value, stability_pool.getTotalValue(alpha_token))
 
 
 def test_stab_vault_withdrawal_edge_cases(
@@ -377,9 +376,9 @@ def test_stab_vault_zero_balance_scenarios(
     shares = stability_pool.getUserLootBoxShare(bob, alpha_token)
     assert shares != 0  # Shares should remain even if balance is zero
 
-    # cannot borrow against stability pool positions
+    # The iterator remains truthful for AuctionHouse, while the amount is zero.
     asset, amount = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
-    assert asset == ZERO_ADDRESS
+    assert asset == alpha_token.address
     assert amount == 0
 
     # Should still show has balance (because shares exist)

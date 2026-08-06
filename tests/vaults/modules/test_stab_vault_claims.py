@@ -575,16 +575,18 @@ def test_stab_vault_claims_tiny_amounts(
     claimable_amount = 3  # Even smaller
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
-        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        alpha_token, 1, bravo_token, claimable_amount,
         ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
     )
 
-    # Claim
+    # A directly selected dormant balance remains claimable while raw NAV remains.
     vault_id = vault_book.getRegId(stability_pool)
     usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
-    
-    assert usd_value >= 0
-    assert bravo_token.balanceOf(bob) >= 0
+
+    assert usd_value == 1
+    assert bravo_token.balanceOf(bob) == 1
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 2
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == 1
 
 
 def test_stab_vault_claims_depletion(
@@ -3240,9 +3242,8 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
     stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
 
-    # Add claimable assets - just above threshold so partial claim leaves dust
-    # $0.15 worth of bravo (at $1 per token)
-    claimable_amount = 15 * 10 ** 16  # 0.15 tokens at $1 = $0.15
+    # Add an active $0.30 balance so a partial claim can leave dormant dust.
+    claimable_amount = 30 * 10 ** 16
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token, deposit_amount, bravo_token, claimable_amount,
@@ -3255,8 +3256,8 @@ def test_stab_vault_claims_dust_removal_below_threshold(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim enough to leave < $0.10 (claim $0.06 worth, leave $0.09)
-    claim_usd_value = 6 * 10 ** 16  # $0.06
+    # Claim $0.21, leaving $0.09.
+    claim_usd_value = 21 * 10 ** 16
     teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Bravo should be removed from the iterable list (dust removal)
@@ -3358,8 +3359,8 @@ def test_stab_vault_claims_dust_balance_preserved(
     alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
     stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
 
-    # Add claimable assets - $0.15 worth
-    claimable_amount = 15 * 10 ** 16
+    # Add an active $0.30 balance.
+    claimable_amount = 30 * 10 ** 16
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token, deposit_amount, bravo_token, claimable_amount,
@@ -3368,8 +3369,8 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim to leave dust ($0.06 -> leaves $0.09)
-    claim_usd_value = 6 * 10 ** 16
+    # Claim $0.21, leaving $0.09 dormant.
+    claim_usd_value = 21 * 10 ** 16
     teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Verify dust removed from list (index == 0 means not in list)
@@ -3477,11 +3478,10 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
-    # Set mock prices - bravo at $1
-    price = 1 * EIGHTEEN_DECIMALS
-    mock_price_source.setPrice(alpha_token, price)
-    mock_price_source.setPrice(bravo_token, price)
-    mock_price_source.setPrice(green_token, price)
+    # Ten wei is worth $0.30, allowing an active entry with a one-wei dust tail.
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 3 * 10 ** 34)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
 
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
@@ -3498,11 +3498,11 @@ def test_stab_vault_claims_dust_precision_loss_triggers_removal(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim 9 out of 10 (leaves 1 wei)
+    # Claim $0.27, which is 9 out of 10 token wei and leaves 1 wei.
     # The remaining USD value calculation would be: (1 * claimUsdValue) / claimAmount
     # which is very small - the precision loss fix should set remainingUsdValue=1 and trigger removal
-    claim_amount = 9
-    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, claim_amount, sender=bob)
+    claim_usd_value = 27 * 10 ** 16
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Should be removed from list due to precision loss handling (index == 0)
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
@@ -3544,9 +3544,8 @@ def test_stab_vault_claims_dust_different_price_levels(
     alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
     stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
 
-    # Add claimable assets - very small amount of expensive token
-    # 0.0001 tokens at $2000 = $0.20 (above threshold initially)
-    claimable_amount = 10 ** 14  # 0.0001 tokens
+    # 0.00015 tokens at $2000 = $0.30, which activates at receipt.
+    claimable_amount = 15 * 10 ** 13
     bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
     stability_pool.swapForLiquidatedCollateral(
         alpha_token, deposit_amount, bravo_token, claimable_amount,
@@ -3555,10 +3554,8 @@ def test_stab_vault_claims_dust_different_price_levels(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim roughly half - should leave $0.10 which is exactly at threshold
-    # At $2000/token, $0.10 = 0.00005 tokens = 5 * 10^13 wei
-    # Claim $0.12 worth = 0.00006 tokens = 6 * 10^13 wei to leave ~$0.08 (below threshold)
-    claim_usd_value = 12 * 10 ** 16  # $0.12 (leaves $0.08)
+    # Claim $0.22 to leave $0.08 below the retention threshold.
+    claim_usd_value = 22 * 10 ** 16
     teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Should be removed from list (remaining < $0.10) - index == 0 means not in list

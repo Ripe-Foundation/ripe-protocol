@@ -574,11 +574,7 @@ def getTotalUserValue(_user: address, _asset: address) -> uint256:
 @view
 @internal
 def _getCurrentTotalValue(_asset: address) -> uint256:
-    greenToken: address = empty(address)
-    savingsGreen: address = empty(address)
-    priceDesk: address = empty(address)
-    greenToken, savingsGreen, priceDesk = self._getStabAddys()
-    return self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
+    return self._getTotalValue(_asset, GREEN_TOKEN, SAVINGS_GREEN, addys._getPriceDeskAddr())
 
 
 @view
@@ -1206,14 +1202,12 @@ def _addClaimableBalance(
     custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
     priorLiability: uint256 = self.totalClaimableBalances[_claimAsset]
     assert custody >= priorLiability # dev: claim custody deficit
-    availableUnaccounted: uint256 = custody - priorLiability
-    assert _reportedAmount <= availableUnaccounted # dev: short claim receipt
+    assert _reportedAmount <= custody - priorLiability # dev: short claim receipt
 
     # update balances
     newPairBalance: uint256 = self.claimableBalances[_stabAsset][_claimAsset] + _reportedAmount
-    newTotalLiability: uint256 = priorLiability + _reportedAmount
     self.claimableBalances[_stabAsset][_claimAsset] = newPairBalance
-    self.totalClaimableBalances[_claimAsset] = newTotalLiability
+    self.totalClaimableBalances[_claimAsset] = priorLiability + _reportedAmount
 
     # already active; do not reprice or emit dormant telemetry
     if self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
@@ -1243,15 +1237,15 @@ def _addClaimableBalance(
 def _registerClaimableAsset(_stabAsset: address, _assetReceived: address):
     assert self.claimableBalances[_stabAsset][_assetReceived] != 0 # dev: no claimable balance
     assert self.indexOfClaimableAsset[_stabAsset][_assetReceived] == 0 # dev: claim asset already active
-    assert self._getNumActiveClaimAssets(_stabAsset) < MAX_ACTIVE_CLAIM_ASSETS # dev: max active claim assets
 
     cid: uint256 = self.numClaimableAssets[_stabAsset]
     if cid == 0:
         cid = 1 # not using 0 index
+    assert cid <= MAX_ACTIVE_CLAIM_ASSETS # dev: max active claim assets
     self.claimableAssets[_stabAsset][cid] = _assetReceived
     self.indexOfClaimableAsset[_stabAsset][_assetReceived] = cid
     self.numClaimableAssets[_stabAsset] = cid + 1
-    log ClaimAssetActivated(stabAsset=_stabAsset, claimAsset=_assetReceived, balance=self.claimableBalances[_stabAsset][_assetReceived], activeCount=self._getNumActiveClaimAssets(_stabAsset))
+    log ClaimAssetActivated(stabAsset=_stabAsset, claimAsset=_assetReceived, balance=self.claimableBalances[_stabAsset][_assetReceived], activeCount=cid)
 
 
 # reduce claimable
@@ -1284,9 +1278,6 @@ def _reduceClaimableBalances(
 @internal
 def _removeClaimableAsset(_stabAsset: address, _asset: address, _reason: uint256):
     numAssets: uint256 = self.numClaimableAssets[_stabAsset]
-    if numAssets == 0:
-        return
-
     targetIndex: uint256 = self.indexOfClaimableAsset[_stabAsset][_asset]
     if targetIndex == 0:
         return
@@ -1302,4 +1293,4 @@ def _removeClaimableAsset(_stabAsset: address, _asset: address, _reason: uint256
     self.claimableAssets[_stabAsset][lastIndex] = empty(address)
     self.indexOfClaimableAsset[_stabAsset][_asset] = 0
     self.numClaimableAssets[_stabAsset] = lastIndex
-    log ClaimAssetDeactivated(stabAsset=_stabAsset, claimAsset=_asset, balance=self.claimableBalances[_stabAsset][_asset], activeCount=self._getNumActiveClaimAssets(_stabAsset), reason=_reason)
+    log ClaimAssetDeactivated(stabAsset=_stabAsset, claimAsset=_asset, balance=self.claimableBalances[_stabAsset][_asset], activeCount=lastIndex - 1, reason=_reason)
