@@ -52,6 +52,7 @@ interface MissionControl:
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
@@ -182,7 +183,6 @@ ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 DANGER_BLOCKS_DENOMINATOR: constant(uint256) = 100_0000 # 100.0000%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
-STABILITY_POOL_ID: constant(uint256) = 1
 CURVE_PRICES_ID: constant(uint256) = 2
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 
@@ -716,8 +716,11 @@ def _getUserBorrowTerms(
     # iterate thru each user vault
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
+        if staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId): # stability positions are never collateral
+            continue
+
         vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
-        if vaultId == STABILITY_POOL_ID or vaultAddr == empty(address): # stability positions are never collateral
+        if vaultAddr == empty(address):
             continue
 
         # iterate thru each user asset

@@ -28,7 +28,7 @@ interface MissionControl:
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
-    def preferredStabVaultId() -> uint256: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
@@ -396,12 +396,14 @@ def _isValidAssetDepositParams(
     
     # staker allocs must be with staker vaults
     if _stakersPointsAlloc != 0:
-        preferredStabVaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
         coreRipeGovVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
 
         hasStakerVault: bool = False
-        for sid: uint256 in [preferredStabVaultId, coreRipeGovVaultId]:
-            if sid != 0 and sid in _vaultIds:
+        for vaultId: uint256 in _vaultIds:
+            if coreRipeGovVaultId != 0 and vaultId == coreRipeGovVaultId:
+                hasStakerVault = True
+                break
+            if staticcall MissionControl(_missionControl).isStabVaultId(vaultId):
                 hasStakerVault = True
                 break
         if not hasStakerVault:

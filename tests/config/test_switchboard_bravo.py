@@ -84,7 +84,7 @@ def test_deployment_success(switchboard_bravo):
 
 
 @pytest.mark.parametrize("matching_vault_id", [3, 4])
-def test_staker_allocation_accepts_either_configured_pointer(
+def test_staker_allocation_accepts_core_or_stability_vault(
     switchboard_bravo,
     governance,
     new_mission_control,
@@ -105,21 +105,70 @@ def test_staker_allocation_accepts_either_configured_pointer(
     assert action_id > 0
 
 
-def test_staker_allocation_rejects_when_neither_configured_pointer_is_present(
+def test_staker_allocation_accepts_non_preferred_stability_vault(
     switchboard_bravo,
     governance,
     new_mission_control,
     alpha_token,
 ):
-    new_mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
-    new_mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
+    new_mission_control.setPriorityStabVaults(
+        [(3, alpha_token.address)],
+        sender=switchboard_bravo.address,
+    )
 
+    assert new_mission_control.preferredStabVaultId() == 1
+    assert new_mission_control.isStabVaultId(3)
+    action_id = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        [3],
+        50_00,
+        new_mission_control.address,
+    )
+    assert action_id > 0
+
+
+def test_staker_allocation_accepts_retired_stability_vault(
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
+    new_mission_control.setPreferredStabVaultId(
+        3,
+        sender=switchboard_bravo.address,
+    )
+    new_mission_control.setPreferredStabVaultId(
+        4,
+        sender=switchboard_bravo.address,
+    )
+
+    assert new_mission_control.preferredStabVaultId() == 4
+    assert new_mission_control.isStabVaultId(3)
+    action_id = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        [3],
+        50_00,
+        new_mission_control.address,
+    )
+    assert action_id > 0
+
+
+def test_staker_allocation_rejects_regular_vault(
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
     with boa.reverts("invalid asset"):
         _add_asset(
             switchboard_bravo,
             governance,
             alpha_token.address,
-            [1, 2],
+            [3],
             50_00,
             new_mission_control.address,
         )

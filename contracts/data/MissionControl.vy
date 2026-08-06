@@ -195,6 +195,7 @@ totalPointsAllocs: public(TotalPointsAllocs)
 # vault cs
 coreRipeGovVaultId: public(uint256)
 preferredStabVaultId: public(uint256)
+isStabVaultId: public(HashMap[uint256, bool])
 ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs
 priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
@@ -247,6 +248,9 @@ def __init__(_ripeHq: address, _defaults: address):
         # priority lists
         self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
         self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()
+        for vault: cs.VaultLite in self.priorityStabVaults:
+            if vault.vaultId != 0:
+                self.isStabVaultId[vault.vaultId] = True
         self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()
 
         # lite signers
@@ -299,6 +303,10 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
+
+    # monotonic because retired stability pools can still hold user balances.
+    if _config.specialStabPoolId != 0:
+        self.isStabVaultId[_config.specialStabPoolId] = True
 
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
@@ -411,6 +419,7 @@ def setPreferredStabVaultId(_vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _vaultId != 0 # dev: invalid vault id
     self.preferredStabVaultId = _vaultId
+    self.isStabVaultId[_vaultId] = True
 
 
 # ripe gov vault
@@ -447,6 +456,9 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
 def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
+    for vault: cs.VaultLite in _priorityStabVaults:
+        if vault.vaultId != 0:
+            self.isStabVaultId[vault.vaultId] = True
 
 
 ################

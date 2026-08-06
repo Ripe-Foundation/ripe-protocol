@@ -131,6 +131,11 @@ def underscoreRegistry() -> address:
 
 @view
 @external
+def isStabVaultId(_vaultId: uint256) -> bool:
+    return False
+
+@view
+@external
 def getDebtTerms(_asset: address) -> cs.DebtTerms:
     assert _asset == allowed_asset, "zero-position terms lookup"
     return terms
@@ -861,7 +866,7 @@ def test_c2_marginal_gas_protocol(
         Path("contracts/core/CreditEngine.vy").read_bytes()
     ).hexdigest()
     assert source_sha256 == (
-        "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb"
+        "d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43"
     )
     manifest_rows = sorted(
         (
