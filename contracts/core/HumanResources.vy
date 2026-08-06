@@ -59,6 +59,10 @@ interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
 
+interface MissionControl:
+    def coreRipeGovVaultId() -> uint256: view
+    def hrConfig() -> cs.HrConfig: view
+
 interface HrContributor:
     def totalClaimed() -> uint256: view
     def compensation() -> uint256: view
@@ -71,10 +75,6 @@ interface Lootbox:
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface MissionControl:
-    def coreRipeGovVaultId() -> uint256: view
-    def hrConfig() -> cs.HrConfig: view
 
 struct ContributorTerms:
     owner: address
@@ -136,19 +136,6 @@ def __init__(
     deptBasics.__init__(False, False, True) # can mint ripe only
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
-
-
-####################
-# Vault ID Pointer #
-####################
-
-
-@view
-@internal
-def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
 
 
 ####################
@@ -469,6 +456,14 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
 #########
 # Other #
 #########
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 @view
