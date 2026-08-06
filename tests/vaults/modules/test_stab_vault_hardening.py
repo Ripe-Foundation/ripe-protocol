@@ -16,7 +16,7 @@ DEACTIVATION_DUST = 2
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_575
+    assert len(runtime) == 24_568
     assert len(runtime) <= 24_576
 
 
@@ -209,7 +209,8 @@ def test_unpriced_receipt_is_accounted_dormant_without_event_spam(
     assert stability_pool.totalClaimableBalances(bravo_token) == amount
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
 
-    stability_pool.activateClaimAssets(alpha_token, [bravo_token, bravo_token], sender=bob)
+    with boa.reverts("contract not paused"):
+        stability_pool.activateClaimAssets(alpha_token, [bravo_token, bravo_token], sender=bob)
     assert filter_logs(stability_pool, "ClaimAssetLeftDormant") == []
     assert filter_logs(stability_pool, "ClaimAssetActivated") == []
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
@@ -729,3 +730,119 @@ def test_green_cannot_be_stability_asset_but_remains_valid_claim_asset(
     assert stability_pool.getClaimAssetState(alpha_token, green_token) == CLAIM_ASSET_ACTIVE
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
     assert stability_pool.claimableBalances(green_token, green_token) == 0
+
+
+def test_green_repoint_cannot_bypass_stability_asset_guard(
+    stability_pool,
+    ripe_hq_deploy,
+    governance,
+    alice,
+    teller,
+):
+    replacement_green = _deploy_claim_token(
+        governance,
+        alice,
+        100,
+        EIGHTEEN_DECIMALS,
+    )
+
+    with boa.env.anchor():
+        assert ripe_hq_deploy.startAddressUpdateToRegistry(
+            1,
+            replacement_green,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=ripe_hq_deploy.registryChangeTimeLock())
+        assert ripe_hq_deploy.confirmAddressUpdateToRegistry(
+            1,
+            sender=governance.address,
+        )
+
+        replacement_green.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alice)
+        with boa.reverts("green cannot be stab asset"):
+            stability_pool.depositTokensInVault(
+                alice,
+                replacement_green,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            )
+
+
+def test_manual_activation_is_blocked_until_pool_is_paused(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    governance,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        100 * EIGHTEEN_DECIMALS + 13,
+    )
+
+    active_assets = []
+    for index in range(12):
+        asset = _deploy_claim_token(governance, alice, index + 200, ACTIVATION_THRESHOLD)
+        mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            asset,
+            alice,
+            ACTIVATION_THRESHOLD,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        active_assets.append(asset)
+
+    dormant = _deploy_claim_token(governance, alice, 300, 500 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(dormant, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        dormant,
+        alice,
+        500 * EIGHTEEN_DECIMALS,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+    assert stability_pool.getClaimAssetState(alpha_token, dormant) == CLAIM_ASSET_DORMANT
+
+    attack_deposit = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, attack_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice,
+        alpha_token,
+        attack_deposit,
+        sender=teller.address,
+    )
+
+    mock_price_source.setPrice(active_assets[0], 2 * 10**17)
+    stability_pool.pruneClaimableAssets(alpha_token, [active_assets[0]], sender=alice)
+    with boa.reverts("contract not paused"):
+        stability_pool.activateClaimAssets(alpha_token, [dormant], sender=alice)
+    assert stability_pool.getClaimAssetState(alpha_token, dormant) == CLAIM_ASSET_DORMANT
+
+    withdrawn, _ = stability_pool.withdrawTokensFromVault(
+        alice,
+        alpha_token,
+        2**256 - 1,
+        alice,
+        sender=teller.address,
+    )
+    assert withdrawn <= attack_deposit

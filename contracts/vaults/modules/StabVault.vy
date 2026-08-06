@@ -161,7 +161,7 @@ def _depositTokensInVault(
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    assert _asset != GREEN_TOKEN # dev: green cannot be stab asset
+    assert _asset != _a.greenToken # dev: green cannot be stab asset
     totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     depositAmount: uint256 = min(_amount, totalAssetBalance)
     assert depositAmount != 0 # dev: invalid deposit amount
@@ -608,9 +608,6 @@ def _getValueOfClaimableAssets(
 
     for i: uint256 in range(1, numClaimableAssets, bound=max_value(uint256)):
         asset: address = self.claimableAssets[_stabAsset][i]
-        if asset == empty(address):
-            continue
-
         balance: uint256 = self.claimableBalances[_stabAsset][asset]
         if balance == 0:
             continue
@@ -1181,6 +1178,7 @@ def activateClaimAssets(
     _stabAsset: address,
     _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
 ):
+    assert vaultData.isPaused # dev: contract not paused
     self._maintainClaimableAssets(_stabAsset, _claimAssets, True)
 
 
