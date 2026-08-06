@@ -1,5 +1,20 @@
 import pytest
+import boa
 from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
+
+
+@pytest.fixture
+def registerVault(vault_book, governance):
+    def registerVault(vault, description):
+        assert vault_book.startAddNewAddressToRegistry(
+            vault.address,
+            description,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+        return vault_book.confirmNewAddressToRegistry(vault.address, sender=governance.address)
+
+    yield registerVault
 
 
 def filter_logs(contract, event_name, _strict=False):

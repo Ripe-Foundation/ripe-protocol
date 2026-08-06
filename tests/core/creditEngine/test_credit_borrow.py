@@ -897,6 +897,64 @@ def test_borrow_savings_green_enter_stab_pool(
     assert final_stab_pool_balance > 0  # should have sGREEN deposited in stability pool
 
 
+def test_borrow_savings_green_uses_preferred_stability_pool_pointer(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    savings_green,
+    stability_pool,
+    alternate_stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+):
+    preferred_id = registerVault(alternate_stability_pool, "Preferred Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [preferred_id])
+    setGeneralDebtConfig()
+    mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=bob)
+    assert alternate_stability_pool.getTotalAmountForUser(bob, savings_green) > 0
+    assert stability_pool.getTotalAmountForUser(bob, savings_green) == 0
+
+
+def test_borrow_savings_green_fails_closed_when_preferred_pointer_is_unset(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    savings_green,
+    mission_control,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [1])
+    setGeneralDebtConfig()
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.eval("self.preferredStabVaultId = 0")
+
+    with boa.reverts("invalid vault id"):
+        teller.borrow(50 * EIGHTEEN_DECIMALS, bob, True, True, sender=bob)
+
+
 def test_borrow_savings_green_no_stab_pool(
     alpha_token,
     alpha_token_whale,

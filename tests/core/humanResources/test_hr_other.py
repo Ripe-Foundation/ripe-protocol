@@ -476,6 +476,88 @@ def test_hr_refund_after_cancel_paycheck_paused(
         )
 
 
+def test_hr_ripe_routes_follow_core_governance_vault_pointer(
+    human_resources,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    ledger,
+    whale,
+    teller,
+    setupRipeGovVaultConfig,
+    deployedContributor,
+    setAssetConfig,
+    alice,
+):
+    setupRipeGovVaultConfig()
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+    contributor_addr = deployedContributor()
+
+    assert not human_resources.hasRipeBalance(contributor_addr)
+    assert human_resources.cashRipeCheck(
+        50_000 * EIGHTEEN_DECIMALS,
+        500,
+        sender=contributor_addr,
+    )
+    assert human_resources.hasRipeBalance(contributor_addr)
+    assert ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == 0
+
+    transferred = human_resources.transferContributorRipeTokens(
+        alice,
+        200,
+        sender=contributor_addr,
+    )
+    assert transferred > 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == transferred
+
+    deposit_amount = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(alternate_ripe_gov_vault, deposit_amount, sender=whale)
+    alternate_ripe_gov_vault.depositTokensInVault(
+        contributor_addr,
+        ripe_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+    ripe_available_before = ledger.ripeAvailForHr()
+    human_resources.refundAfterCancelPaycheck(
+        25_000 * EIGHTEEN_DECIMALS,
+        True,
+        sender=contributor_addr,
+    )
+    assert ledger.ripeAvailForHr() == ripe_available_before + 25_000 * EIGHTEEN_DECIMALS
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token) == 0
+
+
+def test_hr_ripe_routes_fail_closed_when_core_pointer_is_unset(
+    human_resources,
+    mission_control,
+    setupRipeGovVaultConfig,
+    deployedContributor,
+    alice,
+):
+    setupRipeGovVaultConfig()
+    contributor_addr = deployedContributor()
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    with boa.reverts("invalid vault id"):
+        human_resources.hasRipeBalance(contributor_addr)
+    with boa.reverts("invalid vault id"):
+        human_resources.transferContributorRipeTokens(alice, 200, sender=contributor_addr)
+    with boa.reverts("invalid vault id"):
+        human_resources.cashRipeCheck(50_000 * EIGHTEEN_DECIMALS, 500, sender=contributor_addr)
+    with boa.reverts("invalid vault id"):
+        human_resources.refundAfterCancelPaycheck(
+            25_000 * EIGHTEEN_DECIMALS,
+            True,
+            sender=contributor_addr,
+        )
+
+
 # Test getTotalClaimed
 
 

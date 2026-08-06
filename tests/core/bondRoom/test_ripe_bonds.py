@@ -247,6 +247,57 @@ def test_purchase_ripe_bond_with_minimum_lock_duration(
     _test(ripe_payout, expected_deposit)
 
 
+def test_locked_bond_purchase_uses_core_governance_vault_pointer(
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ripe_token,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    setAssetConfig,
+):
+    setupRipeBonds()
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        100,
+        sender=bob,
+    )
+
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == ripe_payout
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_locked_bond_purchase_fails_closed_when_core_pointer_is_unset(
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    mission_control,
+):
+    setupRipeBonds()
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    with boa.reverts("invalid vault id"):
+        teller.purchaseRipeBond(alpha_token, payment_amount, 100, sender=bob)
+
+
 def test_purchase_ripe_bond_with_lock_above_minimum(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test, ripe_token, ripe_gov_vault
 ):
@@ -3174,4 +3225,3 @@ def test_purchase_ripe_bond_rounding_errors(
     # Verify no tokens are stuck due to rounding
     bond_balance = alpha_token.balanceOf(bond_room.address)
     assert bond_balance == 0  # All should be transferred to endaoment
-

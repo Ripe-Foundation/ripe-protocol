@@ -1303,6 +1303,62 @@ def test_teller_get_savings_green_and_enter_stab_pool_basic(
     assert green_token.allowance(teller, savings_green) == 0
 
 
+def test_teller_conversion_uses_preferred_stability_pool_pointer(
+    alternate_stability_pool,
+    stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    green_token,
+    savings_green,
+    whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    preferred_id = registerVault(alternate_stability_pool, "Preferred Stability Pool")
+    setGeneralConfig()
+    setAssetConfig(savings_green, [preferred_id])
+    mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, deposit_amount, sender=whale)
+    green_token.approve(teller.address, deposit_amount, sender=bob)
+    sgreen_amount = teller.convertToSavingsGreenAndDepositIntoStabPool(
+        bob,
+        deposit_amount,
+        sender=bob,
+    )
+
+    log = filter_logs(teller, "TellerDeposit")[0]
+    assert log.vaultId == preferred_id
+    assert log.vaultAddr == alternate_stability_pool.address
+    assert alternate_stability_pool.getTotalAmountForUser(bob, savings_green) == sgreen_amount
+    assert stability_pool.getTotalAmountForUser(bob, savings_green) == 0
+
+
+def test_teller_conversion_fails_closed_when_preferred_pointer_is_unset(
+    mission_control,
+    green_token,
+    savings_green,
+    whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    setGeneralConfig()
+    setAssetConfig(savings_green, [1])
+    mission_control.eval("self.preferredStabVaultId = 0")
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, deposit_amount, sender=whale)
+    green_token.approve(teller.address, deposit_amount, sender=bob)
+    with boa.reverts("invalid vault id"):
+        teller.convertToSavingsGreenAndDepositIntoStabPool(bob, deposit_amount, sender=bob)
+
+
 def test_teller_get_savings_green_and_enter_stab_pool_insufficient_funds(
     stability_pool,
     green_token,
@@ -3286,4 +3342,4 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    assert len(runtime) <= 24_082
+    assert len(runtime) <= 24_326

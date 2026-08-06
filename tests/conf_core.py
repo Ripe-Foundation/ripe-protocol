@@ -40,6 +40,7 @@ def ripe_hq(
     human_resources,
     mission_control,
     switchboard,
+    switchboard_charlie,
     credit_engine,
     deleverage,
     endaoment,
@@ -182,6 +183,10 @@ def ripe_hq(
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
     assert ripe_hq_deploy.finishRipeHqSetup(governance, sender=deploy3r)
+
+    # Canonical vault pointers used by the default local test deployment.
+    mission_control.setCoreRipeGovVaultId(2, sender=switchboard_charlie.address)
+    mission_control.setPreferredStabVaultId(1, sender=switchboard_charlie.address)
 
     return ripe_hq_deploy
 
@@ -726,6 +731,15 @@ def stability_pool(ripe_hq_deploy):
     )
 
 
+@pytest.fixture(scope="function")
+def alternate_stability_pool(ripe_hq):
+    return boa.load(
+        "contracts/vaults/StabilityPool.vy",
+        ripe_hq,
+        name="alternate_stability_pool",
+    )
+
+
 # ripe gov vault
 
 
@@ -735,6 +749,15 @@ def ripe_gov_vault(ripe_hq_deploy):
         "contracts/vaults/RipeGov.vy",
         ripe_hq_deploy,
         name="ripe_gov_vault",
+    )
+
+
+@pytest.fixture(scope="function")
+def alternate_ripe_gov_vault(ripe_hq):
+    return boa.load(
+        "contracts/vaults/RipeGov.vy",
+        ripe_hq,
+        name="alternate_ripe_gov_vault",
     )
 
 

@@ -73,6 +73,7 @@ interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
 
 interface MissionControl:
+    def coreRipeGovVaultId() -> uint256: view
     def hrConfig() -> cs.HrConfig: view
 
 struct ContributorTerms:
@@ -124,8 +125,6 @@ event NewContributorCancelled:
 # pending
 pendingContributor: public(HashMap[uint256, ContributorTerms]) # aid -> terms
 
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
-
 
 @deploy
 def __init__(
@@ -137,6 +136,19 @@ def __init__(
     deptBasics.__init__(False, False, True) # can mint ripe only
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
+
+
+####################
+# Vault ID Pointer #
+####################
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 ####################
@@ -386,7 +398,8 @@ def canModifyHrContributor(_addr: address) -> bool:
 @external
 def hasRipeBalance(_contributor: address) -> bool:
     a: addys.Addys = addys._getAddys()
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID) 
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
 
 
@@ -400,7 +413,7 @@ def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> ui
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
     # transfer tokens in ripe gov vault
-    vaultId: uint256 = RIPE_GOV_VAULT_ID
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId) 
     amount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).transferContributorRipeTokens(msg.sender, _owner, _lockDuration, a)
 
@@ -423,7 +436,8 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
 
     # deposit into gov vault
     assert extcall IERC20(a.ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(a.teller).depositFromTrusted(msg.sender, RIPE_GOV_VAULT_ID, a.ripeToken, _amount, _lockDuration, a)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    extcall Teller(a.teller).depositFromTrusted(msg.sender, vaultId, a.ripeToken, _amount, _lockDuration, a)
     assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
 
@@ -444,7 +458,8 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
         return
 
     # withdraw and burn position
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     if burnAmount != 0:

@@ -62,6 +62,8 @@ interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
 
 interface CreditEngine:
@@ -212,8 +214,6 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
-STABILITY_POOL_ID: constant(uint256) = 1
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
 CURVE_PRICES_ID: constant(uint256) = 2
 
 
@@ -221,6 +221,27 @@ CURVE_PRICES_ID: constant(uint256) = 2
 def __init__(_ripeHq: address, _shouldPause: bool):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
+
+
+#####################
+# Vault ID Pointers #
+#####################
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
+
+
+@view
+@internal
+def _getPreferredStabVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 ############
@@ -654,7 +675,8 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, False, True, True, a)
+    vaultId: uint256 = self._getPreferredStabVaultId(a.missionControl)
+    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), vaultId, msg.sender, 0, False, True, True, a)
 
 
 # claims
@@ -784,7 +806,8 @@ def depositIntoGovVault(
     a: addys.Addys = addys._getAddys()
     if _user != msg.sender:
         assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
-    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, True, False, True, a)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    return self._deposit(_asset, _amount, _user, empty(address), vaultId, msg.sender, _lockDuration, True, False, True, a)
 
 
 @nonreentrant
@@ -798,7 +821,8 @@ def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.
     if _user != msg.sender and not isSwitchboard:
         assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
 
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, a)
 
@@ -814,7 +838,8 @@ def releaseLock(_asset: address, _user: address = msg.sender):
     if _user != msg.sender and not isSwitchboard:
         assert staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreOwnerOrLego(_user, msg.sender, a.missionControl) # dev: no perms
 
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(False, _user, True, a)
 
