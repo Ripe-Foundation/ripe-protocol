@@ -58,9 +58,7 @@ interface EndaomentPSM:
     def setMintFee(_fee: uint256): nonpayable
 
 interface RipeGovVault:
-    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
     def disableGovPointAccrualForUser(_user: address): nonpayable
-    def govPointAccrualDisabledBlock() -> uint256: view
     def disableGovPointAccrualGlobally(): nonpayable
 
 interface VaultBook:
@@ -587,12 +585,45 @@ def _isValidRipeGovPointAccrualDisable(_vaultId: uint256, _user: address) -> boo
     vaultAddr: address = staticcall vaultBook.getAddr(_vaultId)
     if vaultAddr == empty(address) or not vaultAddr.is_contract:
         return False
-    if staticcall RipeGovVault(vaultAddr).govPointAccrualDisabledBlock() != 0:
-        return False
-    if _user != empty(address) and staticcall RipeGovVault(vaultAddr).userGovPointAccrualDisabledBlock(_user) != 0:
+
+    isValidResponse: bool = False
+    disabledBlock: uint256 = 0
+    isValidResponse, disabledBlock = self._tryReadRipeGovUint256(
+        vaultAddr,
+        method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
+    )
+    if not isValidResponse or disabledBlock != 0:
         return False
 
+    if _user != empty(address):
+        isValidResponse, disabledBlock = self._tryReadRipeGovUint256(
+            vaultAddr,
+            concat(
+                method_id("userGovPointAccrualDisabledBlock(address)", output_type=Bytes[4]),
+                convert(_user, bytes32),
+            ),
+        )
+        if not isValidResponse or disabledBlock != 0:
+            return False
+
     return True
+
+
+@view
+@internal
+def _tryReadRipeGovUint256(_target: address, _callData: Bytes[36]) -> (bool, uint256):
+    success: bool = False
+    response: Bytes[32] = b""
+    success, response = raw_call(
+        _target,
+        _callData,
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+    return True, abi_decode(response, uint256)
 
 
 @external

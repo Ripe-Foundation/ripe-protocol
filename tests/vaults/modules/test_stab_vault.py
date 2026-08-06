@@ -1,6 +1,7 @@
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from conf_utils import redeem_from_stability_pool
 
 
 def test_stab_vault_deposit_validation(
@@ -1116,7 +1117,7 @@ def test_stab_vault_swap_with_claimable_green_basic(
     redeem_amount = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
     
     # Verify green is now claimable
     initial_claimable_green = stability_pool.claimableBalances(alpha_token, green_token)
@@ -1194,7 +1195,7 @@ def test_stab_vault_swap_with_claimable_green_max_amount(
     redeem_amount = 75 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Try to swap more green than available
     liq_amount = 100 * (10 ** charlie_token.decimals())
@@ -1358,13 +1359,13 @@ def test_stab_vault_swap_with_claimable_green_multiple_stab_assets(
     redeem_alpha = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_alpha, sender=whale)
     green_token.approve(teller, redeem_alpha, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_alpha, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_alpha, sender=bob)
     
     # Create claimable green for charlie
     redeem_charlie = 30 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_charlie, sender=whale)
     green_token.approve(teller, redeem_charlie, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_charlie, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_charlie, sender=bob)
     
     # Calculate expected green distribution based on bravo proportions
     # Alpha has 80 bravo, Charlie has 60 bravo, total = 140
@@ -1442,7 +1443,7 @@ def test_stab_vault_swap_with_claimable_green_partial_balance(
     redeem_amount = 100 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Move most green out of stability pool
     green_balance = green_token.balanceOf(stability_pool)
@@ -1512,7 +1513,7 @@ def test_stab_vault_swap_with_claimable_green_burn_behavior(
     redeem_amount = 75 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Record green token total supply before swap
     green_supply_before = green_token.totalSupply()
@@ -1598,12 +1599,12 @@ def test_stab_vault_swap_with_claimable_green_complex_scenario(
     redeem1 = 40 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem1, sender=whale)
     green_token.approve(teller, redeem1, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem1, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem1, sender=bob)
 
     redeem2 = 30 * EIGHTEEN_DECIMALS
     green_token.transfer(sally, redeem2, sender=whale)
     green_token.approve(teller, redeem2, sender=sally)
-    teller.redeemFromStabilityPool(vault_id, charlie_token, redeem2, sender=sally)
+    redeem_from_stability_pool(teller, vault_id, charlie_token, redeem2, sender=sally)
 
     total_claimable_green = stability_pool.claimableBalances(alpha_token, green_token)
     _test(redeem1 + redeem2, total_claimable_green)
@@ -1688,7 +1689,7 @@ def test_stab_vault_swap_with_claimable_green_zero_amount(
     redeem_amount = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Try to swap with zero green amount
     charlie_token.transfer(stability_pool, 10 * (10 ** charlie_token.decimals()), sender=charlie_token_whale)
@@ -1749,7 +1750,7 @@ def test_stab_vault_swap_with_claimable_green_depletion(
     redeem_amount = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Check initial state
     assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) != 0
@@ -1817,7 +1818,7 @@ def test_stab_vault_green_always_one_dollar(
     redeem_amount = 50 * EIGHTEEN_DECIMALS  # $50 worth
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    redeem_from_stability_pool(teller, vault_id, bravo_token, redeem_amount, sender=bob)
 
     # Verify Green is now claimable
     initial_claimable_green = stability_pool.claimableBalances(alpha_token, green_token)

@@ -6,6 +6,114 @@ def filter_logs(contract, event_name, _strict=False):
     return [e for e in contract.get_logs(strict=_strict) if type(e).__name__ == event_name]
 
 
+def redeem_collateral(
+    teller,
+    user,
+    vault_id,
+    asset,
+    payment_amount=MAX_UINT256,
+    is_payment_savings_green=False,
+    should_transfer_balance=False,
+    should_refund_savings_green=True,
+    recipient=None,
+    *,
+    sender,
+):
+    """Execute the removed single-redemption API through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    redemption = (user, vault_id, asset, MAX_UINT256)
+    return teller.redeemCollateralFromMany(
+        [redemption],
+        payment_amount,
+        is_payment_savings_green,
+        should_transfer_balance,
+        should_refund_savings_green,
+        recipient,
+        sender=sender,
+    )
+
+
+def buy_fungible_auction(
+    teller,
+    liq_user,
+    vault_id,
+    asset,
+    payment_amount=MAX_UINT256,
+    is_payment_savings_green=False,
+    should_transfer_balance=False,
+    should_refund_savings_green=True,
+    recipient=None,
+    *,
+    sender,
+):
+    """Execute the removed single-auction API through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    purchase = (liq_user, vault_id, asset, MAX_UINT256)
+    return teller.buyManyFungibleAuctions(
+        [purchase],
+        payment_amount,
+        is_payment_savings_green,
+        should_transfer_balance,
+        should_refund_savings_green,
+        recipient,
+        sender=sender,
+    )
+
+
+def claim_from_stability_pool(
+    teller,
+    vault_id,
+    stab_asset,
+    claim_asset,
+    max_usd_value=MAX_UINT256,
+    user=None,
+    should_auto_deposit=False,
+    *,
+    sender,
+):
+    """Execute the removed single-claim API through its one-item batch equivalent."""
+    if user is None:
+        user = sender
+    claim = (stab_asset, claim_asset, max_usd_value)
+    return teller.claimManyFromStabilityPool(
+        vault_id,
+        [claim],
+        user,
+        should_auto_deposit,
+        sender=sender,
+    )
+
+
+def redeem_from_stability_pool(
+    teller,
+    vault_id,
+    claim_asset,
+    payment_amount=MAX_UINT256,
+    recipient=None,
+    should_auto_deposit=False,
+    is_payment_savings_green=False,
+    should_refund_savings_green=True,
+    *,
+    sender,
+):
+    """Execute the removed single-pool redemption through its one-item batch equivalent."""
+    if recipient is None:
+        recipient = sender
+    redemption = (claim_asset, MAX_UINT256)
+    return teller.redeemManyFromStabilityPool(
+        vault_id,
+        [redemption],
+        payment_amount,
+        recipient,
+        should_auto_deposit,
+        is_payment_savings_green,
+        should_refund_savings_green,
+        sender=sender,
+    )
+
+
 def set_full_payoff_params(
     deleverage,
     switchboard_alpha,

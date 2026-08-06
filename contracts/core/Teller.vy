@@ -62,14 +62,11 @@ interface RipeGovVault:
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def buyFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface StabVault:
     def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface CreditEngine:
@@ -599,31 +596,6 @@ def repay(
     return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldRefundSavingsGreen, msg.sender, a)
 
 
-# redeem collateral
-
-
-@nonreentrant
-@external
-def redeemCollateral(
-    _user: address,
-    _vaultId: uint256,
-    _asset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _isPaymentSavingsGreen: bool = False,
-    _shouldTransferBalance: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-    _recipient: address = msg.sender,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    creditRedeem: address = addys._getCreditRedeemAddr()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, creditRedeem, a.greenToken, a.savingsGreen)
-    redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS] = [CollateralRedemption(user=_user, vaultId=_vaultId, asset=_asset, maxGreenAmount=greenAmount)]
-    greenSpent: uint256 = extcall CreditRedeem(creditRedeem).redeemCollateralFromMany(redemptions, max_value(uint256), _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
-
-
 @nonreentrant
 @external
 def redeemCollateralFromMany(
@@ -677,29 +649,6 @@ def liquidateManyUsers(
     return keeperRewards
 
 
-# buy fungible auctions
-
-
-@nonreentrant
-@external
-def buyFungibleAuction(
-    _liqUser: address,
-    _vaultId: uint256,
-    _asset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _isPaymentSavingsGreen: bool = False,
-    _shouldTransferBalance: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-    _recipient: address = msg.sender,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.auctionHouse, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
-
-
 @nonreentrant
 @external
 def buyManyFungibleAuctions(
@@ -745,27 +694,6 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, False, True, True, a)
 
 
-# claims
-
-
-@nonreentrant
-@external
-def claimFromStabilityPool(
-    _vaultId: uint256,
-    _stabAsset: address,
-    _claimAsset: address,
-    _maxUsdValue: uint256 = max_value(uint256),
-    _user: address = msg.sender,
-    _shouldAutoDeposit: bool = False,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, _shouldAutoDeposit, a)
-    self._performHousekeeping(True, _user, True, a)
-    return claimUsdValue
-
-
 @nonreentrant
 @external
 def claimManyFromStabilityPool(
@@ -780,29 +708,6 @@ def claimManyFromStabilityPool(
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, _shouldAutoDeposit, a)
     self._performHousekeeping(True, _user, True, a)
     return claimUsdValue
-
-
-# redemptions
-
-
-@nonreentrant
-@external
-def redeemFromStabilityPool(
-    _vaultId: uint256,
-    _claimAsset: address,
-    _paymentAmount: uint256 = max_value(uint256),
-    _recipient: address = msg.sender,
-    _shouldAutoDeposit: bool = False,
-    _isPaymentSavingsGreen: bool = False,
-    _shouldRefundSavingsGreen: bool = True,
-) -> uint256:
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, _recipient, msg.sender, _shouldAutoDeposit, _shouldRefundSavingsGreen, a)
-    self._performHousekeeping(False, _recipient, True, a)
-    return greenSpent
 
 
 @nonreentrant
