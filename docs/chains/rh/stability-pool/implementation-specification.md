@@ -59,9 +59,11 @@ Final bytecode and ABI evidence is:
 
 Focused validation completed on an isolated source-correct test fixture:
 
-- Stability Vault module suites: `139 passed`, including four whole-registry
-  mutation-model scenarios that reassert pair balances, aggregate liabilities,
-  indexes, slots, counts, states, and custody after each transition;
+- Stability Vault module suites: `142 passed`, comprising `139` deterministic
+  tests plus three Hypothesis properties that execute `70` generated examples
+  inside Boa state anchors. The deterministic and generated mutation models
+  reassert pair balances, aggregate liabilities, indexes, slots, counts,
+  states, and custody after each transition;
 - AuctionHouse Stability integration: `23 passed`;
 - final exploit-regression selection: `2 passed`; and
 - matched first-liquidation-receipt gas: `141,587` baseline versus `221,872`
