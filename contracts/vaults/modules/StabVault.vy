@@ -110,7 +110,7 @@ numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claima
 
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
-MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 12
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18

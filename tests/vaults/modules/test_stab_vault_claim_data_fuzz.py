@@ -4,6 +4,7 @@ from hypothesis import HealthCheck, given, settings, strategies as st
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from test_stab_vault_hardening import (
     ACTIVATION_THRESHOLD,
+    MAX_ACTIVE_CLAIM_ASSETS,
     _assert_claim_data_model,
     _asset_address,
     _claim_pair,
@@ -360,7 +361,7 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
                 1_100 + index,
                 ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
             )
-            for index in range(12)
+            for index in range(MAX_ACTIVE_CLAIM_ASSETS)
         ]
         for token in active_tokens:
             mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
@@ -383,7 +384,9 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             candidate_amount,
         )
         mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
         assert stability_pool.canAcceptLiquidationAsset(alpha_token, active_tokens[0])
         assert not stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
 
@@ -436,7 +439,9 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             alpha_token,
             active_tokens[0],
         ) == ACTIVATION_THRESHOLD + active_increment
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
 
         # Pruning a different active asset frees one slot for the candidate.
         mock_price_source.setPrice(active_tokens[1], 2 * 10**17)
@@ -445,7 +450,9 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             [active_tokens[1]],
             sender=alice,
         )
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 11
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS - 1
+        )
         assert stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
 
         _record_claim(
@@ -459,7 +466,9 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             green_token,
             savings_green,
         )
-        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
         assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) != 0
         assert stability_pool.claimableBalances(alpha_token, candidate) == (
             candidate_amount

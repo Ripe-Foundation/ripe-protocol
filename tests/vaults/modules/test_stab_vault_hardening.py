@@ -10,6 +10,8 @@ CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
 DORMANT_BELOW_FLOOR = 1
 DEACTIVATION_DUST = 2
+MAX_ACTIVE_CLAIM_ASSETS = 20
+MAX_CLAIM_ASSET_MAINTENANCE = 15
 
 
 def test_deployed_runtime_fits_eip170(stability_pool):
@@ -17,7 +19,7 @@ def test_deployed_runtime_fits_eip170(stability_pool):
     assert len(runtime) <= 24_576
 
 
-def test_deposit_and_withdraw_gas_remain_bounded_at_active_claim_ceiling(
+def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     stability_pool,
     alpha_token,
     alpha_token_whale,
@@ -29,6 +31,9 @@ def test_deposit_and_withdraw_gas_remain_bounded_at_active_claim_ceiling(
     mock_price_source,
     green_token,
     savings_green,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
 ):
     _seed_stability_asset(
         stability_pool,
@@ -37,19 +42,28 @@ def test_deposit_and_withdraw_gas_remain_bounded_at_active_claim_ceiling(
         bob,
         teller,
         mock_price_source,
-        100 * EIGHTEEN_DECIMALS + 12,
+        100 * EIGHTEEN_DECIMALS + MAX_ACTIVE_CLAIM_ASSETS,
     )
     claim_tokens = [
         _deploy_claim_token(
             governance,
             alice,
             1_300 + index,
-            ACTIVATION_THRESHOLD,
+            ACTIVATION_THRESHOLD + EIGHTEEN_DECIMALS,
         )
-        for index in range(12)
+        for index in range(MAX_ACTIVE_CLAIM_ASSETS)
     ]
 
-    target_counts = [0, 1, 2, 4, 8, 12]
+    target_counts = [
+        0,
+        1,
+        2,
+        4,
+        8,
+        12,
+        MAX_CLAIM_ASSET_MAINTENANCE,
+        MAX_ACTIVE_CLAIM_ASSETS,
+    ]
     deposit_gas = []
     withdrawal_gas = []
     active_count = 0
@@ -101,8 +115,91 @@ def test_deposit_and_withdraw_gas_remain_bounded_at_active_claim_ceiling(
     # monotonic matrix proves the cap bounds the linear NAV traversal.
     assert all(a < b for a, b in zip(deposit_gas, deposit_gas[1:]))
     assert all(a < b for a, b in zip(withdrawal_gas, withdrawal_gas[1:]))
-    assert deposit_gas[-1] < 400_000
-    assert withdrawal_gas[-1] < 400_000
+    assert deposit_gas[-1] < 500_000
+    assert withdrawal_gas[-1] < 450_000
+
+    with boa.env.anchor():
+        claim_tokens[0].transfer(stability_pool, 1, sender=alice)
+        gas_before = boa.env.get_gas_used()
+        assert stability_pool.swapForLiquidatedCollateral(
+            alpha_token,
+            1,
+            claim_tokens[0],
+            1,
+            bob,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        ) == 1
+        existing_receipt_gas = boa.env.get_gas_used() - gas_before
+
+    with boa.env.anchor():
+        for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+            mock_price_source.setPrice(token, 2 * 10**17)
+        gas_before = boa.env.get_gas_used()
+        stability_pool.pruneClaimableAssets(
+            alpha_token,
+            claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
+            sender=alice,
+        )
+        prune_gas = boa.env.get_gas_used() - gas_before
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS - MAX_CLAIM_ASSET_MAINTENANCE
+        )
+
+        stability_pool.pause(True, sender=switchboard_alpha.address)
+        for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+            mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+        gas_before = boa.env.get_gas_used()
+        stability_pool.activateClaimAssets(
+            alpha_token,
+            claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE],
+            sender=alice,
+        )
+        activation_gas = boa.env.get_gas_used() - gas_before
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
+
+    setGeneralConfig()
+    for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]:
+        setAssetConfig(token)
+
+    with boa.env.anchor():
+        gas_before = boa.env.get_gas_used()
+        assert stability_pool.claimFromStabilityPool(
+            bob,
+            alpha_token,
+            claim_tokens[0],
+            10**15,
+            bob,
+            False,
+            sender=teller.address,
+        ) != 0
+        single_claim_gas = boa.env.get_gas_used() - gas_before
+
+    with boa.env.anchor():
+        claims = [
+            (alpha_token.address, token.address, 10**15)
+            for token in claim_tokens[:MAX_CLAIM_ASSET_MAINTENANCE]
+        ]
+        gas_before = boa.env.get_gas_used()
+        assert stability_pool.claimManyFromStabilityPool(
+            bob,
+            claims,
+            bob,
+            False,
+            sender=teller.address,
+        ) != 0
+        claim_many_gas = boa.env.get_gas_used() - gas_before
+
+    # Local-EVM regression ceilings for the other public bounded paths. They
+    # are not production gas estimates or assertions about a chain gas limit.
+    assert existing_receipt_gas < 50_000
+    assert prune_gas < 500_000
+    assert activation_gas < 1_200_000
+    assert single_claim_gas < 500_000
+    assert claim_many_gas < 7_000_000
 
 
 def _seed_stability_asset(
@@ -541,12 +638,12 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
     )
 
     tokens = []
-    for index in range(13):
+    for index in range(MAX_ACTIVE_CLAIM_ASSETS + 1):
         token = _deploy_claim_token(governance, alice, index, ACTIVATION_THRESHOLD)
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
         tokens.append(token)
 
-    for token in tokens[:12]:
+    for token in tokens[:MAX_ACTIVE_CLAIM_ASSETS]:
         assert _record_claim(
             stability_pool,
             alpha_token,
@@ -559,9 +656,13 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
             savings_green,
         ) == 1
 
-    candidate = tokens[12]
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
-    assert stability_pool.numClaimableAssets(alpha_token) == 13
+    candidate = tokens[MAX_ACTIVE_CLAIM_ASSETS]
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+    assert stability_pool.numClaimableAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS + 1
+    )
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, tokens[0])
     assert not stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
     assert stability_pool.getClaimAssetState(alpha_token, candidate) == CLAIM_ASSET_ABSENT
@@ -598,10 +699,10 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
     stab_address = _asset_address(alpha_token)
     expected_pairs = {
         _claim_pair(alpha_token, token): ACTIVATION_THRESHOLD
-        for token in tokens[:12]
+        for token in tokens[:MAX_ACTIVE_CLAIM_ASSETS]
     }
-    expected_active = {stab_address: tokens[:12]}
-    expected_num_assets = {stab_address: 13}
+    expected_active = {stab_address: tokens[:MAX_ACTIVE_CLAIM_ASSETS]}
+    expected_num_assets = {stab_address: MAX_ACTIVE_CLAIM_ASSETS + 1}
     _assert_claim_data_model(
         stability_pool,
         [alpha_token],
@@ -612,9 +713,11 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
     )
 
     removed = tokens[4]
-    moved = tokens[11]
+    moved = tokens[MAX_ACTIVE_CLAIM_ASSETS - 1]
     assert stability_pool.indexOfClaimableAsset(alpha_token, removed) == 5
-    assert stability_pool.indexOfClaimableAsset(alpha_token, moved) == 12
+    assert stability_pool.indexOfClaimableAsset(alpha_token, moved) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
     mock_price_source.setPrice(removed, 2 * 10**17)
 
     stability_pool.pruneClaimableAssets(
@@ -626,21 +729,28 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
     deactivated = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert len(deactivated) == 1
     assert deactivated[0].balance == ACTIVATION_THRESHOLD
-    assert deactivated[0].activeCount == 11
+    assert deactivated[0].activeCount == MAX_ACTIVE_CLAIM_ASSETS - 1
     assert deactivated[0].reason == DEACTIVATION_DUST
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 11
-    assert stability_pool.numClaimableAssets(alpha_token) == 12
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS - 1
+    )
+    assert stability_pool.numClaimableAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS
     assert stability_pool.getClaimAssetState(alpha_token, removed) == CLAIM_ASSET_DORMANT
     assert stability_pool.claimableBalances(alpha_token, removed) == ACTIVATION_THRESHOLD
     assert stability_pool.totalClaimableBalances(removed) == ACTIVATION_THRESHOLD
     assert stability_pool.claimableAssets(alpha_token, 5) == moved.address
     assert stability_pool.indexOfClaimableAsset(alpha_token, moved) == 5
-    assert stability_pool.claimableAssets(alpha_token, 12) == ZERO_ADDRESS
+    assert stability_pool.claimableAssets(
+        alpha_token,
+        MAX_ACTIVE_CLAIM_ASSETS,
+    ) == ZERO_ADDRESS
 
     expected_active[stab_address] = (
-        tokens[:4] + [tokens[11]] + tokens[5:11]
+        tokens[:4]
+        + [tokens[MAX_ACTIVE_CLAIM_ASSETS - 1]]
+        + tokens[5 : MAX_ACTIVE_CLAIM_ASSETS - 1]
     )
-    expected_num_assets[stab_address] = 12
+    expected_num_assets[stab_address] = MAX_ACTIVE_CLAIM_ASSETS
     _assert_claim_data_model(
         stability_pool,
         [alpha_token],
@@ -662,18 +772,27 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
         green_token,
         savings_green,
     ) == 1
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
-    assert stability_pool.numClaimableAssets(alpha_token) == 13
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+    assert stability_pool.numClaimableAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS + 1
+    )
     assert stability_pool.getClaimAssetState(alpha_token, candidate) == CLAIM_ASSET_ACTIVE
-    assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) == 12
-    assert stability_pool.claimableAssets(alpha_token, 12) == candidate.address
+    assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
+    assert stability_pool.claimableAssets(
+        alpha_token,
+        MAX_ACTIVE_CLAIM_ASSETS,
+    ) == candidate.address
     assert stability_pool.claimableBalances(alpha_token, candidate) == ACTIVATION_THRESHOLD
     assert stability_pool.totalClaimableBalances(candidate) == ACTIVATION_THRESHOLD
     assert not stability_pool.canAcceptLiquidationAsset(alpha_token, removed)
 
     expected_pairs[_claim_pair(alpha_token, candidate)] = ACTIVATION_THRESHOLD
     expected_active[stab_address].append(candidate)
-    expected_num_assets[stab_address] = 13
+    expected_num_assets[stab_address] = MAX_ACTIVE_CLAIM_ASSETS + 1
     _assert_claim_data_model(
         stability_pool,
         [alpha_token],
@@ -684,7 +803,7 @@ def test_cap_rejects_new_receipt_then_prune_allows_activation(
     )
 
     seen = set()
-    for index in range(1, 13):
+    for index in range(1, MAX_ACTIVE_CLAIM_ASSETS + 1):
         asset = stability_pool.claimableAssets(alpha_token, index)
         assert asset != ZERO_ADDRESS
         assert asset not in seen
@@ -993,7 +1112,7 @@ def test_full_pool_accepts_existing_claims_and_keeps_deposits_open(
     )
 
     active_assets = []
-    for index in range(12):
+    for index in range(MAX_ACTIVE_CLAIM_ASSETS):
         asset = _deploy_claim_token(governance, alice, index + 200, ACTIVATION_THRESHOLD + 1)
         mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
         _record_claim(
@@ -1042,7 +1161,9 @@ def test_full_pool_accepts_existing_claims_and_keeps_deposits_open(
         savings_green,
     ) == 1
     assert stability_pool.claimableBalances(alpha_token, active_assets[0]) == ACTIVATION_THRESHOLD + 1
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 12
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
     assert stability_pool.getClaimAssetState(alpha_token, candidate) == CLAIM_ASSET_ABSENT
 
 

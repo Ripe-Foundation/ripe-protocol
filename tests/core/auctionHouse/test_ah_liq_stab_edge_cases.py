@@ -6,6 +6,7 @@ from conf_utils import filter_logs
 
 
 ACTIVATION_THRESHOLD = 25 * 10**16
+MAX_ACTIVE_CLAIM_ASSETS = 20
 
 
 def test_auction_house_deployed_runtime_fits_eip170(auction_house):
@@ -297,7 +298,7 @@ def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
         sender=sally,
     )
 
-    for index in range(12):
+    for index in range(MAX_ACTIVE_CLAIM_ASSETS):
         claim_asset = boa.load(
             "contracts/mock/MockErc20.vy",
             governance,
@@ -325,7 +326,9 @@ def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
             sender=auction_house.address,
         )
 
-    assert stability_pool.getNumActiveClaimAssets(green_lp_token) == 12
+    assert stability_pool.getNumActiveClaimAssets(green_lp_token) == (
+        MAX_ACTIVE_CLAIM_ASSETS
+    )
     assert not stability_pool.canAcceptLiquidationAsset(
         green_lp_token,
         alpha_token,
