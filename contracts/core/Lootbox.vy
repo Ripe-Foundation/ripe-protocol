@@ -215,19 +215,6 @@ def __init__(
         self.hasUnderscoreRewards = True
 
 
-####################
-# Vault ID Pointer #
-####################
-
-
-@view
-@internal
-def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
-
-
 ##############
 # Claim Loot #
 ##############
@@ -1223,6 +1210,17 @@ def _cleanUpUserVaults(
         return
     for vid: uint256 in _vaultsToClean:
         extcall Ledger(_ledger).removeVaultFromUser(_user, vid)
+
+
+# ripe gov vault id
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 ###############################
