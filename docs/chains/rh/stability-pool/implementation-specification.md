@@ -20,10 +20,11 @@ The final contract and test source is bound to this checkpoint:
 
 | Field | Final value |
 | --- | --- |
-| Source/test commit | `e5cc4f53dc45eba97906bcbefef8e1b14142a3d2` |
-| Source/test tree | `d00046b62defecc82a9e3ce0a761439eea3e29c9` |
-| `StabilityPool.vy` SHA-256 | `3fe9fb58a3b772a7266734178f6a11fd12edc581c333c685f8c7e106ba6807ed` |
-| `StabVault.vy` SHA-256 | `4fb757b0ec0706f49ad84fd1ac5728057c755b5adecec1c4c60e050a1520f13a` |
+| Source/test commit | `2a4acca37e8ad0e8fb36f399adeafa77d731a9bc` |
+| Source/test tree | `acac567bc7c50bd4f635f32d050fd58cf069bfd1` |
+| `AuctionHouse.vy` SHA-256 | `d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f` |
+| `StabilityPool.vy` SHA-256 | `c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158` |
+| `StabVault.vy` SHA-256 | `a1552126099ff00bbc363f019f62628f08fc07f018ea22d2ac04ec596d7456df` |
 | Compiler | Vyper `0.4.3` with `# pragma optimize codesize` |
 
 The final owner decisions and security corrections are:
@@ -32,48 +33,64 @@ The final owner decisions and security corrections are:
    off-chain consumers. `valueToShares` and `sharesToValue` are not exported by
    the wrapper.
 2. `canActivateClaimAsset` remains implemented in the StabVault module but is
-   not exported by StabilityPool. Exporting it on the final candidate measured
-   `25,067` deployed runtime bytes, `491` bytes above EIP-170. The module helper
-   is retained because the owner-approved source handoff required it; it is not
-   reachable through the deployed wrapper ABI.
+   not exported by StabilityPool. `canAcceptLiquidationAsset` is exported as
+   the bounded AuctionHouse preflight.
 3. Pause semantics are deliberately asymmetric and no longer ambiguous:
    `pruneClaimableAssets` is permissionless in either pause state; manual
    `activateClaimAssets` is permissionless only while paused; and a liquidation
    receipt may activate an eligible pair in either pause state.
-4. The receipt path atomically marks unavailable-price and capacity-full
-   dormant pairs as material. While any such pair exists for a Stability asset,
-   deposits of that asset revert, so neither manual activation nor a later
-   permissionless liquidation receipt can be used after minting cheap shares.
-   Activation, full reduction, or reduction to a known sub-$0.25 balance clears
-   the gate. Known sub-$0.25 dust does not set it; that avoids a permissionless
-   dust-denial vector and bounds the accepted excluded-NAV exposure per pair at
-   its last receipt/maintenance valuation. Later price appreciation before a
-   new receipt remains a monitored residual.
-5. The deposit path rejects the current GREEN address supplied through
+4. Capacity handling is now skip-before-transfer. AuctionHouse asks the target
+   StabilityPool whether the configured Stability asset is supported, the
+   liquidation asset is not itself a Stability asset, and the pair is already
+   active or has a free slot. A full pair is skipped before collateral moves,
+   and iteration continues to the next configured Stability asset or pool.
+   The pool repeats the capacity assertion as defense in depth. Existing active
+   pairs remain consumable at the cap, and deposits remain open. This view is a
+   compatibility/capacity preflight, not an oracle or custody guarantee; those
+   checks remain atomic in the receipt path.
+5. A new inactive receipt with no usable price reverts atomically instead of
+   creating excluded material dormancy. A priced cumulative balance below
+   `$0.25` remains dormant, claimable, redeemable, and nonblocking. The material
+   dormant flag/count and deposit gate no longer exist.
+6. The deposit path rejects the current GREEN address supplied through
    `Addys`, closing the reproduced RipeHq re-point admission bypass. GREEN and
    sGREEN remain constructor-bound immutables for valuation under the owner's
    chain invariant that those addresses never change.
-6. `recoverFunds` and `recoverFundsMany` remain as interface-compatible
+7. `recoverFunds` and `recoverFundsMany` remain as interface-compatible
    selectors but unconditionally revert. StabilityPool emits no recovery event
    and exposes no generic token-recovery path.
-7. The earlier, unrelated `BlueChipYieldPrices.vy` restoration is removed. Its
+8. The earlier, unrelated `BlueChipYieldPrices.vy` restoration is removed. Its
    ten-argument source and fixture match the owner-selected `rh` version and
-   remain outside this Stability candidate.
-8. Tier C automatic quarantine/retirement remains deferred.
+   remain outside this Stability candidate. The deterministic BlueChip ABI is
+   refreshed to match that ten-argument source; no BlueChip source was restored.
+9. Tier C automatic quarantine/retirement remains deferred.
 
 Final bytecode and ABI evidence is:
 
 | Measurement | Result |
 | --- | ---: |
-| Creation bytecode | `24,761` bytes |
-| Creation SHA-256 | `42e73ff97e906307d4dacaa458f0afc8e5b72450c7878ce0c30e8c5e11ca9e60` |
-| Runtime template | `24,376` bytes |
-| Runtime-template SHA-256 | `dd4b016e2406f053fb03e3bc2828d22bf8a9a357407bbc51a04fe7339e76d008` |
+| Creation bytecode | `24,528` bytes |
+| Creation SHA-256 | `9f6c6e0756ea34892dd97ccd83bb218c85954629f9c5ac797f87e3f7b807e56c` |
+| Runtime template | `24,143` bytes |
+| Runtime-template SHA-256 | `470da394bd6d2619b37a1dec839e99485a077a314ed5a1a0b2c707615d9b5f5d` |
 | Constructor-bound immutable data | `96` bytes |
-| Deployed runtime | `24,472` bytes |
-| EIP-170 headroom | `104` bytes |
-| StabilityPool ABI | `64` entries; deterministic exporter check passes |
-| StabilityPool ABI SHA-256 | `45ef2306df3245d5b97f6886ea6e99f8bda316003d3ebc9d18073fb1cb8b96d4` |
+| Deployed runtime | `24,239` bytes |
+| EIP-170 headroom | `337` bytes |
+| StabilityPool ABI | `65` entries; deterministic exporter check passes |
+| StabilityPool ABI file SHA-256 | `4b720ba58cb96db1eb5e3b9cb30698283da0d5e7d90db55e2170a8674982a543` |
+| StabilityPool canonical ABI SHA-256 | `8086009513c4557dc8a12fec7829c0f3782693001ebc7d21dddab2944084812a` |
+
+AuctionHouse remains deployable but intentionally has very little size margin:
+
+| Measurement | Result |
+| --- | ---: |
+| Creation bytecode | `24,643` bytes |
+| Creation SHA-256 | `06d9c2c29b70a1e71ea5c9f1e3073969292074453af064594edc387e3c8a3251` |
+| Runtime template | `24,460` bytes |
+| Runtime-template SHA-256 | `4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf` |
+| Constructor-bound immutable data | `96` bytes |
+| Deployed runtime | `24,556` bytes |
+| EIP-170 headroom | `20` bytes |
 
 Validation completed directly on the committed source/test tree includes:
 
@@ -86,14 +103,24 @@ Validation completed directly on the committed source/test tree includes:
 - four deterministic Hypothesis properties: `140` generated examples covering
   add, prune, activate, deposit, withdraw, claim reductions, redemption,
   capacity exhaustion, price changes, and re-addition;
-- an explicit dormant-NAV regression proving deposits remain blocked before
-  and after capacity is freed and become available only after activation or
-  bounded resolution;
+- explicit lifecycle regressions proving priced sub-floor dormancy remains
+  claimable and deposit-nonblocking, inactive unpriced receipts revert
+  atomically, and full registries skip new pairs before collateral transfer;
 - a transaction gas matrix at active counts `0, 1, 2, 4, 8, 12`, proving
   monotonic bounded deposit and withdrawal cost and a local-EVM ceiling below
   `400,000` gas at the cap; and
 - deterministic StabilityPool ABI comparison with only the intentionally
   removed recovery event changing from the prior checked ABI.
+
+The final post-simplification affected rerun covered `tests/vaults`,
+`tests/core/auctionHouse`, and `tests/core/deleverage`: `848 passed`, `2 failed`,
+and `3` warnings in `401.97s`. Neither failure is behavioral evidence against
+this change. The fail-closed BasicVault consumer inventory was already stale for
+CreditEngine and Teller and now also reports the reviewed AuctionHouse source
+delta; it requires a separate inventory review rather than a hash-only edit.
+The other failure reaches BasicVault's unchanged `insufficient vault backing`
+assertion, but Boa does not propagate that module reason through Teller's
+external-call failure, so the reason-text matcher fails.
 
 The complete repository pass on the Stability implementation commit
 `a510891c26410ab28c3c326ecaa283f57b4aff66`, before the unrelated BlueChip
@@ -109,18 +136,18 @@ the complete-suite selection.
 
 After the corrective commit, the exact owner-selected ten-argument BlueChip
 source and fixture passed all `44` focused local tests, the Stability Vault
-module suites again passed all `176` tests, and all `14` current-binding
-structural and fail-closed tests passed. The complete block-clock inventory
-suite retains `8` failures caused solely by the same `12` inherited
-AuctionHouse, CreditEngine, and Teller findings recorded below; no BlueChip or
-Stability binding finding remains.
+module suites again passed all `176` tests, and all `14` then-current binding
+structural and fail-closed tests passed.
 
-The Stability closeout preserves the frozen PR #61 and S5 hashes while binding
-the current StabilityPool source and current artifact file separately. The
-checker now gets past all four candidate metadata findings. Its remaining 12
-findings are inherited source-content or reviewed-line drift in AuctionHouse,
-CreditEngine, and Teller; those paths are outside this candidate and were not
-mechanically repinned as part of StabilityPool closeout.
+The final capacity-preflight source changes leave three expected candidate
+findings in the security-controlled block-clock inventory: the current
+StabilityPool source binding, the current AuctionHouse artifact-metadata
+fingerprint, and the S5 legacy-reconstruction fingerprint affected by the new
+AuctionHouse runtime fields. Those historical/provenance records have not been
+rewritten without a separate explicit owner approval. This is a metadata-closeout
+item, not a contract failure: the deterministic frozen-contract artifact checker
+passes the current AuctionHouse expectation, and the exact StabilityPool
+source/runtime pin tests pass.
 
 ### Operational residuals and oracle response
 
@@ -136,8 +163,8 @@ quarantine mechanism:
    `getTotalUserValue` against the repaired source;
 4. simulate deposit, withdrawal, claim, redemption, and liquidation receipt on
    the exact deployed code/configuration; and
-5. unpause only after those checks and the material-dormant deposit gate are
-   clear.
+5. unpause only after those checks show complete, correctly priced NAV and the
+   affected entry points behave as expected.
 
 Pause contains new value movement but does not itself restore liveness. The
 zero-raw-Stability-balance plus dormant-only-claim test remains an explicit
@@ -147,11 +174,11 @@ procedure therefore remain an owner-controlled operational acceptance item,
 not a solved contract property.
 
 Known sub-$0.25 dormant dust is intentionally deposit-nonblocking. If its price
-appreciates above the floor before another receipt or maintenance action, the
-stored gate does not update automatically. This is the explicit tradeoff that
-avoids letting a permissionless dust receipt deny all deposits; monitoring must
-pause and activate a materially appreciated pair before normal operation
-continues.
+appreciates above the floor before another receipt or maintenance action, its
+stored dormant state does not update automatically. This is the explicit
+tradeoff that avoids letting a permissionless dust receipt deny all deposits;
+monitoring must pause and activate a materially appreciated pair before normal
+operation continues.
 
 GREEN and sGREEN valuation also relies on the stated chain invariant that their
 RipeHq identities never change. RipeHq has generic re-point machinery, so an
@@ -228,12 +255,12 @@ record before code changes continue.
 | D-03 | Preserve the existing mapping liabilities and sentinel-index layout. Do not introduce an enum or a second iterable dormant list. |
 | D-04 | Hard cap total active claim assets per Stability asset at `12`, including GREEN. Robinhood configuration reserves one slot for GREEN and permits at most `11` non-GREEN routed claim assets. |
 | D-05 | Hardcode a `$0.25` activation threshold and preserve the `$0.10` retention/deactivation threshold, both in 18-decimal USD. Activation occurs at `>= $0.25`; deactivation occurs only at nonzero `< $0.10`. |
-| D-06 | A zero result from ordinary PriceDesk unavailability leaves the liability dormant and does not trigger PriceDesk's configured-feed raise. It is not proof of a specific oracle failure. Malformed or reverting dependencies remain unsupported and fail closed. |
-| D-07 | A full active set leaves new/inactive receipts dormant and emits capacity telemetry. It never rejects a liquidation solely because no active slot is available. |
+| D-06 | A zero result from the non-raising activation valuation causes a new inactive receipt to revert atomically. It is not retained as excluded dormant liability. Existing active assets remain fail-closed in NAV. |
+| D-07 | AuctionHouse skips a new pair before collateral transfer when the target registry is full and continues its configured traversal. Existing active pairs remain consumable at the cap; StabVault repeats the capacity assertion as defense in depth. |
 | D-08 | Use strict shadow-liability receipt accounting: custody must cover existing liability and the reported receipt must not exceed unaccounted custody. Short receipt reverts atomically. Supported collateral must use standard transfer semantics. |
 | D-09 | Disable generic recovery in the StabilityPool wrapper while preserving the two Vault interface selectors as reverting stubs. Do not alter shared VaultData behavior for other vaults. |
 | D-10 | Prohibit GREEN as a Stability asset in code and generated Robinhood configuration. GREEN may remain a claim asset for a non-GREEN Stability asset and counts toward the cap. |
-| D-11 | Permissionless maintenance is bounded, idempotent, and unrewarded. Pruning is callable in either pause state; manual activation requires the pool to be paused. Receipt-triggered activation remains available in either pause state and is made safe by the material-dormant deposit gate. |
+| D-11 | Permissionless maintenance is bounded, idempotent, and unrewarded. Pruning is callable in either pause state; manual activation requires the pool to be paused. Receipt-triggered activation remains available in either pause state only when AuctionHouse preflight and the pool's own checks permit the pair. |
 | D-12 | Do not make NAV fail open on an active configured-but-unpriced asset. Existing fail-closed NAV remains; oracle liveness is controlled through admission, monitoring, pause, and recovery runbooks. |
 | D-13 | The full Tier A+B wrapper exceeds EIP-170 unless wrapper ABI surface is reduced. Selectively export StabVault, remove `valueToShares` and `sharesToValue`, retain `getTotalValue` and `getTotalUserValue` for off-chain use, and keep `canActivateClaimAsset` module-only. |
 
@@ -273,14 +300,14 @@ implementation.
 | Active claim list can grow forever | Hard active cap of 12 | Dormant mapping pairs can accumulate but are not iterated |
 | One-base-unit first receipt becomes active | Add-time cumulative USD activation gate | Unpriced or sub-floor value remains outside NAV |
 | Existing dust cleanup only deactivates | Add bounded permissionless activation and pruning | Keeper responsiveness is operational, not automatic |
-| Capacity rejection could revert liquidation after collateral transfer | Credit first, then leave dormant when full | A material dormant balance can temporarily be excluded from NAV; capacity alarms require immediate response |
+| Capacity rejection could revert liquidation after collateral transfer | AuctionHouse preflights capacity and skips a full pair before collateral moves; the pool repeats the assertion | If no configured pair can accept the asset, the existing liquidation remainder/auction path must be available and correctly configured |
 | Entire token custody can mask a short receipt | Credit only against custody minus prior aggregate liability; strict reported-receipt check | A pre-existing unaccounted donation can still mask a same-token transfer shortfall because no pre-transfer snapshot exists |
 | Custody falls below aggregate claim liability | Strict receipt check fails closed | Later receipts of that token, and liquidations routed into the pool for it, revert until the deficit is resolved |
 | Generic recovery can sweep claim backing | StabilityPool recovery selectors unconditionally revert | Any unrelated token sent to StabilityPool cannot be generically recovered through this wrapper |
 | GREEN-as-Stability can self-credit and double-count | Contract and configuration prohibition | A future redesign must explicitly revisit the prohibition |
 | Raw Stability balance can reach zero while shares remain | Deterministic exit tests and launch flag assertion | Exit still depends on healthy claim pricing unless a larger in-kind exit design is approved |
 | Weak oracle can misprice claims | Manipulation-resistant primary-source admission; forbid spot-AMM-only pricing | Governance/source compromise remains outside this slice |
-| Full Tier A+B wrapper exceeds EIP-170 | Selective StabVault exports omit two conversion views and the activation preview | The deployed runtime fits by 104 bytes and depends on the codesize pragma |
+| Full Tier A+B wrapper exceeds EIP-170 | Selective StabVault exports omit two conversion views and the activation preview | StabilityPool fits by 337 bytes; AuctionHouse fits by 20 bytes; both measurements depend on the source optimization pragmas and exact compiler |
 
 ## 5. Allowed implementation surface
 
@@ -290,6 +317,7 @@ The default source/test ceiling is:
 | --- | --- |
 | `contracts/vaults/modules/StabVault.vy` | Constants, events, receipt accounting, activation/deactivation helpers, maintenance methods, views, GREEN guard |
 | `contracts/vaults/StabilityPool.vy` | Selective StabVault/VaultData exports, owner-approved ABI reduction, and disabled recovery stubs |
+| `contracts/core/AuctionHouse.vy` | Owner-approved capacity preflight before collateral transfer; no other liquidation behavior change |
 | `tests/vaults/modules/test_stab_vault_hardening.py` | New focused deterministic and invariant-style tests |
 | `tests/vaults/modules/test_stab_vault.py` | Update assumptions broken by add-time threshold/cap only |
 | `tests/vaults/modules/test_stab_vault_claims.py` | Preserve/extend dormant claim behavior |
@@ -301,11 +329,11 @@ The default source/test ceiling is:
 | `config/contract-artifact-expectations.json` and inventory files/tests | Mechanically updated identities and source pins required by the reviewed source delta |
 | `docs/chains/rh/stability-pool/` | Implementation evidence, gas table, and runbook additions |
 
-Do not modify AuctionHouse production source, PriceDesk production source,
-MissionControl storage/config structs, VaultData, Teller production source, or
-Switchboard production source without a new Gate 1 scope approval. In
-particular, AuctionHouse has minimal EIP-170 headroom and must not be used to
-simulate a pre-transfer receipt snapshot in this slice.
+The owner later expanded the source ceiling only for the bounded AuctionHouse
+capacity preflight described above. PriceDesk production source, MissionControl
+storage/config structs, VaultData, Teller production source, and Switchboard
+production source remain outside this slice. AuctionHouse has only 20 bytes of
+deployed EIP-170 headroom after this change.
 
 Before editing, record the exact changed-path ceiling selected from the table.
 After editing, fail the handoff if any unexplained path appears.
@@ -349,9 +377,10 @@ getClaimAssetState(stabAsset, claimAsset) -> uint256
 Return `0 = absent`, `1 = dormant`, `2 = active`. The return values are ABI
 contracts and must be constants in source/tests, not undocumented magic values.
 
-The final remediation adds only non-iterable material-dormancy bookkeeping: a
-pair flag plus a per-Stability-asset count used to gate new deposits. It does
-not change the derived claim state or add a scan.
+The final simplification adds no material-dormancy bookkeeping or deposit gate.
+Only priced sub-floor balances may remain dormant. Capacity-full receipts are
+skipped before transfer, and unavailable-price inactive receipts revert
+atomically.
 
 ## 7. Constants and events
 
@@ -368,8 +397,6 @@ CLAIM_ASSET_ACTIVE: constant(uint256) = 2
 DEACTIVATION_ZERO: constant(uint256) = 1
 DEACTIVATION_DUST: constant(uint256) = 2
 DORMANT_BELOW_FLOOR: constant(uint256) = 1
-DORMANT_NO_PRICE: constant(uint256) = 2
-DORMANT_CAPACITY: constant(uint256) = 3
 ```
 
 Replace internal references to `DUST_USD_THRESHOLD` with
@@ -450,20 +477,20 @@ existing swap/redemption operation. Any later failure must roll the credit back.
 
 ### 8.3 Add-time activation decision
 
-After crediting:
+Before crediting a new inactive pair:
 
-1. If the pair is already active, return without repricing or emitting a
-   dormant event.
-2. Compute cumulative pair value with the non-raising activation helper.
-3. If value is zero, leave dormant and emit reason `DORMANT_NO_PRICE`.
-4. If value is less than `$0.25`, leave dormant and emit
+1. Require the active count to be below 12. AuctionHouse performs the same
+   eligibility check before collateral transfer; the pool assertion is defense
+   in depth.
+2. Compute cumulative pair value with the non-raising activation valuation.
+3. If value is zero, revert the receipt atomically.
+4. Credit the pair and aggregate liability.
+5. If value is less than `$0.25`, leave the priced balance dormant and emit
    `DORMANT_BELOW_FLOOR`.
-5. If active count is 12, leave dormant and emit `DORMANT_CAPACITY`.
 6. Otherwise register the pair and emit `ClaimAssetActivated`.
 
-Credit must always precede steps 2–6. Pricing failure or capacity must never
-discard received collateral. A reverting unsupported token may still revert;
-that is covered by asset admission and negative tests.
+An already-active pair is credited without repricing and remains consumable at
+the cap. No capacity-full or unavailable-price receipt is retained outside NAV.
 
 ### 8.4 Registration helper
 
@@ -561,9 +588,9 @@ Requirements:
 - activation never changes custody, liabilities, or shares.
 
 This pause requirement applies only to the explicit maintenance entry point.
-An eligible liquidation receipt may still register a cumulative dormant pair;
-the material-dormant deposit gate prevents shares from being minted in the
-intervening excluded-NAV state.
+An eligible later liquidation receipt may still register a cumulative dormant
+pair when preflight confirms capacity. Until then, a priced dormant pair remains
+below the activation floor at its last receipt or maintenance valuation.
 
 Implement the module view below. The final wrapper does not export it because
 the measured deployed runtime would exceed EIP-170:
@@ -866,7 +893,8 @@ source delta is independently reviewed.
 Run the deterministic ABI exporter/checker. The StabilityPool ABI may add only:
 
 - `getNumActiveClaimAssets`, `getClaimAssetState`,
-  `pruneClaimableAssets`, and `activateClaimAssets`;
+  `canAcceptLiquidationAsset`, `pruneClaimableAssets`, and
+  `activateClaimAssets`;
 - the three events specified above; and
 - any public constant getters deliberately selected by implementation review.
 
@@ -1000,7 +1028,8 @@ The implementation agent must not:
 
 - change active NAV pricing to `_shouldRaise=False` and silently skip stale
   configured assets;
-- reject a receipt because the active list is full;
+- transfer liquidation collateral before checking whether a new pair has a
+  free active slot;
 - zero or sweep dormant balances;
 - add an iterable dormant list or any unbounded maintenance scan;
 - use total token custody as the new receipt amount;
@@ -1022,11 +1051,12 @@ The implementation candidate is complete only when:
 - active NAV iteration is hard-capped at 12;
 - final StabilityPool runtime is within EIP-170 with recorded headroom and only
   the owner-approved selective-export/recovery ABI changes;
-- sub-$0.25, unavailable-price, and capacity-full receipts are fully accounted
-  dormant without registration;
+- priced sub-$0.25 receipts are fully accounted dormant without registration;
+- unavailable-price inactive receipts revert atomically;
+- capacity-full pairs are skipped before collateral transfer while existing
+  active pairs remain consumable;
 - at/above-floor dormant balances can be permissionlessly activated while
-  paused, or by a later receipt after the deposit gate has prevented cheap
-  share minting;
+  paused or by a later eligible receipt;
 - active zero/sub-$0.10 entries can be permissionlessly pruned;
 - all maintenance is bounded and idempotent;
 - strict custody-minus-aggregate-liability receipt checks pass adversarial

@@ -9,7 +9,7 @@
 > [!NOTE]
 > **Implementation status refreshed 2026-08-06.** Tier A+B was selected and
 > implemented for the isolated candidate at
-> `e5cc4f53dc45eba97906bcbefef8e1b14142a3d2`. The forward-looking plan below
+> `2a4acca37e8ad0e8fb36f399adeafa77d731a9bc`. The forward-looking plan below
 > remains preserved as historical design context. The
 > [implementation specification's as-built outcome](implementation-specification.md#as-built-outcome-2026-08-06)
 > records the final code, bytecode, validation evidence, and owner-approved
@@ -21,27 +21,31 @@ Tier A+B is complete in the isolated candidate; Tier C remains deferred. The
 final implementation:
 
 - bounds each Stability asset to `12` active claim assets;
-- keeps sub-threshold, unpriced, or over-cap receipts in dormant mapping
-  accounting without losing claim or redemption rights;
+- keeps priced sub-threshold receipts in dormant mapping accounting without
+  losing claim or redemption rights;
 - enforces aggregate custody against active and dormant claim liabilities;
 - keeps permissionless pruning available and restricts permissionless manual
   activation to the paused state;
-- marks unavailable-price and capacity-full dormancy as material and blocks new
-  deposits until activation or bounded resolution, closing both manual and
-  receipt-triggered dormant-NAV capture;
+- reverts a new inactive unpriced receipt atomically;
+- preflights registry capacity in AuctionHouse before collateral transfer,
+  skips a full target, and continues to the next configured pair while allowing
+  already-active pairs to consume at the cap;
 - rejects GREEN as a Stability asset using the current `Addys` value on the
   deposit path;
 - keeps the Vault recovery selectors but disables both implementations;
 - retains `getTotalValue` and `getTotalUserValue` for off-chain use while not
   exporting `valueToShares`, `sharesToValue`, or `canActivateClaimAsset`; and
-- deploys at `24,472` bytes, leaving `104` bytes below EIP-170.
+- deploys StabilityPool at `24,239` bytes, leaving `337` bytes below EIP-170;
+  AuctionHouse deploys at `24,556` bytes, leaving `20` bytes.
 
-The original plan's broader ABI-removal and always-available manual activation
-language is therefore superseded as a description of the final candidate. The
+The original plan's fail-to-dormant capacity/unpriced-receipt model, broader
+ABI-removal, and always-available manual activation language is therefore
+superseded as a description of the final candidate. The
 zero-raw-Stability-balance plus dormant-only claim exit remains an explicit
 deferred residual. The earlier, unrelated `BlueChipYieldPrices.vy` restoration
 has been removed; its ten-argument source and fixture match the owner-selected
-`rh` version and remain outside this Stability candidate. Active-asset price
+`rh` version, and its deterministic ABI is refreshed to match that source.
+BlueChip source remains outside this Stability candidate. Active-asset price
 loss remains fail-closed and requires the operational response recorded in the
 implementation specification; Tier C automatic quarantine remains deferred.
 

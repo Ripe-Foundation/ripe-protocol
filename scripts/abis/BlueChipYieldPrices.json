@@ -2135,18 +2135,6 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "MORPHO_V2_ADDR",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
     "name": "EULER_ADDRS",
     "inputs": [
       {
@@ -2251,10 +2239,6 @@
       },
       {
         "name": "_aaveV3Addr",
-        "type": "address"
-      },
-      {
-        "name": "_morphoV2Addr",
         "type": "address"
       }
     ],
