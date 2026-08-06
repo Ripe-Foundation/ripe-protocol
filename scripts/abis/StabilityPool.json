@@ -241,28 +241,6 @@
     "type": "event"
   },
   {
-    "name": "VaultFundsRecovered",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "recipient",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "balance",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "getAddys",

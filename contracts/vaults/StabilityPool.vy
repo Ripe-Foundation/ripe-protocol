@@ -68,7 +68,6 @@ from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.vaults.modules.VaultData as vaultData
 import contracts.vaults.modules.StabVault as stabVault
-from ethereum.ercs import IERC20
 
 event StabilityPoolDeposit:
     user: indexed(address)
@@ -90,8 +89,6 @@ event StabilityPoolTransfer:
     transferAmount: uint256
     isFromUserDepleted: bool
     transferShares: uint256
-
-MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 @deploy
 def __init__(_ripeHq: address):
@@ -213,27 +210,16 @@ def getTotalAmountForVault(_asset: address) -> uint256:
     return stabVault._getTotalAmountForVault(_asset)
 
 
-#################
-# Recover Funds #
-#################
+#####################
+# Disabled Recovery #
+#####################
 
 
 @external
 def recoverFunds(_recipient: address, _asset: address):
-    self._assertSwitchboard()
-    assert stabVault.totalClaimableBalances[_asset] == 0 # dev: claim liability exists
-    vaultData._recoverFunds(_recipient, _asset)
+    raise
 
 
 @external
-def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):
-    self._assertSwitchboard()
-    for asset: address in _assets:
-        assert stabVault.totalClaimableBalances[asset] == 0 # dev: claim liability exists
-        vaultData._recoverFunds(_recipient, asset)
-
-
-@view
-@internal
-def _assertSwitchboard():
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    raise
