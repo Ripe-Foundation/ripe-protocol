@@ -52,10 +52,6 @@ interface CompoundV3Registry:
 interface MorphoRegistry:
     def isMetaMorpho(_vault: address) -> bool: view
 
-# Morpho Vaults V2 use a separate factory and membership selector from
-# MetaMorpho. Calls for this lane are made defensively below so unsupported or
-# malformed factories and vaults fail closed instead of reverting validation.
-
 interface AaveToken:
     def UNDERLYING_ASSET_ADDRESS() -> address: view
 
@@ -70,7 +66,6 @@ flag Protocol:
     FLUID
     AAVE_V3
     COMPOUND_V3
-    MORPHO_V2 # append only: protocol flags may already be stored in configs
 
 struct PriceConfig:
     protocol: Protocol
@@ -178,12 +173,9 @@ pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pen
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 MAX_MARKETS: constant(uint256) = 50
-MAX_SAFE_DECIMALS: constant(uint256) = 77 # 10 ** 77 fits in uint256
-MAX_ADDRESS_VALUE: constant(uint256) = 2 ** 160 - 1
 
 # registries
 MORPHO_ADDRS: public(immutable(address[2]))
-MORPHO_V2_ADDR: public(immutable(address))
 EULER_ADDRS: public(immutable(address[2]))
 FLUID_ADDR: public(immutable(address))
 COMPOUND_V3_ADDR: public(immutable(address))
@@ -203,7 +195,6 @@ def __init__(
     _compoundV3Addr: address,
     _moonwellAddr: address,
     _aaveV3Addr: address,
-    _morphoV2Addr: address,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -212,43 +203,11 @@ def __init__(
 
     # factories / registries
     MORPHO_ADDRS = _morphoAddrs
-    MORPHO_V2_ADDR = _morphoV2Addr
     EULER_ADDRS = _eulerAddrs
     FLUID_ADDR = _fluidAddr
     COMPOUND_V3_ADDR = _compoundV3Addr
     MOONWELL_ADDR = _moonwellAddr
     AAVE_V3_ADDR = _aaveV3Addr
-
-
-######################
-# Checked Arithmetic #
-######################
-
-
-@pure
-@internal
-def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a > max_value(uint256) - _b:
-        return False, 0
-    return True, unsafe_add(_a, _b)
-
-
-@pure
-@internal
-def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
-    if _a == 0 or _b == 0:
-        return True, 0
-    if _a > max_value(uint256) // _b:
-        return False, 0
-    return True, unsafe_mul(_a, _b)
-
-
-@pure
-@internal
-def _getDecimalScale(_decimals: uint256) -> (bool, uint256):
-    if _decimals > MAX_SAFE_DECIMALS:
-        return False, 0
-    return True, 10 ** _decimals
 
 
 ###############
@@ -303,7 +262,7 @@ def _getPrice(
 
     # erc4626 vaults
     price: uint256 = 0
-    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.MORPHO_V2 or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
         price = self._getErc4626Price(_asset, _config, weightedPricePerShare, underlyingPrice)
 
     # moonwell
@@ -470,63 +429,7 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
         return False
     if 0 in [_config.underlyingDecimals, _config.vaultTokenDecimals]:
         return False
-    if _config.underlyingDecimals > MAX_SAFE_DECIMALS or _config.vaultTokenDecimals > MAX_SAFE_DECIMALS:
-        return False
-
-    underlyingPrice: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).getPrice(_config.underlyingAsset, False)
-    if underlyingPrice == 0:
-        return False
-
-    # Revalidate every external observation used by the Morpho V2 pricing lane
-    # so a pending registration cannot become usable after interface drift.
-    if _config.protocol == Protocol.MORPHO_V2:
-        if self._getMorphoV2UnderlyingAsset(_asset) != _config.underlyingAsset:
-            return False
-
-        didRead: bool = False
-        observed: uint256 = 0
-        didRead, observed = self._readMorphoV2Decimals(_config.underlyingAsset)
-        if not didRead or observed != _config.underlyingDecimals:
-            return False
-        didRead, observed = self._readMorphoV2Decimals(_asset)
-        if not didRead or observed != _config.vaultTokenDecimals:
-            return False
-        didRead, observed = self._readMorphoV2Uint(
-            _asset,
-            method_id("totalSupply()", output_type=Bytes[4]),
-        )
-        if not didRead:
-            return False
-
-        didScale: bool = False
-        vaultScale: uint256 = 0
-        didScale, vaultScale = self._getDecimalScale(_config.vaultTokenDecimals)
-        if not didScale:
-            return False
-        normalizedSupply: uint256 = observed // vaultScale
-        if normalizedSupply == 0:
-            return False
-
-        pricePerShare: uint256 = 0
-        didRead, pricePerShare = self._readMorphoV2Uint(
-            _asset,
-            abi_encode(
-                vaultScale,
-                method_id=method_id("convertToAssets(uint256)"),
-            ),
-        )
-        if not didRead or pricePerShare == 0:
-            return False
-
-        compatible: bool = False
-        product: uint256 = 0
-        compatible, product = self._tryMul(normalizedSupply, pricePerShare)
-        if not compatible:
-            return False
-        compatible, product = self._tryMul(underlyingPrice, pricePerShare)
-        if not compatible:
-            return False
-    return True
+    return staticcall PriceDesk(addys._getPriceDeskAddr()).getPrice(_config.underlyingAsset, False) != 0
 
 
 # create price config
@@ -548,9 +451,6 @@ def _getPriceConfig(
     if _protocol == Protocol.MORPHO:
         underlyingAsset = self._getMorphoUnderlyingAsset(_asset)
 
-    elif _protocol == Protocol.MORPHO_V2:
-        underlyingAsset = self._getMorphoV2UnderlyingAsset(_asset)
-
     elif _protocol == Protocol.EULER:
         underlyingAsset = self._getEulerUnderlyingAsset(_asset)
 
@@ -570,24 +470,12 @@ def _getPriceConfig(
 
     underlyingDecimals: uint256 = 0
     if underlyingAsset != empty(address):
-        if _protocol == Protocol.MORPHO_V2:
-            didReadUnderlyingDecimals: bool = False
-            didReadUnderlyingDecimals, underlyingDecimals = self._readMorphoV2Decimals(underlyingAsset)
-            if not didReadUnderlyingDecimals:
-                underlyingDecimals = 0
-        else:
-            underlyingDecimals = convert(staticcall IERC20Detailed(underlyingAsset).decimals(), uint256)
+        underlyingDecimals = convert(staticcall IERC20Detailed(underlyingAsset).decimals(), uint256)
 
     # vault token decimals
     vaultTokenDecimals: uint256 = 0
-    if _asset != empty(address) and (_protocol != Protocol.MORPHO_V2 or underlyingAsset != empty(address)):
-        if _protocol == Protocol.MORPHO_V2:
-            didReadVaultDecimals: bool = False
-            didReadVaultDecimals, vaultTokenDecimals = self._readMorphoV2Decimals(_asset)
-            if not didReadVaultDecimals:
-                vaultTokenDecimals = 0
-        else:
-            vaultTokenDecimals = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    if _asset != empty(address):
+        vaultTokenDecimals = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
 
     return PriceConfig(
         protocol=_protocol,
@@ -858,27 +746,12 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
         if snapShot.pricePerShare == 0 or snapShot.totalSupply == 0 or snapShot.lastUpdate == 0:
             continue
 
-        # too stale, skip. An unrepresentable deadline is an unsafe config.
-        if _config.staleTime != 0:
-            didAdd: bool = False
-            staleAt: uint256 = 0
-            didAdd, staleAt = self._tryAdd(snapShot.lastUpdate, _config.staleTime)
-            if not didAdd:
-                return 0
-            if block.timestamp > staleAt:
-                continue
+        # too stale, skip
+        if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:
+            continue
 
-        didCalculate: bool = False
-        weightedValue: uint256 = 0
-        didCalculate, weightedValue = self._tryMul(snapShot.totalSupply, snapShot.pricePerShare)
-        if not didCalculate:
-            return 0
-        didCalculate, numerator = self._tryAdd(numerator, weightedValue)
-        if not didCalculate:
-            return 0
-        didCalculate, denominator = self._tryAdd(denominator, snapShot.totalSupply)
-        if not didCalculate:
-            return 0
+        numerator += (snapShot.totalSupply * snapShot.pricePerShare)
+        denominator += snapShot.totalSupply
 
     # weighted price per share
     weightedPricePerShare: uint256 = 0
@@ -915,12 +788,8 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
         return False
 
     # check if snapshot is too recent
-    if config.minSnapshotDelay != 0:
-        didAdd: bool = False
-        nextSnapshotAt: uint256 = 0
-        didAdd, nextSnapshotAt = self._tryAdd(config.lastSnapshot.lastUpdate, config.minSnapshotDelay)
-        if not didAdd or nextSnapshotAt > block.timestamp:
-            return False
+    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:
+        return False
 
     # create and store new snapshot
     newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
@@ -957,33 +826,12 @@ def getLatestSnapshot(_asset: address) -> PriceSnapshot:
 @view
 @internal
 def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
-    currentTimestamp: uint256 = block.timestamp
-    didScale: bool = False
-    vaultScale: uint256 = 0
-    didScale, vaultScale = self._getDecimalScale(_config.vaultTokenDecimals)
-    if not didScale:
-        return PriceSnapshot(totalSupply=0, pricePerShare=0, lastUpdate=currentTimestamp)
-
-    totalSupply: uint256 = 0
-    if _config.protocol == Protocol.MORPHO_V2:
-        didReadSupply: bool = False
-        rawSupply: uint256 = 0
-        didReadSupply, rawSupply = self._readMorphoV2Uint(
-            _asset,
-            method_id("totalSupply()", output_type=Bytes[4]),
-        )
-        if didReadSupply:
-            totalSupply = rawSupply // vaultScale
-    else:
-        totalSupply = staticcall IERC20(_asset).totalSupply() // vaultScale
+    totalSupply: uint256 = staticcall IERC20(_asset).totalSupply() // (10 ** _config.vaultTokenDecimals)
     pricePerShare: uint256 = 0
 
     # erc4626 vaults
-    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.MORPHO_V2 or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
-        if _config.protocol == Protocol.MORPHO_V2:
-            pricePerShare = self._getCurrentMorphoV2PricePerShare(_asset, _config.vaultTokenDecimals)
-        else:
-            pricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+        pricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
 
     # moonwell
     elif _config.protocol == Protocol.MOONWELL:
@@ -994,21 +842,10 @@ def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
     # throttle upside (extra safety check)
     pricePerShare = self._throttleUpside(pricePerShare, _config.lastSnapshot.pricePerShare, _config.maxUpsideDeviation)
 
-    if pricePerShare == 0 or (_config.protocol == Protocol.MORPHO_V2 and totalSupply == 0):
-        totalSupply = 0
-        pricePerShare = 0
-    else:
-        compatible: bool = False
-        product: uint256 = 0
-        compatible, product = self._tryMul(totalSupply, pricePerShare)
-        if not compatible:
-            totalSupply = 0
-            pricePerShare = 0
-
     return PriceSnapshot(
         totalSupply=totalSupply,
         pricePerShare=pricePerShare,
-        lastUpdate=currentTimestamp,
+        lastUpdate=block.timestamp,
     )
 
 
@@ -1017,15 +854,7 @@ def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
 def _throttleUpside(_newValue: uint256, _prevValue: uint256, _maxUpside: uint256) -> uint256:
     if _maxUpside == 0 or _prevValue == 0 or _newValue == 0:
         return _newValue
-    didCalculate: bool = False
-    weightedUpside: uint256 = 0
-    didCalculate, weightedUpside = self._tryMul(_prevValue, _maxUpside)
-    if not didCalculate:
-        return 0
-    maxPricePerShare: uint256 = 0
-    didCalculate, maxPricePerShare = self._tryAdd(_prevValue, weightedUpside // HUNDRED_PERCENT)
-    if not didCalculate:
-        return 0
+    maxPricePerShare: uint256 = _prevValue + (_prevValue * _maxUpside // HUNDRED_PERCENT)
     return min(_newValue, maxPricePerShare)
 
 
@@ -1046,45 +875,18 @@ def _getErc4626Price(
     if pricePerShare == 0 or _underlyingPrice == 0:
         return 0
 
-    didScale: bool = False
-    underlyingScale: uint256 = 0
-    didScale, underlyingScale = self._getDecimalScale(_config.underlyingDecimals)
-    if not didScale:
-        return 0
-
     # allow downside if current price per share is lower
-    currentPricePerShare: uint256 = 0
-    if _config.protocol == Protocol.MORPHO_V2:
-        currentPricePerShare = self._getCurrentMorphoV2PricePerShare(_asset, _config.vaultTokenDecimals)
-        if currentPricePerShare == 0:
-            return 0
-    else:
-        currentPricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
+    currentPricePerShare: uint256 = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
     if currentPricePerShare != 0:
-        currentCompatible: bool = False
-        currentProduct: uint256 = 0
-        currentCompatible, currentProduct = self._tryMul(_underlyingPrice, currentPricePerShare)
-        if not currentCompatible:
-            return 0
         pricePerShare = min(pricePerShare, currentPricePerShare)
 
-    didCalculate: bool = False
-    product: uint256 = 0
-    didCalculate, product = self._tryMul(_underlyingPrice, pricePerShare)
-    if not didCalculate:
-        return 0
-    return product // underlyingScale
+    return _underlyingPrice * pricePerShare // (10 ** _config.underlyingDecimals)
 
 
 @view
 @internal
 def _getCurrentErc4626PricePerShare(_asset: address, _decimals: uint256) -> uint256:
-    didScale: bool = False
-    scale: uint256 = 0
-    didScale, scale = self._getDecimalScale(_decimals)
-    if not didScale:
-        return 0
-    return staticcall IERC4626(_asset).convertToAssets(scale)
+    return staticcall IERC4626(_asset).convertToAssets(10 ** _decimals)
 
 
 ##########
@@ -1098,89 +900,6 @@ def _getMorphoUnderlyingAsset(_asset: address) -> address:
     if not staticcall MorphoRegistry(MORPHO_ADDRS[0]).isMetaMorpho(_asset) and not staticcall MorphoRegistry(MORPHO_ADDRS[1]).isMetaMorpho(_asset):
         return empty(address)
     return staticcall IERC4626(_asset).asset()
-
-
-#############
-# Morpho V2 #
-#############
-
-
-@view
-@internal
-def _getMorphoV2UnderlyingAsset(_asset: address) -> address:
-    didRead: bool = False
-    result: uint256 = 0
-    didRead, result = self._readMorphoV2Uint(
-        MORPHO_V2_ADDR,
-        abi_encode(
-            _asset,
-            method_id=method_id("isVaultV2(address)"),
-        ),
-    )
-    if not didRead or result != 1:
-        return empty(address)
-
-    didRead, result = self._readMorphoV2Uint(
-        _asset,
-        method_id("asset()", output_type=Bytes[4]),
-    )
-    if not didRead or result == 0 or result > MAX_ADDRESS_VALUE:
-        return empty(address)
-    return convert(result, address)
-
-
-@view
-@internal
-def _readMorphoV2Decimals(_target: address) -> (bool, uint256):
-    didRead: bool = False
-    result: uint256 = 0
-    didRead, result = self._readMorphoV2Uint(
-        _target,
-        method_id("decimals()", output_type=Bytes[4]),
-    )
-    if not didRead or result > MAX_SAFE_DECIMALS:
-        return False, 0
-    return True, result
-
-
-@view
-@internal
-def _getCurrentMorphoV2PricePerShare(_asset: address, _decimals: uint256) -> uint256:
-    didScale: bool = False
-    scale: uint256 = 0
-    didScale, scale = self._getDecimalScale(_decimals)
-    if not didScale:
-        return 0
-
-    didRead: bool = False
-    result: uint256 = 0
-    didRead, result = self._readMorphoV2Uint(
-        _asset,
-        abi_encode(
-            scale,
-            method_id=method_id("convertToAssets(uint256)"),
-        ),
-    )
-    if not didRead:
-        return 0
-    return result
-
-
-@view
-@internal
-def _readMorphoV2Uint(_target: address, _calldata: Bytes[36]) -> (bool, uint256):
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _target,
-        _calldata,
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32:
-        return False, 0
-    return True, abi_decode(response, uint256)
 
 
 #########
@@ -1256,39 +975,18 @@ def _getMoonwellPrice(
     if pricePerShare == 0 or _underlyingPrice == 0:
         return 0
 
-    didScale: bool = False
-    underlyingScale: uint256 = 0
-    didScale, underlyingScale = self._getDecimalScale(_config.underlyingDecimals)
-    if not didScale:
-        return 0
-
     # allow downside if current price per share is lower
     currentPricePerShare: uint256 = self._getCurrentMoonwellPricePerShare(_asset, _config.vaultTokenDecimals)
     if currentPricePerShare != 0:
         pricePerShare = min(pricePerShare, currentPricePerShare)
 
-    didCalculate: bool = False
-    product: uint256 = 0
-    didCalculate, product = self._tryMul(_underlyingPrice, pricePerShare)
-    if not didCalculate:
-        return 0
-    return product // underlyingScale
+    return _underlyingPrice * pricePerShare // (10 ** _config.underlyingDecimals)
 
 
 @view
 @internal
 def _getCurrentMoonwellPricePerShare(_asset: address, _decimals: uint256) -> uint256:
-    didScale: bool = False
-    scale: uint256 = 0
-    didScale, scale = self._getDecimalScale(_decimals)
-    if not didScale:
-        return 0
-    didCalculate: bool = False
-    product: uint256 = 0
-    didCalculate, product = self._tryMul(scale, staticcall Moonwell(_asset).exchangeRateStored())
-    if not didCalculate:
-        return 0
-    return product // (10 ** 18)
+    return (10 ** _decimals) * staticcall Moonwell(_asset).exchangeRateStored() // (10 ** 18)
 
 
 @view
