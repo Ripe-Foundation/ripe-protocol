@@ -70,6 +70,97 @@ def test_lootbox_deposit_point_routes_fail_closed_when_core_pointer_is_unset(
         )
 
 
+def test_lootbox_point_resets_use_dynamic_core_vault_precision(
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    switchboard_delta,
+    ripe_token,
+    whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    teller,
+    lootbox,
+    ledger,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Reset Points Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[core_id],
+        _stakersPointsAlloc=10,
+        _voterPointsAlloc=20,
+    )
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, deposit_amount, sender=whale)
+    ripe_token.approve(teller, deposit_amount, sender=bob)
+    teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        100,
+        bob,
+        sender=bob,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        core_id,
+        alternate_ripe_gov_vault,
+        ripe_token,
+        sender=teller.address,
+    )
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        core_id,
+        alternate_ripe_gov_vault,
+        ripe_token,
+        sender=teller.address,
+    )
+
+    user_points_before = ledger.userDepositPoints(bob, core_id, ripe_token)
+    asset_points_before = ledger.assetDepositPoints(core_id, ripe_token)
+    assert user_points_before.balancePoints > 0
+    assert asset_points_before.ripeStakerPoints > 0
+    assert asset_points_before.ripeVotePoints > 0
+
+    lootbox.resetUserBalancePoints(
+        bob,
+        ripe_token,
+        core_id,
+        sender=switchboard_delta.address,
+    )
+    assert ledger.userDepositPoints(bob, core_id, ripe_token).balancePoints == 0
+
+    lootbox.resetAssetPoints(
+        ripe_token,
+        core_id,
+        sender=switchboard_delta.address,
+    )
+    asset_points_after = ledger.assetDepositPoints(core_id, ripe_token)
+    assert asset_points_after.ripeStakerPoints == 0
+    assert asset_points_after.ripeVotePoints == 0
+    assert asset_points_after.ripeGenPoints == 0
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+        == deposit_amount
+    )
+
+
 def test_loot_deposit_points_first_save(
     alpha_token,
     alpha_token_whale,

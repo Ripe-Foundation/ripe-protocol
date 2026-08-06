@@ -3297,6 +3297,183 @@ def test_pointer_actions_follow_normal_cancellation_and_expiration_paths(
     assert mission_control.preferredStabVaultId() == 1
 
 
+@pytest.mark.parametrize("pointer_kind", ["core", "preferred"])
+@pytest.mark.parametrize("replacement_kind", ["wrong_interface", "malformed_probe"])
+def test_pointer_execution_rejects_invalid_rebound_contract(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+    pointer_kind,
+    replacement_kind,
+):
+    if pointer_kind == "core":
+        candidate = alternate_ripe_gov_vault
+        asset = ripe_token
+        initial_id = 2
+        setter = switchboard_charlie.setCoreRipeGovVaultId
+        pointer_view = mission_control.coreRipeGovVaultId
+        pending_view = switchboard_charlie.pendingCoreRipeGovVaultId
+        probe_source = """
+@external
+def totalGovPoints():
+    pass
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+"""
+    else:
+        candidate = alternate_stability_pool
+        asset = savings_green
+        initial_id = 1
+        setter = switchboard_charlie.setPreferredStabVaultId
+        pointer_view = mission_control.preferredStabVaultId
+        pending_view = switchboard_charlie.pendingPreferredStabVaultId
+        probe_source = """
+@external
+def totalClaimableBalances(_asset: address):
+    pass
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+"""
+
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        candidate,
+        f"Rebound {pointer_kind} candidate",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        asset.address,
+        [initial_id, vault_id],
+    )
+    action_id = setter(vault_id, sender=governance.address)
+
+    if replacement_kind == "wrong_interface":
+        replacement = boa.loads(
+            """
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+            name=f"rebound_{pointer_kind}_wrong_interface",
+        )
+    else:
+        replacement = boa.loads(
+            probe_source,
+            name=f"rebound_{pointer_kind}_malformed_probe",
+        )
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    confirmation_block = switchboard_charlie.getActionConfirmationBlock(action_id)
+    if boa.env.evm.patch.block_number < confirmation_block:
+        boa.env.time_travel(
+            blocks=confirmation_block - boa.env.evm.patch.block_number
+        )
+    with boa.reverts():
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert pointer_view() == initial_id
+    assert pending_view(action_id) == vault_id
+    assert switchboard_charlie.actionType(action_id) != 0
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+
+@pytest.mark.parametrize("pointer_kind", ["core", "preferred"])
+def test_pointer_execution_rejects_disabled_vault_binding(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+    pointer_kind,
+):
+    if pointer_kind == "core":
+        candidate = alternate_ripe_gov_vault
+        asset = ripe_token
+        initial_id = 2
+        setter = switchboard_charlie.setCoreRipeGovVaultId
+        pointer_view = mission_control.coreRipeGovVaultId
+        pending_view = switchboard_charlie.pendingCoreRipeGovVaultId
+    else:
+        candidate = alternate_stability_pool
+        asset = savings_green
+        initial_id = 1
+        setter = switchboard_charlie.setPreferredStabVaultId
+        pointer_view = mission_control.preferredStabVaultId
+        pending_view = switchboard_charlie.pendingPreferredStabVaultId
+
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        candidate,
+        f"Disabled {pointer_kind} candidate",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        asset.address,
+        [initial_id, vault_id],
+    )
+    action_id = setter(vault_id, sender=governance.address)
+
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    confirmation_block = switchboard_charlie.getActionConfirmationBlock(action_id)
+    if boa.env.evm.patch.block_number < confirmation_block:
+        boa.env.time_travel(
+            blocks=confirmation_block - boa.env.evm.patch.block_number
+        )
+    with boa.reverts("invalid vault"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert pointer_view() == initial_id
+    assert pending_view(action_id) == vault_id
+    assert switchboard_charlie.actionType(action_id) != 0
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+
 # Run the tests
 if __name__ == "__main__":
     print("Additional comprehensive tests for SwitchboardThree.vy")

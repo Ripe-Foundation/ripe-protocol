@@ -2628,3 +2628,157 @@ def test_teller_governance_routes_fail_closed_when_core_pointer_is_unset(
         teller.adjustLock(ripe_token, 500, whale, sender=whale)
     with boa.reverts("invalid vault id"):
         teller.releaseLock(ripe_token, whale, sender=whale)
+
+
+def test_core_pointer_rotation_preserves_legacy_position_points_and_explicit_exit(
+    teller,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    whale,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    lootbox,
+    ledger,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Replacement Core RipeGov")
+    setupRipeGovVaultConfig()
+    setGeneralConfig()
+    setAssetConfig(ripe_token, _vaultIds=[2, core_id])
+    setRipeRewardsConfig(True)
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
+
+    legacy_amount = 100 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, legacy_amount, sender=whale)
+    assert teller.depositIntoGovVault(
+        ripe_token,
+        legacy_amount,
+        100,
+        whale,
+        sender=whale,
+    ) == legacy_amount
+
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        whale,
+        2,
+        ripe_gov_vault,
+        ripe_token,
+        sender=teller.address,
+    )
+
+    legacy_gov_before = ripe_gov_vault.userGovData(whale, ripe_token)
+    legacy_points_before = ledger.userDepositPoints(whale, 2, ripe_token)
+    legacy_asset_points_before = ledger.assetDepositPoints(2, ripe_token)
+    global_points_before = ledger.globalDepositPoints()
+    asset_config_before = mission_control.assetConfig(ripe_token)
+    assert legacy_points_before.balancePoints > 0
+
+    gov_snapshot = (
+        legacy_gov_before.govPoints,
+        legacy_gov_before.lastShares,
+        legacy_gov_before.lastPointsUpdate,
+        legacy_gov_before.unlock,
+    )
+    user_points_snapshot = (
+        legacy_points_before.balancePoints,
+        legacy_points_before.lastBalance,
+        legacy_points_before.lastUpdate,
+    )
+    asset_points_snapshot = (
+        legacy_asset_points_before.balancePoints,
+        legacy_asset_points_before.lastBalance,
+        legacy_asset_points_before.lastUsdValue,
+        legacy_asset_points_before.ripeStakerPoints,
+        legacy_asset_points_before.ripeVotePoints,
+        legacy_asset_points_before.ripeGenPoints,
+        legacy_asset_points_before.lastUpdate,
+        legacy_asset_points_before.precision,
+    )
+    global_points_snapshot = (
+        global_points_before.lastUsdValue,
+        global_points_before.ripeStakerPoints,
+        global_points_before.ripeVotePoints,
+        global_points_before.ripeGenPoints,
+        global_points_before.lastUpdate,
+    )
+
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    legacy_gov_after = ripe_gov_vault.userGovData(whale, ripe_token)
+    legacy_points_after = ledger.userDepositPoints(whale, 2, ripe_token)
+    legacy_asset_points_after = ledger.assetDepositPoints(2, ripe_token)
+    global_points_after = ledger.globalDepositPoints()
+    asset_config_after = mission_control.assetConfig(ripe_token)
+
+    assert ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == legacy_amount
+    assert (
+        legacy_gov_after.govPoints,
+        legacy_gov_after.lastShares,
+        legacy_gov_after.lastPointsUpdate,
+        legacy_gov_after.unlock,
+    ) == gov_snapshot
+    assert (
+        legacy_points_after.balancePoints,
+        legacy_points_after.lastBalance,
+        legacy_points_after.lastUpdate,
+    ) == user_points_snapshot
+    assert (
+        legacy_asset_points_after.balancePoints,
+        legacy_asset_points_after.lastBalance,
+        legacy_asset_points_after.lastUsdValue,
+        legacy_asset_points_after.ripeStakerPoints,
+        legacy_asset_points_after.ripeVotePoints,
+        legacy_asset_points_after.ripeGenPoints,
+        legacy_asset_points_after.lastUpdate,
+        legacy_asset_points_after.precision,
+    ) == asset_points_snapshot
+    assert (
+        global_points_after.lastUsdValue,
+        global_points_after.ripeStakerPoints,
+        global_points_after.ripeVotePoints,
+        global_points_after.ripeGenPoints,
+        global_points_after.lastUpdate,
+    ) == global_points_snapshot
+    assert asset_config_after.stakersPointsAlloc == asset_config_before.stakersPointsAlloc
+    assert asset_config_after.voterPointsAlloc == asset_config_before.voterPointsAlloc
+
+    replacement_amount = 60 * EIGHTEEN_DECIMALS
+    ripe_token.approve(teller, replacement_amount, sender=whale)
+    assert teller.depositIntoGovVault(
+        ripe_token,
+        replacement_amount,
+        100,
+        whale,
+        sender=whale,
+    ) == replacement_amount
+    assert ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == legacy_amount
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(whale, ripe_token)
+        == replacement_amount
+    )
+
+    legacy_unlock = ripe_gov_vault.userGovData(whale, ripe_token).unlock
+    if boa.env.evm.patch.block_number <= legacy_unlock:
+        boa.env.time_travel(
+            blocks=legacy_unlock - boa.env.evm.patch.block_number + 1
+        )
+    assert teller.withdraw(
+        ripe_token,
+        legacy_amount,
+        whale,
+        ripe_gov_vault,
+        2,
+        sender=whale,
+    ) == legacy_amount
+    assert ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == 0
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(whale, ripe_token)
+        == replacement_amount
+    )

@@ -3717,3 +3717,133 @@ def test_stability_pool_auto_deposit_rejects_its_own_dynamic_vault_id(
     )
     assert bravo_token.balanceOf(bob) > 0
     assert alternate_stability_pool.getTotalAmountForUser(bob, bravo_token) == 0
+
+
+def test_preferred_pointer_rotation_preserves_legacy_pool_state_and_explicit_access(
+    stability_pool,
+    alternate_stability_pool,
+    registerVault,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+    green_token,
+    savings_green,
+    alpha_token_whale,
+    bravo_token_whale,
+    whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    preferred_id = registerVault(
+        alternate_stability_pool,
+        "Replacement Preferred Stability Pool",
+    )
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _vaultIds=[1], _stakersPointsAlloc=0)
+    setAssetConfig(bravo_token, _vaultIds=[1], _stakersPointsAlloc=0)
+    setAssetConfig(savings_green, _vaultIds=[1, preferred_id])
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    legacy_deposit = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, legacy_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        legacy_deposit,
+        sender=teller.address,
+    )
+
+    swapped_amount = 40 * EIGHTEEN_DECIMALS
+    claimable_amount = 60 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        swapped_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    legacy_position_before = stability_pool.getTotalAmountForUser(bob, alpha_token)
+    pair_claimable_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    total_claimable_before = stability_pool.totalClaimableBalances(bravo_token)
+    active_claim_assets_before = stability_pool.numClaimableAssets(alpha_token)
+    assert legacy_position_before > 0
+    assert pair_claimable_before > 0
+
+    mission_control.setPreferredStabVaultId(
+        preferred_id,
+        sender=switchboard_alpha.address,
+    )
+
+    assert (
+        stability_pool.getTotalAmountForUser(bob, alpha_token)
+        == legacy_position_before
+    )
+    assert (
+        stability_pool.claimableBalances(alpha_token, bravo_token)
+        == pair_claimable_before
+    )
+    assert stability_pool.totalClaimableBalances(bravo_token) == total_claimable_before
+    assert stability_pool.numClaimableAssets(alpha_token) == active_claim_assets_before
+
+    new_deposit = 25 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, new_deposit, sender=whale)
+    green_token.approve(teller, new_deposit, sender=bob)
+    sgreen_deposited = teller.convertToSavingsGreenAndDepositIntoStabPool(
+        bob,
+        new_deposit,
+        sender=bob,
+    )
+    assert (
+        alternate_stability_pool.getTotalAmountForUser(bob, savings_green)
+        == sgreen_deposited
+    )
+    assert stability_pool.getTotalAmountForUser(bob, savings_green) == 0
+    assert (
+        stability_pool.getTotalAmountForUser(bob, alpha_token)
+        == legacy_position_before
+    )
+    assert (
+        stability_pool.claimableBalances(alpha_token, bravo_token)
+        == pair_claimable_before
+    )
+
+    bravo_balance_before = bravo_token.balanceOf(bob)
+    claimed_usd_value = teller.claimFromStabilityPool(
+        1,
+        alpha_token,
+        bravo_token,
+        MAX_UINT256,
+        bob,
+        False,
+        sender=bob,
+    )
+    assert claimed_usd_value > 0
+    assert bravo_token.balanceOf(bob) > bravo_balance_before
+
+    legacy_remaining = stability_pool.getTotalAmountForUser(bob, alpha_token)
+    assert legacy_remaining > 0
+    withdrawn = teller.withdraw(
+        alpha_token,
+        legacy_remaining,
+        bob,
+        stability_pool,
+        1,
+        sender=bob,
+    )
+    assert 0 <= legacy_remaining - withdrawn <= 1
+    assert stability_pool.getTotalAmountForUser(bob, alpha_token) == 0
+    assert (
+        alternate_stability_pool.getTotalAmountForUser(bob, savings_green)
+        == sgreen_deposited
+    )
