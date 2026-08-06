@@ -236,6 +236,29 @@ def test_priority_and_profile1_values_normalize_from_defaults():
     }
 
 
+def test_launch_stability_pool_routing_is_bounded_and_excludes_green():
+    values = sync.extract_defaults_values()
+
+    def raw(row, field):
+        return values[f"Defaults.assetConfigs[{row}].config.{field}"]["raw"]
+
+    assert raw("GREEN", "vaultIds") == []
+    assert raw("GREEN", "shouldSwapInStabPools") is False
+    assert raw("SGREEN", "vaultIds") == [1]
+    assert values["Defaults.priorityStabVaults[0].asset"] == {
+        "kind": "symbolic_binding",
+        "name": "SGREEN_TOKEN",
+    }
+
+    routed = {
+        row
+        for row in sync.ACTIVE_ASSET_ROWS
+        if raw(row, "shouldSwapInStabPools")
+    }
+    assert routed == {"WETH"}
+    assert len(routed) <= 11
+
+
 def test_every_value_has_one_source_owner_and_full_coverage():
     ledger = _ledger()
     defaults = sync.extract_defaults_values()

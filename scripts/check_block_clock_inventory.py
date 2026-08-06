@@ -218,7 +218,7 @@ SHARED_CREDIT_REDEEM_BASELINE_SHA256 = (
 )
 SHARED_STAB_VAULT_PATH = "contracts/vaults/modules/StabVault.vy"
 SHARED_STAB_VAULT_SHA256 = (
-    "b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e"
+    "4fb757b0ec0706f49ad84fd1ac5728057c755b5adecec1c4c60e050a1520f13a"
 )
 SHARED_STAB_VAULT_BASELINE_SHA256 = (
     "4779448a8eef01363a697efc2cdd2eaec345afdb51349a57de220f743bb0e847"
@@ -237,11 +237,11 @@ POST_S5_PRODUCTION_INVENTORY_SHA256 = (
     "07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122"
 )
 CURRENT_PRODUCTION_INVENTORY_SHA256 = (
-    "184ff0b60a682a18338f80f3e7972c87d60abca3ed04882722768f657ec8caa0"
+    "7e2333b58353a26f68ef91287fd169bf129ca72b083af3a3b232107df75e79d4"
 )
 CURRENT_BINDINGS_SCHEMA_VERSION = 1
 CURRENT_BINDINGS_STATE_SHA256 = (
-    "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59"
+    "6799942a48f496f51c5e74aa36f200636ec3eec3efd81ab9e019f9f920c27ebc"
 )
 EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
     {
@@ -285,7 +285,17 @@ EXPECTED_CURRENT_SOURCE_BINDINGS: tuple[Mapping[str, Any], ...] = (
             "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
         ),
         "currentContentSha256": (
-            "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+            "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
+        ),
+    },
+    {
+        "path": "contracts/vaults/StabilityPool.vy",
+        "classification": "production",
+        "historicalContentSha256": (
+            "04d0a7dddb8b562e8e384f61e6b83c76f5bc4a761070fd069f52d6ae8a4e22eb"
+        ),
+        "currentContentSha256": (
+            "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158"
         ),
     },
 )
@@ -297,7 +307,7 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 787,
-        "currentLine": 914,
+        "currentLine": 787,
         "currentLineText": (
             "    if config.lastSnapshot.lastUpdate == block.timestamp:"
         ),
@@ -312,12 +322,12 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 2,
         "historicalReviewedLine": 791,
-        "currentLine": 922,
+        "currentLine": 791,
         "currentLineText": (
-            "        if not didAdd or nextSnapshotAt > block.timestamp:"
+            "    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:"
         ),
         "currentLineSha256": (
-            "79164ed349a9ccb009cbc82ebc610255a02514ebacc2f8582bce5ffd12da51d9"
+            "9496e63ce369b3249e87b60800f54147307e6d432a1c571388ed02a6e14e2d97"
         ),
     },
     {
@@ -327,10 +337,10 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 848,
-        "currentLine": 960,
-        "currentLineText": "    currentTimestamp: uint256 = block.timestamp",
+        "currentLine": 848,
+        "currentLineText": "        lastUpdate=block.timestamp,",
         "currentLineSha256": (
-            "65ce5080501ffbf935fe37b404bdfb79352808b02a346518e3fd6324216c42a6"
+            "b790e6c99e32877e29bc8e8c9a143cb4fded60811624a57026d77621f7423f4b"
         ),
     },
     {
@@ -340,10 +350,13 @@ EXPECTED_CURRENT_TIMESTAMP_BINDINGS: tuple[Mapping[str, Any], ...] = (
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 750,
-        "currentLine": 868,
-        "currentLineText": "            if block.timestamp > staleAt:",
+        "currentLine": 750,
+        "currentLineText": (
+            "        if _config.staleTime != 0 and block.timestamp > "
+            "snapShot.lastUpdate + _config.staleTime:"
+        ),
         "currentLineSha256": (
-            "9d3d995977312a61f6a54cde9bc61e19ccdc4d13b32aa06d5fde76125c52c174"
+            "0c3f079fdf151069ce95b4011f908f24ceb6d0f05b14241765b88d703ac19794"
         ),
     },
 )
@@ -521,7 +534,7 @@ PR61_ARTIFACT_EXPECTATIONS_SHA256 = (
     "87237f98d3becdd3941e7f8146195f5d29b4cfabe8b34ca3c95f06c755a9feb6"
 )
 CURRENT_ARTIFACT_EXPECTATIONS_SHA256 = (
-    "bd844a082a3307cc09d2772c595bbac9da9bbd47d2e4bf64b70b06230da13b6b"
+    "3cf3077a50fae00733f511653f369d95d91d52edc7cc035676fda1c78b98c397"
 )
 DEFAULTS_ROBINHOOD_ARTIFACT_RECORD_SHA256 = (
     "623171018b02c3b48d32094da0f6a0633b4825c7f56e0c547357baff91efd1e9"
@@ -1869,6 +1882,71 @@ def _is_exact_reviewer_remediation_cadence_registry(
     )
 
 
+def _restore_pr61_artifact_expectations_legacy(
+    artifact_data: dict[str, Any],
+) -> None:
+    """Reconstruct the frozen PR #61 view from the exact current artifact file."""
+
+    contracts = artifact_data["contracts"]
+    contracts["AuctionHouse"]["artifacts"]["creation_sha256"] = (
+        "0b58ea8c6aea0a7615315af80abcf5a06a03ba330e45e7334c4a5b168d0fe0b0"
+    )
+    contracts["AuctionHouse"]["artifacts"].update(
+        {
+            "creation_size": 24_636,
+            "eip170_headroom": 123,
+            "runtime_template_sha256": (
+                "cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f"
+            ),
+            "runtime_template_size": 24_453,
+        }
+    )
+    contracts["AuctionHouse"]["source_git_blob"] = (
+        "d0a2d45cae0128cbb6ed5508238c817dfd963482"
+    )
+    contracts["AuctionHouse"]["source_sha256"] = (
+        "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3"
+    )
+    contracts["AuctionHouse"]["transitive_compiler_input_integrity"] = (
+        "2564615ba13de1b57996eaad449398160d693fc0573d15f51aba82d58b113af1"
+    )
+    contracts["CreditEngine"]["artifacts"]["creation_sha256"] = (
+        "a1e1658810fb0e3ae0afc24975df397655ab5572f1de9da72e7bc3324ae50a2b"
+    )
+    contracts["CreditEngine"]["source_git_blob"] = (
+        "ef7724393d3b9f30f6e4281a1a465c5d2cc49895"
+    )
+    contracts["CreditEngine"]["source_sha256"] = (
+        "05bb1157c6885fc734cc4831efa2fe6aa4c189d14a1bc22bb80472103de105bb"
+    )
+    contracts["CreditEngine"]["transitive_compiler_input_integrity"] = (
+        "3b540ff311cf19c280994296b6316a3f4836217a8cd8f314861980d6cf7b3b23"
+    )
+    contracts["Teller"]["artifacts"].update(
+        {
+            "accepted_runtime_ceiling": 24_152,
+            "creation_sha256": (
+                "b94a58ac0faa6cad71e58f451cb9aea27a7152bf63bfc65798103d3b97704e5a"
+            ),
+            "creation_size": 24_387,
+            "eip170_headroom": 424,
+            "runtime_template_sha256": (
+                "39ffa8d3274b74c91896a36c4d2ce9d6df5c197758a89fbfd1589b394dad5b81"
+            ),
+            "runtime_template_size": 24_152,
+        }
+    )
+    contracts["Teller"]["source_git_blob"] = (
+        "7019b6c47dde03151acc1952944dd19301c83328"
+    )
+    contracts["Teller"]["source_sha256"] = (
+        "4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909"
+    )
+    contracts["Teller"]["transitive_compiler_input_integrity"] = (
+        "1d734c3c0507c8508fa8d7fcfac8aa7dff850f9f0bd167b28d22129986f97fdd"
+    )
+
+
 def _is_exact_pr61_artifact_layout_metadata(
     data: Mapping[str, Any],
     root: Path = ROOT,
@@ -1882,6 +1960,7 @@ def _is_exact_pr61_artifact_layout_metadata(
         defaults_record = artifact_data["contracts"]["DefaultsRobinhood"]
         legacy_projection = copy.deepcopy(artifact_data)
         legacy_projection["contracts"].pop("DefaultsRobinhood")
+        _restore_pr61_artifact_expectations_legacy(legacy_projection)
         legacy_bytes = (
             json.dumps(legacy_projection, indent=2, sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -2624,13 +2703,13 @@ def _validate_current_bindings(
             Finding(
                 code="INV-SCHEMA-CURRENT-BINDINGS",
                 domain="schema",
-                expected="ordered-source=5+ordered-timestamp=4",
+                expected="ordered-source=6+ordered-timestamp=4",
                 actual=(
                     f"source={len(source_bindings)},"
                     f"timestamp={len(timestamp_bindings)}"
                 ),
                 remediation=(
-                    "restore the exact nine current bindings; no adjacent "
+                    "restore the exact ten current bindings; no adjacent "
                     "path or timestamp inherits this authority"
                 ),
             )
@@ -2649,7 +2728,7 @@ def _validate_current_bindings(
             Finding(
                 code="INV-SCHEMA-CURRENT-BINDINGS-DUPLICATE",
                 domain="schema",
-                expected="unique-source=5+unique-timestamp=4",
+                expected="unique-source=6+unique-timestamp=4",
                 actual=(
                     f"source={len(set(source_keys))},"
                     f"timestamp={len(set(timestamp_keys))}"
@@ -4197,7 +4276,7 @@ def check_repository(
             f"timestamp_occurrences={timestamp_counts[0]} "
             f"mixed_clock_functions={len(actual_mixed)} "
             f"vyper_paths={len(data['vyperPathClassifications'])} "
-            "current_bindings=5/4 "
+            "current_bindings=6/4 "
             f"current_state_sha256={CURRENT_BINDINGS_STATE_SHA256} "
             "post_s5_production_records="
             f"{sum(record.get('classification') == 'production' for record in data['vyperPathClassifications'])} "

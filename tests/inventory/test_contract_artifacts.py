@@ -46,13 +46,13 @@ CREATION_BINDING_FACTS = {
         "prefix_size": 24_577,
         "prefix_sha256": "1236fcba166f50d861e9efe979242ebf5a0bbed88e5e754d7c1819c37d94492f",
         "metadata_size": 59,
-        "metadata_sha256": "6ca85b6a786c4434581874abdfc1fab2170611dcdaf6e7e583bb7f66b3c5b581",
+        "metadata_sha256": "0980c24fb517c44725b04c623185dfa6c389da57a71febbc8339c5a516c99493",
     },
     "CreditEngine": {
         "prefix_size": 24_285,
         "prefix_sha256": "1365baa8fdef4d72548ee249e07f78593705912fdca702a6fc0f1bc00b106fdb",
         "metadata_size": 70,
-        "metadata_sha256": "814120fa169f33d4bfb65836f33ff2b9977238826be60db4aa6b5e0807126543",
+        "metadata_sha256": "747bc88dec0dbd567631239d194b0abbb46ed12b1ec50890e183bf78e1b9765e",
     },
     "Deleverage": {
         "prefix_size": 24_833,
@@ -91,10 +91,10 @@ CREATION_BINDING_FACTS = {
         "metadata_sha256": "cc1bcadb5528be3f406a18544734a3a08de07719ec230abf79ff988ac1428f18",
     },
     "Teller": {
-        "prefix_size": 24_295,
-        "prefix_sha256": "0c6cffa7d91b251a741cfca71db077d21d96947cd2295e819b4756dc8e3b64eb",
+        "prefix_size": 24_225,
+        "prefix_sha256": "f3637a5f7e49048655960eb6fb06185fff10bba92041e603a4f9f2198c488967",
         "metadata_size": 92,
-        "metadata_sha256": "7b68fed219ab8fe328e064e4edc044d0d6d0dcfdcda397977826e660c095ec4a",
+        "metadata_sha256": "eb6ff0c814a26aa1c59efc8a2bdfb4b0663e8fbad46ef84e16de263318a4ccba",
     },
 }
 

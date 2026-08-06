@@ -58,6 +58,7 @@ interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
     def swapWithClaimableGreen(_stabAsset: address, _greenAmount: uint256, _liqAsset: address, _liqAmountSent: uint256, _greenToken: address) -> uint256: nonpayable
     def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
 
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -645,8 +646,8 @@ def _swapWithSpecificStabPool(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
-    # cannot liquidate asset that is also a stability pool asset in that vault
-    if staticcall Vault(_stabPool.vaultAddr).isSupportedVaultAsset(_liqAsset):
+    # skip incompatible or full pools before collateral moves
+    if not staticcall StabilityPool(_stabPool.vaultAddr).canAcceptLiquidationAsset(_stabPool.asset, _liqAsset):
         return remainingToRepay, collateralValueOut, False, False
 
     # check for green redemptions for this stab asset

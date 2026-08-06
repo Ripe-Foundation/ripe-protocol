@@ -153,6 +153,29 @@ def _fund_buyer(green_token, whale, teller, buyer, amount):
     green_token.approve(teller, amount, sender=buyer)
 
 
+def _fund_stability_pool_with_sgreen(
+    green_token,
+    savings_green,
+    whale,
+    depositor,
+    amount,
+    teller,
+    stability_pool,
+):
+    green_token.transfer(depositor, amount, sender=whale)
+    green_token.approve(savings_green, amount, sender=depositor)
+    shares = savings_green.deposit(amount, depositor, sender=depositor)
+    savings_green.approve(teller, shares, sender=depositor)
+    teller.deposit(
+        savings_green,
+        shares,
+        depositor,
+        stability_pool,
+        0,
+        sender=depositor,
+    )
+
+
 def _auction_state(
     vault,
     tokens,
@@ -868,6 +891,7 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
     bravo_token,
     bravo_token_whale,
     green_token,
+    savings_green,
     whale,
     deploy3r,
     bob,
@@ -925,26 +949,24 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
         )
         stab_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
         setAssetConfig(
-            green_token,
+            savings_green,
             _vaultIds=[stab_id],
             _debtTerms=stab_terms,
             _shouldBurnAsPayment=True,
         )
         mission_control.setPriorityStabVaults(
-            [(stab_id, green_token)],
+            [(stab_id, savings_green)],
             sender=switchboard_alpha.address,
         )
         mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
-        mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
-        green_token.transfer(sally, amount, sender=whale)
-        green_token.approve(teller, amount, sender=sally)
-        teller.deposit(
+        _fund_stability_pool_with_sgreen(
             green_token,
-            amount,
+            savings_green,
+            whale,
             sally,
+            amount,
+            teller,
             stability_pool,
-            0,
-            sender=sally,
         )
         stock_token.mint(bob, amount, sender=deploy3r)
         stock_token.approve(teller, amount, sender=bob)
@@ -1017,7 +1039,7 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
     )
     stab_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
     setAssetConfig(
-        green_token,
+        savings_green,
         _vaultIds=[stab_id],
         _debtTerms=stab_terms,
         _shouldBurnAsPayment=True,
@@ -1027,7 +1049,7 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
         sender=switchboard_alpha.address,
     )
     mission_control.setPriorityStabVaults(
-        [(stab_id, green_token)],
+        [(stab_id, savings_green)],
         sender=switchboard_alpha.address,
     )
     for token in (stock_token, bravo_token, green_token):
@@ -1049,15 +1071,14 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
         bravo_token_whale,
         simple_erc20_vault,
     )
-    green_token.transfer(sally, amount, sender=whale)
-    green_token.approve(teller, amount, sender=sally)
-    teller.deposit(
+    _fund_stability_pool_with_sgreen(
         green_token,
-        amount,
+        savings_green,
+        whale,
         sally,
+        amount,
+        teller,
         stability_pool,
-        0,
-        sender=sally,
     )
     teller.borrow(80 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     stock_token.adminBurn(

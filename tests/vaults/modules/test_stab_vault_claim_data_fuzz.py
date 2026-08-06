@@ -1,0 +1,814 @@
+import boa
+from hypothesis import HealthCheck, given, settings, strategies as st
+
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from test_stab_vault_hardening import (
+    ACTIVATION_THRESHOLD,
+    MAX_ACTIVE_CLAIM_ASSETS,
+    _assert_claim_data_model,
+    _asset_address,
+    _claim_pair,
+    _deploy_claim_token,
+    _record_claim,
+    _seed_stability_asset,
+)
+
+
+RETENTION_THRESHOLD = 10**17
+NUM_FUZZ_CLAIM_ASSETS = 4
+
+CLAIM_AMOUNT_STRATEGY = st.one_of(
+    st.sampled_from(
+        [
+            1,
+            RETENTION_THRESHOLD - 1,
+            RETENTION_THRESHOLD,
+            RETENTION_THRESHOLD + 1,
+            ACTIVATION_THRESHOLD - 1,
+            ACTIVATION_THRESHOLD,
+            ACTIVATION_THRESHOLD + 1,
+            3 * 10**17,
+        ]
+    ),
+    st.integers(min_value=1, max_value=3 * 10**17),
+)
+PRICE_STRATEGY = st.sampled_from(
+    [
+        0,
+        2 * 10**17,
+        EIGHTEEN_DECIMALS // 2,
+        EIGHTEEN_DECIMALS,
+        2 * EIGHTEEN_DECIMALS,
+    ]
+)
+LIFECYCLE_OPERATION_STRATEGY = st.lists(
+    st.tuples(
+        st.sampled_from(["add", "prune", "activate", "deposit", "withdraw"]),
+        st.integers(min_value=0, max_value=NUM_FUZZ_CLAIM_ASSETS - 1),
+        CLAIM_AMOUNT_STRATEGY,
+        PRICE_STRATEGY,
+    ),
+    min_size=1,
+    max_size=16,
+)
+CAPACITY_CASE_STRATEGY = st.tuples(
+    st.integers(
+        min_value=ACTIVATION_THRESHOLD,
+        max_value=3 * EIGHTEEN_DECIMALS,
+    ),
+    st.integers(min_value=1, max_value=3 * 10**17),
+)
+
+
+@st.composite
+def claim_reduction_cases(draw):
+    pair_balance = draw(
+        st.one_of(
+            st.sampled_from(
+                [
+                    ACTIVATION_THRESHOLD,
+                    ACTIVATION_THRESHOLD + 1,
+                    5 * 10**17,
+                    EIGHTEEN_DECIMALS,
+                ]
+            ),
+            st.integers(
+                min_value=ACTIVATION_THRESHOLD,
+                max_value=2 * EIGHTEEN_DECIMALS,
+            ),
+        )
+    )
+    max_claim_value = draw(
+        st.one_of(
+            st.sampled_from(
+                [
+                    10**15,
+                    RETENTION_THRESHOLD - 1,
+                    RETENTION_THRESHOLD,
+                    ACTIVATION_THRESHOLD,
+                    pair_balance,
+                ]
+            ).filter(lambda value: value <= pair_balance),
+            st.integers(min_value=10**15, max_value=pair_balance),
+        )
+    )
+    return pair_balance, max_claim_value
+
+
+@st.composite
+def redemption_cases(draw):
+    alpha_balance = draw(
+        st.integers(
+            min_value=ACTIVATION_THRESHOLD,
+            max_value=EIGHTEEN_DECIMALS,
+        )
+    )
+    charlie_balance = draw(
+        st.integers(
+            min_value=ACTIVATION_THRESHOLD,
+            max_value=EIGHTEEN_DECIMALS,
+        )
+    )
+    total_payment = draw(
+        st.integers(
+            min_value=1,
+            max_value=alpha_balance + charlie_balance,
+        )
+    )
+    first_payment = draw(st.integers(min_value=1, max_value=total_payment))
+    return (
+        alpha_balance,
+        charlie_balance,
+        first_payment,
+        total_payment - first_payment,
+    )
+
+
+def _swap_pop(active_assets, asset):
+    index = active_assets.index(asset)
+    active_assets[index] = active_assets[-1]
+    active_assets.pop()
+
+
+@settings(
+    max_examples=40,
+    deadline=None,
+    derandomize=True,
+    database=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(operations=LIFECYCLE_OPERATION_STRATEGY)
+def test_fuzz_claim_data_add_prune_activate_sequences(
+    operations,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    governance,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    switchboard_alpha,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    with boa.env.anchor():
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+        )
+        tokens = [
+            _deploy_claim_token(
+                governance,
+                alice,
+                800 + index,
+                20 * EIGHTEEN_DECIMALS,
+            )
+            for index in range(NUM_FUZZ_CLAIM_ASSETS)
+        ]
+
+        stab_address = _asset_address(alpha_token)
+        expected_pairs = {}
+        active_assets = []
+        expected_num_assets = 0
+        is_paused = False
+
+        for operation, token_index, amount, price in operations:
+            token = tokens[token_index]
+            token_address = _asset_address(token)
+            pair_key = _claim_pair(alpha_token, token)
+            mock_price_source.setPrice(token, price)
+
+            if operation == "add":
+                if is_paused:
+                    stability_pool.pause(
+                        False,
+                        sender=switchboard_alpha.address,
+                    )
+                    is_paused = False
+
+                active_addresses = [_asset_address(asset) for asset in active_assets]
+                is_active = token_address in active_addresses
+                if not is_active and price == 0:
+                    with boa.env.anchor():
+                        with boa.reverts("no price for claim asset"):
+                            _record_claim(
+                                stability_pool,
+                                alpha_token,
+                                token,
+                                alice,
+                                amount,
+                                bob,
+                                auction_house,
+                                green_token,
+                                savings_green,
+                            )
+                else:
+                    _record_claim(
+                        stability_pool,
+                        alpha_token,
+                        token,
+                        alice,
+                        amount,
+                        bob,
+                        auction_house,
+                        green_token,
+                        savings_green,
+                    )
+                    expected_pairs[pair_key] = expected_pairs.get(pair_key, 0) + amount
+                    usd_value = expected_pairs[pair_key] * price // EIGHTEEN_DECIMALS
+                    if not is_active and usd_value >= ACTIVATION_THRESHOLD:
+                        active_assets.append(token)
+                        expected_num_assets = len(active_assets) + 1
+
+            elif operation == "prune":
+                stability_pool.pruneClaimableAssets(
+                    alpha_token,
+                    [token, token, ZERO_ADDRESS],
+                    sender=alice,
+                )
+                active_addresses = [_asset_address(asset) for asset in active_assets]
+                pair_balance = expected_pairs.get(pair_key, 0)
+                usd_value = pair_balance * price // EIGHTEEN_DECIMALS
+                if (
+                    token_address in active_addresses
+                    and usd_value != 0
+                    and usd_value < RETENTION_THRESHOLD
+                ):
+                    _swap_pop(active_assets, token)
+                    expected_num_assets = len(active_assets) + 1
+
+            elif operation == "activate":
+                if not is_paused:
+                    stability_pool.pause(
+                        True,
+                        sender=switchboard_alpha.address,
+                    )
+                    is_paused = True
+
+                stability_pool.activateClaimAssets(
+                    alpha_token,
+                    [token, token, ZERO_ADDRESS],
+                    sender=alice,
+                )
+                active_addresses = [_asset_address(asset) for asset in active_assets]
+                pair_balance = expected_pairs.get(pair_key, 0)
+                usd_value = pair_balance * price // EIGHTEEN_DECIMALS
+                if (
+                    pair_balance != 0
+                    and token_address not in active_addresses
+                    and usd_value >= ACTIVATION_THRESHOLD
+                ):
+                    active_assets.append(token)
+                    expected_num_assets = len(active_assets) + 1
+
+            elif operation == "deposit":
+                if is_paused:
+                    stability_pool.pause(
+                        False,
+                        sender=switchboard_alpha.address,
+                    )
+                    is_paused = False
+
+                # Capacity and bounded dormant dust do not freeze deposits.
+                deposit_amount = max(amount, 10**15)
+                with boa.env.anchor():
+                    alpha_token.transfer(
+                        stability_pool,
+                        deposit_amount,
+                        sender=alpha_token_whale,
+                    )
+                    assert stability_pool.depositTokensInVault(
+                        alice,
+                        alpha_token,
+                        deposit_amount,
+                        sender=teller.address,
+                    ) == deposit_amount
+
+            else:
+                if is_paused:
+                    stability_pool.pause(
+                        False,
+                        sender=switchboard_alpha.address,
+                    )
+                    is_paused = False
+
+                # Existing holders retain the ability to exit through every
+                # claim-data lifecycle state.
+                with boa.env.anchor():
+                    withdrawn, _ = stability_pool.withdrawTokensFromVault(
+                        bob,
+                        alpha_token,
+                        max(amount, 10**15),
+                        bob,
+                        sender=teller.address,
+                    )
+                    assert withdrawn != 0
+
+            _assert_claim_data_model(
+                stability_pool,
+                [alpha_token],
+                tokens,
+                expected_pairs,
+                {stab_address: list(active_assets)},
+                {stab_address: expected_num_assets},
+            )
+
+
+@settings(
+    max_examples=20,
+    deadline=None,
+    derandomize=True,
+    database=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(case=CAPACITY_CASE_STRATEGY)
+def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
+    case,
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    governance,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    candidate_amount, active_increment = case
+
+    with boa.env.anchor():
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+            100 * EIGHTEEN_DECIMALS + 14,
+        )
+        active_tokens = [
+            _deploy_claim_token(
+                governance,
+                alice,
+                1_100 + index,
+                ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
+            )
+            for index in range(MAX_ACTIVE_CLAIM_ASSETS)
+        ]
+        for token in active_tokens:
+            mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+            _record_claim(
+                stability_pool,
+                alpha_token,
+                token,
+                alice,
+                ACTIVATION_THRESHOLD,
+                bob,
+                auction_house,
+                green_token,
+                savings_green,
+            )
+
+        candidate = _deploy_claim_token(
+            governance,
+            alice,
+            1_200,
+            candidate_amount,
+        )
+        mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, active_tokens[0])
+        assert not stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
+
+        with boa.env.anchor():
+            with boa.reverts("max active claim assets"):
+                _record_claim(
+                    stability_pool,
+                    alpha_token,
+                    candidate,
+                    alice,
+                    candidate_amount,
+                    bob,
+                    auction_house,
+                    green_token,
+                    savings_green,
+                )
+            assert stability_pool.claimableBalances(alpha_token, candidate) == 0
+            assert stability_pool.totalClaimableBalances(candidate) == 0
+
+        assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) == 0
+        assert stability_pool.claimableBalances(alpha_token, candidate) == 0
+
+        # A full active set does not freeze deposits.
+        with boa.env.anchor():
+            alpha_token.transfer(
+                stability_pool,
+                EIGHTEEN_DECIMALS,
+                sender=alpha_token_whale,
+            )
+            assert stability_pool.depositTokensInVault(
+                alice,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            ) == EIGHTEEN_DECIMALS
+
+        # Existing active claim assets remain consumable at the cap.
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            active_tokens[0],
+            alice,
+            active_increment,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        assert stability_pool.claimableBalances(
+            alpha_token,
+            active_tokens[0],
+        ) == ACTIVATION_THRESHOLD + active_increment
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
+
+        # Pruning a different active asset frees one slot for the candidate.
+        mock_price_source.setPrice(active_tokens[1], 2 * 10**17)
+        stability_pool.pruneClaimableAssets(
+            alpha_token,
+            [active_tokens[1]],
+            sender=alice,
+        )
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS - 1
+        )
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, candidate)
+
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            candidate,
+            alice,
+            candidate_amount,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == (
+            MAX_ACTIVE_CLAIM_ASSETS
+        )
+        assert stability_pool.indexOfClaimableAsset(alpha_token, candidate) != 0
+        assert stability_pool.claimableBalances(alpha_token, candidate) == (
+            candidate_amount
+        )
+
+        with boa.env.anchor():
+            alpha_token.transfer(
+                stability_pool,
+                EIGHTEEN_DECIMALS,
+                sender=alpha_token_whale,
+            )
+            assert stability_pool.depositTokensInVault(
+                alice,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            ) == EIGHTEEN_DECIMALS
+
+
+@settings(
+    max_examples=40,
+    deadline=None,
+    derandomize=True,
+    database=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(case=claim_reduction_cases())
+def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
+    case,
+    stability_pool,
+    alpha_token,
+    charlie_token,
+    alpha_token_whale,
+    charlie_token_whale,
+    governance,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    pair_balance, max_claim_value = case
+
+    with boa.env.anchor():
+        setGeneralConfig()
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+        )
+        _seed_stability_asset(
+            stability_pool,
+            charlie_token,
+            charlie_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+            100 * 10**6,
+        )
+
+        claim = _deploy_claim_token(
+            governance,
+            alice,
+            900,
+            2 * pair_balance,
+        )
+        setAssetConfig(claim)
+        mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)
+        for stab_asset in (alpha_token, charlie_token):
+            _record_claim(
+                stability_pool,
+                stab_asset,
+                claim,
+                alice,
+                pair_balance,
+                bob,
+                auction_house,
+                green_token,
+                savings_green,
+            )
+
+        stab_assets = [alpha_token, charlie_token]
+        alpha_address = _asset_address(alpha_token)
+        charlie_address = _asset_address(charlie_token)
+        expected_pairs = {
+            _claim_pair(alpha_token, claim): pair_balance,
+            _claim_pair(charlie_token, claim): pair_balance,
+        }
+        expected_active = {
+            alpha_address: [claim],
+            charlie_address: [claim],
+        }
+        expected_num_assets = {
+            alpha_address: 2,
+            charlie_address: 2,
+        }
+
+        balance_before = claim.balanceOf(bob)
+        claim_usd_value = stability_pool.claimFromStabilityPool(
+            bob,
+            alpha_token,
+            claim,
+            max_claim_value,
+            bob,
+            False,
+            sender=teller.address,
+        )
+        claimed_amount = claim.balanceOf(bob) - balance_before
+        assert claim_usd_value != 0
+        assert 0 < claimed_amount <= pair_balance
+
+        remaining_balance = pair_balance - claimed_amount
+        remaining_usd_value = 0
+        if remaining_balance != 0:
+            numerator = remaining_balance * claim_usd_value
+            remaining_usd_value = (
+                1 if numerator < claimed_amount else numerator // claimed_amount
+            )
+
+        should_remove = remaining_balance == 0 or (
+            remaining_usd_value != 0 and remaining_usd_value < RETENTION_THRESHOLD
+        )
+        expected_pairs[_claim_pair(alpha_token, claim)] = remaining_balance
+        if should_remove:
+            expected_active[alpha_address] = []
+            expected_num_assets[alpha_address] = 1
+
+        _assert_claim_data_model(
+            stability_pool,
+            stab_assets,
+            [claim],
+            expected_pairs,
+            expected_active,
+            expected_num_assets,
+        )
+
+        if remaining_balance != 0:
+            balance_before = claim.balanceOf(bob)
+            stability_pool.claimFromStabilityPool(
+                bob,
+                alpha_token,
+                claim,
+                MAX_UINT256,
+                bob,
+                False,
+                sender=teller.address,
+            )
+            assert claim.balanceOf(bob) - balance_before == remaining_balance
+            expected_pairs[_claim_pair(alpha_token, claim)] = 0
+            expected_active[alpha_address] = []
+            expected_num_assets[alpha_address] = 1
+            _assert_claim_data_model(
+                stability_pool,
+                stab_assets,
+                [claim],
+                expected_pairs,
+                expected_active,
+                expected_num_assets,
+            )
+
+
+@settings(
+    max_examples=40,
+    deadline=None,
+    derandomize=True,
+    database=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(case=redemption_cases())
+def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
+    case,
+    stability_pool,
+    alpha_token,
+    charlie_token,
+    alpha_token_whale,
+    charlie_token_whale,
+    governance,
+    bob,
+    alice,
+    whale,
+    teller,
+    auction_house,
+    vault_book,
+    mock_price_source,
+    green_token,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    alpha_balance, charlie_balance, first_payment, second_payment = case
+
+    with boa.env.anchor():
+        setGeneralConfig()
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+        )
+        _seed_stability_asset(
+            stability_pool,
+            charlie_token,
+            charlie_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+            100 * 10**6,
+        )
+
+        claim = _deploy_claim_token(
+            governance,
+            alice,
+            1_000,
+            alpha_balance + charlie_balance,
+        )
+        setAssetConfig(claim)
+        mock_price_source.setPrice(claim, EIGHTEEN_DECIMALS)
+        for stab_asset, balance in (
+            (alpha_token, alpha_balance),
+            (charlie_token, charlie_balance),
+        ):
+            _record_claim(
+                stability_pool,
+                stab_asset,
+                claim,
+                alice,
+                balance,
+                bob,
+                auction_house,
+                green_token,
+                savings_green,
+            )
+
+        stab_assets = [alpha_token, charlie_token]
+        claim_assets = [claim, green_token]
+        alpha_address = _asset_address(alpha_token)
+        charlie_address = _asset_address(charlie_token)
+        expected_pairs = {
+            _claim_pair(alpha_token, claim): alpha_balance,
+            _claim_pair(charlie_token, claim): charlie_balance,
+        }
+        expected_active = {
+            alpha_address: [claim],
+            charlie_address: [claim],
+        }
+        expected_num_assets = {
+            alpha_address: 2,
+            charlie_address: 2,
+        }
+        remaining_claims = {
+            alpha_address: alpha_balance,
+            charlie_address: charlie_balance,
+        }
+        green_pairs = {
+            alpha_address: 0,
+            charlie_address: 0,
+        }
+        asset_by_address = {
+            alpha_address: alpha_token,
+            charlie_address: charlie_token,
+        }
+
+        vault_id = vault_book.getRegId(stability_pool)
+        for payment in (first_payment, second_payment):
+            if payment == 0:
+                continue
+
+            green_token.transfer(bob, payment, sender=whale)
+            green_token.approve(teller, payment, sender=bob)
+            assert (
+                teller.redeemFromStabilityPool(
+                    vault_id,
+                    claim,
+                    payment,
+                    bob,
+                    sender=bob,
+                )
+                == payment
+            )
+
+            payment_remaining = payment
+            for stab_address in (alpha_address, charlie_address):
+                if payment_remaining == 0:
+                    break
+
+                stab_asset = asset_by_address[stab_address]
+                claim_amount = min(
+                    payment_remaining,
+                    remaining_claims[stab_address],
+                )
+                if claim_amount == 0:
+                    continue
+
+                remaining_claims[stab_address] -= claim_amount
+                expected_pairs[_claim_pair(stab_asset, claim)] = remaining_claims[
+                    stab_address
+                ]
+                if (
+                    remaining_claims[stab_address] == 0
+                    or remaining_claims[stab_address] < RETENTION_THRESHOLD
+                ):
+                    active_addresses = [
+                        _asset_address(asset) for asset in expected_active[stab_address]
+                    ]
+                    if _asset_address(claim) in active_addresses:
+                        _swap_pop(expected_active[stab_address], claim)
+
+                green_pairs[stab_address] += claim_amount
+                expected_pairs[_claim_pair(stab_asset, green_token)] = green_pairs[
+                    stab_address
+                ]
+                active_addresses = [
+                    _asset_address(asset) for asset in expected_active[stab_address]
+                ]
+                if (
+                    _asset_address(green_token) not in active_addresses
+                    and green_pairs[stab_address] >= ACTIVATION_THRESHOLD
+                ):
+                    expected_active[stab_address].append(green_token)
+
+                expected_num_assets[stab_address] = (
+                    len(expected_active[stab_address]) + 1
+                )
+                payment_remaining -= claim_amount
+
+            assert payment_remaining == 0
+            _assert_claim_data_model(
+                stability_pool,
+                stab_assets,
+                claim_assets,
+                expected_pairs,
+                expected_active,
+                expected_num_assets,
+            )

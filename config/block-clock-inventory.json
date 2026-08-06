@@ -28,7 +28,7 @@
   },
   "currentBindings": {
     "schemaVersion": 1,
-    "currentStateSha256": "3757969a7cd56ba050cea2eac7d8842f67ad9923d09b2878c9e9bf4c84426e59",
+    "currentStateSha256": "6799942a48f496f51c5e74aa36f200636ec3eec3efd81ab9e019f9f920c27ebc",
     "sourcePaths": [
       {
         "path": "contracts/mock/MockMorphoV2Factory.vy",
@@ -58,7 +58,13 @@
         "path": "contracts/priceSources/BlueChipYieldPrices.vy",
         "classification": "production",
         "historicalContentSha256": "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56",
-        "currentContentSha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be"
+        "currentContentSha256": "077a51b7587ef6a3ceb87c920955160944274b3d4560abf098ce904b713d3b56"
+      },
+      {
+        "path": "contracts/vaults/StabilityPool.vy",
+        "classification": "production",
+        "historicalContentSha256": "04d0a7dddb8b562e8e384f61e6b83c76f5bc4a761070fd069f52d6ae8a4e22eb",
+        "currentContentSha256": "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158"
       }
     ],
     "timestampLines": [
@@ -69,7 +75,7 @@
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 787,
-        "currentLine": 914,
+        "currentLine": 787,
         "currentLineText": "    if config.lastSnapshot.lastUpdate == block.timestamp:",
         "currentLineSha256": "30c571ae6e9ac9dc525f53ca3d264eaee4ad0e30a8929d0df113ecb42f495ae3"
       },
@@ -80,9 +86,9 @@
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 2,
         "historicalReviewedLine": 791,
-        "currentLine": 922,
-        "currentLineText": "        if not didAdd or nextSnapshotAt > block.timestamp:",
-        "currentLineSha256": "79164ed349a9ccb009cbc82ebc610255a02514ebacc2f8582bce5ffd12da51d9"
+        "currentLine": 791,
+        "currentLineText": "    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:",
+        "currentLineSha256": "9496e63ce369b3249e87b60800f54147307e6d432a1c571388ed02a6e14e2d97"
       },
       {
         "id": "TS-004",
@@ -91,9 +97,9 @@
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 848,
-        "currentLine": 960,
-        "currentLineText": "    currentTimestamp: uint256 = block.timestamp",
-        "currentLineSha256": "65ce5080501ffbf935fe37b404bdfb79352808b02a346518e3fd6324216c42a6"
+        "currentLine": 848,
+        "currentLineText": "        lastUpdate=block.timestamp,",
+        "currentLineSha256": "b790e6c99e32877e29bc8e8c9a143cb4fded60811624a57026d77621f7423f4b"
       },
       {
         "id": "TS-004",
@@ -102,9 +108,9 @@
         "normalizedExpression": "block.timestamp",
         "ordinalInFunction": 1,
         "historicalReviewedLine": 750,
-        "currentLine": 868,
-        "currentLineText": "            if block.timestamp > staleAt:",
-        "currentLineSha256": "9d3d995977312a61f6a54cde9bc61e19ccdc4d13b32aa06d5fde76125c52c174"
+        "currentLine": 750,
+        "currentLineText": "        if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:",
+        "currentLineSha256": "0c3f079fdf151069ce95b4011f908f24ceb6d0f05b14241765b88d703ac19794"
       }
     ]
   },
@@ -16319,7 +16325,7 @@
     {
       "path": "contracts/vaults/modules/StabVault.vy",
       "classification": "production",
-      "contentSha256": "b6b80e171eaced650b9ccc0583543f2a20dec471f43ff3231c0619d6c637549e",
+      "contentSha256": "4fb757b0ec0706f49ad84fd1ac5728057c755b5adecec1c4c60e050a1520f13a",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",

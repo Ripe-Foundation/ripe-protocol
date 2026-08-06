@@ -15,12 +15,51 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Vault
 
 exports: addys.__interface__
-exports: vaultData.__interface__
-exports: stabVault.__interface__
+exports: (
+    vaultData.isPaused,
+    vaultData.userBalances,
+    vaultData.totalBalances,
+    vaultData.userAssets,
+    vaultData.indexOfUserAsset,
+    vaultData.numUserAssets,
+    vaultData.vaultAssets,
+    vaultData.indexOfAsset,
+    vaultData.numAssets,
+    vaultData.isUserInVaultAsset,
+    vaultData.doesUserHaveBalance,
+    vaultData.deregisterUserAsset,
+    vaultData.isSupportedVaultAsset,
+    vaultData.deregisterVaultAsset,
+    vaultData.doesVaultHaveAnyFunds,
+    vaultData.getNumUserAssets,
+    vaultData.getNumVaultAssets,
+    vaultData.pause,
+)
+exports: (
+    stabVault.claimableBalances,
+    stabVault.totalClaimableBalances,
+    stabVault.claimableAssets,
+    stabVault.indexOfClaimableAsset,
+    stabVault.numClaimableAssets,
+    stabVault.swapForLiquidatedCollateral,
+    stabVault.swapWithClaimableGreen,
+    stabVault.claimFromStabilityPool,
+    stabVault.claimManyFromStabilityPool,
+    stabVault.redeemFromStabilityPool,
+    stabVault.redeemManyFromStabilityPool,
+    stabVault.getTotalValue,
+    stabVault.getTotalUserValue,
+    stabVault.getNumActiveClaimAssets,
+    stabVault.getClaimAssetState,
+    stabVault.canAcceptLiquidationAsset,
+    stabVault.pruneClaimableAssets,
+    stabVault.activateClaimAssets,
+)
 
 initializes: addys
 initializes: vaultData[addys := addys]
@@ -30,7 +69,6 @@ from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.vaults.modules.VaultData as vaultData
 import contracts.vaults.modules.StabVault as stabVault
-from ethereum.ercs import IERC20
 
 event StabilityPoolDeposit:
     user: indexed(address)
@@ -52,7 +90,6 @@ event StabilityPoolTransfer:
     transferAmount: uint256
     isFromUserDepleted: bool
     transferShares: uint256
-
 
 @deploy
 def __init__(_ripeHq: address):
@@ -172,3 +209,18 @@ def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
 @external
 def getTotalAmountForVault(_asset: address) -> uint256:
     return stabVault._getTotalAmountForVault(_asset)
+
+
+#####################
+# Disabled Recovery #
+#####################
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    raise
+
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    raise
