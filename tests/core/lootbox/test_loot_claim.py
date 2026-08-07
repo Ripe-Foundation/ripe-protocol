@@ -174,6 +174,10 @@ def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
     ripe_before = ripe_token.balanceOf(bob)
     _disable_teller_pointer(ripe_hq, governance)
 
+    # The aggregate view does not depend on the Teller pointer and remains
+    # readable even though the state-changing claim path is now unavailable.
+    assert lootbox.getClaimableLoot(bob) > 0
+
     with boa.reverts(dev="no perms"):
         lootbox.claimDepositLootForAsset(
             bob,
@@ -187,7 +191,7 @@ def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
     assert ripe_token.balanceOf(bob) == ripe_before
 
 
-def test_get_claimable_loot_with_position_reverts_when_teller_pointer_is_unset(
+def test_get_claimable_loot_with_position_reverts_when_core_vault_pointer_is_unset(
     bob,
     alice,
     setGeneralConfig,
@@ -198,8 +202,7 @@ def test_get_claimable_loot_with_position_reverts_when_teller_pointer_is_unset(
     vault_book,
     lootbox,
     teller,
-    ripe_hq,
-    governance,
+    mission_control,
     alpha_token,
     alpha_token_whale,
 ):
@@ -216,10 +219,13 @@ def test_get_claimable_loot_with_position_reverts_when_teller_pointer_is_unset(
         alpha_token,
         alpha_token_whale,
     )
-    _disable_teller_pointer(ripe_hq, governance)
+    # There is no public zeroing transition for this pointer. The direct state
+    # setup isolates Lootbox's defensive read-time guard without pretending it
+    # is a reachable governance transition.
+    mission_control.eval("self.coreRipeGovVaultId = 0")
 
     assert lootbox.getClaimableLoot(alice) == 0
-    with boa.reverts():
+    with boa.reverts(dev="invalid vault id"):
         lootbox.getClaimableLoot(bob)
 
 

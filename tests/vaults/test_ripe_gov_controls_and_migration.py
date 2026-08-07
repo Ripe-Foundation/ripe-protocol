@@ -948,9 +948,13 @@ def test_direct_export_rejects_invalid_migration_context_atomically(
     assert_source_unchanged()
 
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
-    invalid_targets = (ZERO_ADDRESS, alice, ripe_gov_vault.address)
-    for invalid_target in invalid_targets:
-        with boa.reverts():
+    invalid_targets = (
+        (ZERO_ADDRESS, "invalid migration address"),
+        (alice, "invalid target vault"),
+        (ripe_gov_vault.address, "invalid target vault"),
+    )
+    for invalid_target, expected_dev in invalid_targets:
+        with boa.reverts(dev=expected_dev):
             ripe_gov_vault.exportPositionForMigration(
                 bob,
                 ripe_token,
@@ -1066,6 +1070,28 @@ def _migration_payload(amount, points=123):
     return (amount, points, 777, LOCK_TERMS)
 
 
+# Defensive migration guards that cannot be reached through the public RipeGov
+# state machine are intentionally dispositioned here instead of manufactured by
+# mutating production storage:
+#
+# - `inconsistent position shares`: every public share mutation updates
+#   GovData.lastShares in the same transaction.
+# - `inconsistent user gov points` / `inconsistent global gov points`: every
+#   public point mutation updates the per-user and global aggregates atomically.
+# - `partial migration`: export always asks `_calcWithdrawalSharesAndAmount` for
+#   max_value(uint256), so the helper returns the full starting share balance.
+# - `incomplete migration`: reducing that exact full balance necessarily removes
+#   all shares and reports depletion while VaultData invariants hold.
+# - `target balance exists`: public balance creation also creates the asset index,
+#   so the earlier `target position exists` guard fires first.
+# - `target gov data exists` / `target terms exist`: public GovData creation is
+#   coupled to position creation, so the earlier position guard fires first.
+#
+# The reachable tombstone and zero-target-share guards have dedicated tests
+# below. These dispositions are defensive-code reachability statements, not
+# claims that the guards are unnecessary.
+
+
 def test_direct_import_rejects_invalid_migration_context_atomically(
     target_ripe_gov_vault,
     ripe_gov_vault,
@@ -1107,8 +1133,13 @@ def test_direct_import_rejects_invalid_migration_context_atomically(
     assert_target_empty()
 
     target.pause(True, sender=switchboard_alpha.address)
-    for source in (ZERO_ADDRESS, alice, target.address):
-        with boa.reverts():
+    invalid_sources = (
+        (ZERO_ADDRESS, "invalid migration address"),
+        (alice, "invalid source vault"),
+        (target.address, "invalid source vault"),
+    )
+    for source, expected_dev in invalid_sources:
+        with boa.reverts(dev=expected_dev):
             target.importPositionForMigration(
                 bob,
                 ripe_token,
@@ -1167,6 +1198,75 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     assert target.userBalances(bob, ripe_token) == existing_shares
     assert target.totalBalances(ripe_token) == existing_total_shares
     assert target.userGovData(bob, ripe_token) == existing_data
+    assert target.totalGovPoints() == 0
+    assert ripe_token.balanceOf(target) == custody_before
+
+
+def test_direct_import_rejects_position_already_migrated_out(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+):
+    target, _ = target_ripe_gov_vault
+    amount = 5 * EIGHTEEN_DECIMALS
+    _direct_deposit(target, ripe_token, whale, bob, amount, teller)
+    target.pause(True, sender=switchboard_alpha.address)
+    target.exportPositionForMigration(
+        bob,
+        ripe_token,
+        ripe_gov_vault,
+        sender=teller.address,
+    )
+    assert target.positionMigratedOut(bob, ripe_token)
+    custody_before = ripe_token.balanceOf(target)
+
+    with boa.reverts(dev="position already migrated out"):
+        target.importPositionForMigration(
+            bob,
+            ripe_token,
+            ripe_gov_vault,
+            _migration_payload(amount),
+            sender=teller.address,
+        )
+    assert target.positionMigratedOut(bob, ripe_token)
+    assert target.userBalances(bob, ripe_token) == 0
+    assert target.totalUserGovPoints(bob) == 0
+    assert target.totalGovPoints() == 0
+    assert ripe_token.balanceOf(target) == custody_before
+
+
+def test_direct_import_rejects_zero_share_result_atomically(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+):
+    target, _ = target_ripe_gov_vault
+    migration_amount = 1
+    donation = EIGHTEEN_DECIMALS
+    target.pause(True, sender=switchboard_alpha.address)
+    ripe_token.transfer(target, donation + migration_amount, sender=whale)
+    custody_before = ripe_token.balanceOf(target)
+
+    with boa.reverts(dev="invalid target shares"):
+        target.importPositionForMigration(
+            bob,
+            ripe_token,
+            ripe_gov_vault,
+            _migration_payload(migration_amount),
+            sender=teller.address,
+        )
+    assert target.userBalances(bob, ripe_token) == 0
+    assert target.totalBalances(ripe_token) == 0
+    assert target.userGovData(bob, ripe_token).govPoints == 0
+    assert target.totalUserGovPoints(bob) == 0
     assert target.totalGovPoints() == 0
     assert ripe_token.balanceOf(target) == custody_before
 

@@ -290,21 +290,46 @@ def test_staker_allocation_accepts_retired_stability_vault(
     assert action_id > 0
 
 
-def test_staker_allocation_rejects_regular_vault(
+def test_staker_allocation_proposal_gate_rejects_then_accepts_classified_vault(
     switchboard_bravo,
     governance,
     new_mission_control,
     alpha_token,
 ):
+    vault_id = 3
+    assert new_mission_control.coreRipeGovVaultId() != vault_id
+    assert not new_mission_control.isStabVaultId(vault_id)
     with boa.reverts("invalid asset"):
         _add_asset(
             switchboard_bravo,
             governance,
             alpha_token.address,
-            [3],
+            [vault_id],
             50_00,
             new_mission_control.address,
         )
+
+    new_mission_control.setPriorityStabVaults(
+        [(vault_id, alpha_token.address)],
+        sender=switchboard_bravo.address,
+    )
+    assert new_mission_control.isStabVaultId(vault_id)
+    action_id = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        [vault_id],
+        50_00,
+        new_mission_control.address,
+    )
+    pending = switchboard_bravo.pendingAssetConfig(action_id)
+    assert action_id > 0
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == new_mission_control.address
+    )
+    assert list(pending.config.vaultIds) == [vault_id]
+    assert pending.config.stakersPointsAlloc == 50_00
 
 
 def test_staker_allocation_rejects_unset_pointers_but_zero_allocation_remains_valid(
@@ -392,8 +417,10 @@ def test_asset_deposit_param_update_uses_target_mission_control_pointers(
     switchboard_bravo,
     governance,
     new_mission_control,
+    mission_control,
     alpha_token,
 ):
+    assert new_mission_control.address != mission_control.address
     new_mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
     new_mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
     add_action = _add_asset(

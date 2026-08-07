@@ -36,6 +36,15 @@ VAULT_CASES = (
     pytest.param("rebase", 4, id="rebase-erc20"),
 )
 
+
+def _boa_error_has_dev_reason(error, expected_reason):
+    return any(
+        not isinstance(frame, str)
+        and getattr(frame, "dev_reason", None) is not None
+        and frame.dev_reason.reason_str == expected_reason
+        for frame in error.stack_trace
+    )
+
 @pytest.fixture(autouse=True)
 def isolate_boa_storage_diagnostics():
     """Avoid Boa repr crashes from stale address/type trace metadata."""
@@ -943,8 +952,12 @@ def test_new_deposit_after_total_loss_with_old_accounting(
     if vault_kind == "simple":
         stock_token.mint(alice, fresh_amount, sender=deploy3r)
         stock_token.approve(teller, fresh_amount, sender=alice)
-        with pytest.raises(BoaError, match="insufficient vault backing"):
+        with pytest.raises(BoaError) as exc_info:
             teller.deposit(stock_token, fresh_amount, alice, vault, sender=alice)
+        assert _boa_error_has_dev_reason(
+            exc_info.value,
+            "insufficient vault backing",
+        )
         assert stock_token.balanceOf(alice) == fresh_amount
         assert stock_token.balanceOf(vault) == 0
         assert vault.getTotalAmountForUser(bob, stock_token) == 0

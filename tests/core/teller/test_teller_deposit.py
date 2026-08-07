@@ -4,6 +4,7 @@ from pathlib import Path
 
 import boa
 import pytest
+from boa.contracts.base_evm_contract import BoaError
 from eth_abi import encode
 from eth_utils import keccak
 
@@ -536,6 +537,15 @@ def _t1_mutex_removal_mutant_source():
     source = source.replace(assertion, "", 1)
     assert "assert not self.receiptMeasurementActive" not in source
     return source
+
+
+def _boa_error_has_dev_reason(error, expected_reason):
+    return any(
+        not isinstance(frame, str)
+        and getattr(frame, "dev_reason", None) is not None
+        and frame.dev_reason.reason_str == expected_reason
+        for frame in error.stack_trace
+    )
 
 
 def _t6_receipt_equality_bypass_mutant_source():
@@ -2320,9 +2330,9 @@ def test_t1_real_basic_vault_blocks_offsetting_receipt_without_teller_mutex(
         vault_book,
     )
 
-    # The mutant's external-call wrapper masks the nested BasicVault dev label.
-    # The post-revert state assertions below discriminate the atomic guard path.
-    with boa.reverts():
+    # The outer Teller frame masks the nested BasicVault dev label from
+    # boa.reverts(dev=...), so inspect every structured trace frame instead.
+    with pytest.raises(BoaError) as exc_info:
         mutant.depositFromTrusted(
             bob,
             vault_id,
@@ -2331,6 +2341,10 @@ def test_t1_real_basic_vault_blocks_offsetting_receipt_without_teller_mutex(
             0,
             sender=credit_engine.address,
         )
+    assert _boa_error_has_dev_reason(
+        exc_info.value,
+        "insufficient vault backing",
+    )
 
     assert token.balanceValue(credit_engine) == amount
     assert token.balanceValue(simple_erc20_vault) == 0
@@ -2857,81 +2871,97 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
-def test_receipt_measurement_mutex_blocks_nested_batch_redemption(
-    alpha_token,
-    alpha_token_whale,
+def test_receipt_measurement_mutex_blocks_nested_deposit(
+    ripe_hq,
+    governance,
+    credit_engine,
+    simple_erc20_vault,
     bob,
     setGeneralConfig,
     setAssetConfig,
-    setGeneralDebtConfig,
-    performDeposit,
-    mock_price_source,
     teller,
-    green_token,
-    whale,
-    simple_erc20_vault,
-    vault_book,
-    createDebtTerms,
-    credit_engine,
     ledger,
+    vault_book,
 ):
-    setGeneralConfig()
-    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=70_00)
-    setAssetConfig(alpha_token, _debtTerms=debt_terms)
-    setGeneralDebtConfig()
-    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
-    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
-    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
-
-    callback_token = _m1_token()
-    setAssetConfig(callback_token)
-    outer_amount = 100 * EIGHTEEN_DECIMALS
-    callback_token.mint(credit_engine, outer_amount)
-    callback_token.approve(teller, outer_amount, sender=credit_engine.address)
-    payment = 100 * EIGHTEEN_DECIMALS
-    green_token.transfer(callback_token, payment, sender=whale)
-    green_token.approve(teller, payment, sender=callback_token.address)
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-    nested = teller.redeemCollateralFromMany.prepare_calldata(
-        [(bob, vault_id, alpha_token.address, MAX_UINT256)],
-        payment,
-        False,
-        True,
-        True,
-        callback_token.address,
+    token, amount, nested_amount, vault_id = (
+        _t1_setup_mutex_sensitive_trusted_callback(
+            teller,
+            teller,
+            ripe_hq,
+            governance,
+            credit_engine,
+            simple_erc20_vault,
+            bob,
+            setGeneralConfig,
+            setAssetConfig,
+            vault_book,
+        )
     )
-    callback_token.configure_callback(teller, nested, True)
-    callback_token.configure_callback_rejection_policy(False)
-    callback_token.configure_transfer(0)
+    token.configure_transfer(0)
+    token.configure_callback_rejection_policy(False)
     snapshot = (
-        callback_token.balanceValue(credit_engine),
-        callback_token.balanceValue(simple_erc20_vault),
-        alpha_token.balanceOf(simple_erc20_vault),
-        simple_erc20_vault.userBalances(bob, alpha_token),
-        simple_erc20_vault.userBalances(callback_token, alpha_token),
-        green_token.balanceOf(callback_token),
-        ledger.getNumUserVaults(callback_token),
+        token.balanceValue(credit_engine),
+        token.balanceValue(token),
+        token.balanceValue(simple_erc20_vault),
+        simple_erc20_vault.userBalances(bob, token),
+        ledger.getNumUserVaults(bob),
     )
 
-    with boa.reverts(dev="receipt measurement active"):
+    with pytest.raises(BoaError) as exc_info:
         teller.depositFromTrusted(
             bob,
             vault_id,
-            callback_token,
-            outer_amount,
+            token,
+            amount,
             0,
             sender=credit_engine.address,
         )
+    assert _boa_error_has_dev_reason(exc_info.value, "receipt measurement active")
     assert snapshot == (
-        callback_token.balanceValue(credit_engine),
-        callback_token.balanceValue(simple_erc20_vault),
-        alpha_token.balanceOf(simple_erc20_vault),
-        simple_erc20_vault.userBalances(bob, alpha_token),
-        simple_erc20_vault.userBalances(callback_token, alpha_token),
-        green_token.balanceOf(callback_token),
-        ledger.getNumUserVaults(callback_token),
+        token.balanceValue(credit_engine),
+        token.balanceValue(token),
+        token.balanceValue(simple_erc20_vault),
+        simple_erc20_vault.userBalances(bob, token),
+        ledger.getNumUserVaults(bob),
     )
+    assert nested_amount == 1
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_nonreentrant_deposit_blocks_nested_ordinary_deposit(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    simple_erc20_vault,
+    ledger,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    nested_amount = 1
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+    token.mint(token, nested_amount)
+    token.set_self_allowance(teller, nested_amount)
+    nested = teller.deposit.prepare_calldata(
+        token,
+        nested_amount,
+        bob,
+        simple_erc20_vault,
+    )
+    token.configure_callback(teller, nested, True)
+    token.configure_callback_rejection_policy(False)
+    token.configure_transfer(0)
+
+    with boa.reverts():
+        teller.deposit(token, amount, bob, simple_erc20_vault, sender=bob)
+    assert token.balanceValue(bob) == amount
+    assert token.balanceValue(token) == nested_amount
+    assert token.balanceValue(simple_erc20_vault) == 0
+    assert simple_erc20_vault.userBalances(bob, token) == 0
+    assert ledger.getNumUserVaults(bob) == 0
     assert filter_logs(teller, "TellerDeposit") == []
 
 
