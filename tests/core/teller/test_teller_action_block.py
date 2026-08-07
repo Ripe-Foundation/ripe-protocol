@@ -680,6 +680,7 @@ def test_surviving_batch_routes_are_callable_runtime_controls(
     signature,
     types,
     teller_route_matrix_env,
+    teller,
 ):
     """Bind the same raw selector derivation to live surviving batch routes."""
 

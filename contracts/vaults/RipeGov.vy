@@ -187,7 +187,7 @@ def depositTokensWithLockDuration(
     _lockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     return self._depositTokensInRipeGovVault(_user, _asset, _amount, _lockDuration, _a)
 
 
@@ -762,7 +762,7 @@ def adjustLock(
     _newLockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     a: addys.Addys = addys._getAddys(_a)
 
     # do a full update first
@@ -794,7 +794,7 @@ def releaseLock(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     a: addys.Addys = addys._getAddys(_a)
 
     # they are probably wanting to exit early because of bad debt, crisis of confidence

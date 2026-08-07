@@ -3100,7 +3100,7 @@ def test_predeployment_valid_ripe_lock_route_preserves_direct_clamp_boundary(
         token,
         requested,
         500,
-        sender=switchboard_alpha.address,
+        sender=teller.address,
     )
 
     assert returned == available

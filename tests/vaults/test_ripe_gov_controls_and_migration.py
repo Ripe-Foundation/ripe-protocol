@@ -51,6 +51,8 @@ def target_ripe_gov_vault(ripe_hq, vault_book, governance):
 
 
 def _direct_deposit(vault, token, funder, user, amount, teller, lock_duration=0, switchboard=None):
+    # `switchboard` is retained only so existing call sites keep working; RipeGov
+    # now accepts these deposits from Teller alone.
     token.transfer(vault, amount, sender=funder)
     if lock_duration == 0:
         return vault.depositTokensInVault(user, token, amount, sender=teller.address)
@@ -59,7 +61,7 @@ def _direct_deposit(vault, token, funder, user, amount, teller, lock_duration=0,
         token,
         amount,
         lock_duration,
-        sender=switchboard.address,
+        sender=teller.address,
     )
 
 
@@ -812,12 +814,12 @@ def test_disabled_points_leave_lock_adjustment_and_release_operational(
     before = _save_points(ripe_gov_vault, bob, ripe_token, switchboard_alpha)
     ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
 
-    ripe_gov_vault.adjustLock(bob, ripe_token, 800, sender=switchboard_alpha.address)
+    ripe_gov_vault.adjustLock(bob, ripe_token, 800, sender=teller.address)
     adjusted = ripe_gov_vault.userGovData(bob, ripe_token)
     assert adjusted.govPoints == before.govPoints
     assert adjusted.unlock > before.unlock
 
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     released = ripe_gov_vault.userGovData(bob, ripe_token)
     assert released.govPoints == before.govPoints
     assert released.unlock == 0
@@ -2182,7 +2184,7 @@ def test_migrated_source_position_is_permanently_tombstoned(
             ripe_token,
             1,
             100,
-            sender=switchboard_alpha.address,
+            sender=teller.address,
         )
     alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
     with boa.reverts("recipient position migrated"):
@@ -2858,7 +2860,10 @@ def test_unregistered_gov_privileged_call_is_rejected_and_fully_atomic(
     caller = unregistered_callers[caller_name]
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice])
 
-    with boa.reverts("no perms"):
+    expected = (
+        "no perms" if method == "updateUserGovPoints" else "only Teller allowed"
+    )
+    with boa.reverts(expected):
         if method == "depositTokensWithLockDuration":
             ripe_gov_vault.depositTokensWithLockDuration(
                 alice, ripe_token, gov_position, 1_000, sender=caller
@@ -2878,52 +2883,9 @@ def test_unregistered_gov_privileged_call_is_rejected_and_fully_atomic(
 # --------------------------------------------------------------------------
 
 
-def test_registered_non_teller_mints_gov_shares_from_existing_custody(
-    ripe_gov_vault,
-    ripe_token,
-    bob,
-    alice,
-    switchboard_bravo,
-    gov_position,
-):
-    """DV-01 characterization (SV-1, SV-4).
-
-    depositTokensWithLockDuration accepts any addys._isValidRipeAddr caller and
-    SharesVault mints against the vault's *current* token balance rather than a
-    receipt proven in this transaction. A registered non-Teller contract can
-    therefore mint shares for an arbitrary beneficiary against custody already
-    attributed to another user, while moving no tokens at all.
-    """
-    custody_before = ripe_token.balanceOf(ripe_gov_vault.address)
-    bob_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
-    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == gov_position
-    assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
-
-    # The attacker sends no tokens to the vault.
-    minted = ripe_gov_vault.depositTokensWithLockDuration(
-        alice, ripe_token, MAX_UINT256, 1_000, sender=switchboard_bravo.address
-    )
-
-    assert minted == gov_position
-    assert ripe_token.balanceOf(ripe_gov_vault.address) == custody_before
-
-    alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
-    assert alice_shares > bob_shares_before * 10**19  # near-total dilution
-    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) >= gov_position - 1
-    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
-
-    # Alice also receives an attacker-chosen lock she never asked for.
-    assert ripe_gov_vault.userGovData(alice, ripe_token).unlock == (
-        boa.env.evm.patch.block_number + 1_000
-    )
 
 
 @pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-01: RipeGov.depositTokensWithLockDuration still uses the broad "
-    "addys._isValidRipeAddr predicate; least-privilege fix is gated on RH-CHANGE-01",
-)
 def test_registered_non_teller_cannot_mint_gov_shares_from_existing_custody(
     caller_name,
     ripe_gov_vault,
@@ -2949,29 +2911,9 @@ def test_registered_non_teller_cannot_mint_gov_shares_from_existing_custody(
 # --------------------------------------------------------------------------
 
 
-def test_registered_non_teller_adjusts_another_users_lock(
-    ripe_gov_vault, ripe_token, bob, stability_pool, gov_position
-):
-    """DV-02 characterization (SV-4, RG-4).
-
-    An unrelated registered contract -- here the StabilityPool, which has no
-    production reason to touch governance locks -- can extend Bob's lock.
-    """
-    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-
-    ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=stability_pool.address)
-
-    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    assert unlock_after == boa.env.evm.patch.block_number + 1_000
-    assert unlock_after > unlock_before
 
 
 @pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-02: RipeGov.adjustLock still uses the broad addys._isValidRipeAddr "
-    "predicate; least-privilege fix is gated on RH-CHANGE-01",
-)
 def test_registered_non_teller_cannot_adjust_another_users_lock(
     caller_name,
     ripe_gov_vault,
@@ -2994,38 +2936,9 @@ def test_registered_non_teller_cannot_adjust_another_users_lock(
 # --------------------------------------------------------------------------
 
 
-def test_registered_non_teller_releases_another_users_lock_and_burns_exit_fee(
-    ripe_gov_vault, ripe_token, bob, stability_pool, locked_gov_position
-):
-    """DV-03 characterization (SV-4, RG-4).
-
-    releaseLock charges the configured exit fee out of the victim's shares and
-    clears the lock. An unrelated registered contract can force this on a user
-    who never asked to exit early.
-    """
-    shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
-    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    assert unlock_before > boa.env.evm.patch.block_number
-
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=stability_pool.address)
-    logs = filter_logs(ripe_gov_vault, "LockReleased")
-
-    # LOCK_TERMS exit fee is 10.00%.
-    expected_removed = shares_before * LOCK_TERMS[4] // 100_00
-    assert ripe_gov_vault.userBalances(bob, ripe_token) == shares_before - expected_removed
-    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
-
-    assert len(logs) == 1
-    assert logs[0].user == bob
-    assert logs[0].exitFee == LOCK_TERMS[4]
 
 
 @pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-03: RipeGov.releaseLock still uses the broad addys._isValidRipeAddr "
-    "predicate; least-privilege fix is gated on RH-CHANGE-01",
-)
 def test_registered_non_teller_cannot_release_another_users_lock(
     caller_name,
     ripe_gov_vault,
@@ -3495,7 +3408,7 @@ def _invoke_gov_mutation(
     elif method == "depositTokensWithLockDuration":
         ripe_token.transfer(vault, EIGHTEEN_DECIMALS, sender=whale)
         vault.depositTokensWithLockDuration(
-            bob, ripe_token, EIGHTEEN_DECIMALS, 500, sender=switchboard_bravo.address
+            bob, ripe_token, EIGHTEEN_DECIMALS, 500, sender=teller.address
         )
     elif method == "withdrawTokensFromVault":
         vault.withdrawTokensFromVault(bob, ripe_token, amount, bob, sender=teller.address)
