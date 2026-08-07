@@ -3,15 +3,21 @@
 Deployment only. Governance moved to the Safe in 0007, so the deployer can no
 longer touch a registry: every one of these has to be pointed at through
 startAddressUpdateToRegistry + confirmAddressUpdateToRegistry, under timelock,
-by the Safe. This migration deploys and then prints that calldata.
+by the Safe. This migration deploys and then prints that calldata. Deploying
+changes no live wiring on its own.
 
-Each contract is recorded in the manifest under a "<Name>V2" label so the
-existing entries keep describing what RipeHq, VaultBook, Switchboard and
-PriceDesk actually point at. Nothing here changes the live wiring.
+Ledger is bytecode-stale too and is DELIBERATELY excluded. It is the only
+contract here holding accounting nobody can rebuild -- accrued deposit and
+borrow points, unclaimed ripeRewards, per-user vault participation -- and a
+replacement starts empty. Its remaining delta is an internal refactor with no
+new external function (removeVaultFromUserForMigration was withdrawn in #75
+and routed through Lootbox instead), and every Ledger call site in the new
+contracts was checked to resolve against the deployed selectors. Redeploy it
+only when something actually needs it, and before real deposits accumulate.
 
-Run `python scripts/prepare_defaults.py` first. MissionControl and Ledger copy
-their defaults into storage at construction, so building them against
-DefaultsRobinhood -- the LAUNCH config -- would make the replacements come up
+Run `python scripts/prepare_defaults.py` first. MissionControl copies its
+defaults into storage at construction, so building it against
+DefaultsRobinhood -- the LAUNCH config -- would make the replacement come up
 forgetting every asset governance has registered since. That script writes
 DefaultsRobinhoodLive.vy from the live chain; review the diff before running
 this.
@@ -27,7 +33,6 @@ from scripts.utils.migration import Migration
 from config.robinhood_launch import (
     HR_MAX_TIMELOCK,
     HR_MIN_TIMELOCK,
-    LEDGER_ACTION_BLOCK_SOURCE,
     LOOTBOX_DEPOSIT_REWARD,
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
@@ -82,18 +87,12 @@ def migrate(migration: Migration):
 
     def redeploy(name, registry, reg_id, *args):
         log.h2(f"Deploying {name}")
-        contract = migration.deploy(name, *args, label=f"{name}V2")
+        contract = migration.deploy(name, *args)
         updates.append((name, registry, reg_id, contract.address))
         return contract
 
     log.h1("Redeploying core departments")
 
-    # Ledger reads ripeAvailFor* from defaults. Because prepare_defaults
-    # sources those from the LIVE Ledger, the replacement inherits what has
-    # already been emitted instead of resetting to the launch allocation. Its
-    # other state -- deposit points, vault participation, lastTouch -- does
-    # NOT carry over.
-    redeploy("Ledger", RIPE_HQ, 4, hq, defaults, LEDGER_ACTION_BLOCK_SOURCE)
     redeploy("MissionControl", RIPE_HQ, 5, hq, defaults)
     redeploy("AuctionHouse", RIPE_HQ, 9, hq)
     redeploy("BondRoom", RIPE_HQ, 12, hq, bond_booster)
@@ -108,6 +107,7 @@ def migrate(migration: Migration):
     )
     redeploy("Teller", RIPE_HQ, 17, hq, TELLER_SHOULD_PAUSE)
     redeploy("CreditRedeem", RIPE_HQ, 19, hq)
+    redeploy("TellerUtils", RIPE_HQ, 20, hq)
 
     log.h1("Redeploying vaults")
 
