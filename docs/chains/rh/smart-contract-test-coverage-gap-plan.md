@@ -16,7 +16,7 @@ The review target used to prepare this plan is:
 - Compared with: `master` at
   `91eda49ccd34a25090582aff0695075c4c806011`
 - Review date: 2026-08-06
-- Revision: 5
+- Revision: 6
 
 Revision 3 corrected the SwitchboardBravo direction, recorded the measured
 22-failure baseline, added route-specific StabVault preconditions, and
@@ -37,6 +37,16 @@ validation because the constructor probe conflicted with Titanoboa; and all
 Uniswap test additions are deferred. The existing Uniswap strict xfail and its
 economic concern remain acknowledged but unchanged and are excluded from this
 plan's implementation and completion gates.
+
+Revision 6 makes this document a dedicated-worktree implementation handoff. It
+adds the complete D-01 candidate literal matrix, corrects the startup and Git
+custody procedure, establishes an exact test-file ceiling and local-commit
+policy, specifies RipeGov disabled-user and trusted-Teller import semantics,
+reclassifies the already-covered SwitchboardAlpha delta as preserve-only, fixes
+the token pre-setup expectation to an exact revert, and adds copy-paste final
+verification and scope-integrity commands. The only remaining owner action is
+to approve or correct the D-01 matrix in Appendix A; every other package is
+decision-complete.
 
 The implementation agent should work against the current `rh` PR code, not a
 deployed-contract inventory. If the PR head changes before implementation,
@@ -81,27 +91,27 @@ contracts under this plan.
 
 ### Mandatory owner decisions before implementation
 
-The owner interview resolved D-02 and D-03. D-01 has an approved candidate
-source but remains open until the complete literal matrix is reviewed. Record
-all decisions in the implementation handoff; the mere presence of a value in
-the pinned branch is not field-level matrix approval.
+The owner interview resolved D-02 and D-03. D-01 now has a complete candidate
+matrix in Appendix A, transcribed from the pinned RH contract, but remains open
+until the owner approves or corrects that matrix. Record all decisions in the
+implementation handoff; the mere presence of a value in the pinned branch is
+not field-level matrix approval.
 
 | Decision | Status in this revision | Blocks |
 | --- | --- | --- |
-| D-01 Defaults authority | **IN PROGRESS — current RH source approved as candidate; full matrix approval required** | Work package 1 test edits |
+| D-01 Defaults authority | **AWAITING OWNER APPROVAL — complete candidate matrix is in Appendix A** | Work package 1 test edits only |
 | D-02 Ledger validation posture | **APPROVED — option A, preserve lazy-at-first-read validation** | Unblocks Work package 2 |
 | D-03 Uniswap test scope | **APPROVED — defer all Uniswap test changes** | Work package 7 excluded |
 
-- **D-01 — Defaults authority.** The owner must approve an explicitly enumerated
-  literal matrix covering every field and array entry returned by all seventeen
-  `DefaultsRobinhood` getters. The candidate matrix may be transcribed from the
-  pinned contract for owner review, but the contract source alone is not the
-  approval and a blanket “use current code” is insufficient unless the owner
-  has reviewed and approved that complete matrix. The existing parameter ledger
-  disagrees with the contract on multiple values and must not be silently
-  selected, repaired, or used as an oracle under this plan. The owner has
-  confirmed `maxBorrowPerInterval = 25e18`; every remaining field still requires
-  matrix review.
+- **D-01 — Defaults authority.** Appendix A explicitly enumerates every field
+  and array entry returned by all seventeen `DefaultsRobinhood` getters. It is
+  the candidate submitted for owner review, not yet the approved oracle. The
+  existing parameter ledger disagrees with the contract on multiple values and
+  must not be silently selected, repaired, or used as an oracle under this plan.
+  The owner has separately confirmed `maxBorrowPerInterval = 25e18`. To close
+  D-01, the owner must approve Appendix A as a whole or return exact row-level
+  corrections. The implementation agent must copy the finally approved matrix
+  into the runtime test without deriving expected values from the contract.
 - **D-02 — Ledger ArbSys validation posture.** Preserve the current lazy
   posture: the exact ArbSys address is accepted at construction;
   missing/reverting/malformed behavior fails closed on first read; no fallback
@@ -114,15 +124,15 @@ the pinned branch is not field-level matrix approval.
   excluded from this plan's completion gate; do not reinterpret deferral as a
   security finding being fixed or accepted as harmless.
 
-Only D-01 remains a blocking interview item. Transcribe and submit its complete
-matrix before editing Work package 1 tests. Work packages 2-6 and 8-9 may
-proceed; Work package 7 must be skipped. The P0-before-P1 ordering preference in
-Section 4 is a sequencing preference, not a gate.
+Only D-01 remains a blocking interview item, and it blocks only Work package 1
+test edits. Submit Appendix A for approval before editing that package. Work
+packages 2-6 and 8-9 may proceed; Work package 7 must be skipped. The
+P0-before-P1 ordering preference in Section 4 is a sequencing preference, not a
+gate.
 
-"Beginning" Work package 1 means **editing test code**. Transcribing the
-candidate D-01 matrix from the pinned contract and submitting it for owner
-review is explicitly permitted before full approval; that is how the matrix
-reaches the owner in the first place. Work package 2 is unblocked by D-02.
+"Beginning" Work package 1 means **editing test code**. Appendix A and its
+review are planning/decision work, not implementation. Work package 2 is
+unblocked by D-02.
 
 Record each decision in this form before handoff:
 
@@ -139,31 +149,97 @@ Authority reference: commit, signed message, or attached decision record
 
 A fresh implementation agent **must** perform these steps before editing:
 
-0. Verify this document's own recorded identity (plan commit/blob or SHA-256,
-   per "Plan custody" in Section 16) against the copy in hand, and quote it in a
-   startup report together with the D-01/D-02/D-03 decision records. A plan copy
-   whose identity cannot be verified is not a basis for implementation.
-1. Check out `rh` in a clean isolated worktree and verify the head commit and
-   tree against Section 1. Do not implement against `master` or a deployed
-   contract snapshot.
-2. If either identity differs, stop, re-diff changed production `.vy` files and
-   related tests, and obtain approval for a refreshed plan before implementation.
-   **Exception:** a head that differs from Section 1 *only* by commits produced
-   under this plan does not require a refreshed plan. Verify this by diffing
-   `contracts/` against `7d8c76e5134bf866ccbb051fdf5030b6e83cef8b` and
-   confirming no production `.vy` file changed. Test-only, mock-only, and the
-   plan-document custody commit are expected as the nine slices land. Without
-   this exception every slice after the first would falsely trigger a stop.
-3. Read this document completely, including the out-of-scope boundaries,
-   D-01/D-02 decisions, known-red exclusions, and definition of done.
-4. Confirm the recorded D-01, D-02, and D-03 decisions. Do not infer them from source,
-   historical tests, a JSON ledger, deployment state, or this plan's test names.
+0. Enter the existing dedicated worktree; do **not** create another worktree and
+   do not check out or mutate `rh` directly:
+
+   ```text
+   /Users/wigglez/dev/ripe-protocol-rh-smart-contract-test-coverage
+   ```
+
+1. Verify the checked-out branch is
+   `codex/rh-smart-contract-test-coverage`, the pinned baseline commit
+   `7d8c76e5134bf866ccbb051fdf5030b6e83cef8b` exists, and the worktree is clean.
+   Verify no production contract differs from that baseline. The plan commit and
+   later test-only slice commits are expected to make `HEAD` differ from `rh`.
+2. Compute this file's last-touch commit, Git blob, and SHA-256 using the commands
+   in "Plan custody" in Section 16. Compare them with the immutable identities in
+   the fresh-session handoff prompt and quote them in the startup report. A
+   mismatch, untracked copy, or locally modified plan is a stop condition.
+3. Read this document completely, including Appendix A, the out-of-scope
+   boundaries, all three decisions, known-red exclusions, and definition of
+   done.
+4. Confirm the recorded D-01, D-02, and D-03 statuses. Do not infer them from
+   source, historical tests, a JSON ledger, deployment state, or this plan's test
+   names. D-01 must say `APPROVED` with the approved Appendix A matrix before
+   Work package 1 test code is edited.
 5. Before adding a proposed test, search the current suite for a semantically
    equivalent assertion. Record the existing file and test name if the gap is
-   already closed; do not add duplicate test volume.
-6. Modify only the test files named by the applicable work package and narrowly
-   necessary test-only mocks/harnesses. Any required production `.vy` change is
-   a stop condition requiring separate owner authorization.
+   already closed; do not add duplicate test volume. This equivalence rule may
+   not be used to avoid one of the explicit runtime matrices required below.
+6. Modify only the files in the authorized file ceiling below. Any required
+   production `.vy` change or any change outside that ceiling is a stop condition
+   requiring separate owner authorization.
+
+Use this startup report format:
+
+```text
+Worktree: exact absolute path
+Branch: exact branch
+HEAD: commit
+Pinned RH baseline: 7d8c76e5134bf866ccbb051fdf5030b6e83cef8b
+Plan last-touch commit: commit
+Plan blob: blob
+Plan SHA-256: digest
+Production contract diff from pinned baseline: NONE
+D-01: status and authority reference
+D-02: APPROVED, lazy-at-first-read
+D-03: APPROVED, Uniswap deferred
+Worktree status: CLEAN
+```
+
+### Authorized file ceiling and Git lifecycle
+
+The implementation may add or modify only these test files:
+
+```text
+tests/config/test_defaults_robinhood_contract.py
+tests/data/test_ledger_action_block.py
+tests/core/teller/test_teller_action_block.py
+tests/core/teller/test_teller_deposit.py
+tests/core/deleverage/test_deleverage_stock_delivery.py
+tests/vaults/test_ripe_gov_controls_and_migration.py
+tests/vaults/test_ripe_gov_vault.py
+tests/core/lootbox/test_loot_claim.py
+tests/core/lootbox/test_loot_deposit_points.py
+tests/vaults/modules/test_stab_vault_hardening.py
+tests/vaults/modules/test_stab_vault_claims.py
+tests/vaults/modules/test_stab_vault_redemptions.py
+tests/vaults/test_stock_token_vault_comparison.py
+tests/config/test_switchboard_bravo.py
+tests/config/test_switchboard_charlie.py
+tests/tokens/test_erc20.py
+```
+
+A narrowly necessary new or modified test-only Vyper mock is allowed only under
+`contracts/mock/` or `contracts/testing/`. Prefer module-local Python fixtures
+and inline `boa.loads` harnesses. Changes to shared `tests/conf_*.py`, `conftest.py`,
+interfaces, production contracts, scripts, configuration, artifacts, inventory,
+or documentation other than this already-committed plan are not authorized.
+If the file ceiling proves insufficient, stop and report the exact additional
+path and why module-local setup cannot work.
+
+Once D-01 approval or corrections are incorporated and the final plan identity
+is handed off, this plan file is immutable during implementation. Its presence
+in the final path audit reflects the custody commit, not permission for an
+implementation agent to rewrite requirements.
+
+Local commits on `codex/rh-smart-contract-test-coverage` are authorized. Make
+one reviewable commit per completed slice using `tests(rh): <slice summary>`.
+Stage only the slice's authorized paths and verify the staged diff before each
+commit. Do not push, update PR #67, merge, rebase, deploy, use RPC, or mutate the
+`rh` branch. A failing reproducer for a production defect may be committed only
+if its commit message and handoff clearly say `expected failing reproducer` and
+the affected package is reported incomplete.
 
 ## 3. Test-quality rules
 
@@ -222,7 +298,7 @@ duplication; those tests still form part of the regression baseline.
 | Changed contract | Disposition in this plan |
 | --- | --- |
 | `contracts/config/DefaultsRobinhood.vy` | Work package 1: direct runtime coverage of every getter and constructor-bound address. |
-| `contracts/config/SwitchboardAlpha.vy` | Work package 8: fill only missing changed action branches. |
+| `contracts/config/SwitchboardAlpha.vy` | Preserve in Work package 8: the complete RH delta is already bound by the three exact tests named there; run but do not modify its module. |
 | `contracts/config/SwitchboardBravo.vy` | Work package 8: execution-time MissionControl/pointer revalidation. |
 | `contracts/config/SwitchboardCharlie.vy` | Work package 8: complete preferred-vault pending event assertions. |
 | `contracts/config/SwitchboardEcho.vy` | Work package 8: reachable disable guards and state composition. |
@@ -267,18 +343,18 @@ the contract and asserting its returned structs and arrays.
 
 Do not derive the expected literals by reading values from the contract under
 test, parsing its source, calling its getters to populate expectations, or
-copying the conflicting parameter ledger without approval. D-01 must supply the
-authority. Hard-code that approved matrix in the runtime test and place a short
-provenance comment beside it identifying the D-01 decision record and pinned
-commit. If the deployed-in-test contract disagrees, report the mismatch as a
-contract defect; do not update the expectation to match the observed result.
+copying the conflicting parameter ledger without approval. Appendix A is the
+complete candidate D-01 matrix. After the owner marks it approved or supplies
+exact corrections, hard-code that approved matrix in the runtime test and place
+a short provenance comment beside it identifying the D-01 decision record and
+pinned commit. If the deployed-in-test contract disagrees, report the mismatch
+as a contract defect; do not update the expectation to match the observed
+result.
 
-Before editing test code, transcribe a complete candidate matrix with one row
-per returned scalar/struct field and array entry, including array order and
-constructor-bound symbolic addresses. Submit that matrix for D-01 approval and
-stop this work package until the approved version is returned. This matrix is a
-human decision artifact, not a generated test oracle; do not add a parser or
-generator to the test suite.
+Appendix A is a human decision artifact, not a generated test oracle. Do not add
+a source parser or generator to the test suite. Until D-01 is approved, the
+implementation agent may review fixtures and test structure for this package
+but may not add or edit its test code.
 
 ### Required tests
 
@@ -432,8 +508,11 @@ digest without confirming the mutant still expresses a real defect.
   `test_teller_deposit.py`, `test_teller_rebalance.py`, and
   `test_teller_withdraw.py`; there is no separate reentrancy or
   adversarial-vault module, and the mutation controls and reentrancy
-  cross-product cases all live in `test_teller_deposit.py`. Put all Work
-  package 3 cases there. Do not create a parallel duplicate suite.
+  cross-product cases all live in `test_teller_deposit.py`. Put Gaps A-C there.
+  Put Gap D beside the existing migration tests in
+  `tests/vaults/test_ripe_gov_controls_and_migration.py`. Gap E has the two
+  explicit action-block/Deleverage destinations stated below. Do not create a
+  parallel duplicate suite.
 - Modify `tests/core/teller/test_teller_action_block.py` only to replace the
   failing source-occurrence inventory with observable housekeeping behavior.
   Do not repair it by changing the expected source count from five to four.
@@ -576,9 +655,12 @@ shares, points, Ledger membership, and Lootbox state are unchanged.
 
 ### Gap E: observable Teller housekeeping classification
 
-Retire the failing source-count test only after every surviving housekeeping
-route is bound by a named runtime assertion. Build a route-to-evidence matrix in
-the implementation handoff with these production groupings:
+Replace the failing source-count test with two required runtime matrices in
+`tests/core/teller/test_teller_action_block.py`. Every surviving Teller route
+below must be an explicit parameter ID in the test, with the exact expected risk
+flag, touched subject, and debt-update flag. Do not substitute source inspection
+or a handoff citation for executing the route. Shared setup helpers are welcome,
+but each row must call its production external entry point.
 
 | Expected housekeeping behavior | Surviving routes to bind |
 | --- | --- |
@@ -591,23 +673,33 @@ the implementation handoff with these production groupings:
 | Caller-supplied risk/user/debt flags | external `performHousekeeping` |
 | Low risk, user subject, update debt through external Teller call | `Deleverage` callsite |
 
-For each row, cite an existing runtime test that proves the risk flag, touched
-subject, and debt-update choice, or add a parameterized case in
-`test_teller_action_block.py`. Observe risk through the same-block Ledger rule,
-observe subject identity through exact `lastTouch` changes with decoy users
-unchanged, and observe the debt-update choice through exact debt state or a
-narrow test-only CreditEngine recorder. A test that only searches Teller or
-Deleverage source text is not acceptable evidence.
+Observe risk through the same-block Ledger rule: a second high-risk action for
+the same subject in the same block must revert, while the paired low-risk control
+must remain callable. Observe subject identity through exact `lastTouch` changes
+with caller, recipient, and decoy users asserted unchanged when they are not the
+subject. Observe the debt-update choice with a narrow test-only CreditEngine
+recorder that records call count, user, and the supplied address bundle; do not
+infer it from an unchanged debt amount. Reset or redeploy recorders between
+parameter rows so state cannot leak.
 
-Suggested replacement tests:
+Required replacement tests:
 
 - `test_teller_route_housekeeping_risk_and_subject_matrix`
 - `test_teller_route_housekeeping_debt_update_matrix`
 
-If setup for a route already lives in another owning test module, strengthen
-that test and cite it rather than duplicating its economic setup here. The
-handoff matrix must nevertheless cover every route listed above before the old
-source-count test is deleted.
+The existing external-entry tests
+`test_external_housekeeping_valid_caller_can_select_victim_and_risk_flag` and
+`test_external_housekeeping_preserves_caller_supplied_addys_propagation` remain
+the controls for caller-supplied flags and address bundles; retain them.
+
+The Deleverage callsite is the one authorized exception to the Teller-module
+location. Strengthen
+`tests/core/deleverage/test_deleverage_stock_delivery.py` with
+`test_deleverage_swap_housekeeping_uses_user_low_risk_and_updates_debt`. Execute
+the real `swapCollateral` path twice in one block to bind low-risk behavior,
+assert the target user's touch and decoy non-touch, and use the same recorder to
+prove `_shouldUpdateDebt=True`. No other owning test module may be changed under
+this package.
 
 ### Acceptance criteria
 
@@ -639,6 +731,21 @@ Add a small state-table suite around `transferContributorRipeTokens`:
 - `test_contributor_transfer_to_disabled_recipient_accounts_for_dropped_points_exactly`
 - `test_contributor_transfer_between_disabled_users_does_not_move_points`
 
+Use a full-position contributor transfer and seed the sender with exactly `P`
+saved governance points. Arrange the transfer so no new time-based points accrue
+during the assertion transaction. The candidate RH semantics to bind are exact:
+
+| Sender | Recipient | Sender point delta | Recipient point delta | `totalGovPoints` delta | Meaning |
+| --- | --- | ---: | ---: | ---: | --- |
+| enabled | enabled | `-P` | `+P` | `0` | points transfer with the position |
+| disabled | enabled | `0` | `0` | `0` | disabled sender retains saved points; no points transfer |
+| enabled | disabled | `-P` | `0` | `-P` | sender points are removed from user/global totals and the disabled recipient discards them |
+| disabled | disabled | `0` | `0` | `0` | both saved point balances and the global total remain unchanged |
+
+In all four rows the entire token/share position moves to the recipient. Assert
+the sender's zero post-transfer shares separately from the sender's possibly
+retained saved points; they are intentionally different state dimensions.
+
 For every case, assert:
 
 - sender and recipient token balances;
@@ -648,11 +755,11 @@ For every case, assert:
 - emitted event fields; and
 - unrelated users remain unchanged.
 
-The disabled-recipient case is especially important. Lock the current arithmetic
-explicitly, including whether points are intentionally removed from both the user
-and global totals. If the observed result violates the contract's documented
-accounting invariant, leave the test failing and report the production defect;
-do not bless the behavior with a weaker assertion.
+The enabled-sender/disabled-recipient row is especially important: the current
+candidate removes `P` from both the sender and global totals and does not credit
+the recipient. If runtime behavior differs from the table, leave the test
+failing and report a production defect; do not replace the table with observed
+values.
 
 ### Gap B: BoardRoom callback behavior
 
@@ -700,7 +807,6 @@ Likewise call `importPositionForMigration` directly as Teller and cover:
 - target vault is not paused;
 - source vault address is zero, non-contract, or the target itself;
 - amount is zero;
-- the source tombstone/authorization condition is missing;
 - the target user already has shares, current points, total points, or other
   non-empty `GovData` state;
 - the target did not receive the asserted token amount; and
@@ -710,10 +816,25 @@ Suggested names:
 
 - `test_direct_import_rejects_invalid_migration_context_atomically`
 - `test_direct_import_rejects_partially_nonempty_target_position`
+- `test_direct_import_trusts_configured_teller_without_source_tombstone_lookup`
 - `test_direct_import_reconstructs_position_and_emits_complete_event`
 
 The success case must assert token receipt, shares, current/total user points,
-global points, Ledger membership, source binding, and all event fields.
+global points, the source address recorded in the event, and all event fields. A
+direct vault import does not update Ledger membership; assert Ledger is
+unchanged in the direct test and leave the membership update assertion to the
+end-to-end Teller migration test.
+
+The trusted-Teller test is a positive contract-boundary assertion, not a missing
+guard test. The current `RipeGov.importPositionForMigration` does not query the
+source vault or require a source tombstone; it trusts the configured Teller to
+have completed export and exact-receipt validation before import. As the Teller,
+use a nonzero, non-self contract as `_sourceVault`, pre-transfer the exact token
+amount, satisfy every target precondition, and assert import succeeds without a
+source callback. Pair it with the existing non-Teller rejection and with the
+end-to-end Teller migration test, which proves the production orchestrator does
+perform export before import. Do not invent a tombstone expectation or change
+production code under this plan.
 
 ### Acceptance criteria
 
@@ -986,7 +1107,8 @@ unchanged relative to the implementation branch baseline.
 
 ### Files
 
-- Modify `tests/config/test_switchboard_alpha.py`.
+- Run `tests/config/test_switchboard_alpha.py` unchanged; its RH delta is
+  preserve-only under the exact disposition below.
 - Modify `tests/config/test_switchboard_bravo.py`.
 - Modify `tests/config/test_switchboard_charlie.py`.
 - Modify `tests/vaults/test_ripe_gov_controls_and_migration.py` for Echo's
@@ -1104,10 +1226,20 @@ Assert the full event payload and pending storage values agree.
 
 ### SwitchboardAlpha
 
-Review the existing validation matrix for every changed action branch. Add only
-the missing branches, each with a valid control and a state-atomic invalid case.
-Do not duplicate generic ownership, pause, or delay tests already common to the
-suite.
+Do not add or modify Alpha tests. The RH contract delta replaces a hardcoded core
+RipeGov vault ID with `MissionControl.coreRipeGovVaultId()` and resolves the
+selected MissionControl before validating/storing a pending RipeGov config. The
+pinned suite already binds every changed behavior with:
+
+- `test_ripe_gov_vault_config_rejects_unset_target_core_pointer`
+- `test_ripe_gov_vault_config_uses_target_mission_control_pointer`
+- `test_ripe_gov_vault_config_execution_keeps_existing_no_revalidation_behavior`
+
+The third test deliberately binds current Alpha behavior: it stores an explicit
+MissionControl and does not revalidate that instance's later core-ID change at
+execution. Preserve these tests and run the whole Alpha module. If any named test
+is missing or no longer asserts the stated property, stop and report baseline
+drift instead of inventing a replacement under this plan.
 
 ### Acceptance criteria
 
@@ -1133,15 +1265,19 @@ For Green, Ripe, and Savings Green, add a parameterized suite:
 - `test_ccip_admin_pre_setup_behavior_is_explicit`
 
 Assert exact addresses before and after a confirmed governance handoff. The
-pre-setup case must assert the actual contract rule—zero address or revert—as
-an explicit expectation rather than accepting either result.
+pre-setup rule is exact: deploy each token with `ripeHq == zero` and a nonzero
+temporary governor, assert `ripeHq()` is zero, and assert `getCCIPAdmin()`
+reverts because the zero-address `governance()` static call returns no decodable
+address. Do not accept a zero-address return as an alternative. After initial HQ
+setup, assert the same instance returns the HQ's current governance address.
 
 ### Acceptance criteria
 
 - All three token types are exercised through the same behavioral matrix.
 - The test proves the admin is read from current Headquarters governance rather
   than cached at token deployment.
-- Pre-setup behavior is one exact assertion, not a permissive either/or.
+- Pre-setup behavior is an exact revert for all three token types, followed by a
+  successful post-setup control on the same instances.
 
 ## 14. Existing coverage to preserve, not churn
 
@@ -1191,12 +1327,12 @@ the full Section 16 set:
 | --- | --- |
 | 1 DefaultsRobinhood | `tests/config/test_defaults_robinhood_contract.py` |
 | 2 Ledger | `tests/data/` |
-| 3 Teller | `tests/core/teller/` |
+| 3 Teller/Deleverage housekeeping | `tests/core/teller/`, `tests/core/deleverage/test_deleverage_stock_delivery.py` |
 | 4 RipeGov | `tests/vaults/test_ripe_gov_controls_and_migration.py`, `tests/vaults/test_ripe_gov_vault.py` |
 | 5 Lootbox | `tests/core/lootbox/` |
 | 6 StabilityPool/StabVault/BasicVault matcher | `tests/vaults/modules/`, `tests/vaults/test_stock_token_vault_comparison.py` |
 | 7 UniswapV2Prices | **Deferred; do not run as a modification gate and do not edit** |
-| 8 Switchboards | `tests/config/test_switchboard_*.py` |
+| 8 Switchboards | unchanged `tests/config/test_switchboard_alpha.py`, changed `tests/config/test_switchboard_bravo.py`, changed `tests/config/test_switchboard_charlie.py`, unchanged `tests/config/test_switchboard_echo.py`, and the Echo cases in `tests/vaults/test_ripe_gov_controls_and_migration.py` |
 | 9 Token CCIP | `tests/tokens/` |
 
 A pre-existing failure owned by a later slice, or listed among the measured
@@ -1206,6 +1342,21 @@ set once at the end, not after every slice.
 
 Slice 7 has no implementation or verification action in this plan. The final
 scope check must instead prove Uniswap production and test files are unchanged.
+
+After each completed slice, create a local commit and append this record to the
+final implementation handoff:
+
+```text
+Slice: number and name
+Commit: exact commit
+Files changed: exact paths
+Tests added or strengthened: exact test node IDs
+Existing equivalents used instead: exact node IDs, or NONE
+Focused result: exact pass/fail counts and command
+Adjacent result: exact pass/fail counts and command
+Production defects: NONE, or exact failing node and explanation
+Residual work: NONE, or explicit stop condition
+```
 
 ## 16. Verification matrix
 
@@ -1219,6 +1370,7 @@ tests/data/test_ledger_action_block.py
 tests/data/test_mission_control.py
 tests/core/teller/test_teller_action_block.py
 tests/core/teller/test_teller_deposit.py
+tests/core/deleverage/test_deleverage_stock_delivery.py
 tests/vaults/test_ripe_gov_controls_and_migration.py
 tests/vaults/test_ripe_gov_vault.py
 tests/core/lootbox/test_loot_claim.py
@@ -1243,6 +1395,7 @@ exactly the following paths—nothing broader is implied:
 ```text
 tests/data/
 tests/core/teller/
+tests/core/deleverage/test_deleverage_stock_delivery.py
 tests/core/lootbox/
 tests/vaults/
 tests/tokens/
@@ -1277,6 +1430,65 @@ the repository's existing non-secret `ETHERSCAN_API_KEY=local-placeholder`
 convention. This records the measured environment; it does not authorize CI or
 dependency changes.
 
+Run this exact serial command from the dedicated worktree for the final
+in-scope gate. Per-slice runs use the same prefix and substitute only the target
+paths from Section 15.
+
+```bash
+validation_root=$(mktemp -d /private/tmp/rh-contract-coverage.XXXXXX)
+chmod 700 "$validation_root"
+mkdir -p \
+  "$validation_root/boa" \
+  "$validation_root/xdg" \
+  "$validation_root/pycache" \
+  "$validation_root/hypothesis" \
+  "$validation_root/basetemp"
+chmod -R 700 "$validation_root"
+
+env \
+  -u WEB3_ALCHEMY_API_KEY \
+  -u ALCHEMY_API_KEY \
+  -u ETH_RPC_URL \
+  -u BASE_RPC_URL \
+  -u ROBINHOOD_MAINNET_RPC_URL \
+  -u ETHEREUM_MAINNET_RPC_URL \
+  -u RPC_URL \
+  -u WEB3_PROVIDER_URI \
+  -u PRIVATE_KEY \
+  -u MNEMONIC \
+  -u AWS_ACCESS_KEY_ID \
+  -u AWS_SECRET_ACCESS_KEY \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONPYCACHEPREFIX="$validation_root/pycache" \
+  XDG_CACHE_HOME="$validation_root/xdg" \
+  HYPOTHESIS_STORAGE_DIRECTORY="$validation_root/hypothesis" \
+  ETHERSCAN_API_KEY=local-placeholder \
+  PYTHONHASHSEED=0 \
+  RIPE_AUDIT_CACHE="$validation_root/boa" \
+  /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python \
+  -c 'import os, sys; from boa.interpret import set_cache_dir; set_cache_dir(os.environ["RIPE_AUDIT_CACHE"]); import pytest; raise SystemExit(pytest.main(sys.argv[1:]))' \
+  -q \
+  -p no:cacheprovider \
+  --basetemp="$validation_root/basetemp" \
+  --ignore=tests/vaults/test_basic_vault_consumer_inventory.py \
+  tests/data/ \
+  tests/core/teller/ \
+  tests/core/deleverage/test_deleverage_stock_delivery.py \
+  tests/core/lootbox/ \
+  tests/vaults/ \
+  tests/tokens/ \
+  tests/config/test_defaults_robinhood_contract.py \
+  tests/config/test_switchboard_alpha.py \
+  tests/config/test_switchboard_bravo.py \
+  tests/config/test_switchboard_charlie.py \
+  tests/config/test_switchboard_echo.py \
+  tests/core/creditEngine/test_credit_borrow.py
+```
+
+Record the complete command, exit code, pass/fail/xfail counts, and temporary
+root in the handoff. Do not report the branch-wide suite as green: the four
+formal exclusions below remain outside this command and outside this plan.
+
 ### Known-red exclusions at the pinned head
 
 The following files are known-red at `7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`
@@ -1305,7 +1517,7 @@ separate source-inventory review judgment, not a mechanical contract-test fix.
 
 ### Measured pre-existing redness inside the adjacent paths
 
-A serial run of the focused modules and the exact adjacent paths at
+A serial baseline run at
 `7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`, in the locked Python 3.12
 validation environment, produced:
 
@@ -1313,14 +1525,24 @@ validation environment, produced:
 22 failed, 1657 passed, 1 xfailed
 ```
 
-These 22 failures are **pre-existing at the pinned head**, not caused by this
-plan. All 22 were reconfirmed to fail in isolation, so none is an ordering or
-Boa trace-pollution artifact. The blanket rule "no newly failing test in the
-focused or exact adjacent paths may be dismissed as known red" stands only for
-tests that are *newly* failing; it must not be read as a claim that these paths
-are green at head. This measured command included the now-excluded BasicVault
-source-inventory file. After applying that one-file scope exclusion, 21 failing
-contract-logic tests remain and are assigned to Work packages 2, 3, and 6.
+That historical measured command included both the now-deferred Uniswap suite
+and the now-excluded BasicVault source-inventory file; it did not include the
+Revision 6 Deleverage regression target. Therefore `1657 passed, 1 xfailed` is
+evidence for the original baseline, not a claimed count for the current exact
+Section 16 command. Revision 6 independently ran
+`tests/core/deleverage/test_deleverage_stock_delivery.py` in the same locked
+environment at the pinned source and measured `5 passed`.
+
+The 22 failures are **pre-existing at the pinned head**, not caused by this plan.
+All 22 were reconfirmed to fail in isolation, so none is an ordering or Boa
+trace-pollution artifact. The blanket rule "no newly failing test in the focused
+or exact adjacent paths may be dismissed as known red" stands only for tests
+that are *newly* failing; it must not be read as a claim that these paths are
+green at head. After applying the BasicVault source-inventory exclusion, 21
+failing contract-logic tests remain and are assigned to Work packages 2, 3, and
+6. Do not derive or advertise a current aggregate pass count by arithmetically
+combining these measurements; the final exact command is the only authoritative
+post-implementation result.
 
 **`tests/data/test_ledger_action_block.py` — 13 failures. Owner: Work package 2
 (gated on D-02).**
@@ -1399,26 +1621,93 @@ This is test verification, not a request to add or modify CI infrastructure.
 
 ### Plan custody before a new-session handoff
 
-The owner selected a dedicated implementation worktree and branch rooted at the
-pinned `rh` head:
+The dedicated implementation worktree and branch already exist and are rooted
+at the pinned `rh` head:
 
 ```text
 Branch: codex/rh-smart-contract-test-coverage
 Worktree: /Users/wigglez/dev/ripe-protocol-rh-smart-contract-test-coverage
+Pinned RH base: 7d8c76e5134bf866ccbb051fdf5030b6e83cef8b
+Revision-5 parent plan commit: 37d8c26a0b372b68efa7a853838400952040b478
 ```
 
-Commit this final document as the branch's first change and record its commit
-and blob identities in the handoff. All implementation work governed by this
-document must occur in that worktree. This authorizes the local branch,
-worktree, and plan commit; it does not authorize a push, PR update, merge, or
-direct mutation of `rh`.
+Revision 6's final commit/blob/SHA-256 are recorded externally in the fresh-agent
+handoff because a file cannot contain its own final identity without changing
+that identity. The fresh agent must compute and compare them with:
+
+```bash
+plan_path=docs/chains/rh/smart-contract-test-coverage-gap-plan.md
+plan_commit=$(git log -1 --format=%H -- "$plan_path")
+plan_blob=$(git rev-parse "$plan_commit:$plan_path")
+plan_sha256=$(shasum -a 256 "$plan_path" | awk '{print $1}')
+test "$(git hash-object "$plan_path")" = "$plan_blob"
+git diff --exit-code "$plan_commit" -- "$plan_path"
+printf 'PLAN_COMMIT=%s\nPLAN_BLOB=%s\nPLAN_SHA256=%s\n' \
+  "$plan_commit" "$plan_blob" "$plan_sha256"
+```
+
+All implementation work governed by this document must occur in the named
+worktree. Before final handoff, run this exact path/scope audit from that
+worktree:
+
+```bash
+rh_base=7d8c76e5134bf866ccbb051fdf5030b6e83cef8b
+git diff --check "$rh_base"...HEAD
+
+git diff --exit-code "$rh_base"...HEAD -- \
+  contracts/priceSources/UniswapV2Prices.vy \
+  tests/priceSources/uniswap/
+
+git diff --exit-code "$rh_base"...HEAD -- \
+  tests/config/test_defaults_robinhood.py \
+  tests/inventory/test_contract_artifacts.py \
+  tests/deployment/test_abi_export.py \
+  tests/vaults/test_basic_vault_consumer_inventory.py
+
+unexpected=0
+while IFS= read -r changed_path; do
+  case "$changed_path" in
+    docs/chains/rh/smart-contract-test-coverage-gap-plan.md|\
+    tests/config/test_defaults_robinhood_contract.py|\
+    tests/data/test_ledger_action_block.py|\
+    tests/core/teller/test_teller_action_block.py|\
+    tests/core/teller/test_teller_deposit.py|\
+    tests/core/deleverage/test_deleverage_stock_delivery.py|\
+    tests/vaults/test_ripe_gov_controls_and_migration.py|\
+    tests/vaults/test_ripe_gov_vault.py|\
+    tests/core/lootbox/test_loot_claim.py|\
+    tests/core/lootbox/test_loot_deposit_points.py|\
+    tests/vaults/modules/test_stab_vault_hardening.py|\
+    tests/vaults/modules/test_stab_vault_claims.py|\
+    tests/vaults/modules/test_stab_vault_redemptions.py|\
+    tests/vaults/test_stock_token_vault_comparison.py|\
+    tests/config/test_switchboard_bravo.py|\
+    tests/config/test_switchboard_charlie.py|\
+    tests/tokens/test_erc20.py|\
+    contracts/mock/*|contracts/testing/*)
+      ;;
+    *)
+      printf 'UNEXPECTED_PATH=%s\n' "$changed_path"
+      unexpected=1
+      ;;
+  esac
+done < <(git diff --name-only "$rh_base"...HEAD)
+test "$unexpected" -eq 0
+```
+
+Any output from either `git diff --exit-code`, any `UNEXPECTED_PATH`, or any
+`git diff --check` error fails the scope gate. This authorizes the local branch,
+test-only slice commits, and plan commit; it does not authorize a push, PR
+update, merge, rebase, direct mutation of `rh`, or any production-contract
+change.
 
 ## 17. Definition of done
 
 This plan is complete only when:
 
 - The implementation startup report records the immutable plan identity and
-  approved D-01/D-02/D-03 decision records.
+  approved D-01/D-02/D-03 decision records; D-01 explicitly approves the final
+  Appendix A matrix or its exact recorded corrections.
 - Every P0 and P1 test above is implemented or explicitly shown to be covered by
   an existing semantically equivalent test, with the exact file and test name
   recorded in the implementation handoff.
@@ -1438,11 +1727,378 @@ This plan is complete only when:
   Work packages, and every focused module and exact adjacent logical path in
   Section 16 passes on the final dedicated implementation-branch candidate with
   the one explicit BasicVault source-inventory `--ignore`.
+- The exact Section 16 final command exits zero with no failures, skips, or
+  xfails, and its complete result is recorded. The deferred Uniswap xfail is not
+  part of that command and is reported separately as unresolved.
 - The four known-red/out-of-scope files in Section 16 remain unmodified and are
   recorded as pre-existing exclusions. No other failure or xfail may be carried.
 - `contracts/priceSources/UniswapV2Prices.vy` and every file beneath
   `tests/priceSources/uniswap/` are unchanged from the dedicated branch's pinned
   RH baseline, and the acknowledged residual is listed as deferred.
+- `tests/config/test_switchboard_alpha.py` remains unchanged and its three named
+  preserve tests pass.
 - Changes are limited to tests and narrowly necessary test-only mocks/harnesses.
+- The Section 16 path/scope audit exits zero, every slice has a local commit and
+  handoff record, and no push, merge, rebase, PR update, RPC action, or deployment
+  occurred.
 - Any discovered contract defect is reported with its reproducing test instead
   of being hidden by a weakened expectation.
+
+## 18. Appendix A — D-01 complete DefaultsRobinhood candidate matrix
+
+### Approval status and use
+
+**Status: AWAITING OWNER APPROVAL.** This matrix was manually transcribed from
+`contracts/config/DefaultsRobinhood.vy` at pinned RH commit
+`7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`. It is deliberately included here
+for line-by-line owner review. Its presence is not approval, and the
+implementation agent must not use the production contract as a runtime oracle.
+An independent one-off Boa comparison in the locked validation environment
+matched all seventeen getters and all four ordered asset rows. That proves the
+transcription matches the pinned candidate; it does not convert candidate values
+into owner-approved values.
+
+The owner has already confirmed `genDebtConfig.maxBorrowPerInterval = 25 * E18`.
+To approve the full matrix without corrections, record:
+
+```text
+Decision: D-01
+Status: APPROVED
+Selection: Appendix A, Revision 6, without corrections
+Approver: owner name/role
+Date: YYYY-MM-DD
+Authority reference: owner message or attached decision record
+```
+
+If any value is corrected, edit the exact Appendix A row, increment the plan
+revision, commit the amended document, and bind the new plan identity before
+Work package 1 begins. Do not silently edit the test expectation alone.
+
+### Symbols and units
+
+The test must deploy two instances with two distinct sets of seven nonzero
+sentinel addresses. The symbolic constructor order is exact:
+
+```text
+CT      = contributor template
+TW      = training wheels
+RIPE    = RIPE token
+GREEN   = GREEN token
+SGREEN  = Savings GREEN token
+USDG    = USDG token
+WETH    = wrapped ETH token
+ZERO    = zero address
+```
+
+The exact numeric units used below are:
+
+```text
+E18           = 10 ** 18
+PCT           = 100_00 = 10_000
+DAY_SECONDS   = 86_400
+WEEK_SECONDS  = 604_800
+MONTH_SECONDS = 2_592_000
+YEAR_SECONDS  = 31_536_000
+HOUR_BLOCKS   = 300
+DAY_BLOCKS    = 7_200
+WEEK_BLOCKS   = 50_400
+MONTH_BLOCKS  = 216_000
+YEAR_BLOCKS   = 2_628_000
+```
+
+Expressions such as `50 * E18` are the exact integer expectations; do not use
+floating point.
+
+### Getter 1 — `genConfig()`
+
+| Field | Expected value |
+| --- | ---: |
+| `perUserMaxVaults` | `5` |
+| `perUserMaxAssetsPerVault` | `15` |
+| `priceStaleTime` | `DAY_SECONDS` |
+| `canDeposit` | `True` |
+| `canWithdraw` | `True` |
+| `canBorrow` | `True` |
+| `canRepay` | `True` |
+| `canClaimLoot` | `True` |
+| `canLiquidate` | `True` |
+| `canRedeemCollateral` | `True` |
+| `canRedeemInStabPool` | `True` |
+| `canBuyInAuction` | `True` |
+| `canClaimInStabPool` | `True` |
+
+### Getter 2 — `genDebtConfig()`
+
+| Field | Expected value |
+| --- | ---: |
+| `perUserDebtLimit` | `50 * E18` |
+| `globalDebtLimit` | `500 * E18` |
+| `minDebtAmount` | `1 * E18` |
+| `numAllowedBorrowers` | `20` |
+| `maxBorrowPerInterval` | `25 * E18` — owner-confirmed |
+| `numBlocksPerInterval` | `DAY_BLOCKS` |
+| `minDynamicRateBoost` | `1 * PCT` |
+| `maxDynamicRateBoost` | `5 * PCT` |
+| `increasePerDangerBlock` | `60` |
+| `maxBorrowRate` | `1 * PCT` |
+| `maxLtvDeviation` | `10_00` |
+| `keeperFeeRatio` | `1_00` |
+| `minKeeperFee` | `1 * E18` |
+| `maxKeeperFee` | `25_000 * E18` |
+| `isDaowryEnabled` | `True` |
+| `ltvPaybackBuffer` | `10_00` |
+| `genAuctionParams.hasParams` | `True` |
+| `genAuctionParams.startDiscount` | `1_00` |
+| `genAuctionParams.maxDiscount` | `50_00` |
+| `genAuctionParams.delay` | `0` |
+| `genAuctionParams.duration` | `DAY_BLOCKS` |
+
+### Getters 3-5 — RIPE availability
+
+| Getter | Expected value |
+| --- | ---: |
+| `ripeAvailForRewards()` | `1_000_000 * E18` |
+| `ripeAvailForHr()` | `0` |
+| `ripeAvailForBonds()` | `1_000_000 * E18` |
+
+### Getter 6 — `ripeBondConfig()`
+
+| Field | Expected value |
+| --- | ---: |
+| `asset` | `USDG` |
+| `amountPerEpoch` | `100 * 10 ** 6` |
+| `canBond` | `False` |
+| `minRipePerUnit` | `0` |
+| `maxRipePerUnit` | `50 * E18` |
+| `maxRipePerUnitLockBonus` | `2 * PCT` |
+| `epochLength` | `8 * HOUR_BLOCKS` |
+| `shouldAutoRestart` | `True` |
+| `restartDelayBlocks` | `2 * HOUR_BLOCKS` |
+
+### Getter 7 — `rewardsConfig()`
+
+| Field | Expected value |
+| --- | ---: |
+| `arePointsEnabled` | `True` |
+| `ripePerBlock` | `9 * 10 ** 15` |
+| `borrowersAlloc` | `10_00` |
+| `stakersAlloc` | `90_00` |
+| `votersAlloc` | `0` |
+| `genDepositorsAlloc` | `0` |
+| `autoStakeRatio` | `75_00` |
+| `autoStakeDurationRatio` | `33_00` |
+| `stabPoolRipePerDollarClaimed` | `1 * E18` |
+
+The four allocation fields must sum to `PCT` exactly.
+
+### Getter 8 — `ripeGovVaultConfigs()`
+
+The result contains exactly one row, in this order:
+
+```text
+row[0].asset                              = RIPE
+row[0].config.lockTerms.minLockDuration   = DAY_BLOCKS
+row[0].config.lockTerms.maxLockDuration   = 3 * YEAR_BLOCKS
+row[0].config.lockTerms.maxLockBoost      = 2 * PCT
+row[0].config.lockTerms.canExit           = True
+row[0].config.lockTerms.exitFee           = 80_00
+row[0].config.assetWeight                 = 1 * PCT
+row[0].config.shouldFreezeWhenBadDebt     = True
+```
+
+### Getter 9 — `hrConfig()`
+
+| Field | Expected value |
+| --- | ---: |
+| `contribTemplate` | `CT` |
+| `maxCompensation` | `0` |
+| `minCliffLength` | `WEEK_SECONDS` |
+| `maxStartDelay` | `3 * MONTH_SECONDS` |
+| `minVestingLength` | `WEEK_SECONDS` |
+| `maxVestingLength` | `10 * YEAR_SECONDS` |
+
+### Getters 10-12 — scalar behavior
+
+| Getter | Expected value |
+| --- | ---: |
+| `underscoreRegistry()` | `ZERO` |
+| `trainingWheels()` | `TW` |
+| `shouldCheckLastTouch()` | `True` |
+
+### Getter 13 — `assetConfigs()`
+
+The result contains exactly four rows in the order `WETH`, `RIPE`, `SGREEN`,
+`GREEN`. Every field below is mandatory.
+
+#### Row 0 — WETH
+
+```text
+asset                                      = WETH
+config.vaultIds                            = [3]
+config.stakersPointsAlloc                  = 0
+config.voterPointsAlloc                    = 0
+config.perUserDepositLimit                 = 25 * 10 ** 17
+config.globalDepositLimit                  = 5 * E18
+config.minDepositBalance                   = 5 * 10 ** 14
+config.debtTerms.ltv                       = 70_00
+config.debtTerms.redemptionThreshold       = 77_00
+config.debtTerms.liqThreshold              = 80_00
+config.debtTerms.liqFee                    = 10_00
+config.debtTerms.borrowRate                = 7_00
+config.debtTerms.daowry                    = 25
+config.shouldBurnAsPayment                 = False
+config.shouldTransferToEndaoment           = False
+config.shouldSwapInStabPools               = True
+config.shouldAuctionInstantly              = True
+config.canDeposit                          = True
+config.canWithdraw                         = True
+config.canRedeemCollateral                 = True
+config.canRedeemInStabPool                 = True
+config.canBuyInAuction                     = True
+config.canClaimInStabPool                  = True
+config.specialStabPoolId                   = 0
+config.customAuctionParams.hasParams       = False
+config.customAuctionParams.startDiscount   = 0
+config.customAuctionParams.maxDiscount     = 0
+config.customAuctionParams.delay           = 0
+config.customAuctionParams.duration        = 0
+config.whitelist                           = ZERO
+config.isNft                               = False
+```
+
+#### Row 1 — RIPE
+
+```text
+asset                                      = RIPE
+config.vaultIds                            = [2]
+config.stakersPointsAlloc                  = 15_00
+config.voterPointsAlloc                    = 0
+config.perUserDepositLimit                 = 100_000_000 * E18
+config.globalDepositLimit                  = 1_000_000_000 * E18
+config.minDepositBalance                   = 1 * 10 ** 14
+config.debtTerms.ltv                       = 0
+config.debtTerms.redemptionThreshold       = 0
+config.debtTerms.liqThreshold              = 0
+config.debtTerms.liqFee                    = 0
+config.debtTerms.borrowRate                = 0
+config.debtTerms.daowry                    = 0
+config.shouldBurnAsPayment                 = False
+config.shouldTransferToEndaoment           = False
+config.shouldSwapInStabPools               = False
+config.shouldAuctionInstantly              = False
+config.canDeposit                          = True
+config.canWithdraw                         = True
+config.canRedeemCollateral                 = False
+config.canRedeemInStabPool                 = True
+config.canBuyInAuction                     = True
+config.canClaimInStabPool                  = True
+config.specialStabPoolId                   = 0
+config.customAuctionParams.hasParams       = False
+config.customAuctionParams.startDiscount   = 0
+config.customAuctionParams.maxDiscount     = 0
+config.customAuctionParams.delay           = 0
+config.customAuctionParams.duration        = 0
+config.whitelist                           = ZERO
+config.isNft                               = False
+```
+
+#### Row 2 — Savings GREEN
+
+```text
+asset                                      = SGREEN
+config.vaultIds                            = [1]
+config.stakersPointsAlloc                  = 15_00
+config.voterPointsAlloc                    = 0
+config.perUserDepositLimit                 = 100_000_000 * E18
+config.globalDepositLimit                  = 1_000_000_000 * E18
+config.minDepositBalance                   = 1 * 10 ** 16
+config.debtTerms.ltv                       = 0
+config.debtTerms.redemptionThreshold       = 0
+config.debtTerms.liqThreshold              = 0
+config.debtTerms.liqFee                    = 0
+config.debtTerms.borrowRate                = 0
+config.debtTerms.daowry                    = 0
+config.shouldBurnAsPayment                 = True
+config.shouldTransferToEndaoment           = False
+config.shouldSwapInStabPools               = False
+config.shouldAuctionInstantly              = False
+config.canDeposit                          = True
+config.canWithdraw                         = True
+config.canRedeemCollateral                 = False
+config.canRedeemInStabPool                 = False
+config.canBuyInAuction                     = False
+config.canClaimInStabPool                  = False
+config.specialStabPoolId                   = 0
+config.customAuctionParams.hasParams       = False
+config.customAuctionParams.startDiscount   = 0
+config.customAuctionParams.maxDiscount     = 0
+config.customAuctionParams.delay           = 0
+config.customAuctionParams.duration        = 0
+config.whitelist                           = ZERO
+config.isNft                               = False
+```
+
+#### Row 3 — GREEN
+
+```text
+asset                                      = GREEN
+config.vaultIds                            = []
+config.stakersPointsAlloc                  = 0
+config.voterPointsAlloc                    = 0
+config.perUserDepositLimit                 = 1
+config.globalDepositLimit                  = 2
+config.minDepositBalance                   = 1
+config.debtTerms.ltv                       = 0
+config.debtTerms.redemptionThreshold       = 0
+config.debtTerms.liqThreshold              = 0
+config.debtTerms.liqFee                    = 0
+config.debtTerms.borrowRate                = 0
+config.debtTerms.daowry                    = 0
+config.shouldBurnAsPayment                 = False
+config.shouldTransferToEndaoment           = False
+config.shouldSwapInStabPools               = False
+config.shouldAuctionInstantly              = False
+config.canDeposit                          = False
+config.canWithdraw                         = False
+config.canRedeemCollateral                 = False
+config.canRedeemInStabPool                 = False
+config.canBuyInAuction                     = False
+config.canClaimInStabPool                  = True
+config.specialStabPoolId                   = 0
+config.customAuctionParams.hasParams       = False
+config.customAuctionParams.startDiscount   = 0
+config.customAuctionParams.maxDiscount     = 0
+config.customAuctionParams.delay           = 0
+config.customAuctionParams.duration        = 0
+config.whitelist                           = ZERO
+config.isNft                               = False
+```
+
+### Getters 14-17 — priority lists and lite signers
+
+```text
+priorityLiqAssetVaults() = [
+    (vaultId=3, asset=WETH),
+]
+
+priorityStabVaults() = [
+    (vaultId=1, asset=SGREEN),
+]
+
+priorityPriceSourceIds() = [1, 2]
+liteSigners() = []
+```
+
+### Matrix completeness check
+
+Before seeking D-01 approval, independently compare this appendix against the
+pinned source and `interfaces/ConfigStructs.vyi`. The reviewer must confirm:
+
+- all seventeen getters appear exactly once;
+- every struct field appears in interface order;
+- all four asset rows and the single governance-vault row are present in runtime
+  order;
+- every nested `DebtTerms`, `AuctionParams`, and `LockTerms` field is present;
+- all empty arrays and the zero-address whitelist/registry values are explicit;
+- all seven constructor-bound addresses use the correct symbols; and
+- `maxBorrowPerInterval` remains the separately confirmed `25 * E18`.
