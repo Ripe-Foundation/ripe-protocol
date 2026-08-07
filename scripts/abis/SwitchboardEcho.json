@@ -1217,6 +1217,43 @@
     "type": "event"
   },
   {
+    "name": "VaultPositionMigrationExecuted",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1913,6 +1950,41 @@
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "migrateRipeGovPositions",
+    "inputs": [
+      {
+        "name": "_migrations",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "user",
+            "type": "address"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "sourceVaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "targetVaultId",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateVaultPositions",
     "inputs": [
       {
         "name": "_migrations",

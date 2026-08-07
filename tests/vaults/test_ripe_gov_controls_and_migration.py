@@ -1557,6 +1557,7 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
     bob,
     teller,
     ledger,
+    lootbox,
     switchboard_alpha,
     switchboard_echo,
     mission_control,
@@ -1577,7 +1578,9 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
         setGeneralConfig=setGeneralConfig,
         switchboard_alpha=switchboard_alpha,
     )
-    ledger.removeVaultFromUserForMigration(
+    # migration cleanup now routes through Lootbox, which is the only contract Ledger
+    # authorizes to remove a user's vault participation
+    lootbox.removeVaultFromUserForMigration(
         bob,
         SOURCE_VAULT_ID,
         sender=teller.address,
