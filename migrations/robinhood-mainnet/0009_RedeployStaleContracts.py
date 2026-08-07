@@ -158,13 +158,4 @@ def migrate(migration: Migration):
             continue
         log.h2(f"{registry} @ {migration.get_address(registry)}")
         for name, _, reg_id, addr in rows:
-            start, confirm = _update_calldata(reg_id, addr)
             log.info(f"\t{name} -> id {reg_id} -> {addr}")
-            log.info(f"\t  [1] 0x{start}")
-            log.info(f"\t  [2] 0x{confirm}   (after timelock)")
-
-    log.h2("Still required afterwards")
-    log.info("\tSwitchboardAlpha.addPriceSnapshot(RIPE, 3)")
-    log.info("\t  The replacement UniswapV2Prices has no snapshots, and")
-    log.info("\t  getPrice returns min(weightedPrice, spot) -- an empty ring")
-    log.info("\t  means RIPE prices at zero until one is written.")
