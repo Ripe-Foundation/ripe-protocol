@@ -113,9 +113,9 @@ REWARD_LAUNCH_CADENCE_RECORD_COUNT = 21
 REWARD_LAUNCH_CADENCE_RECORDS_SHA256 = (
     "e8e943571dcedbc6aa56295434857bac69ed34241405e698407ab7721fbbd01d"
 )
-TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT = 7
+TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT = 1
 TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256 = (
-    "96f8cd1e75e68589b8ecdb98e6ea8aee3251ad7fbfeb88301d5e8e5a3bb85493"
+    "def0d5f2a1f26595e415c97130ab17f5cbde8cf224644e7e6eb14bd735139428"
 )
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
@@ -405,12 +405,11 @@ REWARD_LAUNCH_CADENCE_PATHS = frozenset(
         "tests/core/lootbox/test_robinhood_reward_containment.py",
     }
 )
+# PR #68 deleted robinhood_backends.py, robinhood_executor.py and
+# robinhood_execution_support.py. Only migration_runner.py survives.
 TRANSACTION_EXECUTOR_CADENCE_PATHS = frozenset(
     {
         "scripts/utils/migration_runner.py",
-        "scripts/utils/robinhood_backends.py",
-        "scripts/utils/robinhood_executor.py",
-        "tests/deployment/robinhood_execution_support.py",
     }
 )
 SOURCE_AUTHORITY_BLUEPRINT_CADENCE_KEYS = frozenset(
