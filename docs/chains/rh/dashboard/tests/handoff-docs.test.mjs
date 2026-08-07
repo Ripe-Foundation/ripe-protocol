@@ -12,6 +12,7 @@ const paths = {
   agent: resolve(rhDocs, "AGENT-HANDOFF.md"),
   readiness: resolve(rhDocs, "deployment-owner-readiness.md"),
   quickstart: resolve(rhDocs, "deployment-owner-quickstart.md"),
+  productionCorrection: resolve(rhDocs, "rh-production-vyper-remediation.md"),
   synthesis: resolve(rhDocs, "reassessment-and-qualification-synthesis.md"),
   curve: resolve(rhDocs, "curve-launch-activation.md"),
   curveMigration: resolve(rhDocs, "curve-launch-migration-handoff.md"),
@@ -57,7 +58,8 @@ test("the canonical quick-start binds the current subject and lifecycle facts", 
     assert.match(document, /DefaultsRobinhood\.vy.*exists.*compiles/is);
     assert.match(document, /configuration_consistent=true/is);
     assert.match(document, /deployment_ready=false/is);
-    assert.match(document, /80/is);
+    assert.match(document, new RegExp(String(status.counts.h03_blockers)));
+    assert.match(document, new RegExp(String(status.counts.deployment_readiness_blockers)));
     assert.match(document, /H-05.*deterministic/is);
     assert.match(document, /H-06.*class|H-06.*operator\/storage/is);
   }
@@ -86,10 +88,10 @@ test("source ownership gives constructor and immutable bindings precedence over 
     "sGREEN",
     "USDG",
     "WETH",
-    "SteakHouse USDG",
   ]) {
     assert.match(quickstart, new RegExp(identity));
   }
+  assert.match(quickstart, /Do not restore the historical SteakHouse USDG constructor input/i);
   assert.doesNotMatch(quickstart, /If a value is returned by a Defaults getter/i);
 });
 
@@ -101,38 +103,43 @@ test("current accepted architecture matches the bounded Curve launch topology", 
     {
       1: { semantic: "Chainlink", state: "selected" },
       2: { semantic: "Curve", state: "selected_green_only" },
-      3: { semantic: "BlueChipYield", state: "selected" },
+      3: { semantic: "BlueChipYield", state: "blueprint_selected_but_not_deployed_by_candidate" },
       4: { semantic: "Pyth", state: "empty" },
       5: { semantic: "Stork", state: "empty" },
     },
   );
   assert.deepEqual(
     status.post_freeze_reconciliation.profile1_launch_input_reconciliation.priority_price_source_ids,
-    [1, 3],
+    [1, 2],
   );
-  assert.match(documents.synthesis, /PriceDesk ID 1 has Chainlink selected/i);
-  assert.match(documents.synthesis, /PriceDesk ID 2 has unchanged `CurvePrices` selected/i);
-  assert.match(documents.synthesis, /ID 3 has BlueChipYield selected/i);
-  assert.match(documents.synthesis, /IDs 4 and 5 are empty/i);
-  assert.match(documents.synthesis, /Priority price-source IDs are `\[1, 3\]`/i);
-  assert.match(documents.synthesis, /Chainlink remains the sole USDG and PSM authority/i);
+  assert.match(documents.productionCorrection, /priority price sources are `\[1, 2\]`/i);
+  assert.match(documents.productionCorrection, /BlueChipYield.*not deployed/is);
+  assert.match(documents.quickstart, /USDG has no Curve feed/i);
   assert.match(
-    documents.synthesis,
-    /GREEN -> Curve GREEN\/USDG -> PriceDesk -> Chainlink USDG/i,
+    documents.quickstart,
+    /GREEN ->\s+Curve GREEN\/USDG -> PriceDesk -> Chainlink USDG/i,
   );
-  assert.match(documents.curve, /USDG has no Curve feed/i);
-  assert.match(documents.curve, /80 blockers/i);
-  assert.match(documents.curveMigration, /Do not edit or execute `migrations\/robinhood\/\*\*`/i);
-  assert.doesNotMatch(documents.synthesis, /IDs 2-5 remain empty|PriceDesk IDs 2-5 empty/i);
   const synthesisRole = status.document_roles.find(
     ({ file }) => file === "docs/chains/rh/reassessment-and-qualification-synthesis.md",
   );
-  assert.match(synthesisRole.role, /Current consolidated launch topology/i);
+  assert.match(synthesisRole.role, /Historical pre-remediation/i);
+  const correctionRole = status.document_roles.find(
+    ({ file }) => file === "docs/chains/rh/rh-production-vyper-remediation.md",
+  );
+  assert.match(correctionRole.role, /Current correction record/i);
 });
 
 test("the current Deleverage disposition preserves parked zero controls without stale Defaults claims", async () => {
-  const { deleverage } = await readAll();
-  assert.match(deleverage, /5f5d22b7ee78cbb904c4fe3c6e46599c330c4353/);
+  const { deleverage, status: statusSource } = await readAll();
+  const status = YAML.parse(statusSource);
+  assert.match(
+    deleverage,
+    new RegExp(status.post_freeze_reconciliation.corrected_pr61_integration_ancestor),
+  );
+  assert.match(
+    deleverage,
+    new RegExp(status.post_freeze_reconciliation.production_blob_parity.contracts["contracts/core/Deleverage.vy"]),
+  );
   assert.match(deleverage, /DefaultsRobinhood\.vy.*exists.*compiles.*source-authoritative/is);
   assert.match(deleverage, /all four remain zero and deferred/is);
   assert.match(deleverage, /outside the\s+currently selected launch value projection/is);
@@ -180,7 +187,7 @@ test("canonical register records the post-freeze H-04, H-05, H-06, and S4 lifecy
   );
   assert.match(statuses.get("RH-D011"), /zero-cooldown.*closed.*corrected PR #61.*integrated/i);
   assert.match(statuses.get("RH-D015"), /source authority integrated.*21 decisions approved.*zero open/i);
-  assert.match(statuses.get("RH-D016"), /deterministic blocked planning integrated.*execution.*unauthorized/i);
+  assert.match(statuses.get("RH-D016"), /eight-file imperative.*candidate.*review.*execution.*unauthorized/i);
   assert.match(statuses.get("RH-D017"), /candidate macOS\/APFS operator\/storage-class qualification integrated/i);
 });
 

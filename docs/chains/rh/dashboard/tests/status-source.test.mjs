@@ -879,7 +879,10 @@ test("H-04 lifecycle and fail-closed readiness mirror the integrated manifest", 
   assert.equal(status.h04_decisions.defaults_source_authoritative, true);
   assert.equal(status.h04_decisions.configuration_consistent, true);
   assert.equal(status.h04_decisions.deployment_ready, false);
-  assert.equal(status.h04_decisions.deployment_readiness_blocker_count, 80);
+  assert.equal(
+    status.h04_decisions.deployment_readiness_blocker_count,
+    status.counts.deployment_readiness_blockers,
+  );
   await access(resolve(repositoryRoot, "contracts/config/DefaultsRobinhood.vy"));
 });
 

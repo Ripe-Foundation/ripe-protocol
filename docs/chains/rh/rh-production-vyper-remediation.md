@@ -36,8 +36,8 @@ ID 2 is RipeGov, and all three MissionControl reads agree.
 Setup-time action and registry timelocks may begin at zero. Before the Safe
 handoff, the migration must finalize and read back the approved nonzero values
 for Alpha, Bravo, Charlie, Delta, Echo, ChainlinkPrices, CurvePrices,
-HumanResources, Switchboard, PriceDesk, VaultBook, and RipeHq. BlueChip is not
-deployed in this candidate and must not be fetched or finalized. The Safe
+HumanResources, Switchboard, PriceDesk, VaultBook, and RipeHq. BlueChipYield is
+not deployed in this candidate and must not be fetched or finalized. The Safe
 handoff remains last.
 
 ## Ledger and action-block source

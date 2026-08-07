@@ -6,30 +6,37 @@ machine-readable authority. The dashboard must never become an independently
 maintained status source. Repository documents are the durable handoff and
 fallback.
 
-Current candidate baseline:
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`.
+Current live `rh` parent:
+`0372d48680c281ddaafe2f1982f0bcfa851071c9`, tree
+`79fdc69de22eb8cfa2be3a2067c596d5fed92963`. Draft PR #73 contains production-
+remediation source candidate `e12b1abe26218acb804d84670099c41169e5f515`,
+tree `b680f0016f29f9a217054db9f80c0bbf9f0b9916`, followed only by the current
+status-authority reconciliation. Rebind the production-source identity after
+any production/configuration change.
 
 Ready to begin deployment preparation. PR #61 is merged and closed, and its
-production contract changes are integrated into `rh`. H-04 schema v2, H-05
-deterministic blocked planning, M4 proof, and H-06 candidate-class
-qualification are integrated for their exact scopes. No Robinhood migration,
-deployment, production configuration, activation, RPC, account, key, signer,
-or release action has occurred.
+production contract changes are integrated into `rh`. The current candidate
+uses eight imperative Robinhood migration files. H-05 is deterministic
+repository review only: no executable plan is authorized or censused, and the
+retired declarative runner, transaction executor, and 86-key plan census are
+not current authority. H-06 qualifies an operator/storage class only. No
+Robinhood migration, deployment, production configuration, activation, RPC,
+account, key, signer, or release action has occurred.
 
-Morpho V2 and BlueChipYield support are integrated. The bounded candidate
-selects Chainlink at PriceDesk ID 1, unchanged CurvePrices for GREEN only at
-ID 2, and BlueChipYield at ID 3; IDs 4/5 remain empty and priorities remain
-`[1,3]`. USDG has no Curve feed and neither LP token nor any Curve higher
-power is admitted. `DefaultsRobinhood.vy` exists and compiles, and the derived
-ledger is synchronized. `configuration_consistent=true`,
-`deployment_ready=false`, and the current blocker count is 80. Repository
-configuration is prepared and consistent; production/onchain configuration
-has not occurred.
+The bounded candidate selects Chainlink at PriceDesk ID 1 and unchanged
+CurvePrices for GREEN only at ID 2; priorities are `[1,2]`. BlueChipYield
+remains structurally selected at ID 3 in the blueprint but is not deployed or
+finalized by the current migration candidate. IDs 4/5 remain empty, USDG has
+no Curve feed, and neither LP token nor any Curve higher power is admitted.
+`DefaultsRobinhood.vy` exists and compiles, and the derived ledger is
+synchronized. `configuration_consistent=true`, `deployment_ready=false`, 28
+canonical H-03 blockers remain open, and the current deployment-readiness
+blocker count is 65. Repository configuration is prepared and consistent;
+production/onchain configuration has not occurred.
 
-DP15 and P-H04-399 retain the approved general reward values, while
-`B-REWARD-PROMOTION` remains operationally open and Stock rewards remain
-disabled. The GREEN/USDG pricing pool selection does not admit its LP token;
+Current source assigns `1,000,000e18` RIPE to rewards, zero to HR, and
+`1,000,000e18` RIPE to bonds. `B-REWARD-PROMOTION` remains operationally open
+and Stock rewards remain disabled. The GREEN/USDG pricing pool selection does not admit its LP token;
 RIPE/WETH remains external-canary-only, Uniswap remains PriceDesk-inert, and
 PSM reserves cannot fund LP liquidity.
 
