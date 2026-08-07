@@ -31,6 +31,9 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import buy_fungible_auction, filter_logs
 
 
+pytestmark = pytest.mark.release
+
+
 VAULT_CASES = (
     pytest.param("simple", 3, id="simple-erc20"),
     pytest.param("rebase", 4, id="rebase-erc20"),

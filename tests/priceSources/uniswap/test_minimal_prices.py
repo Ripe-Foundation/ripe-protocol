@@ -7,6 +7,26 @@ from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
 
 
+@dataclass(frozen=True)
+class UniswapV2DeploymentConfig:
+    ripe_is_token0: bool = True
+    ripe_decimals: int = 18
+    quote_decimals: int = 18
+    ripe_units: int = 100
+    quote_units: int = 10
+    quote_usd: int = 2_000 * EIGHTEEN_DECIMALS
+    pool_contains_ripe: bool = True
+    finish_setup: bool = True
+
+
+UNISWAP_V2_DEFAULTS = UniswapV2DeploymentConfig()
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep this focused mock suite independent of the protocol bootstrap."""
+
+
 @dataclass
 class UniswapV2PricesFixture:
     source: object
@@ -29,74 +49,113 @@ def set_pool_reserves(fixture, ripe_units, quote_units):
     fixture.pair.sync()
 
 
+@pytest.fixture(scope="module")
+def uniswap_v2_factories():
+    """Compile each reusable mock/source factory once for this module."""
+    return {
+        "token": boa.load_partial("contracts/mock/MockUniswapV2Token.vy"),
+        "pair": boa.load_partial("contracts/mock/MockUniswapV2Pair.vy"),
+        "quote_desk": boa.load_partial(
+            "contracts/mock/MockUniswapV2QuotePriceDesk.vy"
+        ),
+        "hq": boa.load_partial("contracts/mock/MockUniswapV2RipeHq.vy"),
+        "source": boa.load_partial(
+            "contracts/priceSources/UniswapV2Prices.vy"
+        ),
+    }
+
+
+def _deploy_uniswap_v2_prices(
+    factories,
+    governance,
+    config,
+):
+    ripe = factories["token"].deploy(config.ripe_decimals)
+    quote = factories["token"].deploy(config.quote_decimals)
+    other = factories["token"].deploy(18)
+    pair = factories["pair"].deploy()
+
+    paired_ripe = ripe if config.pool_contains_ripe else other
+    token0 = paired_ripe.address if config.ripe_is_token0 else quote.address
+    token1 = quote.address if config.ripe_is_token0 else paired_ripe.address
+    pair.configureIdentity(ZERO_ADDRESS, token0, token1)
+
+    ripe_reserve = config.ripe_units * 10**config.ripe_decimals
+    quote_reserve = config.quote_units * 10**config.quote_decimals
+    reserve0 = ripe_reserve if config.ripe_is_token0 else quote_reserve
+    reserve1 = quote_reserve if config.ripe_is_token0 else ripe_reserve
+    token0_contract = paired_ripe if config.ripe_is_token0 else quote
+    token1_contract = quote if config.ripe_is_token0 else paired_ripe
+    token0_contract.setBalance(pair.address, reserve0)
+    token1_contract.setBalance(pair.address, reserve1)
+    pair.mint(governance.address)
+
+    quote_desk = factories["quote_desk"].deploy()
+    quote_desk.setPrice(config.quote_usd)
+    hq = factories["hq"].deploy(
+        governance.address,
+        quote_desk.address,
+    )
+    snapshot_caller = boa.env.generate_address("uniswap snapshot caller")
+    switchboard_caller = boa.env.generate_address("uniswap switchboard caller")
+    hq.setValidRipeAddr(snapshot_caller, True)
+    hq.setValidSwitchboardAddr(switchboard_caller, True)
+
+    source = factories["source"].deploy(
+        hq.address,
+        ZERO_ADDRESS,
+        pair.address,
+        ripe.address,
+        1,
+        100,
+    )
+    if config.finish_setup:
+        assert source.setActionTimeLockAfterSetup(sender=governance.address)
+
+    return UniswapV2PricesFixture(
+        source=source,
+        pair=pair,
+        ripe=ripe,
+        quote=quote,
+        quote_desk=quote_desk,
+        hq=hq,
+        governor=governance.address,
+        snapshot_caller=snapshot_caller,
+        switchboard_caller=switchboard_caller,
+        ripe_is_token0=config.ripe_is_token0,
+    )
+
+
 @pytest.fixture
-def uniswap_v2_prices_builder(governance):
+def uniswap_v2_prices_builder(
+    governance,
+    uniswap_v2_factories,
+):
     def build(
         *,
-        ripe_is_token0=True,
-        ripe_decimals=18,
-        quote_decimals=18,
-        ripe_units=100,
-        quote_units=10,
-        quote_usd=2_000 * EIGHTEEN_DECIMALS,
-        pool_contains_ripe=True,
-        finish_setup=True,
+        ripe_is_token0=UNISWAP_V2_DEFAULTS.ripe_is_token0,
+        ripe_decimals=UNISWAP_V2_DEFAULTS.ripe_decimals,
+        quote_decimals=UNISWAP_V2_DEFAULTS.quote_decimals,
+        ripe_units=UNISWAP_V2_DEFAULTS.ripe_units,
+        quote_units=UNISWAP_V2_DEFAULTS.quote_units,
+        quote_usd=UNISWAP_V2_DEFAULTS.quote_usd,
+        pool_contains_ripe=UNISWAP_V2_DEFAULTS.pool_contains_ripe,
+        finish_setup=UNISWAP_V2_DEFAULTS.finish_setup,
     ):
-        ripe = boa.load("contracts/mock/MockUniswapV2Token.vy", ripe_decimals)
-        quote = boa.load("contracts/mock/MockUniswapV2Token.vy", quote_decimals)
-        other = boa.load("contracts/mock/MockUniswapV2Token.vy", 18)
-        pair = boa.load("contracts/mock/MockUniswapV2Pair.vy")
-
-        paired_ripe = ripe if pool_contains_ripe else other
-        token0 = paired_ripe.address if ripe_is_token0 else quote.address
-        token1 = quote.address if ripe_is_token0 else paired_ripe.address
-        pair.configureIdentity(ZERO_ADDRESS, token0, token1)
-
-        ripe_reserve = ripe_units * 10**ripe_decimals
-        quote_reserve = quote_units * 10**quote_decimals
-        reserve0 = ripe_reserve if ripe_is_token0 else quote_reserve
-        reserve1 = quote_reserve if ripe_is_token0 else ripe_reserve
-        token0_contract = paired_ripe if ripe_is_token0 else quote
-        token1_contract = quote if ripe_is_token0 else paired_ripe
-        token0_contract.setBalance(pair.address, reserve0)
-        token1_contract.setBalance(pair.address, reserve1)
-        pair.mint(governance.address)
-
-        quote_desk = boa.load("contracts/mock/MockUniswapV2QuotePriceDesk.vy")
-        quote_desk.setPrice(quote_usd)
-        hq = boa.load(
-            "contracts/mock/MockUniswapV2RipeHq.vy",
-            governance.address,
-            quote_desk.address,
-        )
-        snapshot_caller = boa.env.generate_address("uniswap snapshot caller")
-        switchboard_caller = boa.env.generate_address("uniswap switchboard caller")
-        hq.setValidRipeAddr(snapshot_caller, True)
-        hq.setValidSwitchboardAddr(switchboard_caller, True)
-
-        source = boa.load(
-            "contracts/priceSources/UniswapV2Prices.vy",
-            hq.address,
-            ZERO_ADDRESS,
-            pair.address,
-            ripe.address,
-            1,
-            100,
-        )
-        if finish_setup:
-            assert source.setActionTimeLockAfterSetup(sender=governance.address)
-
-        return UniswapV2PricesFixture(
-            source=source,
-            pair=pair,
-            ripe=ripe,
-            quote=quote,
-            quote_desk=quote_desk,
-            hq=hq,
-            governor=governance.address,
-            snapshot_caller=snapshot_caller,
-            switchboard_caller=switchboard_caller,
+        config = UniswapV2DeploymentConfig(
             ripe_is_token0=ripe_is_token0,
+            ripe_decimals=ripe_decimals,
+            quote_decimals=quote_decimals,
+            ripe_units=ripe_units,
+            quote_units=quote_units,
+            quote_usd=quote_usd,
+            pool_contains_ripe=pool_contains_ripe,
+            finish_setup=finish_setup,
+        )
+        return _deploy_uniswap_v2_prices(
+            uniswap_v2_factories,
+            governance,
+            config,
         )
 
     return build

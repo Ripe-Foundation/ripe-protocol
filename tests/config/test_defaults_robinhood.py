@@ -17,6 +17,9 @@ from config import BluePrint as blueprint_source
 from scripts.params import generate_robinhood_defaults as sync
 
 
+pytestmark = pytest.mark.release
+
+
 ROOT = Path(__file__).resolve().parents[2]
 LEDGER = ROOT / "config" / "robinhood-parameters.json"
 DEFAULTS = ROOT / "contracts" / "config" / "DefaultsRobinhood.vy"

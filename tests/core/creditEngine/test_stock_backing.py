@@ -844,6 +844,7 @@ def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
         )
 
 
+@pytest.mark.gas
 def test_c2_marginal_gas_protocol(
     alpha_token,
     bob,

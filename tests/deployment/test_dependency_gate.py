@@ -16,7 +16,6 @@ import pytest
 import requests
 from _pytest._io.terminalwriter import TerminalWriter
 from dotenv import dotenv_values, find_dotenv, load_dotenv
-from IPython.lib.lexers import IPython3Lexer
 from pygments import highlight, lex
 from pygments.formatters import HtmlFormatter, TerminalFormatter
 from pygments.lexers import PythonLexer
@@ -970,6 +969,8 @@ def test_click_editor_patch_uses_argv_without_shell_execution():
 
 
 def test_pygments_lexer_and_ipython_rich_pytest_rendering_are_exact():
+    from IPython.lib.lexers import IPython3Lexer
+
     source = (
         "def greet(name: str) -> str:\n"
         '    return f"hello {name}"\n'
