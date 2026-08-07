@@ -41,6 +41,8 @@ from ethereum.ercs import IERC4626
 interface TellerUtils:
     def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
+    def validateVaultMigration(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256, _a: addys.Addys = empty(addys.Addys)) -> (address, address): view
+    def validateRipeGovMigration(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> (address, address): view
     def getVaultAddrAndId(_asset: address, _vaultAddr: address, _vaultId: uint256, _vaultBook: address, _missionControl: address) -> (address, uint256): view
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -49,7 +51,6 @@ interface TellerUtils:
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
@@ -107,7 +108,7 @@ interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
 interface AddressRegistry:
-    def isValidRegId(_regId: uint256) -> bool: view
+    def isValidAddr(_addr: address) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
 struct RipeGovMigrationData:
@@ -311,6 +312,9 @@ def _deposit(
     utils: address = addys._getTellerUtilsAddr()
     vaultAddr, vaultId = staticcall TellerUtils(utils).getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
 
+    # one more validation -- TellerUtils repeats this check, but putting here as backup
+    assert staticcall AddressRegistry(_a.vaultBook).isValidAddr(vaultAddr) # dev: invalid vault
+
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
     amount: uint256 = staticcall TellerUtils(utils).validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a)
@@ -493,9 +497,12 @@ def rebalance(
     return withdrawnAmount, depositedAmount
 
 
-###############################
-# Ripe Gov Position Migration #
-###############################
+####################
+# Vault Migrations #
+####################
+
+
+# Ripe Gov migration
 
 
 @nonreentrant
@@ -507,29 +514,12 @@ def migrateRipeGovPosition(
     _targetVaultId: uint256,
 ) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
-    assert _sourceVaultId != _targetVaultId # dev: same vault
 
     # validation
+    sourceVault: address = empty(address)
+    targetVault: address = empty(address)
+    sourceVault, targetVault = staticcall TellerUtils(addys._getTellerUtilsAddr()).validateRipeGovMigration(_user, _asset, _sourceVaultId, _targetVaultId)
     a: addys.Addys = addys._getAddys()
-    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
-    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
-
-    # get vault addresses
-    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
-    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
-    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-    assert sourceVault != targetVault # dev: same vault
-    assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
-    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
-
-    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
 
     # export position
     targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
@@ -551,21 +541,19 @@ def migrateRipeGovPosition(
         migration,
     )
 
-    # Prove the exported source position is empty, then swap Ledger
-    # participation source-first so a user at the vault limit never exceeds it.
+    # make sure user has no balance in the source vault, remove from ledger
     assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
     assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
     extcall Ledger(a.ledger).removeVaultFromUserForMigration(_user, _sourceVaultId)
-    sourceLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
+    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
     assert not sourceLedgerData.isParticipatingInVault # dev: source Ledger cleanup failed
 
+    # add target vault to ledger
     targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
     if not targetLedgerData.isParticipatingInVault:
         extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
 
     # update lootbox points
-    # settle the source through this block and initialize the target at its intentionally
-    # non-core lootbox weight. Governance refreshes the target after switching the core pointer.
     extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
     extcall Lootbox(a.lootbox).updateDepositPoints(_user, _targetVaultId, targetVault, _asset, a)
 
@@ -582,6 +570,57 @@ def migrateRipeGovPosition(
         unlock=migration.unlock,
     )
     return migration.amount
+
+
+# normal vault migration
+
+
+@nonreentrant
+@external
+def migrateVaultPosition(
+    _user: address,
+    _asset: address,
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+
+    # IMPORTANT: teller must be paused for this path
+    assert deptBasics.isPaused # dev: teller not paused
+
+    # validation
+    a: addys.Addys = addys._getAddys()
+    sourceVault: address = empty(address)
+    targetVault: address = empty(address)
+    sourceVault, targetVault = staticcall TellerUtils(addys._getTellerUtilsAddr()).validateVaultMigration(_user, _asset, _sourceVaultId, _targetVaultId, a)
+
+    # withdraw entire position into this contract
+    preBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    amount: uint256 = 0
+    isDepleted: bool = False
+    amount, isDepleted = extcall Vault(sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, a)
+    assert isDepleted # dev: source position not depleted
+
+    # prove the receipt is exactly what the source vault reported
+    tellerBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    assert tellerBalance >= preBalance # dev: invalid migration receipt
+    assert tellerBalance - preBalance == amount # dev: inexact migration receipt
+
+    # deposit into target vault, reusing the normal deposit path
+    self._deposit(_asset, amount, _user, targetVault, _targetVaultId, msg.sender, 0, True, True, False, a)
+
+    # prove nothing was retained here
+    tellerBalance = staticcall IERC20(_asset).balanceOf(self)
+    assert tellerBalance == preBalance # dev: teller balance remains
+
+    # settle source lootbox points through this block
+    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
+
+    # perform house keeping !!!
+    # this ensures user's debt position is still healthy after the migration
+    self._performHousekeeping(True, _user, True, a)
+
+    return amount
 
 
 ########
