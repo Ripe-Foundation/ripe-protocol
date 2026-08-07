@@ -1,4 +1,5 @@
 import boa
+import pytest
 
 from conf_utils import filter_logs
 from constants import MAX_UINT256
@@ -66,7 +67,7 @@ def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig:
 REENTRANT_PAYMENT = """
 # @version 0.4.3
 
-decimals: public(constant(uint8)) = 6
+decimals: public(immutable(uint8))
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
 totalSupply: public(uint256)
@@ -76,9 +77,10 @@ attackAttempted: public(bool)
 attackSucceeded: public(bool)
 
 @deploy
-def __init__(_owner: address):
+def __init__(_owner: address, _decimals: uint8):
+    decimals = _decimals
     self.owner = _owner
-    self.totalSupply = 1_000_000_000 * 10**6
+    self.totalSupply = 10**30
     self.balanceOf[_owner] = self.totalSupply
 
 @external
@@ -396,10 +398,13 @@ def test_anyone_can_buy_only_for_self(lane_env, alice, charlie_token_whale):
     assert lane_env.ripe_token.balanceOf(lane_env.bob) == before_bob
 
 
+@pytest.mark.parametrize("decimals", [6, 18])
 def test_payment_token_reentrancy_cannot_create_a_second_purchase(
-    lane_factory, charlie_token_whale
+    lane_factory,
+    charlie_token_whale,
+    decimals,
 ):
-    token = boa.loads(REENTRANT_PAYMENT, charlie_token_whale)
+    token = boa.loads(REENTRANT_PAYMENT, charlie_token_whale, decimals)
     ctx = lane_factory(payment_token=token)
     ctx.set_config()
 

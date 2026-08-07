@@ -186,6 +186,9 @@ def lane_factory(
                 asset_can_deposit=True,
                 anyone_can_deposit=True,
             ):
+                # Lane-unit tests write MissionControl directly so they can cover
+                # defensive states independently of governance validation. Dedicated
+                # integration cases use the real timelocked switchboard path.
                 setGeneralConfig(_canDeposit=can_deposit)
                 lock_terms = (
                     min_lock,

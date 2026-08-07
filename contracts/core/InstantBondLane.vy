@@ -312,16 +312,15 @@ def buyNow(
 
     config: InstantBondConfig = self.config
     assert config.canBuyNow  # dev: disabled
+    assert block.number <= _deadlineBlock  # dev: expired
 
     a: addys.Addys = addys._getAddys()
     assert staticcall RipeHq(a.hq).canMintRipe(self)  # dev: mint unavailable
 
     endaomentFunds: address = addys._getEndaomentFundsAddr()
     assert endaomentFunds != empty(address)  # dev: no destination
-    assert block.number <= _deadlineBlock  # dev: expired
 
     pricing: PricingState = self._getPricingState(config, configVersion)
-    self._storePricingState(pricing)
     assert _expectedEpoch == pricing.epoch  # dev: epoch moved
 
     remainingPayment: uint256 = pricing.paymentCap - pricing.acceptedPayment
@@ -354,6 +353,7 @@ def buyNow(
         endaomentFunds
     )
 
+    self._storePricingState(pricing)
     self.epochAcceptedPayment = pricing.acceptedPayment + _paymentAmount
     self.cumulativeMinted += payout.totalRipe
 
@@ -363,9 +363,11 @@ def buyNow(
         _paymentAmount,
         default_return_value=True,
     )  # dev: payment failed
-    assert staticcall IERC20(PAYMENT_TOKEN).balanceOf(
+    paymentBalanceAfter: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(
         endaomentFunds
-    ) - paymentBalanceBefore == _paymentAmount  # dev: payment receipt mismatch
+    )
+    assert paymentBalanceAfter >= paymentBalanceBefore  # dev: payment receipt mismatch
+    assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount  # dev: payment receipt mismatch
 
     if payout.actualLock == 0:
         assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe)  # dev: mint failed

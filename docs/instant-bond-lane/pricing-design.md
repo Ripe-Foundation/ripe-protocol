@@ -271,7 +271,7 @@ of v1.
 The `buyNow` entry requires `recipient == msg.sender` for the pilot. The Bond Room
 explicitly gates bonding-for-another (`BondRoom.vy:144-145`), and because RipeGov
 merges deposits into one weighted, blended-unlock position per user
-(`RipeGov.vy:679,719`), a third party locking on someone's behalf can move that
+(`RipeGov.vy:936-961`), a third party locking on someone's behalf can move that
 person's unlock schedule — a griefing surface. Gifting and delegated-wallet support
 can be added later with an explicit authorization and lock-interaction spec.
 
@@ -311,8 +311,8 @@ duration with one all-in payout rate** (or no lock at all) is cleaner: it remove
 second continuous pricing dimension, and it avoids a governance-concentration edge —
 a maximum-lock purchase can receive up to 3× the RIPE *and* accrue up to a further
 3× RipeGov points on that larger position (up to ~9× point accrual per dollar versus
-an unlocked base unit; `RipeGov.vy:618,679`), which the small per-epoch cap and short
-pilot are what keep in check. If flexible locks are retained instead, measuring
+an unlocked base unit; `RipeGov.vy:858-885,903-916`), which the small per-epoch cap and
+short pilot are what keep in check. If flexible locks are retained instead, measuring
 utilization in the payment/base domain (§2.1) keeps the control signal clean, since a
 buyer's lock choice does not change how much of the cap their payment consumes. A
 transaction-size-based minimum-lock rule is **not** recommended — it is evadable by

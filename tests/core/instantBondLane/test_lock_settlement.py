@@ -48,7 +48,7 @@ def depositFromTrusted(
 NONEXACT_RECEIPT_TOKEN = """
 # @version 0.4.3
 
-decimals: public(constant(uint8)) = 6
+decimals: public(immutable(uint8))
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
 totalSupply: public(uint256)
@@ -56,11 +56,12 @@ owner: immutable(address)
 receiptBps: immutable(uint256)
 
 @deploy
-def __init__(_owner: address, _receiptBps: uint256):
+def __init__(_owner: address, _decimals: uint8, _receiptBps: uint256):
     assert _receiptBps <= 20_000
     owner = _owner
+    decimals = _decimals
     receiptBps = _receiptBps
-    self.totalSupply = 1_000_000_000 * 10**6
+    self.totalSupply = 10**30
     self.balanceOf[_owner] = self.totalSupply
 
 @external
@@ -85,6 +86,70 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     else:
         self.totalSupply -= _value - delivered
     return True
+"""
+
+
+NO_RETURN_PAYMENT_TOKEN = """
+# @version 0.4.3
+
+decimals: public(immutable(uint8))
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+
+@deploy
+def __init__(_owner: address, _decimals: uint8):
+    decimals = _decimals
+    self.totalSupply = 10**30
+    self.balanceOf[_owner] = self.totalSupply
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] += _value
+    return True
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256):
+    self.allowance[_from][msg.sender] -= _value
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] += _value
+"""
+
+
+FALSE_RETURN_PAYMENT_TOKEN = """
+# @version 0.4.3
+
+decimals: public(immutable(uint8))
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+
+@deploy
+def __init__(_owner: address, _decimals: uint8):
+    decimals = _decimals
+    self.totalSupply = 10**30
+    self.balanceOf[_owner] = self.totalSupply
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] += _value
+    return True
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    return False
 """
 
 
@@ -238,16 +303,23 @@ def test_locked_settlement_follows_rotated_core_vault_pointer(
     alternate_ripe_gov_vault,
     registerVault,
     setAssetConfig,
+    switchboard_charlie,
 ):
     lane_env.set_config(maxLockBonus=5_000)
     lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
     source_id = lane_env.mission_control.coreRipeGovVaultId()
     core_id = registerVault(alternate_ripe_gov_vault, "Instant Bond Core RipeGov")
     setAssetConfig(lane_env.ripe_token, _vaultIds=[source_id, core_id])
-    lane_env.mission_control.setCoreRipeGovVaultId(
+    action_id = switchboard_charlie.setCoreRipeGovVaultId(
         core_id,
-        sender=lane_env.switchboard.address,
+        sender=lane_env.governance.address,
     )
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    assert switchboard_charlie.executePendingAction(
+        action_id,
+        sender=lane_env.governance.address,
+    )
+    assert lane_env.mission_control.coreRipeGovVaultId() == core_id
 
     amount = 20 * lane_env.scale
     source_before = lane_env.ripe_gov_vault.getTotalAmountForUser(
@@ -312,10 +384,78 @@ def test_locked_settlement_after_user_position_migration_uses_new_core_vault(
     ) == first_payout + second_payout
 
 
-def test_locked_settlement_zero_core_pointer_fails_before_payment(lane_env):
+def test_locked_settlement_rejects_core_vault_without_ripe_support(
+    lane_env,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    lane_env.set_config()
+    lane_env.setup_lock_terms()
+    unsupported_id = registerVault(
+        alternate_ripe_gov_vault,
+        "Unsupported Instant Bond Core",
+    )
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        unsupported_id,
+        sender=lane_env.switchboard.address,
+    )
+
+    amount = lane_env.scale
+    quote = lane_env.quote(amount, 500)
+    before = settlement_snapshot(lane_env)
+    with boa.reverts("vault does not support asset"):
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+        )
+
+    assert settlement_snapshot(lane_env) == before
+
+
+def test_locked_settlement_rejects_non_ripe_gov_core_vault(
+    lane_env,
+    simple_erc20_vault,
+    vault_book,
+    setAssetConfig,
+):
+    lane_env.set_config()
+    lane_env.setup_lock_terms()
+    source_id = lane_env.mission_control.coreRipeGovVaultId()
+    wrong_id = vault_book.getRegId(simple_erc20_vault)
+    assert wrong_id != 0
+    setAssetConfig(lane_env.ripe_token, _vaultIds=[source_id, wrong_id])
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        wrong_id,
+        sender=lane_env.switchboard.address,
+    )
+
+    amount = lane_env.scale
+    quote = lane_env.quote(amount, 500)
+    before = settlement_snapshot(lane_env)
+    wrong_vault_balance_before = lane_env.ripe_token.balanceOf(simple_erc20_vault)
+    with boa.reverts():
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+        )
+
+    assert settlement_snapshot(lane_env) == before
+    assert lane_env.ripe_token.balanceOf(simple_erc20_vault) == wrong_vault_balance_before
+
+
+def test_locked_settlement_zero_core_pointer_fails_before_payment(
+    lane_env,
+    setAssetConfig,
+):
     lane_env.set_config()
     lane_env.setup_lock_terms()
     lane_env.mission_control.eval("self.coreRipeGovVaultId = 0")
+    # This removes Teller's vault-id-zero fallback. Without the lane-local guard the
+    # downstream reason changes to `invalid asset`, so this assertion kills removal
+    # of the guard rather than accepting Lootbox's identical `invalid vault id` text.
+    setAssetConfig(lane_env.ripe_token, _vaultIds=[])
     amount = lane_env.scale
     quote = lane_env.quote(amount, 500)
     before = settlement_snapshot(lane_env)
@@ -332,15 +472,24 @@ def test_locked_settlement_zero_core_pointer_fails_before_payment(lane_env):
     assert settlement_snapshot(lane_env) == before
 
 
-@pytest.mark.parametrize("receipt_bps", [0, 5_000, 15_000])
+@pytest.mark.parametrize(
+    "decimals, receipt_bps",
+    [(6, 0), (6, 5_000), (6, 15_000), (18, 5_000)],
+)
 @pytest.mark.parametrize("requested_lock", [0, 500])
 def test_nonexact_payment_receipt_reverts_every_effect(
     lane_factory,
     charlie_token_whale,
+    decimals,
     receipt_bps,
     requested_lock,
 ):
-    token = boa.loads(NONEXACT_RECEIPT_TOKEN, charlie_token_whale, receipt_bps)
+    token = boa.loads(
+        NONEXACT_RECEIPT_TOKEN,
+        charlie_token_whale,
+        decimals,
+        receipt_bps,
+    )
     ctx = lane_factory(payment_token=token)
     ctx.set_config()
     if requested_lock:
@@ -350,6 +499,61 @@ def test_nonexact_payment_receipt_reverts_every_effect(
     quote = ctx.quote(amount, requested_lock)
     before = settlement_snapshot(ctx)
     with boa.reverts("payment receipt mismatch"):
+        ctx.buy(
+            amount,
+            requested_lock=requested_lock,
+            expected_epoch=quote.epoch,
+        )
+
+    assert settlement_snapshot(ctx) == before
+
+
+@pytest.mark.parametrize("decimals", [6, 18])
+@pytest.mark.parametrize("requested_lock", [0, 500])
+def test_no_return_payment_token_settles_exactly(
+    lane_factory,
+    charlie_token_whale,
+    decimals,
+    requested_lock,
+):
+    token = boa.loads(NO_RETURN_PAYMENT_TOKEN, charlie_token_whale, decimals)
+    ctx = lane_factory(payment_token=token)
+    ctx.set_config()
+    if requested_lock:
+        ctx.setup_lock_terms()
+
+    amount = 10 * ctx.scale
+    quote = ctx.quote(amount, requested_lock)
+    payment_before = token.balanceOf(ctx.endaoment_funds)
+    payout = ctx.buy(
+        amount,
+        requested_lock=requested_lock,
+        expected_epoch=quote.epoch,
+        min_ripe_out=quote.totalRipe,
+    )
+
+    assert payout == quote.totalRipe
+    assert token.balanceOf(ctx.endaoment_funds) == payment_before + amount
+
+
+@pytest.mark.parametrize("decimals", [6, 18])
+@pytest.mark.parametrize("requested_lock", [0, 500])
+def test_false_return_payment_token_reverts_every_effect(
+    lane_factory,
+    charlie_token_whale,
+    decimals,
+    requested_lock,
+):
+    token = boa.loads(FALSE_RETURN_PAYMENT_TOKEN, charlie_token_whale, decimals)
+    ctx = lane_factory(payment_token=token)
+    ctx.set_config()
+    if requested_lock:
+        ctx.setup_lock_terms()
+
+    amount = 10 * ctx.scale
+    quote = ctx.quote(amount, requested_lock)
+    before = settlement_snapshot(ctx)
+    with boa.reverts("payment failed"):
         ctx.buy(
             amount,
             requested_lock=requested_lock,
@@ -530,6 +734,47 @@ def test_repeated_max_lock_purchases_measure_rounding_bonus_and_share_blocks(lan
     assert observed_unlocks[-1] < boa.env.evm.patch.block_number + 1_000
 
 
+def test_accepted_expired_position_max_bonus_dilution_is_pinned(lane_env):
+    lane_env.set_config(maxLockBonus=5_000)
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    prior_amount = 100_000 * 10**18
+    lane_env.ripe_token.transfer(
+        lane_env.ripe_gov_vault,
+        prior_amount,
+        sender=lane_env.ripe_whale,
+    )
+    lane_env.ripe_gov_vault.depositTokensWithLockDuration(
+        lane_env.bob,
+        lane_env.ripe_token,
+        prior_amount,
+        100,
+        sender=lane_env.switchboard.address,
+    )
+    boa.env.time_travel(blocks=101)
+
+    amount = 10 * lane_env.scale
+    quote = lane_env.quote(amount, 1_000)
+    payout = lane_env.buy(
+        amount,
+        requested_lock=1_000,
+        expected_epoch=quote.epoch,
+        min_ripe_out=quote.totalRipe,
+    )
+    final_unlock = lane_env.ripe_gov_vault.userGovData(
+        lane_env.bob,
+        lane_env.ripe_token,
+    ).unlock
+    effective_duration = final_unlock - boa.env.evm.patch.block_number
+
+    assert quote.bonusRatio == 5_000
+    assert quote.bonusRipe == quote.baseRipe // 2
+    assert payout == quote.totalRipe
+    # Owner-accepted inherited RipeGov behavior: a dominant expired position can
+    # dilute a 1,000-block bonus-bearing deposit to the one-block floor (0.1%).
+    assert effective_duration == 1
+    assert effective_duration * 1_000 == quote.actualLock
+
+
 def test_exit_disclosure_and_bad_debt_freeze(lane_env):
     lane_env.set_config()
     amount = lane_env.scale
@@ -556,12 +801,12 @@ def test_exit_disclosure_and_bad_debt_freeze(lane_env):
         min_lock=100,
         max_lock=1_000,
         can_exit=False,
-        exit_fee=900,
+        exit_fee=0,
         freeze_on_bad_debt=False,
     )
     no_exit = lane_env.quote(amount, 500)
     assert not no_exit.canExitEarly
-    assert no_exit.exitFee == 900
+    assert no_exit.exitFee == 0
     assert not no_exit.isExitFrozen
 
     unlocked = lane_env.quote(amount, 0)
@@ -593,9 +838,9 @@ def test_deposit_gates_and_ripe_gov_pause_only_block_locked_path(lane_env):
     locked = lane_env.quote(amount, 500)
     assert locked.available
     paused_snapshot = settlement_snapshot(lane_env)
-    # RH Teller exact-receipt accounting wraps the nested vault call, so the
-    # inner Vyper reason string is no longer exposed by the outer transaction.
-    with boa.reverts():
+    # Teller's outer deposit equality check exposes this stable reason rather than
+    # the nested paused-vault diagnostic.
+    with boa.reverts("deposit failed"):
         lane_env.buy(
             amount,
             requested_lock=500,
