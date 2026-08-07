@@ -243,65 +243,81 @@ committed authority that Section 0.4 says to respect.
 ## Validation
 
 Interpreter `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
-(Python 3.12.0, IPython 9.8.0, pytest 8.4.2, vyper 0.4.3), same machine and same
-private-cache methodology for every baseline and final measurement.
+(Python 3.12.0, IPython 9.8.0, pytest 8.4.2, vyper 0.4.3) on
+Wigglez-MacStudio-2025, same private-cache methodology for every measurement.
+Exact paths, SHA-256 values, timing metadata, and the complete failure
+inventories are in [`validation-evidence.md`](validation-evidence.md).
+
+The authoritative baseline/candidate pair ran in two **`git clone` checkouts**
+rather than worktrees. A concurrent `git worktree remove`/`prune` in the source
+repository cannot reach a clone, which removes the interference that damaged an
+earlier attempt. Each clone's `HEAD` was re-read after every lane and recorded.
 
 ### Suites
 
-| Lane | Baseline `610b43f` | Final `b4f2a95` |
+| Lane | Baseline `610b43f` | Candidate `e74f184` |
 | --- | --- | --- |
-| Lean (default) | 13 failed, 3,205 passed, 278 deselected, 1 xfailed, 25 errors — pytest 934.80s, wall 997.30s, exit 1 | 13 failed, 3,205 passed, 278 deselected, 1 xfailed, 25 errors — pytest 1003.49s, wall 1071.24s, exit 1 |
-| Comprehensive | 34 failed, 4,303 passed, 143 deselected, 1 xfailed, 201 errors — pytest 1627.42s, wall 1780.94s, exit 1 | 34 failed, 4,303 passed, 143 deselected, 1 xfailed, 201 errors — pytest 1607.62s, wall 1749.66s, exit 1 |
+| Lean | 13 failed, 3,205 passed, 278 deselected, 1 xfailed, 25 errors — pytest 987.23s, wall 1052.96s, exit 1 | 13 failed, 3,205 passed, 278 deselected, 1 xfailed, 25 errors — pytest 962.67s, wall 1027.77s, exit 1 |
+| Comprehensive | 36 failed, 4,301 passed, 143 deselected, 1 xfailed, 201 errors — pytest 1650.20s, wall 1791.01s, exit 1 | 36 failed, 4,301 passed, 143 deselected, 1 xfailed, 201 errors — pytest 1622.63s, wall 1768.99s, exit 1 |
 
 **Normalized failure/error identity diff: zero new identities in both lanes, and
-zero identities lost.** Lean 38 → 38, comprehensive 235 → 235. Both baseline sets
-were cross-checked against their terminal `FAILED`/`ERROR` node IDs and reconcile
-exactly (the comprehensive terminal writer truncates parametrized IDs containing
-spaces; those reconcile by prefix).
+zero lost.** Lean 38 → 38, comprehensive 237 → 237, collection identical
+(3,244 lean / 4,539 comprehensive).
 
-Neither lane is green, at baseline or at final. The 38 lean identities are 13
-pre-existing failures plus 25 `tests/priceSources/blueChip/test_bluechip_morpho_v2.py`
-errors. This cleanup neither fixed nor introduced any of them.
+Four independent comprehensive runs across two checkout mechanisms, three
+candidate commits, and five checkouts all agree; every pair measured with a
+consistent mechanism yields zero drift. The 235-vs-237 difference between
+worktree and clone runs is fully diagnosed in `validation-evidence.md`: two
+`test_defaults_robinhood` tests shell out to Git for historical commits that a
+clone does not copy, and both pass at both commits once those objects are
+restored.
 
-### Gates at final, from the clean committed validation checkout
+Neither lane is green, at baseline or candidate. The 176 comprehensive
+`test_block_clock_inventory` errors are one pre-existing cause — its session
+fixture copies every path pinned by `config/block-clock-inventory.json`, and
+three pinned paths do not exist at the baseline commit. This cleanup neither
+fixed nor introduced any of them.
 
-| Gate | Result |
-| --- | --- |
-| `scripts/check_contract_artifacts.py` | `CONTRACT_ARTIFACTS_OK` — no retained production-artifact drift |
-| ABI export parity (`test_abi_export.py`) | GREEN, 9/9 — exactly 52 checked-in ABIs retained |
-| Dependency-security gate | GREEN, 45/45 |
-| Contract artifact inventory | GREEN, 41/41 |
-| Current-manifest promotion | GREEN, 62/62 |
-| Network profiles | GREEN, 31/31 |
-| Base profile regression | GREEN, 19/19 |
-| Robinhood blueprint census | GREEN, 79/79 |
-| Manifest schema | 85/86, the single failure pre-existing |
-| BluePrint stock M4 HEAD census | 29/37, all 8 failures pre-existing |
-| `tests.constants` import smoke | Migrations and `scripts/params/params_utils.py` still resolve it |
-| `git diff --check` | Clean |
-| `python-tests.yml` YAML parse, retained paths, pinned actions | Valid; all four actions pinned to 40-hex SHAs |
+Terminal `FAILED`/`ERROR` node IDs were cross-checked against the JUnit sets. The
+lean lane matches exactly, 38 = 38. The comprehensive terminal writer truncates
+parametrized IDs containing spaces, so six JUnit identities map onto four
+truncated terminal prefixes; those four were reconciled by prefix match rather
+than exact equality, which is weaker evidence than the lean lane's exact match.
 
-The workflow was **not dispatched**. The branch is not pushed, so no GitHub
-Actions run was observed and no CI result is claimed.
+### Gates at the candidate tip
+
+`scripts/check_contract_artifacts.py` reports `CONTRACT_ARTIFACTS_OK` — no
+retained production-artifact drift. ABI export parity (52 outputs), the
+dependency-security gate, contract artifact inventory, current-manifest
+promotion, network profiles, base profile regression, the Robinhood blueprint
+census, and the offline fork suite are all GREEN. The full table, including the
+gates carrying pre-existing failures, is in `validation-evidence.md`.
+
+The Python workflow was **not dispatched**. The branch is unpushed, so no CI
+result is claimed.
 
 ### Benchmarks (process wall time from `/usr/bin/time -p`, authoritative)
 
-| Target | Baseline cold | Final cold | Baseline warm | Final warm | Warm change |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `tests/tokens` | 148.28s | 135.92s | 57.54s | 54.76s | −4.8% |
-| `tests/data/test_mission_control.py` | 149.17s | 138.34s | 56.10s | 56.59s | +0.9% |
+Matched pair, both sets measured in clone checkouts on an otherwise idle machine:
 
-pytest-reported durations, same order: 126.38 → 115.93 and 36.15 → 35.05;
-129.43 → 118.51 and 37.05 → 37.72. Both targets pass (82 and 83 tests). Each run
-used a fresh private runtime root, so the first run is cold for both bytecode and
-Boa artifacts and the immediate rerun measures both warm. No warm regression
-exceeds the ±10% rule.
+| Target | Baseline warm | Candidate warm | Change |
+| --- | ---: | ---: | ---: |
+| `tests/tokens` | 55.41s | 55.78s | +0.7% |
+| `tests/data/test_mission_control.py` | 57.18s | 54.05s | −5.5% |
+
+Cold times moved −2.0% and −1.9%. No warm regression approaches the ±10% rule.
+Per-run `user`/`sys`, pytest durations, exit codes, runtime-root paths, and log
+hashes are in `validation-evidence.md`.
+
+An earlier candidate benchmark set was **discarded**: a stray retry loop that a
+`pkill` failed to stop was running full suites concurrently, so it did not match
+the quiet-machine baseline methodology.
 
 ### Socket-purity gate (pass/fail, not a timing benchmark)
 
 `tests/clock/test_clock_profiles.py` with `socket.socket` patched to raise:
-**57 passed** at baseline and 57 passed at final. Lazy port allocation inside the
-`anvil()` factory is preserved; the pure clock subtree binds no socket.
+**57 passed** at both `610b43f` and `e74f184`. Lazy port allocation inside the
+`anvil()` factory is preserved.
 
 ## Tests not run, and why
 
@@ -335,3 +351,13 @@ exceeds the ±10% rule.
   the baseline with three codes, and three of its 160 pinned paths were already
   missing. This cleanup did not touch that; it is why the block-clock package
   could not be retired.
+- **Tests depending on unreachable Git objects.** Two `test_defaults_robinhood`
+  tests shell out for commits `0f79b626…` (reachable only from
+  `refs/remotes/origin/rh-deploy`) and `74c4120f…` (unreachable from any ref,
+  surviving on gc grace). Both fail on any fresh clone and would fail after a
+  `git gc`. Pre-existing, unrelated to this cleanup, and worth a separate fix.
+- **Concurrent repository activity.** The owner was working in this repository
+  throughout: `rh` moved `610b43f` → `be6e4e9` and several worktrees were created
+  and swept, one of which destroyed an early reference checkout mid-run. Per plan
+  Section 14.2 the branch stayed bound to the exact baseline and was not rebased.
+  A landing decision should account for `rh` having advanced.
