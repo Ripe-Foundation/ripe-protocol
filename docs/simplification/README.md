@@ -13,28 +13,47 @@ from Git history at the baseline commit.
 
 ## Commit series
 
-| Commit | Train |
+| Commit | Content |
 | --- | --- |
 | `56b6100` | Train 1 — bind the plan, verify the integrated speed foundation (no-change verification) |
 | `51616b9` | Train 2 — extract deployment step manifests and the parked RH dashboard |
-| `b4f2a95` | Final fixes — record the extraction in the live status authority |
+| `b4f2a95` | Record the step-manifest extraction in the live status authority |
+| `61ec63d` | First implementation report |
+| *(see [`validation-evidence.md`](validation-evidence.md))* | Review remediation: RH-D020 supersession, corrected metrics, evidence packet, complete retained-document list |
 
 Train 3 produced no commit; every candidate was blocked by a retained consumer
 or a committed authority. See **De-scopes** below.
 
-Commits are unsigned. The sandbox this ran in denies access to `~/.gnupg`, and
-reaching for the owner's signing key was not appropriate for an automated run.
-The landing owner can re-sign at integration.
+The exact delivered tip, the tip each measurement is bound to, and every
+evidence path with its SHA-256 are recorded in
+[`validation-evidence.md`](validation-evidence.md). That document is the
+authoritative evidence inventory; this one is the narrative report.
+
+Commits are unsigned because the sandbox denies access to `~/.gnupg`. Signing was
+not a plan requirement; the landing owner can re-sign at integration.
 
 ## Before / after
 
-| Measure | Baseline `610b43f` | Final `b4f2a95` | Change |
+Tracked-line counts move by a few hundred with each report revision because this
+document is itself tracked. [`validation-evidence.md`](validation-evidence.md)
+records the exact figure for every commit in the series; the table below is bound
+to the commits named in its header.
+
+| Measure | Baseline `610b43f` | Delivered tip | Change |
 | --- | ---: | ---: | ---: |
 | Tracked files | 678 | 588 | −90 |
-| Tracked lines | 3,445,736 | 615,611 | −2,830,125 (−82.1%) |
+| Tracked lines | 3,445,736 | see `validation-evidence.md` (≈615,900) | ≈−82.1% |
 | Working-tree bytes (excl. `.git`) | 162,472 KB | 26,688 KB | −83.6% |
 
-| Area | Baseline files / lines | Final files / lines |
+The file count is stable across the series at 588. Only `docs/simplification/`
+report text changes between the last commits, and no test, script, config, or
+scanner reads that directory — proven in `validation-evidence.md`.
+
+Per-area figures below are measured at `b4f2a95`, the last commit that changed
+anything outside `docs/simplification/`; only this report's own line count moves
+after it.
+
+| Area | Baseline `610b43f` files / lines | At `b4f2a95` files / lines |
 | --- | ---: | ---: |
 | `migration_history/` | 68 / 2,957,627 | 2 / 146,579 |
 | `tests/` | 170 / 149,889 | 170 / 149,894 |
@@ -48,7 +67,7 @@ The landing owner can re-sign at integration.
 
 Against the non-binding Section 10 projection (roughly 500,000–575,000 lines and
 470–590 files): the file count lands inside the range at 588; the line count is
-615,611, about 40,600 above the top of the projected zone. The gap is entirely
+about 615,900, roughly 40,900 above the top of the projected zone. The gap is entirely
 accounted for by two documented de-scopes — the block-clock process package
 (23,184 projected lines) and the provisional 40,000–70,000 "other completed
 docs" range, which the reverse-reference scan did not support. Section 10 states
@@ -151,8 +170,11 @@ consumer. `scripts/export_abis.py` excludes `contracts/mock/` and
 
 ## Document disposition
 
-126 of 149 documents are retained. The 23 removed non-dashboard-adjacent
-documents are exactly the dashboard application's own files.
+149 baseline documents − 26 removed + 3 added = **126 retained**. All 26 removed
+files are the dashboard application's own files; nothing else under `docs/` was
+deleted. The 3 added are this report, the extraction manifest, and the tracked
+plan copy. The complete retained list is in
+[`validation-evidence.md`](validation-evidence.md).
 
 **Runtime-read documents, all retained** (found by the required reverse-reference
 scan over `tests/`, `scripts/`, `config/`, `migrations/`, `.github/` for literal
@@ -295,11 +317,14 @@ exceeds the ±10% rule.
 
 ## Residual risks and follow-ups
 
-- **RH-D018 tension.** The decision register ratified keeping the dashboard under
-  `docs/chains/rh/dashboard/` "during the current handoff phase". The plan
-  (Sections 1.1, 4.2, 10) explicitly directs its removal, and `status.yaml`
-  records publication as parked. The extraction is recorded as a current overlay
-  rather than a revocation. **This is an owner ratification decision.**
+- **RH-D018 is resolved, not deferred.** The owner ratified superseding its
+  repository-placement clause on 2026-08-07. `RH-D020 — The dashboard is
+  extracted from the active tree` now carries that authority in the decision
+  register, `status.yaml` mirrors it in the `decisions` list and in
+  `dashboard_governance`, and register/`status.yaml` identifier-and-title parity
+  was verified programmatically (23 = 23, no mismatches). The RH-D018
+  dependency-scope boundary and the RH-D019 parked publication posture are
+  unchanged, and no Sites action is authorized.
 - **Deployment CLI defects** recorded in
   `robinhood-deployment-support-specification.md` are untouched and out of scope
   by Section 2.4. They remain a separate deployment-owner task.

@@ -293,7 +293,10 @@ deployment, promotion, activation, production use, or release.
 
 **Status:** Owner-ratified for the current handoff repository shape on 27 July
 2026, against exact candidate commit
-`330916b03d939c62bb8b05fc51691a2dbc70948f`.
+`330916b03d939c62bb8b05fc51691a2dbc70948f`. **Its repository-placement clause is
+superseded by [RH-D020](#rh-d020--the-dashboard-is-extracted-from-the-active-tree)
+on 7 August 2026.** The dependency-scope and H-01 isolation clauses below remain
+in force.
 
 Keep the self-contained dashboard application under
 `docs/chains/rh/dashboard/` during the current handoff phase. Co-locating it
@@ -322,16 +325,36 @@ Path-scoped CI must run the dashboard build, integrity tests, and lint whenever
 changes. This workflow is a post-push backstop and manual verification surface,
 not a substitute for the required local validation or explicit merge authority.
 
-**Current overlay.** The RH codebase simplification pass extracted the dashboard
-application and its `rh-handoff-dashboard.yml` workflow from the active tree
-while publication remained parked, so no path-scoped dashboard CI currently
-exists. The historical ratification above is preserved and is not revoked; the
-directory boundary stayed clean, which is what made the extraction a pure
-removal. All 27 files remain recoverable from
-`610b43f4508e85628a1362532a79d68d71ea902c`, with per-file blob IDs and SHA-256
-values in [`extracted-files.tsv`](../../simplification/extracted-files.tsv).
-Reinstating the dashboard in the repository, or moving it to its own home, is an
-owner decision that this overlay does not make.
+**Superseded in part.** The repository-placement clause above — "keep the
+self-contained dashboard application under `docs/chains/rh/dashboard/`" — and its
+path-scoped CI requirement are superseded by RH-D020. Everything else in RH-D018,
+including the dependency-scope boundary and the rule that no dashboard package
+state can affect an H-01 disposition, remains in force.
+
+### RH-D020 — The dashboard is extracted from the active tree
+
+**Status:** Owner-ratified on 7 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification` on baseline
+`610b43f4508e85628a1362532a79d68d71ea902c`.
+
+The self-contained dashboard application and its `rh-handoff-dashboard.yml`
+workflow are removed from the active tree. This supersedes the RH-D018
+repository-placement clause and its path-scoped CI requirement: there is no
+dashboard build, integrity-test, or lint job in this repository, and
+`docs/chains/rh/**` changes trigger no workflow.
+
+All 27 files remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c`, with per-file Git mode, blob ID, byte
+length, and SHA-256 in
+[`extracted-files.tsv`](../../simplification/extracted-files.tsv). Restoration is
+a Git checkout of that commit and requires no reconstruction.
+
+This decision changes repository placement only. It does not revoke the RH-D018
+dependency-scope boundary, does not alter the RH-D019 publication posture — Sites
+recovery, dashboard deployment, and access changes stay parked and nonblocking —
+and does not authorize any Sites action. [`status.yaml`](status.yaml) is
+unaffected as the sole machine-readable current-status authority; it was never
+part of the dashboard directory.
 
 ### RH-D019 — Private dashboard is a temporary presentation mirror
 
