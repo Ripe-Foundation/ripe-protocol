@@ -38,6 +38,7 @@ exports: (
     vaultData.doesVaultHaveAnyFunds,
     vaultData.getNumUserAssets,
     vaultData.getNumVaultAssets,
+    vaultData.pause,
 )
 exports: (
     stabVault.claimableBalances,
@@ -45,7 +46,6 @@ exports: (
     stabVault.claimableAssets,
     stabVault.indexOfClaimableAsset,
     stabVault.numClaimableAssets,
-    stabVault.noPriceQuarantineCount,
     stabVault.swapForLiquidatedCollateral,
     stabVault.swapWithClaimableGreen,
     stabVault.claimFromStabilityPool,
@@ -91,24 +91,11 @@ event StabilityPoolTransfer:
     isFromUserDepleted: bool
     transferShares: uint256
 
-event VaultPauseModified:
-    isPaused: bool
-
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     vaultData.__init__(False)
     stabVault.__init__()
-
-
-@external
-def pause(_shouldPause: bool):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert _shouldPause != vaultData.isPaused # dev: no change
-    if not _shouldPause:
-        assert stabVault.noPriceQuarantineCount == 0 # dev: unresolved no-price quarantine
-    vaultData.isPaused = _shouldPause
-    log VaultPauseModified(isPaused=_shouldPause)
 
 
 ########

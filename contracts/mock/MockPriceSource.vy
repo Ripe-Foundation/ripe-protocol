@@ -20,6 +20,9 @@ import contracts.modules.TimeLock as timeLock
 import interfaces.PriceSource as PriceSource
 
 price: public(HashMap[address, uint256])
+# Test-only: makes this source revert for one asset, so the PriceDesk
+# source-failure path can be exercised. Defaults to False everywhere.
+shouldRevert: public(HashMap[address, bool])
 
 
 @deploy
@@ -35,6 +38,11 @@ def __init__(
 
 
 # MOCK CONFIG
+
+
+@external
+def setShouldRevert(_asset: address, _shouldRevert: bool):
+    self.shouldRevert[_asset] = _shouldRevert
 
 
 @external
@@ -68,12 +76,14 @@ def addPriceSnapshot(_asset: address) -> bool:
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
+    assert not self.shouldRevert[_asset] # dev: mock price source reverted
     return self.price[_asset]
 
 
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
+    assert not self.shouldRevert[_asset] # dev: mock price source reverted
     price: uint256 = self.price[_asset]
     return price, priceData.indexOfAsset[_asset] != 0
 

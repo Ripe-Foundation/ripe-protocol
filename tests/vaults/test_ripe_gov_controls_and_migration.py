@@ -1,7 +1,8 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -1556,6 +1557,7 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
     bob,
     teller,
     ledger,
+    lootbox,
     switchboard_alpha,
     switchboard_echo,
     mission_control,
@@ -1576,7 +1578,9 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
         setGeneralConfig=setGeneralConfig,
         switchboard_alpha=switchboard_alpha,
     )
-    ledger.removeVaultFromUserForMigration(
+    # migration cleanup now routes through Lootbox, which is the only contract Ledger
+    # authorizes to remove a user's vault participation
+    lootbox.removeVaultFromUserForMigration(
         bob,
         SOURCE_VAULT_ID,
         sender=teller.address,
@@ -2328,7 +2332,7 @@ def test_actual_hr_contributor_position_migrates_with_points_and_lock(
     assert ledger.isParticipatingInVault(contributor, target_id)
 
 
-def test_echo_disable_validator_returns_false_instead_of_reverting(
+def test_echo_disable_validator_reverts_for_wrong_vault_interface(
     switchboard_echo,
     ripe_gov_vault,
     simple_erc20_vault,
@@ -2340,7 +2344,8 @@ def test_echo_disable_validator_returns_false_instead_of_reverting(
     assert ripe_gov_id == SOURCE_VAULT_ID
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(0, bob) is False
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(999, bob) is False
-    assert switchboard_echo.isValidRipeGovPointAccrualDisable(simple_vault_id, bob) is False
+    with boa.reverts():
+        switchboard_echo.isValidRipeGovPointAccrualDisable(simple_vault_id, bob)
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(ripe_gov_id, bob) is True
 
 
@@ -2648,3 +2653,990 @@ def test_echo_batch_is_governance_only_nonempty_and_atomic(
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
     assert target.getTotalAmountForUser(bob, ripe_token) == 0
     assert not ripe_gov_vault.positionMigratedOut(bob, ripe_token)
+
+
+############################################################################
+# WP1 (Section 8.1/8.2/9.4): RipeGov privileged-caller, lock, and pause matrix
+#
+# Written against the bound RH baseline before any owner disposition of
+# RH-CHANGE-01, GOV-WEIGHT-01, or RG-SIZE-01. Each finding gets a plain
+# PASSING characterization of the exact behavior that exists today plus a
+# strict-xfail HARDENING test stating the invariant the plan wants.
+#
+# Every caller, action, and boundary is an INDEPENDENT parametrized node. A
+# loop inside one strict-xfail would stop at its first unexpected success and
+# silently leave the rest of the matrix unexecuted, so the matrix would not
+# actually be covered. The Section 6.1(B) expected-red table lists these node
+# IDs individually.
+#
+# The strict xfails are preserved test-only checkpoints: remove the xfail (and
+# require the plain test to pass) if the owner approves the corresponding
+# production change, or delete it in favour of the characterization alone if
+# the owner records an accepted residual risk.
+############################################################################
+
+
+# Registered RIPE addresses that are NOT Teller. Work Package 0 found Teller to
+# be the only production caller of depositTokensWithLockDuration / adjustLock /
+# releaseLock (contracts/core/Teller.vy:338, :826, :843). Every entry below is
+# accepted today purely because addys._isValidRipeAddr returns True for it.
+REGISTERED_NON_TELLER_CALLERS = (
+    "auction_house",
+    "credit_engine",
+    "human_resources",
+    "lootbox",
+    "bond_room",
+    "switchboard_alpha",
+    "switchboard_bravo",
+    "switchboard_charlie",
+    "switchboard_delta",
+    "switchboard_echo",
+    "stability_pool",
+    "other_vault_simple",
+    "other_vault_rebase",
+)
+
+UNREGISTERED_CALLERS = ("alice", "sally", "mock_rando_contract")
+
+
+def _gov_state_snapshot(vault, ripe_token, users):
+    """Complete observable RipeGov state for the users under test.
+
+    Covers every field Section 8.1 requires to be unchanged for a rejected
+    caller: token custody, user and total shares, lastShares, lock duration and
+    unlock time, user and global points, fee balances (the vault's own share
+    balance, which releaseLock burns into), and timestamps/checkpoints.
+    """
+    state = {
+        "vault_custody": ripe_token.balanceOf(vault.address),
+        "total_shares": vault.totalBalances(ripe_token),
+        "total_gov_points": vault.totalGovPoints(),
+        "num_vault_assets": vault.numAssets(),
+        "gov_disabled_block": vault.govPointAccrualDisabledBlock(),
+    }
+    for user in users:
+        data = vault.userGovData(user, ripe_token)
+        state[user] = (
+            vault.userBalances(user, ripe_token),
+            vault.getTotalAmountForUser(user, ripe_token),
+            data.govPoints,
+            data.lastShares,
+            data.lastPointsUpdate,
+            data.unlock,
+            tuple(data.lastTerms),
+            vault.totalUserGovPoints(user),
+            vault.numUserAssets(user),
+            vault.indexOfUserAsset(user, ripe_token),
+            vault.positionMigratedOut(user, ripe_token),
+            vault.getUserLootBoxShare(user, ripe_token),
+            ripe_token.balanceOf(user),
+        )
+    return state
+
+
+@pytest.fixture
+def registered_non_teller_callers(
+    auction_house,
+    credit_engine,
+    human_resources,
+    lootbox,
+    bond_room,
+    switchboard_alpha,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_delta,
+    switchboard_echo,
+    stability_pool,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+):
+    return {
+        "auction_house": auction_house,
+        "credit_engine": credit_engine,
+        "human_resources": human_resources,
+        "lootbox": lootbox,
+        "bond_room": bond_room,
+        "switchboard_alpha": switchboard_alpha,
+        "switchboard_bravo": switchboard_bravo,
+        "switchboard_charlie": switchboard_charlie,
+        "switchboard_delta": switchboard_delta,
+        "switchboard_echo": switchboard_echo,
+        "stability_pool": stability_pool,
+        "other_vault_simple": simple_erc20_vault,
+        "other_vault_rebase": rebase_erc20_vault,
+    }
+
+
+@pytest.fixture
+def unregistered_callers(alice, sally, mock_rando_contract):
+    return {
+        "alice": alice,
+        "sally": sally,
+        "mock_rando_contract": mock_rando_contract.address,
+    }
+
+
+@pytest.fixture
+def gov_position(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """Bob holds a 100 RIPE unlocked RipeGov position; returns the amount."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, amount, teller)
+    return amount
+
+
+@pytest.fixture
+def locked_gov_position(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_bravo,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """Bob holds a 100 RIPE position locked for 1,000 blocks."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        amount,
+        teller,
+        lock_duration=1_000,
+        switchboard=switchboard_bravo,
+    )
+    return amount
+
+
+# --------------------------------------------------------------------------
+# DV-01/02/03 negative half -- already correct on the bound baseline
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("caller_name", UNREGISTERED_CALLERS)
+@pytest.mark.parametrize(
+    "method", ("depositTokensWithLockDuration", "adjustLock", "releaseLock", "updateUserGovPoints")
+)
+def test_unregistered_gov_privileged_call_is_rejected_and_fully_atomic(
+    caller_name,
+    method,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    alice,
+    unregistered_callers,
+    gov_position,
+):
+    """Section 8.1: nothing moves for a rejected caller. Passes on the baseline."""
+    boa.env.time_travel(blocks=10)
+    caller = unregistered_callers[caller_name]
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice])
+
+    with boa.reverts("no perms"):
+        if method == "depositTokensWithLockDuration":
+            ripe_gov_vault.depositTokensWithLockDuration(
+                alice, ripe_token, gov_position, 1_000, sender=caller
+            )
+        elif method == "adjustLock":
+            ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=caller)
+        elif method == "releaseLock":
+            ripe_gov_vault.releaseLock(bob, ripe_token, sender=caller)
+        else:
+            ripe_gov_vault.updateUserGovPoints(bob, sender=caller)
+
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice]) == before
+
+
+# --------------------------------------------------------------------------
+# DV-01: registered non-Teller can mint governance shares from existing custody
+# --------------------------------------------------------------------------
+
+
+def test_registered_non_teller_mints_gov_shares_from_existing_custody(
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    alice,
+    switchboard_bravo,
+    gov_position,
+):
+    """DV-01 characterization (SV-1, SV-4).
+
+    depositTokensWithLockDuration accepts any addys._isValidRipeAddr caller and
+    SharesVault mints against the vault's *current* token balance rather than a
+    receipt proven in this transaction. A registered non-Teller contract can
+    therefore mint shares for an arbitrary beneficiary against custody already
+    attributed to another user, while moving no tokens at all.
+    """
+    custody_before = ripe_token.balanceOf(ripe_gov_vault.address)
+    bob_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == gov_position
+    assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
+
+    # The attacker sends no tokens to the vault.
+    minted = ripe_gov_vault.depositTokensWithLockDuration(
+        alice, ripe_token, MAX_UINT256, 1_000, sender=switchboard_bravo.address
+    )
+
+    assert minted == gov_position
+    assert ripe_token.balanceOf(ripe_gov_vault.address) == custody_before
+
+    alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
+    assert alice_shares > bob_shares_before * 10**19  # near-total dilution
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) >= gov_position - 1
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+    # Alice also receives an attacker-chosen lock she never asked for.
+    assert ripe_gov_vault.userGovData(alice, ripe_token).unlock == (
+        boa.env.evm.patch.block_number + 1_000
+    )
+
+
+@pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-01: RipeGov.depositTokensWithLockDuration still uses the broad "
+    "addys._isValidRipeAddr predicate; least-privilege fix is gated on RH-CHANGE-01",
+)
+def test_registered_non_teller_cannot_mint_gov_shares_from_existing_custody(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    alice,
+    registered_non_teller_callers,
+    gov_position,
+):
+    """DV-01 hardening target (SV-1, SV-4). One node per registered caller."""
+    caller = registered_non_teller_callers[caller_name]
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice])
+
+    with boa.reverts():
+        ripe_gov_vault.depositTokensWithLockDuration(
+            alice, ripe_token, MAX_UINT256, 1_000, sender=caller.address
+        )
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob, alice]) == before
+
+
+# --------------------------------------------------------------------------
+# DV-02: registered non-Teller can adjust another user's lock
+# --------------------------------------------------------------------------
+
+
+def test_registered_non_teller_adjusts_another_users_lock(
+    ripe_gov_vault, ripe_token, bob, stability_pool, gov_position
+):
+    """DV-02 characterization (SV-4, RG-4).
+
+    An unrelated registered contract -- here the StabilityPool, which has no
+    production reason to touch governance locks -- can extend Bob's lock.
+    """
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+
+    ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=stability_pool.address)
+
+    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock_after == boa.env.evm.patch.block_number + 1_000
+    assert unlock_after > unlock_before
+
+
+@pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-02: RipeGov.adjustLock still uses the broad addys._isValidRipeAddr "
+    "predicate; least-privilege fix is gated on RH-CHANGE-01",
+)
+def test_registered_non_teller_cannot_adjust_another_users_lock(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    registered_non_teller_callers,
+    gov_position,
+):
+    """DV-02 hardening target (SV-4, RG-4). One node per registered caller."""
+    caller = registered_non_teller_callers[caller_name]
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+
+    with boa.reverts():
+        ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=caller.address)
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
+
+
+# --------------------------------------------------------------------------
+# DV-03: registered non-Teller can release another user's lock and burn the fee
+# --------------------------------------------------------------------------
+
+
+def test_registered_non_teller_releases_another_users_lock_and_burns_exit_fee(
+    ripe_gov_vault, ripe_token, bob, stability_pool, locked_gov_position
+):
+    """DV-03 characterization (SV-4, RG-4).
+
+    releaseLock charges the configured exit fee out of the victim's shares and
+    clears the lock. An unrelated registered contract can force this on a user
+    who never asked to exit early.
+    """
+    shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock_before > boa.env.evm.patch.block_number
+
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=stability_pool.address)
+    logs = filter_logs(ripe_gov_vault, "LockReleased")
+
+    # LOCK_TERMS exit fee is 10.00%.
+    expected_removed = shares_before * LOCK_TERMS[4] // 100_00
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == shares_before - expected_removed
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert logs[0].exitFee == LOCK_TERMS[4]
+
+
+@pytest.mark.parametrize("caller_name", REGISTERED_NON_TELLER_CALLERS)
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-03: RipeGov.releaseLock still uses the broad addys._isValidRipeAddr "
+    "predicate; least-privilege fix is gated on RH-CHANGE-01",
+)
+def test_registered_non_teller_cannot_release_another_users_lock(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    registered_non_teller_callers,
+    locked_gov_position,
+):
+    """DV-03 hardening target (SV-4, RG-4). One node per registered caller."""
+    caller = registered_non_teller_callers[caller_name]
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+
+    with boa.reverts():
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=caller.address)
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
+
+
+# --------------------------------------------------------------------------
+# DV-04: same-address transferBalanceWithinVault is not a no-op
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
+def test_gov_same_user_zero_amount_transfer_reverts_without_state_change(
+    caller_name,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    auction_house,
+    credit_engine,
+    locked_gov_position,
+    switchboard_alpha,
+):
+    """DV-04 boundary: the zero-amount same-address case already fails closed.
+
+    SharesVault._calcWithdrawalSharesAndAmount asserts a nonzero withdrawal
+    amount, so this corner of the Section 8.2 matrix is safe today. It is a
+    plain passing regression, not a checkpoint.
+    """
+    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
+    boa.env.time_travel(blocks=50)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+
+    with boa.reverts("no withdrawal amount"):
+        ripe_gov_vault.transferBalanceWithinVault(
+            ripe_token, bob, bob, 0, sender=caller.address
+        )
+
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
+
+
+@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
+@pytest.mark.parametrize("portion", ("partial", "full"))
+def test_gov_same_user_transfer_mutates_lock_and_points(
+    caller_name,
+    portion,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    auction_house,
+    credit_engine,
+    locked_gov_position,
+    switchboard_alpha,
+):
+    """DV-04 characterization (RG-5).
+
+    RipeGov.transferBalanceWithinVault has no owner-equals-recipient guard. The
+    AuctionHouse and CreditEngine paths run the full withdrawal-then-deposit
+    governance bookkeeping against a single user, so a same-address move burns
+    the proportional point penalty and re-weights the unlock toward the
+    configured minimum lock duration instead of being a no-op.
+
+    A full same-address transfer destroys the user's entire point balance:
+    _handleGovDataOnWithdrawal reduces all points when the moved shares equal
+    lastShares, and transferBalanceWithinVault passes _shouldTransferPoints
+    False, so nothing is credited back.
+    """
+    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
+    amount = locked_gov_position if portion == "full" else locked_gov_position // 4
+
+    boa.env.time_travel(blocks=50)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+    points_before = ripe_gov_vault.userGovData(bob, ripe_token).govPoints
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    assert points_before > 0
+
+    ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token, bob, bob, amount, sender=caller.address
+    )
+
+    after = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+    assert after != before
+
+    data = ripe_gov_vault.userGovData(bob, ripe_token)
+    # Shares are conserved (out and straight back in) ...
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == shares_before
+    # ... but points were burned and the unlock was re-weighted down.
+    assert data.govPoints < points_before
+    assert data.unlock < unlock_before
+    if portion == "full":
+        assert data.govPoints == 0
+        assert ripe_gov_vault.totalUserGovPoints(bob) == 0
+
+
+@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
+@pytest.mark.parametrize("portion", ("partial", "full"))
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-04: RipeGov has no same-address short-circuit in "
+    "transferBalanceWithinVault; the Section 9.2 guard is gated on RH-CHANGE-01",
+)
+def test_gov_same_user_transfer_is_complete_noop(
+    caller_name,
+    portion,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    auction_house,
+    credit_engine,
+    locked_gov_position,
+    switchboard_alpha,
+):
+    """DV-04 hardening target (RG-5). One node per caller and per portion."""
+    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
+    amount = locked_gov_position if portion == "full" else locked_gov_position // 4
+
+    boa.env.time_travel(blocks=50)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+
+    ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token, bob, bob, amount, sender=caller.address
+    )
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
+
+
+def test_gov_transfer_to_a_different_user_still_moves_shares(
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    alice,
+    auction_house,
+    locked_gov_position,
+):
+    """Section 8.2 control: the non-same-address case must keep working.
+
+    Guards against a Section 9.2 fix that over-reaches and breaks the real
+    AuctionHouse seizure path.
+    """
+    bob_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
+
+    ripe_gov_vault.transferBalanceWithinVault(
+        ripe_token, bob, alice, locked_gov_position // 2, sender=auction_house.address
+    )
+
+    assert ripe_gov_vault.userBalances(alice, ripe_token) > 0
+    assert ripe_gov_vault.userBalances(bob, ripe_token) < bob_shares_before
+
+
+# --------------------------------------------------------------------------
+# DV-05: contributor lock duration is not clamped to governance bounds
+# --------------------------------------------------------------------------
+
+
+def test_contributor_transfer_shortens_recipient_lock_below_minimum(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    switchboard_bravo,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """DV-05 characterization (RG-4).
+
+    RipeGov.transferContributorRipeTokens forwards the contributor's configured
+    depositLockDuration straight into _getWeightedLockOnTokenDeposit without
+    clamping it to the governance lock bounds. A large contributor payout with
+    a short (or zero) configured duration therefore drags the recipient's
+    existing unlock down, and the result can land below minLockDuration.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
+
+    # Recipient holds a small position at the maximum lock.
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        10 * EIGHTEEN_DECIMALS,
+        teller,
+        lock_duration=max_lock,
+        switchboard=switchboard_bravo,
+    )
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock_before == boa.env.evm.patch.block_number + max_lock
+
+    # Contributor holds a much larger position.
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 1_000 * EIGHTEEN_DECIMALS, teller
+    )
+
+    # Contributor payout carries a 1-block lock duration -- far below min_lock.
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, 1, sender=human_resources.address
+    )
+
+    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    remaining = unlock_after - boa.env.evm.patch.block_number
+    assert unlock_after < unlock_before
+    assert remaining < min_lock  # the unclamped duration wins the weighted average
+    assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-05: contributor lock duration is still unclamped in "
+    "RipeGov._handleGovDataOnTransfer; the Section 9.3 fix is gated on RH-CHANGE-01",
+)
+def test_contributor_transfer_cannot_shorten_existing_lock(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    switchboard_bravo,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """DV-05 hardening target (RG-4, Section 9.3)."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    max_lock = LOCK_TERMS[1]
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        10 * EIGHTEEN_DECIMALS,
+        teller,
+        lock_duration=max_lock,
+        switchboard=switchboard_bravo,
+    )
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 1_000 * EIGHTEEN_DECIMALS, teller
+    )
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, 1, sender=human_resources.address
+    )
+
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock >= unlock_before
+
+
+# Section 8.2 boundary set, split by whether the clamp invariant already holds.
+# A raw duration that happens to sit inside [minLockDuration, maxLockDuration]
+# trivially satisfies the clamp, so only the out-of-bounds boundaries are
+# checkpoints. Keeping them in one loop would have hidden that distinction.
+CONTRIBUTOR_DURATIONS_IN_BOUNDS = (
+    ("at_min", LOCK_TERMS[0]),
+    ("ordinary", (LOCK_TERMS[0] + LOCK_TERMS[1]) // 2),
+    ("at_max", LOCK_TERMS[1]),
+)
+CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS = (
+    ("zero", 0),
+    ("one", 1),
+    ("below_min", LOCK_TERMS[0] - 1),
+    ("above_max", LOCK_TERMS[1] + 1),
+    ("far_above_max", LOCK_TERMS[1] * 10),
+)
+CONTRIBUTOR_DURATIONS = CONTRIBUTOR_DURATIONS_IN_BOUNDS + CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS
+
+
+@pytest.mark.parametrize(
+    "duration", [d for _label, d in CONTRIBUTOR_DURATIONS], ids=[l for l, _d in CONTRIBUTOR_DURATIONS]
+)
+def test_contributor_duration_lands_unclamped_on_a_fresh_recipient(
+    duration,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """DV-05 characterization at every Section 8.2 duration boundary.
+
+    With no prior recipient balance, _getWeightedLockOnTokenDeposit returns
+    block.number + the raw requested duration, so the resulting unlock is
+    exactly the unclamped input at every boundary -- including zero and values
+    far above maxLockDuration.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+    )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, duration, sender=human_resources.address
+    )
+
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
+        boa.env.evm.patch.block_number + duration
+    )
+
+
+@pytest.mark.parametrize(
+    "duration",
+    [d for _label, d in CONTRIBUTOR_DURATIONS_IN_BOUNDS],
+    ids=[l for l, _d in CONTRIBUTOR_DURATIONS_IN_BOUNDS],
+)
+def test_contributor_duration_inside_bounds_already_satisfies_the_clamp(
+    duration,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """DV-05 control half: an in-bounds duration trivially lands in bounds.
+
+    These three boundaries pass on the bound baseline, so they are plain
+    regressions. They exist so a Section 9.3 clamp cannot silently change the
+    in-bounds behavior while fixing the out-of-bounds cases.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+    )
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, duration, sender=human_resources.address
+    )
+
+    remaining = (
+        ripe_gov_vault.userGovData(bob, ripe_token).unlock - boa.env.evm.patch.block_number
+    )
+    assert min_lock <= remaining <= max_lock
+    assert remaining == duration
+
+
+@pytest.mark.parametrize(
+    "duration",
+    [d for _label, d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
+    ids=[l for l, _d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
+)
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-05: contributor lock duration is still unclamped in "
+    "RipeGov._handleGovDataOnTransfer; the Section 9.3 fix is gated on RH-CHANGE-01",
+)
+def test_contributor_duration_is_clamped_to_current_governance_bounds(
+    duration,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    sally,
+    teller,
+    human_resources,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """DV-05 hardening target, bounds half (RG-4, Section 9.3).
+
+    A fresh recipient with no prior lock must end up inside
+    [minLockDuration, maxLockDuration] for any contributor duration.
+    """
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
+    _direct_deposit(
+        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+    )
+
+    ripe_gov_vault.transferContributorRipeTokens(
+        sally, bob, duration, sender=human_resources.address
+    )
+
+    remaining = (
+        ripe_gov_vault.userGovData(bob, ripe_token).unlock - boa.env.evm.patch.block_number
+    )
+    assert min_lock <= remaining <= max_lock
+
+
+# --------------------------------------------------------------------------
+# DV-06 / Section 9.4: pause matrix over every public RipeGov mutation
+# --------------------------------------------------------------------------
+
+# (method name, blocked-while-paused on the bound baseline)
+GOV_PAUSE_MATRIX = (
+    ("depositTokensInVault", True),
+    ("depositTokensWithLockDuration", True),
+    ("withdrawTokensFromVault", True),
+    ("withdrawContributorTokensToBurn", True),
+    ("transferBalanceWithinVault", True),
+    ("transferContributorRipeTokens", True),
+    ("updateUserGovPoints", False),
+    ("adjustLock", False),
+    ("releaseLock", False),
+    ("disableGovPointAccrualForUser", False),
+    ("disableGovPointAccrualGlobally", False),
+)
+
+
+def _invoke_gov_mutation(
+    method, vault, ripe_token, whale, bob, alice, teller, auction_house,
+    human_resources, switchboard_alpha, switchboard_bravo, amount,
+):
+    """Invoke one public state-changing RipeGov method with valid arguments."""
+    if method == "depositTokensInVault":
+        ripe_token.transfer(vault, EIGHTEEN_DECIMALS, sender=whale)
+        vault.depositTokensInVault(bob, ripe_token, EIGHTEEN_DECIMALS, sender=teller.address)
+    elif method == "depositTokensWithLockDuration":
+        ripe_token.transfer(vault, EIGHTEEN_DECIMALS, sender=whale)
+        vault.depositTokensWithLockDuration(
+            bob, ripe_token, EIGHTEEN_DECIMALS, 500, sender=switchboard_bravo.address
+        )
+    elif method == "withdrawTokensFromVault":
+        vault.withdrawTokensFromVault(bob, ripe_token, amount, bob, sender=teller.address)
+    elif method == "withdrawContributorTokensToBurn":
+        vault.withdrawContributorTokensToBurn(bob, sender=human_resources.address)
+    elif method == "transferBalanceWithinVault":
+        vault.transferBalanceWithinVault(
+            ripe_token, bob, alice, amount // 4, sender=auction_house.address
+        )
+    elif method == "transferContributorRipeTokens":
+        vault.transferContributorRipeTokens(bob, alice, 500, sender=human_resources.address)
+    elif method == "updateUserGovPoints":
+        vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    elif method == "adjustLock":
+        vault.adjustLock(bob, ripe_token, 1_000, sender=teller.address)
+    elif method == "releaseLock":
+        vault.releaseLock(bob, ripe_token, sender=teller.address)
+    elif method == "disableGovPointAccrualForUser":
+        vault.disableGovPointAccrualForUser(bob, sender=switchboard_alpha.address)
+    elif method == "disableGovPointAccrualGlobally":
+        vault.disableGovPointAccrualGlobally(sender=switchboard_alpha.address)
+    else:  # pragma: no cover - guards against a typo in the matrix
+        raise AssertionError(f"unhandled method {method}")
+
+
+def _reverted_with_pause(exc):
+    return any(
+        not isinstance(frame, str)
+        and getattr(frame, "dev_reason", None) is not None
+        and frame.dev_reason.reason_str == "contract paused"
+        for frame in exc.stack_trace
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "blocked_while_paused"),
+    GOV_PAUSE_MATRIX,
+    ids=[m for m, _b in GOV_PAUSE_MATRIX],
+)
+def test_ripe_gov_pause_matrix_while_paused(
+    method,
+    blocked_while_paused,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    human_resources,
+    switchboard_alpha,
+    switchboard_bravo,
+    locked_gov_position,
+):
+    """DV-06 characterization (SV-5, Section 9.4): exact pause policy per method.
+
+    VaultData.isPaused is consulted only by SharesVault's deposit, withdraw,
+    and transfer helpers. Everything else -- point updates, both point-disable
+    setters, and crucially adjustLock and releaseLock -- stays live while the
+    vault is paused. releaseLock is the sharpest case: it reduces balances via
+    vaultData._reduceBalanceOnWithdrawal directly, bypassing SharesVault
+    entirely, so it burns the exit fee out of a paused vault.
+    """
+    boa.env.time_travel(blocks=10)
+    ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.isPaused()
+
+    if blocked_while_paused:
+        with boa.reverts("contract paused"):
+            _invoke_gov_mutation(
+                method, ripe_gov_vault, ripe_token, whale, bob, alice, teller,
+                auction_house, human_resources, switchboard_alpha,
+                switchboard_bravo, locked_gov_position,
+            )
+    else:
+        _invoke_gov_mutation(
+            method, ripe_gov_vault, ripe_token, whale, bob, alice, teller,
+            auction_house, human_resources, switchboard_alpha,
+            switchboard_bravo, locked_gov_position,
+        )
+
+
+@pytest.mark.parametrize(
+    ("method", "blocked_while_paused"),
+    GOV_PAUSE_MATRIX,
+    ids=[m for m, _b in GOV_PAUSE_MATRIX],
+)
+def test_ripe_gov_pause_matrix_while_unpaused(
+    method,
+    blocked_while_paused,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    human_resources,
+    switchboard_alpha,
+    switchboard_bravo,
+    locked_gov_position,
+):
+    """Section 9.4 control half: no method is pause-blocked while unpaused."""
+    boa.env.time_travel(blocks=10)
+    assert not ripe_gov_vault.isPaused()
+    try:
+        _invoke_gov_mutation(
+            method, ripe_gov_vault, ripe_token, whale, bob, alice, teller,
+            auction_house, human_resources, switchboard_alpha,
+            switchboard_bravo, locked_gov_position,
+        )
+    except BoaError as exc:
+        # A method may still revert for an unrelated reason (for example a
+        # locked withdrawal); it must never revert because of the pause flag.
+        assert not _reverted_with_pause(exc), method
+
+
+@pytest.mark.parametrize("method", ("adjustLock", "releaseLock"))
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-06: RipeGov pause semantics for adjustLock/releaseLock are "
+    "unchanged pending the Section 9.4 owner decision under RH-CHANGE-01",
+)
+def test_gov_lock_mutation_reverts_while_vault_is_paused(
+    method,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    teller,
+    switchboard_alpha,
+    locked_gov_position,
+):
+    """DV-06 hardening target (SV-5, Section 9.4 preferred rule)."""
+    boa.env.time_travel(blocks=10)
+    ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
+    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
+
+    with boa.reverts("contract paused"):
+        if method == "adjustLock":
+            ripe_gov_vault.adjustLock(bob, ripe_token, 1_000, sender=teller.address)
+        else:
+            ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+
+    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before

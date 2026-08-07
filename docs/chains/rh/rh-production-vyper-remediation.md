@@ -50,7 +50,13 @@ separately proves both exact immutable readback and a live, exactly 32-byte
 wrong source, malformed data, or a zero result blocks registration. This is a
 lazy deployment-time validation, not a constructor-time health call.
 
-## Stability stale-price recovery
+## Stability unavailable-price behavior
+
+**Owner correction effective 2026-08-07.** This section supersedes the paused
+quarantine/reactivation design selected by D-02 in the implementation plan.
+The final contract deliberately has no no-price pair marker, quarantine count,
+special claim-asset state, capacity reservation, or oracle-specific unpause
+guard.
 
 Dormant activation is exactly `$0.10`; active retention is exactly `$0.05`.
 The hysteresis is deliberate. No aggregate dormant-pair or dormant-value
@@ -58,55 +64,46 @@ counter is added, so many individually sub-threshold balances may accumulate
 material aggregate exposure outside iterable NAV. Monitoring must therefore
 track token custody and pair liabilities offchain.
 
-### Code-size, storage, and gas disclosure
+When an active claim-asset balance has no nonzero USD price, valuation requests
+the non-reverting PriceDesk result and skips that asset when the result is zero.
+The collateral remains in custody and stays claimable, but contributes zero to
+the Stability asset's NAV until a nonzero price returns. NAV views, deposits,
+withdrawals, and operations involving other priced claim assets therefore
+remain live without an additional quarantine state machine. Claiming or
+redeeming the unpriced asset itself still requires a usable price and cannot
+complete until pricing returns.
 
-The required recovery path did not fit beneath EIP-170 with the prior module
-immutables. As a bounded local code-size optimization,
-`StabVault.greenToken` and `StabVault.savingsGreen` are now two private storage
-slots rather than `immutable(address)` values. The module constructor writes
-them once from the RipeHq registry-derived addresses and no setter exists, so
-the values remain deployment-initialized and externally nonmutable. This is
-nevertheless a real storage-layout and gas change: the layout gains two slots,
-the deployed immutable section loses two addresses, and valuation paths that
-read these cached identities incur storage reads. The external ABI and selected
-addresses do not change. The final StabilityPool deployed runtime is `24,575`
-bytes, leaving `1` byte of EIP-170 headroom.
+This is an explicit liveness-over-accounting tradeoff. While claim collateral
+is omitted from NAV, depositing users may receive shares without paying for its
+eventual recovery and withdrawing users may exit without receiving its value.
+Restoring the oracle can therefore redistribute the recovered value among the
+shareholders present at that time. Monitoring should alert on every active
+claim balance whose returned price is zero.
 
-The mock oracle used by tests also changed semantics: `setPrice(asset, 0)` now
-means a configured feed reporting zero, while `disablePriceFeed(asset)` removes
-feed registration. This distinction lets tests cover strict configured-zero
-failure separately from the no-feed routing fallback; it is not a production
-oracle change.
+Permissionless pruning skips an unpriced active pair in either pause state and
+continues processing later batch entries. It never removes or reclassifies the
+pair, and preserves its active index, custody, pair liability, aggregate
+liability, and user shares. Repairing or replacing the price feed restores NAV
+and economic operations immediately; no activation call or persistent recovery
+bookkeeping is required.
 
-If an active claim asset becomes unpriced:
+The standard Switchboard pause path has no oracle-specific unpause predicate.
+`getClaimAssetState(stabAsset, claimAsset)` therefore has only the existing
+states `0` absent, `1` dormant, and `2` active.
 
-1. Pause StabilityPool before maintenance.
-2. Call the bounded prune path for each affected Stability-asset/claim-asset
-   pair. A zero price marks that exact pair as a no-price quarantine,
-   increments the global quarantine count, and removes it from active NAV
-   without changing custody, claimable balance, aggregate liability, or user
-   shares.
-3. Repair or reconfigure the oracle through separately authorized governance.
-4. While still paused, reactivate each marked pair only after its price is
-   nonzero and cumulative value meets `$0.10`. Reactivation clears the pair
-   marker and decrements the count exactly once.
-   While any quarantine remains, slots released by quarantine are reserved for
-   marked pairs; ordinary dormant pairs cannot consume them and strand unpause.
-5. Verify custody, liabilities, shares, exact pair markers, active membership,
-   and `noPriceQuarantineCount == 0`.
-6. Only then may any Switchboard unpause path succeed.
+`StabVault.GREEN_TOKEN` and `StabVault.SAVINGS_GREEN` are again
+constructor-bound immutables. Removing the quarantine state machine eliminates
+the private storage slots and repeated storage reads introduced solely for its
+EIP-170 optimization. The final StabilityPool deployed runtime is `24,371`
+bytes, leaving `205` bytes of EIP-170 headroom.
 
-Recovery depends on operational oracle repair and keeper/governance execution;
-pause and quarantine preserve accounting but do not restore the feed. A
-mispriced nonzero feed is outside this zero-price recovery. Stability positions
-remain excluded from borrowing power, but otherwise eligible positions remain
-phase-2 liquidatable.
-
-`getClaimAssetState(stabAsset, claimAsset)` returns `0` for absent, `1` for
-dormant, `2` for active, and `3` for an exact no-price-quarantined pair. The
-quarantined state is a new view result. Permissionless pruning outside pause
-continues to skip unpriced active entries and process later batch items; only a
-paused pool may turn an unpriced active pair into state `3`.
+The mock oracle used by tests distinguishes `setPrice(asset, 0)`, a configured
+feed reporting zero, from `disablePriceFeed(asset)`, which removes feed
+registration. Both cases exclude the active claim balance from NAV without
+deactivating it, and a later nonzero price restores it to NAV automatically.
+A mispriced nonzero feed remains outside this zero-price behavior. Stability
+positions remain excluded from borrowing power, while otherwise eligible
+positions remain phase-2 liquidatable.
 
 ## RipeGov and migration invariants
 

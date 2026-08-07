@@ -1128,6 +1128,35 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "migrateVaultPosition",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "borrow",
     "inputs": [],
     "outputs": [

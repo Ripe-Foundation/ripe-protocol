@@ -158,6 +158,12 @@ PSM_YIELD_VAULT_TOKEN = ZERO_ADDRESS
 PRICE_CHANGE_MIN_TIMELOCK = PRICE_MIN_TIMELOCK
 PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
 
+# --- RIPE price (Uniswap V2) ------------------------------------------------
+# The RIPE/WETH v2 pool. UniswapV2Prices reads its reserves and multiplies the
+# ratio by whatever PriceDesk says WETH is worth, so this feed inherits the
+# Chainlink ETH/USD route -- it is not an independent price.
+RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
+
 # --- curve pool -------------------------------------------------------------
 # 100 USDG (6dp) + 100 GREEN (18dp), matching Base's GREEN pool seed.
 POOL_SEED_USDG = 100 * 10**6
