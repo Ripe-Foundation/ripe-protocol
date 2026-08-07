@@ -1388,28 +1388,40 @@
     },
     "StabilityPool": {
       "abi": {
-        "canonical_sha256": "613c903674f4e88c2d66bddebc5b727c81ce7e6d4f70b778e9fa45f2da1fbe5d",
-        "committed_file_sha256": "a6ba05b136271f9850dae724d648b218ee1dda900ff7b3352c42fdbb0e329d31",
+        "canonical_sha256": "8086009513c4557dc8a12fec7829c0f3782693001ebc7d21dddab2944084812a",
+        "committed_file_sha256": "4b720ba58cb96db1eb5e3b9cb30698283da0d5e7d90db55e2170a8674982a543",
         "committed_path": "scripts/abis/StabilityPool.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "568261c8865fa04abe4b1a59175ceea49da2a43c0a0fb88088c81b41c5f1c9bc",
-        "creation_executable_prefix_size": 24860,
-        "creation_metadata_sha256": "40e68b6afa9c0cdb4c339d7cd11b1614f714b40bcdba15babe48f2a353212d2b",
+        "creation_executable_prefix_sha256": "a4cc04535e1a9186214862741eb35f84123ef905cf1b4c09a139f48b2c984434",
+        "creation_executable_prefix_size": 24594,
+        "creation_metadata_sha256": "ddad1289752e7329e0a25b186ca744a8cf4e811ce888c1dd4b263d59b5b97136",
         "creation_metadata_size": 66,
-        "creation_sha256": "9009d7998fb013f8e7570ae9975783b72e9c737602b1a1db53136b8106d7b8f3",
-        "creation_size": 24926,
-        "deployed_eip170_headroom": 1,
-        "deployed_runtime_size": 24575,
-        "eip170_headroom": 33,
-        "runtime_template_sha256": "13e063658283fd7a2d1c437e9e5f194656da4eba3eabb6a3346af8aad6809c41",
-        "runtime_template_size": 24543
+        "creation_sha256": "718e6d3ce9800323110177ae6142554430415cac2dc18a017170d4dc5b2a021c",
+        "creation_size": 24660,
+        "deployed_eip170_headroom": 205,
+        "deployed_runtime_size": 24371,
+        "eip170_headroom": 301,
+        "runtime_template_sha256": "d47f9d2c92cbac07fb7ed6e86b4c55cfab09bc19d3de8bc717e5b99d58955361",
+        "runtime_template_size": 24275
       },
       "code_layout": {
         "addys": {
           "RIPE_HQ_FOR_ADDYS": {
             "length": 32,
             "offset": 0,
+            "type": "address"
+          }
+        },
+        "stabVault": {
+          "GREEN_TOKEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "address"
+          },
+          "SAVINGS_GREEN": {
+            "length": 32,
+            "offset": 64,
             "type": "address"
           }
         }
@@ -1438,12 +1450,12 @@
         "count": 8
       },
       "selectors": {
-        "canonical_sha256": "932540ef86cff11cf5dc8a8860101ca59f8987f1b3c747667c3cd3a4e24a2d6a",
-        "count": 57
+        "canonical_sha256": "7524780e1d548349e7a65ebffeb9c6a24d0207e5dcf77abdf8f8a09341c620bd",
+        "count": 56
       },
-      "source_git_blob": "d7b6114b41faafd5f5d67e43e1cc83c556ae7dbf",
+      "source_git_blob": "22f6225b952608f65c9f5a8bc50b808f1c4b47c0",
       "source_path": "contracts/vaults/StabilityPool.vy",
-      "source_sha256": "3896a28d93b189a4d317ec1078eeee6eee949f79a5c25bcdb18fbb8aad2a9849",
+      "source_sha256": "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158",
       "storage_layout": {
         "stabVault": {
           "claimableAssets": {
@@ -1456,35 +1468,15 @@
             "slot": 9,
             "type": "HashMap[address, HashMap[address, uint256]]"
           },
-          "greenToken": {
-            "n_slots": 1,
-            "slot": 16,
-            "type": "address"
-          },
           "indexOfClaimableAsset": {
             "n_slots": 1,
             "slot": 12,
             "type": "HashMap[address, HashMap[address, uint256]]"
           },
-          "noPriceQuarantineCount": {
-            "n_slots": 1,
-            "slot": 15,
-            "type": "uint256"
-          },
-          "noPriceQuarantined": {
-            "n_slots": 1,
-            "slot": 14,
-            "type": "HashMap[address, HashMap[address, bool]]"
-          },
           "numClaimableAssets": {
             "n_slots": 1,
             "slot": 13,
             "type": "HashMap[address, uint256]"
-          },
-          "savingsGreen": {
-            "n_slots": 1,
-            "slot": 17,
-            "type": "address"
           },
           "totalClaimableBalances": {
             "n_slots": 1,
@@ -1547,7 +1539,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "355355f1f944e71f086762076d1041d61e590f0504422f9ac3cacf993887ac7e"
+      "transitive_compiler_input_integrity": "8acd3179615a0714e2e9da4a95bdfe44c3165093c0e50a15c4de8176860eab9a"
     },
     "SwitchboardBravo": {
       "abi": {

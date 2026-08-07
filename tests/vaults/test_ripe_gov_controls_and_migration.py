@@ -2328,7 +2328,7 @@ def test_actual_hr_contributor_position_migrates_with_points_and_lock(
     assert ledger.isParticipatingInVault(contributor, target_id)
 
 
-def test_echo_disable_validator_returns_false_instead_of_reverting(
+def test_echo_disable_validator_reverts_for_wrong_vault_interface(
     switchboard_echo,
     ripe_gov_vault,
     simple_erc20_vault,
@@ -2340,7 +2340,8 @@ def test_echo_disable_validator_returns_false_instead_of_reverting(
     assert ripe_gov_id == SOURCE_VAULT_ID
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(0, bob) is False
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(999, bob) is False
-    assert switchboard_echo.isValidRipeGovPointAccrualDisable(simple_vault_id, bob) is False
+    with boa.reverts():
+        switchboard_echo.isValidRipeGovPointAccrualDisable(simple_vault_id, bob)
     assert switchboard_echo.isValidRipeGovPointAccrualDisable(ripe_gov_id, bob) is True
 
 

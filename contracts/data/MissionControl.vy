@@ -215,8 +215,6 @@ MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
-STABILITY_POOL_VAULT_ID: constant(uint256) = 1
 
 
 @deploy
@@ -226,9 +224,9 @@ def __init__(_ripeHq: address, _defaults: address):
 
     self.numAssets = 1 # not using 0 index
     self.numLiteSigners = 1 # not using 0 index, 0 means "not in list"
-    self.coreRipeGovVaultId = RIPE_GOV_VAULT_ID
-    self.preferredStabVaultId = STABILITY_POOL_VAULT_ID
-    self.isStabVaultId[STABILITY_POOL_VAULT_ID] = True
+    self.preferredStabVaultId = 1
+    self.isStabVaultId[1] = True
+    self.coreRipeGovVaultId = 2
 
     # defaults
     if _defaults != empty(address):

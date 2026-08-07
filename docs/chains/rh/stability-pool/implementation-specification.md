@@ -1,10 +1,12 @@
 # Robinhood Stability Pool hardening implementation specification
 
 > [!WARNING]
-> **Superseded design snapshot below.** The 2026-08-06 remediation changes the
-> dormant thresholds to `$0.10/$0.05` and adds a liability-preserving paused
-> zero-price quarantine/reactivation path. The current runbook, residual risk,
-> and non-borrowing/phase-2-liquidatable invariant are recorded in
+> **Superseded design snapshot below.** The current owner correction retains
+> the `$0.10/$0.05` dormant thresholds, values unavailable active claim
+> collateral at zero, and removes the later paused zero-price
+> quarantine/reactivation state machine.
+> The current behavior, residual risk, and
+> non-borrowing/phase-2-liquidatable invariant are recorded in
 > [`../rh-production-vyper-remediation.md`](../rh-production-vyper-remediation.md).
 > Retain the remainder as historical design evidence.
 
@@ -61,12 +63,11 @@ The final owner decisions and security corrections are:
    `$0.25` remains dormant, claimable, redeemable, and nonblocking. The material
    dormant flag/count and deposit gate no longer exist.
 6. The deposit path rejects the current GREEN address supplied through
-   `Addys`, closing the reproduced RipeHq re-point admission bypass. This
-   historical candidate bound GREEN and sGREEN as constructor immutables. The
-   controlling 2026-08-06 remediation demotes those two cached identities to
-   constructor-initialized private storage, with no setter, as an explicitly
-   disclosed EIP-170 optimization; see the current correction linked above for
-   the storage-layout and gas consequences.
+   `Addys`, closing the reproduced RipeHq re-point admission bypass. GREEN and
+   sGREEN are constructor-bound immutables. A short-lived 2026-08-06
+   quarantine candidate demoted them to storage for EIP-170, but the current
+   owner correction removes that state machine and restores the immutable
+   layout.
 7. `recoverFunds` and `recoverFundsMany` remain as interface-compatible
    selectors but unconditionally revert. StabilityPool emits no recovery event
    and exposes no generic token-recovery path.

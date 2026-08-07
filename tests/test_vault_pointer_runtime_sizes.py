@@ -5,7 +5,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "SwitchboardBravo": 23_082,
     "Teller": 24_139,
     "CreditEngine": 24_392,
-    "StabilityPool": 24_575,
+    "StabilityPool": 24_371,
 }
 
 

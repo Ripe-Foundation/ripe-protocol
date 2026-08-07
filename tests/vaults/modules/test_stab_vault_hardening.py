@@ -15,16 +15,14 @@ DORMANT_BELOW_FLOOR = 1
 DEACTIVATION_DUST = 2
 DEACTIVATION_ZERO = 1
 DECIMAL_OFFSET = 10**8
-DEACTIVATION_NO_PRICE = 3
-CLAIM_ASSET_NO_PRICE_QUARANTINED = 3
 MAX_ACTIVE_CLAIM_ASSETS = 20
 MAX_CLAIM_ASSET_MAINTENANCE = 15
 
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_575
-    assert 24_576 - len(runtime) == 1
+    assert len(runtime) == 24_371
+    assert 24_576 - len(runtime) == 205
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -693,7 +691,113 @@ def test_unpriced_new_receipt_reverts_without_claim_accounting(
     assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
 
 
-def test_no_price_quarantine_blocks_unpause_until_every_exact_pair_recovers(
+def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        ACTIVATION_THRESHOLD,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    total_value_before = stability_pool.getTotalValue(alpha_token)
+    shares_before = stability_pool.userBalances(bob, alpha_token)
+    custody_before = bravo_token.balanceOf(stability_pool)
+    pair_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    active_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert active_index != 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+    # A configured feed reporting zero excludes the claim collateral from NAV
+    # without removing it from the active claim-asset set.
+    mock_price_source.setPrice(bravo_token, 0)
+    known_value = total_value_before - ACTIVATION_THRESHOLD
+    assert stability_pool.getTotalValue(alpha_token) == known_value
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == known_value
+
+    # Deposits and withdrawals remain live while the unavailable claim asset is
+    # temporarily valued at zero.
+    with boa.env.anchor():
+        alpha_token.transfer(
+            stability_pool,
+            EIGHTEEN_DECIMALS,
+            sender=alpha_token_whale,
+        )
+        assert stability_pool.depositTokensInVault(
+            alice,
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            sender=teller.address,
+        ) == EIGHTEEN_DECIMALS
+        withdrawn, is_user_depleted = stability_pool.withdrawTokensFromVault(
+            alice,
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            alice,
+            sender=teller.address,
+        )
+        assert EIGHTEEN_DECIMALS - 1 <= withdrawn <= EIGHTEEN_DECIMALS
+        assert is_user_depleted
+
+    # Maintenance never removes or reclassifies an unpriced active pair,
+    # whether the pool is paused or unpaused.
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        [bravo_token, bravo_token],
+        sender=alice,
+    )
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == active_index
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == pair_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
+    assert bravo_token.balanceOf(stability_pool) == custody_before
+    assert stability_pool.userBalances(bob, alpha_token) == shares_before
+
+    # Unpause has no oracle-specific state machine. Removing the feed entirely
+    # has the same zero-NAV treatment as a configured feed reporting zero.
+    stability_pool.pause(False, sender=switchboard_alpha.address)
+    assert not stability_pool.isPaused()
+    mock_price_source.disablePriceFeed(bravo_token)
+    assert stability_pool.getTotalValue(alpha_token) == known_value
+
+    # Restoring the feed puts the collateral back into NAV immediately; no
+    # activation call or persistent recovery bookkeeping is required.
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    assert stability_pool.getTotalValue(alpha_token) == total_value_before
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+def test_prune_skips_unpriced_pair_and_continues_batch_while_paused_or_unpaused(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -709,158 +813,6 @@ def test_no_price_quarantine_blocks_unpause_until_every_exact_pair_recovers(
     green_token,
     savings_green,
     switchboard_alpha,
-    switchboard_bravo,
-    switchboard_charlie,
-    switchboard_delta,
-    switchboard_echo,
-):
-    _seed_stability_asset(
-        stability_pool,
-        alpha_token,
-        alpha_token_whale,
-        bob,
-        teller,
-        mock_price_source,
-    )
-    claim_assets = (
-        (bravo_token, bravo_token_whale, ACTIVATION_THRESHOLD),
-        (charlie_token, charlie_token_whale, 10**5),
-    )
-    for claim_asset, whale, amount in claim_assets:
-        mock_price_source.setPrice(claim_asset, EIGHTEEN_DECIMALS)
-        _record_claim(
-            stability_pool,
-            alpha_token,
-            claim_asset,
-            whale,
-            amount,
-            bob,
-            auction_house,
-            green_token,
-            savings_green,
-        )
-
-    shares_before = stability_pool.userBalances(bob, alpha_token)
-    custody_before = {
-        token.address: token.balanceOf(stability_pool)
-        for token, _, _ in claim_assets
-    }
-    pair_before = {
-        token.address: stability_pool.claimableBalances(alpha_token, token)
-        for token, _, _ in claim_assets
-    }
-    total_before = {
-        token.address: stability_pool.totalClaimableBalances(token)
-        for token, _, _ in claim_assets
-    }
-
-    # Keep the configured feed present while making its reported price zero so
-    # the strict pre-pause valuation path must reject the stale value.
-    mock_price_source.setPrice(bravo_token, 0)
-    with boa.reverts():
-        stability_pool.withdrawTokensFromVault(
-            bob,
-            alpha_token,
-            1,
-            bob,
-            sender=teller.address,
-        )
-
-    stability_pool.pause(True, sender=switchboard_alpha.address)
-    mock_price_source.setPrice(charlie_token, 0)
-    stability_pool.pruneClaimableAssets(
-        alpha_token,
-        [bravo_token, charlie_token, bravo_token],
-        sender=alice,
-    )
-
-    logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
-    assert len(logs) == 2
-    assert all(log.reason == DEACTIVATION_NO_PRICE for log in logs)
-    assert stability_pool.noPriceQuarantineCount() == 2
-    for claim_asset, _, _ in claim_assets:
-        assert stability_pool.getClaimAssetState(
-            alpha_token,
-            claim_asset,
-        ) == CLAIM_ASSET_NO_PRICE_QUARANTINED
-        assert stability_pool.indexOfClaimableAsset(alpha_token, claim_asset) == 0
-        assert stability_pool.claimableBalances(alpha_token, claim_asset) == pair_before[
-            claim_asset.address
-        ]
-        assert stability_pool.totalClaimableBalances(claim_asset) == total_before[
-            claim_asset.address
-        ]
-        assert claim_asset.balanceOf(stability_pool) == custody_before[
-            claim_asset.address
-        ]
-    assert stability_pool.userBalances(bob, alpha_token) == shares_before
-
-    with boa.reverts("contract paused"):
-        stability_pool.depositTokensInVault(
-            bob,
-            alpha_token,
-            1,
-            sender=teller.address,
-        )
-
-    # Zero-price activation is a no-op and cannot clear either obligation.
-    stability_pool.activateClaimAssets(
-        alpha_token,
-        [bravo_token, charlie_token],
-        sender=alice,
-    )
-    assert stability_pool.noPriceQuarantineCount() == 2
-
-    for switchboard in (
-        switchboard_alpha,
-        switchboard_bravo,
-        switchboard_charlie,
-        switchboard_delta,
-        switchboard_echo,
-    ):
-        with boa.reverts("unresolved no-price quarantine"):
-            stability_pool.pause(False, sender=switchboard.address)
-
-    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
-    stability_pool.activateClaimAssets(alpha_token, [bravo_token], sender=alice)
-    assert stability_pool.getClaimAssetState(
-        alpha_token,
-        bravo_token,
-    ) == CLAIM_ASSET_ACTIVE
-    assert stability_pool.getClaimAssetState(
-        alpha_token,
-        charlie_token,
-    ) == CLAIM_ASSET_NO_PRICE_QUARANTINED
-    assert stability_pool.noPriceQuarantineCount() == 1
-    with boa.reverts("unresolved no-price quarantine"):
-        stability_pool.pause(False, sender=switchboard_alpha.address)
-
-    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
-    stability_pool.activateClaimAssets(alpha_token, [charlie_token], sender=alice)
-    assert stability_pool.noPriceQuarantineCount() == 0
-    assert stability_pool.getClaimAssetState(
-        alpha_token,
-        charlie_token,
-    ) == CLAIM_ASSET_ACTIVE
-    stability_pool.pause(False, sender=switchboard_alpha.address)
-    assert not stability_pool.isPaused()
-
-
-def test_unpaused_prune_skips_unpriced_pair_and_continues_batch(
-    stability_pool,
-    alpha_token,
-    bravo_token,
-    charlie_token,
-    alpha_token_whale,
-    bravo_token_whale,
-    charlie_token_whale,
-    bob,
-    alice,
-    teller,
-    auction_house,
-    mock_price_source,
-    green_token,
-    savings_green,
 ):
     _seed_stability_asset(
         stability_pool,
@@ -889,6 +841,7 @@ def test_unpaused_prune_skips_unpriced_pair_and_continues_batch(
 
     bravo_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
     charlie_balance = stability_pool.claimableBalances(alpha_token, charlie_token)
+    bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     mock_price_source.setPrice(bravo_token, 0)
     mock_price_source.setPrice(charlie_token, 4 * 10**17)
 
@@ -903,104 +856,16 @@ def test_unpaused_prune_skips_unpriced_pair_and_continues_batch(
     assert logs[0].claimAsset == charlie_token.address
     assert logs[0].reason == DEACTIVATION_DUST
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == bravo_index
     assert stability_pool.claimableBalances(alpha_token, bravo_token) == bravo_balance
     assert stability_pool.getClaimAssetState(alpha_token, charlie_token) == CLAIM_ASSET_DORMANT
     assert stability_pool.claimableBalances(alpha_token, charlie_token) == charlie_balance
-    assert stability_pool.noPriceQuarantineCount() == 0
 
-
-def test_quarantine_recovery_reserves_released_capacity_until_unpause_is_safe(
-    stability_pool,
-    alpha_token,
-    alpha_token_whale,
-    governance,
-    bob,
-    alice,
-    teller,
-    auction_house,
-    mock_price_source,
-    green_token,
-    savings_green,
-    switchboard_alpha,
-):
-    _seed_stability_asset(
-        stability_pool,
-        alpha_token,
-        alpha_token_whale,
-        bob,
-        teller,
-        mock_price_source,
-        100 * EIGHTEEN_DECIMALS + MAX_ACTIVE_CLAIM_ASSETS,
-    )
-
-    ordinary = _deploy_claim_token(
-        governance,
-        alice,
-        1_600,
-        ACTIVATION_THRESHOLD,
-    )
-    mock_price_source.setPrice(ordinary, 5 * 10**17)
-    _record_claim(
-        stability_pool,
-        alpha_token,
-        ordinary,
-        alice,
-        ACTIVATION_THRESHOLD,
-        bob,
-        auction_house,
-        green_token,
-        savings_green,
-    )
-    assert stability_pool.getClaimAssetState(alpha_token, ordinary) == CLAIM_ASSET_DORMANT
-
-    active = []
-    for index in range(MAX_ACTIVE_CLAIM_ASSETS):
-        token = _deploy_claim_token(
-            governance,
-            alice,
-            1_601 + index,
-            ACTIVATION_THRESHOLD,
-        )
-        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
-        _record_claim(
-            stability_pool,
-            alpha_token,
-            token,
-            alice,
-            ACTIVATION_THRESHOLD,
-            bob,
-            auction_house,
-            green_token,
-            savings_green,
-        )
-        active.append(token)
-
-    quarantined = active[0]
-    mock_price_source.setPrice(ordinary, EIGHTEEN_DECIMALS)
     stability_pool.pause(True, sender=switchboard_alpha.address)
-    mock_price_source.setPrice(quarantined, 0)
-    stability_pool.pruneClaimableAssets(alpha_token, [quarantined], sender=alice)
-
-    assert stability_pool.noPriceQuarantineCount() == 1
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS - 1
-    assert stability_pool.getClaimAssetState(
-        alpha_token,
-        quarantined,
-    ) == CLAIM_ASSET_NO_PRICE_QUARANTINED
-    with boa.reverts("reserved"):
-        stability_pool.activateClaimAssets(alpha_token, [ordinary], sender=alice)
-    assert stability_pool.getClaimAssetState(alpha_token, ordinary) == CLAIM_ASSET_DORMANT
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS - 1
-    assert stability_pool.noPriceQuarantineCount() == 1
-
-    mock_price_source.setPrice(quarantined, EIGHTEEN_DECIMALS)
-    stability_pool.activateClaimAssets(alpha_token, [quarantined], sender=alice)
-    assert stability_pool.getClaimAssetState(alpha_token, quarantined) == CLAIM_ASSET_ACTIVE
-    assert stability_pool.getClaimAssetState(alpha_token, ordinary) == CLAIM_ASSET_DORMANT
-    assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS
-    assert stability_pool.noPriceQuarantineCount() == 0
-    stability_pool.pause(False, sender=switchboard_alpha.address)
-    assert not stability_pool.isPaused()
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == bravo_index
 
 
 def test_dormant_thresholds_have_exact_hysteresis_boundaries(
