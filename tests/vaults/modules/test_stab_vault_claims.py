@@ -4245,7 +4245,7 @@ def test_stab_reward_lock_never_shortens_a_later_existing_unlock(
     existing = 1_000 * EIGHTEEN_DECIMALS
     ripe_token.transfer(ripe_gov_vault, existing, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, existing, 1_100, sender=switchboard_alpha.address
+        bob, ripe_token, existing, 1_100, sender=teller.address
     )
     prior_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
     assert prior_unlock == boa.env.evm.patch.block_number + 1_100
