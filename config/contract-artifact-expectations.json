@@ -920,11 +920,11 @@
         "committed_path": "scripts/abis/MissionControl.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "e0f39225c3b448c39059d1e98ba1b7b7e650a25a00b213c9b3d83ea0afaad7d0",
+        "creation_executable_prefix_sha256": "387119d12d30fcd4a12286e229cf34747026810a021e1caa6ffc2bfd56386bb7",
         "creation_executable_prefix_size": 21549,
-        "creation_metadata_sha256": "38480a00d1e19a5c9ec5882d577194f5014c1d02365da8298aa09ca205186f29",
+        "creation_metadata_sha256": "9205818fdc4b8e930c283cbe0ed444dd769029f3897ba9deb10332908ce63c81",
         "creation_metadata_size": 78,
-        "creation_sha256": "eace70469426939c7342109adc88a61f5c56cab180fb0de22e56dc749a42f3b4",
+        "creation_sha256": "a308651ad178b94df99b3a8dc83b5cdbc6433e1b2b452861cda4c9aeae25d2fb",
         "creation_size": 21627,
         "deployed_eip170_headroom": 8578,
         "deployed_runtime_size": 15998,
@@ -984,9 +984,9 @@
         "canonical_sha256": "7715a1c7cf9526f63f07a5882a98a175a20dd410afec30bac66a45925e4d768a",
         "count": 82
       },
-      "source_git_blob": "f1a72ffb8db214999ff2edffe343648da00aa0f5",
+      "source_git_blob": "9d79143492a677da5a8039ca643a9623541b5b1d",
       "source_path": "contracts/data/MissionControl.vy",
-      "source_sha256": "37558bf5a403545f9e9254f9fb07274a652b0d289e51dd708292a33639da905f",
+      "source_sha256": "9585e642c14034956f9503c9534f03c56f0e7de96c27561bb1ddcc00f0de4476",
       "storage_layout": {
         "assetConfig": {
           "n_slots": 1,
@@ -1122,7 +1122,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "e3328c9c7aec7c357436ec188ee23624e4530007ae71a97d95fc2d90e75092d8"
+      "transitive_compiler_input_integrity": "169879b708ab90b203db6ecc129a13ff89af2cf7348c359faa32d8b4011e911b"
     },
     "RipeGov": {
       "abi": {

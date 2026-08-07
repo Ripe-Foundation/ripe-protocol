@@ -294,7 +294,7 @@ deployment, promotion, activation, production use, or release.
 **Status:** Owner-ratified for the current handoff repository shape on 27 July
 2026, against exact candidate commit
 `330916b03d939c62bb8b05fc51691a2dbc70948f`. **Its repository-placement clause is
-superseded by [RH-D020](#rh-d020--the-dashboard-is-extracted-from-the-active-tree)
+superseded by [RH-D024](#rh-d024--the-dashboard-is-extracted-from-the-active-tree)
 on 7 August 2026.** The dependency-scope and H-01 isolation clauses below remain
 in force.
 
@@ -327,11 +327,11 @@ not a substitute for the required local validation or explicit merge authority.
 
 **Superseded in part.** The repository-placement clause above — "keep the
 self-contained dashboard application under `docs/chains/rh/dashboard/`" — and its
-path-scoped CI requirement are superseded by RH-D020. Everything else in RH-D018,
+path-scoped CI requirement are superseded by RH-D024. Everything else in RH-D018,
 including the dependency-scope boundary and the rule that no dashboard package
 state can affect an H-01 disposition, remains in force.
 
-### RH-D020 — The dashboard is extracted from the active tree
+### RH-D024 — The dashboard is extracted from the active tree
 
 **Status:** Owner-ratified on 7 August 2026, against the RH codebase
 simplification branch `codex/rh-codebase-simplification` on baseline

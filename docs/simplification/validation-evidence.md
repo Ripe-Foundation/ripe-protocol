@@ -13,7 +13,7 @@ path, and hash a landing reviewer needs.
 | `51616b9` | Train 2 — step-manifest and dashboard extraction | 588 | 615,611 |
 | `b4f2a95` | Step-manifest extraction recorded in status.yaml | 588 | 615,623 |
 | `61ec63d` | First implementation report | 588 | 615,863 |
-| `e74f184` | Review remediation: RH-D020, corrected metrics **← validated tip** | 588 | 615,919 |
+| `e74f184` | Review remediation: RH-D024, corrected metrics **← validated tip** | 588 | 615,919 |
 
 **Validated candidate tip:** `e74f1843497cde63dcb813048bbee9cfc5546890`
 **Delivered branch tip:** `e74f1843497cde63dcb813048bbee9cfc5546890`

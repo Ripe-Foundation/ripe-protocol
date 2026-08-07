@@ -11,67 +11,56 @@
 Nothing was archived inside the repository. Every extracted path is recovered
 from Git history at the baseline commit.
 
-## Commit series
+## Status and authority
 
-| Commit | Content |
-| --- | --- |
-| `56b6100` | Train 1 — bind the plan, verify the integrated speed foundation (no-change verification) |
-| `51616b9` | Train 2 — extract deployment step manifests and the parked RH dashboard |
-| `b4f2a95` | Record the step-manifest extraction in the live status authority |
-| `61ec63d` | First implementation report |
-| *(see [`validation-evidence.md`](validation-evidence.md))* | Review remediation: RH-D020 supersession, corrected metrics, evidence packet, complete retained-document list |
+**This branch is the owner-rebound implementation candidate.** It is open as
+[PR #77](https://github.com/Ripe-Foundation/ripe-protocol/pull/77) against `rh`,
+currently in **draft** pending completion of the post-merge validation matrix.
 
-Train 3 produced no commit; every candidate was blocked by a retained consumer
-or a committed authority. See **De-scopes** below.
+`implementation-plan.md` in this directory is the byte-exact copy of the plan
+that authorized this work (SHA-256
+`52b9d33f2157b463a6cf26c8fe37783b4ce81bcd6157f5e841be73392ee13e4e`, baseline
+`610b43f`). The root `RH-CODEBASE-SIMPLIFICATION-PLAN.md` was subsequently
+replaced with a revised plan (SHA-256
+`a20a4a53d953a3c3120462bee186e81e092fc2a90d0d407edfdda5f5151a4990`, baseline
+`be6e4e9`) that called for a fresh `-v2` branch and forbade opening a PR. **On
+2026-08-07 the owner explicitly rebound to this branch**, superseding that
+plan's branch, baseline, and no-PR clauses. The tracked copy here is
+deliberately the plan that authorized the work, not the later revision.
 
-The exact delivered tip, the tip each measurement is bound to, and every
-evidence path with its SHA-256 are recorded in
-[`validation-evidence.md`](validation-evidence.md). That document is the
-authoritative evidence inventory; this one is the narrative report.
+The substance is unaffected: the revised plan mandates the same removals — 66
+numeric step manifests, 26 dashboard files, one workflow — and records the same
+Train 3 no-change retention outcome this branch reached independently.
 
-Commits are unsigned because the sandbox denies access to `~/.gnupg`. Signing was
-not a plan requirement; the landing owner can re-sign at integration.
+For the commit series, exact per-commit tree sizes, and the commit each
+measurement is bound to, see [`validation-evidence.md`](validation-evidence.md).
+Commits are unsigned because the sandbox denies `~/.gnupg`; the landing owner can
+re-sign at integration.
 
 ## Before / after
 
-Tracked-line counts move by a few hundred with each report revision because this
-document is itself tracked. [`validation-evidence.md`](validation-evidence.md)
-records the exact figure for every commit in the series; the table below is bound
-to the commits named in its header.
+The extraction itself is fixed and does not move: **93 files removed**, all
+recoverable from `610b43f`. What moves with each rebase or report revision is
+the absolute tree size, so exact per-commit counts live in
+[`validation-evidence.md`](validation-evidence.md) rather than here.
 
-| Measure | Baseline `610b43f` | Delivered tip | Change |
-| --- | ---: | ---: | ---: |
-| Tracked files | 678 | 588 | −90 |
-| Tracked lines | 3,445,736 | see `validation-evidence.md` (≈615,900) | ≈−82.1% |
-| Working-tree bytes (excl. `.git`) | 162,472 KB | 26,688 KB | −83.6% |
-
-The file count is stable across the series at 588. Only `docs/simplification/`
-report text changes between the last commits, and no test, script, config, or
-scanner reads that directory — proven in `validation-evidence.md`.
-
-Per-area figures below are measured at `b4f2a95`, the last commit that changed
-anything outside `docs/simplification/`; only this report's own line count moves
-after it.
-
-| Area | Baseline `610b43f` files / lines | At `b4f2a95` files / lines |
+| Removed | Files | Lines |
 | --- | ---: | ---: |
-| `migration_history/` | 68 / 2,957,627 | 2 / 146,579 |
-| `tests/` | 170 / 149,889 | 170 / 149,894 |
-| `docs/` | 149 / 129,519 | 126 / 110,493 |
-| `scripts/` | 100 / 115,027 | 100 / 115,027 |
-| `config/` | 8 / 49,242 | 8 / 49,242 |
-| `contracts/` | 96 / 39,697 | 96 / 39,697 |
-| `migrations/` | 72 / 3,412 | 72 / 3,412 |
-| `interfaces/` | 6 / 758 | 6 / 758 |
-| `.github/` | 2 / 148 | 1 / 92 |
+| Numeric deployment step manifests | 66 | 2,811,048 |
+| Parked RH dashboard | 26 | 20,277 |
+| Dashboard workflow | 1 | 56 |
+| **Total** | **93** | **2,831,381** |
 
-Against the non-binding Section 10 projection (roughly 500,000–575,000 lines and
-470–590 files): the file count lands inside the range at 588; the line count is
-about 615,900, roughly 40,900 above the top of the projected zone. The gap is entirely
-accounted for by two documented de-scopes — the block-clock process package
-(23,184 projected lines) and the provisional 40,000–70,000 "other completed
-docs" range, which the reverse-reference scan did not support. Section 10 states
-that retention rules and evidence-based de-scopes win over every number in it.
+Measured against the original baseline `610b43f`, the active tree went from
+678 files / 3,445,736 lines to 588 files / 615,919 lines — a **−82.1%** line
+reduction, and 162,472 KB → 26,688 KB on disk. After merging rh the absolute
+figures are larger on both sides because rh added work; the extraction delta is
+unchanged.
+
+Against the non-binding Section 10 projection (500,000–575,000 lines,
+470–590 files) the file count landed inside the range and the line count about
+40,900 above it, entirely accounted for by the documented block-clock and
+document-pruning de-scopes.
 
 ## Recovery
 
@@ -122,9 +111,12 @@ EOF
 
 ## Test and invariant disposition
 
-**No test file was removed and no test identity disappeared.** `tests/` still holds
-170 files, and both lanes collect exactly what they collected at baseline
-(lean 3,244; comprehensive 4,539).
+**No test file was removed and no test identity disappeared.** At the original
+baseline comparison `tests/` held 170 files on both sides and both lanes
+collected identically (lean 3,244; comprehensive 4,539). Post-merge the absolute
+counts are larger because rh added tests; the invariant that this branch removes
+no test still holds and is re-verified in
+[`validation-evidence.md`](validation-evidence.md).
 
 One test was adapted, the single change Section 4.1 permits:
 
@@ -240,6 +232,50 @@ committed authority that Section 0.4 says to respect.
 | Parked CCIP examples | `examples/ExampleGreenCcipBurnMintPool.vy` is read by the retained checker and pinned in the retained inventory; the other two files in that directory are its README and reference source. |
 | One-time scripts | None found without a consumer. All six `scripts/params/*.py` reports are invoked by `scripts/params/run_all.py`; `scripts/utils/log.py` is imported by `migrate.py` and the runner; `check_contract_artifacts.py`, `update_contract_artifact_expectations.py`, `export_abis.py`, and `verify_blockscout.py` are on the Section 3.4 retention list. `scripts/ledger_signing_smoke.py` has no textual consumer but is deployment-owner signing tooling protected by Section 0.5 precedence 3. |
 
+## Artifact repairs (owner-authorized)
+
+Two artifact-integrity gates arrived red **from rh**, reproduced identically on a
+pristine `6260726` checkout. The owner directed that they be repaired in this PR
+rather than upstream. Both repairs are mechanical and are recorded here because
+they touch artifact authority, which this cleanup otherwise never does.
+
+| Gate | Condition on rh `6260726` | Repair |
+| --- | --- | --- |
+| ABI parity | `contracts/config/DefaultsRobinhoodLive.vy` exists with no exported ABI → `ABI_EXPORT_FAILED: missing ABI output: DefaultsRobinhoodLive.json` | Ran `scripts/export_abis.py`. It emitted exactly one new file, `scripts/abis/DefaultsRobinhoodLive.json`; the other 52 were already byte-current. `tests/deployment/test_abi_export.py`'s census assertion moves 52 → 53. **All 52 ABIs present at `610b43f` are retained; this cleanup removes none.** |
+| Contract artifacts | `MissionControl.vy` hashes `9585e6…` while `contract-artifact-expectations.json` still recorded `37558b…` → `CONTRACT_ARTIFACTS_FAILED` | Ran the sanctioned `scripts/update_contract_artifact_expectations.py MissionControl`. Six fields changed, all derived from the source: `source_git_blob`, `source_sha256`, the three creation hashes, and `transitive_compiler_input_integrity`. No size field changed. |
+
+**What the MissionControl refresh ratifies.** rh commit `be6e4e9` removed two
+constants and inlined their literal values, reordering three constructor
+assignments:
+
+```diff
+-RIPE_GOV_VAULT_ID: constant(uint256) = 2
+-STABILITY_POOL_VAULT_ID: constant(uint256) = 1
+-    self.coreRipeGovVaultId = RIPE_GOV_VAULT_ID
+-    self.preferredStabVaultId = STABILITY_POOL_VAULT_ID
+-    self.isStabVaultId[STABILITY_POOL_VAULT_ID] = True
++    self.preferredStabVaultId = 1
++    self.isStabVaultId[1] = True
++    self.coreRipeGovVaultId = 2
+```
+
+Same values, same semantics — a no-op refactor. Creation and runtime **sizes are
+unchanged**, which corroborates that; only instruction order moved. The
+expectation file already carried the new sizes, so rh had partially refreshed it
+and left the hashes stale.
+
+I advised against making these repairs here, because the plan forbids refreshing
+an expectation hash to make a gate pass and because artifact authority belongs
+with the contract's author. The owner decided otherwise on the record. The
+refresh is disclosed in full above so a reviewer can judge it directly.
+
+**Still red, and deliberately not repaired:**
+`tests/deployment/test_manifest_schema.py::test_robinhood_migration_handoff_is_in_memory_typed_and_write_free`
+fails with `AttributeError: 'Migration' object has no attribute
+'handoff_manifest_v2_action_result'`. It failed at `610b43f` and fails on
+pristine rh. Fixing it means changing the migration runner or manifest schema,
+which plan Sections 1.2 and 6 place out of scope.
+
 ## Validation
 
 Interpreter `/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
@@ -286,15 +322,17 @@ than exact equality, which is weaker evidence than the lean lane's exact match.
 
 ### Gates at the candidate tip
 
-`scripts/check_contract_artifacts.py` reports `CONTRACT_ARTIFACTS_OK` — no
-retained production-artifact drift. ABI export parity (52 outputs), the
+`scripts/check_contract_artifacts.py` reports `CONTRACT_ARTIFACTS_OK` and
+`scripts/export_abis.py --check` passes — but only after two owner-authorized
+repairs of drift that arrived with rh, described under **Artifact repairs** below. ABI export parity (52 outputs), the
 dependency-security gate, contract artifact inventory, current-manifest
 promotion, network profiles, base profile regression, the Robinhood blueprint
 census, and the offline fork suite are all GREEN. The full table, including the
 gates carrying pre-existing failures, is in `validation-evidence.md`.
 
-The Python workflow was **not dispatched**. The branch is unpushed, so no CI
-result is claimed.
+The Python workflow was **not dispatched**. It has no push or pull-request
+trigger — it is `workflow_dispatch` only — so opening PR #77 starts no CI run and
+no CI result is claimed anywhere in this report.
 
 ### Benchmarks (process wall time from `/usr/bin/time -p`, authoritative)
 
@@ -334,7 +372,7 @@ the quiet-machine baseline methodology.
 ## Residual risks and follow-ups
 
 - **RH-D018 is resolved, not deferred.** The owner ratified superseding its
-  repository-placement clause on 2026-08-07. `RH-D020 — The dashboard is
+  repository-placement clause on 2026-08-07. `RH-D024 — The dashboard is
   extracted from the active tree` now carries that authority in the decision
   register, `status.yaml` mirrors it in the `decisions` list and in
   `dashboard_governance`, and register/`status.yaml` identifier-and-title parity
