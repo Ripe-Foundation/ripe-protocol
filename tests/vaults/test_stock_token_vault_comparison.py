@@ -25,6 +25,7 @@ C-01 -> registry and required asset flags
 
 import boa
 import pytest
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import buy_fungible_auction, filter_logs
@@ -942,7 +943,7 @@ def test_new_deposit_after_total_loss_with_old_accounting(
     if vault_kind == "simple":
         stock_token.mint(alice, fresh_amount, sender=deploy3r)
         stock_token.approve(teller, fresh_amount, sender=alice)
-        with boa.reverts("insufficient vault backing"):
+        with pytest.raises(BoaError, match="insufficient vault backing"):
             teller.deposit(stock_token, fresh_amount, alice, vault, sender=alice)
         assert stock_token.balanceOf(alice) == fresh_amount
         assert stock_token.balanceOf(vault) == 0

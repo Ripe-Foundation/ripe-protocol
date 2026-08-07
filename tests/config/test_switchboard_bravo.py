@@ -74,6 +74,139 @@ def zero_pointer_mission_control(ripe_hq, defaults):
     )
 
 
+def _replace_registered_mission_control(ripe_hq, governance, replacement):
+    assert ripe_hq.startAddressUpdateToRegistry(
+        5,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(5, sender=governance.address)
+    assert ripe_hq.getAddr(5) == replacement.address
+
+
+def _assert_failed_execution_preserves_pending(
+    switchboard_bravo,
+    governance,
+    action_id,
+    expected_asset,
+):
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
+    action_type_before = switchboard_bravo.actionType(action_id)
+    with boa.reverts("invalid asset config"):
+        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.actionType(action_id) == action_type_before
+    pending_after = switchboard_bravo.pendingAssetConfig(action_id)
+    assert pending_after.asset == pending_before.asset == expected_asset
+    assert pending_after.config == pending_before.config
+
+
+def test_execute_liq_config_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    action_id = switchboard_bravo.setAssetLiqConfig(
+        alpha_token,
+        False,
+        False,
+        False,
+        False,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
+def test_execute_debt_terms_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    terms = original.debtTerms
+    action_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token,
+        terms.ltv,
+        terms.redemptionThreshold,
+        terms.liqThreshold,
+        terms.liqFee,
+        terms.borrowRate,
+        terms.daowry,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
+def test_execute_whitelist_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    action_id = switchboard_bravo.setWhitelistForAsset(
+        alpha_token,
+        ZERO_ADDRESS,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
 ###############
 # Tests
 ###############

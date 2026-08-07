@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import boa
 import pytest
 
@@ -28,36 +26,114 @@ ADDYS_FIELDS = (
 )
 
 
-def test_teller_callsite_classification_and_identity_matrix_is_preserved():
-    teller_source = Path("contracts/core/Teller.vy").read_text()
-    expected_calls = {
-        "self._performHousekeeping(False, _user, True, a)": 4,
-        "self._performHousekeeping(False, _user, True, _a)": 1,
-        "self._performHousekeeping(True, _user, True, a)": 5,
-        "self._performHousekeeping(True, _user, False, a)": 1,
-        "self._performHousekeeping(False, _user, False, a)": 1,
-        "self._performHousekeeping(False, _recipient, True, a)": 7,
-        "self._performHousekeeping(False, msg.sender, True, a)": 3,
-        (
-            "self._performHousekeeping("
-            "_isHigherRisk, _user, _shouldUpdateDebt, a)"
-        ): 1,
-    }
+def _credit_engine_recorder():
+    return boa.loads(
+        """# @version 0.4.3
+count: public(uint256)
+lastUser: public(address)
+lastHq: public(address)
 
-    for call, count in expected_calls.items():
-        assert teller_source.count(call) == count
-    assert teller_source.count("self._performHousekeeping(") == sum(
-        expected_calls.values()
+struct Addys:
+    hq: address
+    greenToken: address
+    savingsGreen: address
+    ripeToken: address
+    ledger: address
+    missionControl: address
+    switchboard: address
+    priceDesk: address
+    vaultBook: address
+    auctionHouse: address
+    auctionHouseNft: address
+    boardroom: address
+    bondRoom: address
+    creditEngine: address
+    endaoment: address
+    humanResources: address
+    lootbox: address
+    teller: address
+
+@external
+def updateDebtForUser(_user: address, _a: Addys) -> bool:
+    self.count += 1
+    self.lastUser = _user
+    self.lastHq = _a.hq
+    return True
+""",
+        name="teller_housekeeping_credit_engine_recorder",
     )
 
-    deleverage_source = Path("contracts/core/Deleverage.vy").read_text()
-    assert (
-        deleverage_source.count(
-            "extcall Teller(a.teller).performHousekeeping("
-            "False, _user, True, a)"
+
+@pytest.mark.parametrize(
+    ("is_higher_risk", "subject_fixture"),
+    (
+        pytest.param(False, "alice", id="low-risk-user-subject"),
+        pytest.param(True, "bob", id="high-risk-user-subject"),
+    ),
+)
+def test_teller_route_housekeeping_risk_and_subject_matrix(
+    request,
+    is_higher_risk,
+    subject_fixture,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    deleverage,
+    alice,
+    bob,
+):
+    mission_control.setShouldCheckLastTouch(True, sender=switchboard_alpha.address)
+    subject = request.getfixturevalue(subject_fixture)
+    decoy = bob if subject == alice else alice
+
+    teller.performHousekeeping(
+        is_higher_risk,
+        subject,
+        False,
+        sender=deleverage.address,
+    )
+    assert ledger.lastTouch(subject) == boa.env.evm.patch.block_number
+    assert ledger.lastTouch(decoy) == 0
+
+    if is_higher_risk:
+        with boa.reverts("one action per block"):
+            teller.performHousekeeping(
+                True,
+                subject,
+                False,
+                sender=deleverage.address,
+            )
+    else:
+        teller.performHousekeeping(
+            False,
+            subject,
+            False,
+            sender=deleverage.address,
         )
-        == 1
+        assert ledger.lastTouch(subject) == boa.env.evm.patch.block_number
+
+
+@pytest.mark.parametrize("should_update_debt", [False, True])
+def test_teller_route_housekeeping_debt_update_matrix(
+    should_update_debt,
+    teller,
+    deleverage,
+    alice,
+):
+    recorder = _credit_engine_recorder()
+    supplied = _addys_bundle(teller, creditEngine=recorder.address)
+    teller.performHousekeeping(
+        False,
+        alice,
+        should_update_debt,
+        supplied,
+        sender=deleverage.address,
     )
+    assert recorder.count() == int(should_update_debt)
+    if should_update_debt:
+        assert recorder.lastUser() == alice
+        assert recorder.lastHq() == supplied[0]
 
 
 def _addys_bundle(teller, **replacements):

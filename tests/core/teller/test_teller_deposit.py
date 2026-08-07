@@ -1,10 +1,11 @@
-import hashlib
 import subprocess
 import sys
 from pathlib import Path
 
 import boa
 import pytest
+from eth_abi import encode
+from eth_utils import keccak
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs, redeem_collateral
@@ -517,12 +518,6 @@ def _m1_replace_hq_address(ripe_hq, governance, registry_id, replacement):
     )
 
 
-T1_MUTEX_REMOVAL_SHA256 = (
-    "fdb1e2de2fb0617ba0d250e6380ce62a88107dcded80d718ffd994206270a6fd"
-)
-T6_RECEIPT_EQUALITY_BYPASS_SHA256 = (
-    "63e9433c0408b1b8e9f88e3991136bea34a17b6cf234dfc3e454e6915b9ad2ef"
-)
 # Keep source-mutant registrations outside Boa's generated-address sequence.
 # Auto-anchored tests can reuse generated addresses while Boa retains diagnostic
 # type metadata for the prior contract registered at that address.
@@ -533,17 +528,13 @@ T6_RECEIPT_EQUALITY_MUTANT_ADDRESS = (
 
 def _t1_mutex_removal_mutant_source():
     source = Path("contracts/core/Teller.vy").read_text()
-    removals = (
-        "receiptMeasurementActive: transient(bool)\n",
-        "    assert not self.receiptMeasurementActive\n",
-        "    self.receiptMeasurementActive = True\n",
-        "    self.receiptMeasurementActive = False\n",
+    assertion = (
+        "    assert not self.receiptMeasurementActive"
+        " # dev: receipt measurement active\n"
     )
-    for removal in removals:
-        assert source.count(removal) == 1
-        source = source.replace(removal, "", 1)
-    assert "receiptMeasurementActive" not in source
-    assert hashlib.sha256(source.encode()).hexdigest() == T1_MUTEX_REMOVAL_SHA256
+    assert source.count(assertion) == 1
+    source = source.replace(assertion, "", 1)
+    assert "assert not self.receiptMeasurementActive" not in source
     return source
 
 
@@ -551,7 +542,7 @@ def _t6_receipt_equality_bypass_mutant_source():
     source = Path("contracts/core/Teller.vy").read_text()
     equality = (
         "        assert extcall Vault(vaultAddr).depositTokensInVault("
-        "_user, _asset, amount, _a) == amount\n"
+        "_user, _asset, amount, _a) == amount # dev: deposit failed\n"
     )
     bypass = (
         "        extcall Vault(vaultAddr).depositTokensInVault("
@@ -560,9 +551,6 @@ def _t6_receipt_equality_bypass_mutant_source():
     assert source.count(equality) == 1
     source = source.replace(equality, bypass, 1)
     assert equality not in source
-    assert hashlib.sha256(source.encode()).hexdigest() == (
-        T6_RECEIPT_EQUALITY_BYPASS_SHA256
-    )
     return source
 
 
@@ -1740,7 +1728,7 @@ def test_m1_typed_balance_observation_accepts_trailing_data(
         pytest.param(4, id="reverts"),
     ),
 )
-def test_m1_vault_result_mismatch_reverts_exact_transfer(
+def test_deposit_reverts_when_vault_reports_result_different_from_receipt(
     vault_mode,
     vault_book,
     governance,
@@ -1769,6 +1757,92 @@ def test_m1_vault_result_mismatch_reverts_exact_transfer(
         teller.deposit(token, amount, bob, vault, sender=bob)
 
     _m1_assert_no_deposit_effects(teller, ledger, vault, token, bob, amount)
+
+
+def test_deposit_succeeds_when_vault_result_matches_exact_receipt(
+    simple_erc20_vault,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+):
+    setGeneralConfig()
+    token = _m1_token()
+    setAssetConfig(token)
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(bob, amount)
+    token.approve(teller, amount, sender=bob)
+
+    assert teller.deposit(
+        token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert token.balanceValue(bob) == 0
+    assert token.balanceValue(simple_erc20_vault) == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, token) == amount
+    assert ledger.isParticipatingInVault(bob, 3)
+    assert ledger.getNumUserVaults(bob) == 1
+
+
+def test_removed_single_item_routes_are_not_callable_at_runtime(teller, bob):
+    probe = boa.loads(
+        """# @version 0.4.3
+
+@external
+def call_succeeds(_target: address, _data: Bytes[1024]) -> bool:
+    success: bool = False
+    response: Bytes[4096] = b""
+    success, response = raw_call(
+        _target,
+        _data,
+        max_outsize=4096,
+        revert_on_failure=False,
+    )
+    return success
+""",
+        name="removed_teller_selector_probe",
+    )
+    route_families = (
+        (
+            "redeemCollateral",
+            ("address", "uint256", "address", "uint256", "bool", "bool", "bool", "address"),
+            (str(bob), 1, str(bob), 1, False, False, False, str(bob)),
+            range(3, 9),
+        ),
+        (
+            "buyFungibleAuction",
+            ("address", "uint256", "address", "uint256", "bool", "bool", "bool", "address"),
+            (str(bob), 1, str(bob), 1, False, False, False, str(bob)),
+            range(3, 9),
+        ),
+        (
+            "claimFromStabilityPool",
+            ("uint256", "address", "address", "uint256", "address", "bool"),
+            (1, str(bob), str(bob), 1, str(bob), False),
+            range(3, 7),
+        ),
+        (
+            "redeemFromStabilityPool",
+            ("uint256", "address", "uint256", "address", "bool", "bool", "bool"),
+            (1, str(bob), 1, str(bob), False, False, False),
+            range(2, 8),
+        ),
+    )
+    checked_signatures = []
+    for name, all_types, all_values, arities in route_families:
+        for arity in arities:
+            types = all_types[:arity]
+            signature = f"{name}({','.join(types)})"
+            calldata = keccak(text=signature)[:4] + encode(types, all_values[:arity])
+            assert not probe.call_succeeds(teller, calldata), signature
+            checked_signatures.append(signature)
+
+    assert len(checked_signatures) == 22
+    assert probe.call_succeeds(teller, keccak(text="isPaused()")[:4])
 
 
 def test_t6_vault_receipt_equality_mutant_silently_accepts_short_report(
@@ -1874,7 +1948,7 @@ def test_t6_real_basic_vault_blocks_short_report_without_teller_equality(
     token.approve(mutant, amount, sender=credit_engine.address)
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
-    with boa.reverts("insufficient vault backing"):
+    with boa.reverts(dev="insufficient vault backing"):
         mutant.depositFromTrusted(
             bob,
             vault_id,
@@ -2246,7 +2320,9 @@ def test_t1_real_basic_vault_blocks_offsetting_receipt_without_teller_mutex(
         vault_book,
     )
 
-    with boa.reverts("insufficient vault backing"):
+    # The mutant's external-call wrapper masks the nested BasicVault dev label.
+    # The post-revert state assertions below discriminate the atomic guard path.
+    with boa.reverts():
         mutant.depositFromTrusted(
             bob,
             vault_id,
@@ -2781,6 +2857,154 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
+def test_receipt_measurement_mutex_blocks_nested_batch_redemption(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+    credit_engine,
+    ledger,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=70_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    callback_token = _m1_token()
+    setAssetConfig(callback_token)
+    outer_amount = 100 * EIGHTEEN_DECIMALS
+    callback_token.mint(credit_engine, outer_amount)
+    callback_token.approve(teller, outer_amount, sender=credit_engine.address)
+    payment = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(callback_token, payment, sender=whale)
+    green_token.approve(teller, payment, sender=callback_token.address)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    nested = teller.redeemCollateralFromMany.prepare_calldata(
+        [(bob, vault_id, alpha_token.address, MAX_UINT256)],
+        payment,
+        False,
+        True,
+        True,
+        callback_token.address,
+    )
+    callback_token.configure_callback(teller, nested, True)
+    callback_token.configure_callback_rejection_policy(False)
+    callback_token.configure_transfer(0)
+    snapshot = (
+        callback_token.balanceValue(credit_engine),
+        callback_token.balanceValue(simple_erc20_vault),
+        alpha_token.balanceOf(simple_erc20_vault),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(callback_token, alpha_token),
+        green_token.balanceOf(callback_token),
+        ledger.getNumUserVaults(callback_token),
+    )
+
+    with boa.reverts(dev="receipt measurement active"):
+        teller.depositFromTrusted(
+            bob,
+            vault_id,
+            callback_token,
+            outer_amount,
+            0,
+            sender=credit_engine.address,
+        )
+    assert snapshot == (
+        callback_token.balanceValue(credit_engine),
+        callback_token.balanceValue(simple_erc20_vault),
+        alpha_token.balanceOf(simple_erc20_vault),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(callback_token, alpha_token),
+        green_token.balanceOf(callback_token),
+        ledger.getNumUserVaults(callback_token),
+    )
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+def test_receipt_measurement_mutex_allows_normal_sequential_operations(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+    credit_engine,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=70_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    sequential_token = _m1_token()
+    setAssetConfig(sequential_token)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    sequential_token.mint(credit_engine, deposit_amount)
+    sequential_token.approve(teller, deposit_amount, sender=credit_engine.address)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert teller.depositFromTrusted(
+        bob,
+        vault_id,
+        sequential_token,
+        deposit_amount,
+        0,
+        sender=credit_engine.address,
+    ) == deposit_amount
+    assert sequential_token.balanceValue(simple_erc20_vault) == deposit_amount
+
+    payment = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    bob_collateral_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    alice_collateral_before = simple_erc20_vault.getTotalAmountForUser(alice, alpha_token)
+    spent = redeem_collateral(
+        teller,
+        bob,
+        vault_id,
+        alpha_token,
+        payment,
+        False,
+        True,
+        True,
+        alice,
+        sender=alice,
+    )
+    assert 0 < spent <= payment
+    alice_received = (
+        simple_erc20_vault.getTotalAmountForUser(alice, alpha_token)
+        - alice_collateral_before
+    )
+    assert alice_received > 0
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) < bob_collateral_before
+    assert alpha_token.balanceOf(alice) == 0
+
+
 @pytest.mark.parametrize(
     "vault_fixture",
     (
@@ -3264,10 +3488,8 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
             user,
         )
     elif nested_action == "redemption":
-        nested = teller.redeemCollateral.prepare_calldata(
-            user,
-            protected_id,
-            token,
+        nested = teller.redeemCollateralFromMany.prepare_calldata(
+            [(user, protected_id, token.address, 1)],
             1,
             False,
             False,

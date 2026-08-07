@@ -4,6 +4,271 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
+TELLER_ID = 17
+
+
+def _alternate_teller(name):
+    return boa.loads(
+        """
+# pragma version ~=0.4.3
+
+@external
+def marker():
+    pass
+""",
+        name=name,
+    )
+
+
+def _replace_teller_pointer(ripe_hq, governance, replacement):
+    ripe_hq.startAddressUpdateToRegistry(
+        TELLER_ID,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        TELLER_ID,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(TELLER_ID) == replacement.address
+
+
+def _disable_teller_pointer(ripe_hq, governance):
+    ripe_hq.startAddressDisableInRegistry(TELLER_ID, sender=governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressDisableInRegistry(
+        TELLER_ID,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(TELLER_ID) == ZERO_ADDRESS
+
+
+def _seed_claimable_deposit_loot(
+    user,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    asset,
+    whale,
+):
+    setGeneralConfig()
+    setAssetConfig(asset)
+    setRipeRewardsConfig()
+    performDeposit(user, 100 * EIGHTEEN_DECIMALS, asset, whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(
+        user,
+        vault_id,
+        simple_erc20_vault,
+        asset,
+        sender=teller.address,
+    )
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        user,
+        vault_id,
+        simple_erc20_vault,
+        asset,
+        sender=teller.address,
+    )
+    return vault_id
+
+
+def test_claim_deposit_loot_uses_current_teller_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    alternate = _alternate_teller("alternate_loot_claim_teller")
+    _replace_teller_pointer(ripe_hq, governance, alternate)
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints
+    claimable = lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token)
+    assert points_before > 0
+    assert claimable > 0
+
+    with boa.reverts(dev="no perms"):
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_id,
+            alpha_token,
+            sender=teller.address,
+        )
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == points_before
+    assert ripe_token.balanceOf(bob) == 0
+
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alternate.address,
+    )
+    assert claimed == claimable
+    assert ripe_token.balanceOf(bob) == claimed
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+
+
+def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    global_before = ledger.globalDepositPoints()
+    last_touch_before = ledger.lastTouch(bob)
+    ripe_before = ripe_token.balanceOf(bob)
+    _disable_teller_pointer(ripe_hq, governance)
+
+    with boa.reverts(dev="no perms"):
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_id,
+            alpha_token,
+            sender=teller.address,
+        )
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token) == points_before
+    assert ledger.globalDepositPoints() == global_before
+    assert ledger.lastTouch(bob) == last_touch_before
+    assert ripe_token.balanceOf(bob) == ripe_before
+
+
+def test_get_claimable_loot_with_position_reverts_when_teller_pointer_is_unset(
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    alpha_token,
+    alpha_token_whale,
+):
+    _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    _disable_teller_pointer(ripe_hq, governance)
+
+    assert lootbox.getClaimableLoot(alice) == 0
+    with boa.reverts():
+        lootbox.getClaimableLoot(bob)
+
+
+def test_get_claimable_loot_from_alternate_pointer_matches_claimed_amount(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    alternate = _alternate_teller("alternate_loot_view_teller")
+    _replace_teller_pointer(ripe_hq, governance, alternate)
+    viewed = lootbox.getClaimableLoot(bob)
+    assert viewed > 0
+
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alternate.address,
+    )
+    assert claimed == viewed
+    assert ripe_token.balanceOf(bob) == viewed
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+
+
 def test_loot_claim_basic(
     bob,
     setGeneralConfig,

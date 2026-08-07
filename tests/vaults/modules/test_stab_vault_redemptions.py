@@ -1,7 +1,7 @@
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import redeem_from_stability_pool
+from conf_utils import filter_logs, redeem_from_stability_pool
 
 
 def test_stab_vault_redemptions_basic(
@@ -153,6 +153,90 @@ def test_stab_vault_redemptions_refund(
     # these should stay the same!
     assert stability_pool.getTotalUserValue(alice, alpha_token) == pre_user_value
     assert stability_pool.getTotalValue(alpha_token) == pre_total_value
+
+
+def test_full_redemption_depletes_active_pair_and_emits_deactivation_zero_reason_one(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    for asset in (alpha_token, bravo_token, green_token):
+        mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, 100 * amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        alice,
+        alpha_token,
+        100 * amount,
+        sender=teller.address,
+    )
+    bravo_token.transfer(stability_pool, amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        1,
+        bravo_token,
+        amount,
+        alice,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 1
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
+    green_token.transfer(bob, amount, sender=whale)
+    green_token.approve(teller, amount, sender=bob)
+    vault_id = vault_book.getRegId(stability_pool)
+
+    redeemed = redeem_from_stability_pool(
+        teller,
+        vault_id,
+        bravo_token,
+        amount,
+        bob,
+        False,
+        False,
+        True,
+        sender=bob,
+    )
+    assert redeemed == amount
+    events = filter_logs(teller, "ClaimAssetDeactivated")
+    assert len(events) == 1
+    event = events[0]
+    assert event.stabAsset == alpha_token.address
+    assert event.claimAsset == bravo_token.address
+    assert event.balance == 0
+    assert event.activeCount == 0
+    assert event.reason == 1
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == 0
+    assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) == 1
+    assert stability_pool.claimableBalances(alpha_token, green_token) == amount
+    assert stability_pool.totalClaimableBalances(green_token) == amount
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
+    assert stability_pool.claimableAssets(alpha_token, 1) == green_token.address
+    activated = filter_logs(teller, "ClaimAssetActivated")
+    assert len(activated) == 1
+    assert activated[0].stabAsset == alpha_token.address
+    assert activated[0].claimAsset == green_token.address
+    assert activated[0].activeCount == 1
+    assert bravo_token.balanceOf(bob) == amount
+    assert green_token.balanceOf(bob) == 0
 
 
 def test_stab_vault_redemptions_validation(

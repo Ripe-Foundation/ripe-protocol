@@ -76,12 +76,13 @@ def _deploy_ledger(ripe_hq_deploy, defaults, source, name="action_block_ledger")
     )
 
 
-def test_native_source_getter_and_action_identity_match_block_number(
+def test_native_action_block_mode_does_not_call_arb_sys(
     ledger,
     teller,
     alice,
 ):
     assert ledger.ACTION_BLOCK_SOURCE() == ZERO_ADDRESS
+    _install_arb_sys_failure("reverting")
 
     for increment in (0, 1, 2, 4, 60):
         if increment:
@@ -119,23 +120,39 @@ def test_constructor_rejects_every_nonzero_non_arb_sys_source(
         "incompatible",
     ],
 )
-def test_arb_sys_constructor_fails_closed_when_call_or_decode_is_invalid(
+def test_arb_sys_constructor_defers_validation_to_first_runtime_read(
     ripe_hq_deploy,
     defaults,
+    teller,
+    alice,
     failure,
 ):
     _install_arb_sys_failure(failure)
+    ledger = _deploy_ledger(ripe_hq_deploy, defaults, ARB_SYS)
+
+    assert ledger.ACTION_BLOCK_SOURCE() == ARB_SYS
+    assert ledger.lastTouch(alice) == 0
+    assert ledger.getNumUserVaults(alice) == 0
     with boa.reverts():
-        _deploy_ledger(ripe_hq_deploy, defaults, ARB_SYS)
+        ledger.getArbActionBlock()
+    with boa.reverts():
+        ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+    assert ledger.lastTouch(alice) == 0
+    assert ledger.getNumUserVaults(alice) == 0
 
 
-def test_arb_sys_constructor_validates_call_and_exposes_immutable_source(
+def test_get_arb_action_block_returns_exact_identity_word(
     ripe_hq_deploy,
     defaults,
+    teller,
+    alice,
 ):
     _install_arb_sys(700)
     ledger = _deploy_ledger(ripe_hq_deploy, defaults, ARB_SYS)
     assert ledger.ACTION_BLOCK_SOURCE() == ARB_SYS
+    assert ledger.getArbActionBlock() == 700
+    ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+    assert ledger.lastTouch(alice) == 700
 
 
 def test_arb_sys_identity_not_native_block_controls_equality(
@@ -230,11 +247,12 @@ def test_arb_sys_keeps_users_isolated_within_one_action_block(
         "incompatible",
     ],
 )
-def test_arb_sys_runtime_failure_reverts_without_fallback_or_partial_write(
+def test_get_arb_action_block_rejects_invalid_returndata_without_fallback(
     ripe_hq_deploy,
     defaults,
     teller,
     alice,
+    bob,
     failure,
 ):
     _install_arb_sys(1_000)
@@ -246,8 +264,13 @@ def test_arb_sys_runtime_failure_reverts_without_fallback_or_partial_write(
     boa.env.time_travel(blocks=1)
 
     with boa.reverts():
-        ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+        ledger.getArbActionBlock()
+    with boa.reverts():
+        ledger.checkAndUpdateLastTouch(bob, False, sender=teller.address)
     assert ledger.lastTouch(alice) == 1_000
+    assert ledger.lastTouch(bob) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+    assert ledger.numBorrowers() == 0
     assert ledger.lastTouch(alice) != native_block + 1
 
 
@@ -411,15 +434,6 @@ def _getArbActionBlock() -> uint256:
             "        max_outsize=65,",
             "        max_outsize=32,",
         )
-    if kind == "no_constructor_probe":
-        return _replace_once(
-            source,
-            """    if _actionBlockSource == ARB_SYS:
-        _: uint256 = self._getArbActionBlock()
-
-""",
-            "",
-        )
     if kind == "native_fallback":
         mutant_helper = """@view
 @internal
@@ -483,16 +497,13 @@ def test_l2_both_check_and_update_last_touch_selectors_share_teller_gated_body(
 
 L3A_KILLING_TESTS = {
     "typed_call": (
-        "test_l3a_typed_call_mutant_accepts_every_oversized_constructor_case"
+        "test_l3a_typed_call_mutant_accepts_every_oversized_runtime_case"
     ),
     "truncation": (
-        "test_arb_sys_constructor_fails_closed_when_call_or_decode_is_invalid"
-    ),
-    "no_constructor_probe": (
-        "test_arb_sys_constructor_fails_closed_when_call_or_decode_is_invalid"
+        "test_l3a_truncation_mutant_accepts_oversized_runtime_case"
     ),
     "native_fallback": (
-        "test_arb_sys_runtime_failure_reverts_without_fallback_or_partial_write"
+        "test_get_arb_action_block_rejects_invalid_returndata_without_fallback"
     ),
     "monotonic": (
         "test_arb_sys_preserves_equality_only_without_monotonicity_assertion"
@@ -505,23 +516,19 @@ L3A_KILLING_TESTS = {
     [
         (
             "typed_call",
-            "0357682c8018c9cec062179f1d2020109000d890950590b2b5d2f8c590f9e6b4",
+            "e49a3c268dd03f44bdf1945b322eef9b6f7758abe94f4af2ea0eee1359a23783",
         ),
         (
             "truncation",
-            "3012fdbc09bf750980dae1e08da48b014c846345b16dd3ca0e8ee8eaf8043865",
-        ),
-        (
-            "no_constructor_probe",
-            "d847811d29fb7eede2c6be62938703cd508d4196ab47e543fb206d42d3a6c073",
+            "14b7588e482eb6befa973b1ae0e0946d6cba41645b6caf4db95d21eefffae23b",
         ),
         (
             "native_fallback",
-            "1379dd6a5e67703db3e1a3c00fa0063be4e993540117ebc624657ca4510ac25d",
+            "6dda650f33d66a5ca08e86f6f80b442b9fc4897d40548a71bf07d9029ab48d5e",
         ),
         (
             "monotonic",
-            "94bc87b5d2549444b3ed3fe9f01d90275643e92697716899ea3f99307780abdb",
+            "40cc1866f1c8d2b58686b90114567934d68921917f0023f2920d84fa0d501b97",
         ),
     ],
 )
@@ -538,7 +545,7 @@ def test_l3a_mutant_source_identities_are_frozen(kind, expected_sha256):
     "failure",
     ("oversized_33", "oversized_64", "oversized_gt_64"),
 )
-def test_l3a_typed_call_mutant_accepts_every_oversized_constructor_case(
+def test_l3a_typed_call_mutant_accepts_every_oversized_runtime_case(
     ripe_hq_deploy,
     defaults,
     failure,
@@ -552,6 +559,7 @@ def test_l3a_typed_call_mutant_accepts_every_oversized_constructor_case(
         f"l3a_typed_call_ledger_{failure}",
     )
     assert mutant.ACTION_BLOCK_SOURCE() == ARB_SYS
+    assert mutant.getArbActionBlock() == 0
 
 
 @pytest.mark.parametrize(
@@ -601,7 +609,7 @@ def test_exact_but_false_words_define_identity_not_chain_truth(
         assert ledger.lastTouch(alice) == 0
 
 
-def test_l3a_truncation_mutant_fails_oversized_constructor_case(
+def test_l3a_truncation_mutant_accepts_oversized_runtime_case(
     ripe_hq_deploy,
     defaults,
 ):
@@ -614,21 +622,7 @@ def test_l3a_truncation_mutant_fails_oversized_constructor_case(
         "l3a_truncated_return_ledger",
     )
     assert mutant.ACTION_BLOCK_SOURCE() == ARB_SYS
-
-
-def test_l3a_removed_probe_mutant_fails_missing_constructor_case(
-    ripe_hq_deploy,
-    defaults,
-):
-    _install_arb_sys_failure("missing")
-    mutant = _deploy_ledger_source(
-        _l3a_mutant_source("no_constructor_probe"),
-        ripe_hq_deploy,
-        defaults,
-        ARB_SYS,
-        "l3a_no_constructor_probe_ledger",
-    )
-    assert mutant.ACTION_BLOCK_SOURCE() == ARB_SYS
+    assert mutant.getArbActionBlock() == 0
 
 
 def test_l3a_native_fallback_mutant_fails_runtime_source_failure_case(

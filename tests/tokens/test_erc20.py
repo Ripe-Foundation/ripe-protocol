@@ -21,6 +21,83 @@ def mock_ripe_hq(governance, fork, green_token, savings_green, ripe_token):
     )
 
 
+def _deploy_unset_ccip_tokens(deploy3r, fork):
+    token_args = (
+        ZERO_ADDRESS,
+        deploy3r,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        0,
+        ZERO_ADDRESS,
+    )
+    green = boa.load("contracts/tokens/GreenToken.vy", *token_args)
+    ripe = boa.load("contracts/tokens/RipeToken.vy", *token_args)
+    savings = boa.load(
+        "contracts/tokens/SavingsGreen.vy",
+        green,
+        *token_args,
+    )
+    return green, ripe, savings
+
+
+def _finish_ccip_setup(tokens, deploy3r, fork):
+    green, ripe, savings = tokens
+    hq = boa.load(
+        "contracts/registries/RipeHq.vy",
+        green,
+        savings,
+        ripe,
+        deploy3r,
+        PARAMS[fork]["RIPE_HQ_MIN_GOV_TIMELOCK"],
+        PARAMS[fork]["RIPE_HQ_MAX_GOV_TIMELOCK"],
+        PARAMS[fork]["RIPE_HQ_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["RIPE_HQ_MAX_REG_TIMELOCK"],
+    )
+    for token in tokens:
+        assert token.finishTokenSetup(hq, sender=deploy3r)
+        assert token.ripeHq() == hq.address
+    return hq
+
+
+def test_ccip_admin_equals_current_hq_governance(deploy3r, fork):
+    tokens = _deploy_unset_ccip_tokens(deploy3r, fork)
+    hq = _finish_ccip_setup(tokens, deploy3r, fork)
+
+    assert hq.governance() == deploy3r
+    for token in tokens:
+        assert token.getCCIPAdmin() == deploy3r
+
+
+def test_ccip_admin_follows_confirmed_hq_governance_change(
+    deploy3r,
+    fork,
+    mock_rando_contract,
+):
+    tokens = _deploy_unset_ccip_tokens(deploy3r, fork)
+    hq = _finish_ccip_setup(tokens, deploy3r, fork)
+    assert all(token.getCCIPAdmin() == deploy3r for token in tokens)
+
+    hq.startGovernanceChange(mock_rando_contract, sender=deploy3r)
+    boa.env.time_travel(blocks=hq.govChangeTimeLock())
+    hq.confirmGovernanceChange(sender=mock_rando_contract.address)
+
+    assert hq.governance() == mock_rando_contract.address
+    for token in tokens:
+        assert token.getCCIPAdmin() == mock_rando_contract.address
+
+
+def test_ccip_admin_pre_setup_behavior_is_explicit(deploy3r, fork):
+    tokens = _deploy_unset_ccip_tokens(deploy3r, fork)
+    for token in tokens:
+        assert token.ripeHq() == ZERO_ADDRESS
+        with boa.reverts():
+            token.getCCIPAdmin()
+
+    hq = _finish_ccip_setup(tokens, deploy3r, fork)
+    for token in tokens:
+        assert token.getCCIPAdmin() == hq.governance() == deploy3r
+
+
 # Basic ERC20 Tests
 def test_green_token_basic_info(green_token):
     """Test basic ERC20 token information for Green Token"""
@@ -490,4 +567,3 @@ def test_green_token_events(green_token, whale, bob, governance, switchboard, mo
     assert hq_change_log.prevHq == green_token.ripeHq()
     assert hq_change_log.newHq == mock_ripe_hq.address
     assert hq_change_log.confirmBlock == boa.env.evm.patch.block_number + green_token.hqChangeTimeLock()
-
