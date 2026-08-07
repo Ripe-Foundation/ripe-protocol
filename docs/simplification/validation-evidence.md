@@ -13,14 +13,25 @@ path, and hash a landing reviewer needs.
 | `51616b9` | Train 2 — step-manifest and dashboard extraction | 588 | 615,611 |
 | `b4f2a95` | Step-manifest extraction recorded in status.yaml | 588 | 615,623 |
 | `61ec63d` | First implementation report | 588 | 615,863 |
-| `e74f184` | Review remediation: RH-D024, corrected metrics **← validated tip** | 588 | 615,919 |
+| `e74f184` | Review remediation: RH-D024, corrected metrics **← pre-merge validated tip** | 588 | 615,919 |
+| `186ef35` | Merge rh (`6260726`) into the branch | 599 | 628,777 |
+| `0d99cdb` | Record post-merge state and rh's pre-existing failures | 599 | 628,777 |
+| `1a74dfa` | Re-review remediation: RH-D024, artifact repairs, operator spec | 600 | 629,496 |
+| `6781cb2` | Revert the artifact repairs; leave those gates with rh **← delivered tip** | 599 | 628,810 |
 
-**Validated candidate tip:** `e74f1843497cde63dcb813048bbee9cfc5546890`
-**Delivered branch tip:** `e74f1843497cde63dcb813048bbee9cfc5546890`
+For reference, the post-merge baseline `6260726` (rh tip) holds 688 tracked
+files and 3,457,888 tracked lines, so the delivered tip removes 89 files and
+2,829,078 lines (−81.8%) relative to the branch point it will merge back into.
 
-If the delivered tip differs from the validated tip, the only difference is
-this evidence document, which is added last. The exact diff and the re-run fast
-gates are recorded in section 9.
+**Pre-merge validated tip:** `e74f1843497cde63dcb813048bbee9cfc5546890`
+**Delivered branch tip:** `6781cb2107b5b9403307df27195bcdfb94f3656b`
+
+Sections 3–7 bind the **pre-merge** pair `610b43f` versus `e74f184`. The branch
+has since merged rh and taken two remediation commits, so the delivered tip is
+no longer the tip those sections validated. The post-merge re-run that Section
+12 called for — full baseline/candidate matrix at `6260726` versus `6781cb2` —
+has now landed and is reported in **Section 13**, which is the authoritative
+evidence for the delivered tip.
 
 ## 2. Environment and machine
 
@@ -669,12 +680,112 @@ artifact expectation.
 
 The full baseline/candidate matrix in sections 3–7 is bound to `610b43f` versus
 `e74f184` and **does not bind the merged tree**. Plan Section 14.4 requires
-repeating it against the new rh tip as baseline. That re-run is reported
-separately; until it lands, the merged branch carries only the targeted evidence
-in this section plus these fast gates:
+repeating it against the new rh tip as baseline. **That re-run has now landed —
+see Section 13**, which supersedes this subsection as the binding evidence for
+the delivered tip. The fast gates below were the interim record:
 
 | Fast gate on the merged tree | Result |
 | --- | --- |
 | lean collection | 3457/3739 (282 deselected) |
 | comprehensive collection | 4756/4899 (143 deselected) |
 | socket-purity gate | 57 passed |
+
+## 13. Post-merge full matrix (`6260726` versus `6781cb2`)
+
+This section is the Plan Section 14.4 re-run that Section 12 deferred. It binds
+the **delivered tip** and supersedes Section 12's interim fast gates.
+
+### Method
+
+Baseline and candidate each ran in a dedicated `git clone --no-hardlinks`
+checkout (`baseline-clone` at `6260726`, `candidate2-clone` at `6781cb2`), the
+same clone-not-worktree isolation Section 2 describes. Both checkouts were
+clean at run time and each `HEAD` was re-read after every lane. Interpreter and
+machine match Section 2 and were confirmed from the run artifacts themselves:
+`/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312` (Python
+3.12), host `Wigglez-MacStudio-2025.local`, run 2026-08-07.
+
+### Suite results
+
+| Lane | Commit | Result | pytest | `real` | `user` | `sys` | exit |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Lean | `6260726` | 13 failed, 3355 passed, 282 deselected, 64 xfailed, 25 errors (0:17:05) | 1025.61s | 1093.87s | 1051.07s | 39.92s | 1 |
+| Comprehensive | `6260726` | 42 failed, 4449 passed, 143 deselected, 64 xfailed, 201 errors (0:26:51) | 1611.34s | 1757.99s | 1678.98s | 73.91s | 1 |
+| Lean | `6781cb2` | 13 failed, 3355 passed, 282 deselected, 64 xfailed, 25 errors (0:17:04) | 1024.78s | 1092.55s | 1048.93s | 40.45s | 1 |
+| Comprehensive | `6781cb2` | 42 failed, 4449 passed, 143 deselected, 64 xfailed, 201 errors (0:27:02) | 1622.80s | 1773.38s | 1696.91s | 71.30s | 1 |
+
+```text
+baseline_lean_head_after          = 6260726d0d08a3bfec5b6e494c0adacb70be90f9
+baseline_comprehensive_head_after = 6260726d0d08a3bfec5b6e494c0adacb70be90f9
+final_lean_head_after             = 6781cb2107b5b9403307df27195bcdfb94f3656b
+final_comprehensive_head_after    = 6781cb2107b5b9403307df27195bcdfb94f3656b
+```
+
+The 42 failures and 201 errors are rh's own pre-existing conditions; they are
+present **identically on the baseline**, so this branch introduces none of them.
+
+### Per-node identity (the binding check)
+
+Summary counts can coincide while the underlying sets differ, so identity was
+established per test node from the JUnit XMLs — comparing every
+`classname::name` and its status — not from the summary lines:
+
+| Lane | Nodes | Baseline outcome | Candidate outcome | Only in baseline | Only in candidate | Status changed |
+| --- | ---: | --- | --- | ---: | ---: | ---: |
+| Lean | 3,457 | 3355 P / 13 F / 25 E / 64 skipped | identical | 0 | 0 | 0 |
+| Comprehensive | 4,756 | 4449 P / 42 F / 201 E / 64 skipped | identical | 0 | 0 | 0 |
+
+**Zero drift in either lane.** No test appears or disappears, and no test
+changes status, between baseline and candidate.
+
+### Extraction-manifest integrity
+
+All 93 rows of `extracted-files.tsv` were re-verified against recovery commit
+`610b43f4508e85628a1362532a79d68d71ea902c`: for every row the blob exists at
+that commit and its blob id, byte length, and SHA-256 all match the recorded
+values — **93/93 exact, 0 discrepancies**. The deleted-path set and the TSV
+path set reconcile 1:1 with no member on either side unmatched. `610b43f4` is
+an ancestor of live branches in the origin repository, so recovery does not
+depend on any temporary checkout.
+
+### Scope of the delivered diff
+
+`6260726 → 6781cb2` is 103 files: 93 deleted, 6 modified, 4 added. The only
+non-documentation change is `tests/deployment/test_manifest_schema.py`.
+
+> **Reviewer note — genuine coverage reduction.** In
+> `test_every_committed_base_json_parses_without_rewrite`, the corpus assertion
+> moves from `== 60` to `== 1`. The loop body and every schema assertion are
+> unchanged, and the test passes on both sides, but its assertion surface now
+> covers one manifest (`current-manifest.json`) instead of sixty. The
+> corpus-level guard against a schema-breaking rewrite of the historical
+> manifests therefore lives in git history rather than in CI. This is intended
+> and disclosed, not a regression — but it is a real reduction and is the item
+> most deserving of an explicit landing decision.
+
+`.github/workflows/rh-handoff-dashboard.yml` is deleted alongside the dashboard
+it builds (its `working-directory` is `docs/chains/rh/dashboard`); removing one
+without the other would leave a workflow that cannot run.
+
+### Evidence packet
+
+Archived out of volatile `/private/tmp` to
+`~/dev/ripe-protocol-review-archives/rh-simplification-mergerun/`, with
+`SHA256SUMS.txt` alongside (verified `OK` on all eight files after the copy):
+
+```text
+aa30096bd07656648b21936ff142a49bfaa2b97c09f99efe5d035a6e336a492e  evidence-baseline/baseline-lean.log
+07c46297c30ab9b3d236384d3884d2c0d0ccac946728517088b5600e0caced28  evidence-baseline/baseline-lean.xml
+124852bc3929660c51f8e6e3df021f118e45b83db8be0479184eb01aeac745ce  evidence-baseline/baseline-comprehensive.log
+0ce0cd5a6f8e64776309cf438e3e453c931080f471548c4f3948627ea536e0bc  evidence-baseline/baseline-comprehensive.xml
+f05efb2d86a59b313f59bb310b63dfde692fa6463adf35b309f2eb4f0e10367e  evidence-final2/final-lean.log
+ffd92b5988e8cb3c862cd06016d52fb99f30aaeb6e6ae6504ae3a79f85b60455  evidence-final2/final-lean.xml
+69847fc28de409accca173ff6e05b77f8fb290fb0b0ac05e0d46882d190f03ff  evidence-final2/final-comprehensive.log
+879879f8432fff109e0345ab1fc4e7bf980a8de257a82f4871d3aa34d79022d2  evidence-final2/final-comprehensive.xml
+```
+
+### Standing invariant, restated
+
+Sections 3–7 remain bound to the pre-merge pair. This section binds the
+delivered tip. Any future commit touching a path outside `docs/simplification/`
+requires repeating this Section 13 matrix.
