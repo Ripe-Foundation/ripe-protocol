@@ -7,6 +7,26 @@ from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
 
 
+@dataclass(frozen=True)
+class UniswapV2DeploymentConfig:
+    ripe_is_token0: bool = True
+    ripe_decimals: int = 18
+    quote_decimals: int = 18
+    ripe_units: int = 100
+    quote_units: int = 10
+    quote_usd: int = 2_000 * EIGHTEEN_DECIMALS
+    pool_contains_ripe: bool = True
+    finish_setup: bool = True
+
+
+UNISWAP_V2_DEFAULTS = UniswapV2DeploymentConfig()
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep this focused mock suite independent of the protocol bootstrap."""
+
+
 @dataclass
 class UniswapV2PricesFixture:
     source: object
@@ -29,74 +49,113 @@ def set_pool_reserves(fixture, ripe_units, quote_units):
     fixture.pair.sync()
 
 
+@pytest.fixture(scope="module")
+def uniswap_v2_factories():
+    """Compile each reusable mock/source factory once for this module."""
+    return {
+        "token": boa.load_partial("contracts/mock/MockUniswapV2Token.vy"),
+        "pair": boa.load_partial("contracts/mock/MockUniswapV2Pair.vy"),
+        "quote_desk": boa.load_partial(
+            "contracts/mock/MockUniswapV2QuotePriceDesk.vy"
+        ),
+        "hq": boa.load_partial("contracts/mock/MockUniswapV2RipeHq.vy"),
+        "source": boa.load_partial(
+            "contracts/priceSources/UniswapV2Prices.vy"
+        ),
+    }
+
+
+def _deploy_uniswap_v2_prices(
+    factories,
+    governance,
+    config,
+):
+    ripe = factories["token"].deploy(config.ripe_decimals)
+    quote = factories["token"].deploy(config.quote_decimals)
+    other = factories["token"].deploy(18)
+    pair = factories["pair"].deploy()
+
+    paired_ripe = ripe if config.pool_contains_ripe else other
+    token0 = paired_ripe.address if config.ripe_is_token0 else quote.address
+    token1 = quote.address if config.ripe_is_token0 else paired_ripe.address
+    pair.configureIdentity(ZERO_ADDRESS, token0, token1)
+
+    ripe_reserve = config.ripe_units * 10**config.ripe_decimals
+    quote_reserve = config.quote_units * 10**config.quote_decimals
+    reserve0 = ripe_reserve if config.ripe_is_token0 else quote_reserve
+    reserve1 = quote_reserve if config.ripe_is_token0 else ripe_reserve
+    token0_contract = paired_ripe if config.ripe_is_token0 else quote
+    token1_contract = quote if config.ripe_is_token0 else paired_ripe
+    token0_contract.setBalance(pair.address, reserve0)
+    token1_contract.setBalance(pair.address, reserve1)
+    pair.mint(governance.address)
+
+    quote_desk = factories["quote_desk"].deploy()
+    quote_desk.setPrice(config.quote_usd)
+    hq = factories["hq"].deploy(
+        governance.address,
+        quote_desk.address,
+    )
+    snapshot_caller = boa.env.generate_address("uniswap snapshot caller")
+    switchboard_caller = boa.env.generate_address("uniswap switchboard caller")
+    hq.setValidRipeAddr(snapshot_caller, True)
+    hq.setValidSwitchboardAddr(switchboard_caller, True)
+
+    source = factories["source"].deploy(
+        hq.address,
+        ZERO_ADDRESS,
+        pair.address,
+        ripe.address,
+        1,
+        100,
+    )
+    if config.finish_setup:
+        assert source.setActionTimeLockAfterSetup(sender=governance.address)
+
+    return UniswapV2PricesFixture(
+        source=source,
+        pair=pair,
+        ripe=ripe,
+        quote=quote,
+        quote_desk=quote_desk,
+        hq=hq,
+        governor=governance.address,
+        snapshot_caller=snapshot_caller,
+        switchboard_caller=switchboard_caller,
+        ripe_is_token0=config.ripe_is_token0,
+    )
+
+
 @pytest.fixture
-def uniswap_v2_prices_builder(governance):
+def uniswap_v2_prices_builder(
+    governance,
+    uniswap_v2_factories,
+):
     def build(
         *,
-        ripe_is_token0=True,
-        ripe_decimals=18,
-        quote_decimals=18,
-        ripe_units=100,
-        quote_units=10,
-        quote_usd=2_000 * EIGHTEEN_DECIMALS,
-        pool_contains_ripe=True,
-        finish_setup=True,
+        ripe_is_token0=UNISWAP_V2_DEFAULTS.ripe_is_token0,
+        ripe_decimals=UNISWAP_V2_DEFAULTS.ripe_decimals,
+        quote_decimals=UNISWAP_V2_DEFAULTS.quote_decimals,
+        ripe_units=UNISWAP_V2_DEFAULTS.ripe_units,
+        quote_units=UNISWAP_V2_DEFAULTS.quote_units,
+        quote_usd=UNISWAP_V2_DEFAULTS.quote_usd,
+        pool_contains_ripe=UNISWAP_V2_DEFAULTS.pool_contains_ripe,
+        finish_setup=UNISWAP_V2_DEFAULTS.finish_setup,
     ):
-        ripe = boa.load("contracts/mock/MockUniswapV2Token.vy", ripe_decimals)
-        quote = boa.load("contracts/mock/MockUniswapV2Token.vy", quote_decimals)
-        other = boa.load("contracts/mock/MockUniswapV2Token.vy", 18)
-        pair = boa.load("contracts/mock/MockUniswapV2Pair.vy")
-
-        paired_ripe = ripe if pool_contains_ripe else other
-        token0 = paired_ripe.address if ripe_is_token0 else quote.address
-        token1 = quote.address if ripe_is_token0 else paired_ripe.address
-        pair.configureIdentity(ZERO_ADDRESS, token0, token1)
-
-        ripe_reserve = ripe_units * 10**ripe_decimals
-        quote_reserve = quote_units * 10**quote_decimals
-        reserve0 = ripe_reserve if ripe_is_token0 else quote_reserve
-        reserve1 = quote_reserve if ripe_is_token0 else ripe_reserve
-        token0_contract = paired_ripe if ripe_is_token0 else quote
-        token1_contract = quote if ripe_is_token0 else paired_ripe
-        token0_contract.setBalance(pair.address, reserve0)
-        token1_contract.setBalance(pair.address, reserve1)
-        pair.mint(governance.address)
-
-        quote_desk = boa.load("contracts/mock/MockUniswapV2QuotePriceDesk.vy")
-        quote_desk.setPrice(quote_usd)
-        hq = boa.load(
-            "contracts/mock/MockUniswapV2RipeHq.vy",
-            governance.address,
-            quote_desk.address,
-        )
-        snapshot_caller = boa.env.generate_address("uniswap snapshot caller")
-        switchboard_caller = boa.env.generate_address("uniswap switchboard caller")
-        hq.setValidRipeAddr(snapshot_caller, True)
-        hq.setValidSwitchboardAddr(switchboard_caller, True)
-
-        source = boa.load(
-            "contracts/priceSources/UniswapV2Prices.vy",
-            hq.address,
-            ZERO_ADDRESS,
-            pair.address,
-            ripe.address,
-            1,
-            100,
-        )
-        if finish_setup:
-            assert source.setActionTimeLockAfterSetup(sender=governance.address)
-
-        return UniswapV2PricesFixture(
-            source=source,
-            pair=pair,
-            ripe=ripe,
-            quote=quote,
-            quote_desk=quote_desk,
-            hq=hq,
-            governor=governance.address,
-            snapshot_caller=snapshot_caller,
-            switchboard_caller=switchboard_caller,
+        config = UniswapV2DeploymentConfig(
             ripe_is_token0=ripe_is_token0,
+            ripe_decimals=ripe_decimals,
+            quote_decimals=quote_decimals,
+            ripe_units=ripe_units,
+            quote_units=quote_units,
+            quote_usd=quote_usd,
+            pool_contains_ripe=pool_contains_ripe,
+            finish_setup=finish_setup,
+        )
+        return _deploy_uniswap_v2_prices(
+            uniswap_v2_factories,
+            governance,
+            config,
         )
 
     return build
@@ -285,7 +344,7 @@ def test_constructor_sets_expected_immutables_and_defaults(uniswap_v2_prices_bui
     assert config.staleTime == 86_400
     assert config.nextIndex == 0
     assert fixture.source.getPricedAssets() == [fixture.ripe.address]
-    assert len(boa.env.get_code(fixture.source.address)) == 13_925
+    assert len(boa.env.get_code(fixture.source.address)) == 14_122
 
 
 def test_protocol_price_is_zero_until_first_snapshot(uniswap_v2_prices_builder):
@@ -537,6 +596,8 @@ def test_governance_can_propose_and_confirm_configuration(uniswap_v2_prices_buil
     assert fixture.source.updatePriceConfig(*new_config, sender=fixture.governor)
     pending = fixture.source.pendingPriceConfigs(fixture.ripe.address)
     assert pending.actionId != 0
+    assert pending.config.lastSnapshot == (0, 0)
+    assert pending.config.nextIndex == 0
     assert fixture.source.hasPendingPriceFeedUpdate(fixture.ripe.address)
     assert not fixture.source.canConfirmAction(pending.actionId)
 
@@ -574,7 +635,9 @@ def test_configuration_cannot_be_confirmed_before_timelock(uniswap_v2_prices_bui
     assert fixture.source.hasPendingPriceFeedUpdate(fixture.ripe.address)
 
 
-def test_config_confirmation_adds_fresh_snapshot(uniswap_v2_prices_builder):
+def test_config_confirmation_preserves_multiple_snapshots_added_during_timelock(
+    uniswap_v2_prices_builder,
+):
     fixture = uniswap_v2_prices_builder()
     assert fixture.source.addPriceSnapshot(
         fixture.ripe.address,
@@ -588,16 +651,29 @@ def test_config_confirmation_adds_fresh_snapshot(uniswap_v2_prices_builder):
         fixture.ripe.address,
         sender=fixture.snapshot_caller,
     )
-    latest_before_confirm = fixture.source.priceConfigs(fixture.ripe.address).lastSnapshot
+    boa.env.time_travel(seconds=300)
+    set_pool_reserves(fixture, 100, 4)
+    assert fixture.source.addPriceSnapshot(
+        fixture.ripe.address,
+        sender=fixture.snapshot_caller,
+    )
+    before_confirm = fixture.source.priceConfigs(fixture.ripe.address)
+    slots_before_confirm = [
+        fixture.source.snapShots(fixture.ripe.address, index)
+        for index in range(3)
+    ]
 
     assert fixture.source.confirmPriceFeedUpdate(
         fixture.ripe.address,
         sender=fixture.governor,
     )
     config = fixture.source.priceConfigs(fixture.ripe.address)
-    assert config.lastSnapshot == latest_before_confirm
-    assert config.nextIndex == 2
-    assert fixture.source.snapShots(fixture.ripe.address, 1) == latest_before_confirm
+    assert config.lastSnapshot == before_confirm.lastSnapshot
+    assert config.nextIndex == before_confirm.nextIndex == 3
+    assert [
+        fixture.source.snapShots(fixture.ripe.address, index)
+        for index in range(3)
+    ] == slots_before_confirm
 
 
 def test_config_confirmation_clamps_cursor_when_snapshot_window_shrinks(
@@ -611,6 +687,7 @@ def test_config_confirmation_clamps_cursor_when_snapshot_window_shrinks(
         )
         boa.env.time_travel(seconds=300)
     assert fixture.source.priceConfigs(fixture.ripe.address).nextIndex == 12
+    retained_out_of_window = fixture.source.snapShots(fixture.ripe.address, 7)
 
     assert fixture.source.updatePriceConfig(
         300,
@@ -624,16 +701,53 @@ def test_config_confirmation_clamps_cursor_when_snapshot_window_shrinks(
         fixture.ripe.address,
         sender=fixture.governor,
     )
-    assert fixture.source.priceConfigs(fixture.ripe.address).nextIndex == 0
+    # The live cursor clamps 12 % 5 to 2, then the normal confirmation-time
+    # snapshot succeeds and advances it once.
+    assert fixture.source.priceConfigs(fixture.ripe.address).nextIndex == 3
+    assert fixture.source.snapShots(fixture.ripe.address, 7) == retained_out_of_window
+    assert fixture.source.getWeightedPrice(
+        fixture.ripe.address,
+    ) == 200 * EIGHTEEN_DECIMALS
 
     boa.env.time_travel(seconds=300)
-    old_slot = fixture.source.snapShots(fixture.ripe.address, 0)
+    old_slot = fixture.source.snapShots(fixture.ripe.address, 3)
     assert fixture.source.addPriceSnapshot(
         fixture.ripe.address,
         sender=fixture.snapshot_caller,
     )
-    assert fixture.source.priceConfigs(fixture.ripe.address).nextIndex == 1
-    assert fixture.source.snapShots(fixture.ripe.address, 0).lastUpdate > old_slot.lastUpdate
+    assert fixture.source.priceConfigs(fixture.ripe.address).nextIndex == 4
+    assert fixture.source.snapShots(fixture.ripe.address, 3).lastUpdate > old_slot.lastUpdate
+
+
+def test_config_confirmation_preserves_cursor_when_window_expands(
+    uniswap_v2_prices_builder,
+):
+    fixture = uniswap_v2_prices_builder()
+    for index in range(7):
+        assert fixture.source.addPriceSnapshot(
+            fixture.ripe.address,
+            sender=fixture.snapshot_caller,
+        )
+        if index != 6:
+            boa.env.time_travel(seconds=300)
+    live = fixture.source.priceConfigs(fixture.ripe.address)
+    assert live.nextIndex == 7
+
+    assert fixture.source.updatePriceConfig(
+        300,
+        25,
+        1_000,
+        86_400,
+        sender=fixture.governor,
+    )
+    boa.env.time_travel(blocks=fixture.source.actionTimeLock())
+    assert fixture.source.confirmPriceFeedUpdate(
+        fixture.ripe.address,
+        sender=fixture.governor,
+    )
+    expanded = fixture.source.priceConfigs(fixture.ripe.address)
+    assert expanded.nextIndex == live.nextIndex
+    assert expanded.lastSnapshot == live.lastSnapshot
 
 
 def test_governance_can_cancel_configuration(uniswap_v2_prices_builder):
@@ -676,7 +790,7 @@ def test_governance_cannot_cancel_configuration_while_paused(
     assert not fixture.source.hasPendingPriceFeedUpdate(fixture.ripe.address)
 
 
-def test_new_config_proposal_replaces_pending_record_without_cancelling_old_action(
+def test_new_config_proposal_cancels_old_action_before_replacement(
     uniswap_v2_prices_builder,
 ):
     fixture = uniswap_v2_prices_builder()
@@ -697,10 +811,13 @@ def test_new_config_proposal_replaces_pending_record_without_cancelling_old_acti
         10_800,
         sender=fixture.governor,
     )
+    cancelled = filter_logs(fixture.source, "PriceConfigUpdateCancelled")
     new_aid = fixture.source.pendingPriceConfigs(fixture.ripe.address).actionId
     assert new_aid != old_aid
-    assert fixture.source.hasPendingAction(old_aid)
+    assert not fixture.source.hasPendingAction(old_aid)
     assert fixture.source.hasPendingAction(new_aid)
+    assert len(cancelled) == 1
+    assert cancelled[0].asset == fixture.ripe.address
 
 
 def test_expired_config_remains_reported_as_pending_until_cancelled(

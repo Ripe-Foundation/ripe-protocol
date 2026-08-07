@@ -1,5 +1,13 @@
 EIP170_LIMIT = 24_576
 
+EXPECTED_DEPLOYED_RUNTIME_BYTES = {
+    "MissionControl": 15_998,
+    "SwitchboardBravo": 23_082,
+    "Teller": 24_139,
+    "CreditEngine": 24_392,
+    "StabilityPool": 24_371,
+}
+
 
 def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     mission_control,
@@ -28,6 +36,11 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
     }
     print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
+
+    assert {
+        name: deployed_runtime_bytes[name]
+        for name in EXPECTED_DEPLOYED_RUNTIME_BYTES
+    } == EXPECTED_DEPLOYED_RUNTIME_BYTES
 
     oversized = {
         name: size

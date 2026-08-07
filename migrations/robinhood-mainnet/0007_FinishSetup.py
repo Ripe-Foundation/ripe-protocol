@@ -1,38 +1,52 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
 
-from config.robinhood_launch import GOVERNANCE, address
+from config.robinhood_launch import GOVERNANCE
+
+
+ACTION_TIMELOCK_COMPONENTS = (
+    "SwitchboardAlpha",
+    "SwitchboardBravo",
+    "SwitchboardCharlie",
+    "SwitchboardDelta",
+    "SwitchboardEcho",
+    "ChainlinkPrices",
+    "CurvePrices",
+    "HumanResources",
+)
+
+REGISTRY_TIMELOCK_COMPONENTS = (
+    "Switchboard",
+    "PriceDesk",
+    "VaultBook",
+    "RipeHq",
+)
 
 
 def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
-    # switchboard = migration.get_contract("Switchboard")
-    # sb_alpha = migration.get_contract("SwitchboardAlpha")
-    # sb_bravo = migration.get_contract("SwitchboardBravo")
-    # sb_charlie = migration.get_contract("SwitchboardCharlie")
-    # sb_delta = migration.get_contract("SwitchboardDelta")
-    # sb_echo = migration.get_contract("SwitchboardEcho")
-    # chainlink = migration.get_contract("ChainlinkPrices")
-    # curve_prices = migration.get_contract("CurvePrices")
-    # blue_chip = migration.get_contract("BlueChipYieldPrices")
-    # human_resources = migration.get_contract("HumanResources")
-    # price_desk = migration.get_contract("PriceDesk")
-    # vault_book = migration.get_contract("VaultBook")
 
-    # log.h1("Setting time locks after setup")
+    log.h1("Setting time locks after setup")
 
-    # for board in (sb_alpha, sb_bravo, sb_charlie, sb_delta, sb_echo):
-    #     migration.execute(board.setActionTimeLockAfterSetup)
+    for name in ACTION_TIMELOCK_COMPONENTS:
+        component = migration.get_contract(name)
+        assert int(component.actionTimeLock()) == 0, f"{name} timelock already set"
+        selected = int(component.minActionTimeLock())
+        assert selected != 0, f"{name} minimum timelock is zero"
+        assert migration.execute(component.setActionTimeLockAfterSetup, selected)
+        actual = int(component.actionTimeLock())
+        assert actual == selected, f"{name} timelock readback mismatch"
+        log.h2(f"{name}: actionTimeLock 0 -> {actual}")
 
-    # migration.execute(chainlink.setActionTimeLockAfterSetup)
-    # migration.execute(curve_prices.setActionTimeLockAfterSetup)
-    # migration.execute(blue_chip.setActionTimeLockAfterSetup)
-    # migration.execute(human_resources.setActionTimeLockAfterSetup)
-
-    # assert migration.execute(switchboard.setRegistryTimeLockAfterSetup)
-    # assert migration.execute(price_desk.setRegistryTimeLockAfterSetup)
-    # assert migration.execute(vault_book.setRegistryTimeLockAfterSetup)
-    # assert migration.execute(hq.setRegistryTimeLockAfterSetup)
+    for name in REGISTRY_TIMELOCK_COMPONENTS:
+        registry = migration.get_contract(name)
+        assert int(registry.registryChangeTimeLock()) == 0, f"{name} timelock already set"
+        selected = int(registry.minRegistryTimeLock())
+        assert selected != 0, f"{name} minimum timelock is zero"
+        assert migration.execute(registry.setRegistryTimeLockAfterSetup, selected)
+        actual = int(registry.registryChangeTimeLock())
+        assert actual == selected, f"{name} timelock readback mismatch"
+        log.h2(f"{name}: registryChangeTimeLock 0 -> {actual}")
 
     log.h1("Handing governance to the Safe")
 

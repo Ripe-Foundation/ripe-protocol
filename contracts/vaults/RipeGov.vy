@@ -326,10 +326,19 @@ def _handleGovDataOnWithdrawal(
         if _config.shouldFreezeWhenBadDebt:
             assert staticcall Ledger(_ledger).badDebt() == 0 # dev: cannot withdraw when bad debt
 
-    # disabled user keeps their saved points unchanged while position data stays current.
+    # Disabled users forfeit no stored points on a partial exit. A complete
+    # per-asset exit clears only the frozen points already recorded for that
+    # asset; unsafe pending accrual is intentionally never calculated.
     if self._isGovPointAccrualDisabled(_user):
         userData.lastShares = vaultData.userBalances[_user][_asset]
         userData.lastPointsUpdate = block.number
+        if userData.lastShares == 0:
+            savedPoints: uint256 = userData.govPoints
+            assert self.totalUserGovPoints[_user] >= savedPoints # dev: inconsistent user gov points
+            assert self.totalGovPoints >= savedPoints # dev: inconsistent global gov points
+            userData.govPoints = 0
+            self.totalUserGovPoints[_user] -= savedPoints
+            self.totalGovPoints -= savedPoints
         self.userGovData[_user][_asset] = userData
         return 0
 
@@ -413,9 +422,15 @@ def _handleGovDataOnTransfer(
     # to user
     self._handleGovDataOnDeposit(_toUser, _asset, _transferShares, _lockDuration, transferPoints, _config)
 
-    # update other gov points / boardroom
-    self._updateUserGovPoints(_fromUser, _asset, _missionControl, _boardroom)
-    self._updateUserGovPoints(_toUser, _asset, _missionControl, _boardroom)
+    # The disabled sender already skips its own Boardroom callback below, but
+    # the healthy recipient would still call it and could strand the sender's
+    # emergency exit. Suppress both callbacks for this transaction; canonical
+    # totals update atomically and the public update path can retry the recipient.
+    boardroom: address = _boardroom
+    if self._isGovPointAccrualDisabled(_fromUser):
+        boardroom = empty(address)
+    self._updateUserGovPoints(_fromUser, _asset, _missionControl, boardroom)
+    self._updateUserGovPoints(_toUser, _asset, _missionControl, boardroom)
 
 
 # transfer contributor tokens
@@ -563,7 +578,6 @@ def importPositionForMigration(
     assert _sourceVault != self and _sourceVault.is_contract # dev: invalid source vault
     assert _migration.amount != 0 # dev: invalid migration amount
     assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated out
-    assert vaultData.indexOfUserAsset[_user][_asset] == 0 # dev: target position exists
     assert vaultData.userBalances[_user][_asset] == 0 # dev: target balance exists
 
     # check gov data -- cannot have any existing gov data

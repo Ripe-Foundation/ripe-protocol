@@ -343,7 +343,6 @@ class RobinhoodStockM4Binding:
 # separately retained verification metadata is closed.
 ROBINHOOD_USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
 ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"
-ROBINHOOD_STEAKHOUSE_USDG_VAULT = "0xBeEff033F34C046626B8D0A041844C5d1A5409dd"
 ROBINHOOD_GOVERNANCE = "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf"
 ROBINHOOD_CHAINLINK_ETH_USD = "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9"
 ROBINHOOD_CHAINLINK_BTC_USD = "0xa2c5184bF03d373Dc9dE4876eb4Bce595B460251"
@@ -362,7 +361,6 @@ ROBINHOOD_ADDRESSES = {
     # Defaults constructor external facts.
     "USDG": ROBINHOOD_USDG,
     "WETH": ROBINHOOD_WETH,
-    "STEAKHOUSE_USDG_VAULT": ROBINHOOD_STEAKHOUSE_USDG_VAULT,
     # Governance, oracle, protocol, and chain identities.
     "GOVERNANCE": ROBINHOOD_GOVERNANCE,
     "SAFE": ROBINHOOD_GOVERNANCE,
@@ -387,7 +385,6 @@ ROBINHOOD_ADDRESS_STATUS = {
     "GUARDIAN": "deployment_produced_unresolved",
     "USDG": "selected_external_fact_unverified",
     "WETH": "selected_external_fact_unverified",
-    "STEAKHOUSE_USDG_VAULT": "selected_external_fact_unverified",
     "GOVERNANCE": "selected_external_fact_unverified",
     "SAFE": "selected_external_fact_unverified",
     "CHAINLINK_ETH_USD": "selected_external_fact_unverified",
@@ -408,7 +405,6 @@ ROBINHOOD_DEFAULTS_CONSTRUCTOR = (
     ("sgreenToken", "SGREEN_TOKEN"),
     ("usdgToken", "USDG"),
     ("wethToken", "WETH"),
-    ("steakhouseUsdgVault", "STEAKHOUSE_USDG_VAULT"),
 )
 
 ROBINHOOD_CHAIN = {
@@ -1014,7 +1010,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     # DP-15
     'Deployment.DP-15.rewards.arePointsEnabled': RobinhoodInput(SourceReference('Defaults.rewardsConfig.arePointsEnabled'), 'approved'),
     'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),
-    'Deployment.DP-15.rewards.promotion': RobinhoodInput('7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec', 'approved'),
+    'Deployment.DP-15.rewards.promotion': RobinhoodInput('f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234', 'approved'),
     # DP-16
     'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(False, 'disabled'),
     'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(False, 'disabled'),
@@ -1127,7 +1123,7 @@ ROBINHOOD_COMPONENTS["curve_launch"] = {
     "component_id": "CM-017",
     "registry_id": 2,
     "configured_assets": ("GREEN",),
-    "priority_ids": (1, 3),
+    "priority_ids": (1, 2),
 }
 
 # Bounded Curve launch authority. Every row is either an approved repository
@@ -1163,7 +1159,7 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "selected_launch",
     ),
     RobinhoodCurveLaunchInput(
-        "launch.priority_price_source_ids", (1, 3), "repository_approved", "oracle_owner",
+        "launch.priority_price_source_ids", (1, 2), "repository_approved", "oracle_owner",
         "contracts/config/DefaultsRobinhood.vy", "resolved_repository_fact",
     ),
     RobinhoodCurveLaunchInput(
@@ -1702,6 +1698,4 @@ CORE_TOKENS["robinhood"] = {
     "RIPE": ROBINHOOD_ADDRESSES["RIPE_TOKEN"],
     "SGREEN": ROBINHOOD_ADDRESSES["SGREEN_TOKEN"],
 }
-YIELD_TOKENS["robinhood"] = {
-    "STEAKHOUSE_USDG": ROBINHOOD_ADDRESSES["STEAKHOUSE_USDG_VAULT"],
-}
+YIELD_TOKENS["robinhood"] = {}

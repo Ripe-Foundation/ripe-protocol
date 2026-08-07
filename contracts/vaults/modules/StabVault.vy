@@ -116,8 +116,8 @@ MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-ACTIVATION_USD_THRESHOLD: constant(uint256) = 25 * 10 ** 16  # $0.25 in 18-decimal USD
-RETENTION_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
+ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
+RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 
 CLAIM_ASSET_ABSENT: constant(uint256) = 0
 CLAIM_ASSET_DORMANT: constant(uint256) = 1
@@ -611,7 +611,7 @@ def _getValueOfClaimableAssets(
         if balance == 0:
             continue
 
-        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
+        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, False)
         if claimValue == 0:
             continue
 

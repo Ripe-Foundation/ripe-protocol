@@ -1,9 +1,10 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 1 August 2026
-**Current configuration-source subject:** commit
-`5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
-`7454b5456ebb6cd02d716a64b408629ab501629e`
+**Snapshot date:** 7 August 2026
+**Current production-source candidate:** commit
+`e12b1abe26218acb804d84670099c41169e5f515`, tree
+`b680f0016f29f9a217054db9f80c0bbf9f0b9916`, under draft PR #73 status
+reconciliation
 **Current status authority:** [`status.yaml`](status.yaml)
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
@@ -33,7 +34,7 @@ The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
 `DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
 two editable value authorities, and the ledger is derived and synchronized.
 The exact current result is `configuration_consistent=true`,
-`deployment_ready=false`, with 80 readiness blockers. Repository configuration
+`deployment_ready=false`, with 65 readiness blockers. Repository configuration
 is prepared and consistent; production/onchain configuration has not occurred.
 
 ## Program-level decisions
@@ -219,7 +220,7 @@ Sources:
 ### RH-D014 — Symbolic blueprint before concrete values
 
 **Status:** H-03 Phase A evidence and implementation integrated; all concrete
-values and all 42 canonical blockers remain open, including the 23
+values and all 28 canonical blockers remain open, including nine
 Curve-specific typed inputs.
 
 H-03 controls the typed launch graph, symbolic inputs, explicit omissions,
@@ -244,7 +245,7 @@ the typed JSON ledger is derived evidence, not an input surface.
 All operative decisions are approved, and the integrated manifest carries 14
 binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
-remain unresolved, so deployment readiness fails closed with 80 blockers. The
+remain unresolved, so deployment readiness fails closed with 65 blockers. The
 corrected PR #61 four-control machine representation gap remains
 preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
@@ -254,15 +255,16 @@ Source:
 
 ### RH-D016 — Shared migration source, isolated histories
 
-**Status:** H-05 deterministic blocked planning integrated; execution
-unauthorized and no Robinhood migration history exists.
+**Status:** Eight-file imperative Robinhood migration candidate under draft PR
+#73 review; no executable plan is authorized or currently censused, execution
+is unauthorized, and no Robinhood migration history exists.
 
-Use one shared `migrations/robinhood/` source and separate immutable
-Robinhood-testnet and Robinhood-mainnet histories if and only if later
-execution is authorized. Current deterministic reports are predeployment
-planning: a reservation, assertion, omission, blocked row, deferred row,
-rejection, or tooling-only row is not an executable migration; `plan_hash`
-remains null while planning is blocked.
+The current candidate uses `migrations/robinhood-mainnet/0000_TokensAndHq.py`
+through `0007_FinishSetup.py`. Review those repository files deterministically
+against Blueprint and Defaults. The former shared declarative source, runner,
+transaction executor, 17-stage/action census, and 86-key plan census are
+retired historical evidence. Do not create history or infer an executable plan
+from repository migration files.
 
 Source:
 [`evidence/robinhood-migration-phase-a.md`](evidence/robinhood-migration-phase-a.md).
@@ -383,40 +385,40 @@ work.
 every external-state phase remain blocked.
 
 Select unchanged `CurvePrices` at PriceDesk ID 2 for GREEN only, while keeping
-Chainlink at ID 1, BlueChipYield at ID 3, IDs 4 and 5 empty, and priority IDs
-`[1, 3]`. The exact route is GREEN -> Curve GREEN/USDG -> PriceDesk ->
-Chainlink USDG. USDG has no Curve feed, so the route cannot recurse.
+Chainlink at ID 1, IDs 4 and 5 empty, and priority IDs `[1, 2]`. BlueChipYield
+remains structurally selected at ID 3 in the blueprint but is deliberately not
+deployed or finalized by the current production-remediation candidate. The
+exact configured route is GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink
+USDG. USDG has no Curve feed, so the route cannot recurse.
 
 This decision does not admit either LP token, add another Curve feed or
 consumer, enable dynamic rates, create Teller reference snapshots, enable
 Endaoment stabilization, use Curve in the PSM, or add Stock/Uniswap behavior.
-Five official identities remain unverified, six pool values remain research
-candidates, ten operating inputs remain owner choices, the pool address must
-be deployment-produced, and production observation remains absent. Those 23
-Curve-specific blockers contribute to the current 80-blocker fail-closed
-readiness result.
+Five official provider and binding identities remain unverified; the pool
+address must be deployment-produced; and the slippage limit, minimum retained
+liquidity, and production observation remain open. Those nine Curve-specific
+blockers contribute to the current 65-binding fail-closed readiness result.
 
-Source: [`curve-launch-activation.md`](curve-launch-activation.md).
+Current correction source:
+[`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md).
+The earlier Curve qualification remains historical risk provenance.
 
 ### RH-D022 — RIPE reward launch product decision approved; operations open
 
 **Status:** Approved product decision; DP15 and P-H04-399 approved;
 B-REWARD-PROMOTION remains operationally blocked.
 
-The existing PR #66 values are the candidate initial-launch economics: points
-enabled, `0.009 RIPE/block`, 10% borrower and 90% staker allocation, zero voter
-and general-depositor allocation, 75% auto-stake for an explicit non-staking
-claim, a 33% lock-duration ratio, `1 RIPE/$` Stability rewards, and the shared
-initial `1,000 RIPE` budget. Stock rewards remain disabled. The owner accepts
-the approximately 15.432-day emission-only runway, Stability competition that
-can shorten it, and the theoretical zero shared-budget minimum. No Stability
-reserve, separate budget, redesign, or launch disablement is selected.
+Current source enables points at `0.009 RIPE/block`, assigns 10% to borrowers
+and 90% to stakers, assigns zero to voters and general depositors, uses 75%
+auto-stake for an explicit non-staking claim, a 33% lock-duration ratio, and
+`1 RIPE/$` Stability rewards. It assigns `1,000,000e18` RIPE to rewards, zero
+to HR, and `1,000,000e18` RIPE to bonds. Stock rewards remain disabled.
 
-The exact derived approved-decision packet, lifecycle, runway limits, emergency
-procedure, monitoring decisions, and rollback limits are recorded in
-[`reward-launch-qualification.md`](reward-launch-qualification.md) and
-`config/robinhood-reward-launch-plan.json`. Its SHA-256 identity binds the
-approved decision bytes and is the concrete DP15 value. Initial checkpoints;
+The controlling source values are in `DefaultsRobinhood`; the current
+candidate correction is recorded in
+[`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md).
+The former reward qualification and derived packet remain historical
+pre-remediation evidence, not current source authority. Initial checkpoints;
 governance, lite-signer, and registered checkpoint-caller identities;
 emergency-runbook acceptance; monitoring owners/routes; H-05/H-06/H-08/H-09;
 testnet rehearsal; and release authorization remain open. This record
@@ -442,7 +444,7 @@ posture as a stop condition. It independently found:
   routes remain reachable if an LP becomes a supported asset.
 
 Both Defaults LP rows therefore remain omitted, every DP-14 leaf remains a
-typed blocker, priority IDs stay `[1, 3]`, unchanged `CurvePrices` remains
+typed blocker, priority IDs are `[1, 2]`, unchanged `CurvePrices` remains
 selected at PriceDesk ID 2 for GREEN only, and the Uniswap monitor stays
 interface-inert. Pool selection and GREEN pricing do not grant LP-token
 admission. Closing the LP route gap would require shared production design

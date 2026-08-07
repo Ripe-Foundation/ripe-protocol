@@ -181,7 +181,6 @@ ASSET_FIELDS = (
 GOV_ROWS = ("RIPE", "RIPE_WETH_LP")
 ACTIVE_GOV_ROWS = ("RIPE",)
 ASSET_ROWS = (
-    "STEAKHOUSE_USDG",
     "GREEN",
     "RIPE",
     "SGREEN",
@@ -190,7 +189,6 @@ ASSET_ROWS = (
     "RIPE_WETH_LP",
 )
 ACTIVE_ASSET_ROWS = (
-    "STEAKHOUSE_USDG",
     "WETH",
     "RIPE",
     "SGREEN",
@@ -222,7 +220,6 @@ CONSTRUCTOR_ABI_NAMES = (
     "_sgreenToken",
     "_usdgToken",
     "_wethToken",
-    "_steakhouseUsdgVault",
 )
 CONSTRUCTOR_BLUEPRINT_KEYS = (
     "CONTRIBUTOR_TEMPLATE",
@@ -232,7 +229,6 @@ CONSTRUCTOR_BLUEPRINT_KEYS = (
     "SGREEN_TOKEN",
     "USDG",
     "WETH",
-    "STEAKHOUSE_USDG_VAULT",
 )
 
 
@@ -311,15 +307,13 @@ def canonical_default_paths() -> tuple[str, ...]:
         (
             "Defaults.priorityLiqAssetVaults[0].vaultId",
             "Defaults.priorityLiqAssetVaults[0].asset",
-            "Defaults.priorityLiqAssetVaults[1].vaultId",
-            "Defaults.priorityLiqAssetVaults[1].asset",
             "Defaults.priorityStabVaults[0].vaultId",
             "Defaults.priorityStabVaults[0].asset",
             "Defaults.priorityPriceSourceIds",
             "Defaults.liteSigners[0]",
         )
     )
-    if len(paths) != 305 or len(set(paths)) != 305:
+    if len(paths) != 272 or len(set(paths)) != 272:
         raise ManifestError("H04_INTERNAL_DEFAULT_PATH_CENSUS")
     return tuple(paths)
 
@@ -415,7 +409,8 @@ def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
         _expect_keys(entry, schedule_keys, "H04_SCHEDULE_KEYS")
 
     parameters = ledger.get("parameters")
-    if not isinstance(parameters, list) or len(parameters) != 436:
+    valid_parameter_counts = {403, 436} if allow_legacy else {403}
+    if not isinstance(parameters, list) or len(parameters) not in valid_parameter_counts:
         raise ManifestError("H04_PARAMETER_CENSUS")
     expected_record_keys = (
         LEGACY_RECORD_KEYS if schema == LEGACY_SCHEMA_VERSION else RECORD_KEYS
@@ -464,7 +459,15 @@ def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
         for field in ("blockers", "consumers", "invalidation"):
             if not isinstance(record[field], list):
                 raise ManifestError(f"H04_{field.upper()}_TYPE")
-    if len(set(ids)) != 436 or ids != [f"P-H04-{i:03d}" for i in range(1, 437)]:
+    try:
+        numeric_ids = [int(record_id.removeprefix("P-H04-")) for record_id in ids]
+    except ValueError as error:
+        raise ManifestError("H04_PARAMETER_IDS") from error
+    if (
+        len(set(ids)) != len(parameters)
+        or any(not record_id.startswith("P-H04-") for record_id in ids)
+        or numeric_ids != sorted(numeric_ids)
+    ):
         raise ManifestError("H04_PARAMETER_IDS")
     _validate_assertion_path_census(
         [
@@ -473,7 +476,7 @@ def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
             if record["destination"]["kind"] == "assertion"
         ]
     )
-    if len(set(destinations)) != 436:
+    if len(set(destinations)) != len(parameters):
         raise ManifestError("H04_DUPLICATE_DESTINATION")
 
 
@@ -647,14 +650,13 @@ def _extract_defaults_values_in_active_env(
         )
 
     asset_row_by_key = {
-        "STEAKHOUSE_USDG_VAULT": "STEAKHOUSE_USDG",
         "WETH": "WETH",
         "RIPE_TOKEN": "RIPE",
         "SGREEN_TOKEN": "SGREEN",
         "GREEN_TOKEN": "GREEN",
     }
     asset_results = contract.assetConfigs()
-    if len(asset_results) != 5:
+    if len(asset_results) != 4:
         raise ManifestError("H04_ACTIVE_ASSET_ROW_CENSUS")
     seen_rows: set[str] = set()
     for entry in asset_results:
@@ -674,7 +676,7 @@ def _extract_defaults_values_in_active_env(
         raise ManifestError("H04_ACTIVE_ASSET_ROWS")
 
     liquidations = contract.priorityLiqAssetVaults()
-    if len(liquidations) != 2:
+    if len(liquidations) != 1:
         raise ManifestError("H04_PRIORITY_LIQ_CENSUS")
     for index, entry in enumerate(liquidations):
         _add_fields(
@@ -743,10 +745,10 @@ def extract_defaults_values(
         raise ManifestError(f"H04_DEFAULTS_ADDRESS_LITERAL:{nonzero_literals[0]}")
 
     selected = blueprint or _blueprint_module()
-    if len(selected.ROBINHOOD_DEFAULTS_CONSTRUCTOR) != 8:
+    if len(selected.ROBINHOOD_DEFAULTS_CONSTRUCTOR) != 7:
         raise ManifestError("H04_CONSTRUCTOR_BINDING_CENSUS")
-    sentinels = tuple(f"0x{index:040x}" for index in range(1, 9))
-    if len(set(sentinels)) != 8:
+    sentinels = tuple(f"0x{index:040x}" for index in range(1, 8))
+    if len(set(sentinels)) != 7:
         raise ManifestError("H04_SENTINEL_DISTINCTNESS")
     sentinel_bindings = {
         sentinel.lower(): selected.ROBINHOOD_ADDRESSES[key]
@@ -929,11 +931,11 @@ def derive_assertion_values(
 def _validate_census(ledger: Mapping[str, Any]) -> None:
     records = ledger["parameters"]
     by_kind = Counter(record["destination"]["kind"] for record in records)
-    if by_kind != Counter(defaults_field=305, deployment_input=119, assertion=12):
+    if by_kind != Counter(defaults_field=272, deployment_input=119, assertion=12):
         raise ManifestError(f"H04_PARTITION:{dict(by_kind)}")
     defaults = [record for record in records if record["destination"]["kind"] == "defaults_field"]
     statuses = Counter(record["status"] for record in defaults)
-    if statuses != Counter(approved=223, external_fact=5, blocked=7, omitted=70):
+    if statuses != Counter(approved=192, external_fact=3, blocked=7, omitted=70):
         raise ManifestError(f"H04_DEFAULT_STATUS_PARTITION:{dict(statuses)}")
     active_leaves = [
         record
@@ -945,7 +947,7 @@ def _validate_census(ledger: Mapping[str, Any]) -> None:
         record["destination"]["path"].split("[", 1)[1].split("]", 1)[0]
         for record in active_leaves
     }
-    if len(active_leaves) != 155 or active_rows != set(ACTIVE_ASSET_ROWS):
+    if len(active_leaves) != 124 or active_rows != set(ACTIVE_ASSET_ROWS):
         raise ManifestError("H04_ACTIVE_ASSET_PARTITION")
 
 
@@ -958,10 +960,38 @@ def derive_ledger(
     _validate_shape(tracked, allow_legacy=True)
     expected = copy.deepcopy(tracked)
     expected["schema_version"] = SCHEMA_VERSION
+
+    # The selected seven-argument authority removes one 31-field Steakhouse
+    # asset row and one two-field priority-liquidation row. Preserve every
+    # surviving record's stable ID and review metadata; gaps are intentional
+    # tombstones for the removed historical destinations.
+    selected = blueprint or _blueprint_module()
+    retained_paths = (
+        set(canonical_default_paths())
+        | set(selected.ROBINHOOD_DEPLOYMENT_INPUTS)
+        | {
+            record["destination"]["path"]
+            for record in tracked["parameters"]
+            if record["destination"]["kind"] == "assertion"
+        }
+    )
+    retained_records = []
+    for record in expected["parameters"]:
+        if record["destination"]["path"] not in retained_paths:
+            continue
+        retained_records.append(record)
+    expected["parameters"] = retained_records
+    retained_ids = {record["id"] for record in retained_records}
+    for schedule in expected["binding_schedules"]:
+        schedule["records"] = [
+            record_id
+            for record_id in schedule["records"]
+            if record_id in retained_ids
+        ]
+
     for record in expected["parameters"]:
         record.pop("generated_repr", None)
 
-    selected = blueprint or _blueprint_module()
     deployment_paths = {
         record["destination"]["path"]
         for record in tracked["parameters"]

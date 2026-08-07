@@ -74,6 +74,139 @@ def zero_pointer_mission_control(ripe_hq, defaults):
     )
 
 
+def _replace_registered_mission_control(ripe_hq, governance, replacement):
+    assert ripe_hq.startAddressUpdateToRegistry(
+        5,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(5, sender=governance.address)
+    assert ripe_hq.getAddr(5) == replacement.address
+
+
+def _assert_failed_execution_preserves_pending(
+    switchboard_bravo,
+    governance,
+    action_id,
+    expected_asset,
+):
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
+    action_type_before = switchboard_bravo.actionType(action_id)
+    with boa.reverts("invalid asset config"):
+        switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.actionType(action_id) == action_type_before
+    pending_after = switchboard_bravo.pendingAssetConfig(action_id)
+    assert pending_after.asset == pending_before.asset == expected_asset
+    assert pending_after.config == pending_before.config
+
+
+def test_execute_liq_config_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    action_id = switchboard_bravo.setAssetLiqConfig(
+        alpha_token,
+        False,
+        False,
+        False,
+        False,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
+def test_execute_debt_terms_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    terms = original.debtTerms
+    action_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token,
+        terms.ltv,
+        terms.redemptionThreshold,
+        terms.liqThreshold,
+        terms.liqFee,
+        terms.borrowRate,
+        terms.daowry,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
+def test_execute_whitelist_revalidates_current_mission_control_target(
+    switchboard_bravo,
+    governance,
+    ripe_hq,
+    mission_control,
+    zero_pointer_mission_control,
+    alpha_token,
+    setAssetConfig,
+):
+    setAssetConfig(alpha_token)
+    original = mission_control.assetConfig(alpha_token)
+    action_id = switchboard_bravo.setWhitelistForAsset(
+        alpha_token,
+        ZERO_ADDRESS,
+        sender=governance.address,
+    )
+    _replace_registered_mission_control(
+        ripe_hq,
+        governance,
+        zero_pointer_mission_control,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    _assert_failed_execution_preserves_pending(
+        switchboard_bravo,
+        governance,
+        action_id,
+        alpha_token.address,
+    )
+    assert mission_control.assetConfig(alpha_token) == original
+    assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
+
+
 ###############
 # Tests
 ###############
@@ -157,76 +290,85 @@ def test_staker_allocation_accepts_retired_stability_vault(
     assert action_id > 0
 
 
-def test_staker_allocation_rejects_regular_vault(
+def test_staker_allocation_proposal_gate_rejects_then_accepts_classified_vault(
     switchboard_bravo,
     governance,
     new_mission_control,
     alpha_token,
 ):
+    vault_id = 3
+    assert new_mission_control.coreRipeGovVaultId() != vault_id
+    assert not new_mission_control.isStabVaultId(vault_id)
     with boa.reverts("invalid asset"):
         _add_asset(
             switchboard_bravo,
             governance,
             alpha_token.address,
-            [3],
+            [vault_id],
             50_00,
             new_mission_control.address,
         )
 
+    new_mission_control.setPriorityStabVaults(
+        [(vault_id, alpha_token.address)],
+        sender=switchboard_bravo.address,
+    )
+    assert new_mission_control.isStabVaultId(vault_id)
+    action_id = _add_asset(
+        switchboard_bravo,
+        governance,
+        alpha_token.address,
+        [vault_id],
+        50_00,
+        new_mission_control.address,
+    )
+    pending = switchboard_bravo.pendingAssetConfig(action_id)
+    assert action_id > 0
+    assert (
+        switchboard_bravo.pendingMissionControl(action_id)
+        == new_mission_control.address
+    )
+    assert list(pending.config.vaultIds) == [vault_id]
+    assert pending.config.stakersPointsAlloc == 50_00
 
-def test_staker_allocation_rejects_unset_pointers_but_zero_allocation_remains_valid(
+
+def test_zero_staker_allocation_remains_valid_with_initialized_pointers(
     switchboard_bravo,
     governance,
-    zero_pointer_mission_control,
+    new_mission_control,
     alpha_token,
 ):
-    with boa.reverts("invalid asset"):
-        _add_asset(
-            switchboard_bravo,
-            governance,
-            alpha_token.address,
-            [1],
-            50_00,
-            zero_pointer_mission_control.address,
-        )
-
+    assert new_mission_control.coreRipeGovVaultId() == 2
+    assert new_mission_control.preferredStabVaultId() == 1
     action_id = _add_asset(
         switchboard_bravo,
         governance,
         alpha_token.address,
         [1],
         0,
-        zero_pointer_mission_control.address,
+        new_mission_control.address,
     )
     assert action_id > 0
 
 
 @pytest.mark.parametrize(
-    ("setter_name", "configured_vault_id"),
-    [
-        ("setCoreRipeGovVaultId", 3),
-        ("setPreferredStabVaultId", 4),
-    ],
+    "initialized_vault_id",
+    [1, 2],
 )
-def test_staker_allocation_accepts_one_configured_pointer_when_the_other_is_unset(
+def test_staker_allocation_accepts_each_initialized_pointer(
     switchboard_bravo,
     governance,
-    zero_pointer_mission_control,
+    new_mission_control,
     alpha_token,
-    setter_name,
-    configured_vault_id,
+    initialized_vault_id,
 ):
-    getattr(zero_pointer_mission_control, setter_name)(
-        configured_vault_id,
-        sender=switchboard_bravo.address,
-    )
     action_id = _add_asset(
         switchboard_bravo,
         governance,
         alpha_token.address,
-        [configured_vault_id],
+        [initialized_vault_id],
         50_00,
-        zero_pointer_mission_control.address,
+        new_mission_control.address,
     )
     assert action_id > 0
 
@@ -259,8 +401,10 @@ def test_asset_deposit_param_update_uses_target_mission_control_pointers(
     switchboard_bravo,
     governance,
     new_mission_control,
+    mission_control,
     alpha_token,
 ):
+    assert new_mission_control.address != mission_control.address
     new_mission_control.setCoreRipeGovVaultId(3, sender=switchboard_bravo.address)
     new_mission_control.setPreferredStabVaultId(4, sender=switchboard_bravo.address)
     add_action = _add_asset(
@@ -1603,6 +1747,40 @@ def test_special_stab_pool_id_validation(switchboard_bravo, governance, alpha_to
         sender=governance.address
     )
     assert action_id > 0
+
+
+@pytest.mark.parametrize("wrong_vault_id", [2, 3])
+def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
+    wrong_vault_id,
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    mission_control,
+):
+    with boa.reverts():
+        switchboard_bravo.addAsset(
+            alpha_token,
+            [1],
+            50_00,
+            30_00,
+            1_000,
+            10_000,
+            0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False,
+            False,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            wrong_vault_id,
+            sender=governance.address,
+        )
+    assert not mission_control.isStabVaultId(wrong_vault_id)
 
 
 def test_whitelist_interface_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):

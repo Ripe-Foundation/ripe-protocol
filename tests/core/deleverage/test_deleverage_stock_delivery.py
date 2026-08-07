@@ -127,6 +127,45 @@ def _swap_state(
     )
 
 
+def _credit_engine_recorder():
+    return boa.loads(
+        """# @version 0.4.3
+
+struct Addys:
+    hq: address
+    greenToken: address
+    savingsGreen: address
+    ripeToken: address
+    ledger: address
+    missionControl: address
+    switchboard: address
+    priceDesk: address
+    vaultBook: address
+    auctionHouse: address
+    auctionHouseNft: address
+    boardroom: address
+    bondRoom: address
+    creditEngine: address
+    endaoment: address
+    humanResources: address
+    lootbox: address
+    teller: address
+
+count: public(uint256)
+lastUser: public(address)
+lastHq: public(address)
+
+@external
+def updateDebtForUser(_user: address, _a: Addys) -> bool:
+    self.count += 1
+    self.lastUser = _user
+    self.lastHq = _a.hq
+    return True
+""",
+        name="deleverage_housekeeping_credit_engine_recorder",
+    )
+
+
 def test_standard_swap_delivers_withdrawal_and_exact_teller_deposit(
     setGeneralConfig,
     setGeneralDebtConfig,
@@ -237,6 +276,95 @@ def test_standard_swap_delivers_withdrawal_and_exact_teller_deposit(
     assert standard_deposits[0].amount == deposited
     assert swaps[0].withdrawAmount == withdrawn
     assert swaps[0].depositAmount == deposited
+
+
+def test_deleverage_swap_housekeeping_uses_user_low_risk_and_updates_debt(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    bob,
+    alice,
+    teller,
+    deleverage,
+    mock_price_source,
+    ledger,
+    safe_simple_erc20_vault,
+    vault_book,
+    governance,
+    ripe_hq,
+):
+    vault_id = _register_safe_nominal_vault(
+        vault_book,
+        governance,
+        safe_simple_erc20_vault,
+    )
+    _configure_swap_assets(
+        (alpha_token, bravo_token),
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+        mock_price_source,
+        green_token,
+    )
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    debt_amount = 25 * EIGHTEEN_DECIMALS
+    swap_amount = 10 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        deposit_amount,
+        alpha_token,
+        alpha_token_whale,
+        safe_simple_erc20_vault,
+    )
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    bravo_token.transfer(governance, 2 * swap_amount, sender=bravo_token_whale)
+    bravo_token.approve(deleverage, 2 * swap_amount, sender=governance.address)
+    recorder = _credit_engine_recorder()
+    ripe_hq.startAddressUpdateToRegistry(13, recorder, sender=governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(13, sender=governance.address)
+    decoy_touch = ledger.lastTouch(alice)
+
+    first = deleverage.swapCollateral(
+        bob,
+        vault_id,
+        alpha_token,
+        vault_id,
+        bravo_token,
+        swap_amount,
+        sender=governance.address,
+    )
+    action_block = ledger.lastTouch(bob)
+    assert first == (swap_amount, swap_amount)
+    assert action_block == boa.env.evm.patch.block_number
+    assert recorder.count() == 1
+    assert recorder.lastUser() == bob
+    assert recorder.lastHq() == ripe_hq.address
+    assert ledger.lastTouch(alice) == decoy_touch
+
+    second = deleverage.swapCollateral(
+        bob,
+        vault_id,
+        alpha_token,
+        vault_id,
+        bravo_token,
+        swap_amount,
+        sender=governance.address,
+    )
+    assert second == (swap_amount, swap_amount)
+    assert ledger.lastTouch(bob) == action_block
+    assert ledger.lastTouch(alice) == decoy_touch
+    assert recorder.count() == 2
+    assert recorder.lastUser() == bob
 
 
 def test_teller_exact_receipt_is_decisive_after_standard_withdrawal(

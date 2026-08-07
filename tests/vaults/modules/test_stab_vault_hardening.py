@@ -1,22 +1,28 @@
 import boa
+from eth_abi import encode
+from eth_utils import keccak
 
 from conf_utils import claim_from_stability_pool, filter_logs, redeem_from_stability_pool
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 
 
-ACTIVATION_THRESHOLD = 25 * 10**16
+ACTIVATION_THRESHOLD = 10 * 10**16
+RETENTION_THRESHOLD = 5 * 10**16
 CLAIM_ASSET_ABSENT = 0
 CLAIM_ASSET_DORMANT = 1
 CLAIM_ASSET_ACTIVE = 2
 DORMANT_BELOW_FLOOR = 1
 DEACTIVATION_DUST = 2
+DEACTIVATION_ZERO = 1
+DECIMAL_OFFSET = 10**8
 MAX_ACTIVE_CLAIM_ASSETS = 20
 MAX_CLAIM_ASSET_MAINTENANCE = 15
 
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) <= 24_576
+    assert len(runtime) == 24_371
+    assert 24_576 - len(runtime) == 205
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -244,6 +250,184 @@ def _record_claim(
         savings_green,
         sender=auction_house.address,
     )
+
+
+def _deposit_and_get_shares(
+    stability_pool,
+    asset,
+    whale,
+    user,
+    teller,
+    mock_price_source,
+    amount,
+):
+    mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    asset.transfer(stability_pool, amount, sender=whale)
+    stability_pool.depositTokensInVault(
+        user,
+        asset,
+        amount,
+        sender=teller.address,
+    )
+    event = filter_logs(stability_pool, "StabilityPoolDeposit")[0]
+    assert event.amount == amount
+    assert event.shares == stability_pool.userBalances(user, asset)
+    return event.shares
+
+
+def test_withdrawal_rounds_shares_up_at_exact_remainder_boundary(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+):
+    deposited = 5
+    shares = _deposit_and_get_shares(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        deposited,
+    )
+    balance_before = alpha_token.balanceOf(bob)
+    withdrawn, depleted = stability_pool.withdrawTokensFromVault(
+        bob,
+        alpha_token,
+        1,
+        bob,
+        sender=teller.address,
+    )
+    expected_burn = (shares + DECIMAL_OFFSET) // (deposited + 1)
+    event = filter_logs(stability_pool, "StabilityPoolWithdrawal")[0]
+    assert withdrawn == 1
+    assert not depleted
+    assert event.shares == expected_burn == DECIMAL_OFFSET
+    assert stability_pool.userBalances(bob, alpha_token) == shares - expected_burn
+    assert stability_pool.totalBalances(alpha_token) == shares - expected_burn
+    assert alpha_token.balanceOf(bob) == balance_before + 1
+    assert alpha_token.balanceOf(stability_pool) == deposited - 1
+
+
+def test_withdrawal_rounding_boundary_below_exact_above(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+):
+    deposited = 5
+    shares = _deposit_and_get_shares(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        deposited,
+    )
+    donation = 3
+    alpha_token.transfer(stability_pool, donation, sender=alpha_token_whale)
+    denominator = deposited + donation + 1
+    multiplier = shares + DECIMAL_OFFSET
+
+    for amount in (2, 3, 4):
+        with boa.env.anchor():
+            user_before = alpha_token.balanceOf(bob)
+            withdrawn, _ = stability_pool.withdrawTokensFromVault(
+                bob,
+                alpha_token,
+                amount,
+                bob,
+                sender=teller.address,
+            )
+            numerator = amount * multiplier
+            expected_burn = numerator // denominator
+            if numerator % denominator:
+                expected_burn += 1
+            event = filter_logs(stability_pool, "StabilityPoolWithdrawal")[0]
+            assert withdrawn == amount
+            assert event.shares == expected_burn
+            assert stability_pool.userBalances(bob, alpha_token) == shares - expected_burn
+            assert stability_pool.totalBalances(alpha_token) == shares - expected_burn
+            assert alpha_token.balanceOf(bob) == user_before + amount
+            assert alpha_token.balanceOf(stability_pool) == deposited + donation - amount
+    assert (2 * multiplier) % denominator != 0
+    assert (3 * multiplier) % denominator == 0
+    assert (4 * multiplier) % denominator != 0
+
+
+def test_direct_donation_cannot_create_zero_share_or_value_capture_deposit(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+):
+    alice_shares = _deposit_and_get_shares(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        alice,
+        teller,
+        mock_price_source,
+        1,
+    )
+    donation = DECIMAL_OFFSET - 1
+    alpha_token.transfer(stability_pool, donation, sender=alpha_token_whale)
+    alpha_token.transfer(stability_pool, 1, sender=alpha_token_whale)
+    assert stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        1,
+        sender=teller.address,
+    ) == 1
+    bob_shares = stability_pool.userBalances(bob, alpha_token)
+    assert bob_shares == 1
+    assert stability_pool.totalBalances(alpha_token) == alice_shares + bob_shares
+    assert stability_pool.getTotalAmountForUser(bob, alpha_token) <= 1
+    assert stability_pool.getTotalAmountForUser(alice, alpha_token) == donation + 1
+    assert alpha_token.balanceOf(stability_pool) == donation + 2
+
+
+def test_decimal_offset_one_unit_boundary_preserves_accounting(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+):
+    shares = _deposit_and_get_shares(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        1,
+    )
+    assert shares == DECIMAL_OFFSET
+    withdrawn, depleted = stability_pool.withdrawTokensFromVault(
+        bob,
+        alpha_token,
+        1,
+        bob,
+        sender=teller.address,
+    )
+    event = filter_logs(stability_pool, "StabilityPoolWithdrawal")[0]
+    assert withdrawn == 1
+    assert depleted
+    assert event.shares == shares
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+    assert stability_pool.totalBalances(alpha_token) == 0
+    assert alpha_token.balanceOf(stability_pool) == 0
 
 
 def _deploy_claim_token(governance, holder, index, amount=EIGHTEEN_DECIMALS):
@@ -507,6 +691,271 @@ def test_unpriced_new_receipt_reverts_without_claim_accounting(
     assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
 
 
+def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        ACTIVATION_THRESHOLD,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    total_value_before = stability_pool.getTotalValue(alpha_token)
+    shares_before = stability_pool.userBalances(bob, alpha_token)
+    custody_before = bravo_token.balanceOf(stability_pool)
+    pair_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    active_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert active_index != 0
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+    # A configured feed reporting zero excludes the claim collateral from NAV
+    # without removing it from the active claim-asset set.
+    mock_price_source.setPrice(bravo_token, 0)
+    known_value = total_value_before - ACTIVATION_THRESHOLD
+    assert stability_pool.getTotalValue(alpha_token) == known_value
+    assert stability_pool.getTotalUserValue(bob, alpha_token) == known_value
+
+    # Deposits and withdrawals remain live while the unavailable claim asset is
+    # temporarily valued at zero.
+    with boa.env.anchor():
+        alpha_token.transfer(
+            stability_pool,
+            EIGHTEEN_DECIMALS,
+            sender=alpha_token_whale,
+        )
+        assert stability_pool.depositTokensInVault(
+            alice,
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            sender=teller.address,
+        ) == EIGHTEEN_DECIMALS
+        withdrawn, is_user_depleted = stability_pool.withdrawTokensFromVault(
+            alice,
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            alice,
+            sender=teller.address,
+        )
+        assert EIGHTEEN_DECIMALS - 1 <= withdrawn <= EIGHTEEN_DECIMALS
+        assert is_user_depleted
+
+    # Maintenance never removes or reclassifies an unpriced active pair,
+    # whether the pool is paused or unpaused.
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        [bravo_token, bravo_token],
+        sender=alice,
+    )
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == active_index
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == pair_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
+    assert bravo_token.balanceOf(stability_pool) == custody_before
+    assert stability_pool.userBalances(bob, alpha_token) == shares_before
+
+    # Unpause has no oracle-specific state machine. Removing the feed entirely
+    # has the same zero-NAV treatment as a configured feed reporting zero.
+    stability_pool.pause(False, sender=switchboard_alpha.address)
+    assert not stability_pool.isPaused()
+    mock_price_source.disablePriceFeed(bravo_token)
+    assert stability_pool.getTotalValue(alpha_token) == known_value
+
+    # Restoring the feed puts the collateral back into NAV immediately; no
+    # activation call or persistent recovery bookkeeping is required.
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    assert stability_pool.getTotalValue(alpha_token) == total_value_before
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+
+def test_prune_skips_unpriced_pair_and_continues_batch_while_paused_or_unpaused(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    for claim_asset, whale, amount in (
+        (bravo_token, bravo_token_whale, ACTIVATION_THRESHOLD),
+        (charlie_token, charlie_token_whale, 100_000),
+    ):
+        mock_price_source.setPrice(claim_asset, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            claim_asset,
+            whale,
+            amount,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+
+    bravo_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
+    charlie_balance = stability_pool.claimableBalances(alpha_token, charlie_token)
+    bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    mock_price_source.setPrice(bravo_token, 0)
+    mock_price_source.setPrice(charlie_token, 4 * 10**17)
+
+    stability_pool.pruneClaimableAssets(
+        alpha_token,
+        [bravo_token, charlie_token],
+        sender=alice,
+    )
+
+    logs = filter_logs(stability_pool, "ClaimAssetDeactivated")
+    assert len(logs) == 1
+    assert logs[0].claimAsset == charlie_token.address
+    assert logs[0].reason == DEACTIVATION_DUST
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == bravo_index
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == bravo_balance
+    assert stability_pool.getClaimAssetState(alpha_token, charlie_token) == CLAIM_ASSET_DORMANT
+    assert stability_pool.claimableBalances(alpha_token, charlie_token) == charlie_balance
+
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
+    assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == bravo_index
+
+
+def test_dormant_thresholds_have_exact_hysteresis_boundaries(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        ACTIVATION_THRESHOLD - 1,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_DORMANT
+
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        1,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_ACTIVE
+
+    # Exact $0.05 remains active; immediately below it prunes. The band from
+    # $0.05 through $0.099... therefore preserves the existing state.
+    retention_price = RETENTION_THRESHOLD * EIGHTEEN_DECIMALS // ACTIVATION_THRESHOLD
+    mock_price_source.setPrice(bravo_token, retention_price)
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_ACTIVE
+    mock_price_source.setPrice(bravo_token, retention_price - 1)
+    stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_DORMANT
+
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    activation_price = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(bravo_token, activation_price - 1)
+    stability_pool.activateClaimAssets(alpha_token, [bravo_token], sender=alice)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_DORMANT
+    mock_price_source.setPrice(bravo_token, activation_price)
+    stability_pool.activateClaimAssets(alpha_token, [bravo_token], sender=alice)
+    assert stability_pool.getClaimAssetState(
+        alpha_token,
+        bravo_token,
+    ) == CLAIM_ASSET_ACTIVE
+
+
 def test_zero_raw_balance_with_only_dormant_claim_is_explicit_exit_residual(
     stability_pool,
     alpha_token,
@@ -592,9 +1041,9 @@ def test_activation_floor_is_decimal_independent(
     )
 
     cases = (
-        (bravo_token, bravo_token_whale, 25 * 10**16),
-        (charlie_token, charlie_token_whale, 250_000),
-        (delta_token, delta_token_whale, 25_000_000),
+        (bravo_token, bravo_token_whale, 10 * 10**16),
+        (charlie_token, charlie_token_whale, 100_000),
+        (delta_token, delta_token_whale, 10_000_000),
     )
     for expected_index, (token, whale, amount) in enumerate(cases, start=1):
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
@@ -957,27 +1406,92 @@ def test_short_receipt_and_later_swap_failure_roll_back_accounting(
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
 
 
-def test_generic_recovery_is_disabled_for_stability_pool(
+def test_stability_pool_recovery_entrypoints_are_disabled_for_all_callers(
+    stability_pool,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    switchboard_alpha,
+):
+    alpha_token.transfer(stability_pool, 50, sender=alpha_token_whale)
+    pool_shares_before = stability_pool.totalBalances(alpha_token)
+    for caller in (switchboard_alpha.address, bob, alice):
+        with boa.reverts():
+            stability_pool.recoverFunds(
+                bob,
+                alpha_token,
+                sender=caller,
+            )
+        with boa.reverts():
+            stability_pool.recoverFundsMany(
+                bob,
+                [alpha_token],
+                sender=caller,
+            )
+        assert alpha_token.balanceOf(stability_pool) == 50
+        assert alpha_token.balanceOf(bob) == 0
+        assert stability_pool.totalBalances(alpha_token) == pool_shares_before
+
+    alpha_token.transfer(simple_erc20_vault, 50, sender=alpha_token_whale)
+    simple_erc20_vault.recoverFunds(
+        bob,
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+    assert alpha_token.balanceOf(bob) == 50
+
+
+def test_removed_conversion_selectors_are_not_callable_at_runtime(
     stability_pool,
     alpha_token,
     alpha_token_whale,
     bob,
-    switchboard_alpha,
+    teller,
+    mock_price_source,
 ):
-    alpha_token.transfer(stability_pool, 50, sender=alpha_token_whale)
-    with boa.reverts():
-        stability_pool.recoverFunds(
-            bob,
-            alpha_token,
-            sender=switchboard_alpha.address,
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    probe = boa.loads(
+        """# @version 0.4.3
+
+@external
+def call_succeeds(_target: address, _data: Bytes[256]) -> bool:
+    success: bool = False
+    response: Bytes[4096] = b""
+    success, response = raw_call(
+        _target,
+        _data,
+        max_outsize=4096,
+        revert_on_failure=False,
+        is_static_call=True,
+    )
+    return success
+""",
+        name="removed_stability_selector_probe",
+    )
+    args = encode(("address", "uint256", "bool"), (alpha_token.address, 1, False))
+    for signature in (
+        "valueToShares(address,uint256,bool)",
+        "sharesToValue(address,uint256,bool)",
+    ):
+        assert not probe.call_succeeds(
+            stability_pool,
+            keccak(text=signature)[:4] + args,
         )
-    with boa.reverts():
-        stability_pool.recoverFundsMany(
-            bob,
-            [alpha_token],
-            sender=switchboard_alpha.address,
-        )
-    assert alpha_token.balanceOf(stability_pool) == 50
+    control = keccak(text="getTotalAmountForVault(address)")[:4] + encode(
+        ("address",),
+        (alpha_token.address,),
+    )
+    assert probe.call_succeeds(stability_pool, control)
 
 
 def test_green_cannot_be_stability_asset_but_remains_valid_claim_asset(
@@ -1052,13 +1566,41 @@ def test_green_cannot_be_stability_asset_but_remains_valid_claim_asset(
     assert stability_pool.claimableBalances(green_token, green_token) == 0
 
 
-def test_green_repoint_cannot_bypass_stability_asset_guard(
+def test_green_asset_identity_does_not_change_after_hq_repoint(
     stability_pool,
     ripe_hq_deploy,
     governance,
     alice,
+    bob,
+    whale,
     teller,
+    auction_house,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    green_token,
+    savings_green,
 ):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    green_token.transfer(stability_pool, ACTIVATION_THRESHOLD, sender=whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        1,
+        green_token,
+        ACTIVATION_THRESHOLD,
+        bob,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    total_before = stability_pool.getTotalValue(alpha_token)
     replacement_green = _deploy_claim_token(
         governance,
         alice,
@@ -1077,6 +1619,8 @@ def test_green_repoint_cannot_bypass_stability_asset_guard(
             1,
             sender=governance.address,
         )
+        assert stability_pool.getAddys().greenToken == replacement_green.address
+        assert stability_pool.getTotalValue(alpha_token) == total_before
 
         replacement_green.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alice)
         with boa.reverts("green cannot be stab asset"):
@@ -1086,6 +1630,128 @@ def test_green_repoint_cannot_bypass_stability_asset_guard(
                 EIGHTEEN_DECIMALS,
                 sender=teller.address,
             )
+
+
+def test_savings_green_asset_identity_does_not_change_after_hq_repoint(
+    stability_pool,
+    ripe_hq_deploy,
+    governance,
+    alice,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    green_token.transfer(alice, ACTIVATION_THRESHOLD, sender=whale)
+    green_token.approve(savings_green, ACTIVATION_THRESHOLD, sender=alice)
+    savings_green.deposit(ACTIVATION_THRESHOLD, alice, sender=alice)
+    savings_amount = savings_green.balanceOf(alice)
+    assert savings_amount > 0
+    savings_green.transfer(stability_pool, savings_amount, sender=alice)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        1,
+        savings_green,
+        savings_amount,
+        bob,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    total_before = stability_pool.getTotalValue(alpha_token)
+    replacement = _deploy_claim_token(
+        governance,
+        alice,
+        101,
+        EIGHTEEN_DECIMALS,
+    )
+
+    with boa.env.anchor():
+        assert ripe_hq_deploy.startAddressUpdateToRegistry(
+            2,
+            replacement,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=ripe_hq_deploy.registryChangeTimeLock())
+        assert ripe_hq_deploy.confirmAddressUpdateToRegistry(
+            2,
+            sender=governance.address,
+        )
+        assert stability_pool.getAddys().savingsGreen == replacement.address
+        assert stability_pool.getTotalValue(alpha_token) == total_before
+
+
+def test_claimable_green_swap_depletes_active_pair_and_emits_deactivation_zero_reason_one(
+    stability_pool,
+    alpha_token,
+    alpha_token_whale,
+    whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    pair_amount = ACTIVATION_THRESHOLD
+    green_token.transfer(stability_pool, pair_amount, sender=whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        1,
+        green_token,
+        pair_amount,
+        bob,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) == 1
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
+
+    fresh_receipt = 1
+    green_token.transfer(stability_pool, fresh_receipt, sender=whale)
+    burned = stability_pool.swapWithClaimableGreen(
+        alpha_token,
+        pair_amount + fresh_receipt,
+        green_token,
+        fresh_receipt,
+        green_token,
+        sender=auction_house.address,
+    )
+    assert burned == pair_amount + fresh_receipt
+    events = filter_logs(stability_pool, "ClaimAssetDeactivated")
+    assert len(events) == 1
+    event = events[0]
+    assert event.stabAsset == alpha_token.address
+    assert event.claimAsset == green_token.address
+    assert event.balance == 0
+    assert event.activeCount == 0
+    assert event.reason == DEACTIVATION_ZERO
+    assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) == 0
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
+    assert stability_pool.claimableBalances(alpha_token, green_token) == 0
+    assert stability_pool.totalClaimableBalances(green_token) == 0
 
 
 def test_full_pool_accepts_existing_claims_and_keeps_deposits_open(
@@ -1505,7 +2171,7 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
         100 * 10**6,
     )
 
-    partial_claim = 2 * 10**17
+    partial_claim = 6 * 10**16
     claim = _deploy_claim_token(
         governance,
         alice,
@@ -1568,7 +2234,7 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
     assert 0 < claimed_amount <= partial_claim
 
     remaining = ACTIVATION_THRESHOLD - claimed_amount
-    assert 0 < remaining < 10**17
+    assert 0 < remaining < RETENTION_THRESHOLD
     expected_pairs[_claim_pair(alpha_token, claim)] = remaining
     expected_active[alpha_address] = []
     expected_num_assets[alpha_address] = 1
@@ -1741,7 +2407,8 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
         }
     )
     expected_active[alpha_address] = [green_token]
-    expected_active[charlie_address] = [claim]
+    expected_active[charlie_address] = [claim, green_token]
+    expected_num_assets[charlie_address] = 3
     _assert_claim_data_model(
         stability_pool,
         stab_assets,
@@ -1751,9 +2418,9 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
         expected_num_assets,
     )
 
-    # The second redemption dusts the remaining claim pair while cumulative
-    # GREEN reaches the activation floor in the same transaction.
-    second_redemption = 15 * 10**16
+    # The second redemption dusts the remaining claim pair while the active
+    # GREEN pair receives the entire additional payment.
+    second_redemption = 16 * 10**16
     green_token.transfer(bob, second_redemption, sender=whale)
     green_token.approve(teller, second_redemption, sender=bob)
     assert redeem_from_stability_pool(teller,
@@ -1766,11 +2433,12 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
 
     expected_pairs.update(
         {
-            _claim_pair(charlie_token, claim): 5 * 10**16,
-            _claim_pair(charlie_token, green_token): ACTIVATION_THRESHOLD,
+            _claim_pair(charlie_token, claim): 4 * 10**16,
+            _claim_pair(charlie_token, green_token): 26 * 10**16,
         }
     )
     expected_active[charlie_address] = [green_token]
+    expected_num_assets[charlie_address] = 2
     _assert_claim_data_model(
         stability_pool,
         stab_assets,

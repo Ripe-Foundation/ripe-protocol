@@ -1,5 +1,15 @@
 # Robinhood Stability Pool hardening implementation specification
 
+> [!WARNING]
+> **Superseded design snapshot below.** The current owner correction retains
+> the `$0.10/$0.05` dormant thresholds, values unavailable active claim
+> collateral at zero, and removes the later paused zero-price
+> quarantine/reactivation state machine.
+> The current behavior, residual risk, and
+> non-borrowing/phase-2-liquidatable invariant are recorded in
+> [`../rh-production-vyper-remediation.md`](../rh-production-vyper-remediation.md).
+> Retain the remainder as historical design evidence.
+
 > [!IMPORTANT]
 > **Implementation handoff, not implementation authority.** This document is
 > precise enough for a fresh agent to build and validate an isolated candidate.
@@ -54,8 +64,10 @@ The final owner decisions and security corrections are:
    dormant flag/count and deposit gate no longer exist.
 6. The deposit path rejects the current GREEN address supplied through
    `Addys`, closing the reproduced RipeHq re-point admission bypass. GREEN and
-   sGREEN remain constructor-bound immutables for valuation under the owner's
-   chain invariant that those addresses never change.
+   sGREEN are constructor-bound immutables. A short-lived 2026-08-06
+   quarantine candidate demoted them to storage for EIP-170, but the current
+   owner correction removes that state machine and restores the immutable
+   layout.
 7. `recoverFunds` and `recoverFundsMany` remain as interface-compatible
    selectors but unconditionally revert. StabilityPool emits no recovery event
    and exposes no generic token-recovery path.

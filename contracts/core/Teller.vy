@@ -61,6 +61,8 @@ interface RipeGovVault:
     def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256: nonpayable
     def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def getTotalAmountForUser(_user: address, _asset: address) -> uint256: view
+    def doesUserHaveBalance(_user: address, _asset: address) -> bool: view
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -85,6 +87,7 @@ interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def removeVaultFromUserForMigration(_user: address, _vaultId: uint256): nonpayable
 
 interface Deleverage:
     def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -525,6 +528,9 @@ def migrateRipeGovPosition(
     assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
     assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
 
+    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
+    assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
+
     # export position
     targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
     migration: RipeGovMigrationData = extcall RipeGovVault(sourceVault).exportPositionForMigration(
@@ -545,7 +551,14 @@ def migrateRipeGovPosition(
         migration,
     )
 
-    # update ledger
+    # Prove the exported source position is empty, then swap Ledger
+    # participation source-first so a user at the vault limit never exceeds it.
+    assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
+    assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
+    extcall Ledger(a.ledger).removeVaultFromUserForMigration(_user, _sourceVaultId)
+    sourceLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
+    assert not sourceLedgerData.isParticipatingInVault # dev: source Ledger cleanup failed
+
     targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
     if not targetLedgerData.isParticipatingInVault:
         extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)

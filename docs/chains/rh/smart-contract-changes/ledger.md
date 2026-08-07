@@ -227,7 +227,7 @@ It is one file, 41 insertions and 6 deletions.
 | --- | --- | --- | --- |
 | Constant/immutable | No source selection | Fixed `ARB_SYS` and public immutable `ACTION_BLOCK_SOURCE` | Bind the identity mode at construction |
 | `lastTouch` description | “block number” | “action-block identity” | Record its chain-dependent domain |
-| Constructor | Two arguments | Third source argument, strict allowlist, immutable write, ArbSys probe | Reject unsupported or malformed deployments |
+| Constructor | Two arguments | Third source argument, strict allowlist, immutable write, no ArbSys call | Reject unsupported modes while keeping chain-health qualification separate |
 | ArbSys helper | Absent | Fixed selector, static raw call, 65-byte ceiling, exact-32 assertion | Enforce approved return shape |
 | Identity helper | Absent | Native-zero or ArbSys dispatch | Centralize the selected domain |
 | Equality/read-write | Direct `block.number` | One selected `actionBlock` value | Compare and write the same execution identity |
@@ -303,7 +303,7 @@ The constructor at
 | Input | Mode | Constructor behavior |
 | --- | --- | --- |
 | Zero | Native | Stores zero; makes no source call |
-| Exact `0x64` | ArbSys | Stores `0x64`; immediately probes `arbBlockNumber()` |
+| Exact `0x64` | ArbSys | Stores `0x64`; makes no constructor-time ArbSys call |
 | Any other value | Unsupported | Reverts |
 
 ### Native mode
@@ -330,24 +330,25 @@ desired execution-block identity.
 construct with exact 0x64
   -> allowlist succeeds
   -> immutable is 0x64
-  -> fixed selector is called
-  -> call must succeed and return exactly 32 bytes
+  -> no external source call
 
 every housekeeping call
-  -> repeat the same fixed exact-length source read
+  -> fixed selector source read must succeed and return exactly 32 bytes
   -> equality check if requested
   -> lastTouch write
 ```
 
 Missing code, revert, short data, oversized data, or incompatible response
-aborts construction. The same failures at runtime abort housekeeping before a
-successful `lastTouch` update; there is no native fallback.
+does not affect construction. Those failures abort the separate runtime health
+call or housekeeping before a successful `lastTouch` update; there is no native
+fallback.
 
-Constructor validation is useful but not permanent proof. A system-contract
-outage or chain upgrade can still break runtime reads. That can block
-repayment, liquidation, and other actions that require housekeeping. The
-current operational response is pause and containment; there is no in-place
-source recovery.
+Immutable readback proves the selected mode but not live ArbSys health. A
+separate real-node `getArbActionBlock()` call is required before registration,
+and a system-contract outage or chain upgrade can still break later runtime
+reads. That can block repayment, liquidation, and other actions that require
+housekeeping. The current operational response is pause and containment; there
+is no in-place source recovery.
 
 The source is immutable because a setter would allow governance to change the
 meaning of stored `lastTouch` values and the guard bucket under live state.
@@ -619,8 +620,8 @@ All named tests below are in
 | --- | --- | --- | --- | --- |
 | [`native source getter`, 79](../../../../tests/data/test_ledger_action_block.py#L79) | Native getter and native `block.number` | Getter is zero; stored touch follows native number | Detects calling ArbSys or writing another value in native mode | Fixture, not a real native deployment |
 | [`reject non-ArbSys source`, 101](../../../../tests/data/test_ledger_action_block.py#L101) | Constructor allowlist | Every nonzero non-`0x64` source reverts | Detects arbitrary-provider acceptance | Does not test production deployment profile |
-| [`constructor failure matrix`, 122](../../../../tests/data/test_ledger_action_block.py#L122) | Missing/revert/short/33/64/96/incompatible ArbSys | Construction reverts | Detects probe removal; 64-byte case detects rejected typed call | Controlled code at `0x64` |
-| [`constructor success/getter`, 132](../../../../tests/data/test_ledger_action_block.py#L132) | Exact ArbSys response | Construction succeeds; immutable getter is `0x64` | Detects wrong immutable or missing success path | Local double |
+| [`lazy runtime failure matrix`, 122](../../../../tests/data/test_ledger_action_block.py#L122) | Missing/revert/short/33/64/96/incompatible ArbSys | Construction succeeds; runtime health read reverts | Detects accidental constructor probing, malformed-response acceptance, or native fallback | Controlled code at `0x64` |
+| [`constructor stores without probe`, 134](../../../../tests/data/test_ledger_action_block.py#L134) | ArbSys absent at construction, valid afterward | Construction succeeds; immutable getter is `0x64`; later health read returns the installed value | Detects a constructor-time ArbSys dependency or wrong immutable | Local double |
 | [`ArbSys overrides native`, 141](../../../../tests/data/test_ledger_action_block.py#L141) | Native advances while child identity is held | Same child identity rejects | Detects native fallback | Does not prove live chain topology |
 | [`equality-only`, 165](../../../../tests/data/test_ledger_action_block.py#L165) | Same, next, then `750 -> 749` | Equal rejects; different/decreasing succeeds | Detects monotonic comparison | Accepts monitored source-regression risk |
 | [`low/high ordering`, 180](../../../../tests/data/test_ledger_action_block.py#L180) | Low→high and high→low→high | Low arms high; second high rejects | Detects loss of unchecked writes or wrong ordering | Direct Ledger calls, not every enclosing route |
@@ -655,12 +656,13 @@ authority, zero user, unchecked repeats, and mixed modes.
 
 ### Mutation conclusions and gaps
 
-- Replacing the raw helper with the original typed call makes the malformed
-  64-byte constructor case fail to reject, so the test is mutation-sensitive.
+- Replacing the raw runtime helper with the original typed call makes malformed
+  oversized runtime responses fail to reject, so the test is mutation-sensitive.
 - Adding native fallback is detected by the held-child-identity and runtime
   failure tests.
 - Allowing arbitrary providers is detected by the constructor allowlist test.
-- Removing the constructor probe is detected by constructor failure cases.
+- Adding a constructor-time probe is detected by construction with missing
+  ArbSys code followed by successful lazy runtime recovery.
 - Changing equality to monotonic comparison is detected by `750 -> 749`.
 - Locked-account and later-route tests detect observable rollback/order
   changes.
@@ -736,7 +738,7 @@ not current Robinhood fee predictions:
 | Risk | Severity | Likelihood | Impact | Mitigation | Release-blocking? |
 | --- | --- | --- | --- | --- | --- |
 | Robinhood deployment selects zero or lacks an executable path | High | Present gap | Guard uses ancestor identity or deployment cannot proceed | Exact-profile deployment tests, immutable getter, final runtime/manifest proof | **Yes** |
-| ArbSys unavailable or malformed after deployment | High availability | Low/unknown | Housekeeping-dependent actions can fail | Constructor probe, runtime fail-closed, monitoring, pause/runbook | Qualification/operations gate |
+| ArbSys unavailable or malformed after deployment | High availability | Low/unknown | Housekeeping-dependent actions can fail | Separate pre-registration real-node health call, runtime fail-closed, monitoring, pause/runbook | Qualification/operations gate |
 | Well-formed but false value from `0x64` | High | Low; chain-governance dependent | Wrong security buckets | Official source/version pin, receipt agreement, monitoring | Qualification gate |
 | Equality-only regression/anomaly | Moderate | Low/unknown | Different regressed identities may permit actions | Activation proof and monitoring | No if monitoring gate closes |
 | External consumer assumes `lastTouch == EVM NUMBER` | Moderate | Unknown | Analytics/indexing mismatch | Document domain; consumer-owner sign-off | Conditional |
@@ -788,8 +790,8 @@ Ledger-associated release gap.
 These improve assurance but do not identify a defect in the current runtime:
 
 - retain the current `depositFromTrusted`, dual-selector, and deployment-profile
-  mutation tests for zero/wrong source, removed constructor
-  probe, typed-call substitution, `max_outsize=32`, native fallback, monotonic
+  mutation tests for zero/wrong source, accidental constructor probing,
+  typed-call substitution, `max_outsize=32`, native fallback, monotonic
   comparison, and omitted immutable/runtime assertions;
 - automate source/ABI/compiler/layout/runtime-size and immutable-bound artifact
   comparisons for every future Ledger change;
@@ -897,8 +899,8 @@ The design history separates into:
    unmigrated.
 3. **Rejected candidate:** typed Vyper accepted a two-word response and decoded
    only its first word.
-4. **Corrected production source:** fixed selector, exact response length,
-   constructor probe, immutable discriminator, and no fallback.
+4. **Corrected production source:** fixed selector, exact runtime response
+   length, immutable discriminator, lazy validation, and no fallback.
 5. **Gate 1/Gate 2:** action classification, mutation-sensitive behavior,
    ABI/storage/artifacts/gas, inventory, and regression evidence were reviewed.
 6. **Integration:** the production Ledger source remained byte-identical

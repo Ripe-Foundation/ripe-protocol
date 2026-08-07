@@ -1,31 +1,34 @@
-schema_version: 12
+schema_version: 13
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-01
+  as_of: 2026-08-07
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
-  program_subject_commit: 5f5d22b7ee78cbb904c4fe3c6e46599c330c4353
-  program_subject_tree: 7454b5456ebb6cd02d716a64b408629ab501629e
-  migration_candidate_parent_commit: 25c0d58e1243449276e4ac4cae8d7abb8272f376
-  migration_candidate_parent_tree: 2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf
-  migration_candidate_branch: codex/rh-transaction-executor
-  migration_candidate_state: final_review_unstaged_uncommitted
-  migration_candidate_census: { stages: 17, actions: 117, deployments: 37, registrations: 33, deferred_executable_stage_1000: false }
+  program_subject_commit: 0372d48680c281ddaafe2f1982f0bcfa851071c9
+  program_subject_tree: 79fdc69de22eb8cfa2be3a2067c596d5fed92963
+  migration_candidate_parent_commit: 0372d48680c281ddaafe2f1982f0bcfa851071c9
+  migration_candidate_parent_tree: 79fdc69de22eb8cfa2be3a2067c596d5fed92963
+  migration_candidate_branch: codex/rh-production-vyper-remediation-integration
+  migration_candidate_commit: e12b1abe26218acb804d84670099c41169e5f515
+  migration_candidate_tree: b680f0016f29f9a217054db9f80c0bbf9f0b9916
+  migration_candidate_identity_scope: last_production_source_commit_and_tree_before_status_only_reconciliation
+  migration_candidate_state: draft_pr_73_reviewed_status_reconciled
+  migration_candidate_census: { migration_files: 8, legacy_declarative_plan_retired: true, executable_plan_authorized: false }
   subject_in_origin_history: build_derived
   origin_commits_after_subject: build_derived
   build_worktree_clean: build_derived
   reconciliation: >
-    This status is bound to the current integrated configuration-source
-    baseline above. Documentation authority and publication lifecycle are
-    derived at build time, never hardcoded. The earlier frozen protocol/pause
-    baseline remains historical checkpoint evidence; this file is the sole
-    current machine-readable lifecycle authority.
+    This status reconciles the reviewed production-remediation candidate above
+    against its exact integrated rh parent. Documentation authority and
+    publication lifecycle are derived at build time, never hardcoded. Earlier
+    launch and transaction-executor records remain historical evidence; this
+    file is the sole current machine-readable lifecycle authority.
   posture: "Repository configuration is prepared and consistent; production/onchain configuration has not occurred."
   hero_lead: "Ready to begin deployment preparation."
   hero_emphasis: Repository configuration is prepared and consistent; production/onchain configuration has not occurred.
-  launch_readiness: "Ready to continue bounded launch preparation; 80 typed blockers prevent deployment readiness."
+  launch_readiness: "Ready to continue bounded launch preparation; 65 unresolved or unverified bindings prevent deployment readiness."
   live_actions_completed: 0
   status_owner: Robinhood deployment owner
   freshness_rule: >
@@ -36,36 +39,33 @@ snapshot:
 counts:
   workstreams: 28
   rh_d_decisions: 23
-  h03_blockers: 42
+  h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
   h04_retired_non_operative: 1
   h04_open: 0
-  deployment_readiness_blockers: 80
+  deployment_readiness_blockers: 65
   binding_schedules: 14
   hard_gates: 10
-  handoff_documents: 15
+  handoff_documents: 14
   parked_lanes: 6
   live_actions: 0
 
 migration_readiness:
   source_configuration:
-    blockers: 66
+    blockers: 65
     configuration_consistent: true
     deployment_ready: false
   executable_plan:
-    blockers: 86
-    categories:
-      binding: 39
-      curve: 9
-      external_address: 5
-      deployment_input: 17
-      reservation: 4
-      stock: 12
+    state: not_authorized_not_censused
+    blockers: null
+    migration_files: 8
+    legacy_declarative_plan: retired
   relationship: >
-    The 86 executable-plan blockers layer migration-specific bindings,
-    reservations, and Stock inputs on top of the 66 source/configuration
-    readiness blockers. Neither count replaces the other.
+    The former 86-key declarative-plan census is retired with its removed
+    runner. The eight-file imperative migration candidate remains
+    non-executable and unauthorized; the 65 source/configuration blockers are
+    current but are not a substitute executable-plan census.
 
 post_freeze_reconciliation:
   frozen_protocol_pause_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
@@ -118,33 +118,33 @@ post_freeze_reconciliation:
   defaults_robinhood: present_source_authoritative_configuration_consistent
   s4_zero_cooldown_decision: closed_not_reopened
   profile1_launch_input_reconciliation:
-    state: bounded_curve_launch_candidate_on_current_baseline
-    configuration_source_baseline_commit: 5f5d22b7ee78cbb904c4fe3c6e46599c330c4353
-    configuration_source_baseline_tree: 7454b5456ebb6cd02d716a64b408629ab501629e
+    state: production_remediation_candidate_on_current_rh_parent
+    configuration_source_baseline_commit: e12b1abe26218acb804d84670099c41169e5f515
+    configuration_source_baseline_tree: b680f0016f29f9a217054db9f80c0bbf9f0b9916
     source_authority_commit: b7531316ba6e9dfa5a7187d3098dbc4477fcfc87
     morpho_v2_support_commit: 33ad0f3c08bf6dc88f6569c622886d264d6e2868
-    controlling_pr66_commit: 0f79b626c6ec4788ba43b3132ada9ebec6084f2a
+    controlling_production_candidate_commit: e12b1abe26218acb804d84670099c41169e5f515
     controlling_paths: [config/BluePrint.py, contracts/config/DefaultsRobinhood.vy]
     derived_ledger: config/robinhood-parameters.json
-    selected_assets: [SteakHouse USDG, WETH, RIPE, sGREEN, GREEN]
-    priority_liquidation_assets: [[3, SteakHouse USDG], [3, WETH]]
+    selected_assets: [WETH, RIPE, sGREEN, GREEN]
+    priority_liquidation_assets: [[3, WETH]]
     priority_stability_assets: [[1, sGREEN]]
-    priority_price_source_ids: [1, 3]
+    priority_price_source_ids: [1, 2]
     price_desk_registry:
       1: { semantic: Chainlink, state: selected }
       2: { semantic: Curve, state: selected_green_only }
-      3: { semantic: BlueChipYield, state: selected }
+      3: { semantic: BlueChipYield, state: blueprint_selected_but_not_deployed_by_candidate }
       4: { semantic: Pyth, state: empty }
       5: { semantic: Stork, state: empty }
     external_address_state: external_facts_pending_independent_verification
     deployment_identity_state: unresolved_until_derived
-    bluechip_compatibility_state: resolved_by_integrated_commit_33ad0f3c
+    bluechip_compatibility_state: source_compatible_but_omitted_from_current_migration_candidate
     bluechip_runtime_bytes: 22054
     bluechip_eip170_headroom_bytes: 2522
     defaults_state: present_compiling_source_authoritative_derived_ledger_synchronized
     configuration_consistency: passing
-    deployment_readiness: blocked_80_typed_unresolved_and_unverified_bindings
-    excluded_lanes: [PSM parameters or activation, Deleverage values, CCIP, CreditEngine zero-backing changes, Curve higher powers or LP activation, Uniswap, old migration namespace and custom runner]
+    deployment_readiness: blocked_65_unresolved_and_unverified_bindings
+    excluded_lanes: [PSM parameters or activation, Deleverage values, CCIP, CreditEngine zero-backing changes, Curve higher powers or LP activation, Uniswap admission and manipulation-defense redesign, retired declarative migration runner]
     lifecycle_effect: none_no_deployment_migration_configuration_activation_or_release
 
 publication:
@@ -233,10 +233,11 @@ document_roles:
   - { file: docs/chains/rh/deployment-owner-readiness.md, role: "Compatibility redirect to the canonical quick-start."}
   - { file: docs/chains/rh/decision-register.md, role: "Canonical RH-D namespace and accepted-risk index."}
   - { file: docs/chains/rh-summary.md, role: "Stable architecture and launch checklist; not live status authority."}
-  - { file: docs/chains/rh/reassessment-and-qualification-synthesis.md, role: "Current consolidated launch topology, follow-on capability, deferral, package, and external-input authority."}
-  - { file: docs/chains/rh/curve-launch-activation.md, role: "Current bounded Curve launch-pricing topology, inputs, blockers, tests, failure modes, and lifecycle boundary."}
+  - { file: docs/chains/rh/rh-production-vyper-remediation.md, role: "Current correction record for the production-remediation candidate, including active assets, source IDs, reward availability, migration topology, and lifecycle boundaries."}
+  - { file: docs/chains/rh/reassessment-and-qualification-synthesis.md, role: "Historical pre-remediation launch synthesis; retained for design provenance, not current configuration or migration authority."}
+  - { file: docs/chains/rh/curve-launch-activation.md, role: "Historical pre-remediation Curve qualification; retained for risk provenance, not current owner-choice or blocker counts."}
   - { file: docs/chains/rh/curve-launch-migration-handoff.md, role: "Exact migration rebind order and abort criteria; no migration bytes or execution authority."}
-  - { file: docs/chains/rh/reward-launch-qualification.md, role: "Approved general reward product values, accepted shared-budget risks, and still-open operational prerequisites."}
+  - { file: docs/chains/rh/reward-launch-qualification.md, role: "Historical pre-remediation reward qualification; current source values and operational gates are controlled by DefaultsRobinhood and this status."}
   - { file: docs/chains/rh/qualification/lp-launch-admission.md, role: "Current independent GREEN/USDG and RIPE/WETH LP-token non-admission qualification authority."}
   - { file: docs/chains/rh/evidence/, role: "Historical hash-bound evidence; lifecycle openings may be superseded."}
 
@@ -248,7 +249,7 @@ reassessment_and_qualification:
     teller: preserve_current_strict_balance_measurement
     basic_vault: shared_fail_closed_nominal_protection_candidate
     launch_profile: bounded_curve_pricing
-    launch_oracle_authority: Chainlink_slot_1_Curve_slot_2_GREEN_only_BlueChipYield_slot_3
+    launch_oracle_authority: Chainlink_slot_1_Curve_slot_2_GREEN_only_BlueChipYield_slot_3_blueprint_selected_but_not_deployed_by_candidate
     uniswap_launch_price_source: none
     ripe_weth_v2: optional_externally_held_liquidity_canary_only
     green_usdg: launch_pricing_pool_candidate_deployment_and_operations_blocked
@@ -257,7 +258,7 @@ reassessment_and_qualification:
     lp_launch_admission_basis: missing_verified_facts_owner_controls_and_shared_path_safety_properties
     reward_product_decision: dp15_and_p_h04_399_approved_operations_open
     stock_rewards: disabled
-    psm: excluded_from_pr66_reconciliation_and_preserved_disabled
+    psm: excluded_from_current_production_candidate_and_preserved_disabled
     h09: opt_in_read_only_archive_fork_network_disabled_by_default
     h10: live_rehearsal_and_external_state
   profile_2:
@@ -356,8 +357,8 @@ owner_priority_overlay:
         registration, Chainlink fallback, pool address, liquidity amount,
         funding or custody authority, migration, deployment-plan dependency,
         configuration, admission, deployment, or activation. No Uniswap launch
-        price source is required; the PriceDesk priority source IDs [1, 3]
-        remain unchanged. An optional externally held RIPE/WETH V2
+        price source is required; the current migration candidate configures
+        PriceDesk priority source IDs [1, 2]. An optional externally held RIPE/WETH V2
         liquidity canary remains operational preparation, not protocol oracle
         authority.
       reopen_condition: Approved security-relevant RIPE-price consumer plus separate owner, risk, security, custody, and exposure decisions.
@@ -452,19 +453,19 @@ deployment_owner:
 
 overall:
   bottom_line: >
-    Ready to continue bounded launch preparation under the consolidated
-    reassessment and qualification disposition. Ledger, Teller, and
-    CurvePrices production source remain unchanged; the feature candidate uses
-    protected SimpleErc20 through BasicVault and removes GuardedErc20. The candidate selects Chainlink slot 1,
-    GREEN-only Curve slot 2, and source-compatible BlueChipYield slot 3 while
-    preserving priority IDs [1, 3]. Both LP admissions and every Curve higher
-    power remain separate. Every Deleverage task is deferred. Repository
-    configuration is consistent but 80 typed inputs remain blocked;
+    Ready to continue bounded launch preparation under the current
+    production-remediation disposition. The candidate selects Chainlink slot 1
+    and GREEN-only Curve slot 2 with priority IDs [1, 2]. BlueChipYield remains
+    structurally selected at slot 3 in the blueprint but is deliberately not
+    deployed or finalized by this migration candidate. Both LP admissions and
+    every Curve higher power remain separate. Every Deleverage task is
+    deferred. Repository configuration is consistent but 65 unresolved or
+    unverified bindings keep deployment readiness false;
     production/onchain configuration has not occurred. Nothing is deployed,
     activated, or released.
   architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
   engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, corrected PR #61, Morpho V2 support, and the two-source configuration authority are integrated for their exact scopes."}
-  launch_implementation: { status: partial_final_review_candidate, note: "The transaction-executor candidate continues from integrated shared-migration parent 25c0d58e/tree 2dd9ddb3 and preserves 17 stages through 0900, 117 actions, 37 deployments, and 33 registrations; stage 1000 remains deferred without an executable file. The candidate adds the distinct unresolved temporary-local-governance execution binding, exact 11-contract constructor/relinquishment census, typed action and per-contract receipts, fail-closed history promotion, and evidence-bound resume. Real testnet/mainnet plans remain typed blocked with null plan hashes while temporary governance, Curve, AAPL, external, owner, operator, reward-promotion, and release inputs remain open. Synthetic and local-Boa proof are implementation evidence only. No migration history, execution, deployment, configuration, activation, or release authority exists."}
+  launch_implementation: { status: draft_pr_73_reviewed_candidate, note: "The current production-remediation candidate contains eight imperative Robinhood migration files, 0000 through 0007. The former 17-stage declarative plan, action census, executor, and 86-key blocker census were retired with their removed runner. No executable plan is authorized or currently censused. PR #73 is a repository candidate only; no migration history, execution, deployment, configuration, activation, or release authority exists."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
   production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
 
@@ -486,14 +487,13 @@ authorization_boundaries:
   - Zero-backing settlement and bad-debt policy work is parked and nonblocking for current work; integrated M2/M3 behavior remains unchanged.
   - Stock remains disabled and unreachable.
   - H-04 source authority is present and its derived ledger is synchronized; unverified external facts and unresolved deployment identities independently keep deployment readiness fail-closed.
-  - H-05 deterministic predeployment planning and the shared 0010-0900 graph are integrated; the transaction-executor final-review candidate adds no migration authority and creates no Robinhood history.
-  - "The unresolved binding:temporary-local-governance is an execution-envelope field only: it must be nonzero, equal the actual deployment sender, differ from final RipeHq governance, cover exactly 11 LocalGov constructor surfaces, and never be inferred from another role."
+  - The current eight-file imperative Robinhood migration candidate is under draft PR #73 review; the retired declarative runner, transaction executor, and former 86-key census are not current authority.
   - H-06 qualifies a candidate operator/storage class only; final operator, machine, volume, deployment, and release authorization remain open.
   - M4 composed-route evidence is integrated; M5 configuration, freeze, and activation remain outstanding.
   - fullPayoffBuffer, overageBps, dustThreshold, and dustBps remain zero and lack Robinhood machine-facing parameter/planning representation; every Deleverage task is parked and nonblocking.
-  - Launch selects PriceDesk 1 Chainlink, PriceDesk 2 unchanged CurvePrices for GREEN only, and PriceDesk 3 BlueChipYield; IDs 4/5 remain empty, priorities remain [1, 3], USDG has no Curve feed, no Uniswap source is admitted or deployed, and neither LP token is admitted. All selected external identities remain verification-gated.
+  - Launch selects PriceDesk 1 Chainlink and PriceDesk 2 unchanged CurvePrices for GREEN only; PriceDesk 3 BlueChipYield remains blueprint-selected but is not deployed or finalized by the current candidate. IDs 4/5 remain empty, priorities are [1, 2], USDG has no Curve feed, no Uniswap source is admitted or deployed, and neither LP token is admitted. All selected external identities remain verification-gated.
   - The GREEN/USDG pool is a launch-pricing venue candidate only. Its deployment and operating inputs, both LP admissions, every additional Curve feed or consumer, dynamic rates, Teller snapshots, and Endaoment stabilization remain independently gated.
-  - DP15 and P-H04-399 are approved product/configuration decisions with the exact PR #66 values and shared 1,000-RIPE budget; B-REWARD-PROMOTION remains open for checkpoints, identities, runbook acceptance, monitoring, operator binding, rehearsal, and release prerequisites. Stock rewards remain disabled.
+  - Current source sets RIPE availability to 1,000,000e18 for rewards, 0 for HR, and 1,000,000e18 for bonds; B-REWARD-PROMOTION remains open for checkpoints, identities, runbook acceptance, monitoring, operator binding, rehearsal, and release prerequisites. Stock rewards remain disabled.
   - The fresh LP qualification preserves the selected GREEN/USDG launch-pricing pool while rejecting its LP token as a Ripe asset; RIPE/WETH remains external-canary-only, Uniswap remains PriceDesk-inert, and PSM reserves cannot fund LP liquidity.
   - H-09 is network-disabled by default and owns explicit opt-in read-only archive-fork qualification; H-10 separately owns live rehearsal.
   - CCIP is disabled; examples are non-production and manual execution is recovery only.
@@ -520,11 +520,11 @@ h04_decisions:
   defaults_source_authoritative: true
   configuration_consistent: true
   deployment_ready: false
-  deployment_readiness_blocker_count: 80
+  deployment_readiness_blocker_count: 65
   approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21, D-H04-22]
   open_ids: []
   retired_ids: [D-H04-19]
-  unresolved_binding_classes: [unverified external facts, deployment-produced identities, TrainingWheels, unresolved non-Defaults deployment inputs, Curve pool research candidates, Curve owner choices, Curve production observation]
+  unresolved_binding_classes: [unverified external facts, deployment-produced identities, TrainingWheels, unresolved non-Defaults deployment inputs, Curve pool address, Curve slippage limit, Curve minimum retained liquidity, Curve production observation]
   deferred_nonblocking_class: [four Deleverage controls and every related task]
   binding_schedule_count: 14
   implementation_file_surface:
@@ -558,12 +558,12 @@ h04_decisions:
     - { id: D-H04-19, title: "Retired environment-exception slot", state: "retired_non_operative"}
     - { id: D-H04-20, title: "Legitimate-zero and legitimate-false register", state: "approved"}
     - { id: D-H04-21, title: "Omitted and blocked field register", state: "approved"}
-    - { id: D-H04-22, title: "Owner-selected PR #66 Profile 1 launch inputs", state: "approved"}
+    - { id: D-H04-22, title: "Owner-selected Profile 1 launch inputs", state: "approved"}
 
 h03_blockers:
   - { id: B-S5-LEDGER, state: "open", implementation_predicate: "satisfied", remaining: "Downstream binding, deployment proof, activation, monitoring, and release remain open."}
   - { id: B-H04-PARAMS, state: "open", implementation_predicate: "satisfied", remaining: "The source-authority configuration and derived ledger are consistent; unresolved non-Deleverage identity bindings and deployment readiness remain. Every Deleverage task is parked and nonblocking."}
-  - { id: B-H05-PLAN, state: "open", implementation_predicate: "satisfied", remaining: "The integrated shared source produces deterministic blocked reports and the transaction-executor candidate preserves fail-closed execution gates; independent review/integration, the temporary local-governance operator identity, and all other unresolved bindings still prevent an executable plan, and migration execution remains unauthorized."}
+  - { id: B-H05-PLAN, state: "open", implementation_predicate: "not_satisfied", remaining: "The current eight-file imperative migration candidate remains under draft PR #73 review. No executable plan is authorized or censused, and migration execution remains unauthorized."}
   - { id: B-T8-M1, state: "open", implementation_predicate: "satisfied", remaining: "M1 and M4 proof are integrated; deployment binding and activation remain open."}
   - { id: B-T8-M2, state: "open", implementation_predicate: "satisfied", remaining: "M2 and M4 proof are integrated; registry placement, deployment proof, and activation remain open."}
   - { id: B-T8-M3, state: "open", implementation_predicate: "satisfied", remaining: "M3 and M4 proof are integrated; M5 activation and parked policy work remain separate."}
@@ -571,10 +571,10 @@ h03_blockers:
   - { id: B-T8-M5, state: "open", implementation_predicate: "not_satisfied", remaining: "Configuration, freeze, release evidence, deployment, and activation are unapproved."}
   - { id: B-T8-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "AAPL identity, feed, caps, vault identity, and configuration hashes require final revalidation."}
   - { id: B-ORACLE-FREEZE, state: "open", implementation_predicate: "not_satisfied", remaining: "Feed runtime, decimals, heartbeat, failure evidence, and LP oracle selection are not frozen."}
-  - { id: B-P1-EXTERNAL-VERIFY, state: "open", implementation_predicate: "not_satisfied", remaining: "PR #66 externally verifiable addresses remain source facts pending independent target-chain verification; they are not approved deployment bindings."}
+  - { id: B-P1-EXTERNAL-VERIFY, state: "open", implementation_predicate: "not_satisfied", remaining: "Externally verifiable addresses remain source facts pending independent target-chain verification; they are not approved deployment bindings."}
   - { id: B-LP-ARTIFACTS, state: "open", implementation_predicate: "not_satisfied", remaining: "LP artifacts, custody, valuation-route exclusions, and composed proof remain unbound. Neither LP token is admitted at launch. GREEN/USDG is a bounded pricing venue candidate only, not an LP admission; RIPE/WETH V2 remains only an externally held launch-liquidity canary candidate. LP requirements gate later activation, not the bounded GREEN pricing route."}
   - { id: B-PSM-SEQUENCE, state: "open", implementation_predicate: "not_satisfied", remaining: "PSM runtime, disabled posture, ordered activation, re-verification, and mint activation proof are absent."}
-  - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "The exact PR #66 values and shared-budget risks are owner approved; remaining prerequisites are initial global and points checkpoint execution/binding, exact governance and any qualified lite-signer identities, registered RIPE checkpoint-caller identity, emergency-runbook operational acceptance, monitoring owners and alert routes, H-05 deterministic planning, H-06 operator binding, H-08 post-deployment assertions, H-09 fork qualification, testnet rehearsal, and release authorization."}
+  - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "Current source sets RIPE availability to 1,000,000e18 for rewards, 0 for HR, and 1,000,000e18 for bonds; remaining prerequisites are initial global and points checkpoint execution/binding, exact governance and any qualified lite-signer identities, registered RIPE checkpoint-caller identity, emergency-runbook operational acceptance, monitoring owners and alert routes, H-05 deterministic planning, H-06 operator binding, H-08 post-deployment assertions, H-09 fork qualification, testnet rehearsal, and release authorization."}
   - { id: B-T1-CCIP, state: "open", implementation_predicate: "not_satisfied", remaining: "Historical technical gaps remain recorded, but CCIP is owner-parked and nonblocking for current non-CCIP work until explicitly reopened."}
   - { id: B-T1-TOOLCHAIN, state: "open", implementation_predicate: "not_satisfied", remaining: "No canonical pinned production Solidity toolchain is approved."}
   - { id: B-H08-PROOF, state: "open", implementation_predicate: "not_satisfied", remaining: "Read-only deployed topology and negative-reachability proof does not exist."}
@@ -585,28 +585,14 @@ h03_blockers:
   - { id: B-CURVE-ADDRESS-PROVIDER-BINDING-11, state: "open", implementation_predicate: "not_satisfied", remaining: "AddressProvider ID 11 TricryptoNG factory is not independently observed on the target chain."}
   - { id: B-CURVE-ADDRESS-PROVIDER-BINDING-12, state: "open", implementation_predicate: "not_satisfied", remaining: "AddressProvider ID 12 StableSwapNG factory is not independently observed on the target chain."}
   - { id: B-CURVE-ADDRESS-PROVIDER-BINDING-13, state: "open", implementation_predicate: "not_satisfied", remaining: "AddressProvider ID 13 TwoCryptoNG factory is not independently observed on the target chain."}
-  - { id: B-CURVE-POOL-NAME, state: "open", implementation_predicate: "not_satisfied", remaining: "The GREEN/USDG pool name is an unresolved owner choice."}
-  - { id: B-CURVE-POOL-SYMBOL, state: "open", implementation_predicate: "not_satisfied", remaining: "The GREEN/USDG pool symbol is an unresolved owner choice."}
-  - { id: B-CURVE-POOL-COIN-ORDER, state: "open", implementation_predicate: "not_satisfied", remaining: "USDG/GREEN coin order remains a research candidate pending owner approval."}
-  - { id: B-CURVE-POOL-COIN-DECIMALS, state: "open", implementation_predicate: "not_satisfied", remaining: "The 6/18 decimal vector remains a research candidate pending owner approval and exact token verification."}
-  - { id: B-CURVE-POOL-A, state: "open", implementation_predicate: "not_satisfied", remaining: "A=100 remains a research candidate pending owner approval."}
-  - { id: B-CURVE-POOL-FEE, state: "open", implementation_predicate: "not_satisfied", remaining: "fee=4,000,000 remains a research candidate pending owner approval."}
-  - { id: B-CURVE-POOL-OFFPEG-FEE-MULTIPLIER, state: "open", implementation_predicate: "not_satisfied", remaining: "off-peg multiplier 20,000,000,000 remains a research candidate pending owner approval."}
-  - { id: B-CURVE-POOL-MA-EXP-TIME, state: "open", implementation_predicate: "not_satisfied", remaining: "ma_exp_time=600 remains a research candidate pending owner approval; 866 is test-only."}
   - { id: B-CURVE-POOL-ADDRESS, state: "open", implementation_predicate: "not_satisfied", remaining: "The CREATE-produced pool address does not exist until an authorized deployment and must not be precomputed."}
-  - { id: B-CURVE-POOL-PRODUCTION-LIQUIDITY-AMOUNT, state: "open", implementation_predicate: "not_satisfied", remaining: "Production liquidity amount is unresolved."}
-  - { id: B-CURVE-POOL-FUNDING-SOURCE, state: "open", implementation_predicate: "not_satisfied", remaining: "Production funding source is unresolved."}
-  - { id: B-CURVE-POOL-CUSTODIAN, state: "open", implementation_predicate: "not_satisfied", remaining: "Pool custody owner is unresolved."}
-  - { id: B-CURVE-POOL-APPROVING-ACCOUNT, state: "open", implementation_predicate: "not_satisfied", remaining: "The token-approving account is unresolved."}
-  - { id: B-CURVE-POOL-MINIMUM-MINTED-LP, state: "open", implementation_predicate: "not_satisfied", remaining: "Minimum minted LP protection is unresolved."}
   - { id: B-CURVE-POOL-SLIPPAGE-LIMIT, state: "open", implementation_predicate: "not_satisfied", remaining: "Pool-deployment slippage limit is unresolved."}
-  - { id: B-CURVE-POOL-WITHDRAWAL-AUTHORITY, state: "open", implementation_predicate: "not_satisfied", remaining: "Liquidity withdrawal authority is unresolved."}
   - { id: B-CURVE-POOL-MINIMUM-RETAINED-LIQUIDITY, state: "open", implementation_predicate: "not_satisfied", remaining: "Minimum retained liquidity is unresolved."}
   - { id: B-CURVE-POOL-PRODUCTION-OBSERVATION, state: "open", implementation_predicate: "not_satisfied", remaining: "No production pool observation exists."}
 
 glossary:
   - { term: CCIP, meaning: "Chainlink Cross-Chain Interoperability Protocol; currently disabled, owner-parked, and nonblocking for current non-CCIP work."}
-  - { term: PSM, meaning: "Peg Stability Module for reserve minting and redemption; its parameters and activation are outside the PR #66 reconciliation and the existing capability remains disabled."}
+  - { term: PSM, meaning: "Peg Stability Module for reserve minting and redemption; its parameters and activation are outside the current production candidate and the existing capability remains disabled."}
   - { term: CLI, meaning: "Command-line interface used to select a network and prepare actions; profiles do not authorize live use."}
   - { term: ArbSys at 0x64, meaning: "Robinhood system contract used by the portable Ledger to read child-block identity."}
   - { term: EIP-170, meaning: "Ethereum deployed-contract size limit that constrained the integrated M1 Teller change."}
@@ -617,7 +603,7 @@ glossary:
   - { term: Stage C, meaning: "Post-Gate-1 checked inventory and planning-document reconciliation; it is not implementation validation."}
 
 critical_path:
-  - { order: 1, label: "Bind unresolved launch deployment inputs", internal_reference: "H-04 and bounded Curve deployment readiness", plain_language_scope: "Verify external facts and bind every unresolved non-Deleverage deployment identity, including the 23 typed Curve blockers, while preserving all consolidated deferrals.", why_it_matters: "A consistent source configuration does not make unresolved deployment inputs executable.", detail: "Keep deployment readiness fail-closed; do not open Deleverage representation, Curve higher powers, LP admission, or size/headroom work.", state: "gated", owner_gate: "H-04, protocol security, Curve input owners, and independent reviewers"}
+  - { order: 1, label: "Bind unresolved launch deployment inputs", internal_reference: "H-04 and bounded Curve deployment readiness", plain_language_scope: "Verify external facts and bind every unresolved non-Deleverage deployment identity, including the nine current Curve blockers, while preserving all consolidated deferrals.", why_it_matters: "A consistent source configuration does not make unresolved deployment inputs executable.", detail: "Keep deployment readiness fail-closed; do not open Deleverage representation, Curve higher powers, LP admission, or size/headroom work.", state: "gated", owner_gate: "H-04, protocol security, Curve input owners, and independent reviewers"}
   - { order: 2, label: "Maintain source and derived-ledger consistency", internal_reference: "H-04 / S6", plain_language_scope: "Edit Blueprint and DefaultsRobinhood directly, then synchronize and check the derived evidence ledger.", why_it_matters: "The JSON ledger must never become an alternate product-value authority.", detail: "Require deterministic sync, read-only check mode, exact ownership, compilation, parity, and configuration-consistency review.", state: "active", owner_gate: "H-04 owner and independent reviewers"}
   - { order: 3, label: "Promote deterministic planning to release-candidate readiness", internal_reference: "H-05 planning", plain_language_scope: "Rebuild deterministic reports after binding while preserving blocked, omitted, assertion-only, and executable distinctions.", why_it_matters: "Integrated planning code must not turn absent values or reservations into transactions.", detail: "No Robinhood migration history exists; plan execution remains a later separately authorized gate.", state: "gated", owner_gate: "H-05, protocol, security, and release reviewers"}
   - { order: 4, label: "Bind the final manifest operator and storage", internal_reference: "H-06 qualification", plain_language_scope: "Bind the qualified macOS/APFS class to the intended operator machine, selected volume, and frozen release candidate.", why_it_matters: "Candidate class qualification is not final machine, volume, publication, deployment, or release authorization.", detail: "Preserve the case-sensitive history residual and keep Linux unsupported and fail-closed.", state: "gated", owner_gate: "H-06 operations, security, and release reviewers"}
@@ -757,7 +743,7 @@ workstreams:
     integration_state: integrated
     review_state: reviewed and integrated
     owner_decision_state: symbolic graph approved; concrete values unapproved
-    remaining_blockers: [All 42 canonical H-03 blockers remain open, including the 23 Curve-specific typed inputs.]
+    remaining_blockers: [All 28 canonical H-03 blockers remain open, including nine Curve-specific typed inputs.]
     deployment_release_state: blueprint only; no deployment authority
     exact_next_action: Consume the blueprint read-only while closing blockers through their owners.
     authority: Integrated H-03 implementation and provenance.
@@ -782,15 +768,15 @@ workstreams:
     group: Deployment execution
     plain_language_scope: Discover immutable history and produce a plan that keeps blocked, omitted, assertion-only, and executable rows distinct.
     why_it_matters: A reservation or symbolic graph row must never become an executable migration by implication.
-    current_phase: transaction-executor candidate ready for one independent review; execution unauthorized
-    implementation_state: integrated 17-stage shared source through 0900 with 117 actions and 33 registrations plus an unstaged executor candidate with typed envelope validation, exact 11-surface temporary governance, per-contract handoff receipts, failure records, and evidence-bound resume
-    integration_state: candidate_not_integrated
-    review_state: final_candidate_awaiting_independent_review
-    owner_decision_state: planning implementation approved; migration execution not approved
-    remaining_blockers: [Independent candidate review/integration, approved temporary local-governance operator identity, typed Curve and AAPL inputs, external and deployment-produced identities, reward operational promotion gates, in-scope H-04 bindings, B-H05-PLAN, exact execution authority; four-control representation is parked and nonblocking.]
+    current_phase: eight-file imperative migration candidate under draft PR #73 review; execution unauthorized
+    implementation_state: current production-remediation candidate contains migrations 0000 through 0007; the former declarative runner, executor, and 86-key census are retired
+    integration_state: draft_pr_73_not_integrated
+    review_state: candidate_validation_and_status_reconciliation_complete
+    owner_decision_state: repository candidate approved for review; migration execution not approved
+    remaining_blockers: [pull request 73 review and integration, typed Curve and AAPL inputs, external and deployment-produced identities, reward operational promotion gates, in-scope H-04 bindings, B-H05-PLAN, exact execution authority; four-control representation is parked and nonblocking.]
     deployment_release_state: no migration history, plan execution, or deployment
-    exact_next_action: Independently review the complete unstaged candidate; preserve real plan_hash null and do not stage, create history, or execute migrations.
-    authority: Integrated H-05 shared source plus the unstaged transaction-executor final-review candidate on the recorded exact parent; neither grants execution authority.
+    exact_next_action: Review and integrate only the exact PR #73 repository candidate; do not create history or execute migrations.
+    authority: The eight-file imperative candidate and its correction record are repository review inputs only and grant no execution authority.
     docs: [{ label: H-05 evidence, path: docs/chains/rh/evidence/robinhood-migration-phase-a.md }]
   - id: H-06
     name: Immutable manifest and evidence writer
@@ -1062,15 +1048,15 @@ decisions:
   - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
-  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; all 42 canonical H-03 blockers, including the 23 Curve launch inputs, remain open and grant no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
+  - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; all 28 canonical H-03 blockers, including nine Curve launch inputs, remain open and grant no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
   - { id: RH-D015, title: "One combined defaults and parameter workstream", status: "source_authority_integrated_bindings_open", summary: "Blueprint and DefaultsRobinhood are the two value authorities and the v4 ledger is derived. Configuration consistency passes; unverified external facts and deployment-produced identities keep deployment readiness fail-closed while Deleverage is parked.", source: "docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md"}
-  - { id: RH-D016, title: "Shared migration source, isolated histories", status: "deterministic_planning_integrated_execution_unauthorized", summary: "Deterministic blocked planning is integrated; no Robinhood history exists and execution remains unauthorized.", source: "docs/chains/rh/evidence/robinhood-migration-phase-a.md"}
+  - { id: RH-D016, title: "Shared migration source, isolated histories", status: "imperative_candidate_review_execution_unauthorized", summary: "The current eight-file imperative Robinhood migration candidate is under draft PR #73 review; no executable plan is authorized or censused, no Robinhood history exists, and execution remains unauthorized.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D017, title: "Immutable manifest and evidence chain", status: "candidate_class_qualified_final_binding_open", summary: "H-06 qualifies a macOS/APFS operator/storage class only; final machine/volume, deployment, promotion, and release remain unauthorized.", source: "docs/chains/rh/evidence/robinhood-manifest-macos-release-qualification.md"}
   - { id: RH-D018, title: "Dashboard tooling is separate from launch dependencies", status: "approved_current_handoff", summary: "Dashboard tooling remains outside H-01 and cannot affect its disposition.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D019, title: "Private dashboard is a temporary presentation mirror", status: "approved_temporary", summary: "The private mirror is optional; repository documents remain complete authority and fallback.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_superseded_for_curve_topology", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture. RH-D021 supersedes only the earlier empty-ID-2 and all-Curve-in-Profile-2 boundary; the remaining H-09/H-10 lifecycle separation continues.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
-  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, preserve IDs 1/3 and priorities [1,3], keep USDG Chainlink-only and IDs 4/5 empty, and exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and Uniswap. Eighty typed blockers keep deployment readiness false.", source: "docs/chains/rh/curve-launch-activation.md"}
-  - { id: RH-D022, title: "RIPE reward launch product decision approved; operations open", status: "approved_product_decision_operationally_blocked", summary: "The unchanged PR #66 values, shared 1,000-RIPE Lootbox/Stability budget, approximately 15.432-day emission-only runway, possible shorter Stability-claim runway, and zero theoretical minimum are owner accepted with no separate reserve, redesign, or launch disablement; DP15 and P-H04-399 are approved, operational prerequisites remain open, and no lifecycle authority is granted.", source: "docs/chains/rh/reward-launch-qualification.md"}
+  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, configure priorities [1,2], keep USDG Chainlink-only and IDs 4/5 empty, and keep blueprint-selected ID 3 undeployed by the current candidate. Exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and Uniswap. Sixty-five unresolved or unverified bindings keep deployment readiness false.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
+  - { id: RH-D022, title: "RIPE reward launch product decision approved; operations open", status: "approved_product_decision_operationally_blocked", summary: "Current source assigns 1,000,000e18 RIPE to rewards, 0 to HR, and 1,000,000e18 to bonds while retaining the approved rewards configuration. Operational prerequisites remain open, Stock rewards remain disabled, and no lifecycle authority is granted.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D023, title: "LP launch admission reconsidered independently", status: "qualified_no_protocol_admission", summary: "Fresh per-LP source-path qualification preserves the selected GREEN/USDG launch-pricing pool but excludes its LP token; RIPE/WETH remains external-canary-only, both protocol admissions and all DP-14 leaves remain blocked, and no lifecycle authority is granted.", source: "docs/chains/rh/qualification/lp-launch-admission.md"}
 
 deadlines:
@@ -1080,7 +1066,7 @@ deadlines:
 hard_gates:
   - { id: G-M5, label: "Freeze Stock configuration without activation", plain_language_scope: "Bind AAPL identity, oracle, vault, caps, routes, assertions, monitoring, and a disabled configuration package.", why_it_matters: "Integrated M1-M4 proof does not choose production values or make Stock reachable safely.", state: "open", effect: "Blocks Stock reachability, deployment, activation, and release; parked policy work remains nonblocking."}
   - { id: G-H04-BINDING, label: "Resolve deployment binding readiness", plain_language_scope: "Verify external facts and bind deployment-produced identities, TrainingWheels, and required non-Deleverage machine inputs before any deployment use.", why_it_matters: "A compiling, synchronized configuration does not make unresolved inputs deployable.", state: "open", effect: "Blocks H-05 release-candidate planning, deployment configuration, deployment, activation, and release; it does not block local source/ledger consistency checks."}
-  - { id: G-CURVE-INPUTS, label: "Close bounded Curve launch inputs", plain_language_scope: "Verify five official identities; approve or replace six pool research candidates; bind ten owner controls, the deployment-produced pool address, and production observation before ID-2 deployment use.", why_it_matters: "Repository candidates and official source provenance are not target-chain verification, pool deployment, custody authority, or an operating observation.", state: "open", effect: "Blocks Curve deployment, ID-2 registration, GREEN feed activation, migration readiness, and release; it does not block offline source, generator, or test validation."}
+  - { id: G-CURVE-INPUTS, label: "Close bounded Curve launch inputs", plain_language_scope: "Verify five official provider and binding identities; bind the deployment-produced pool address, slippage limit, minimum retained liquidity, and production observation before ID-2 deployment use.", why_it_matters: "Repository candidates and official source provenance are not target-chain verification, pool deployment, or an operating observation.", state: "open", effect: "Blocks Curve deployment, ID-2 registration, GREEN feed activation, migration readiness, and release; it does not block offline source, generator, or test validation."}
   - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero without opening representation, configuration, test, fork, documentation, or size/headroom work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred every Deleverage task rather than authorizing a machine implementation.", state: "parked_nonblocking", effect: "Does not block current non-Deleverage launch preparation; explicit owner reopening is required before any Deleverage work."}
   - { id: G-H05-READINESS, label: "Promote deterministic planning after bindings", plain_language_scope: "Rebuild the integrated deterministic reports only after required bindings exist, preserving typed blocked and non-executable rows.", why_it_matters: "Planning code must not turn missing inputs or reservations into transactions.", state: "open", effect: "Blocks an executable release-candidate plan and later deployment evidence; migration execution remains separately unauthorized."}
   - { id: G-H06-OPS, label: "Qualify intended manifest operator and storage", plain_language_scope: "Repeat exact macOS/APFS qualification for the intended operator, device, filesystem, and runbook.", why_it_matters: "Integrated implementation evidence is not operational publication or release qualification.", state: "open", effect: "Blocks operational publication, deployment evidence, and release."}
@@ -1090,7 +1076,7 @@ hard_gates:
   - { id: G-PROD, label: "Authorize restricted production deployment and release", plain_language_scope: "Approve the exact production plan, authorities, artifacts, configuration, monitoring, activation, and release sequence.", why_it_matters: "Production affects real users and assets and has no implied authority from earlier phases.", state: "open", effect: "Blocks production deployment, migration, registration, role transfer, configuration, activation, and release."}
 
 reading_paths:
-  human_10_minute: [docs/chains/rh/deployment-owner-quickstart.md, docs/chains/rh/reassessment-and-qualification-synthesis.md, docs/chains/rh/curve-launch-activation.md, docs/chains/rh/reward-launch-qualification.md, docs/chains/rh/status.yaml]
+  human_10_minute: [docs/chains/rh/deployment-owner-quickstart.md, docs/chains/rh/rh-production-vyper-remediation.md, docs/chains/rh/current-owner-priorities.md, docs/chains/rh/decision-register.md, docs/chains/rh/status.yaml]
   human_45_minute: [docs/chains/rh/current-owner-priorities.md, docs/chains/rh/decision-register.md, docs/chains/rh-summary.md, docs/chains/rh/minimal-contract-change-reassessment.md, docs/chains/rh/qualification/lp-launch-admission.md, docs/chains/rh/robinhood-deployment-support-specification.md, docs/chains/rh/robinhood-deployment-validation-plan.md, docs/chains/rh/robinhood-manifest-operator-runbook.md, docs/chains/rh/hardening/release-packet-evidence-checklist.md, docs/chains/rh/curve-launch-migration-handoff.md]
   agent_bootstrap:
     - docs/chains/rh/deployment-owner-quickstart.md

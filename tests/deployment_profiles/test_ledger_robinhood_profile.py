@@ -89,11 +89,11 @@ def test_r1_manifest_is_canonical_draft_with_deterministic_placeholders():
 
 def test_r1_compiles_reviewed_ledger_with_pinned_source_owned_settings():
     compiled = profile.compile_reviewed_ledger()
-    assert len(compiled.creation) == 13_730
-    assert len(compiled.runtime_template) == 13_125
+    assert len(compiled.creation) == 13_683
+    assert len(compiled.runtime_template) == 13_264
     assert compiled.integrity == (
-        "62cc9e492ee1b1a3e84ad104507d684dc"
-        "81edecef969fc0ae0f7a1586dd0d830"
+        "b381be6ad58a12908a6d494b25b5cf764"
+        "c3a8dbcef658a4f0757624e595a093d"
     )
 
 
@@ -124,7 +124,10 @@ def test_r1_unsupported_source_space_is_closed_by_contract_two_branch_allowlist(
     assert source.count(
         "assert _actionBlockSource in [empty(address), ARB_SYS]"
     ) == 1
-    assert source.count("if _actionBlockSource == ARB_SYS:") == 1
+    assert source.count("if ACTION_BLOCK_SOURCE == empty(address):") == 1
+    assert "arbBlockNumber()" not in source.split("def __init__", 1)[1].split(
+        "# one action per block", 1
+    )[0]
     assert "ACTION_BLOCK_SOURCE = _actionBlockSource" in source
 
 

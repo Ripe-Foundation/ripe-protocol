@@ -224,6 +224,9 @@ def __init__(_ripeHq: address, _defaults: address):
 
     self.numAssets = 1 # not using 0 index
     self.numLiteSigners = 1 # not using 0 index, 0 means "not in list"
+    self.preferredStabVaultId = 1
+    self.isStabVaultId[1] = True
+    self.coreRipeGovVaultId = 2
 
     # defaults
     if _defaults != empty(address):

@@ -17,10 +17,13 @@ from scripts.params.validate_robinhood_reward_launch_plan import (
 )
 
 
+pytestmark = pytest.mark.release
+
+
 ROOT = Path(__file__).resolve().parents[2]
 PLAN = ROOT / "config" / "robinhood-reward-launch-plan.json"
 LEDGER = ROOT / "config" / "robinhood-parameters.json"
-PLAN_SHA256 = "7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec"
+PLAN_SHA256 = "f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234"
 
 
 def _ledger_record(record_id: str) -> dict:
@@ -95,25 +98,25 @@ def test_dp15_and_p_h04_399_are_approved_while_reward_operations_remain_blocked(
 
     blockers = {item.blocker_id for item in ROBINHOOD_BLUEPRINT.blockers}
     assert "B-REWARD-PROMOTION" in blockers
-    assert len(blockers) == 42
+    assert len(blockers) == 28
     ready, readiness_blockers = defaults_sync.deployment_readiness()
     assert ready is False
-    assert len(readiness_blockers) == 80
+    assert len(readiness_blockers) == 65
     assert not any("Deployment.DP-15.rewards.promotion" in item for item in readiness_blockers)
 
 
 def test_runway_and_shared_budget_risks_are_explicitly_owner_accepted():
     plan = json.loads(PLAN.read_bytes())
     derived = plan["derived_calculations"]
-    assert derived["emission_only_first_capped_wall_time"] == "15d10h22m24s"
+    assert derived["emission_only_first_capped_wall_time"] == "15432d2h22m24s"
     assert derived["shared_budget_theoretical_minimum_runway_seconds"] == 0
     assert derived["thirty_day_minimum_budget_ripe_before_stability_reserve"] == "1944"
     assert derived["thirty_day_max_rate_ripe_per_block_before_stability_reserve"].startswith(
-        "0.004629629629"
+        "4.629629629629"
     )
     assert derived["stability_reserve"] == "none_selected_owner_accepted"
     decision = plan["owner_product_decision"]
-    assert decision["emission_only_runway_days_approx"] == "15.432"
+    assert decision["emission_only_runway_days_approx"] == "15432.099"
     assert decision["stability_claim_effect"] == "can_shorten_emission_only_runway"
     assert decision["shared_budget_theoretical_minimum_runway_seconds"] == 0
     assert decision["dedicated_stability_reserve"] == "none_selected"

@@ -132,9 +132,12 @@ def test_mission_control_initial_state(mission_control):
     assert not mission_control.canMintRipe()
 
 
-def test_vault_id_pointers_initialize_to_zero(fresh_mission_control):
-    assert fresh_mission_control.coreRipeGovVaultId() == 0
-    assert fresh_mission_control.preferredStabVaultId() == 0
+def test_vault_id_pointers_initialize_to_robinhood_and_base_invariants(
+    fresh_mission_control,
+):
+    assert fresh_mission_control.coreRipeGovVaultId() == 2
+    assert fresh_mission_control.preferredStabVaultId() == 1
+    assert fresh_mission_control.isStabVaultId(1)
 
 
 def test_default_priority_stab_vaults_initialize_registry(ripe_hq):

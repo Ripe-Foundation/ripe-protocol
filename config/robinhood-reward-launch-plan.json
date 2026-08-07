@@ -18,9 +18,9 @@
     "rpc_authorized": false
   },
   "owner_product_decision": {
-    "scope": "exact_pr66_initial_launch_reward_configuration",
-    "accepted_shared_budget": "Lootbox_emissions_and_Stability_rewards_share_the_1000_RIPE_budget",
-    "emission_only_runway_days_approx": "15.432",
+    "scope": "owner_selected_current_defaults_reward_configuration",
+    "accepted_shared_budget": "Lootbox_emissions_and_Stability_rewards_share_the_1000000_RIPE_budget",
+    "emission_only_runway_days_approx": "15432.099",
     "stability_claim_effect": "can_shorten_emission_only_runway",
     "shared_budget_theoretical_minimum_runway_seconds": 0,
     "dedicated_stability_reserve": "none_selected",
@@ -31,7 +31,7 @@
     "lifecycle_authority_effect": "none"
   },
   "candidate_configuration": {
-    "classification": "derived_owner_approved_launch_values",
+    "classification": "derived_owner_selected_current_launch_values",
     "configuration_timing": "configured_during_deployment",
     "emission_start": "after_first_successful_global_lootbox_checkpoint",
     "values": {
@@ -41,7 +41,7 @@
       },
       "ripeAvailForRewards": {
         "source": "Defaults.ripeAvailForRewards",
-        "value": 1000000000000000000000
+        "value": 1000000000000000000000000
       },
       "ripePerBlock": {
         "source": "Defaults.rewardsConfig.ripePerBlock",
@@ -85,14 +85,14 @@
     "ripe_per_day": "64.800",
     "borrower_ripe_per_day": "6.480",
     "staker_ripe_per_day": "58.320",
-    "emission_only_continuous_budget_days": "15.4320987654320987654320987654320987654320987654320987654321",
-    "emission_only_first_capped_block_increment": 111112,
-    "emission_only_first_capped_wall_seconds": 1333344,
-    "emission_only_first_capped_wall_time": "15d10h22m24s",
+    "emission_only_continuous_budget_days": "15432.0987654320987654320987654320987654320987654320987654321",
+    "emission_only_first_capped_block_increment": 111111112,
+    "emission_only_first_capped_wall_seconds": 1333333344,
+    "emission_only_first_capped_wall_time": "15432d2h22m24s",
     "shared_budget_theoretical_minimum_runway_seconds": 0,
     "thirty_day_emission_budget_ripe": "1944.000",
     "thirty_day_minimum_budget_ripe_before_stability_reserve": "1944",
-    "thirty_day_max_rate_ripe_per_block_before_stability_reserve": "0.00462962962962962962962962962962962962962962962962962962962963",
+    "thirty_day_max_rate_ripe_per_block_before_stability_reserve": "4.62962962962962962962962962962962962962962962962962962962963",
     "stability_reserve": "none_selected_owner_accepted",
     "auto_stake_lock_blocks": 2599344,
     "auto_stake_lock_days": "361.02"
@@ -138,7 +138,7 @@
       "id": "RF-07",
       "classification": "derived_scope_limit",
       "evidence": "derived_calculations and RF-03",
-      "fact": "15d10h22m24s is only the emission-only maximum from the first checkpoint; shared-budget theoretical minimum runway is zero"
+      "fact": "15432d2h22m24s is only the emission-only maximum from the first checkpoint; shared-budget theoretical minimum runway is zero"
     }
   ],
   "emergency_runbook": {

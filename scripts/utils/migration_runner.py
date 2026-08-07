@@ -634,7 +634,7 @@ def _blocker_code(prefix: str, reference: str) -> str:
 
 def _defaults_contract_checks(root: Path, blueprint: Any, stages: Sequence[Mapping[str, Any]]) -> None:
     source = (root / "contracts/config/DefaultsRobinhood.vy").read_text(encoding="utf-8")
-    if re.search(r"def priorityPriceSourceIds\(\).*?return \[1, 3\]", source, re.S) is None:
+    if re.search(r"def priorityPriceSourceIds\(\).*?return \[1, 2\]", source, re.S) is None:
         raise MigrationPlanError("H05_DEFAULTS_PRIORITY_MISMATCH")
     defaults_action = next(
         action
@@ -727,13 +727,13 @@ def _validate_curve_authority(blueprint: Any) -> None:
         and launch_rows["launch.component"].value == "CM-017:CurvePrices"
         and launch_rows["launch.price_desk_registration_order"].value
         == expected_order
-        and launch_rows["launch.priority_price_source_ids"].value == (1, 3)
+        and launch_rows["launch.priority_price_source_ids"].value == (1, 2)
         and blueprint.ROBINHOOD_COMPONENTS.get("curve_launch")
         == {
             "component_id": "CM-017",
             "registry_id": 2,
             "configured_assets": ("GREEN",),
-            "priority_ids": (1, 3),
+            "priority_ids": (1, 2),
         }
     ):
         raise MigrationPlanError("H05_CURVE_AUTHORITY_MISMATCH")

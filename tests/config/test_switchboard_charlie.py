@@ -3124,6 +3124,39 @@ def test_vault_pointer_actions_allow_explicit_initialization_from_zero(
     assert zero_pointer_mission_control.preferredStabVaultId() == 1
 
 
+def test_preferred_vault_pending_event_contains_new_address_and_confirmation_block(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    zero_pointer_mission_control,
+    savings_green,
+    stability_pool,
+):
+    _support_asset(
+        zero_pointer_mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1],
+    )
+    action_id = switchboard_charlie.setPreferredStabVaultId(
+        1,
+        zero_pointer_mission_control.address,
+        sender=governance.address,
+    )
+
+    logs = filter_logs(switchboard_charlie, "PendingPreferredStabVaultIdChange")
+    assert len(logs) == 1
+    event = logs[0]
+    assert event.previousVaultId == 0
+    assert event.newVaultId == 1
+    assert event.newVaultAddr == stability_pool.address
+    assert event.confirmationBlock == switchboard_charlie.getActionConfirmationBlock(action_id)
+    assert event.actionId == action_id
+    assert switchboard_charlie.pendingPreferredStabVaultId(action_id) == 1
+    assert switchboard_charlie.pendingMissionControl(action_id) == zero_pointer_mission_control.address
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+
 def test_core_pointer_action_lifecycle_and_candidate_mission_control(
     switchboard_charlie,
     switchboard_bravo,

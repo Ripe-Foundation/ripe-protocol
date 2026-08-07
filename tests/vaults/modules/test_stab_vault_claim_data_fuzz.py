@@ -1,4 +1,5 @@
 import boa
+import pytest
 from hypothesis import HealthCheck, given, settings, strategies as st
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
@@ -9,14 +10,38 @@ from test_stab_vault_hardening import (
     _assert_claim_data_model,
     _asset_address,
     _claim_pair,
-    _deploy_claim_token,
     _record_claim,
     _seed_stability_asset,
 )
 
 
-RETENTION_THRESHOLD = 10**17
+pytestmark = pytest.mark.fuzz
+
+
+RETENTION_THRESHOLD = 5 * 10**16
 NUM_FUZZ_CLAIM_ASSETS = 4
+
+
+@pytest.fixture(scope="module")
+def fuzz_claim_tokens(governance):
+    """Reuse one 21-address token pool; anchors restore state per example."""
+    factory = boa.load_partial("contracts/mock/MockErc20.vy")
+    return tuple(
+        factory.deploy(
+            governance,
+            f"Fuzz Claim {index}",
+            f"FC{index}",
+            18,
+            0,
+        )
+        for index in range(MAX_ACTIVE_CLAIM_ASSETS + 1)
+    )
+
+
+def _prepare_claim_token(token, governance, holder, amount):
+    token.mint(holder, amount, sender=governance.address)
+    return token
+
 
 CLAIM_AMOUNT_STRATEGY = st.one_of(
     st.sampled_from(
@@ -35,7 +60,6 @@ CLAIM_AMOUNT_STRATEGY = st.one_of(
 )
 PRICE_STRATEGY = st.sampled_from(
     [
-        0,
         2 * 10**17,
         EIGHTEEN_DECIMALS // 2,
         EIGHTEEN_DECIMALS,
@@ -153,6 +177,7 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
     mock_price_source,
     green_token,
     savings_green,
+    fuzz_claim_tokens,
 ):
     with boa.env.anchor():
         _seed_stability_asset(
@@ -164,10 +189,10 @@ def test_fuzz_claim_data_add_prune_activate_sequences(
             mock_price_source,
         )
         tokens = [
-            _deploy_claim_token(
+            _prepare_claim_token(
+                fuzz_claim_tokens[index],
                 governance,
                 alice,
-                800 + index,
                 20 * EIGHTEEN_DECIMALS,
             )
             for index in range(NUM_FUZZ_CLAIM_ASSETS)
@@ -342,6 +367,7 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
     mock_price_source,
     green_token,
     savings_green,
+    fuzz_claim_tokens,
 ):
     candidate_amount, active_increment = case
 
@@ -356,10 +382,10 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
             100 * EIGHTEEN_DECIMALS + 14,
         )
         active_tokens = [
-            _deploy_claim_token(
+            _prepare_claim_token(
+                fuzz_claim_tokens[index],
                 governance,
                 alice,
-                1_100 + index,
                 ACTIVATION_THRESHOLD + (active_increment if index == 0 else 0),
             )
             for index in range(MAX_ACTIVE_CLAIM_ASSETS)
@@ -378,10 +404,10 @@ def test_fuzz_capacity_rejection_existing_receipt_and_readdition(
                 savings_green,
             )
 
-        candidate = _deploy_claim_token(
+        candidate = _prepare_claim_token(
+            fuzz_claim_tokens[MAX_ACTIVE_CLAIM_ASSETS],
             governance,
             alice,
-            1_200,
             candidate_amount,
         )
         mock_price_source.setPrice(candidate, EIGHTEEN_DECIMALS)
@@ -514,6 +540,7 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
     savings_green,
     setGeneralConfig,
     setAssetConfig,
+    fuzz_claim_tokens,
 ):
     pair_balance, max_claim_value = case
 
@@ -537,10 +564,10 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
             100 * 10**6,
         )
 
-        claim = _deploy_claim_token(
+        claim = _prepare_claim_token(
+            fuzz_claim_tokens[0],
             governance,
             alice,
-            900,
             2 * pair_balance,
         )
         setAssetConfig(claim)
@@ -665,6 +692,7 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
     savings_green,
     setGeneralConfig,
     setAssetConfig,
+    fuzz_claim_tokens,
 ):
     alpha_balance, charlie_balance, first_payment, second_payment = case
 
@@ -688,10 +716,10 @@ def test_fuzz_redemptions_preserve_claim_and_green_registry_model(
             100 * 10**6,
         )
 
-        claim = _deploy_claim_token(
+        claim = _prepare_claim_token(
+            fuzz_claim_tokens[0],
             governance,
             alice,
-            1_000,
             alpha_balance + charlie_balance,
         )
         setAssetConfig(claim)

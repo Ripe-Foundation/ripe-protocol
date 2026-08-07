@@ -840,14 +840,6 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'before testnet/production activation',
   'blocked',
   ('B-H08-PROOF', 'B-H09-RELEASE')),
- ('I-STEAKHOUSE-USDG',
-  'selected SteakHouse USDG Morpho Vaults V2 identity and membership facts',
-  ('CM-009', 'CM-018', 'CM-034'),
-  'OWN-H04',
-  ('OWN-ORACLE', 'OWN-H05'),
- 'before Defaults render and oracle plan freeze',
- 'required',
-  ('B-P1-EXTERNAL-VERIFY',)),
  ('I-MORPHO-V2-FACTORY',
   'selected Robinhood Morpho Vaults V2 factory identity and runtime facts',
   ('CM-018',),
@@ -5299,7 +5291,7 @@ def validate_curve_launch_authority() -> None:
         values["launch.chain_id"] != 4663
         or values["launch.component"] != "CM-017:CurvePrices"
         or values["launch.price_desk_registration_order"] != expected_registration
-        or values["launch.priority_price_source_ids"] != (1, 3)
+        or values["launch.priority_price_source_ids"] != (1, 2)
     ):
         _fail("RH_CURVE_LAUNCH_TOPOLOGY")
 
@@ -5590,7 +5582,6 @@ _SYMBOLIC_AUTHORITY_CLASSES = {
     "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
     "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
     "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
-    "I-STEAKHOUSE-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
     "I-MORPHO-V2-FACTORY": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
     "I-CONTRIB-TEMPLATE": AuthorityClass.DEPLOYMENT_PRODUCED,
 }
@@ -5630,7 +5621,6 @@ _PROFILE1_SELECTION = Profile1LaunchSelection(
         "I-GOV-HANDOFF",
         "I-LEDGER-BLOCK-SOURCE",
         "I-MORPHO-V2-FACTORY",
-        "I-STEAKHOUSE-USDG",
         "I-USDG",
         "I-USDG-FEED",
         "I-WETH",
@@ -5988,7 +5978,7 @@ def validate_blueprint(
             _fail("H03_ADDRESS_LITERAL")
 
     symbolic_ids = tuple(item.field_id for item in blueprint.symbolic_inputs)
-    if len(symbolic_ids) != 51 or len(set(symbolic_ids)) != 51:
+    if len(symbolic_ids) != 50 or len(set(symbolic_ids)) != 50:
         _fail("H03_SYMBOLIC_FIELD")
     if any(
         not isinstance(item.authority_class, AuthorityClass)

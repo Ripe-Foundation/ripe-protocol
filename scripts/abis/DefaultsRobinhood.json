@@ -692,10 +692,6 @@
       {
         "name": "_wethToken",
         "type": "address"
-      },
-      {
-        "name": "_steakhouseUsdgVault",
-        "type": "address"
       }
     ],
     "outputs": []

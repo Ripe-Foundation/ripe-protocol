@@ -75,13 +75,13 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
     price: uint256 = self.price[_asset]
-    return price, price != 0
+    return price, priceData.indexOfAsset[_asset] != 0
 
 
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    return self.price[_asset] != 0
+    return priceData.indexOfAsset[_asset] != 0
 
 
 #########
