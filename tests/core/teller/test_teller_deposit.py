@@ -1852,6 +1852,9 @@ def call_succeeds(_target: address, _data: Bytes[1024]) -> bool:
             checked_signatures.append(signature)
 
     assert len(checked_signatures) == 22
+    # The four surviving batch-family runtime controls live in
+    # test_teller_action_block.py, where one shared downstream recorder makes
+    # each route complete successfully through the deployed production Teller.
     assert probe.call_succeeds(teller, keccak(text="isPaused()")[:4])
 
 
