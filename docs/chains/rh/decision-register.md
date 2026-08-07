@@ -322,6 +322,17 @@ Path-scoped CI must run the dashboard build, integrity tests, and lint whenever
 changes. This workflow is a post-push backstop and manual verification surface,
 not a substitute for the required local validation or explicit merge authority.
 
+**Current overlay.** The RH codebase simplification pass extracted the dashboard
+application and its `rh-handoff-dashboard.yml` workflow from the active tree
+while publication remained parked, so no path-scoped dashboard CI currently
+exists. The historical ratification above is preserved and is not revoked; the
+directory boundary stayed clean, which is what made the extraction a pure
+removal. All 27 files remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c`, with per-file blob IDs and SHA-256
+values in [`extracted-files.tsv`](../../simplification/extracted-files.tsv).
+Reinstating the dashboard in the repository, or moving it to its own home, is an
+owner decision that this overlay does not make.
+
 ### RH-D019 — Private dashboard is a temporary presentation mirror
 
 **Status:** Owner-ratified temporarily for the immediate team handoff on 27

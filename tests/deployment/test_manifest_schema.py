@@ -1258,13 +1258,18 @@ def test_robinhood_migration_handoff_is_in_memory_typed_and_write_free(
 
 
 def test_every_committed_base_json_parses_without_rewrite():
+    # The 59 numeric Base step manifests were extracted from the active tree and
+    # remain recoverable from 610b43f4508e85628a1362532a79d68d71ea902c; see
+    # docs/simplification/extracted-files.tsv. Only the corpus count changes
+    # here: the retained current manifest is still parsed and byte-checked with
+    # exactly the same schema assertions.
     before = {
         path.relative_to(ROOT).as_posix(): hashlib.sha256(
             path.read_bytes()
         ).hexdigest()
         for path in sorted(BASE_HISTORY.glob("*.json"))
     }
-    assert len(before) == 60
+    assert len(before) == 1
     for relative in before:
         parsed = json.loads((ROOT / relative).read_bytes())
         assert set(parsed) == {"contracts"}

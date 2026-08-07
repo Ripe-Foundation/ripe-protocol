@@ -115,9 +115,9 @@ package must:
 6. pass independent production-package review, testnet rehearsal, monitoring,
    activation, and release gates.
 
-The repository's only GitHub Actions workflow validates the Robinhood dashboard
-and does not compile or test this Solidity reference. None of the evidence on
-this page is continuously enforced by repository CI.
+The repository's only GitHub Actions workflow runs the Python/Vyper test lanes
+on manual dispatch and does not compile or test this Solidity reference. None of
+the evidence on this page is continuously enforced by repository CI.
 
 ## Reproducible source checks
 

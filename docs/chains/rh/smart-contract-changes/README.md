@@ -196,13 +196,19 @@ dated exact-hash review evidence rather than a fresh current compilation.
 ## Automated enforcement boundary
 
 The repository currently contains one GitHub Actions workflow:
-[`rh-handoff-dashboard.yml`](../../../../.github/workflows/rh-handoff-dashboard.yml).
-It builds, tests, and lints the Robinhood dashboard only. It does not run the
-Python/Vyper contract suites, central artifact checker, block-clock inventory,
-Defaults generator, deterministic ABI export check, or any Solidity build/test
-package. The red four-file token ABI discrepancy and the Solidity reference
-gaps therefore have no repository CI enforcement. Every validation result in
-this directory is explicit audit evidence, not a continuously enforced gate.
+[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). It runs the
+lean or comprehensive pytest lane on manual dispatch only; it has no push or
+pull-request trigger. It does not run the central artifact checker, block-clock
+inventory, Defaults generator, deterministic ABI export check, or any Solidity
+build/test package as a required check. The red four-file token ABI discrepancy
+and the Solidity reference gaps therefore have no repository CI enforcement.
+Every validation result in this directory is explicit audit evidence, not a
+continuously enforced gate.
+
+The former `rh-handoff-dashboard.yml` workflow and the dashboard application it
+built were extracted from the active tree; both remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c` (see
+[`extracted-files.tsv`](../../../simplification/extracted-files.tsv)).
 
 ## Complete rationale page inventory
 

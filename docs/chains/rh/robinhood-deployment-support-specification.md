@@ -288,6 +288,24 @@ backends empty until owner approval.
 
 ### 3.6 Existing migration and history conventions
 
+> [!NOTE]
+> **Active-tree extraction, 2026-08-07.** The numeric step manifests described
+> below were extracted from the active tree by the RH codebase simplification
+> pass. `migration_history/base-mainnet/v1/` and
+> `migration_history/robinhood-mainnet/v1/` now contain only their
+> `current-manifest.json`; both directories, both current manifests, and every
+> `config/network_profiles.py` declaration are unchanged. All 66 extracted step
+> manifests remain recoverable from
+> `610b43f4508e85628a1362532a79d68d71ea902c`, with per-file blob IDs and
+> SHA-256 values in
+> [`extracted-files.tsv`](../../simplification/extracted-files.tsv).
+>
+> This changes no operator behavior. `--start-timestamp` defaults to the string
+> `"0"`, so `MigrationRunner._migrations()` always takes the explicit-start
+> branch and `_latest_manifest_timestamp()` stays unreachable from the CLI, as
+> Section 2.4 of the simplification plan records. The counts below remain the
+> historical observation made at the starting commit.
+
 At the starting commit:
 
 - `migrations/base-mainnet/` contains 62 migration files.

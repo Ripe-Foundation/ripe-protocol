@@ -176,8 +176,17 @@ dashboard_governance:
   authority_status: owner_ratified
   ratified_at: 2026-07-27
   ratified_against_commit: 330916b03d939c62bb8b05fc51691a2dbc70948f
-  repository_placement: docs/chains/rh/dashboard
+  repository_placement: extracted_from_active_tree
+  repository_placement_history: docs/chains/rh/dashboard
   placement_reason: Keep status, presentation, generated artifacts, and integrity tests together for atomic review.
+  extraction_state: >
+    The dashboard application and its rh-handoff-dashboard.yml workflow were
+    extracted from the active tree by the RH codebase simplification pass while
+    publication remained parked. All 27 files remain recoverable from
+    610b43f4508e85628a1362532a79d68d71ea902c; per-file blob IDs and SHA-256
+    values are recorded in docs/simplification/extracted-files.tsv. This does not
+    revoke the RH-D018 ratification or authorize any Sites action; restoring the
+    directory requires no more than a Git checkout of that commit.
   dependency_scope: documentation_tooling_outside_h01_launch_scope
   dependency_owner: Robinhood handoff dashboard maintainer
   dependency_policy: >
