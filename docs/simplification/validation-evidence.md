@@ -599,5 +599,31 @@ That difference cannot affect any gate:
   **root** `README.md` only — `docs/` is outside every cadence root;
 - `scripts/export_abis.py` reads `contracts/` only.
 
-The exact diff and the re-run fast gates at the delivered tip are recorded in the
-final commit message.
+### Confirmed at the delivered tip
+
+The diff from the validated tip `e74f184` to commit `c3bd65f` (tree `7a827619391de84be2b55dd3a001c381bec18185`) is
+**documentation only** — `docs/simplification/README.md` and this file, nothing
+else:
+
+```text
+docs/simplification/README.md              | 114 +++---
+docs/simplification/validation-evidence.md | 603 +++++++++++++++++++++++++++++
+2 files changed, 673 insertions(+), 44 deletions(-)
+```
+
+The fast gates were re-run in the isolated candidate clone at that tree and are
+unchanged from the validated tip:
+
+| Check at delivered tip | Result |
+| --- | --- |
+| `python -m pytest --collect-only -q` (lean) | 3244/3522 (278 deselected) |
+| `python -m pytest -o addopts='' --collect-only -q` | 4539/4682 (143 deselected) |
+| Socket-purity gate | 57 passed |
+| `scripts/check_contract_artifacts.py` | `CONTRACT_ARTIFACTS_OK` |
+
+**Standing invariant.** Every commit after `e74f184` touches only
+`docs/simplification/`. That directory is read by no test, script, config,
+workflow, or scanner, so no commit in that class can change a gate outcome. This
+closes the self-reference without regress: the property is proven for the class
+of change, not merely for one instance. Any future commit touching a path outside
+`docs/simplification/` requires re-running the full Section 3 matrix.
