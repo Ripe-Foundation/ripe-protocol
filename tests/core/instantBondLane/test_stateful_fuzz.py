@@ -434,6 +434,11 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 assert purchase.epoch == pricing["epoch"]
                 assert purchase.pricingConfigVersion == pricing["version"]
                 assert purchase.liveConfigVersion == self.config_version
+                assert purchase.ripeGovVaultId == (
+                    self.ctx.mission_control.coreRipeGovVaultId()
+                    if payout["actual_lock"]
+                    else 0
+                )
                 self._commit_purchase(pricing, payment_amount, payout)
                 return
 

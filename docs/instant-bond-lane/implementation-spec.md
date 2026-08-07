@@ -216,12 +216,16 @@ participate in the §3.3 arithmetic bounds. There is no recurring runtime decima
 dependency. Deployment tooling must still verify that `PAYMENT_TOKEN` is the intended
 canonical dollar stablecoin on the target chain. The constructor rejects the registered
 RIPE token, but otherwise establishes only contract code and a representable decimal
-scale; it does not establish dollar denomination, intended stablecoin identity, transfer
-semantics, stable value, or absence of proxy risk.
+scale; it does not establish dollar denomination, intended stablecoin identity, stable
+value, or absence of proxy risk. Runtime purchase settlement nevertheless measures the
+Endaoment Funds balance delta and rejects any transfer that does not deliver the exact
+requested amount.
 
-`RIPE_GOV_VAULT_ID = 2` follows the existing protocol assumption. Fork and live
-preflight must verify that id 2 still resolves to RipeGov and supports the RIPE token;
-the lane must not deploy against a topology where that assumption is false.
+Locked settlement resolves `MissionControl.coreRipeGovVaultId()` on every purchase and
+rejects a zero pointer before payment or minting. This follows the protocol's rotatable
+core-vault topology and ensures purchases after a RipeGov migration route to the current
+core vault rather than a historical numeric ID. Fork and live preflight must verify that
+the current pointer resolves to RipeGov and supports the RIPE token.
 
 The lane deploys paused, unconfigured, and inert. The constructor installs no
 economic values. `DeptBasics` supplies `isPaused`, `pause(bool)`, `canMintRipe`, and
@@ -302,7 +306,6 @@ they can describe the prior epoch until the next purchase. Integrations must use
 
 ```text
 HUNDRED_PERCENT              = 10_000
-RIPE_GOV_VAULT_ID            = 2
 MAX_LOCK_BONUS_CONST         = 100_000  # 1000%, aligned with existing bond ceiling
 MAX_PRICE_STEP_BPS_CONST     = 10_000   # at most a 100% price-up step
 MAX_DECAY_EPOCHS_CONST       = 32       # hard gas/velocity bound
@@ -741,17 +744,27 @@ Normative flow:
 13. budgetRemaining = cfg.mintBudget - cumulativeMinted
     assert totalRipe <= budgetRemaining                        # dev: mint budget
 
-14. epochAcceptedPayment += paymentAmount                      # effects
+14. ripeGovVaultId = 0
+    if actualLock != 0:
+        ripeGovVaultId = MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert ripeGovVaultId != 0                              # dev: invalid vault id
+
+15. paymentBalanceBefore = IERC20(PAYMENT_TOKEN).balanceOf(endaomentFunds)
+
+16. epochAcceptedPayment += paymentAmount                      # effects
     cumulativeMinted   += totalRipe
 
-15. assert IERC20(PAYMENT_TOKEN).transferFrom(
+17. assert IERC20(PAYMENT_TOKEN).transferFrom(
         msg.sender,
         endaomentFunds,
         paymentAmount,
         default_return_value=True,
     )                                                          # dev: payment failed
+    assert IERC20(PAYMENT_TOKEN).balanceOf(endaomentFunds)
+        - paymentBalanceBefore == paymentAmount
+                                                               # dev: payment receipt mismatch
 
-16. if actualLock == 0:
+18. if actualLock == 0:
         assert RipeToken(a.ripeToken).mint(msg.sender, totalRipe)
                                                                   # dev: mint failed
     else:
@@ -763,7 +776,7 @@ Normative flow:
         )                                                       # dev: approval failed
         depositedAmount = Teller(a.teller).depositFromTrusted(
             msg.sender,
-            RIPE_GOV_VAULT_ID,
+            ripeGovVaultId,
             a.ripeToken,
             totalRipe,
             actualLock,
@@ -776,14 +789,15 @@ Normative flow:
             default_return_value=True,
         )                                                       # dev: approval failed
 
-17. emit InstantBondPurchased(...)
-18. return totalRipe
+19. emit InstantBondPurchased(..., ripeGovVaultId)
+20. return totalRipe
 ```
 
-Any failed transfer, mint, approval, Teller deposit, or deposited-amount equality check
-reverts the full transaction, including cap and budget state. The canonical payment
-token is assumed non-fee-on-transfer; the lane credits the exact requested
-`paymentAmount`.
+Any failed transfer, exact-receipt check, mint, approval, Teller deposit, or
+deposited-amount equality check reverts the full transaction, including cap and budget
+state. Standard transfers and no-return transfers are supported when the observed
+Endaoment Funds balance increase is exactly `paymentAmount`; short, fee-on-transfer,
+zero, or excess receipt is rejected atomically.
 
 ---
 
@@ -793,8 +807,9 @@ The settlement path mirrors `BondRoom.vy`:
 
 - Proceeds go directly from the buyer to Endaoment Funds (id 21).
 - Unlocked RIPE is minted directly to the buyer.
-- Locked RIPE is minted to the lane, approved exactly to Teller, deposited into vault
-  id 2 with `depositFromTrusted`, and the approval is reset to zero.
+- Locked RIPE is minted to the lane, approved exactly to Teller, deposited into the
+  current `MissionControl.coreRipeGovVaultId()` with `depositFromTrusted`, and the
+  approval is reset to zero.
 - The lane should normally retain no payment-token or RIPE balance.
 - `depositFromTrusted` accepts the lane after its RipeHq registration because the lane
   becomes a valid Ripe address.
@@ -1062,6 +1077,7 @@ InstantBondPurchased(
     epoch indexed,
     pricingConfigVersion indexed,
     liveConfigVersion,
+    ripeGovVaultId,
 )
 
 InstantBondConfigSet(
@@ -1112,7 +1128,9 @@ Tests must prove:
    bonus; below-min requests are unlocked; intermediate bonuses are linear; the
    deposited lock equals the bonus-bearing lock and never exceeds the request.
 7. **Settlement:** Endaoment Funds receives exactly `paymentAmount`; buyer receives or
-   locks exactly `totalRipe`; the lane has no normal residual balance or allowance.
+   locks exactly `totalRipe` in the current MissionControl core RipeGov vault; the lane
+   has no normal residual balance or allowance. The purchase event records that vault
+   ID, or zero for an unlocked purchase.
 8. **Recipient:** `msg.sender` is always the RIPE recipient.
 9. **Atomicity:** any payment, mint, approval, or Teller failure reverts all cap,
    budget, token, and event effects.
@@ -1229,18 +1247,20 @@ Tests must prove:
   recipient; a RIPE-blacklisted buyer can still acquire RipeGov vault exposure if the
   MissionControl deposit allowlist permits them. Bond Room inherits the same pattern.
 - `available=true` is lane-side only. A locked quote can still revert because general
-  deposits are disabled, the buyer is not deposit-allowlisted, vault id 2 does not
-  support RIPE, RipeGov is paused, or the RIPE token is paused. An unlocked quote can
-  still revert because the RIPE token is paused or the buyer is token-blacklisted. Any
+  deposits are disabled, the buyer is not deposit-allowlisted, the current core-vault
+  pointer is zero or does not support RIPE, RipeGov is paused, or the RIPE token is
+  paused. An unlocked quote can still revert because the RIPE token is paused or the
+  buyer is token-blacklisted. Any
   quote can also precede a purchase revert if Endaoment Funds id 21 resolves to the zero
   address; preview intentionally does not add that registry lookup.
 - Preview itself may revert if required registry, MissionControl, RipeHq, or Ledger
   calls revert or resolve to unusable addresses. Before configuration or genesis it
   returns a zeroed unavailable quote without making those calls; after that point it is
   a dependency-aware view, not a guaranteed no-revert health endpoint.
-- The mechanism assumes a canonical, dollar-denominated, non-fee-on-transfer ERC-20.
-  Its decimal count may vary and is snapshotted immutably at construction. The lane has
-  no oracle and cannot verify the token's dollar value or detect a depeg.
+- The mechanism assumes a canonical, dollar-denominated ERC-20 whose successful
+  transfer delivers the exact requested amount. Its decimal count may vary and is
+  snapshotted immutably at construction. The lane enforces exact receipt but has no
+  oracle and cannot verify the token's dollar value or detect a depeg.
 
 ### Complexity controls
 
@@ -1336,8 +1356,11 @@ multiple decimal counts.
 
 ### Settlement and atomicity
 
-- unlocked mint and vault-2 locked settlement;
-- exact Endaoment Funds receipt;
+- unlocked mint and current-core-vault locked settlement;
+- pointer rotation and post-migration locked settlement, including a zero-pointer
+  fail-closed case;
+- exact Endaoment Funds receipt plus atomic rejection of short and fee-on-transfer
+  receipt on both unlocked and locked paths;
 - payment, mint, approval, Teller failure, and Teller deposited-amount mismatch rollback;
 - zero normal residual payment-token/RIPE and zero Teller allowance.
 

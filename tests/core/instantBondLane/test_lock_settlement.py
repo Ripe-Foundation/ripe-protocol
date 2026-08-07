@@ -45,6 +45,49 @@ def depositFromTrusted(
 """
 
 
+NONEXACT_RECEIPT_TOKEN = """
+# @version 0.4.3
+
+decimals: public(constant(uint8)) = 6
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+owner: immutable(address)
+receiptBps: immutable(uint256)
+
+@deploy
+def __init__(_owner: address, _receiptBps: uint256):
+    assert _receiptBps <= 20_000
+    owner = _owner
+    receiptBps = _receiptBps
+    self.totalSupply = 1_000_000_000 * 10**6
+    self.balanceOf[_owner] = self.totalSupply
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] += _value
+    return True
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    self.allowance[_from][msg.sender] -= _value
+    self.balanceOf[_from] -= _value
+    delivered: uint256 = _value * receiptBps // 10_000
+    self.balanceOf[_to] += delivered
+    if delivered > _value:
+        self.totalSupply += delivered - _value
+    else:
+        self.totalSupply -= _value - delivered
+    return True
+"""
+
+
 def settlement_snapshot(ctx):
     return (
         ctx.lane.isInitialized(),
@@ -176,6 +219,7 @@ def test_locked_settlement_exact_amount_lock_and_zero_residue(lane_env):
     assert payout == quote.totalRipe
     assert purchase.actualLock == 1_000
     assert purchase.bonusRatio == 5_000
+    assert purchase.ripeGovVaultId == lane_env.mission_control.coreRipeGovVaultId()
     assert lane_env.payment_token.balanceOf(lane_env.endaoment_funds) == payment_before + amount
     assert lane_env.ripe_gov_vault.getTotalAmountForUser(
         lane_env.bob, lane_env.ripe_token
@@ -187,6 +231,132 @@ def test_locked_settlement_exact_amount_lock_and_zero_residue(lane_env):
     assert lane_env.ripe_token.balanceOf(lane_env.lane) == 0
     assert lane_env.ripe_token.allowance(lane_env.lane, lane_env.teller) == 0
     assert terms[1] == purchase.actualLock
+
+
+def test_locked_settlement_follows_rotated_core_vault_pointer(
+    lane_env,
+    alternate_ripe_gov_vault,
+    registerVault,
+    setAssetConfig,
+):
+    lane_env.set_config(maxLockBonus=5_000)
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    source_id = lane_env.mission_control.coreRipeGovVaultId()
+    core_id = registerVault(alternate_ripe_gov_vault, "Instant Bond Core RipeGov")
+    setAssetConfig(lane_env.ripe_token, _vaultIds=[source_id, core_id])
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        core_id,
+        sender=lane_env.switchboard.address,
+    )
+
+    amount = 20 * lane_env.scale
+    source_before = lane_env.ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    )
+    target_before = alternate_ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    )
+    payout = lane_env.buy(amount, requested_lock=1_000)
+    purchase = filter_logs(lane_env.lane, "InstantBondPurchased")[0]
+
+    assert purchase.ripeGovVaultId == core_id
+    assert lane_env.ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    ) == source_before
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    ) == target_before + payout
+
+
+def test_locked_settlement_after_user_position_migration_uses_new_core_vault(
+    lane_env,
+    alternate_ripe_gov_vault,
+    registerVault,
+    setAssetConfig,
+    switchboard_echo,
+):
+    lane_env.set_config(maxLockBonus=5_000)
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    source_id = lane_env.mission_control.coreRipeGovVaultId()
+    first_payout = lane_env.buy(20 * lane_env.scale, requested_lock=500)
+
+    core_id = registerVault(alternate_ripe_gov_vault, "Migrated Instant Bond Core")
+    setAssetConfig(lane_env.ripe_token, _vaultIds=[source_id, core_id])
+    lane_env.ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
+    alternate_ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
+    assert lane_env.teller.migrateRipeGovPosition(
+        lane_env.bob,
+        lane_env.ripe_token,
+        source_id,
+        core_id,
+        sender=switchboard_echo.address,
+    ) == first_payout
+    assert lane_env.ripe_gov_vault.positionMigratedOut(
+        lane_env.bob, lane_env.ripe_token
+    )
+
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        core_id,
+        sender=lane_env.switchboard.address,
+    )
+    alternate_ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
+    second_payout = lane_env.buy(10 * lane_env.scale, requested_lock=500)
+    purchase = filter_logs(lane_env.lane, "InstantBondPurchased")[0]
+
+    assert purchase.ripeGovVaultId == core_id
+    assert lane_env.ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    ) == 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(
+        lane_env.bob, lane_env.ripe_token
+    ) == first_payout + second_payout
+
+
+def test_locked_settlement_zero_core_pointer_fails_before_payment(lane_env):
+    lane_env.set_config()
+    lane_env.setup_lock_terms()
+    lane_env.mission_control.eval("self.coreRipeGovVaultId = 0")
+    amount = lane_env.scale
+    quote = lane_env.quote(amount, 500)
+    before = settlement_snapshot(lane_env)
+
+    assert quote.available
+    assert quote.actualLock == 500
+    with boa.reverts("invalid vault id"):
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+        )
+
+    assert settlement_snapshot(lane_env) == before
+
+
+@pytest.mark.parametrize("receipt_bps", [0, 5_000, 15_000])
+@pytest.mark.parametrize("requested_lock", [0, 500])
+def test_nonexact_payment_receipt_reverts_every_effect(
+    lane_factory,
+    charlie_token_whale,
+    receipt_bps,
+    requested_lock,
+):
+    token = boa.loads(NONEXACT_RECEIPT_TOKEN, charlie_token_whale, receipt_bps)
+    ctx = lane_factory(payment_token=token)
+    ctx.set_config()
+    if requested_lock:
+        ctx.setup_lock_terms()
+
+    amount = 10 * ctx.scale
+    quote = ctx.quote(amount, requested_lock)
+    before = settlement_snapshot(ctx)
+    with boa.reverts("payment receipt mismatch"):
+        ctx.buy(
+            amount,
+            requested_lock=requested_lock,
+            expected_epoch=quote.epoch,
+        )
+
+    assert settlement_snapshot(ctx) == before
 
 
 def test_intermediate_bonus_settlement_event_uses_the_bonus_bearing_lock(lane_env):
@@ -211,6 +381,7 @@ def test_intermediate_bonus_settlement_event_uses_the_bonus_bearing_lock(lane_en
 
     assert quote.actualLock == purchase.actualLock == deposit.lockDuration == 550
     assert quote.bonusRatio == purchase.bonusRatio == 2_500
+    assert purchase.ripeGovVaultId == lane_env.mission_control.coreRipeGovVaultId()
     assert deposit.amount == payout == quote.totalRipe
 
 

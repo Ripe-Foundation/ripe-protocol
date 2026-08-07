@@ -201,9 +201,11 @@ def lane_factory(
                     lock_terms,
                     sender=switchboard_alpha.address,
                 )
+                core_vault_id = mission_control.coreRipeGovVaultId()
+                assert core_vault_id != 0
                 setAssetConfig(
                     ripe_token,
-                    _vaultIds=[2],
+                    _vaultIds=[core_vault_id],
                     _canDeposit=asset_can_deposit,
                 )
                 setUserConfig(

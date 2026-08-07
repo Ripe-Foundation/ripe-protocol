@@ -218,6 +218,7 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     assert purchase[0].epoch == quote.epoch
     assert purchase[0].pricingConfigVersion == 1
     assert purchase[0].liveConfigVersion == 1
+    assert purchase[0].ripeGovVaultId == 0
 
 
 def test_failed_first_purchase_is_fully_atomic(lane_env, alice):

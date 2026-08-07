@@ -117,6 +117,7 @@ def test_event_abi_names_order_and_indexing():
         "epoch",
         "pricingConfigVersion",
         "liveConfigVersion",
+        "ripeGovVaultId",
     ]
     assert indexed_fields(purchased) == [
         "buyer",

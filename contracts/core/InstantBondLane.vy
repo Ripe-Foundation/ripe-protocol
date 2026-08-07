@@ -35,6 +35,7 @@ interface Teller:
 
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface Ledger:
     def badDebt() -> uint256: view
@@ -133,6 +134,7 @@ event InstantBondPurchased:
     epoch: indexed(uint256)
     pricingConfigVersion: indexed(uint256)
     liveConfigVersion: uint256
+    ripeGovVaultId: uint256
 
 event InstantBondConfigSet:
     newVersion: uint256
@@ -152,7 +154,6 @@ event InstantBondConfigSet:
 
 
 HUNDRED_PERCENT: constant(uint256) = 10_000
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
 MAX_LOCK_BONUS_CONST: constant(uint256) = 100_000
 MAX_PRICE_STEP_BPS_CONST: constant(uint256) = 10_000
 MAX_DECAY_EPOCHS_CONST: constant(uint256) = 32
@@ -342,6 +343,17 @@ def buyNow(
     budgetRemaining: uint256 = config.mintBudget - self.cumulativeMinted
     assert payout.totalRipe <= budgetRemaining  # dev: mint budget
 
+    ripeGovVaultId: uint256 = 0
+    if payout.actualLock != 0:
+        ripeGovVaultId = staticcall MissionControl(
+            a.missionControl
+        ).coreRipeGovVaultId()
+        assert ripeGovVaultId != 0  # dev: invalid vault id
+
+    paymentBalanceBefore: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(
+        endaomentFunds
+    )
+
     self.epochAcceptedPayment = pricing.acceptedPayment + _paymentAmount
     self.cumulativeMinted += payout.totalRipe
 
@@ -351,6 +363,9 @@ def buyNow(
         _paymentAmount,
         default_return_value=True,
     )  # dev: payment failed
+    assert staticcall IERC20(PAYMENT_TOKEN).balanceOf(
+        endaomentFunds
+    ) - paymentBalanceBefore == _paymentAmount  # dev: payment receipt mismatch
 
     if payout.actualLock == 0:
         assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe)  # dev: mint failed
@@ -363,7 +378,7 @@ def buyNow(
         )  # dev: approval failed
         depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(
             msg.sender,
-            RIPE_GOV_VAULT_ID,
+            ripeGovVaultId,
             a.ripeToken,
             payout.totalRipe,
             payout.actualLock,
@@ -388,6 +403,7 @@ def buyNow(
         epoch=pricing.epoch,
         pricingConfigVersion=pricing.pricingConfigVersion,
         liveConfigVersion=configVersion,
+        ripeGovVaultId=ripeGovVaultId,
     )
     return payout.totalRipe
 

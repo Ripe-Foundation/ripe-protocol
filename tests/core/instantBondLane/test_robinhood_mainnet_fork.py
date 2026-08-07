@@ -54,7 +54,6 @@ MISSION_CONTROL_ID = 5
 SWITCHBOARD_ID = 6
 VAULT_BOOK_ID = 8
 ENDAOMENT_FUNDS_ID = 21
-RIPE_GOV_VAULT_ID = 2
 SWITCHBOARD_ALPHA_ID = 1
 SWITCHBOARD_CHARLIE_ID = 3
 MAX_UINT256 = 2**256 - 1
@@ -355,8 +354,10 @@ def _live_contracts(inputs: ForkInputs) -> SimpleNamespace:
     vault_book = boa.load_partial("contracts/registries/VaultBook.vy").at(
         hq.getAddr(VAULT_BOOK_ID)
     )
+    ripe_gov_vault_id = mission_control.coreRipeGovVaultId()
+    assert ripe_gov_vault_id != 0
     ripe_gov = boa.load_partial("contracts/vaults/RipeGov.vy").at(
-        vault_book.getAddr(RIPE_GOV_VAULT_ID)
+        vault_book.getAddr(ripe_gov_vault_id)
     )
     payment_token = boa.loads_abi(ERC20_ABI, name="ForkPaymentToken").at(
         inputs.payment_token
@@ -367,6 +368,7 @@ def _live_contracts(inputs: ForkInputs) -> SimpleNamespace:
         mission_control=mission_control,
         switchboard=switchboard,
         vault_book=vault_book,
+        ripe_gov_vault_id=ripe_gov_vault_id,
         ripe_gov=ripe_gov,
         payment_token=payment_token,
     )
@@ -496,11 +498,11 @@ def test_robinhood_mainnet_fork_binds_topology_token_and_evm_clock(rh_fork):
     assert live.payment_token.address == rh_fork.payment_token
     assert live.payment_token.decimals() == rh_fork.payment_decimals
     assert live.payment_token.address != live.ripe_token.address
-    assert live.vault_book.getAddr(RIPE_GOV_VAULT_ID) == live.ripe_gov.address
-    assert live.vault_book.getRegId(live.ripe_gov) == RIPE_GOV_VAULT_ID
+    assert live.vault_book.getAddr(live.ripe_gov_vault_id) == live.ripe_gov.address
+    assert live.vault_book.getRegId(live.ripe_gov) == live.ripe_gov_vault_id
     assert live.vault_book.isVaultBookAddr(live.ripe_gov)
     assert live.mission_control.isSupportedAssetInVault(
-        RIPE_GOV_VAULT_ID, live.ripe_token
+        live.ripe_gov_vault_id, live.ripe_token
     )
     assert live.ripe_gov.isSupportedVaultAsset(live.ripe_token)
     assert str(live.hq.getAddr(ENDAOMENT_FUNDS_ID)).lower() != (
@@ -575,6 +577,12 @@ def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_f
             sender=locked_buyer,
         )
         assert locked_payout == locked_quote.totalRipe
+        purchase = next(
+            log
+            for log in lane.get_logs()
+            if type(log).__name__ == "InstantBondPurchased"
+        )
+        assert purchase.ripeGovVaultId == live.ripe_gov_vault_id
         assert live.ripe_gov.getTotalAmountForUser(
             locked_buyer, live.ripe_token
         ) == locked_vault_before + locked_payout
