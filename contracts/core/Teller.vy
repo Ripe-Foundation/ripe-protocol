@@ -83,12 +83,12 @@ interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def removeVaultFromUserForMigration(_user: address, _vaultId: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-    def removeVaultFromUserForMigration(_user: address, _vaultId: uint256): nonpayable
 
 interface Deleverage:
     def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -544,7 +544,7 @@ def migrateRipeGovPosition(
     # make sure user has no balance in the source vault, remove from ledger
     assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
     assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
-    extcall Ledger(a.ledger).removeVaultFromUserForMigration(_user, _sourceVaultId)
+    extcall Lootbox(a.lootbox).removeVaultFromUserForMigration(_user, _sourceVaultId, a)
     sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
     assert not sourceLedgerData.isParticipatingInVault # dev: source Ledger cleanup failed
 
