@@ -16,7 +16,7 @@ The review target used to prepare this plan is:
 - Compared with: `master` at
   `91eda49ccd34a25090582aff0695075c4c806011`
 - Review date: 2026-08-06
-- Revision: 6
+- Revision: 7
 
 Revision 3 corrected the SwitchboardBravo direction, recorded the measured
 22-failure baseline, added route-specific StabVault preconditions, and
@@ -44,9 +44,13 @@ custody procedure, establishes an exact test-file ceiling and local-commit
 policy, specifies RipeGov disabled-user and trusted-Teller import semantics,
 reclassifies the already-covered SwitchboardAlpha delta as preserve-only, fixes
 the token pre-setup expectation to an exact revert, and adds copy-paste final
-verification and scope-integrity commands. The only remaining owner action is
-to approve or correct the D-01 matrix in Appendix A; every other package is
-decision-complete.
+verification and scope-integrity commands.
+
+Revision 7 records the protocol owner's 2026-08-06 approval of Appendix A,
+Revision 6, without corrections. D-01 is therefore approved, no matrix value
+changed, and all work packages are decision-complete. This revision is ready
+for a fresh implementation agent to execute subject to the pinned-baseline,
+scope, test, and stop conditions below.
 
 The implementation agent should work against the current `rh` PR code, not a
 deployed-contract inventory. If the PR head changes before implementation,
@@ -89,29 +93,27 @@ report the defect and failing test. It should not weaken the expectation to make
 the current implementation pass, and it should not silently change production
 contracts under this plan.
 
-### Mandatory owner decisions before implementation
+### Owner decisions and implementation authority
 
-The owner interview resolved D-02 and D-03. D-01 now has a complete candidate
-matrix in Appendix A, transcribed from the pinned RH contract, but remains open
-until the owner approves or corrects that matrix. Record all decisions in the
-implementation handoff; the mere presence of a value in the pinned branch is
-not field-level matrix approval.
+The owner interview resolved D-01, D-02, and D-03. Appendix A records the
+approved D-01 matrix. These decisions are controlling for implementation of
+this plan against the pinned RH candidate.
 
 | Decision | Status in this revision | Blocks |
 | --- | --- | --- |
-| D-01 Defaults authority | **AWAITING OWNER APPROVAL — complete candidate matrix is in Appendix A** | Work package 1 test edits only |
+| D-01 Defaults authority | **APPROVED — Appendix A, Revision 6, without corrections** | None |
 | D-02 Ledger validation posture | **APPROVED — option A, preserve lazy-at-first-read validation** | Unblocks Work package 2 |
 | D-03 Uniswap test scope | **APPROVED — defer all Uniswap test changes** | Work package 7 excluded |
 
 - **D-01 — Defaults authority.** Appendix A explicitly enumerates every field
   and array entry returned by all seventeen `DefaultsRobinhood` getters. It is
-  the candidate submitted for owner review, not yet the approved oracle. The
-  existing parameter ledger disagrees with the contract on multiple values and
-  must not be silently selected, repaired, or used as an oracle under this plan.
-  The owner has separately confirmed `maxBorrowPerInterval = 25e18`. To close
-  D-01, the owner must approve Appendix A as a whole or return exact row-level
-  corrections. The implementation agent must copy the finally approved matrix
-  into the runtime test without deriving expected values from the contract.
+  the approved test oracle for the pinned RH candidate. The owner approved
+  Appendix A, Revision 6, without corrections on 2026-08-06 and separately
+  confirmed `maxBorrowPerInterval = 25e18`. The existing parameter ledger
+  disagrees with the contract on multiple values and must not be silently
+  selected, repaired, or used as an oracle under this plan. The implementation
+  agent must copy the approved matrix into the runtime test without deriving
+  expected values from the contract.
 - **D-02 — Ledger ArbSys validation posture.** Preserve the current lazy
   posture: the exact ArbSys address is accepted at construction;
   missing/reverting/malformed behavior fails closed on first read; no fallback
@@ -124,15 +126,12 @@ not field-level matrix approval.
   excluded from this plan's completion gate; do not reinterpret deferral as a
   security finding being fixed or accepted as harmless.
 
-Only D-01 remains a blocking interview item, and it blocks only Work package 1
-test edits. Submit Appendix A for approval before editing that package. Work
-packages 2-6 and 8-9 may proceed; Work package 7 must be skipped. The
-P0-before-P1 ordering preference in Section 4 is a sequencing preference, not a
-gate.
+No owner-decision blocker remains. Work packages 1-6 and 8-9 may proceed; Work
+package 7 must be skipped. The P0-before-P1 ordering preference in Section 4 is
+a sequencing preference, not a gate.
 
-"Beginning" Work package 1 means **editing test code**. Appendix A and its
-review are planning/decision work, not implementation. Work package 2 is
-unblocked by D-02.
+Work package 1 test edits are authorized against the approved Appendix A
+matrix. Work package 2 is unblocked by D-02.
 
 Record each decision in this form before handoff:
 
@@ -228,10 +227,10 @@ or documentation other than this already-committed plan are not authorized.
 If the file ceiling proves insufficient, stop and report the exact additional
 path and why module-local setup cannot work.
 
-Once D-01 approval or corrections are incorporated and the final plan identity
-is handed off, this plan file is immutable during implementation. Its presence
-in the final path audit reflects the custody commit, not permission for an
-implementation agent to rewrite requirements.
+With D-01 approval incorporated and the final plan identity handed off, this
+plan file is immutable during implementation. Its presence in the final path
+audit reflects the custody commit, not permission for an implementation agent
+to rewrite requirements.
 
 Local commits on `codex/rh-smart-contract-test-coverage` are authorized. Make
 one reviewable commit per completed slice using `tests(rh): <slice summary>`.
@@ -283,10 +282,11 @@ Every added test must follow these rules. The definition of done enforces them:
 | 9 | P2 | Token governance surface | Incorrect CCIP administration after governance changes |
 
 P0 work should land before the lower-priority packages. This is a sequencing
-preference, not a gate: D-01 blocks only Work package 1 test edits, D-02 unblocks
-Work package 2, and D-03 requires Work package 7 to be skipped. Within an active
-package, add the failure-path tests before refactoring shared fixtures so the
-reason for each fixture change remains visible.
+preference, not a gate: D-01 authorizes Work package 1, D-02 authorizes the
+current behavior tested in Work package 2, and D-03 requires Work package 7 to
+be skipped. Within an active package, add the failure-path tests before
+refactoring shared fixtures so the reason for each fixture change remains
+visible.
 
 ### Complete changed-contract disposition
 
@@ -343,18 +343,14 @@ the contract and asserting its returned structs and arrays.
 
 Do not derive the expected literals by reading values from the contract under
 test, parsing its source, calling its getters to populate expectations, or
-copying the conflicting parameter ledger without approval. Appendix A is the
-complete candidate D-01 matrix. After the owner marks it approved or supplies
-exact corrections, hard-code that approved matrix in the runtime test and place
-a short provenance comment beside it identifying the D-01 decision record and
-pinned commit. If the deployed-in-test contract disagrees, report the mismatch
-as a contract defect; do not update the expectation to match the observed
-result.
+copying the conflicting parameter ledger. Appendix A is the approved D-01
+matrix. Hard-code that approved matrix in the runtime test and place a short
+provenance comment beside it identifying the D-01 decision record and pinned
+commit. If the deployed-in-test contract disagrees, report the mismatch as a
+contract defect; do not update the expectation to match the observed result.
 
 Appendix A is a human decision artifact, not a generated test oracle. Do not add
-a source parser or generator to the test suite. Until D-01 is approved, the
-implementation agent may review fixtures and test structure for this package
-but may not add or edit its test code.
+a source parser or generator to the test suite.
 
 ### Required tests
 
@@ -1631,7 +1627,7 @@ Pinned RH base: 7d8c76e5134bf866ccbb051fdf5030b6e83cef8b
 Revision-5 parent plan commit: 37d8c26a0b372b68efa7a853838400952040b478
 ```
 
-Revision 6's final commit/blob/SHA-256 are recorded externally in the fresh-agent
+Revision 7's final commit/blob/SHA-256 are recorded externally in the fresh-agent
 handoff because a file cannot contain its own final identity without changing
 that identity. The fresh agent must compute and compare them with:
 
@@ -1706,8 +1702,8 @@ change.
 This plan is complete only when:
 
 - The implementation startup report records the immutable plan identity and
-  approved D-01/D-02/D-03 decision records; D-01 explicitly approves the final
-  Appendix A matrix or its exact recorded corrections.
+  approved D-01/D-02/D-03 decision records; D-01 identifies Appendix A,
+  Revision 6, without corrections.
 - Every P0 and P1 test above is implemented or explicitly shown to be covered by
   an existing semantically equivalent test, with the exact file and test name
   recorded in the implementation handoff.
@@ -1744,35 +1740,33 @@ This plan is complete only when:
 - Any discovered contract defect is reported with its reproducing test instead
   of being hidden by a weakened expectation.
 
-## 18. Appendix A — D-01 complete DefaultsRobinhood candidate matrix
+## 18. Appendix A — D-01 approved DefaultsRobinhood matrix
 
 ### Approval status and use
 
-**Status: AWAITING OWNER APPROVAL.** This matrix was manually transcribed from
+**Status: APPROVED.** This matrix was manually transcribed from
 `contracts/config/DefaultsRobinhood.vy` at pinned RH commit
-`7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`. It is deliberately included here
-for line-by-line owner review. Its presence is not approval, and the
-implementation agent must not use the production contract as a runtime oracle.
-An independent one-off Boa comparison in the locked validation environment
-matched all seventeen getters and all four ordered asset rows. That proves the
-transcription matches the pinned candidate; it does not convert candidate values
-into owner-approved values.
+`7d8c76e5134bf866ccbb051fdf5030b6e83cef8b`. An independent one-off Boa
+comparison in the locked validation environment matched all seventeen getters
+and all four ordered asset rows. The protocol owner approved the complete
+matrix without corrections, making it the normative expected-value oracle for
+Work package 1. The implementation agent must not derive expected values from
+the production contract at test runtime.
 
-The owner has already confirmed `genDebtConfig.maxBorrowPerInterval = 25 * E18`.
-To approve the full matrix without corrections, record:
+Approval record:
 
 ```text
 Decision: D-01
 Status: APPROVED
 Selection: Appendix A, Revision 6, without corrections
-Approver: owner name/role
-Date: YYYY-MM-DD
-Authority reference: owner message or attached decision record
+Approver: protocol owner (human requester)
+Date: 2026-08-06
+Authority reference: owner message in the controlling Codex task: "I approve Appendix A, Revision 6, without corrections."
 ```
 
-If any value is corrected, edit the exact Appendix A row, increment the plan
-revision, commit the amended document, and bind the new plan identity before
-Work package 1 begins. Do not silently edit the test expectation alone.
+Any future correction requires an explicit owner decision, an exact Appendix A
+row edit, a plan-revision increment, and a newly bound plan identity. Do not
+silently edit a test expectation alone.
 
 ### Symbols and units
 
@@ -2091,8 +2085,9 @@ liteSigners() = []
 
 ### Matrix completeness check
 
-Before seeking D-01 approval, independently compare this appendix against the
-pinned source and `interfaces/ConfigStructs.vyi`. The reviewer must confirm:
+Before implementation, independently compare this approved appendix against
+the pinned source and `interfaces/ConfigStructs.vyi`. The implementer must
+confirm:
 
 - all seventeen getters appear exactly once;
 - every struct field appears in interface order;
