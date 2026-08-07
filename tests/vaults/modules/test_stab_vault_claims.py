@@ -1987,7 +1987,6 @@ def test_stab_vault_claims_without_delegation_permission(
 def setupStabPoolClaimsRewards(mission_control, setAssetConfig, setGeneralConfig, setRipeRewardsConfig, switchboard_alpha, ripe_token):
     def setupStabPoolClaimsRewards(
         _ripePerDollar = 1 * EIGHTEEN_DECIMALS,
-        _stabRewardsLockDuration = 500,
         _minLockDuration = 0,
         _maxLockDuration = 1000,
         _autoStakeDurationRatio = 0,
@@ -2040,11 +2039,13 @@ def test_stab_vault_claim_rewards_basic(
     setupStabPoolClaimsRewards,
 ):
     """Test basic Ripe rewards functionality when claiming from stability pool"""
-    # Set up stability pool claim rewards configuration
-    # 0.1 Ripe per dollar claimed, 30-day lock (assuming ~12 sec blocks)
+    # Set up stability pool claim rewards configuration.
+    # NOTE: the reward lock is derived by MissionControl._getLockDuration from
+    # (maxLockDuration - minLockDuration) * autoStakeDurationRatio. This setup
+    # leaves autoStakeDurationRatio at 0, so rewards land unlocked; the exact
+    # lock behavior is proven by the WP8 tests at the end of this file.
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
-        _stabRewardsLockDuration = 216000,  # ~30 days in blocks (30*24*60*60/12)
     )
     setAssetConfig(bravo_token)
 
@@ -2086,8 +2087,15 @@ def test_stab_vault_claim_rewards_basic(
     actual_ripe_rewards = final_gov_balance - initial_gov_balance
     _test(expected_ripe_rewards, actual_ripe_rewards)
 
-    # Verify the Ripe tokens are locked (Bob should have a position in gov vault)
+    # The reward creates a gov-vault position. It is NOT locked under this
+    # configuration -- autoStakeDurationRatio and minLockDuration are both 0,
+    # so MissionControl._getLockDuration returns 0. Asserted explicitly so the
+    # test cannot be read as proving a lock. Lock behavior is proven by the WP8
+    # tests at the end of this file.
     assert ripe_gov_vault.userBalances(bob, ripe_token) > 0
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock <= (
+        boa.env.evm.patch.block_number
+    )
 
 
 def test_stab_vault_claim_rewards_different_rates(
@@ -2116,7 +2124,6 @@ def test_stab_vault_claim_rewards_different_rates(
     # Test 1: High reward rate (1 Ripe per dollar)
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS,  # 1 Ripe per dollar
-        _stabRewardsLockDuration = 50400,  # ~7 days in blocks (7*24*60*60/12)
     )
     setAssetConfig(bravo_token)
 
@@ -2202,7 +2209,6 @@ def test_stab_vault_claim_rewards_zero_config(
     # Set up rewards configuration with zero rate
     setupStabPoolClaimsRewards(
         _ripePerDollar = 0,  # 0 Ripe per dollar (no rewards)
-        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
     )
     setAssetConfig(bravo_token)
 
@@ -2261,7 +2267,6 @@ def test_stab_vault_claim_rewards_many_claims(
     # Set up rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS // 5,  # 0.2 Ripe per dollar
-        _stabRewardsLockDuration = 100800,  # ~14 days in blocks (14*24*60*60/12)
     )
     setAssetConfig(bravo_token)
     setAssetConfig(charlie_token)
@@ -2348,7 +2353,6 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     # Set up high rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = 10 * EIGHTEEN_DECIMALS,  # 10 Ripe per dollar (very high)
-        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
     )
     setAssetConfig(bravo_token)
 
@@ -2502,7 +2506,6 @@ def test_stab_vault_claim_rewards_partial_claims(
     # Set up rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS // 4,  # 0.25 Ripe per dollar
-        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
     )
     setAssetConfig(bravo_token)
 
@@ -2578,7 +2581,6 @@ def test_stab_vault_claim_rewards_config_changes(
     # Initial rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
-        _stabRewardsLockDuration = 50400,  # ~7 days in blocks
     )
     setAssetConfig(bravo_token)
 
@@ -2668,11 +2670,15 @@ def test_stab_vault_claim_rewards_integration(
     setAssetConfig,
     setupStabPoolClaimsRewards,
 ):
-    """Integration test for rewards - verifies the complete flow from claim to locked rewards"""
+    """Integration test for rewards: the complete flow from claim to gov-vault deposit.
+
+    This configuration leaves autoStakeDurationRatio and minLockDuration at 0,
+    so the reward lands UNLOCKED. The exact lock behavior is covered by the WP8
+    tests at the end of this file; this one covers routing and amounts.
+    """
     # Set up moderate rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = EIGHTEEN_DECIMALS // 2,  # 0.5 Ripe per dollar
-        _stabRewardsLockDuration = 648000,  # ~90 days in blocks (90*24*60*60/12)
     )
     setAssetConfig(bravo_token)
 
@@ -2725,10 +2731,12 @@ def test_stab_vault_claim_rewards_integration(
     assert final_gov_shares > 0  # Bob should have shares in gov vault
     assert final_ripe_balance == 0  # Bob should not have liquid Ripe tokens
 
-    # Verify the rewards are locked (Bob can't immediately withdraw)
-    # This would typically require checking lock duration, but for the test we just
-    # verify Bob has a position in the gov vault
+    # The reward is routed into the gov vault rather than paid out liquid.
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > initial_gov_balance
+    # ... and it is explicitly NOT locked under this configuration.
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock <= (
+        boa.env.evm.patch.block_number
+    )
 
 
 def test_stab_vault_claim_rewards_no_ripe_available(
@@ -2754,7 +2762,6 @@ def test_stab_vault_claim_rewards_no_ripe_available(
     # Set up high rewards configuration
     setupStabPoolClaimsRewards(
         _ripePerDollar = 5 * EIGHTEEN_DECIMALS,  # 5 Ripe per dollar (very high rate)
-        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
     )
     setAssetConfig(bravo_token)
 
@@ -3983,3 +3990,653 @@ def test_preferred_pointer_rotation_preserves_legacy_pool_state_and_explicit_acc
         alternate_stability_pool.getTotalAmountForUser(bob, savings_green)
         == sgreen_deposited
     )
+
+
+############################################################################
+# WP8 (Section 15): stability-reward lock correctness
+#
+# The fixture argument `_stabRewardsLockDuration` was dead: production derives
+# the reward lock in MissionControl._getLockDuration as
+#   minLockDuration                      if ratio == 0 or maxLock <= minLock
+#   (maxLock - minLock) * ratio / 100_00 otherwise
+# Note the second branch does NOT add minLockDuration back; the floor is
+# re-applied later by RipeGov._depositTokensInRipeGovVault, which clamps the
+# requested duration into [minLockDuration, maxLockDuration].
+# and StabVault._handleClaimRewards forwards that value to
+# Teller.depositFromTrusted. With the old fixture defaults (minLock 0,
+# ratio 0) every "reward lock" test asserted only that a position existed,
+# which a completely unlocked position also satisfies. These tests configure
+# a nonzero lock and assert the exact unlock block and the exact boundary.
+############################################################################
+
+
+@pytest.fixture
+def setupStabRewardLock(
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+    setRipeRewardsConfig,
+    switchboard_alpha,
+    ripe_token,
+):
+    """Configure stab-pool claim rewards with an explicit gov-vault lock."""
+
+    def setupStabRewardLock(
+        _ripePerDollar=EIGHTEEN_DECIMALS,
+        _minLockDuration=100,
+        _maxLockDuration=1_100,
+        _autoStakeDurationRatio=0,
+        _maxLockBoost=0,
+    ):
+        setGeneralConfig()
+        setRipeRewardsConfig(
+            _stabPoolRipePerDollarClaimed=_ripePerDollar,
+            _autoStakeDurationRatio=_autoStakeDurationRatio,
+        )
+        lock_terms = (
+            _minLockDuration,
+            _maxLockDuration,
+            _maxLockBoost,
+            False,
+            0,
+        )
+        mission_control.setRipeGovVaultConfig(
+            ripe_token,
+            100_00,
+            False,
+            lock_terms,
+            sender=switchboard_alpha.address,
+        )
+        setAssetConfig(ripe_token, _vaultIds=[2])
+
+    return setupStabRewardLock
+
+
+def _claim_for_stab_rewards(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    claimer,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    deposit_amount=100 * EIGHTEEN_DECIMALS,
+    claimable_amount=150 * EIGHTEEN_DECIMALS,
+):
+    """Run one full stability-pool claim so the reward deposit is exercised."""
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        claimer, alpha_token, deposit_amount, sender=teller.address
+    )
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    return claim_from_stability_pool(
+        teller, vault_id, alpha_token, bravo_token, sender=claimer
+    )
+
+
+@pytest.mark.parametrize(
+    ("ratio", "expected_lock"),
+    (
+        (0, 100),        # ratio 0 -> minLockDuration only
+        (33_00, 330),    # (1_100 - 100) * 33%
+        (50_00, 500),    # (1_100 - 100) * 50%
+        (100_00, 1_000), # (1_100 - 100) * 100%, still under maxLockDuration
+    ),
+)
+def test_stab_reward_lock_matches_autostake_ratio_exactly(
+    ratio,
+    expected_lock,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """The reward lock is exactly the MissionControl-derived duration."""
+    setupStabRewardLock(_autoStakeDurationRatio=ratio)
+    setAssetConfig(bravo_token)
+
+    _claim_for_stab_rewards(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        alpha_token_whale,
+        bravo_token_whale,
+        bob,
+        teller,
+        auction_house,
+        mock_price_source,
+        vault_book,
+        savings_green,
+        ripe_token,
+    )
+
+    assert ripe_gov_vault.userBalances(bob, ripe_token) > 0
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
+        boa.env.evm.patch.block_number + expected_lock
+    )
+
+
+def test_stab_reward_lock_blocks_withdrawal_until_the_exact_unlock_block(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """One block before unlock the exit reverts; at unlock it succeeds.
+
+    This is the assertion the old suite was missing: with ratio 0 and
+    minLockDuration 0 the reward was never locked at all, so "a position
+    exists" passed without proving any unlock boundary.
+    """
+    setupStabRewardLock(_autoStakeDurationRatio=50_00)
+    setAssetConfig(bravo_token)
+
+    _claim_for_stab_rewards(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        alpha_token_whale,
+        bravo_token_whale,
+        bob,
+        teller,
+        auction_house,
+        mock_price_source,
+        vault_book,
+        savings_green,
+        ripe_token,
+    )
+
+    unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock == boa.env.evm.patch.block_number + 500
+    reward_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    assert reward_shares > 0
+
+    # One block before unlock.
+    boa.env.time_travel(blocks=unlock - boa.env.evm.patch.block_number - 1)
+    assert boa.env.evm.patch.block_number == unlock - 1
+    with boa.reverts("not reached unlock"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, MAX_UINT256, bob, sender=teller.address
+        )
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == reward_shares
+
+    # Exactly at unlock.
+    boa.env.time_travel(blocks=1)
+    assert boa.env.evm.patch.block_number == unlock
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, MAX_UINT256, bob, sender=teller.address
+    )
+    assert withdrawn > 0
+    assert is_depleted
+
+
+def test_stab_reward_lock_never_shortens_a_later_existing_unlock(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    switchboard_alpha,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """A reward paid into an existing longer-locked position (Section 15).
+
+    _getWeightedLockOnTokenDeposit blends the reward's lock with the existing
+    one, so the resulting unlock must stay between the reward-only lock and the
+    prior unlock -- never below the reward lock and never above the prior one.
+    """
+    setupStabRewardLock(_autoStakeDurationRatio=50_00)
+    setAssetConfig(bravo_token)
+
+    # Pre-existing position at the maximum lock.
+    existing = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, existing, sender=whale)
+    ripe_gov_vault.depositTokensWithLockDuration(
+        bob, ripe_token, existing, 1_100, sender=switchboard_alpha.address
+    )
+    prior_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert prior_unlock == boa.env.evm.patch.block_number + 1_100
+
+    _claim_for_stab_rewards(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        alpha_token_whale,
+        bravo_token_whale,
+        bob,
+        teller,
+        auction_house,
+        mock_price_source,
+        vault_book,
+        savings_green,
+        ripe_token,
+    )
+
+    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    reward_only_unlock = boa.env.evm.patch.block_number + 500
+    assert reward_only_unlock <= unlock_after <= prior_unlock
+    # The reward is small relative to the existing stake, so the blend stays
+    # close to the prior unlock rather than collapsing to the reward lock.
+    assert unlock_after > prior_unlock - 100
+
+
+# ---- Section 15 remaining matrix -----------------------------------------
+
+
+def _reward_points_after(vault, user, ripe_token, switchboard_alpha, blocks):
+    """Accrue `blocks` of governance points and return the saved total."""
+    boa.env.time_travel(blocks=blocks)
+    vault.updateUserGovPoints(user, sender=switchboard_alpha.address)
+    return vault.userGovData(user, ripe_token).govPoints
+
+
+@pytest.mark.parametrize(
+    ("ratio", "expected_lock"),
+    ((0, 100), (33_00, 330), (50_00, 500), (100_00, 1_000)),
+)
+def test_stab_reward_lock_point_contribution_is_exact(
+    ratio,
+    expected_lock,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    switchboard_alpha,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15: the exact point contribution, not merely that a position exists.
+
+    With a 100% maxLockBoost the reward's points are base points plus a lock
+    bonus of maxLockBoost * (remaining - minLock) / (maxLock - minLock), so the
+    contribution is fully determined by the derived lock duration.
+    """
+    max_lock_boost = 100_00
+    setupStabRewardLock(
+        _autoStakeDurationRatio=ratio, _maxLockBoost=max_lock_boost
+    )
+    setAssetConfig(bravo_token)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+
+    shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock == boa.env.evm.patch.block_number + expected_lock
+
+    blocks = 10
+    points = _reward_points_after(
+        ripe_gov_vault, bob, ripe_token, switchboard_alpha, blocks
+    )
+
+    # Reproduce RipeGov._getLatestGovPoints exactly.
+    min_lock, max_lock = 100, 1_100
+    base = (shares // 10**18) * blocks
+    base = base * 100_00 // 100_00  # assetWeight is 100.00%
+    remaining = unlock - boa.env.evm.patch.block_number if unlock > boa.env.evm.patch.block_number else 0
+    remaining = min(remaining, max_lock)
+    bonus = 0
+    if remaining > min_lock:
+        bonus_ratio = max_lock_boost * (remaining - min_lock) // (max_lock - min_lock)
+        bonus = base * bonus_ratio // 100_00
+    assert points == base + bonus
+
+
+@pytest.mark.parametrize(
+    ("min_lock", "max_lock", "ratio", "expected_lock"),
+    (
+        (0, 0, 0, 0),
+        (100, 1_100, 0, 100),
+        (100, 1_100, 50_00, 500),
+        (100, 1_100, 100_00, 1_000),
+    ),
+    ids=("zero", "minimum", "ordinary", "maximum"),
+)
+def test_stab_reward_lock_configured_duration_boundaries(
+    min_lock,
+    max_lock,
+    ratio,
+    expected_lock,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15: zero, minimum, ordinary, and maximum configured duration."""
+    setupStabRewardLock(
+        _minLockDuration=min_lock,
+        _maxLockDuration=max_lock,
+        _autoStakeDurationRatio=ratio,
+    )
+    setAssetConfig(bravo_token)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+
+    assert ripe_gov_vault.userBalances(bob, ripe_token) > 0
+    unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock == boa.env.evm.patch.block_number + expected_lock
+    # A zero derived duration leaves the position immediately withdrawable.
+    if expected_lock == 0:
+        assert unlock <= boa.env.evm.patch.block_number
+
+
+def test_stab_reward_added_to_an_existing_unlocked_position_creates_a_lock(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    whale,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15: reward added to an existing unlocked position.
+
+    The recipient already holds an unlocked RIPE position. The reward's derived
+    lock is blended in by _getWeightedLockOnTokenDeposit, so the resulting
+    unlock is strictly between "unlocked" and the reward-only lock.
+    """
+    setupStabRewardLock(_autoStakeDurationRatio=50_00)
+    setAssetConfig(bravo_token)
+
+    existing = 1_000 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, existing, sender=whale)
+    ripe_gov_vault.depositTokensInVault(
+        bob, ripe_token, existing, sender=teller.address
+    )
+    prior_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    prior_remaining = (
+        prior_unlock - boa.env.evm.patch.block_number
+        if prior_unlock > boa.env.evm.patch.block_number
+        else 0
+    )
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+
+    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    remaining_after = unlock_after - boa.env.evm.patch.block_number
+    assert prior_remaining <= remaining_after <= 500
+
+
+def test_stab_reward_weighted_unlock_after_multiple_reward_deposits(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15: exact weighted unlock after two successive reward deposits.
+
+    Each reward deposit re-runs the weighted blend against the position that
+    already exists, so a second reward can only move the unlock between the
+    prior unlock and the reward-only lock -- never outside that band.
+    """
+    setupStabRewardLock(_autoStakeDurationRatio=50_00)
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+    first_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert first_unlock == boa.env.evm.patch.block_number + 500
+
+    boa.env.time_travel(blocks=50)
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, charlie_token, alpha_token_whale,
+        charlie_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+        deposit_amount=50 * EIGHTEEN_DECIMALS,
+        claimable_amount=50 * 10**6,
+    )
+
+    second_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    remaining = second_unlock - boa.env.evm.patch.block_number
+    prior_remaining = first_unlock - boa.env.evm.patch.block_number
+    low, high = sorted((prior_remaining, 500))
+    assert low <= remaining <= high
+
+
+MISSION_CONTROL_ID = 5
+
+
+def _swap_mission_control(ripe_hq_deploy, governance, new_mission_control):
+    assert ripe_hq_deploy.startAddressUpdateToRegistry(
+        MISSION_CONTROL_ID, new_mission_control, sender=governance.address
+    )
+    boa.env.time_travel(blocks=ripe_hq_deploy.registryChangeTimeLock())
+    assert ripe_hq_deploy.confirmAddressUpdateToRegistry(
+        MISSION_CONTROL_ID, sender=governance.address
+    )
+
+
+def _clone_reward_source(
+    source_mission_control,
+    target_mission_control,
+    switchboard_alpha,
+    assets,
+    *,
+    auto_stake_duration_ratio,
+    ripe_token,
+    min_lock,
+    max_lock,
+):
+    """Copy the live configuration into a second MissionControl, overriding
+    only the two values that determine the reward lock.
+
+    Cloning the structs straight off the active source keeps this test bound to
+    the real config shape instead of a hand-written tuple that would silently
+    drift from cs.AssetConfig.
+    """
+    target_mission_control.setGeneralConfig(
+        source_mission_control.genConfig(), sender=switchboard_alpha.address
+    )
+    rewards = list(source_mission_control.rewardsConfig())
+    rewards[7] = auto_stake_duration_ratio  # autoStakeDurationRatio
+    target_mission_control.setRipeRewardsConfig(
+        tuple(rewards), sender=switchboard_alpha.address
+    )
+    gov_cfg = source_mission_control.ripeGovVaultConfig(ripe_token)
+    target_mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        gov_cfg.assetWeight,
+        gov_cfg.shouldFreezeWhenBadDebt,
+        (min_lock, max_lock, gov_cfg.lockTerms.maxLockBoost,
+         gov_cfg.lockTerms.canExit, gov_cfg.lockTerms.exitFee),
+        sender=switchboard_alpha.address,
+    )
+    for asset in assets:
+        target_mission_control.setAssetConfig(
+            asset,
+            source_mission_control.assetConfig(asset),
+            sender=switchboard_alpha.address,
+        )
+
+
+def test_stab_reward_lock_follows_the_active_mission_control_source(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    mission_control,
+    switchboard_alpha,
+    ripe_hq_deploy,
+    governance,
+    defaults,
+    setAssetConfig,
+    setupStabRewardLock,
+):
+    """Section 15 final row: replace the active config source, then restore it.
+
+    Proves the reward lock is read from whichever MissionControl RipeHq
+    currently resolves, and that restoring the original source restores the
+    original lock -- so the derived lock is not cached anywhere.
+    """
+    # Original source: 50% auto-stake ratio over [100, 1_100] -> 500 blocks.
+    setupStabRewardLock(_autoStakeDurationRatio=50_00)
+    setAssetConfig(bravo_token)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, bob, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
+        boa.env.evm.patch.block_number + 500
+    )
+
+    # Second valid config contract: 100% ratio over [200, 1_200] -> 1_000 blocks.
+    second_mission_control = boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq_deploy,
+        defaults,
+        name="second_mission_control",
+        override_address=boa.env.generate_address(),
+    )
+    _clone_reward_source(
+        mission_control,
+        second_mission_control,
+        switchboard_alpha,
+        (ripe_token, bravo_token),
+        auto_stake_duration_ratio=100_00,
+        ripe_token=ripe_token,
+        min_lock=200,
+        max_lock=1_200,
+    )
+    _swap_mission_control(ripe_hq_deploy, governance, second_mission_control)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, alice, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+    alice_unlock = ripe_gov_vault.userGovData(alice, ripe_token).unlock
+    assert alice_unlock == boa.env.evm.patch.block_number + 1_000
+
+    # Restore the original source; subsequent rewards use the original values.
+    _swap_mission_control(ripe_hq_deploy, governance, mission_control)
+
+    _claim_for_stab_rewards(
+        stability_pool, alpha_token, bravo_token, alpha_token_whale,
+        bravo_token_whale, sally, teller, auction_house, mock_price_source,
+        vault_book, savings_green, ripe_token,
+    )
+    restored_unlock = ripe_gov_vault.userGovData(sally, ripe_token).unlock
+    assert restored_unlock == boa.env.evm.patch.block_number + 500
