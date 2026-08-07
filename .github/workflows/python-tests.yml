@@ -1,6 +1,11 @@
 name: Python tests
 
 on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - rh
   workflow_dispatch:
     inputs:
       lane:
@@ -23,7 +28,7 @@ jobs:
   test:
     name: Python 3.12 (${{ inputs.lane || 'lean' }})
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.lane == 'comprehensive' && 120 || 30 }}
+    timeout-minutes: ${{ inputs.lane == 'comprehensive' && 120 || 45 }}
     env:
       ETHERSCAN_API_KEY: local-placeholder
       HYPOTHESIS_STORAGE_DIRECTORY: ${{ runner.temp }}/hypothesis
