@@ -652,6 +652,62 @@ cost picture is:
 4. Optimized order-independent Uniswap hotspot: 5.09–5.22s warm pytest /
    6.31–6.39s warm wall.
 
+### Final RH rebase verification — 2026-08-07
+
+The historical measurements above remain bound to the frozen `7d8c76e` source.
+They are not used as evidence for integration into current RH. The implementation
+was separately rebound to final RH commit
+`2c026b0ee8a296e1b8bcb9d5d70651eaf385438e` (tree
+`eced68c3bf23ca0198b0be4b5e2b3d3b7f7474d4`) as signed implementation commit
+`25b9220a073c033b5f979d9201a4ed5a677ebab5` (tree
+`2e505d818af9edb9d4f4d44176ff428109d72c06`). The only cherry-pick conflict was
+in the StabilityPool fuzz module; the resolution preserves RH's production
+`RETENTION_THRESHOLD = 5 * 10**16` and the candidate's marker and reusable-token
+optimization.
+
+Current collection and lane controls were reverified:
+
+- Default collection through both `python -m pytest` and bare `pytest`: 3,244
+  selected from 3,522 discovered tests, with 278 marker-deselected tests and no
+  collection errors.
+- Comprehensive collect-only: 4,539 selected from 4,682 tests, with the 143
+  local-fork-policy deselections retained.
+- Plugin-manager probes: default `unraisableexception=False`; comprehensive
+  override `unraisableexception=True`.
+- Uniswap minimal prices: 75 passed and 1 expected failure; the second warm run
+  completed in 5.93s pytest / 7.37s wall.
+- StabilityPool comprehensive fuzz: 4 passed across the retained 40/20/40/40
+  example budgets in 143.65s pytest / 178.72s wall.
+
+The final default-lane comparison used isolated caches, one serial worker, local
+fork policy, the non-secret Etherscan placeholder, and unset RPC/secret-shaped
+variables on both trees. Because the marker annotations that exclude 135
+release/fuzz/gas tests exist only in the candidate patch, pristine RH used
+equivalent explicit ignores/deselection. Both sides therefore executed the same
+3,244 test cases in the same order.
+
+| Tree | Cache | Pytest | Wall (`real`) | Outcome |
+|---|---|---:|---:|---|
+| Pristine final RH `2c026b0` | fresh isolated | 727.77s | 790.35s | 3,205 passed, 13 failed, 25 errors, 1 xfailed |
+| Rebound candidate `25b9220` | warm isolated | 711.79s | 769.63s | 3,205 passed, 13 failed, 25 errors, 1 xfailed |
+
+The ordered JUnit records match exactly for all 3,244 nodes, including outcome
+classification. A separate nine-module replay also matched exactly: each tree
+reported 494 passed, 12 failed, and 25 errors with the same 37 non-passing node
+ids. The full Teller subtree passed identically on both trees (268 passed); the
+additional Teller withdrawal failure requires earlier full-suite state and was
+then reproduced at the same collection position on pristine RH. Therefore the
+current 13-failure/25-error set is pre-existing on final RH, and the rebound
+candidate introduces no new failing or erroring node. The candidate's first cold
+pass took 924.15s wall, but its detailed pytest summary was lost to execution
+transport truncation, so no unsupported cold pytest-duration claim is made.
+
+The manual-only workflow parses locally and retains explicit lean/comprehensive
+selection, pinned actions, isolated runtime directories, and rolling Titanoboa
+cache keys. It was not dispatched because the exactly reproduced RH baseline
+failures would intentionally leave either full default run red. Automatic PR and
+push triggers remain absent under the owner's prior manual-only authorization.
+
 ### Failure and omitted-work record
 
 - Pre-edit artifact checker fingerprint: `CreditEngine` source SHA-256 expected
