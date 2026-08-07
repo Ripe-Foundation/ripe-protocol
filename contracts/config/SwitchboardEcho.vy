@@ -63,12 +63,13 @@ interface RipeGovVault:
     def govPointAccrualDisabledBlock() -> uint256: view
     def disableGovPointAccrualGlobally(): nonpayable
 
+interface Teller:
+    def migrateRipeGovPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
-
-interface Teller:
-    def migrateRipeGovPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
@@ -183,6 +184,12 @@ struct RipeGovPointAccrualDisableAction:
     user: address
 
 struct RipeGovMigration:
+    user: address
+    asset: address
+    sourceVaultId: uint256
+    targetVaultId: uint256
+
+struct VaultMigration:
     user: address
     asset: address
     sourceVaultId: uint256
@@ -465,6 +472,14 @@ event RipeGovPositionMigrationExecuted:
     amount: uint256
     caller: address
 
+event VaultPositionMigrationExecuted:
+    user: indexed(address)
+    asset: indexed(address)
+    sourceVaultId: indexed(uint256)
+    targetVaultId: uint256
+    amount: uint256
+    caller: address
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingEndaoSwapActions: public(HashMap[uint256, DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
@@ -493,6 +508,7 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
+MAX_VAULT_MIGRATIONS: constant(uint256) = 25
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -662,6 +678,38 @@ def migrateRipeGovPositions(
             migration.targetVaultId,
         )
         log RipeGovPositionMigrationExecuted(
+            user=migration.user,
+            asset=migration.asset,
+            sourceVaultId=migration.sourceVaultId,
+            targetVaultId=migration.targetVaultId,
+            amount=amount,
+            caller=msg.sender,
+        )
+
+    return len(_migrations)
+
+
+###########################
+# Deposit Vault Migration #
+###########################
+
+
+@external
+def migrateVaultPositions(
+    _migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS],
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_migrations) != 0 # dev: no migrations
+
+    teller: Teller = Teller(self._getTellerAddr())
+    for migration: VaultMigration in _migrations:
+        amount: uint256 = extcall teller.migrateVaultPosition(
+            migration.user,
+            migration.asset,
+            migration.sourceVaultId,
+            migration.targetVaultId,
+        )
+        log VaultPositionMigrationExecuted(
             user=migration.user,
             asset=migration.asset,
             sourceVaultId=migration.sourceVaultId,

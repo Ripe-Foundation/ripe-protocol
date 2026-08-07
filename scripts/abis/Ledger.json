@@ -346,22 +346,6 @@
     "outputs": []
   },
   {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "removeVaultFromUserForMigration",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      }
-    ],
-    "outputs": []
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "getDepositLedgerData",
