@@ -627,3 +627,54 @@ workflow, or scanner, so no commit in that class can change a gate outcome. This
 closes the self-reference without regress: the property is proven for the class
 of change, not merely for one instance. Any future commit touching a path outside
 `docs/simplification/` requires re-running the full Section 3 matrix.
+
+## 12. Post-merge state (rh `6260726` integrated)
+
+The branch was merged with rh at `6260726d0d08a3bfec5b6e494c0adacb70be90f9`
+under owner authorization. The merge is conflict-free: no file is modified by
+both sides, and none of the 93 extracted paths is touched by rh's 16 commits
+since `610b43f`.
+
+### New deployment history is retained, not extracted
+
+rh added `migration_history/robinhood-mainnet/v1/0008-manifest.json` after this
+branch's baseline. It is **deliberately retained**:
+
+- it postdates the authorized extraction set, which is bound to `610b43f`;
+- it is live deployment history the deployment owner has just produced, and plan
+  Section 0.5 places operator files above tree-size reduction;
+- `extracted-files.tsv` makes no claim about material created after the baseline.
+
+The retained Base-history corpus assertion is unaffected: rh's addition is under
+`robinhood-mainnet`, while `tests/deployment/test_manifest_schema.py` counts
+`base-mainnet`, which still holds exactly its `current-manifest.json`.
+
+### rh's own pre-existing failures at `6260726`
+
+Three checks fail on the merged branch. All three fail **identically on a
+pristine rh checkout at `6260726`**, so the merge introduces none of them:
+
+| Check | Merged branch | Pristine rh `6260726` |
+| --- | --- | --- |
+| `tests/deployment/test_manifest_schema.py::test_robinhood_migration_handoff_is_in_memory_typed_and_write_free` | FAIL | FAIL |
+| `tests/deployment/test_abi_export.py::test_repository_default_abi_directory_is_byte_current` | FAIL | FAIL |
+| `scripts/check_contract_artifacts.py` | `CONTRACT_ARTIFACTS_FAILED` — MissionControl `source_sha256` mismatch | identical failure |
+
+The remaining 205 tests in that targeted set pass on both. The MissionControl
+artifact drift is an rh-side condition the deployment owner should be aware of;
+it is out of scope for this cleanup, which changes no production Vyper and no
+artifact expectation.
+
+### Validation status
+
+The full baseline/candidate matrix in sections 3–7 is bound to `610b43f` versus
+`e74f184` and **does not bind the merged tree**. Plan Section 14.4 requires
+repeating it against the new rh tip as baseline. That re-run is reported
+separately; until it lands, the merged branch carries only the targeted evidence
+in this section plus these fast gates:
+
+| Fast gate on the merged tree | Result |
+| --- | --- |
+| lean collection | 3457/3739 (282 deselected) |
+| comprehensive collection | 4756/4899 (143 deselected) |
+| socket-purity gate | 57 passed |
