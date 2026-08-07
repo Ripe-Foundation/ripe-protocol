@@ -66,6 +66,14 @@ def _json_sha256(value: Any) -> str:
     return _sha256(_canonical_json_bytes(value))
 
 
+def _iter_code_layout_entries(layout: Mapping[str, Any]):
+    for value in layout.values():
+        if isinstance(value, Mapping) and {"offset", "length", "type"} <= set(value):
+            yield value
+        elif isinstance(value, Mapping):
+            yield from _iter_code_layout_entries(value)
+
+
 def _creation_binding(
     creation: bytes,
     *,
@@ -263,6 +271,30 @@ def _check_contract(
     )
     _assert_equal(
         name,
+        "creation executable-prefix size",
+        len(creation_binding.executable_prefix),
+        artifacts["creation_executable_prefix_size"],
+    )
+    _assert_equal(
+        name,
+        "creation executable-prefix SHA-256",
+        _sha256(creation_binding.executable_prefix),
+        artifacts["creation_executable_prefix_sha256"],
+    )
+    _assert_equal(
+        name,
+        "creation compiler-metadata size",
+        len(creation_binding.compiler_metadata),
+        artifacts["creation_metadata_size"],
+    )
+    _assert_equal(
+        name,
+        "creation compiler-metadata SHA-256",
+        _sha256(creation_binding.compiler_metadata),
+        artifacts["creation_metadata_sha256"],
+    )
+    _assert_equal(
+        name,
         "runtime_template_size",
         len(compiled.runtime_template),
         artifacts["runtime_template_size"],
@@ -275,6 +307,27 @@ def _check_contract(
     )
     headroom = EIP_170_LIMIT - len(compiled.runtime_template)
     _assert_equal(name, "eip170_headroom", headroom, artifacts["eip170_headroom"])
+    code_data_size = sum(
+        int(item["length"])
+        for item in _iter_code_layout_entries(compiled.code_layout)
+    )
+    deployed_runtime_size = len(compiled.runtime_template) + code_data_size
+    _assert_equal(
+        name,
+        "constructor-bound deployed runtime size",
+        deployed_runtime_size,
+        artifacts["deployed_runtime_size"],
+    )
+    _assert_equal(
+        name,
+        "constructor-bound deployed EIP-170 headroom",
+        EIP_170_LIMIT - deployed_runtime_size,
+        artifacts["deployed_eip170_headroom"],
+    )
+    if deployed_runtime_size >= EIP_170_LIMIT:
+        raise ArtifactCheckError(
+            f"{name}: deployed runtime {deployed_runtime_size} is not below EIP-170"
+        )
     accepted_ceiling = artifacts.get("accepted_runtime_ceiling")
     if accepted_ceiling is not None and len(compiled.runtime_template) > accepted_ceiling:
         raise ArtifactCheckError(

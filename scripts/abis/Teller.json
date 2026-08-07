@@ -126,6 +126,63 @@
     "type": "event"
   },
   {
+    "name": "RipeGovPositionMigrated",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "sourceVault",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "targetVault",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "targetShares",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "govPoints",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "unlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "UserConfigSet",
     "inputs": [
       {
@@ -1042,6 +1099,35 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "migrateRipeGovPosition",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "borrow",
     "inputs": [],
     "outputs": [
@@ -1250,216 +1336,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemCollateral",
-    "inputs": [
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "redeemCollateralFromMany",
     "inputs": [
       {
@@ -1794,216 +1670,6 @@
       {
         "name": "_wantsSavingsGreen",
         "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "buyFungibleAuction",
-    "inputs": [
-      {
-        "name": "_liqUser",
-        "type": "address"
-      },
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldTransferBalance",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
       }
     ],
     "outputs": [
@@ -2336,130 +2002,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "claimFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "claimFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_maxUsdValue",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "claimFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_maxUsdValue",
-        "type": "uint256"
-      },
-      {
-        "name": "_user",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "claimFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_stabAsset",
-        "type": "address"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_maxUsdValue",
-        "type": "uint256"
-      },
-      {
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "claimManyFromStabilityPool",
     "inputs": [
       {
@@ -2564,192 +2106,6 @@
       },
       {
         "name": "_shouldAutoDeposit",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "redeemFromStabilityPool",
-    "inputs": [
-      {
-        "name": "_vaultId",
-        "type": "uint256"
-      },
-      {
-        "name": "_claimAsset",
-        "type": "address"
-      },
-      {
-        "name": "_paymentAmount",
-        "type": "uint256"
-      },
-      {
-        "name": "_recipient",
-        "type": "address"
-      },
-      {
-        "name": "_shouldAutoDeposit",
-        "type": "bool"
-      },
-      {
-        "name": "_isPaymentSavingsGreen",
-        "type": "bool"
-      },
-      {
-        "name": "_shouldRefundSavingsGreen",
         "type": "bool"
       }
     ],

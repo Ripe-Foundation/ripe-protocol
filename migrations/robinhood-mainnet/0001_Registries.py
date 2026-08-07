@@ -4,25 +4,49 @@ from scripts.utils.migration import Migration
 from config.robinhood_launch import LEDGER_ACTION_BLOCK_SOURCE
 
 
-def _arb_action_block(migration, ledger_address):
-    """Read getArbActionBlock() from the NODE, not from boa's local EVM.
+def _node_read_word(migration, contract_address, signature):
+    """Read one exact ABI word from the configured Robinhood node.
 
     Arbitrum marks its precompiles with a single 0xfe byte on chain. The node
     intercepts calls to them, but titanoboa mirrors chain state into a local
-    EVM and executes that byte, which is INVALID -- so ANY boa-side read that
-    touches ArbSys reverts even when the contract is perfectly correct. The
-    deployment itself works because the node executes the constructor.
+    EVM and executes that byte, which is INVALID. Production evidence must
+    therefore come from the real RPC, never Boa's local EVM.
     """
     from web3 import Web3
 
     rpc = migration.rpc()
-    if not rpc or rpc == "boa":
-        return None  # local/boa run: nothing real to ask
+    assert rpc and rpc != "boa", "production Ledger requires a real RPC node"
     w3 = Web3(Web3.HTTPProvider(rpc))
-    selector = Web3.keccak(text="getArbActionBlock()")[:4]
-    result = w3.eth.call({"to": Web3.to_checksum_address(ledger_address),
-                          "data": selector})
+    assert w3.is_connected(), "production Ledger RPC is unavailable"
+    selector = Web3.keccak(text=signature)[:4]
+    result = w3.eth.call(
+        {
+            "to": Web3.to_checksum_address(contract_address),
+            "data": selector,
+        }
+    )
+    assert len(result) == 32, f"malformed {signature} readback"
     return int.from_bytes(result, "big")
+
+
+def _validate_ledger_profile(migration, ledger_address):
+    expected_source = int(LEDGER_ACTION_BLOCK_SOURCE, 16)
+    assert expected_source == 0x64, "production action-block source must be ArbSys"
+
+    actual_source = _node_read_word(
+        migration,
+        ledger_address,
+        "ACTION_BLOCK_SOURCE()",
+    )
+    assert actual_source == expected_source, "Ledger action-block source mismatch"
+
+    action_block = _node_read_word(
+        migration,
+        ledger_address,
+        "getArbActionBlock()",
+    )
+    assert action_block != 0, "ArbSys action block reads zero"
+    return actual_source, action_block
 
 
 def migrate(migration: Migration):
@@ -31,22 +55,20 @@ def migrate(migration: Migration):
 
     log.h1("Deploying Ledger")
 
-    # LEDGER_ACTION_BLOCK_SOURCE is ArbSys: on this L2 `block.number` is the L1
-    # ancestor estimate and repeats across child blocks. The constructor calls
-    # arbBlockNumber() and reverts if it cannot decode the result, so a wrong
-    # value fails here rather than silently weakening the one-action-per-block
-    # guard.
+    # The constructor stores and allowlists the source. The node-backed checks
+    # below prove both the exact stored source and its live runtime behavior.
     ledger = migration.deploy(
         "Ledger",
         hq,
         defaults,
         LEDGER_ACTION_BLOCK_SOURCE,
     )
-    # Asked of the node, because boa cannot execute ArbSys. None on a local run.
-    arb_block = _arb_action_block(migration, ledger.address)
-    if arb_block is not None:
-        assert arb_block != 0, "ArbSys action block reads zero"
-        log.h2(f"ArbSys action block: {arb_block}")
+    action_source, action_block = _validate_ledger_profile(
+        migration,
+        ledger.address,
+    )
+    log.h2(f"Ledger ACTION_BLOCK_SOURCE: 0x{action_source:040x}")
+    log.h2(f"ArbSys action block: {action_block}")
 
     migration.execute(hq.startAddNewAddressToRegistry, ledger, "Ledger")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, ledger)) == 4

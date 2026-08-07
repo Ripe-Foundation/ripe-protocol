@@ -41,6 +41,11 @@ interface Whitelist:
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
+interface StabilityPool:
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def isPaused() -> bool: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -487,9 +492,16 @@ def _isValidAssetLiqConfig(
         if _debtTermsLtv == 0:
             return False
 
-    # make sure special stab pool is valid
-    if _specialStabPoolId != 0 and not staticcall VaultBook(vaultBook).isValidRegId(_specialStabPoolId):
-        return False
+    # A valid VaultBook id is not sufficient: prove the target implements the
+    # minimum Stability Pool read interface on every proposal/revalidation.
+    if _specialStabPoolId != 0:
+        if not staticcall VaultBook(vaultBook).isValidRegId(_specialStabPoolId):
+            return False
+        stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
+        if stabPool == empty(address) or not stabPool.is_contract:
+            return False
+        na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)
+        naPaused: bool = staticcall StabilityPool(stabPool).isPaused()
 
     return True
 

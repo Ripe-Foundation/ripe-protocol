@@ -1,5 +1,13 @@
 # Robinhood RIPE reward launch approved product-decision packet
 
+> [!WARNING]
+> **Superseded economics snapshot.** This packet records the earlier 1,000-RIPE
+> decision and is retained as historical evidence. The selected Defaults source
+> now contains a shared 1,000,000-RIPE reward bucket; see
+> [`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md).
+> Neither the old packet nor the current source grants deployment or activation
+> authority.
+
 ## Verdict
 
 The existing PR #66 reward values are the **owner-approved product

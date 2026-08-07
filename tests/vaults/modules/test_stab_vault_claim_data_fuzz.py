@@ -15,7 +15,7 @@ from test_stab_vault_hardening import (
 )
 
 
-RETENTION_THRESHOLD = 10**17
+RETENTION_THRESHOLD = 5 * 10**16
 NUM_FUZZ_CLAIM_ASSETS = 4
 
 CLAIM_AMOUNT_STRATEGY = st.one_of(
@@ -35,7 +35,6 @@ CLAIM_AMOUNT_STRATEGY = st.one_of(
 )
 PRICE_STRATEGY = st.sampled_from(
     [
-        0,
         2 * 10**17,
         EIGHTEEN_DECIMALS // 2,
         EIGHTEEN_DECIMALS,

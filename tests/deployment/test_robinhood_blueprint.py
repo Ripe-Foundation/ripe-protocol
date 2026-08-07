@@ -491,7 +491,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.CHAIN_SPECIFIC_CONFIG: 3,
         SourceClass.EXTERNAL_ARTIFACT: 3,
     }
-    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 51
+    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 50
     assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
@@ -632,9 +632,6 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
         "I-VERIFY-EXPORT": AuthorityClass.DEPLOYMENT_PRODUCED,
         "I-RELEASE-PROOF": AuthorityClass.DEPLOYMENT_PRODUCED,
         "I-MANIFEST-HISTORY": AuthorityClass.REPOSITORY_APPROVED,
-        "I-STEAKHOUSE-USDG": (
-            AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
-        ),
         "I-MORPHO-V2-FACTORY": (
             AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT
         ),
@@ -647,7 +644,7 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
     assert actual == expected
     assert Counter(actual.values()) == {
         AuthorityClass.REPOSITORY_APPROVED: 5,
-        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 10,
+        AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 9,
         AuthorityClass.OWNER_SELECTED: 27,
         AuthorityClass.DEPLOYMENT_PRODUCED: 9,
     }

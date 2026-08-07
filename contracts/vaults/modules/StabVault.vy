@@ -109,6 +109,8 @@ totalClaimableBalances: public(HashMap[address, uint256]) # claimable asset -> b
 claimableAssets: public(HashMap[address, HashMap[uint256, address]]) # stab asset -> index -> claimable asset
 indexOfClaimableAsset: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> index
 numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claimable assets
+noPriceQuarantined: HashMap[address, HashMap[address, bool]] # stab asset -> claim asset -> quarantined
+noPriceQuarantineCount: public(uint256)
 
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
@@ -116,32 +118,34 @@ MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 MAX_CLAIM_ASSET_MAINTENANCE: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-ACTIVATION_USD_THRESHOLD: constant(uint256) = 25 * 10 ** 16  # $0.25 in 18-decimal USD
-RETENTION_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
+ACTIVATION_USD_THRESHOLD: constant(uint256) = 10 * 10 ** 16  # $0.10 in 18-decimal USD
+RETENTION_USD_THRESHOLD: constant(uint256) = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 
 CLAIM_ASSET_ABSENT: constant(uint256) = 0
 CLAIM_ASSET_DORMANT: constant(uint256) = 1
 CLAIM_ASSET_ACTIVE: constant(uint256) = 2
+CLAIM_ASSET_NO_PRICE_QUARANTINED: constant(uint256) = 3
 
 DEACTIVATION_ZERO: constant(uint256) = 1
 DEACTIVATION_DUST: constant(uint256) = 2
+DEACTIVATION_NO_PRICE: constant(uint256) = 3
 
 DORMANT_BELOW_FLOOR: constant(uint256) = 1
 
-GREEN_TOKEN: immutable(address)
-SAVINGS_GREEN: immutable(address)
+greenToken: address
+savingsGreen: address
 
 
 @deploy
 def __init__():
-    GREEN_TOKEN = addys._getGreenToken()
-    SAVINGS_GREEN = addys._getSavingsGreen()
+    self.greenToken = addys._getGreenToken()
+    self.savingsGreen = addys._getSavingsGreen()
 
 
 @view
 @internal
 def _getStabAddys() -> (address, address, address):
-    return GREEN_TOKEN, SAVINGS_GREEN, addys._getPriceDeskAddr()
+    return self.greenToken, self.savingsGreen, addys._getPriceDeskAddr()
 
 
 ########
@@ -541,7 +545,7 @@ def _validateLiquidationSwap(_stabAsset: address, _liqAsset: address, _sender: a
     assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
     assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
     assert _liqAsset != empty(address) # dev: invalid liq asset
-    assert _stabAsset != GREEN_TOKEN # dev: green cannot be stab asset
+    assert _stabAsset != self.greenToken # dev: green cannot be stab asset
 
 
 @internal
@@ -573,7 +577,7 @@ def getTotalUserValue(_user: address, _asset: address) -> uint256:
 @view
 @internal
 def _getCurrentTotalValue(_asset: address) -> uint256:
-    return self._getTotalValue(_asset, GREEN_TOKEN, SAVINGS_GREEN, addys._getPriceDeskAddr())
+    return self._getTotalValue(_asset, self.greenToken, self.savingsGreen, addys._getPriceDeskAddr())
 
 
 @view
@@ -1084,6 +1088,8 @@ def _getNumActiveClaimAssets(_stabAsset: address) -> uint256:
 def getClaimAssetState(_stabAsset: address, _claimAsset: address) -> uint256:
     if self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0:
         return CLAIM_ASSET_ACTIVE
+    if self.noPriceQuarantined[_stabAsset][_claimAsset]:
+        return CLAIM_ASSET_NO_PRICE_QUARANTINED
     return CLAIM_ASSET_ABSENT if self.claimableBalances[_stabAsset][_claimAsset] == 0 else CLAIM_ASSET_DORMANT
 
 
@@ -1180,7 +1186,12 @@ def _maintainClaimableAssets(
             continue
 
         usdValue: uint256 = self._getUsdValue(claimAsset, balance, greenToken, savingsGreen, priceDesk, False)
-        if usdValue != 0 and usdValue < RETENTION_USD_THRESHOLD:
+        if usdValue == 0:
+            if vaultData.isPaused:
+                self.noPriceQuarantined[_stabAsset][claimAsset] = True
+                self.noPriceQuarantineCount += 1
+                self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_NO_PRICE)
+        elif usdValue < RETENTION_USD_THRESHOLD:
             self._removeClaimableAsset(_stabAsset, claimAsset, DEACTIVATION_DUST)
 
 
@@ -1228,7 +1239,7 @@ def _addClaimableBalance(
     if not isActive:
         activeCount = self._getNumActiveClaimAssets(_stabAsset)
         assert activeCount < MAX_ACTIVE_CLAIM_ASSETS # dev: max active claim assets
-        usdValue = self._getUsdValue(_claimAsset, newPairBalance, GREEN_TOKEN, SAVINGS_GREEN, _priceDesk, False)
+        usdValue = self._getUsdValue(_claimAsset, newPairBalance, self.greenToken, self.savingsGreen, _priceDesk, False)
         assert usdValue != 0 # dev: no price for claim asset
 
     # update balances
@@ -1253,6 +1264,9 @@ def _addClaimableBalance(
 def _registerClaimableAsset(_stabAsset: address, _assetReceived: address):
     assert self.claimableBalances[_stabAsset][_assetReceived] != 0 # dev: no claimable balance
     assert self.indexOfClaimableAsset[_stabAsset][_assetReceived] == 0 # dev: claim asset already active
+    isQuarantined: bool = self.noPriceQuarantined[_stabAsset][_assetReceived]
+    if not isQuarantined:
+        assert self.noPriceQuarantineCount == 0 # dev: reserved
 
     cid: uint256 = self.numClaimableAssets[_stabAsset]
     if cid == 0:
@@ -1261,6 +1275,9 @@ def _registerClaimableAsset(_stabAsset: address, _assetReceived: address):
     self.claimableAssets[_stabAsset][cid] = _assetReceived
     self.indexOfClaimableAsset[_stabAsset][_assetReceived] = cid
     self.numClaimableAssets[_stabAsset] = cid + 1
+    if isQuarantined:
+        self.noPriceQuarantined[_stabAsset][_assetReceived] = False
+        self.noPriceQuarantineCount -= 1
     log ClaimAssetActivated(stabAsset=_stabAsset, claimAsset=_assetReceived, balance=self.claimableBalances[_stabAsset][_assetReceived], activeCount=cid)
 
 

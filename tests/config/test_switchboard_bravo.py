@@ -332,59 +332,43 @@ def test_staker_allocation_proposal_gate_rejects_then_accepts_classified_vault(
     assert pending.config.stakersPointsAlloc == 50_00
 
 
-def test_staker_allocation_rejects_unset_pointers_but_zero_allocation_remains_valid(
+def test_zero_staker_allocation_remains_valid_with_initialized_pointers(
     switchboard_bravo,
     governance,
-    zero_pointer_mission_control,
+    new_mission_control,
     alpha_token,
 ):
-    with boa.reverts("invalid asset"):
-        _add_asset(
-            switchboard_bravo,
-            governance,
-            alpha_token.address,
-            [1],
-            50_00,
-            zero_pointer_mission_control.address,
-        )
-
+    assert new_mission_control.coreRipeGovVaultId() == 2
+    assert new_mission_control.preferredStabVaultId() == 1
     action_id = _add_asset(
         switchboard_bravo,
         governance,
         alpha_token.address,
         [1],
         0,
-        zero_pointer_mission_control.address,
+        new_mission_control.address,
     )
     assert action_id > 0
 
 
 @pytest.mark.parametrize(
-    ("setter_name", "configured_vault_id"),
-    [
-        ("setCoreRipeGovVaultId", 3),
-        ("setPreferredStabVaultId", 4),
-    ],
+    "initialized_vault_id",
+    [1, 2],
 )
-def test_staker_allocation_accepts_one_configured_pointer_when_the_other_is_unset(
+def test_staker_allocation_accepts_each_initialized_pointer(
     switchboard_bravo,
     governance,
-    zero_pointer_mission_control,
+    new_mission_control,
     alpha_token,
-    setter_name,
-    configured_vault_id,
+    initialized_vault_id,
 ):
-    getattr(zero_pointer_mission_control, setter_name)(
-        configured_vault_id,
-        sender=switchboard_bravo.address,
-    )
     action_id = _add_asset(
         switchboard_bravo,
         governance,
         alpha_token.address,
-        [configured_vault_id],
+        [initialized_vault_id],
         50_00,
-        zero_pointer_mission_control.address,
+        new_mission_control.address,
     )
     assert action_id > 0
 
@@ -1763,6 +1747,40 @@ def test_special_stab_pool_id_validation(switchboard_bravo, governance, alpha_to
         sender=governance.address
     )
     assert action_id > 0
+
+
+@pytest.mark.parametrize("wrong_vault_id", [2, 3])
+def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
+    wrong_vault_id,
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    mission_control,
+):
+    with boa.reverts():
+        switchboard_bravo.addAsset(
+            alpha_token,
+            [1],
+            50_00,
+            30_00,
+            1_000,
+            10_000,
+            0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False,
+            False,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            wrong_vault_id,
+            sender=governance.address,
+        )
+    assert not mission_control.isStabVaultId(wrong_vault_id)
 
 
 def test_whitelist_interface_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):

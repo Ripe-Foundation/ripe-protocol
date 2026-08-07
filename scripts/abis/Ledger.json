@@ -212,6 +212,18 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getArbActionBlock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "checkAndUpdateLastTouch",
@@ -321,6 +333,22 @@
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "removeVaultFromUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeVaultFromUserForMigration",
     "inputs": [
       {
         "name": "_user",

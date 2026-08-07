@@ -128,7 +128,7 @@ def test_defaults_implements_all_seventeen_interface_getters():
     )
 
 
-def test_constructor_has_eight_named_blueprint_bindings_and_no_address_literals():
+def test_constructor_has_seven_named_blueprint_bindings_and_no_address_literals():
     values = sync.extract_defaults_values()
     assert tuple(blueprint_source.ROBINHOOD_DEFAULTS_CONSTRUCTOR) == (
         ("contributorTemplate", "CONTRIBUTOR_TEMPLATE"),
@@ -138,7 +138,6 @@ def test_constructor_has_eight_named_blueprint_bindings_and_no_address_literals(
         ("sgreenToken", "SGREEN_TOKEN"),
         ("usdgToken", "USDG"),
         ("wethToken", "WETH"),
-        ("steakhouseUsdgVault", "STEAKHOUSE_USDG_VAULT"),
     )
     assert values["Defaults.hrConfig.contribTemplate"] == {
         "kind": "symbolic_binding",
@@ -155,7 +154,7 @@ def test_constructor_has_eight_named_blueprint_bindings_and_no_address_literals(
     assert not re.findall(r"0x[0-9A-Fa-f]{40}", DEFAULTS.read_text())
 
 
-def test_constructor_abi_intentionally_extends_pr66_five_arguments():
+def test_constructor_abi_intentionally_extends_pr66_to_seven_arguments():
     abi = json.loads((ROOT / "scripts" / "abis" / "DefaultsRobinhood.json").read_text())
     constructor = next(entry for entry in abi if entry["type"] == "constructor")
     assert [item["name"] for item in constructor["inputs"]] == list(
@@ -186,16 +185,16 @@ def test_manifest_partition_statuses_assets_and_omissions_are_exact():
     ledger = _ledger()
     records = ledger["parameters"]
     assert ledger["schema_version"] == sync.SCHEMA_VERSION
-    assert len(records) == 436
+    assert len(records) == 403
     assert Counter(r["destination"]["kind"] for r in records) == Counter(
-        defaults_field=305,
+        defaults_field=272,
         deployment_input=119,
         assertion=12,
     )
     defaults = [r for r in records if r["destination"]["kind"] == "defaults_field"]
     assert Counter(r["status"] for r in defaults) == Counter(
-        approved=223,
-        external_fact=5,
+        approved=192,
+        external_fact=3,
         blocked=7,
         omitted=70,
     )
@@ -205,11 +204,11 @@ def test_manifest_partition_statuses_assets_and_omissions_are_exact():
         if r["destination"]["path"].startswith("Defaults.assetConfigs[")
         and r["status"] != "omitted"
     ]
-    assert len(asset_records) == 155
+    assert len(asset_records) == 124
     assert {
         r["destination"]["path"].split("[", 1)[1].split("]", 1)[0]
         for r in asset_records
-    } == {"GREEN", "RIPE", "SGREEN", "WETH", "STEAKHOUSE_USDG"}
+    } == {"GREEN", "RIPE", "SGREEN", "WETH"}
     omitted = [r for r in defaults if r["status"] == "omitted"]
     assert len(omitted) == 70
     assert all(r["value"] == {"kind": "omitted", "profile": "Profile 2"} for r in omitted)
@@ -219,10 +218,6 @@ def test_priority_and_profile1_values_normalize_from_defaults():
     values = sync.extract_defaults_values()
     assert values["Defaults.priorityLiqAssetVaults[0].vaultId"]["raw"] == 3
     assert values["Defaults.priorityLiqAssetVaults[0].asset"]["raw"] == (
-        blueprint_source.ROBINHOOD_ADDRESSES["STEAKHOUSE_USDG_VAULT"]
-    )
-    assert values["Defaults.priorityLiqAssetVaults[1].vaultId"]["raw"] == 3
-    assert values["Defaults.priorityLiqAssetVaults[1].asset"]["raw"] == (
         blueprint_source.ROBINHOOD_ADDRESSES["WETH"]
     )
     assert values["Defaults.priorityStabVaults[0].vaultId"]["raw"] == 1
@@ -232,7 +227,7 @@ def test_priority_and_profile1_values_normalize_from_defaults():
     }
     assert values["Defaults.priorityPriceSourceIds"] == {
         "kind": "concrete",
-        "raw": [1, 3],
+        "raw": [1, 2],
     }
 
 
@@ -265,7 +260,7 @@ def test_every_value_has_one_source_owner_and_full_coverage():
     deployment = sync.extract_deployment_values(defaults)
     assertions = sync.derive_assertion_values(defaults)
     destinations = [r["destination"]["path"] for r in ledger["parameters"]]
-    assert len(destinations) == len(set(destinations)) == 436
+    assert len(destinations) == len(set(destinations)) == 403
     assert set(defaults) == {
         r["destination"]["path"]
         for r in ledger["parameters"]
@@ -363,7 +358,7 @@ def marker() -> uint256:
     )
 
     values = sync.extract_defaults_values()
-    assert len(values) == 305
+    assert len(values) == 272
     assert boa.env is original_env
     assert boa_interpret._disk_cache is original_cache
     assert (
@@ -438,7 +433,7 @@ def test_blueprint_address_mutation_fails_ledger_check():
     (
         ("perUserMaxVaults = 5", "perUserMaxVaults = 6"),
         ("canDeposit = True", "canDeposit = False"),
-        ("return [1, 3]", "return [1]"),
+        ("return [1, 2]", "return [1]"),
         ("vaultIds=[3]", "vaultIds=[2]"),
     ),
 )
@@ -535,7 +530,7 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False
-    assert len(blockers) == 80
+    assert len(blockers) == 65
     assert not any("Deployment.DP-15.rewards.promotion" in item for item in blockers)
     assert any(item.endswith(":unresolved") for item in blockers)
     assert any(item.endswith(":unverified") for item in blockers)
@@ -562,7 +557,7 @@ def test_curve_launch_values_are_blueprint_owned_and_not_derived_json_values():
     assert not any("curve" in destination.lower() for destination in destinations)
 
 
-def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
+def test_launch_authority_semantics_preserve_stable_ids_and_selected_reconciliations():
     launch = json.loads(
         subprocess.check_output(
             ["git", "show", f"{LAUNCH}:config/robinhood-parameters.json"],
@@ -573,9 +568,44 @@ def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
     current = _ledger()
     old_by_id = {record["id"]: record for record in launch["parameters"]}
     new_by_id = {record["id"]: record for record in current["parameters"]}
-    assert set(old_by_id) == set(new_by_id)
-    for record_id, old in old_by_id.items():
-        new = new_by_id[record_id]
+    assert set(new_by_id) < set(old_by_id)
+    removed = [old_by_id[record_id] for record_id in set(old_by_id) - set(new_by_id)]
+    assert len(removed) == 33
+    assert all(
+        "STEAKHOUSE" in record["destination"]["path"]
+        or record["destination"]["path"].startswith(
+            "Defaults.priorityLiqAssetVaults[1]."
+        )
+        for record in removed
+    )
+    reconciled_ids = {
+        "P-H04-018",
+        "P-H04-035",
+        "P-H04-036",
+        "P-H04-037",
+        "P-H04-039",
+        "P-H04-042",
+        "P-H04-046",
+        "P-H04-211",
+        "P-H04-299",
+        "P-H04-304",
+        "P-H04-389",
+        "P-H04-391",
+        "P-H04-399",
+        "P-H04-415",
+        "P-H04-417",
+        "P-H04-436",
+    }
+    semantic_changes = {
+        record_id
+        for record_id, new in new_by_id.items()
+        if new["status"] != old_by_id[record_id]["status"]
+        or _semantic_raw(new["value"])
+        != _semantic_raw(old_by_id[record_id]["value"])
+    }
+    assert semantic_changes == reconciled_ids
+    for record_id, new in new_by_id.items():
+        old = old_by_id[record_id]
         assert new["destination"] == old["destination"]
         if record_id in {"P-H04-399", "P-H04-436"}:
             assert old["status"] == "blocked"
@@ -591,6 +621,9 @@ def test_launch_authority_semantics_are_preserved_except_resolved_morpho_gate():
                     "and omission are distinct."
                 ),
             }
+            continue
+        if record_id in reconciled_ids:
+            assert new["status"] == old["status"]
             continue
         assert new["status"] == old["status"]
         if old["status"] in {"approved", "disabled", "external_fact", "derived"}:

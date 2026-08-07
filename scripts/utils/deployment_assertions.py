@@ -498,7 +498,7 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
                     key=lambda row: row["registry_id"],
                 )
             ],
-            "priority_ids": [1, 3],
+            "priority_ids": [1, 2],
             "validation_postconditions": list(
                 curve_validation.get("postconditions", [])
             ),

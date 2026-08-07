@@ -273,12 +273,22 @@ def updatePriceConfig(
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    p: PriceConfig = self.priceConfigs[RIPE_TOKEN]
-    p.minSnapshotDelay = _minSnapshotDelay
-    p.maxNumSnapshots = _maxNumSnapshots
-    p.maxUpsideDeviation = _maxUpsideDeviation
-    p.staleTime = _staleTime
+    # Pending state is policy-only. Runtime cursor/snapshot state is merged
+    # from the latest live config at confirmation.
+    p: PriceConfig = PriceConfig(
+        minSnapshotDelay=_minSnapshotDelay,
+        maxNumSnapshots=_maxNumSnapshots,
+        maxUpsideDeviation=_maxUpsideDeviation,
+        staleTime=_staleTime,
+        lastSnapshot=empty(PriceSnapshot),
+        nextIndex=0,
+    )
     assert self._isValidPriceConfig(p) # dev: invalid config
+
+    previousAid: uint256 = self.pendingPriceConfigs[RIPE_TOKEN].actionId
+    if previousAid != 0:
+        self._cancelPriceFeedUpdate(RIPE_TOKEN, previousAid)
+        log PriceConfigUpdateCancelled(asset=RIPE_TOKEN)
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -477,17 +487,26 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert d.actionId != 0 # dev: no pending config
     if not self._isValidPriceConfig(d.config):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
+        log PriceConfigUpdateCancelled(asset=_asset)
         return False
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
-    # save new feed config
-    self.priceConfigs[_asset] = d.config
+    # Merge only approved policy into the latest live runtime state. Snapshots
+    # taken during the timelock and their cursor remain authoritative.
+    config: PriceConfig = self.priceConfigs[_asset]
+    config.minSnapshotDelay = d.config.minSnapshotDelay
+    config.maxNumSnapshots = d.config.maxNumSnapshots
+    config.maxUpsideDeviation = d.config.maxUpsideDeviation
+    config.staleTime = d.config.staleTime
+    if config.nextIndex >= config.maxNumSnapshots:
+        config.nextIndex %= config.maxNumSnapshots
+    self.priceConfigs[_asset] = config
     self.pendingPriceConfigs[_asset] = empty(PendingPriceConfig)
 
     # add snapshot
-    self._addPriceSnapshot(_asset, d.config)
+    self._addPriceSnapshot(_asset, config)
 
     log PriceConfigUpdated(
         asset=_asset,

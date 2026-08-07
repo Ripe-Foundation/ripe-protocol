@@ -24,8 +24,13 @@ REQUIRED_CONTRACTS = frozenset(
         "SimpleErc20",
         "Ledger",
         "Lootbox",
+        "MissionControl",
+        "RipeGov",
         "SwitchboardDelta",
+        "SwitchboardBravo",
+        "StabilityPool",
         "Teller",
+        "UniswapV2Prices",
     }
 )
 NEW_CONTRACT_SOURCES = {
@@ -33,71 +38,19 @@ NEW_CONTRACT_SOURCES = {
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
     "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "SwitchboardDelta": ROOT / "contracts" / "config" / "SwitchboardDelta.vy",
+    "MissionControl": ROOT / "contracts" / "data" / "MissionControl.vy",
+    "RipeGov": ROOT / "contracts" / "vaults" / "RipeGov.vy",
+    "StabilityPool": ROOT / "contracts" / "vaults" / "StabilityPool.vy",
+    "SwitchboardBravo": ROOT / "contracts" / "config" / "SwitchboardBravo.vy",
+    "UniswapV2Prices": ROOT / "contracts" / "priceSources" / "UniswapV2Prices.vy",
 }
 
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_549, "headroom": 27},
+    "AuctionHouse": {"size": 24_556, "headroom": 20},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
-CREATION_BINDING_FACTS = {
-    "AuctionHouse": {
-        "prefix_size": 24_577,
-        "prefix_sha256": "1236fcba166f50d861e9efe979242ebf5a0bbed88e5e754d7c1819c37d94492f",
-        "metadata_size": 59,
-        "metadata_sha256": "0980c24fb517c44725b04c623185dfa6c389da57a71febbc8339c5a516c99493",
-    },
-    "CreditEngine": {
-        "prefix_size": 24_285,
-        "prefix_sha256": "1365baa8fdef4d72548ee249e07f78593705912fdca702a6fc0f1bc00b106fdb",
-        "metadata_size": 70,
-        "metadata_sha256": "747bc88dec0dbd567631239d194b0abbb46ed12b1ec50890e183bf78e1b9765e",
-    },
-    "Deleverage": {
-        "prefix_size": 24_833,
-        "prefix_sha256": "26ff82b5e245dbcc146adc36452a4352581c81d04820d95194fe58611d49e219",
-        "metadata_size": 61,
-        "metadata_sha256": "0e52a5555be52eda112bd98d8a9a6ddf439f00837b49eb27a5aa8363065273ac",
-    },
-    "DefaultsRobinhood": {
-        "prefix_size": 2_938,
-        "prefix_sha256": "58f068b8289c0d0e5144c4213ba1f62fb2865aee519099ecc0e5fce7cac45e0b",
-        "metadata_size": 57,
-        "metadata_sha256": "e900bfb673577092d576a12fd2cd757791ac09fd5620297d355cc3eee4e47f39",
-    },
-    "SimpleErc20": {
-        "prefix_size": 9_479,
-        "prefix_sha256": "ee58a1eea39f21f6b4babfe3f36473ffff4374fa319af11b16457fb15c37727e",
-        "metadata_size": 56,
-        "metadata_sha256": "f32154b61566126645ceff1ca70fff36b4d9868253e102da3f1920163b2dbf09",
-    },
-    "Ledger": {
-        "prefix_size": 13_674,
-        "prefix_sha256": "51d9b8ad87d7ac50b58c8004a623f067ddfa26b9d7c84e4ff1de3c459dd29fce",
-        "metadata_size": 56,
-        "metadata_sha256": "3d532fe4ad921b1c38182671d4f0dc502eddf4870e58da828cb0d7c963dcc28f",
-    },
-    "Lootbox": {
-        "prefix_size": 21_848,
-        "prefix_sha256": "53dac6ede2946eaf838c64e845b963cce61fcda37112be966ce977febc454d70",
-        "metadata_size": 63,
-        "metadata_sha256": "9ece9d291e68621d380f08bc035c2e47b4004fe9606faa7831987ca6de361c00",
-    },
-    "SwitchboardDelta": {
-        "prefix_size": 24_305,
-        "prefix_sha256": "5d7e5a00144259460b75b0e623b3371b05e122c4491423f42c6ca7e49ae6fe4f",
-        "metadata_size": 84,
-        "metadata_sha256": "cc1bcadb5528be3f406a18544734a3a08de07719ec230abf79ff988ac1428f18",
-    },
-    "Teller": {
-        "prefix_size": 24_225,
-        "prefix_sha256": "f3637a5f7e49048655960eb6fb06185fff10bba92041e603a4f9f2198c488967",
-        "metadata_size": 92,
-        "metadata_sha256": "eb6ff0c814a26aa1c59efc8a2bdfb4b0663e8fbad46ef84e16de263318a4ccba",
-    },
-}
-
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
         "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
@@ -165,13 +118,15 @@ def test_new_contract_selection_succeeds(contract):
     assert lines[0].startswith(f"{contract}:")
 
 
-def test_constructor_bound_deployed_runtime_facts_are_not_template_headroom():
+def test_constructor_bound_deployed_runtime_facts_are_compiler_backed():
     contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
 
     for name, deployed in DEPLOYED_RUNTIME_FACTS.items():
         artifacts = contracts[name]["artifacts"]
         assert contracts[name]["constructor_bound_runtime_template"] is True
         assert deployed["size"] + deployed["headroom"] == EIP_170_LIMIT
+        assert artifacts["deployed_runtime_size"] == deployed["size"]
+        assert artifacts["deployed_eip170_headroom"] == deployed["headroom"]
         assert (
             artifacts["runtime_template_size"] + artifacts["eip170_headroom"]
             == EIP_170_LIMIT
@@ -184,13 +139,15 @@ def test_constructor_bound_deployed_runtime_facts_are_not_template_headroom():
 
 def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
     contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
-    metadata_sizes = {facts["metadata_size"] for facts in CREATION_BINDING_FACTS.values()}
+    metadata_sizes = {
+        record["artifacts"]["creation_metadata_size"]
+        for record in contracts.values()
+    }
 
     assert len(metadata_sizes) > 1
-    assert set(CREATION_BINDING_FACTS) == REQUIRED_CONTRACTS
     vyper = artifact_checker._vyper_path()
-    for name, facts in CREATION_BINDING_FACTS.items():
-        record = contracts[name]
+    for name, record in contracts.items():
+        facts = record["artifacts"]
         compiled = artifact_checker._compile(ROOT / record["source_path"], vyper)
         binding = artifact_checker._creation_binding(
             compiled.creation,
@@ -201,13 +158,13 @@ def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
             len(binding.executable_prefix) + len(binding.compiler_metadata)
             == record["artifacts"]["creation_size"]
         )
-        assert len(binding.executable_prefix) == facts["prefix_size"]
+        assert len(binding.executable_prefix) == facts["creation_executable_prefix_size"]
         assert artifact_checker._sha256(binding.executable_prefix) == (
-            facts["prefix_sha256"]
+            facts["creation_executable_prefix_sha256"]
         )
-        assert len(binding.compiler_metadata) == facts["metadata_size"]
+        assert len(binding.compiler_metadata) == facts["creation_metadata_size"]
         assert artifact_checker._sha256(binding.compiler_metadata) == (
-            facts["metadata_sha256"]
+            facts["creation_metadata_sha256"]
         )
 
 
@@ -254,9 +211,9 @@ def test_prefix_or_metadata_byte_tampering_breaks_the_frozen_creation_binding():
     )
     assert artifact_checker._sha256(
         tampered_prefix_binding.executable_prefix
-    ) != CREATION_BINDING_FACTS["Teller"]["prefix_sha256"]
+    ) != expected["artifacts"]["creation_executable_prefix_sha256"]
     assert artifact_checker._sha256(tampered_prefix_binding.compiler_metadata) == (
-        CREATION_BINDING_FACTS["Teller"]["metadata_sha256"]
+        expected["artifacts"]["creation_metadata_sha256"]
     )
 
     tampered_metadata = bytearray(compiled.creation)

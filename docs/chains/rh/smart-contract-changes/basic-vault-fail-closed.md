@@ -89,9 +89,10 @@ The public interface and persistent, transient, and immutable layouts remain
 the canonical `SimpleErc20` layouts. The runtime changes because the shared
 safety behavior is compiled into each future Simple deployment.
 
-AuctionHouse is separately pinned at 24,549 deployed runtime bytes, leaving
-27 bytes of EIP-170 headroom. The test asserts that exact measurement rather
-than only `<= 24,576`.
+AuctionHouse is separately pinned by final compiler output and deployed-code
+measurement at 24,556 runtime bytes, leaving 20 bytes of EIP-170 headroom. The
+test deploys and measures the exact code; the arithmetic equality is only a
+secondary consistency assertion.
 
 ## Baseline verification caveat
 

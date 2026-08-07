@@ -194,6 +194,129 @@
     "type": "event"
   },
   {
+    "name": "GovPointAccrualDisabledGlobally",
+    "inputs": [
+      {
+        "name": "disabledBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovPointAccrualDisabledForUser",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "disabledBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeGovPositionExported",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "targetVault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "sourceShares",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "govPoints",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "unlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeGovPositionImported",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "targetShares",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "govPoints",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "unlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "VaultPauseModified",
     "inputs": [
       {
@@ -1505,6 +1628,302 @@
     ]
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "disableGovPointAccrualGlobally",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "disableGovPointAccrualForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "exportPositionForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "govPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "unlock",
+            "type": "uint256"
+          },
+          {
+            "name": "lastTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "exportPositionForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "govPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "unlock",
+            "type": "uint256"
+          },
+          {
+            "name": "lastTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "importPositionForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVault",
+        "type": "address"
+      },
+      {
+        "name": "_migration",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "govPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "unlock",
+            "type": "uint256"
+          },
+          {
+            "name": "lastTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "getVaultDataOnDeposit",
@@ -2364,6 +2783,56 @@
       {
         "name": "",
         "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "govPointAccrualDisabledBlock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userGovPointAccrualDisabledBlock",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "positionMigratedOut",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ]
   },

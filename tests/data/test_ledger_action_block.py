@@ -516,19 +516,19 @@ L3A_KILLING_TESTS = {
     [
         (
             "typed_call",
-            "e49a3c268dd03f44bdf1945b322eef9b6f7758abe94f4af2ea0eee1359a23783",
+            "8d89ee5af4fcd2848577ed013e2aa35de15a1eeba934031735b91f81f0f4c45f",
         ),
         (
             "truncation",
-            "14b7588e482eb6befa973b1ae0e0946d6cba41645b6caf4db95d21eefffae23b",
+            "a059530cbb814e811915d5e40ca8bdd906e83ecd773f22b472f0897ea4b4b742",
         ),
         (
             "native_fallback",
-            "6dda650f33d66a5ca08e86f6f80b442b9fc4897d40548a71bf07d9029ab48d5e",
+            "daf97457021e8dae8aefe30fef9e283d971926dc51c8b87e1b43a759e0e51a99",
         ),
         (
             "monotonic",
-            "40cc1866f1c8d2b58686b90114567934d68921917f0023f2920d84fa0d501b97",
+            "2cace5d4317ade485fc937f6f8b4e7052dd11b9786acbdb32a9e3d422872bddf",
         ),
     ],
 )

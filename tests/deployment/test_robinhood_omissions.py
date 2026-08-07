@@ -698,7 +698,7 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
         if path.startswith("Defaults.assetConfigs[")
         and path.endswith(".asset")
         and records[path]["status"] != "omitted"
-    } == {"STEAKHOUSE_USDG", "WETH", "RIPE", "SGREEN", "GREEN"}
+    } == {"WETH", "RIPE", "SGREEN", "GREEN"}
 
     assert surfaces["S-048-MINT"].disposition is Disposition.DISABLED
     assert surfaces["S-048-REDEEM"].disposition is Disposition.DISABLED

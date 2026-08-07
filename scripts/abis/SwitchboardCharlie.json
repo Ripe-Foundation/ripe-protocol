@@ -1061,6 +1061,114 @@
     "type": "event"
   },
   {
+    "name": "PendingCoreRipeGovVaultIdChange",
+    "inputs": [
+      {
+        "name": "previousVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultAddr",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CoreRipeGovVaultIdSet",
+    "inputs": [
+      {
+        "name": "previousVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultAddr",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPreferredStabVaultIdChange",
+    "inputs": [
+      {
+        "name": "previousVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultAddr",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PreferredStabVaultIdSet",
+    "inputs": [
+      {
+        "name": "previousVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVaultAddr",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1687,6 +1795,82 @@
     "type": "function",
     "name": "expiration",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCoreRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_newVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCoreRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "_newVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPreferredStabVaultId",
+    "inputs": [
+      {
+        "name": "_newVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPreferredStabVaultId",
+    "inputs": [
+      {
+        "name": "_newVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -3190,6 +3374,40 @@
             ]
           }
         ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingCoreRipeGovVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPreferredStabVaultId",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ]
   },

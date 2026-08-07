@@ -7,6 +7,14 @@
 > evidence; no RPC, account, signer, secret, transaction, or external system was
 > accessed during this reassessment.
 
+> **Current-state correction (2026-08-06).** The frozen snapshot discussed
+> below predates the owner-selected lazy-validation change. Current Ledger
+> construction allowlists and stores zero or exact `0x64` but does not call
+> ArbSys. Exact immutable readback and a separate real-node
+> `getArbActionBlock()` health call are required before registration. Historical
+> source-history discussion is retained, but all current-behavior matrices and
+> recommendations below are corrected to that selected behavior.
+
 ## 1. Executive recommendation
 
 ### First-draft recommendation
@@ -316,26 +324,17 @@ def __init__(_ripeHq: address, _defaults: address, _actionBlockSource: address):
   domain of already stored `lastTouch` values.
 - No `chain.id`, code hash, ArbOS version, or chain/profile pairing is checked.
 
-### Lines 194-197: construction-time source probe
+### Lines 194-197: no construction-time source call
 
-```vyper
-if _actionBlockSource == ARB_SYS:
-    _: uint256 = self._getArbActionBlock()
-```
-
-- Native mode performs no external clock call.
-- ArbSys mode must successfully perform and decode the approved call during
-  deployment.
-- If address `0x64` is missing, reverts, or returns a non-exact response, the
-  entire creation transaction reverts.
-- The decoded value is intentionally discarded; the probe checks present-time
-  compatibility, not a minimum value or monotonicity.
-- A later system-contract outage or upgrade is not prevented by this one-time
-  probe.
+After storing the discriminator, current source proceeds directly to module
+initialization. Native and `0x64` modes therefore construct without calling the
+clock source. Missing, reverting, short, or oversized ArbSys data is detected
+only by the separate health call or later housekeeping. This lazy validation
+keeps immutable mode selection distinct from live chain-health qualification.
 
 ### Lines 199-205: unrelated constructor dependencies
 
-After the source probe:
+After the source binding:
 
 - `addys.__init__(_ripeHq)` requires a nonzero RipeHq and binds the registry
   immutable;
@@ -537,7 +536,8 @@ reopen the following settled architecture:
 2. keep native mode for ordinary EVM deployments;
 3. use fixed ArbSys child-block identity for Robinhood;
 4. bind the choice immutably at deployment;
-5. fail construction and runtime calls closed, with no native fallback;
+5. fail construction closed for unsupported source values and fail ArbSys
+   runtime calls closed, with no native fallback;
 6. reject arbitrary providers and selectors;
 7. keep one forward accounting source;
 8. leave the deployed Base Ledger on its historical bytecode; and
@@ -549,11 +549,11 @@ selection of the shared Ledger/raw-call architecture.
 
 ### Git history
 
-Commit `ed10d4d...` made the complete production source change:
+Commit `ed10d4d...` made the original production source change:
 
 - added `ARB_SYS` and `ACTION_BLOCK_SOURCE`;
 - changed the constructor from two to three arguments;
-- added the construction probe;
+- added the then-selected construction probe;
 - added `_getArbActionBlock` and `_getActionBlock`;
 - replaced direct `block.number` comparison/write with one selected identity;
   and
@@ -563,7 +563,9 @@ Its exact `41/6` numstat is `40/5` substantive diff lines plus one add/delete
 pair from adding the final LF to a file that previously lacked it.
 
 No debt, vault, points, rewards, auction, contributor, bond, bad-debt, or pool
-accounting changed. The current source remains byte-identical to that commit.
+accounting changed. A later owner-selected correction removed the constructor
+call while retaining the immutable discriminator and exact runtime helper, so
+current source is not byte-identical to that historical commit.
 
 ### Why the first typed-call candidate was rejected
 
@@ -594,7 +596,7 @@ cases to the committed mutation test would make the general rule durable.
 Post-S5 hardening added, without modifying Ledger:
 
 - source/profile mutation tests for typed substitution, 32-byte truncation,
-  removed constructor probe, native fallback, monotonic comparison, zero/wrong
+  accidental constructor probing, native fallback, monotonic comparison, zero/wrong
   Robinhood source, and missing readbacks;
 - a draft exact-`0x64` Robinhood profile;
 - deterministic constructor encoding and local immutable-bound artifact
@@ -718,16 +720,16 @@ security boundary.
 | --- | --- | --- | --- | --- |
 | **Existing Base deployment** | Historical two-argument Ledger already deployed | Native `block.number` in old bytecode | No raw call and no S5 deployment/runtime cost | Keep permanently untouched |
 | **Fresh Base deployment of current source with zero** | Succeeds if other constructor dependencies succeed | Native `block.number` | Same intended native semantic family; new ABI/artifact | Supported forward-native mode, but requires a new migration |
-| **Fresh Base current source with `0x64`** | Normally expected to fail if `0x64` has no compatible code; would succeed if compatible exact-return code exists | Whatever exact word `0x64` reports | Contract does not know this is Base | Deployment profile must reject; contract alone is not chain-bound |
+| **Fresh Base current source with `0x64`** | Construction succeeds if other constructor dependencies succeed; no ArbSys call occurs | Runtime reads whatever exact word `0x64` reports | Contract does not know this is Base | Deployment profile must reject; contract alone is not chain-bound |
 | **Ethereum current source with zero** | Succeeds if other constructor dependencies succeed | Ethereum `block.number` | Native execution-block identity | Architecturally compatible forward-native mode; no deployment asserted |
-| **Ethereum current source with `0x64`** | Expected to fail on empty/incompatible `0x64`; would accept compatible exact-return code | Returned word | No chain-ID defense | Must be rejected by deployment policy |
-| **Robinhood with exact `0x64`** | Requires successful exact 32-byte constructor probe | ArbSys child-chain number | Runtime source failure blocks housekeeping; no fallback | Intended Robinhood mode |
+| **Ethereum current source with `0x64`** | Construction succeeds; a later health/housekeeping call fails on empty or incompatible `0x64` | Returned word when valid | No chain-ID defense | Must be rejected by deployment policy |
+| **Robinhood with exact `0x64`** | Construction stores `0x64` without a source call; separate pre-registration health proof is required | ArbSys child-chain number | Runtime source failure blocks housekeeping; no fallback | Intended Robinhood mode |
 | **Robinhood with zero** | **Contract construction succeeds** | Native EVM `NUMBER`/ancestor domain | Wrong approved security bucket despite syntactic success | Draft profile script rejects this only when invoked; no binding deployment path is yet proven |
 | **Local Boa with zero** | Succeeds | Boa native block number | Used by ordinary fixtures | Valid native behavioral model, not chain proof |
-| **Local Boa with `0x64` and no code** | Reverts | none | Empty returndata fails exact-length assertion | Correct fail-closed behavior |
+| **Local Boa with `0x64` and no code** | Construction succeeds | Runtime health read reverts | Empty returndata fails exact-length assertion on use | Correct lazy fail-closed behavior |
 | **Local Boa with installed exact double at `0x64`** | Succeeds | Controlled storage value | Enables held/advanced/malformed behavior tests | Strong compiler/EVM behavior evidence, not authentic Nitro proof |
 | **Future chain with correct native semantics** | Zero succeeds | Native `block.number` | Safe only if native number is the approved execution identity | Extensible without source change, but needs explicit profile review |
-| **Future chain with exact Nitro-compatible `0x64`** | `0x64` succeeds if return shape matches | Reported child identity | Safe only if address, ABI, truth, and topology are qualified | Reuse is possible but not automatic |
+| **Future chain with exact Nitro-compatible `0x64`** | `0x64` construction succeeds; separate health qualification must match | Reported child identity | Safe only if address, ABI, truth, and topology are qualified | Reuse is possible but not automatic |
 | **Future chain with another semantic family** | Nonzero non-`0x64` rejects; zero may succeed syntactically but be semantically wrong | No safe approved mode | Fail-closed over configured addresses, not over wrong-zero semantics | Requires architecture/source decision |
 
 ### Is the code Arbitrum-specific, Robinhood-specific, or universal?
@@ -790,7 +792,7 @@ fail before any deployment or registration action.
 
 | Dimension | Assessment |
 | --- | --- |
-| Security properties | Immutable two-value allowlist; exact returndata; static call; constructor probe; no fallback; one canonical accounting source |
+| Security properties | Immutable two-value allowlist; exact runtime returndata; static call; separate health qualification; no fallback; one canonical accounting source |
 | Failure modes | Wrong zero/`0x64` deployment pairing; exact-word false value; runtime ArbSys outage creates housekeeping denial of service |
 | Upgrade/deployment complexity | Lowest for fresh Robinhood deployment; exact third constructor word and readback required; existing Base stays untouched |
 | Storage/ABI compatibility | Current 37-entry storage; current 92-entry ABI; constructor differs from historical Base artifact |
@@ -931,7 +933,8 @@ implementation phase.
 The current suites do more than pin source text:
 
 - missing, reverting, 31-byte, 33-byte, 64-byte, and 96-byte source behavior;
-- constructor and runtime failure with no fallback or partial write;
+- constructor rejection for unsupported sources plus lazy runtime failure with
+  no fallback or partial write;
 - native versus held/advanced ArbSys identity;
 - equality-only behavior including a decreasing different value;
 - low-to-high and high-to-low-to-high ordering;
@@ -941,7 +944,7 @@ The current suites do more than pin source text:
 - Underscore exemption while retaining writes;
 - external-housekeeping propagation and rollback;
 - trusted-deposit non-arming plus explicit housekeeping and enclosing rollback;
-- source mutants for typed call, truncation, removed probe, fallback, and
+- source mutants for typed call, truncation, accidental constructor probing, fallback, and
   monotonic comparison;
 - Robinhood profile mutants for zero/wrong source and missing readbacks;
 - exact three-word constructor encoding;

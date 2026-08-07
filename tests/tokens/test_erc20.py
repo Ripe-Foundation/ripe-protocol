@@ -1,5 +1,6 @@
 import pytest
 import boa
+from pathlib import Path
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
 from conf_utils import filter_logs
@@ -105,6 +106,39 @@ def test_green_token_basic_info(green_token):
     assert green_token.symbol() == "GREEN"
     assert green_token.decimals() == 18
     assert green_token.totalSupply() == 10_000_000 * EIGHTEEN_DECIMALS
+
+
+def test_ccip_admin_reverts_before_setup_and_resolves_only_hq_governance(
+    deploy3r,
+    fork,
+    governance,
+    green_token,
+    savings_green,
+    ripe_token,
+):
+    fresh_green = boa.load(
+        "contracts/tokens/GreenToken.vy",
+        ZERO_ADDRESS,
+        deploy3r,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        0,
+        ZERO_ADDRESS,
+    )
+
+    assert fresh_green.ripeHq() == ZERO_ADDRESS
+    with boa.reverts():
+        fresh_green.getCCIPAdmin()
+
+    # All three production token types share Erc20Token.getCCIPAdmin(). Their
+    # post-setup answer comes only from RipeHq.governance(), never tempGov.
+    source = Path("contracts/tokens/modules/Erc20Token.vy").read_text()
+    ccip_body = source.split("def getCCIPAdmin() -> address:", 1)[1]
+    assert "return staticcall RipeHq(self.ripeHq).governance()" in ccip_body
+    assert "tempGov" not in ccip_body
+    assert green_token.getCCIPAdmin() == governance.address
+    assert savings_green.getCCIPAdmin() == governance.address
+    assert ripe_token.getCCIPAdmin() == governance.address
 
 
 def test_green_token_transfer(green_token, whale, bob, alice):

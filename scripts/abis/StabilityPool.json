@@ -632,18 +632,6 @@
     ]
   },
   {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "pause",
-    "inputs": [
-      {
-        "name": "_shouldPause",
-        "type": "bool"
-      }
-    ],
-    "outputs": []
-  },
-  {
     "stateMutability": "view",
     "type": "function",
     "name": "claimableBalances",
@@ -733,6 +721,18 @@
         "type": "address"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "noPriceQuarantineCount",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -1579,6 +1579,18 @@
       {
         "name": "_claimAssets",
         "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
       }
     ],
     "outputs": []

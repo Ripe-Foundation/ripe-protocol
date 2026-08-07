@@ -9,8 +9,6 @@ are therefore not importable packages -- the same reason Base's migrations
 import their values from config/ and scripts/.
 """
 
-import os
-
 from config.BluePrint import ROBINHOOD_ADDRESSES, ROBINHOOD_GOVERNANCE
 
 ZERO_ADDRESS = "0x" + "0" * 40
@@ -99,17 +97,12 @@ TRAINING_WHEELS_ALLOWLIST = []
 #
 # It CANNOT be exercised on a titanoboa fork. ArbSys is a node-implemented
 # precompile, not bytecode: `boa.env.get_code(0x64)` returns 1 byte and the call
-# reverts, so the Ledger constructor -- which deliberately refuses to deploy
-# unless it can read the block number -- fails on any local fork.
+# reverts. The live migration therefore performs both Ledger readbacks through
+# the configured Robinhood RPC node before registering the contract.
 #
-# Set RIPE_LEDGER_BLOCK_SOURCE=native to fork-test the REST of the deployment.
-# That run does not validate this choice, and must not be read as proving it.
-_NATIVE_BLOCK_SOURCE = ZERO_ADDRESS
-LEDGER_ACTION_BLOCK_SOURCE = (
-    _NATIVE_BLOCK_SOURCE
-    if os.environ.get("RIPE_LEDGER_BLOCK_SOURCE") == "native"
-    else ROBINHOOD_ADDRESSES["ARB_SYS"]
-)
+# A local simulation that substitutes native block mode is a different profile
+# and is never selectable through the production configuration.
+LEDGER_ACTION_BLOCK_SOURCE = ROBINHOOD_ADDRESSES["ARB_SYS"]
 
 # --- blue chip yield --------------------------------------------------------
 # Only Morpho V2 exists on Robinhood. The other six registries are zero, which

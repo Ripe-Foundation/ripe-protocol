@@ -20,7 +20,7 @@ class BluePrint:
         self.YIELD_TOKENS = YIELD_TOKENS[blueprint]
 
     def defaults_robinhood_constructor_args(self):
-        """Return the eight ordered inputs, failing on unresolved identities."""
+        """Return the seven ordered inputs, failing on unresolved identities."""
         if self.blueprint != "robinhood":
             raise ValueError("DefaultsRobinhood constructor is Robinhood-only")
         values = []

@@ -1,5 +1,13 @@
 # DefaultsRobinhood: configuration-source authority
 
+> [!WARNING]
+> **Superseded current-state snapshot.** The identities, counts, constructor
+> matrix, and launch values below predate the 2026-08-06 production Vyper
+> remediation. The current seven-argument/no-Steakhouse matrix and selected
+> values are recorded in
+> [`rh-production-vyper-remediation.md`](../rh-production-vyper-remediation.md)
+> and the final source. Preserve the remainder as historical evidence only.
+
 ## Current `rh` rebind
 
 This rationale is bound to current `rh` commit

@@ -1,5 +1,13 @@
 # Robinhood deployment-owner quick-start
 
+> [!WARNING]
+> **Superseded operational snapshot.** Counts, constructor inputs, selected
+> assets, priority sources, and reward budget below predate the 2026-08-06
+> production Vyper remediation. Use
+> [`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md)
+> for the current correction. This historical quick-start authorizes no
+> lifecycle action.
+
 This is the sole canonical human handoff for the Robinhood deployment owner and
 the deployment owner's agents. It is operational guidance, not execution
 authority. Nothing here authorizes RPC access, accounts, keys, signers,

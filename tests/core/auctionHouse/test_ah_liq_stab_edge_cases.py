@@ -363,6 +363,116 @@ def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(
     assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
 
 
+def test_stability_routing_prices_or_falls_back_before_collateral_transfer(
+    setupStabAssetConfig,
+    setAssetConfig,
+    green_lp_token,
+    green_lp_token_whale,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    whale,
+    teller,
+    green_token,
+    ledger,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    simple_erc20_vault,
+    performDeposit,
+    mission_control,
+    vault_book,
+    switchboard_alpha,
+):
+    setupStabAssetConfig()
+    stab_id = vault_book.getRegId(stability_pool)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, green_lp_token)],
+        sender=switchboard_alpha.address,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=createDebtTerms(
+            _liqThreshold=80_00,
+            _liqFee=10_00,
+            _borrowRate=0,
+        ),
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    liquidity = 200 * EIGHTEEN_DECIMALS
+    green_lp_token.transfer(sally, liquidity, sender=green_lp_token_whale)
+    green_lp_token.approve(teller, liquidity, sender=sally)
+    teller.deposit(
+        green_lp_token,
+        liquidity,
+        sally,
+        stability_pool,
+        0,
+        sender=sally,
+    )
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    bob_green = green_token.balanceOf(bob)
+    assert bob_green > 0
+    green_token.transfer(whale, bob_green, sender=bob)
+    mock_price_source.setPrice(
+        alpha_token,
+        125 * EIGHTEEN_DECIMALS // 200,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+
+    borrower_collateral = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    assert borrower_collateral == 200 * EIGHTEEN_DECIMALS
+    pool_liquidity = green_lp_token.balanceOf(stability_pool)
+    assert stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.totalClaimableBalances(alpha_token) == 0
+    assert alpha_token.balanceOf(stability_pool) == 0
+
+    # A configured-but-zero feed fails closed and rolls back before collateral
+    # or claim accounting moves.
+    with boa.env.anchor():
+        mock_price_source.setPrice(green_lp_token, 0)
+        with boa.reverts("has price config, no price"):
+            teller.liquidateUser(bob, False, sender=sally)
+        assert not ledger.isUserInLiquidation(bob)
+        assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == borrower_collateral
+        assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+        assert stability_pool.totalClaimableBalances(alpha_token) == 0
+        assert alpha_token.balanceOf(stability_pool) == 0
+        assert green_lp_token.balanceOf(stability_pool) == pool_liquidity
+
+    # Removing the feed entirely is a non-raising no-price result. AuctionHouse
+    # must skip the Stability Pool and start the configured auction without a
+    # duplicate price gate in canAcceptLiquidationAsset.
+    mock_price_source.disablePriceFeed(green_lp_token)
+    assert stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+    liquidation = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation) == 1
+    assert liquidation[0].numAuctionsStarted == 1
+    assert ledger.isUserInLiquidation(bob)
+    assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
+    assert stability_pool.totalClaimableBalances(alpha_token) == 0
+    assert alpha_token.balanceOf(stability_pool) == 0
+    assert green_lp_token.balanceOf(stability_pool) == pool_liquidity
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == borrower_collateral
+
+
 def test_ah_liquidation_zero_price(
     setupStabAssetConfig,
     setAssetConfig,

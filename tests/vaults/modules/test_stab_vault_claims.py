@@ -3341,7 +3341,7 @@ def test_stab_vault_claims_auto_deposit_with_delegation(
 #################################
 
 
-DUST_USD_THRESHOLD = 10 ** 17  # $0.10 in 18-decimal USD
+DUST_USD_THRESHOLD = 5 * 10 ** 16  # $0.05 in 18-decimal USD
 
 
 def test_stab_vault_claims_dust_removal_below_threshold(
@@ -3361,7 +3361,7 @@ def test_stab_vault_claims_dust_removal_below_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimable asset is removed from iterable list when remaining USD value < $0.10"""
+    """Test removal when remaining USD value is below $0.05."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3390,8 +3390,8 @@ def test_stab_vault_claims_dust_removal_below_threshold(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.21, leaving $0.09.
-    claim_usd_value = 21 * 10 ** 16
+    # Claim $0.26, leaving $0.04.
+    claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Bravo should be removed from the iterable list (dust removal)
@@ -3422,7 +3422,7 @@ def test_stab_vault_claims_no_dust_removal_above_threshold(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Test that claimable asset stays in list when remaining USD value >= $0.10"""
+    """Test that claimable asset stays active at or above $0.05."""
     setGeneralConfig()
     setAssetConfig(bravo_token)
 
@@ -3503,8 +3503,8 @@ def test_stab_vault_claims_dust_balance_preserved(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.21, leaving $0.09 dormant.
-    claim_usd_value = 21 * 10 ** 16
+    # Claim $0.26, leaving $0.04 dormant.
+    claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Verify dust removed from list (index == 0 means not in list)
@@ -3563,7 +3563,7 @@ def test_stab_vault_claims_dust_readdition_after_removal(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Claim to leave dust
-    claim_usd_value = 6 * 10 ** 16
+    claim_usd_value = 11 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
     # Verify removed from list (index == 0)
@@ -3688,11 +3688,11 @@ def test_stab_vault_claims_dust_different_price_levels(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Claim $0.22 to leave $0.08 below the retention threshold.
-    claim_usd_value = 22 * 10 ** 16
+    # Claim $0.26 to leave $0.04 below the retention threshold.
+    claim_usd_value = 26 * 10 ** 16
     claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, claim_usd_value, sender=bob)
 
-    # Should be removed from list (remaining < $0.10) - index == 0 means not in list
+    # Should be removed from list (remaining < $0.05).
     bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
     assert bravo_index_after == 0, "Dust should be removed from list"
 
