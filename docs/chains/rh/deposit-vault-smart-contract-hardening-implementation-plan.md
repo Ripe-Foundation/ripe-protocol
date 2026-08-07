@@ -241,6 +241,8 @@ Choose one:
 
 A. Keep current optimization and implement only source substitutions or reductions that preserve semantics and leave at least 200 bytes after the approved hardening.
 
+Option A has a non-obvious cost: the unchanged contract has only 77 bytes of headroom, while a 200-byte floor limits the candidate to 24,376 bytes. The final candidate must therefore be at least 123 bytes smaller than the current RipeGov runtime after all new checks are included. In practice this means semantics-preserving shrinkage or refactoring must more than pay for the hardening. That refactor is itself new-code review risk and must be weighed against the minimum-change directive; Option A is not automatically the least-risk choice merely because optimization mode stays unchanged.
+
 B. Add a source-level codesize optimization pragma to RipeGov, explicitly accepting changed gas costs, then re-run every affected behavior and size check. This requires owner approval.
 
 C. Make no RipeGov production change and explicitly accept the residual risks, while retaining characterization tests where useful.
@@ -265,7 +267,14 @@ The owner must explicitly approve the exact subset of production changes. Approv
 
 ### 5.5 RH-LANE-01: migration-lane sequencing
 
-At review time, local branch codex/rh-vault-migration-phase1 is an in-flight candidate from the same bound baseline and modifies contracts/config/SwitchboardEcho.vy, contracts/core/Teller.vy, and contracts/core/TellerUtils.vy. This overlaps the migration regression in Section 9.5 and Teller hardening in Section 13. Its state is drift-prone and must be rechecked at startup.
+At review time, local branch codex/rh-vault-migration-phase1 still points at the bound baseline commit. Its candidate exists only as uncommitted worktree modifications to contracts/config/SwitchboardEcho.vy, contracts/core/Teller.vy, and contracts/core/TellerUtils.vy. This overlaps the migration regression in Section 9.5 and Teller hardening in Section 13. Its state is drift-prone and must be rechecked at startup.
+
+Before moving, cleaning, rebasing, accepting, or rejecting that lane, its owner must preserve the exact candidate as either:
+
+- a local checkpoint commit on its existing isolated branch; or
+- a durable binary-capable patch/archive with absolute path, SHA-256, source commit/tree, path/mode list, and short status recorded.
+
+Snapshotting is preservation, not approval to integrate, merge, push, or deploy. This deposit-vault plan must not modify or snapshot the separate lane without explicit authority from its owner.
 
 Recommended sequence: finish, accept, or reject the migration lane first. If accepted and integrated, rebind this entire plan to the exact integrated commit before deposit-vault implementation. If rejected, record that disposition and retain the present bound baseline. Do not modify Teller in two live lanes at once.
 
@@ -277,10 +286,10 @@ The required order is:
 
 1. Resolve RH-LANE-01, rebind, and record baseline suite health.
 2. Inventory callers, state flows, contract sizes, and existing tests.
-3. Add and demonstrate each failing adversarial test against the rebound baseline.
-4. Present the minimum-change table and obtain RH-CHANGE-01 plus affected semantic/size decisions.
+3. Enter the Section 6.1 loop: add and demonstrate one failing adversarial test against the rebound baseline, or place a deliberate batch under the exact expected-red controls.
+4. Present the corresponding minimum-change row, or the controlled batch table, and obtain RH-CHANGE-01 plus affected semantic/size decisions.
 5. Pair each authorized production fix with its failing regression and return that focused slice to green.
-6. Add the authorized RipeGov and StabilityPool stateful invariant suites.
+6. Add the RipeGov and StabilityPool stateful invariant suites; test-only work does not require RH-CHANGE-01 production-change authorization.
 7. Correct stability-reward lock tests and any confirmed dead argument.
 8. Run focused, fuzz, composed, and shared-vault behavior suites explicitly.
 9. Perform ABI, selector, layout, runtime-size, and source-diff review.
@@ -289,11 +298,25 @@ Do not combine all changes into one unreviewable patch. Work Package 1 is intent
 
 Do not leave a permanent xfail in the final suite. A temporary xfail(strict=True) is acceptable only for a deliberately preserved test-only checkpoint; remove it when the paired fix lands. The final branch must contain plain assertions and no expected failure for a remediated issue.
 
+### 6.1 Expected-red mechanics before owner decisions
+
+Suite health must remain interpretable between characterization and owner disposition. Use one of these two explicit mechanisms:
+
+A. Preferred immediate pair: add one adversarial test, run that exact node ID to capture its expected baseline failure, present the corresponding RH-CHANGE-01 row, then resolve that finding before adding an unrelated failing test.
+
+B. Batched owner review: maintain an expected-red table in the evidence bundle with finding ID, exact test node ID, expected exception/assertion and message, baseline command, and owner-decision status. The full deterministic lane may be red only when every failure matches that table exactly and there are no additional failures. A preserved test-only checkpoint may instead use xfail(strict=True) with the finding ID in the reason.
+
+After owner disposition:
+
+- for an approved remediation, remove any xfail/expected-red entry and require the plain test to pass;
+- for accepted residual risk, replace the desired-hardening failure with a plain passing characterization of the exact accepted behavior and link it to the decision record;
+- never treat an unexpected failure, XPASS, new node ID, or changed error reason as approved baseline noise.
+
 ## 7. Work Package 0: rebind and caller inventory
 
 ### Tasks
 
-- Recheck codex/rh-vault-migration-phase1 and resolve RH-LANE-01 before selecting the implementation baseline.
+- Recheck codex/rh-vault-migration-phase1, confirm whether its changes are still uncommitted, and require its owner to record the checkpoint commit or archive identity described by RH-LANE-01 before selecting the implementation baseline.
 - Create or identify a clean detached copy of the exact implementation baseline for baseline-versus-candidate checks.
 - Run every Section 16 behavior set against the exact baseline before changing tests or contracts. Record commands, collected counts, passed, failed, skipped, deselected, xfailed, and duration. An independent reviewer observed 146 passing tests in the two RipeGov vault files on the original bound baseline, but the implementation agent must reproduce rather than inherit that result.
 - Reproduce compiler versions and the runtime-size table in RG-SIZE-01 using normal per-file pragma compilation.
@@ -331,7 +354,8 @@ Stop before implementation if:
 - any candidate contract cannot retain at least 200 bytes of runtime headroom and no exact owner waiver exists;
 - GOV-WEIGHT-01, RG-SIZE-01, RH-CHANGE-01, or RH-LANE-01 is required for the next production step but unresolved;
 - the baseline behavior suites are not green or their failures are not classified before candidate work;
-- an explicit fuzz lane collects zero tests.
+- an explicit fuzz lane collects zero tests;
+- the migration lane still has unsnapshotted uncommitted changes and the proposed next action could move, clean, rebase, accept, or reject that lane.
 
 ### Deliverable
 
@@ -342,7 +366,8 @@ A concise evidence bundle in the implementation PR description or review notes c
 - reproduced runtime-size table;
 - existing zero-price test inventory;
 - minimum-change decision table;
-- recorded owner decisions and lane order.
+- recorded owner decisions and lane order;
+- migration-lane checkpoint commit, or archive path plus SHA-256 and source identity.
 
 Do not create a peripheral inventory system.
 
@@ -828,6 +853,10 @@ rh_vault_pytest() {
 }
 ```
 
+Create RH_VAULT_TEST_ROOT once per working session and reuse it for all commands in that session. A new root forces cold contract compilation and can make even a tiny sample take roughly one to two minutes; that is expected, not a hang. Reusing the same private root preserves safe caches and makes later invocations materially faster.
+
+ETHERSCAN_API_KEY=local-placeholder is an intentional non-secret fixture value read by tests/conf_env.py. It mirrors existing repository usage and does not authorize network, explorer, or fork activity.
+
 Record the output of:
 
 ```zsh
@@ -841,7 +870,8 @@ pytest.ini excludes fuzz tests by default. Do not edit it. Use this policy:
 - comprehensive Hypothesis/state-machine campaigns use pytest.mark.fuzz;
 - create the new generated suites as tests/vaults/test_ripe_gov_invariants.py and tests/vaults/modules/test_stab_vault_invariants.py;
 - run every fuzz completion gate explicitly with command-line -m fuzz;
-- run collect-only first and treat zero collected tests as failure.
+- run collect-only first and treat zero collected tests as failure;
+- leave release-marked tests deselected in these logic lanes unless a separate release gate explicitly authorizes them. The -m fuzz command selects fuzz tests; it does not opt into release tests.
 
 The explicit command-line marker overrides the default marker expression. On the bound tree, this command must collect four existing claim-data fuzz tests:
 
@@ -931,36 +961,90 @@ Record both collections. The first command is expected to deselect fuzz; the sec
 
 ### 16.5 Contract acceptance checks
 
-Use a clean detached worktree for the rebound baseline and the pinned compiler:
+Use a clean detached worktree for the rebound baseline and the pinned compiler. Vyper resolves project-root imports from the current working directory, not from the top-level source file’s location. Always compile from the root of the tree being measured. Never invoke Vyper on an absolute file in one worktree while the shell is rooted in another worktree.
 
 ```zsh
-RH_VAULT_VYPER=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
-RH_VAULT_BASELINE_WORKTREE=/absolute/path/to/clean-rebound-baseline
-RH_VAULT_CANDIDATE_WORKTREE=/absolute/path/to/candidate
+(
+  set -euo pipefail
 
-rh_vault_runtime_size() {
-  "$RH_VAULT_VYPER" -f bytecode_runtime "$1" | awk '{bytes=(length($0)-2)/2; print bytes, 24576-bytes}'
-}
+  RH_VAULT_VYPER=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
+  RH_VAULT_BASELINE_WORKTREE=/absolute/path/to/clean-rebound-baseline
+  RH_VAULT_CANDIDATE_WORKTREE=/absolute/path/to/candidate
 
-rh_vault_runtime_size "$RH_VAULT_BASELINE_WORKTREE/contracts/vaults/RipeGov.vy"
-rh_vault_runtime_size "$RH_VAULT_BASELINE_WORKTREE/contracts/vaults/StabilityPool.vy"
-rh_vault_runtime_size "$RH_VAULT_BASELINE_WORKTREE/contracts/core/Teller.vy"
-rh_vault_runtime_size "$RH_VAULT_CANDIDATE_WORKTREE/contracts/vaults/RipeGov.vy"
-rh_vault_runtime_size "$RH_VAULT_CANDIDATE_WORKTREE/contracts/vaults/StabilityPool.vy"
-rh_vault_runtime_size "$RH_VAULT_CANDIDATE_WORKTREE/contracts/core/Teller.vy"
+  rh_vault_runtime_size() {
+    local RH_VAULT_TREE_ROOT="$1"
+    local RH_VAULT_CONTRACT_PATH="$2"
+    local RH_VAULT_BYTECODE
+    local RH_VAULT_BYTES
+
+    RH_VAULT_BYTECODE=$(cd "$RH_VAULT_TREE_ROOT" && "$RH_VAULT_VYPER" -f bytecode_runtime "$RH_VAULT_CONTRACT_PATH")
+    if [[ "$RH_VAULT_BYTECODE" != 0x* || ${#RH_VAULT_BYTECODE} -le 2 ]]; then
+      printf 'invalid or empty bytecode: %s %s\n' "$RH_VAULT_TREE_ROOT" "$RH_VAULT_CONTRACT_PATH" >&2
+      return 1
+    fi
+
+    RH_VAULT_BYTES=$(( (${#RH_VAULT_BYTECODE} - 2) / 2 ))
+    printf '%s bytes=%s headroom=%s\n' "$RH_VAULT_CONTRACT_PATH" "$RH_VAULT_BYTES" "$((24576 - RH_VAULT_BYTES))"
+  }
+
+  for RH_VAULT_TREE_ROOT in "$RH_VAULT_BASELINE_WORKTREE" "$RH_VAULT_CANDIDATE_WORKTREE"; do
+    printf 'tree=%s\n' "$RH_VAULT_TREE_ROOT"
+    rh_vault_runtime_size "$RH_VAULT_TREE_ROOT" contracts/vaults/RipeGov.vy
+    rh_vault_runtime_size "$RH_VAULT_TREE_ROOT" contracts/vaults/StabilityPool.vy
+    rh_vault_runtime_size "$RH_VAULT_TREE_ROOT" contracts/core/Teller.vy
+  done
+)
 ```
+
+The subshell’s errexit/pipefail settings and explicit nonempty-bytecode check make a compiler error fatal instead of allowing an empty pipeline to appear successful.
 
 Do not pass -O in acceptance commands. Each source file’s checked-in pragma must control optimization. If RG-SIZE-01 authorizes adding a RipeGov codesize pragma, the candidate source must contain it and the normal command above must reproduce the result.
 
 For each changed deployed source path, compare ABI, method identifiers, and storage layout with the exact rebound baseline:
 
 ```zsh
-RH_VAULT_CONTRACT_PATH=contracts/vaults/RipeGov.vy
-for RH_VAULT_FORMAT in abi method_identifiers layout; do
-  diff -u \
-    <("$RH_VAULT_VYPER" -f "$RH_VAULT_FORMAT" "$RH_VAULT_BASELINE_WORKTREE/$RH_VAULT_CONTRACT_PATH") \
-    <("$RH_VAULT_VYPER" -f "$RH_VAULT_FORMAT" "$RH_VAULT_CANDIDATE_WORKTREE/$RH_VAULT_CONTRACT_PATH")
-done
+(
+  set -euo pipefail
+
+  RH_VAULT_VYPER=/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/vyper
+  RH_VAULT_BASELINE_WORKTREE=/absolute/path/to/clean-rebound-baseline
+  RH_VAULT_CANDIDATE_WORKTREE=/absolute/path/to/candidate
+  RH_VAULT_CONTRACT_PATH=contracts/vaults/RipeGov.vy
+  RH_VAULT_ARTIFACT_ROOT=$(mktemp -d /private/tmp/rh-vault-contract-artifacts.XXXXXX)
+  chmod 700 "$RH_VAULT_ARTIFACT_ROOT"
+
+  rh_vault_compile_artifact() {
+    local RH_VAULT_TREE_ROOT="$1"
+    local RH_VAULT_FORMAT="$2"
+    local RH_VAULT_SOURCE_PATH="$3"
+    local RH_VAULT_OUTPUT_PATH="$4"
+
+    (cd "$RH_VAULT_TREE_ROOT" && "$RH_VAULT_VYPER" -f "$RH_VAULT_FORMAT" "$RH_VAULT_SOURCE_PATH") > "$RH_VAULT_OUTPUT_PATH"
+    if [[ ! -s "$RH_VAULT_OUTPUT_PATH" ]]; then
+      printf 'empty compiler artifact: %s %s %s\n' "$RH_VAULT_TREE_ROOT" "$RH_VAULT_FORMAT" "$RH_VAULT_SOURCE_PATH" >&2
+      return 1
+    fi
+  }
+
+  for RH_VAULT_FORMAT in abi method_identifiers layout; do
+    RH_VAULT_BASELINE_OUTPUT="$RH_VAULT_ARTIFACT_ROOT/baseline-$RH_VAULT_FORMAT.json"
+    RH_VAULT_CANDIDATE_OUTPUT="$RH_VAULT_ARTIFACT_ROOT/candidate-$RH_VAULT_FORMAT.json"
+
+    rh_vault_compile_artifact "$RH_VAULT_BASELINE_WORKTREE" "$RH_VAULT_FORMAT" "$RH_VAULT_CONTRACT_PATH" "$RH_VAULT_BASELINE_OUTPUT"
+    rh_vault_compile_artifact "$RH_VAULT_CANDIDATE_WORKTREE" "$RH_VAULT_FORMAT" "$RH_VAULT_CONTRACT_PATH" "$RH_VAULT_CANDIDATE_OUTPUT"
+
+    if diff -u "$RH_VAULT_BASELINE_OUTPUT" "$RH_VAULT_CANDIDATE_OUTPUT"; then
+      :
+    else
+      RH_VAULT_DIFF_STATUS=$?
+      if (( RH_VAULT_DIFF_STATUS > 1 )); then
+        exit "$RH_VAULT_DIFF_STATUS"
+      fi
+    fi
+  done
+
+  printf 'compiler artifacts retained at %s\n' "$RH_VAULT_ARTIFACT_ROOT"
+)
 ```
 
 Repeat with RH_VAULT_CONTRACT_PATH set to every changed deployed contract. A nonzero diff is not automatically a failure, but every changed ABI entry, selector, and storage item must be intended and explicitly approved.
@@ -983,6 +1067,7 @@ Stop and report before proceeding if any of the following occurs:
 
 - HEAD or tree contains a production/test delta from the rebound baseline before implementation begins; the committed plan-only delta is allowed as specified in Section 2;
 - RH-LANE-01 is unresolved or another live lane is modifying Teller, TellerUtils, RipeGov, StabilityPool, or StabVault;
+- the uncommitted migration candidate lacks the RH-LANE-01 checkpoint/archive evidence and the next action could disturb or dispose of it;
 - the next production edit lacks an exact RH-CHANGE-01 owner approval;
 - GOV-WEIGHT-01 or RG-SIZE-01 is unresolved and the next edit would choose it implicitly;
 - a legitimate production caller would be blocked by the proposed least-privilege rule;
@@ -1006,6 +1091,7 @@ This plan is complete only when all of the following are true. For a production-
 - [ ] Exact baseline, tree, worktree, branch, and clean starting state are recorded.
 - [ ] The committed plan-only delta is identified and no other pre-implementation drift exists.
 - [ ] RH-LANE-01 names the lane order and the non-active overlapping lane is paused, rejected, or integrated.
+- [ ] The migration candidate is preserved by checkpoint commit or identified archive before any action that could disturb its uncommitted worktree state.
 - [ ] Pinned Python, Vyper, titanoboa, pytest, and Hypothesis versions are reproduced.
 - [ ] All mandatory deterministic and fuzz behavior sets have a baseline health record before edits.
 - [ ] Production caller inventory is complete for every restricted method.
@@ -1031,9 +1117,10 @@ This plan is complete only when all of the following are true. For a production-
 - [ ] Focused, composed, shared-vault, migration-regression, and explicitly selected fuzz/invariant behavior suites pass with nonzero collection.
 - [ ] Changed deployed contracts compile below the runtime bytecode limit with no unapproved ABI or storage-layout change.
 - [ ] No remediated security test remains xfailed, skipped, or deselected from all executed lanes.
+- [ ] Every characterization-stage red test was controlled by the Section 6.1 expected-red table or a temporary strict xfail, and every final disposition removed that temporary state.
 - [ ] No CI, harness, deployment, monitoring, or unrelated code was changed.
 
-A green test count alone is not completion. The final review must map each security finding to a production fix or an explicitly accepted policy, and to a regression test that would fail if the vulnerability returned.
+A green test count alone is not completion. The final review must map each security finding either to an authorized production fix plus a regression test that fails if the vulnerability returns, or to an exact accepted-residual-risk record plus a plain passing characterization of the behavior that remains.
 
 ## 19. Fresh-agent startup report
 
@@ -1061,6 +1148,8 @@ The implementation agent should begin with this concise report before making cha
 - RG-SIZE-01 selected option and owner waiver if any:
 - RH-CHANGE-01 approved production-change rows:
 - RH-LANE-01 active-first lane and other-lane disposition:
+- Migration-lane checkpoint commit, or archive path and SHA-256:
+- Expected-red table entries, or none:
 - Confirmed RipeGov privileged callers:
 - Confirmed StabilityPool settlement callers:
 - Proposed production files:
