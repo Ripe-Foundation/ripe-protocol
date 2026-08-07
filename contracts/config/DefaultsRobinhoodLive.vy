@@ -27,45 +27,23 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 
-# addresses
-UNDERSCORE_REGISTRY: constant(address) = empty(address)
-CONTRIB_TEMPLATE: immutable(address)
-TRAINING_WHEELS: immutable(address)
-RIPE_TOKEN:  immutable(address)
-GREEN_TOKEN: immutable(address)
-SGREEN_TOKEN: immutable(address)
-USDG_TOKEN: immutable(address)
-WETH_TOKEN: immutable(address)
-
-# Registered by governance after launch. Robinhood-only addresses, so they
-# are constants here rather than constructor bindings.
-ASSET_GREEN_USDG_POOL: constant(address) = 0x2fD13b49F970e8C6D89283056C1c6281214b7EB6
-ASSET_SPCX: constant(address) = 0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa
-ASSET_NVDA: constant(address) = 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC
-ASSET_TSLA: constant(address) = 0x322F0929c4625eD5bAd873c95208D54E1c003b2d
-ASSET_AAPL: constant(address) = 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
-ASSET_GOOGL: constant(address) = 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
-ASSET_GME: constant(address) = 0x1b0E319c6A659F002271B69dB8A7df2F911c153E
-ASSET_RIPE_WETH_LP: constant(address) = 0xba6F6CBa1a4104000847d4fdccB676E99166CEcE
-
-
-@deploy
-def __init__(
-    _contribTemplate: address,
-    _trainingWheels: address,
-    _ripeToken: address,
-    _greenToken: address,
-    _sgreenToken: address,
-    _usdgToken: address,
-    _wethToken: address,
-):
-    CONTRIB_TEMPLATE = _contribTemplate
-    TRAINING_WHEELS = _trainingWheels
-    RIPE_TOKEN = _ripeToken
-    GREEN_TOKEN = _greenToken
-    SGREEN_TOKEN = _sgreenToken
-    USDG_TOKEN = _usdgToken
-    WETH_TOKEN = _wethToken
+# addresses -- all read from the live deployment, so there is no
+# constructor and nothing to bind at deploy time
+WETH: constant(address) = 0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
+RIPE_TOKEN: constant(address) = 0x4D3f37a965b21aB4122e92Dd41D2693E742c883b
+SGREEN_TOKEN: constant(address) = 0x290a52380A88f743813B8C3e9F6B0e61DB5FDF73
+GREEN_TOKEN: constant(address) = 0x355bB7F0f6c730e4460d620420a300fa08FF82F3
+GREEN_USDG_LP: constant(address) = 0x2fD13b49F970e8C6D89283056C1c6281214b7EB6
+SPCX: constant(address) = 0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa
+NVDA: constant(address) = 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC
+TSLA: constant(address) = 0x322F0929c4625eD5bAd873c95208D54E1c003b2d
+AAPL: constant(address) = 0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9
+GOOGL: constant(address) = 0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3
+GME: constant(address) = 0x1b0E319c6A659F002271B69dB8A7df2F911c153E
+RIPE_WETH_LP: constant(address) = 0xba6F6CBa1a4104000847d4fdccB676E99166CEcE
+USDG: constant(address) = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
+TRAINING_WHEELS: constant(address) = 0x987DEa46AEfA442B67Faa5Db6F71024e5be01406
+CONTRIB_TEMPLATE: constant(address) = 0x2593D4eeEeaB39Eb5F86B76AE54C6f0F1A7cC567
 
 
 @view
@@ -140,7 +118,7 @@ def ripeAvailForBonds() -> uint256:
 @external
 def ripeBondConfig() -> cs.RipeBondConfig:
     return cs.RipeBondConfig(
-        asset=USDG_TOKEN,
+        asset=USDG,
         amountPerEpoch=100000000,
         canBond=False,
         minRipePerUnit=0,
@@ -187,7 +165,7 @@ def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
             ),
         ),
         cs.RipeGovVaultConfigEntry(
-            asset=ASSET_RIPE_WETH_LP,
+            asset=RIPE_WETH_LP,
             config=cs.RipeGovVaultConfig(
                 lockTerms=cs.LockTerms(
                     minLockDuration=7200,
@@ -239,7 +217,7 @@ def shouldCheckLastTouch() -> bool:
 def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
     return [
         # WETH
-        cs.AssetConfigEntry(asset=WETH_TOKEN, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=WETH, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -387,7 +365,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # GREEN/USDG
-        cs.AssetConfigEntry(asset=ASSET_GREEN_USDG_POOL, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=GREEN_USDG_LP, config=cs.AssetConfig(
             vaultIds=[1],
             stakersPointsAlloc=2500,
             voterPointsAlloc=0,
@@ -424,7 +402,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # SPCX
-        cs.AssetConfigEntry(asset=ASSET_SPCX, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=SPCX, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -461,7 +439,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # NVDA
-        cs.AssetConfigEntry(asset=ASSET_NVDA, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=NVDA, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -498,7 +476,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # TSLA
-        cs.AssetConfigEntry(asset=ASSET_TSLA, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=TSLA, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -535,7 +513,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # AAPL
-        cs.AssetConfigEntry(asset=ASSET_AAPL, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=AAPL, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -572,7 +550,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # GOOGL
-        cs.AssetConfigEntry(asset=ASSET_GOOGL, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=GOOGL, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -609,7 +587,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # GME
-        cs.AssetConfigEntry(asset=ASSET_GME, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=GME, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
@@ -646,7 +624,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # UNI-V2
-        cs.AssetConfigEntry(asset=ASSET_RIPE_WETH_LP, config=cs.AssetConfig(
+        cs.AssetConfigEntry(asset=RIPE_WETH_LP, config=cs.AssetConfig(
             vaultIds=[2],
             stakersPointsAlloc=4500,
             voterPointsAlloc=0,
@@ -689,7 +667,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
 @external
 def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
     return [
-        cs.VaultLite(vaultId=3, asset=WETH_TOKEN),
+        cs.VaultLite(vaultId=3, asset=WETH),
     ]
 
 
@@ -697,7 +675,7 @@ def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
 @external
 def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
     return [
-        cs.VaultLite(vaultId=1, asset=ASSET_GREEN_USDG_POOL),
+        cs.VaultLite(vaultId=1, asset=GREEN_USDG_LP),
         cs.VaultLite(vaultId=1, asset=SGREEN_TOKEN),
     ]
 

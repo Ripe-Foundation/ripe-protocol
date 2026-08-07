@@ -62,20 +62,21 @@ NESTED_STRUCT = {
     "lockTerms": "cs.LockTerms",
 }
 
-# Addresses already bound through the constructor. Emitted by name so the
-# generated file keeps holding no literal for them.
-IMMUTABLE_BY_MANIFEST = {
+# Preferred constant names, so the common tokens read the same way they do
+# elsewhere in the codebase instead of being named off their ERC20 symbol.
+PREFERRED_NAMES = {
     "RipeToken": "RIPE_TOKEN",
     "GreenToken": "GREEN_TOKEN",
     "SavingsGreen": "SGREEN_TOKEN",
     "Contributor": "CONTRIB_TEMPLATE",
     "TrainingWheels": "TRAINING_WHEELS",
+    "GreenUsdgPool": "GREEN_USDG_LP",
 }
 
 # The Uniswap pool reports the generic "UNI-V2" symbol and is not a manifest
 # contract, so it would otherwise generate an opaque name.
 NAME_OVERRIDES = {
-    "0xba6f6cba1a4104000847d4fdccb676e99166cece": "ASSET_RIPE_WETH_LP",
+    "0xba6f6cba1a4104000847d4fdccb676e99166cece": "RIPE_WETH_LP",
 }
 
 HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
@@ -106,39 +107,7 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
-
-# addresses
-UNDERSCORE_REGISTRY: constant(address) = empty(address)
-CONTRIB_TEMPLATE: immutable(address)
-TRAINING_WHEELS: immutable(address)
-RIPE_TOKEN:  immutable(address)
-GREEN_TOKEN: immutable(address)
-SGREEN_TOKEN: immutable(address)
-USDG_TOKEN: immutable(address)
-WETH_TOKEN: immutable(address)
 '''
-
-CONSTRUCTOR = '''
-
-@deploy
-def __init__(
-    _contribTemplate: address,
-    _trainingWheels: address,
-    _ripeToken: address,
-    _greenToken: address,
-    _sgreenToken: address,
-    _usdgToken: address,
-    _wethToken: address,
-):
-    CONTRIB_TEMPLATE = _contribTemplate
-    TRAINING_WHEELS = _trainingWheels
-    RIPE_TOKEN = _ripeToken
-    GREEN_TOKEN = _greenToken
-    SGREEN_TOKEN = _sgreenToken
-    USDG_TOKEN = _usdgToken
-    WETH_TOKEN = _wethToken
-'''
-
 
 def _abi(source: str) -> list:
     out = subprocess.run(
@@ -217,57 +186,51 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
     if liq_vaults:
         weth = liq_vaults[0][1]  # WETH is the liquidation-priority asset
 
-    addr_names = {}
-    for addr in {*assets, usdg, *( [weth] if weth else [] )}:
-        low = addr.lower()
-        name = by_addr.get(low)
-        if name in IMMUTABLE_BY_MANIFEST:
-            addr_names[low] = IMMUTABLE_BY_MANIFEST[name]
-        elif weth and low == weth.lower():
-            addr_names[low] = "WETH_TOKEN"
-        elif low == usdg.lower():
-            addr_names[low] = "USDG_TOKEN"
-    for name, key in IMMUTABLE_BY_MANIFEST.items():
-        row = manifest.get(name)
-        if row and row.get("address"):
-            addr_names.setdefault(row["address"].lower(), key)
+    # Every address the file needs a name for. All of them are live, so they
+    # are emitted as constants and the contract takes no constructor at all.
+    hr = call(mc, "hrConfig")
+    wanted = list(assets) + [usdg, call(mc, "trainingWheels"), hr[0]]
+    if weth:
+        wanted.append(weth)
 
-    # Anything left over needs a generated constant.
-    extra = []
-    for addr in assets:
+    addr_names: dict[str, str] = {}
+    consts: list[tuple[str, str]] = []
+    for addr in wanted:
         low = addr.lower()
-        if low in addr_names:
+        if low in addr_names or int(low, 16) == 0:
             continue
         if low in NAME_OVERRIDES:
             const = NAME_OVERRIDES[low]
         else:
-            label = by_addr.get(low) or _symbol(w3, addr) or "ASSET"
-            # split camelCase so GreenUsdgPool reads as GREEN_USDG_POOL
-            spaced = "".join(
-                f"_{ch}" if i and ch.isupper() and not label[i - 1].isupper() else ch
-                for i, ch in enumerate(label)
-            )
-            const = "ASSET_" + "".join(
-                ch if ch.isalnum() else "_" for ch in spaced.upper()
-            ).strip("_")
-        while const in [c for c, _ in extra]:
-            const += "_X"
-        extra.append((const, Web3.to_checksum_address(addr)))
+            manifest_name = by_addr.get(low)
+            if manifest_name in PREFERRED_NAMES:
+                const = PREFERRED_NAMES[manifest_name]
+            else:
+                label = manifest_name or _symbol(w3, addr) or "ADDRESS"
+                # split camelCase so GreenUsdgPool reads as GREEN_USDG_POOL
+                spaced = "".join(
+                    f"_{ch}" if i and ch.isupper() and not label[i - 1].isupper() else ch
+                    for i, ch in enumerate(label)
+                )
+                const = "".join(
+                    ch if ch.isalnum() else "_" for ch in spaced.upper()
+                ).strip("_")
+        base, n = const, 2
+        while const in [c for c, _ in consts]:
+            const = f"{base}_{n}"
+            n += 1
+        consts.append((const, Web3.to_checksum_address(addr)))
         addr_names[low] = const
 
     r = Renderer(addr_names)
     out = [HEADER]
 
-    if extra:
-        out.append(
-            "\n# Registered by governance after launch. Robinhood-only "
-            "addresses, so they\n# are constants here rather than constructor "
-            "bindings.\n"
-        )
-        for const, addr in extra:
-            out.append(f"{const}: constant(address) = {addr}\n")
-
-    out.append(CONSTRUCTOR)
+    out.append(
+        "\n# addresses -- all read from the live deployment, so there is no\n"
+        "# constructor and nothing to bind at deploy time\n"
+    )
+    for const, addr in consts:
+        out.append(f"{const}: constant(address) = {addr}\n")
 
     def getter(name, ret, body):
         out.append(f"\n\n@view\n@external\ndef {name}() -> {ret}:\n    return {body}\n")
