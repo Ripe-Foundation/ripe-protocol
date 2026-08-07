@@ -103,6 +103,18 @@ post_freeze_reconciliation:
     None is a production-contract parity failure or Robinhood migration
     authority. Do not merge master or import Base history merely for parity;
     Robinhood planning and history remain isolated.
+  migration_history_extraction: >
+    The RH codebase simplification pass extracted all 66 numeric step manifests
+    from the active tree on 2026-08-07. The numeric *-manifest.json paths listed
+    in upstream_base_provenance_paths and
+    current_master_rh_pr_touched_path_differences above remain accurate
+    provenance records of what that upstream change touched, but they no longer
+    resolve in the working tree. Both current-manifest.json files, both v1
+    directories, and every config/network_profiles.py declaration are retained
+    unchanged. All 66 files are recoverable from
+    610b43f4508e85628a1362532a79d68d71ea902c; per-file blob IDs and SHA-256
+    values are in docs/simplification/extracted-files.tsv. Operator behavior is
+    unchanged.
   deployment_state: none
   migration_execution_state: none
   production_configuration_state: none
