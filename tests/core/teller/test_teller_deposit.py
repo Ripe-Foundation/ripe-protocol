@@ -1852,9 +1852,10 @@ def call_succeeds(_target: address, _data: Bytes[1024]) -> bool:
             checked_signatures.append(signature)
 
     assert len(checked_signatures) == 22
-    # The four surviving batch-family runtime controls live in
-    # test_teller_action_block.py, where one shared downstream recorder makes
-    # each route complete successfully through the deployed production Teller.
+    # The four surviving batch-family raw-calldata controls live in
+    # test_teller_action_block.py. They use this same keccak-plus-ABI encoding,
+    # compare it with production prepare_calldata, and execute each selector
+    # through the deployed Teller and a shared downstream recorder.
     assert probe.call_succeeds(teller, keccak(text="isPaused()")[:4])
 
 
@@ -2874,6 +2875,14 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
+# Plan-substitution and deferred-risk record: the required nested batch-
+# redemption premise cannot be a receipt-mutex proof because
+# receiptMeasurementActive is checked only by _deposit. On the pinned tree,
+# depositFromTrusted also lacks @nonreentrant, so a callback may enter a
+# different custody-changing route while receipt measurement is active. The
+# test-only ceiling forbids repairing production Teller here. This replacement
+# binds the mutex's actual nested-deposit scope; the broader cross-route risk
+# remains production-hardening work and must not be inferred closed from it.
 def test_receipt_measurement_mutex_blocks_nested_deposit(
     ripe_hq,
     governance,

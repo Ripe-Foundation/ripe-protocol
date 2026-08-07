@@ -191,6 +191,10 @@ def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
     assert ripe_token.balanceOf(bob) == ripe_before
 
 
+# Plan-substitution record: getClaimableLoot does not read the Teller pointer,
+# so an unset Teller cannot make this view revert. The state-changing Teller-
+# pointer failure is bound above. This replacement exercises the actual
+# position-dependent pointer lookup in the view: the core RipeGov vault ID.
 def test_get_claimable_loot_with_position_reverts_when_core_vault_pointer_is_unset(
     bob,
     alice,

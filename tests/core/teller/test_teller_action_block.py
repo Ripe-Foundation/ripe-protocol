@@ -1,5 +1,7 @@
 import boa
 import pytest
+from eth_abi import encode
+from eth_utils import keccak
 
 from constants import ZERO_ADDRESS
 
@@ -89,6 +91,22 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
     self.balances[_owner] -= _shares
     assert extcall IERC20(self.underlying).transfer(_receiver, _shares)
     return _shares
+"""
+
+
+RAW_CALL_PROBE_SOURCE = """# @version 0.4.3
+
+@external
+def call_succeeds(_target: address, _data: Bytes[1024]) -> bool:
+    success: bool = False
+    response: Bytes[4096] = b""
+    success, response = raw_call(
+        _target,
+        _data,
+        max_outsize=4096,
+        revert_on_failure=False,
+    )
+    return success
 """
 
 
@@ -256,70 +274,99 @@ def teller_route_matrix_env(
     registerVault,
     setGeneralConfig,
     setAssetConfig,
+    setUserConfig,
+    setUserDelegation,
+    mock_undy_v2,
     bob,
     alice,
     charlie,
 ):
-    setGeneralConfig()
-    asset = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_asset")
-    green = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_green")
-    savings = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_savings")
-    savings.configure_underlying(green)
+    # Keep registry rewrites and test-only user permissions local even if this
+    # module is collected without the repository's autouse Boa anchor plugin.
+    with boa.env.anchor():
+        setGeneralConfig()
+        asset = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_asset")
+        green = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_green")
+        savings = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_savings")
+        savings.configure_underlying(green)
 
-    vault = _route_sink("route_matrix_vault")
-    credit_engine = _route_sink("route_matrix_credit_engine")
-    auction_house = _route_sink("route_matrix_auction_house")
-    bond_room = _route_sink("route_matrix_bond_room")
-    lootbox = _route_sink("route_matrix_lootbox")
-    credit_redeem = _route_sink("route_matrix_credit_redeem")
-    vault_id = registerVault(vault, "Teller route matrix vault")
+        vault = _route_sink("route_matrix_vault")
+        credit_engine = _route_sink("route_matrix_credit_engine")
+        auction_house = _route_sink("route_matrix_auction_house")
+        bond_room = _route_sink("route_matrix_bond_room")
+        lootbox = _route_sink("route_matrix_lootbox")
+        credit_redeem = _route_sink("route_matrix_credit_redeem")
+        vault_id = registerVault(vault, "Teller route matrix vault")
 
-    mission_control.setCoreRipeGovVaultId(
-        vault_id,
-        sender=switchboard_alpha.address,
-    )
-    mission_control.setPreferredStabVaultId(
-        vault_id,
-        sender=switchboard_alpha.address,
-    )
-    mission_control.setShouldCheckLastTouch(
-        True,
-        sender=switchboard_alpha.address,
-    )
-    setAssetConfig(asset, _vaultIds=[vault_id])
-    setAssetConfig(savings, _vaultIds=[vault_id])
-
-    replacements = (
-        (1, green),
-        (2, savings),
-        (9, auction_house),
-        (12, bond_room),
-        (13, credit_engine),
-        (16, lootbox),
-        (19, credit_redeem),
-    )
-    for registry_id, replacement in replacements:
-        _replace_hq_address(
-            ripe_hq,
-            governance,
-            registry_id,
-            replacement,
+        mission_control.setCoreRipeGovVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
         )
+        mission_control.setPreferredStabVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+        mission_control.setShouldCheckLastTouch(
+            True,
+            sender=switchboard_alpha.address,
+        )
+        # Bob remains an ordinary account for last-touch enforcement. The mock
+        # registry recognizes Charlie as an Underscore protocol caller so the
+        # gov-vault/lock routes can exercise _user != msg.sender as well.
+        mission_control.setUnderscoreRegistry(
+            mock_undy_v2.address,
+            sender=switchboard_alpha.address,
+        )
+        mock_undy_v2.setAllAddressesAreVaults(False)
+        mock_undy_v2.setIsUserWallet(False)
+        setUserConfig(
+            bob,
+            _canAnyoneDeposit=True,
+            _canAnyoneRepayDebt=True,
+            _canAnyoneBondForUser=True,
+        )
+        setUserDelegation(
+            bob,
+            charlie,
+            _canWithdraw=True,
+            _canBorrow=True,
+            _canClaimFromStabPool=True,
+            _canClaimLoot=True,
+        )
+        setAssetConfig(asset, _vaultIds=[vault_id])
+        setAssetConfig(savings, _vaultIds=[vault_id])
 
-    return {
-        "asset": asset,
-        "green": green,
-        "savings": savings,
-        "vault": vault,
-        "vault_id": vault_id,
-        "credit_engine": credit_engine,
-        "teller": teller,
-        "ledger": ledger,
-        "bob": bob,
-        "alice": alice,
-        "charlie": charlie,
-        "ripe_hq": ripe_hq,
-    }
+        replacements = (
+            (1, green),
+            (2, savings),
+            (9, auction_house),
+            (12, bond_room),
+            (13, credit_engine),
+            (16, lootbox),
+            (19, credit_redeem),
+        )
+        for registry_id, replacement in replacements:
+            _replace_hq_address(
+                ripe_hq,
+                governance,
+                registry_id,
+                replacement,
+            )
+
+        yield {
+            "asset": asset,
+            "green": green,
+            "savings": savings,
+            "vault": vault,
+            "vault_id": vault_id,
+            "credit_engine": credit_engine,
+            "teller": teller,
+            "ledger": ledger,
+            "bob": bob,
+            "alice": alice,
+            "charlie": charlie,
+            "ripe_hq": ripe_hq,
+        }
 
 
 ROUTE_CASES = (
@@ -396,6 +443,8 @@ def _fund_and_approve(token, owner, teller, amount=10):
 def _route_subject(env, subject_kind):
     if subject_kind == "recipient":
         return env["alice"]
+    if subject_kind == "caller":
+        return env["charlie"]
     return env["bob"]
 
 
@@ -405,41 +454,42 @@ def _invoke_teller_route(route, env):
     green = env["green"]
     vault = env["vault"]
     vault_id = env["vault_id"]
-    caller = env["bob"]
+    user = env["bob"]
+    caller = env["charlie"]
     recipient = env["alice"]
     amount = 10
 
     if route == "deposit":
         _fund_and_approve(asset, caller, teller, amount)
-        return teller.deposit(asset, amount, caller, vault, sender=caller)
+        return teller.deposit(asset, amount, user, vault, sender=caller)
     if route == "depositMany":
         _fund_and_approve(asset, caller, teller, amount)
         return teller.depositMany(
-            caller,
+            user,
             [(asset.address, amount, vault.address, 0)],
             sender=caller,
         )
     if route == "convertToSavingsGreenAndDepositIntoStabPool":
         _fund_and_approve(green, caller, teller, amount)
         return teller.convertToSavingsGreenAndDepositIntoStabPool(
-            caller,
+            user,
             amount,
             sender=caller,
         )
     if route == "depositIntoGovVault":
         _fund_and_approve(asset, caller, teller, amount)
-        return teller.depositIntoGovVault(asset, amount, 1, caller, sender=caller)
+        return teller.depositIntoGovVault(asset, amount, 1, user, sender=caller)
     if route == "claimLoot":
-        return teller.claimLoot(caller, False, sender=caller)
+        return teller.claimLoot(user, False, sender=caller)
     if route == "adjustLock":
-        return teller.adjustLock(asset, 1, caller, sender=caller)
+        return teller.adjustLock(asset, 1, user, sender=caller)
     if route == "releaseLock":
-        return teller.releaseLock(asset, caller, sender=caller)
+        return teller.releaseLock(asset, user, sender=caller)
     if route == "withdraw":
-        return teller.withdraw(asset, 1, caller, vault, sender=caller)
+        return teller.withdraw(asset, 1, user, vault, sender=caller)
     if route == "withdrawMany":
         return teller.withdrawMany(
-            caller,
+            user,
             [(asset.address, 1, vault.address, 0)],
             sender=caller,
         )
@@ -452,22 +502,22 @@ def _invoke_teller_route(route, env):
             vault_id,
             amount,
             1,
-            caller,
+            user,
             sender=caller,
         )
     if route == "claimManyFromStabilityPool":
         return teller.claimManyFromStabilityPool(
             vault_id,
             [],
-            caller,
+            user,
             False,
             sender=caller,
         )
     if route == "borrow":
-        return teller.borrow(1, caller, False, False, sender=caller)
+        return teller.borrow(1, user, False, False, sender=caller)
     if route == "repay":
         _fund_and_approve(green, caller, teller, amount)
-        return teller.repay(1, caller, False, True, sender=caller)
+        return teller.repay(1, user, False, True, sender=caller)
     if route == "redeemCollateralFromMany":
         _fund_and_approve(green, caller, teller, amount)
         return teller.redeemCollateralFromMany(
@@ -566,22 +616,99 @@ def test_teller_route_housekeeping_debt_update_matrix(
 
 
 @pytest.mark.parametrize(
-    "route",
+    ("route", "signature", "types"),
     (
-        "redeemCollateralFromMany",
-        "buyManyFungibleAuctions",
-        "claimManyFromStabilityPool",
-        "redeemManyFromStabilityPool",
+        pytest.param(
+            "redeemCollateralFromMany",
+            (
+                "redeemCollateralFromMany((address,uint256,address,uint256)[],"
+                "uint256,bool,bool,bool,address)"
+            ),
+            (
+                "(address,uint256,address,uint256)[]",
+                "uint256",
+                "bool",
+                "bool",
+                "bool",
+                "address",
+            ),
+            id="redeemCollateralFromMany",
+        ),
+        pytest.param(
+            "buyManyFungibleAuctions",
+            (
+                "buyManyFungibleAuctions((address,uint256,address,uint256)[],"
+                "uint256,bool,bool,bool,address)"
+            ),
+            (
+                "(address,uint256,address,uint256)[]",
+                "uint256",
+                "bool",
+                "bool",
+                "bool",
+                "address",
+            ),
+            id="buyManyFungibleAuctions",
+        ),
+        pytest.param(
+            "claimManyFromStabilityPool",
+            "claimManyFromStabilityPool(uint256,(address,address,uint256)[],address,bool)",
+            ("uint256", "(address,address,uint256)[]", "address", "bool"),
+            id="claimManyFromStabilityPool",
+        ),
+        pytest.param(
+            "redeemManyFromStabilityPool",
+            (
+                "redeemManyFromStabilityPool(uint256,(address,uint256)[],"
+                "uint256,address,bool,bool,bool)"
+            ),
+            (
+                "uint256",
+                "(address,uint256)[]",
+                "uint256",
+                "address",
+                "bool",
+                "bool",
+                "bool",
+            ),
+            id="redeemManyFromStabilityPool",
+        ),
     ),
 )
 def test_surviving_batch_routes_are_callable_runtime_controls(
     route,
+    signature,
+    types,
     teller_route_matrix_env,
 ):
-    """Prove old-selector failures are not a generic calldata/fallback result."""
+    """Bind the same raw selector derivation to live surviving batch routes."""
 
-    result = _invoke_teller_route(route, teller_route_matrix_env)
-    assert result == 1
+    env = teller_route_matrix_env
+    teller = env["teller"]
+    probe = boa.loads(
+        RAW_CALL_PROBE_SOURCE,
+        name=f"surviving_{route}_selector_probe",
+    )
+    if route in ("redeemCollateralFromMany", "buyManyFungibleAuctions"):
+        values = ([], 10, False, False, True, str(env["alice"]))
+    elif route == "claimManyFromStabilityPool":
+        values = (env["vault_id"], [], str(env["bob"]), False)
+    else:
+        values = (
+            env["vault_id"],
+            [],
+            10,
+            str(env["alice"]),
+            False,
+            False,
+            True,
+        )
+
+    if route != "claimManyFromStabilityPool":
+        _fund_and_approve(env["green"], probe.address, teller, 10)
+    calldata = keccak(text=signature)[:4] + encode(types, values)
+    assert calldata == getattr(teller, route).prepare_calldata(*values)
+    assert probe.call_succeeds(teller, calldata), signature
 
 
 def _addys_bundle(teller, **replacements):
