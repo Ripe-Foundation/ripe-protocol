@@ -1427,7 +1427,7 @@ def test_direct_import_reconstructs_position_and_emits_complete_event(
     assert event.unlock == unlock
 
 
-def test_teller_migration_preserves_position_and_updates_ledger_and_lootbox(
+def test_teller_migration_preserves_position_and_updates_ledger_and_deposit_points(
     target_ripe_gov_vault,
     ripe_gov_vault,
     ripe_token,
@@ -1559,7 +1559,6 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
     bob,
     teller,
     ledger,
-    lootbox,
     switchboard_alpha,
     switchboard_echo,
     mission_control,
@@ -1580,9 +1579,9 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
         setGeneralConfig=setGeneralConfig,
         switchboard_alpha=switchboard_alpha,
     )
-    # migration cleanup now routes through Lootbox, which is the only contract Ledger
-    # authorizes to remove a user's vault participation
-    lootbox.removeVaultFromUserForMigration(
+    # Arrange the missing-ledger precondition through the same Teller-only Ledger
+    # entry point used by the migration path.
+    ledger.removeVaultFromUserForMigration(
         bob,
         SOURCE_VAULT_ID,
         sender=teller.address,
@@ -1600,6 +1599,46 @@ def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
     assert target.getTotalAmountForUser(bob, ripe_token) == 0
     assert not ripe_gov_vault.positionMigratedOut(bob, ripe_token)
+
+
+def test_migration_ledger_cleanup_is_teller_only_and_pause_guarded(
+    ledger,
+    teller,
+    lootbox,
+    bob,
+    switchboard_alpha,
+):
+    ledger.addVaultToUser(bob, SOURCE_VAULT_ID, sender=teller.address)
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+
+    with boa.reverts("only Teller allowed"):
+        ledger.removeVaultFromUserForMigration(
+            bob,
+            SOURCE_VAULT_ID,
+            sender=lootbox.address,
+        )
+    with boa.reverts("only Teller allowed"):
+        ledger.removeVaultFromUserForMigration(
+            bob,
+            SOURCE_VAULT_ID,
+            sender=bob,
+        )
+
+    ledger.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("not activated"):
+        ledger.removeVaultFromUserForMigration(
+            bob,
+            SOURCE_VAULT_ID,
+            sender=teller.address,
+        )
+    ledger.pause(False, sender=switchboard_alpha.address)
+
+    ledger.removeVaultFromUserForMigration(
+        bob,
+        SOURCE_VAULT_ID,
+        sender=teller.address,
+    )
+    assert not ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
 
 
 def test_existing_target_ledger_entry_is_not_duplicated_during_migration(
