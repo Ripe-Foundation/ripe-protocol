@@ -225,6 +225,64 @@ condition preserved by the callers, not by the vault.
 
 ---
 
+## 6b. Recorded disposition — no StabilityPool contract change
+
+**Decision:** none of the three StabilityPool hardening changes specified by the
+hardening plan will be made. Rule 1 above is the standing mitigation.
+
+**Why.** All three defend against exactly one thing: a claim asset that is
+fee-on-transfer, rebasing/burnable, or callback-capable. Rule 1 excludes that
+entire token class. Making the changes would spend the contract's last remaining
+bytes — and, for the custody-deficit guard, permanent gas on the hottest path —
+defending against assets that are not admitted.
+
+**What was measured.** StabilityPool has **205 bytes** of EIP-170 headroom
+(24,371 deployed of 24,576). Each candidate was built and compiled; the exact
+patches are retained at
+`~/dev/ripe-protocol-review-archives/rh-deposit-vault/size-probes/`.
+
+| Candidate | Plan section | Template Δ | Deployed headroom after |
+|---|---|---:|---:|
+| Custody-deficit guard on the NAV path | §11.1 | +78 | 127 |
+| Exact outbound delivery measurement | §11.3 | +151 | 54 |
+| Pull-and-measure settlement | §11.2 (**the plan's preferred design**) | +295 | **−90** |
+
+Two consequences the plan does not anticipate:
+
+1. **§11.2 as specified cannot be deployed.** At 24,666 bytes it exceeds EIP-170
+   outright. It also requires a matching AuctionHouse change — approve instead of
+   transfer — on a contract with 20 bytes of headroom. The plan mandates it as
+   the preferred design; it is unbuildable at current sizes.
+2. **§11.1 and §11.3 cannot both be taken.** Together they are +229, which also
+   exceeds the limit. Individually each fits but lands below the plan's own
+   200-byte safety floor, so either would need an explicit RG-SIZE-01 waiver.
+
+Beyond bytes, the custody-deficit guard sits inside the loop over active claim
+assets — up to 20 — which already makes one PriceDesk call per asset. It would
+double the external calls on every NAV read, and NAV is read on deposit,
+withdrawal, claim and redemption. `test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling`
+would need its bounds revisited.
+
+**Standing constraint.** Independent of this review, StabilityPool is 99.2% of
+the way to the EIP-170 limit and already compiles with
+`# pragma optimize codesize`, so that lever is spent. Any future StabilityPool
+feature needs a size reduction first. No reduction search has been run on this
+contract; the equivalent search on RipeGov found 523 bytes in unused public view
+wrappers, so room may well exist — but it would be ABI-breaking and has not been
+measured.
+
+**To revisit:** if rule 1 is ever waived for a specific asset, reopen
+RH-CHANGE-01 before admitting it. The hardening tests are already written and
+sit as `xfail(strict=True)` checkpoints (DV-08, DV-09, DV-13).
+
+**Registry follow-up.** This disposition has not been minted as an `RH-D`
+identifier in [`decision-register.md`](decision-register.md), because that
+register requires a mirrored entry in [`status.yaml`](status.yaml) and that file
+should not be edited during an active deployment. Worth adding once the
+deployment settles.
+
+---
+
 ## 7. What is verified in tests, and what is not
 
 Every behavior above is pinned by a passing characterization test, so a future code
