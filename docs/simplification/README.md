@@ -232,49 +232,31 @@ committed authority that Section 0.4 says to respect.
 | Parked CCIP examples | `examples/ExampleGreenCcipBurnMintPool.vy` is read by the retained checker and pinned in the retained inventory; the other two files in that directory are its README and reference source. |
 | One-time scripts | None found without a consumer. All six `scripts/params/*.py` reports are invoked by `scripts/params/run_all.py`; `scripts/utils/log.py` is imported by `migrate.py` and the runner; `check_contract_artifacts.py`, `update_contract_artifact_expectations.py`, `export_abis.py`, and `verify_blockscout.py` are on the Section 3.4 retention list. `scripts/ledger_signing_smoke.py` has no textual consumer but is deployment-owner signing tooling protected by Section 0.5 precedence 3. |
 
-## Artifact repairs (owner-authorized)
+## Artifact gates: left to rh, deliberately
 
-Two artifact-integrity gates arrived red **from rh**, reproduced identically on a
-pristine `6260726` checkout. The owner directed that they be repaired in this PR
-rather than upstream. Both repairs are mechanical and are recorded here because
-they touch artifact authority, which this cleanup otherwise never does.
+Three integrity checks are red on this branch. **All three are red on rh itself
+at `6260726`**, reproduced on a pristine checkout, and this PR causes none of
+them. They are left unrepaired here so the diff stays pure cleanup and artifact
+authority stays with the contract's author — particularly relevant while a
+deployment is in flight and may regenerate these files.
 
-| Gate | Condition on rh `6260726` | Repair |
+| Check | Condition on rh `6260726` | Owner |
 | --- | --- | --- |
-| ABI parity | `contracts/config/DefaultsRobinhoodLive.vy` exists with no exported ABI → `ABI_EXPORT_FAILED: missing ABI output: DefaultsRobinhoodLive.json` | Ran `scripts/export_abis.py`. It emitted exactly one new file, `scripts/abis/DefaultsRobinhoodLive.json`; the other 52 were already byte-current. `tests/deployment/test_abi_export.py`'s census assertion moves 52 → 53. **All 52 ABIs present at `610b43f` are retained; this cleanup removes none.** |
-| Contract artifacts | `MissionControl.vy` hashes `9585e6…` while `contract-artifact-expectations.json` still recorded `37558b…` → `CONTRACT_ARTIFACTS_FAILED` | Ran the sanctioned `scripts/update_contract_artifact_expectations.py MissionControl`. Six fields changed, all derived from the source: `source_git_blob`, `source_sha256`, the three creation hashes, and `transitive_compiler_input_integrity`. No size field changed. |
+| `scripts/export_abis.py --check` | `contracts/config/DefaultsRobinhoodLive.vy` exists with no exported ABI → `ABI_EXPORT_FAILED: missing ABI output: DefaultsRobinhoodLive.json`. Also fails `tests/deployment/test_abi_export.py::test_repository_default_abi_directory_is_byte_current`. | whoever added `DefaultsRobinhoodLive.vy` |
+| `scripts/check_contract_artifacts.py` | `MissionControl.vy` hashes `9585e6…`; `contract-artifact-expectations.json` records `37558b…` → `CONTRACT_ARTIFACTS_FAILED`. The file already carries the new *sizes*, so it was partially refreshed and the hashes left stale. | whoever landed rh `be6e4e9` |
+| `tests/deployment/test_manifest_schema.py::test_robinhood_migration_handoff_is_in_memory_typed_and_write_free` | `AttributeError: 'Migration' object has no attribute 'handoff_manifest_v2_action_result'`. Also failed at `610b43f`. | deployment owner; needs a migration-runner change, out of scope per Sections 1.2 and 6 |
 
-**What the MissionControl refresh ratifies.** rh commit `be6e4e9` removed two
-constants and inlined their literal values, reordering three constructor
-assignments:
+The MissionControl mismatch is narrow: rh `be6e4e9` removed two constants and
+inlined their identical literal values, reordering three constructor
+assignments. Creation and runtime **sizes are unchanged** — a no-op refactor
+whose expectation hashes simply were not refreshed.
 
-```diff
--RIPE_GOV_VAULT_ID: constant(uint256) = 2
--STABILITY_POOL_VAULT_ID: constant(uint256) = 1
--    self.coreRipeGovVaultId = RIPE_GOV_VAULT_ID
--    self.preferredStabVaultId = STABILITY_POOL_VAULT_ID
--    self.isStabVaultId[STABILITY_POOL_VAULT_ID] = True
-+    self.preferredStabVaultId = 1
-+    self.isStabVaultId[1] = True
-+    self.coreRipeGovVaultId = 2
-```
-
-Same values, same semantics — a no-op refactor. Creation and runtime **sizes are
-unchanged**, which corroborates that; only instruction order moved. The
-expectation file already carried the new sizes, so rh had partially refreshed it
-and left the hashes stale.
-
-I advised against making these repairs here, because the plan forbids refreshing
-an expectation hash to make a gate pass and because artifact authority belongs
-with the contract's author. The owner decided otherwise on the record. The
-refresh is disclosed in full above so a reviewer can judge it directly.
-
-**Still red, and deliberately not repaired:**
-`tests/deployment/test_manifest_schema.py::test_robinhood_migration_handoff_is_in_memory_typed_and_write_free`
-fails with `AttributeError: 'Migration' object has no attribute
-'handoff_manifest_v2_action_result'`. It failed at `610b43f` and fails on
-pristine rh. Fixing it means changing the migration runner or manifest schema,
-which plan Sections 1.2 and 6 place out of scope.
+These repairs were briefly applied and then **reverted at the owner's
+direction** once a deployment was known to be in flight, since
+`config/contract-artifact-expectations.json` and `scripts/abis/` are exactly what
+a deployment regenerates. `config/contract-artifact-expectations.json`,
+`tests/deployment/test_abi_export.py`, and the whole of `scripts/abis/` are now
+byte-identical to rh `6260726`; the ABI census is back to rh's 52.
 
 ## Validation
 
@@ -322,9 +304,9 @@ than exact equality, which is weaker evidence than the lean lane's exact match.
 
 ### Gates at the candidate tip
 
-`scripts/check_contract_artifacts.py` reports `CONTRACT_ARTIFACTS_OK` and
-`scripts/export_abis.py --check` passes — but only after two owner-authorized
-repairs of drift that arrived with rh, described under **Artifact repairs** below. ABI export parity (52 outputs), the
+The artifact and ABI gates are red on rh itself and are left that way here; see
+**Artifact gates: left to rh** above. Every gate this cleanup is responsible for
+is green. ABI export parity (52 outputs), the
 dependency-security gate, contract artifact inventory, current-manifest
 promotion, network profiles, base profile regression, the Robinhood blueprint
 census, and the offline fork suite are all GREEN. The full table, including the

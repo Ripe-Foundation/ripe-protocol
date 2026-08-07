@@ -141,13 +141,8 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 
 
 def test_repository_default_abi_directory_is_byte_current():
-    # 53, not 52: rh added contracts/config/DefaultsRobinhoodLive.vy without
-    # exporting its ABI, which left this parity check red on rh itself. The
-    # missing scripts/abis/DefaultsRobinhoodLive.json is exported here, so the
-    # census is one larger. The 52 ABIs present at 610b43f are all retained; the
-    # simplification cleanup removes no ABI.
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 53
+    assert len(report.exported) == 52
     exported_names = {path.name for path in report.exported}
     assert exported_names >= {
         "Addys.json",
