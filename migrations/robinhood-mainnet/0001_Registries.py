@@ -12,10 +12,11 @@ def _node_read_word(migration, contract_address, signature):
     EVM and executes that byte, which is INVALID. Production evidence must
     therefore come from the real RPC, never Boa's local EVM.
     """
-    from web3 import Web3
-
     rpc = migration.rpc()
     assert rpc and rpc != "boa", "production Ledger requires a real RPC node"
+
+    from web3 import Web3
+
     w3 = Web3(Web3.HTTPProvider(rpc))
     assert w3.is_connected(), "production Ledger RPC is unavailable"
     selector = Web3.keccak(text=signature)[:4]

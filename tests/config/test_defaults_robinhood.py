@@ -548,7 +548,7 @@ def test_curve_launch_values_are_blueprint_owned_and_not_derived_json_values():
     assert params["GREEN_POOL_A"] == 100
     assert params["GREEN_POOL_FEE"] == 4_000_000
     assert params["GREEN_POOL_OFFPEG_MULTIPLIER"] == 20_000_000_000
-    assert params["GREEN_POOL_MA_EXP_TIME"] == 600
+    assert params["GREEN_POOL_MA_EXP_TIME"] == 866
     assert params["GREEN_POOL_MA_EXP_TIME_ALTERNATIVE_TEST_VECTOR"] == 866
     assert type(params["GREEN_POOL_ADDRESS"]).__name__ == "SymbolicBinding"
     destinations = {

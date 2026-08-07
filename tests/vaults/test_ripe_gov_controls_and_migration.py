@@ -242,9 +242,11 @@ def _assert_contributor_transfer_case(
     assert ripe_gov_vault.getTotalAmountForUser(recipient, ripe_token) == amount
     assert ripe_gov_vault.userBalances(recipient, ripe_token) > 0
 
-    expected_sender = points if disable_sender else 0
+    # This is a full-position transfer. D-05 clears the sender's stored points
+    # at the complete per-asset exit boundary, including for disabled users.
+    expected_sender = 0
     expected_recipient = 0 if disable_sender or disable_recipient else points
-    expected_global = 0 if disable_recipient and not disable_sender else points
+    expected_global = expected_recipient
     assert ripe_gov_vault.totalUserGovPoints(sender) == expected_sender
     assert ripe_gov_vault.totalUserGovPoints(recipient) == expected_recipient
     assert ripe_gov_vault.totalGovPoints() == expected_global
@@ -1262,7 +1264,7 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     ripe_token.transfer(target, existing, sender=whale)
     custody_before = ripe_token.balanceOf(target)
 
-    with boa.reverts("target position exists"):
+    with boa.reverts(dev="target balance exists"):
         target.importPositionForMigration(
             bob,
             ripe_token,

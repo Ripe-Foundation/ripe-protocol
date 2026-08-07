@@ -747,7 +747,9 @@ def test_dust_deactivated_pair_with_residual_balance_remains_claimable(
         sender=auction_house.address,
     )
     assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 1
-    mock_price_source.setPrice(bravo_token, 2 * 10**17)
+    # The production retention floor is $0.05. At $0.10/token the residual is
+    # worth $0.03 and must move to the dormant set.
+    mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=bob)
     events = filter_logs(stability_pool, "ClaimAssetDeactivated")
     assert len(events) == 1

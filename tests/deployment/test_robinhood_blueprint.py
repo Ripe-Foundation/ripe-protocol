@@ -1028,7 +1028,7 @@ def _mutate_curve_input(monkeypatch, input_id, **changes):
         ("pool.coin_decimals", {"value": (18, 6)}, "RH_CURVE_POOL_PARAMS"),
         ("pool.fee", {"value": 4}, "RH_CURVE_POOL_PARAMS"),
         ("pool.offpeg_fee_multiplier", {"value": 20}, "RH_CURVE_POOL_PARAMS"),
-        ("pool.ma_exp_time", {"value": 866}, "RH_CURVE_POOL_PARAMS"),
+        ("pool.ma_exp_time", {"value": 600}, "RH_CURVE_POOL_PARAMS"),
         ("pool.address", {"value": "0x0000000000000000000000000000000000000000"}, "RH_CURVE_POOL_IDENTITY"),
         ("pool.factory_method", {"value": "unknown"}, "RH_CURVE_POOL_IDENTITY"),
         ("pool.factory_nonce_or_order", {"value": "precomputed"}, "RH_CURVE_POOL_IDENTITY"),
