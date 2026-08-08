@@ -65,7 +65,6 @@ interface RipeGovVault:
 
 interface Teller:
     def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool): nonpayable
-    def migrateLegacyRipeGovPosition(_user: address, _asset: address) -> uint256: nonpayable
     def setLegacyRipeGovMigrationAsset(_asset: address): nonpayable
     def migrateRipeGovPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
     def migrateVaultPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
@@ -76,6 +75,7 @@ interface VaultBook:
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -527,6 +527,7 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGACY_MIGRATIONS: constant(uint256) = 25
+LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 # per-transaction duplicate-user guard for a legacy migration/settlement batch. A repeated user
 # would hit the target's replay protection on the second row and revert the whole batch after
@@ -750,13 +751,16 @@ def migrateLegacyRipeGovPositions(
     assert len(_users) != 0 # dev: no migrations
     assert _asset != empty(address) # dev: invalid asset
 
+    targetVaultId: uint256 = staticcall MissionControl(self._getMissionControlAddr()).coreRipeGovVaultId()
+    assert targetVaultId != 0 # dev: invalid target vault id
+
     teller: Teller = Teller(self._getTellerAddr())
     for user: address in _users:
         assert user != empty(address) # dev: invalid user
         assert not self.legacyUserDedupe[user] # dev: duplicate user
         self.legacyUserDedupe[user] = True
 
-        amount: uint256 = extcall teller.migrateLegacyRipeGovPosition(user, _asset)
+        amount: uint256 = extcall teller.migrateRipeGovPosition(user, _asset, LEGACY_RIPE_GOV_VAULT_ID, targetVaultId)
         log LegacyRipeGovPositionMigrationExecuted(
             user=user,
             asset=_asset,

@@ -216,16 +216,6 @@ event LegacyRipeGovMigrationAssetSet:
     asset: indexed(address)
     caller: indexed(address)
 
-event LegacyRipeGovPositionMigrated:
-    user: indexed(address)
-    asset: indexed(address)
-    caller: indexed(address)
-    amount: uint256
-    sourceShares: uint256
-    targetShares: uint256
-    govPoints: uint256
-    unlock: uint256
-
 event LegacyRipeGovSourceSettled:
     user: indexed(address)
     caller: indexed(address)
@@ -551,6 +541,25 @@ def rebalance(
 # Ripe Gov migration
 
 
+# Handles BOTH sources:
+#
+#  - an exporter-capable vault, via `exportPositionForMigration` (the qualified upstream path); and
+#  - the deployed Base LEGACY gov vault at id 2, which predates the exporter and cannot be changed.
+#    That source is synthesized from its own public state and drained through its ordinary
+#    `SharesVault` withdrawal, so it must stay UNPAUSED while the target is paused.
+#
+# The two differ only in how the source position is acquired and validated. Everything after --
+# import, target Ledger registration, Lootbox points, event -- is shared.
+#
+# Source Ledger participation is NEVER removed here, for either source. The depletion checks below
+# prove only that THIS asset is gone, and a user may hold more than one governance asset. Removing
+# the whole entry would drop the other from `Ledger.userVaults` -- the enumeration
+# `CreditEngine._getUserBorrowTerms` walks to value collateral and `AuctionHouse` walks to seize it
+# -- so the remaining position would stay in the vault but stop counting, degrading a borrower's
+# health with nothing to revert it. `Lootbox._claimLoot` already does this cleanup correctly,
+# removing the vault only once the user is genuinely out of it.
+
+
 @nonreentrant
 @external
 def migrateRipeGovPosition(
@@ -560,21 +569,55 @@ def migrateRipeGovPosition(
     _targetVaultId: uint256,
 ) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    a: addys.Addys = addys._getAddys()
+    utils: address = addys._getTellerUtilsAddr()
 
-    # validation
     sourceVault: address = empty(address)
     targetVault: address = empty(address)
-    sourceVault, targetVault = staticcall TellerUtils(addys._getTellerUtilsAddr()).validateRipeGovMigration(_user, _asset, _sourceVaultId, _targetVaultId)
-    a: addys.Addys = addys._getAddys()
+    migration: RipeGovMigrationData = empty(RipeGovMigrationData)
+    snap: LegacySourceSnapshot = empty(LegacySourceSnapshot)
+    targetBalanceBefore: uint256 = 0
 
-    # export position
-    targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-    migration: RipeGovMigrationData = extcall RipeGovVault(sourceVault).exportPositionForMigration(
-        _user,
-        _asset,
-        targetVault,
-        a,
-    )
+    if _sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID:
+        # the approved full-protocol freeze must be active for the whole migration window, and the
+        # asset must be the one whose window is currently open
+        assert deptBasics.isPaused # dev: teller not paused
+        assert _asset != empty(address) and _asset == self.activeMigrationAsset # dev: asset window closed
+        assert _targetVaultId == staticcall MissionControl(a.missionControl).coreRipeGovVaultId() # dev: invalid target vault id
+
+        sourceVault = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
+        targetVault = staticcall AddressRegistry(a.vaultBook).getAddr(_targetVaultId)
+        assert staticcall TellerUtils(utils).validateLegacyRipeGovMigration(
+            _user, _asset, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, _targetVaultId, targetVault, a,
+        ) # dev: invalid migration
+
+        # capture the complete original record BEFORE the withdrawal destroys it
+        snap = staticcall TellerUtils(utils).getLegacyRipeGovSourceSnapshot(_user, _asset, sourceVault, targetVault, a)
+        targetBalanceBefore = staticcall IERC20(_asset).balanceOf(targetVault)
+        tellerBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
+
+        # drain the whole position DIRECTLY into the target -- no custody hop
+        amount: uint256 = 0
+        isDepleted: bool = False
+        amount, isDepleted = extcall Vault(sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), targetVault, a)
+        assert isDepleted # dev: source position not depleted
+        assert amount == snap.sourceAmount # dev: inexact source withdrawal
+        assert staticcall IERC20(_asset).balanceOf(self) == tellerBalanceBefore # dev: teller balance residue
+        assert staticcall IERC20(_asset).allowance(self, targetVault) == 0 # dev: teller allowance residue
+
+        migration = RipeGovMigrationData(
+            amount=amount,
+            govPoints=snap.govPoints,
+            unlock=snap.unlock,
+            lastTerms=snap.lastTerms,
+        )
+
+    else:
+        sourceVault, targetVault = staticcall TellerUtils(utils).validateRipeGovMigration(_user, _asset, _sourceVaultId, _targetVaultId)
+        targetBalanceBefore = staticcall IERC20(_asset).balanceOf(targetVault)
+        migration = extcall RipeGovVault(sourceVault).exportPositionForMigration(_user, _asset, targetVault, a)
+
+    # exact receipt, for both routes
     targetBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
     assert targetBalanceAfter >= targetBalanceBefore # dev: invalid migration receipt
     assert targetBalanceAfter - targetBalanceBefore == migration.amount # dev: inexact migration receipt
@@ -591,22 +634,6 @@ def migrateRipeGovPosition(
     assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
     assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
 
-    # NOTE: source Ledger participation is deliberately NOT removed here.
-    #
-    # The checks above prove only that THIS asset is depleted. A user may hold more than one
-    # governance asset in the source vault, and removing the whole Ledger entry after migrating one
-    # of them drops the other from `Ledger.userVaults` -- the enumeration `CreditEngine`'s
-    # `_getUserBorrowTerms` walks to value collateral, and that `AuctionHouse` walks to seize it.
-    # The remaining position would stay physically in the vault but stop counting as collateral,
-    # degrading a borrower's health with nothing to revert it (this path runs no housekeeping), and
-    # a liquidation could not even see the asset to take it.
-    #
-    # `Lootbox._claimLoot` already performs exactly this cleanup correctly: it deregisters
-    # zero-balance assets and removes the vault only once the user is genuinely out of it. Note
-    # that `_reduceBalanceOnWithdrawal` does not deregister, so the migrated asset remains
-    # registered with a zero balance until that cleanup runs -- which is the ordinary steady state
-    # for any user who withdraws without claiming, and costs only loop gas.
-
     # add target vault to ledger
     targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
     if not targetLedgerData.isParticipatingInVault:
@@ -615,6 +642,15 @@ def migrateRipeGovPosition(
     # update lootbox points
     extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
     extcall Lootbox(a.lootbox).updateDepositPoints(_user, _targetVaultId, targetVault, _asset, a)
+
+    # the legacy route additionally proves the preserved record landed exactly, and runs the real
+    # borrower health path last -- reverting the whole migration if the user would be left unsafe
+    if _sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID:
+        assert staticcall TellerUtils(utils).verifyLegacyRipeGovImport(
+            _user, _asset, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, targetVault, _targetVaultId,
+            migration.amount, targetShares, snap, a,
+        ) # dev: invalid migration result
+        self._performHousekeeping(True, _user, True, a)
 
     log RipeGovPositionMigrated(
         user=_user,
@@ -631,21 +667,7 @@ def migrateRipeGovPosition(
     return migration.amount
 
 
-# BASE LEGACY ripe gov migration
-#
-# `migrateRipeGovPosition` above is left byte-identical: it is the qualified upstream flow for an
-# exporter-capable source, and it removes the whole source Ledger entry after depleting a single
-# asset. Base cannot use it. The deployed Base legacy vault predates the exporter and cannot be
-# changed, and a Base user may hold both RIPE and the LP, so source Ledger participation must
-# survive until every asset, reward and registration is gone.
-#
-# This branch therefore synthesizes the legacy record from the source's own public state, drives its
-# ordinary `SharesVault` withdrawal straight into the target, and imports through the SAME
-# `importPositionForMigration` the upstream flow uses. Source Ledger removal happens only later,
-# through Lootbox, in `settleAndCleanupLegacyRipeGovSource`.
-#
-# Teller keeps the pause, reentrancy, receipt, depletion, points and housekeeping checks; every
-# read-only validation and post-condition lives in TellerUtils.
+# BASE LEGACY window control and source settlement
 
 
 @external
@@ -666,89 +688,6 @@ def setLegacyRipeGovMigrationAsset(_asset: address):
 
     self.activeMigrationAsset = _asset
     log LegacyRipeGovMigrationAssetSet(asset=_asset, caller=msg.sender)
-
-
-@nonreentrant
-@external
-def migrateLegacyRipeGovPosition(_user: address, _asset: address) -> uint256:
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-    a: addys.Addys = addys._getAddys()
-    utils: address = addys._getTellerUtilsAddr()
-
-    # the approved full-protocol freeze must be active for the whole migration window
-    assert deptBasics.isPaused # dev: teller not paused
-    assert _asset != empty(address) and _asset == self.activeMigrationAsset # dev: asset window closed
-
-    targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-    assert targetVaultId != 0 and targetVaultId != LEGACY_RIPE_GOV_VAULT_ID # dev: invalid target vault id
-    targetVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(targetVaultId)
-    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
-    assert sourceVault != empty(address) # dev: legacy vault not registered
-
-    assert staticcall TellerUtils(utils).validateLegacyRipeGovMigration(
-        _user, _asset, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, targetVaultId, targetVault, a,
-    ) # dev: invalid migration
-
-    # capture the complete original source record BEFORE the withdrawal destroys it
-    snap: LegacySourceSnapshot = staticcall TellerUtils(utils).getLegacyRipeGovSourceSnapshot(_user, _asset, sourceVault, targetVault, a)
-
-    targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-    tellerBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
-
-    # withdraw the whole source position DIRECTLY into the target -- no custody hop
-    amount: uint256 = 0
-    isDepleted: bool = False
-    amount, isDepleted = extcall Vault(sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), targetVault, a)
-
-    # depletion and exact receipt, checked on the values this contract holds
-    assert isDepleted # dev: source position not depleted
-    assert amount == snap.sourceAmount # dev: inexact source withdrawal
-    assert staticcall IERC20(_asset).balanceOf(targetVault) - targetBalanceBefore == amount # dev: inexact target receipt
-    assert staticcall IERC20(_asset).balanceOf(self) == tellerBalanceBefore # dev: teller balance residue
-    assert staticcall IERC20(_asset).allowance(self, targetVault) == 0 # dev: teller allowance residue
-
-    # import through the SAME importer the upstream flow uses
-    targetShares: uint256 = extcall RipeGovVault(targetVault).importPositionForMigration(
-        _user,
-        _asset,
-        sourceVault,
-        RipeGovMigrationData(
-            amount=amount,
-            govPoints=snap.govPoints,
-            unlock=snap.unlock,
-            lastTerms=snap.lastTerms,
-        ),
-    )
-    assert targetShares != 0 # dev: invalid target shares
-
-    # target ledger participation, exactly once. Source participation is deliberately RETAINED.
-    targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, targetVaultId)
-    if not targetLedgerData.isParticipatingInVault:
-        extcall Ledger(a.ledger).addVaultToUser(_user, targetVaultId)
-
-    # settle both sides' deposit points while the source asset is still enumerable and claimable
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, _asset, a)
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, targetVaultId, targetVault, _asset, a)
-
-    assert staticcall TellerUtils(utils).verifyLegacyRipeGovImport(
-        _user, _asset, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, targetVault, targetVaultId,
-        amount, targetShares, snap, a,
-    ) # dev: invalid migration result
-
-    # real borrower housekeeping LAST -- reverts the whole migration if the user is unhealthy
-    self._performHousekeeping(True, _user, True, a)
-
-    log LegacyRipeGovPositionMigrated(
-        user=_user,
-        asset=_asset,
-        caller=msg.sender,
-        amount=amount,
-        sourceShares=snap.sourceShares,
-        targetShares=targetShares,
-        govPoints=snap.govPoints,
-        unlock=snap.unlock,
-    )
-    return amount
 
 
 @nonreentrant
