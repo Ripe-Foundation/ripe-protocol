@@ -80072,6 +80072,9 @@
     },
     "RipeCcipBurnMintTokenPool": {
       "address": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836"
+    },
+    "GreenCcipBurnMintTokenPool": {
+      "address": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f"
     }
   }
 }
