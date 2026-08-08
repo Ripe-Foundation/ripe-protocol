@@ -45,7 +45,7 @@ interface TellerUtils:
     def validateRipeGovMigration(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> (address, address): view
     def verifyLegacyRipeGovImport(_user: address, _asset: address, _sourceVault: address, _sourceVaultId: uint256, _targetVault: address, _targetVaultId: uint256, _amount: uint256, _targetShares: uint256, _snapshot: LegacySourceSnapshot, _a: addys.Addys = empty(addys.Addys)) -> bool: view
     def validateLegacyRipeGovMigration(_user: address, _asset: address, _sourceVaultId: uint256, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
-    def verifyLegacyRipeGovSettlement(_user: address, _sourceVault: address, _sourceVaultId: uint256, _settledAsset: address, _lpAsset: address, _didRemoveVault: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: view
+    def verifyLegacyRipeGovSettlement(_user: address, _sourceVault: address, _sourceVaultId: uint256, _settledAsset: address, _didRemoveVault: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: view
     def getLegacyRipeGovSourceSnapshot(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> LegacySourceSnapshot: view
     def getVaultAddrAndId(_asset: address, _vaultAddr: address, _vaultId: uint256, _vaultBook: address, _missionControl: address) -> (address, uint256): view
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -56,6 +56,7 @@ interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
@@ -273,13 +274,10 @@ MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
 CURVE_PRICES_ID: constant(uint256) = 2
 
-# Base legacy Ripe Gov vault -- deployed, unchangeable, only ever a migration SOURCE
+# Base legacy Ripe Gov vault -- deployed, unchangeable, only ever a migration SOURCE.
+# Its address is resolved from the live VaultBook rather than bound at deploy, matching how every
+# other vault reference in this contract is resolved.
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
-
-# legacy migration bindings, fixed at deploy and never caller-supplied
-LEGACY_RIPE_GOV_VAULT: public(immutable(address))
-MIGRATION_LP_ASSET: public(immutable(address))
-MIGRATION_CONTROL_ID: public(immutable(uint256)) # Switchboard registry id of the migration control
 
 # the one asset whose migration window is currently open. empty means no migration is allowed.
 # At most one asset may be MIGRATED at a time, and a window must be closed before the next opens.
@@ -289,21 +287,9 @@ activeMigrationAsset: public(address)
 
 
 @deploy
-def __init__(
-    _ripeHq: address,
-    _shouldPause: bool,
-    _legacyRipeGovVault: address,
-    _migrationLpAsset: address,
-    _migrationControlId: uint256,
-):
+def __init__(_ripeHq: address, _shouldPause: bool):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
-
-    assert empty(address) not in [_legacyRipeGovVault, _migrationLpAsset] # dev: invalid migration addr
-    assert _migrationControlId != 0 # dev: invalid migration control id
-    LEGACY_RIPE_GOV_VAULT = _legacyRipeGovVault
-    MIGRATION_LP_ASSET = _migrationLpAsset
-    MIGRATION_CONTROL_ID = _migrationControlId
 
 
 ############
@@ -662,19 +648,12 @@ def migrateRipeGovPosition(
 # read-only validation and post-condition lives in TellerUtils.
 
 
-@view
-@internal
-def _assertMigrationControl(_caller: address, _a: addys.Addys):
-    # only the exact registered migration control department may drive this
-    assert _caller == staticcall AddressRegistry(_a.switchboard).getAddr(MIGRATION_CONTROL_ID) # dev: no perms
-
-
 @external
 def setLegacyRipeGovMigrationAsset(_asset: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     a: addys.Addys = addys._getAddys()
-    self._assertMigrationControl(msg.sender, a)
 
-    assert _asset == empty(address) or _asset in [a.ripeToken, MIGRATION_LP_ASSET] # dev: unapproved migration asset
+    assert _asset == empty(address) or staticcall MissionControl(a.missionControl).isSupportedAssetInVault(LEGACY_RIPE_GOV_VAULT_ID, _asset) # dev: unapproved migration asset
 
     # close-before-open: an open window must be explicitly closed before another asset opens, so no
     # single transaction hands the window straight from RIPE to LP.
@@ -692,8 +671,8 @@ def setLegacyRipeGovMigrationAsset(_asset: address):
 @nonreentrant
 @external
 def migrateLegacyRipeGovPosition(_user: address, _asset: address) -> uint256:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     a: addys.Addys = addys._getAddys()
-    self._assertMigrationControl(msg.sender, a)
     utils: address = addys._getTellerUtilsAddr()
 
     # the approved full-protocol freeze must be active for the whole migration window
@@ -703,7 +682,8 @@ def migrateLegacyRipeGovPosition(_user: address, _asset: address) -> uint256:
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
     assert targetVaultId != 0 and targetVaultId != LEGACY_RIPE_GOV_VAULT_ID # dev: invalid target vault id
     targetVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(targetVaultId)
-    sourceVault: address = LEGACY_RIPE_GOV_VAULT
+    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
+    assert sourceVault != empty(address) # dev: legacy vault not registered
 
     assert staticcall TellerUtils(utils).validateLegacyRipeGovMigration(
         _user, _asset, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, targetVaultId, targetVault, a,
@@ -774,15 +754,16 @@ def migrateLegacyRipeGovPosition(_user: address, _asset: address) -> uint256:
 @nonreentrant
 @external
 def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     a: addys.Addys = addys._getAddys()
-    self._assertMigrationControl(msg.sender, a)
     assert deptBasics.isPaused # dev: teller not paused
     assert _user != empty(address) # dev: invalid user
 
     activeAsset: address = self.activeMigrationAsset
     assert activeAsset != empty(address) # dev: asset window closed
 
-    sourceVault: address = LEGACY_RIPE_GOV_VAULT
+    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
+    assert sourceVault != empty(address) # dev: legacy vault not registered
     assert staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID) == sourceVault # dev: source vault not registered
     assert not staticcall Vault(sourceVault).doesUserHaveBalance(_user, activeAsset) # dev: active asset not migrated
 
@@ -793,7 +774,7 @@ def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool):
     ripeClaimed, didRemoveVault = extcall Lootbox(a.lootbox).settleAndCleanupMigratedSource(_user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, a)
 
     assert staticcall TellerUtils(addys._getTellerUtilsAddr()).verifyLegacyRipeGovSettlement(
-        _user, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, activeAsset, MIGRATION_LP_ASSET, didRemoveVault, a,
+        _user, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, activeAsset, didRemoveVault, a,
     ) # dev: invalid settlement result
 
     # settlement can change collateral enumeration, so borrower health runs LAST here too --

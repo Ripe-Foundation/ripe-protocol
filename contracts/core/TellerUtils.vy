@@ -45,6 +45,10 @@ interface MissionControl:
     def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
+interface SourceVault:
+    def vaultAssets(_index: uint256) -> address: view
+    def numAssets() -> uint256: view
+
 interface RipeGovVault:
     def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
     def totalUserGovPoints(_user: address) -> uint256: view
@@ -126,6 +130,9 @@ struct TellerWithdrawConfig:
     isUserAllowed: bool
     canWithdrawForUser: bool
     minDepositBalance: uint256
+
+# bound for walking the legacy source vault's own asset list (1-based, so cap + 1)
+MAX_SOURCE_VAULT_ASSETS: constant(uint256) = 21
 
 UNDERSCORE_LEDGER_ID: constant(uint256) = 1
 UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
@@ -488,7 +495,6 @@ def verifyLegacyRipeGovSettlement(
     _sourceVault: address,
     _sourceVaultId: uint256,
     _settledAsset: address,
-    _lpAsset: address,
     _didRemoveVault: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
@@ -508,15 +514,19 @@ def verifyLegacyRipeGovSettlement(
         # nothing may remain REGISTERED in the source
         assert staticcall Vault(_sourceVault).numUserAssets(_user) <= 1 # dev: source registrations remain
 
-        # ...and nothing may remain OWED on either live source asset. Registration count alone is
-        # not proof of reward-freeness: an asset deregistered in an earlier round could still hold
-        # residual Ledger deposit points, which no enumeration would surface again.
-        # LIMIT: the deprecated pool is not read here; its emptiness (including zero residual
-        # deposit points) is a hard Phase 2 census precondition.
-        ripePoints: UserDepositPoints = staticcall Ledger(a.ledger).userDepositPoints(_user, _sourceVaultId, a.ripeToken)
-        lpPoints: UserDepositPoints = staticcall Ledger(a.ledger).userDepositPoints(_user, _sourceVaultId, _lpAsset)
-        assert ripePoints.balancePoints == 0 # dev: ripe entitlement remains
-        assert lpPoints.balancePoints == 0 # dev: lp entitlement remains
+        # ...and nothing may remain OWED on ANY asset the source vault supports. The per-user
+        # registration count is not proof of reward-freeness: an asset deregistered in an earlier
+        # round still holds its Ledger deposit points, and no per-user enumeration would surface
+        # it again. So this walks the vault's own asset list, which covers the live assets and the
+        # deprecated pool alike.
+        numAssets: uint256 = staticcall SourceVault(_sourceVault).numAssets()
+        assert numAssets <= MAX_SOURCE_VAULT_ASSETS # dev: source asset list over cap
+        for i: uint256 in range(1, numAssets, bound=MAX_SOURCE_VAULT_ASSETS):
+            asset: address = staticcall SourceVault(_sourceVault).vaultAssets(i)
+            if asset == empty(address):
+                continue
+            points: UserDepositPoints = staticcall Ledger(a.ledger).userDepositPoints(_user, _sourceVaultId, asset)
+            assert points.balancePoints == 0 # dev: source entitlement remains
 
     return True
 
