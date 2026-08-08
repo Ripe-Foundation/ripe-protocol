@@ -55,6 +55,52 @@ def test_basic_repay(
     assert green_token.balanceOf(credit_engine) == 0
 
 
+def test_repay_low_risk_succeeds_between_checked_actions_and_rearms_guard(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
+    teller.borrow(20 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    repay_amount = 5 * EIGHTEEN_DECIMALS
+    green_token.approve(teller, repay_amount, sender=bob)
+    assert teller.repay(repay_amount, bob, False, False, sender=bob)
+
+    debt = ledger.userDebt(bob).amount
+    touch = ledger.lastTouch(bob)
+    with boa.reverts("one action per block"):
+        teller.borrow(1 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    assert ledger.userDebt(bob).amount == debt
+    assert ledger.lastTouch(bob) == touch
+
+
 def test_repay_zero_amount(
     alpha_token,
     alpha_token_whale,
@@ -732,3 +778,119 @@ def test_repay_with_savings_green_payment_max_amount(
     assert green_token.balanceOf(credit_engine) == 0
 
 
+M3_REPAY_PRICE_DESK_SOURCE = """
+# @version 0.4.3
+
+unsafe_asset: immutable(address)
+
+@deploy
+def __init__(_unsafe_asset: address):
+    unsafe_asset = _unsafe_asset
+
+@view
+@external
+def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256:
+    assert _asset != unsafe_asset, "unsafe price lookup"
+    return _amount
+
+@view
+@external
+def getAddr(_regId: uint256) -> address:
+    return empty(address)
+"""
+
+
+def test_repay_uses_safe_collateral_without_pricing_zero_amount_position(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    teller,
+    green_token,
+    ledger,
+    price_desk,
+    rebase_erc20_vault,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=5_00,
+        _daowry=0,
+    )
+    setAssetConfig(alpha_token, _vaultIds=[3], _debtTerms=debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[4], _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    safe_amount = 100 * EIGHTEEN_DECIMALS
+    unsafe_nominal = 1 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        safe_amount,
+        alpha_token,
+        alpha_token_whale,
+    )
+    performDeposit(
+        bob,
+        unsafe_nominal,
+        bravo_token,
+        bravo_token_whale,
+        rebase_erc20_vault,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    debt_before = 40 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt_before, bob, False, sender=bob) == debt_before
+
+    # A total-loss SharesVault position remains `(asset, 0)`.
+    bravo_token.transfer(
+        bravo_token_whale,
+        unsafe_nominal,
+        sender=rebase_erc20_vault.address,
+    )
+    unsafe_asset, unsafe_amount = (
+        rebase_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1)
+    )
+    assert unsafe_asset == bravo_token.address
+    assert unsafe_amount == 0
+
+    # The replacement reverts for the unsafe asset. Successful preview, health,
+    # and repayment therefore prove that CreditEngine never asks for its price.
+    guarded_price_desk = boa.loads(
+        M3_REPAY_PRICE_DESK_SOURCE,
+        bravo_token.address,
+        name="m3_repay_price_desk",
+        override_address=boa.env.generate_address(),
+    )
+    boa.env.set_code(
+        price_desk.address,
+        boa.env.get_code(guarded_price_desk.address),
+    )
+
+    preview = credit_engine.getUserBorrowTerms(bob, True)
+    assert preview.collateralVal == safe_amount
+    assert preview.totalMaxDebt == safe_amount // 2
+    assert preview.debtTerms.liqThreshold == 70_00
+    assert credit_engine.hasGoodDebtHealth(bob)
+
+    repay_amount = 10 * EIGHTEEN_DECIMALS
+    assert green_token.approve(teller, repay_amount, sender=bob)
+    assert teller.repay(repay_amount, bob, False, False, sender=bob)
+
+    assert ledger.userDebt(bob).amount == debt_before - repay_amount
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.outstandingUserDebt == debt_before - repay_amount
+    assert repay_log.userCollateralVal == preview.collateralVal
+    assert repay_log.maxUserDebt == preview.totalMaxDebt
+    assert repay_log.hasGoodDebtHealth

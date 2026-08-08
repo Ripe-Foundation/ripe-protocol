@@ -16,6 +16,65 @@ import os
 MIGRATION_SCRIPTS_DIR = "./migrations"
 MIGRATION_HISTORY_DIR = "./migration_history"
 
+def _load_dotenv() -> None:
+    """Read .env so the RPC and keys need not be exported by hand.
+
+    Called from cli(), never at import: importing a module must not pull
+    secrets into the process environment as a side effect, because anything
+    that merely imports this file would inherit them. Running the command is
+    an explicit act; importing it is not.
+
+    override=False so a variable already in the environment wins, and an
+    explicit `FOO=bar python -m scripts.migrate ...` is never silently
+    overridden by .env.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(override=False)
+
+
+def _redact_rpc(url: str) -> str:
+    """Reduce a provider URL to scheme and host.
+
+    Everything after the host is dropped: Alchemy and friends put the key in
+    the path, and some providers use a query parameter.
+    """
+    if not url or "://" not in url:
+        return url or "<unset>"
+    scheme, _, rest = url.partition("://")
+    host = rest.split("/", 1)[0].split("?", 1)[0]
+    return f"{scheme}://{host}/<redacted>"
+
+
+def _rpc_from_env(chain):
+    """Per-chain RPC override, e.g. ROBINHOOD_MAINNET_RPC_URL."""
+    return os.environ.get(f"{chain.replace('-', '_').upper()}_RPC_URL")
+
+
+def _local_account(account_name):
+    """Load the deployer key from {ACCOUNT}_PRIVATE_KEY, e.g. DEPLOYER.
+
+    scripts.utils.migration_helpers.get_account now requires a verified
+    network identity for the H-02 path, so this keeps the plain key route
+    without changing a helper that other callers depend on. There is no
+    fallback test key: deploying from a well-known key is never what anyone
+    wants, and a missing key should say so rather than pick one.
+    """
+    from eth_account import Account
+
+    log.h1(f"Connecting to deployer account {account_name}")
+    key = os.environ.get(f"{account_name}_PRIVATE_KEY")
+    if not key:
+        raise click.ClickException(
+            f"{account_name}_PRIVATE_KEY is not set. Export it, put it in "
+            ".env, or pass --ledger <index> to sign with a device."
+        )
+    account = Account.from_key(key)
+    log.h2(f"Deployer account {account_name} connected")
+    return account
+
 
 CLICK_PROMPTS = {
     "safe": {
@@ -60,7 +119,7 @@ CLICK_PROMPTS = {
         "prompt": "Chain name",
         "default": "base-mainnet",
         "help": "Chain name for custom configuration on the deployment (ex: eth-mainnet, eth-sepolia, base-mainnet, base-sepolia).  Defaults to `local`",
-        "type": click.Choice(["local", "base-mainnet", "base-sepolia", "eth-sepolia", "eth-mainnet", "base-mainnet", "base-sepolia"], case_sensitive=False),
+        "type": click.Choice(["local", "base-mainnet", "base-sepolia", "eth-sepolia", "eth-mainnet", "robinhood-mainnet", "robinhood-testnet"], case_sensitive=False),
 
     },
     "account": {
@@ -81,10 +140,17 @@ CLICK_PROMPTS = {
 }
 
 
-ETHERSCAN_API_KEYS = {
-    "base-mainnet": os.environ["BASESCAN_API_KEY"],
-    "base-sepolia": os.environ["BASESCAN_API_KEY"],
-}
+# Chains whose verifier key comes from BASESCAN_API_KEY. The key is read when
+# it is needed, never at import: importing this module must not require, or
+# capture, a credential -- and a missing key should not stop `--help` or a
+# deployment to a chain that has no explorer.
+_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia", "robinhood-testnet")
+
+
+def _etherscan_api_key(chain):
+    if chain not in _BASESCAN_CHAINS:
+        return None
+    return os.environ.get("BASESCAN_API_KEY")
 ETHERSCAN_URLS = {
     "eth-mainnet": "https://api.etherscan.io/api",
     "eth-goerli": "https://api-goerli.etherscan.io/api",
@@ -92,6 +158,7 @@ ETHERSCAN_URLS = {
     "base-mainnet": "https://api.basescan.org/api",
     "base-goerli": "https://api-goerli.basescan.org/api",
     "base-sepolia": "https://api-sepolia.basescan.org/api",
+    "robinhood-testnet": "https://api-sepolia.basescan.org/api",
 }
 
 
@@ -255,8 +322,25 @@ def cli(
     `.migration_history/network-219183`.
     """
 
-    final_rpc = rpc if rpc else (
-        'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
+    _load_dotenv()
+
+    # No provider URL is assembled from a token here: a half-built URL with a
+    # missing key silently becomes a request to the wrong place. Supply the
+    # endpoint explicitly via --rpc or <CHAIN>_RPC_URL.
+    final_rpc = rpc or _rpc_from_env(chain) or ('boa' if chain == 'local' else None)
+    if not final_rpc:
+        raise click.ClickException(
+            f"No RPC for `{chain}`. Set {chain.replace('-', '_').upper()}_RPC_URL "
+            "in the environment or .env, or pass --rpc."
+        )
+
+    # A fork cannot execute ArbSys: it is a node-implemented precompile, so
+    # `arbBlockNumber()` reverts and the Ledger constructor refuses to deploy.
+    # Default fork runs to native so they just work, and leave live runs on
+    # ArbSys -- the action block source is an IMMUTABLE constructor argument,
+    # so a live run that silently picked native could not be corrected.
+    if fork and not os.environ.get("RIPE_LEDGER_BLOCK_SOURCE"):
+        os.environ["RIPE_LEDGER_BLOCK_SOURCE"] = "native"
 
     if safe != "":
         if fork:
@@ -267,16 +351,23 @@ def cli(
         #         rpc_url=final_rpc
         #     )
     elif ledger != -1:
-        # sender = LedgerAccount(final_rpc, ledger)
+        from scripts.utils.ledger_account import LedgerAccount
+
+        sender = LedgerAccount(final_rpc, ledger)
+        # On a fork nothing is broadcast, so resolve the address from the device
+        # and then stop touching it -- a fork must never prompt for signatures.
         if fork:
             sender = MockAccount(sender.address)
     else:
-        sender = get_account(account)
+        sender = _local_account(account)
 
     deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
 
     log.h1("Contract Migration")
-    log.info(f"Connected to rpc `{final_rpc}`.")
+    # The RPC value is never logged, not even redacted: the reference is what
+    # an operator needs, and a URL in scrollback or CI output is a key in
+    # scrollback or CI output.
+    log.info(f"RPC configured for chain `{chain}`.")
     log.info(f"Deployer account `{sender.address}`.")
     log.info(f"Manifests are stored in `{environment}`.")
     log.info(f"Deployment arguments: {deploy_args}")
@@ -295,7 +386,11 @@ def cli(
     )
 
     boa.deployments.set_deployments_db(boa.deployments.DeploymentsDB(":memory:"))
-    boa.set_etherscan(api_key=ETHERSCAN_API_KEYS[chain], uri=ETHERSCAN_URLS[chain])
+    # Robinhood has no Etherscan; it uses Blockscout, and nothing here needs a
+    # verifier. Only configure one for chains that actually have an entry.
+    api_key = _etherscan_api_key(chain)
+    if api_key and chain in ETHERSCAN_URLS:
+        boa.set_etherscan(api_key=api_key, uri=ETHERSCAN_URLS[chain])
 
     if final_rpc == 'boa':
         with boa.set_env(Env()) as env:
@@ -314,6 +409,21 @@ def cli(
     else:
         with boa.set_network_env(final_rpc) as env:
             env.add_account(sender)
+            # Disable boa's transaction tracer. It probes the node with a
+            # dummy `debug_traceTransaction` on first use, which providers can
+            # be slow enough to time out -- and that probe runs AFTER the
+            # transaction has broadcast, so a deployment that actually
+            # succeeded raises before it is written to the log and manifest.
+            # The next run then has no idea it already happened and deploys a
+            # second copy. Traces only improve error messages; losing the
+            # record of a live deployment is the worse failure.
+            #
+            # boa catches HTTPError and RPCError there but not
+            # requests.ReadTimeout, so suppress_debug_tt() alone is not
+            # enough: `_tracer` is a cached_property, and seeding it skips
+            # the probe entirely.
+            env._tracer = None
+            env.suppress_debug_tt()
             total_gas = migrations.run(
                 deploy_args, start_timestamp, end_timestamp, not single)
 

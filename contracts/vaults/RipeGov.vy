@@ -61,6 +61,12 @@ struct GovData:
     unlock: uint256
     lastTerms: cs.LockTerms
 
+struct RipeGovMigrationData:
+    amount: uint256
+    govPoints: uint256
+    unlock: uint256
+    lastTerms: cs.LockTerms
+
 event RipeGovVaultDeposit:
     user: indexed(address)
     asset: indexed(address)
@@ -104,10 +110,42 @@ event LockReleased:
     asset: indexed(address)
     exitFee: uint256
 
+event GovPointAccrualDisabledGlobally:
+    disabledBlock: uint256
+    caller: indexed(address)
+
+event GovPointAccrualDisabledForUser:
+    user: indexed(address)
+    disabledBlock: uint256
+    caller: indexed(address)
+
+event RipeGovPositionExported:
+    user: indexed(address)
+    asset: indexed(address)
+    targetVault: indexed(address)
+    amount: uint256
+    sourceShares: uint256
+    govPoints: uint256
+    unlock: uint256
+
+event RipeGovPositionImported:
+    user: indexed(address)
+    asset: indexed(address)
+    sourceVault: indexed(address)
+    amount: uint256
+    targetShares: uint256
+    govPoints: uint256
+    unlock: uint256
+
 # user gov data
 userGovData: public(HashMap[address, HashMap[address, GovData]]) # user -> asset -> GovData
 totalUserGovPoints: public(HashMap[address, uint256]) # user -> gov points
 totalGovPoints: public(uint256) # total gov points
+
+# admin controls
+govPointAccrualDisabledBlock: public(uint256) # zero means enabled; nonzero is the irreversible global-disable block
+userGovPointAccrualDisabledBlock: public(HashMap[address, uint256]) # zero means enabled; nonzero is the irreversible user-disable block
+positionMigratedOut: public(HashMap[address, HashMap[address, bool]]) # permanently prevents a migrated position from re-entering this vault
 
 PRECISION: constant(uint256) = 10 ** 18 # total should be 10**24 (each asset in this strat is 18 decimals, plus 8 decimal offset for shares)
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -149,7 +187,7 @@ def depositTokensWithLockDuration(
     _lockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     return self._depositTokensInRipeGovVault(_user, _asset, _amount, _lockDuration, _a)
 
 
@@ -161,6 +199,7 @@ def _depositTokensInRipeGovVault(
     _lockDuration: uint256,
     _a: addys.Addys,
 ) -> uint256:
+    assert not self.positionMigratedOut[_user][_asset] # dev: position migrated
     a: addys.Addys = addys._getAddys(_a)
 
     # deposit tokens (using shares module)
@@ -189,8 +228,11 @@ def _handleGovDataOnDeposit(
     _config: cs.RipeGovVaultConfig,
 ):
     userData: GovData = self.userGovData[_user][_asset]
-    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
-    newPoints += _additionalPoints
+    shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
+    newPoints: uint256 = 0
+    if shouldUpdatePoints:
+        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
+        newPoints += _additionalPoints
 
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, _config.lockTerms, userData.lastTerms)
@@ -199,13 +241,15 @@ def _handleGovDataOnDeposit(
 
     # save user data
     userData.lastShares = vaultData.userBalances[_user][_asset]
-    userData.govPoints += newPoints
     userData.lastPointsUpdate = block.number
+    if shouldUpdatePoints:
+        userData.govPoints += newPoints
     self.userGovData[_user][_asset] = userData
 
     # save total gov points
-    self.totalUserGovPoints[_user] += newPoints
-    self.totalGovPoints += newPoints
+    if shouldUpdatePoints:
+        self.totalUserGovPoints[_user] += newPoints
+        self.totalGovPoints += newPoints
 
 
 # withdraw
@@ -248,7 +292,6 @@ def _withdrawTokensFromVault(
     _shouldCheckRestrictions: bool,
     _a: addys.Addys,
 ) -> (uint256, bool):
-
     # withdraw tokens (using shares module)
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
@@ -274,8 +317,6 @@ def _handleGovDataOnWithdrawal(
     _ledger: address,
 ) -> uint256:
     userData: GovData = self.userGovData[_user][_asset]
-    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
-    prevSavedPoints: uint256 = userData.govPoints
 
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, _config.lockTerms, userData.lastTerms)
@@ -284,6 +325,25 @@ def _handleGovDataOnWithdrawal(
         assert block.number >= userData.unlock # dev: not reached unlock
         if _config.shouldFreezeWhenBadDebt:
             assert staticcall Ledger(_ledger).badDebt() == 0 # dev: cannot withdraw when bad debt
+
+    # Disabled users forfeit no stored points on a partial exit. A complete
+    # per-asset exit clears only the frozen points already recorded for that
+    # asset; unsafe pending accrual is intentionally never calculated.
+    if self._isGovPointAccrualDisabled(_user):
+        userData.lastShares = vaultData.userBalances[_user][_asset]
+        userData.lastPointsUpdate = block.number
+        if userData.lastShares == 0:
+            savedPoints: uint256 = userData.govPoints
+            assert self.totalUserGovPoints[_user] >= savedPoints # dev: inconsistent user gov points
+            assert self.totalGovPoints >= savedPoints # dev: inconsistent global gov points
+            userData.govPoints = 0
+            self.totalUserGovPoints[_user] -= savedPoints
+            self.totalGovPoints -= savedPoints
+        self.userGovData[_user][_asset] = userData
+        return 0
+
+    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
+    prevSavedPoints: uint256 = userData.govPoints
 
     # handle points penalty for withdrawal
     newUserPoints: uint256 = userData.govPoints + newPoints
@@ -352,6 +412,8 @@ def _handleGovDataOnTransfer(
     _boardroom: address,
     _ledger: address,
 ):
+    assert not self.positionMigratedOut[_toUser][_asset] # dev: recipient position migrated
+
     # from user
     transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, _config, _ledger)
     if not _shouldTransferPoints:
@@ -360,9 +422,15 @@ def _handleGovDataOnTransfer(
     # to user
     self._handleGovDataOnDeposit(_toUser, _asset, _transferShares, _lockDuration, transferPoints, _config)
 
-    # update other gov points / boardroom
-    self._updateUserGovPoints(_fromUser, _asset, _missionControl, _boardroom)
-    self._updateUserGovPoints(_toUser, _asset, _missionControl, _boardroom)
+    # The disabled sender already skips its own Boardroom callback below, but
+    # the healthy recipient would still call it and could strand the sender's
+    # emergency exit. Suppress both callbacks for this transaction; canonical
+    # totals update atomically and the public update path can retry the recipient.
+    boardroom: address = _boardroom
+    if self._isGovPointAccrualDisabled(_fromUser):
+        boardroom = empty(address)
+    self._updateUserGovPoints(_fromUser, _asset, _missionControl, boardroom)
+    self._updateUserGovPoints(_toUser, _asset, _missionControl, boardroom)
 
 
 # transfer contributor tokens
@@ -393,6 +461,168 @@ def transferContributorRipeTokens(
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount
+
+
+# disable governance-point accrual
+
+
+@external
+def disableGovPointAccrualGlobally():
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert self.govPointAccrualDisabledBlock == 0 # dev: already disabled
+
+    self.govPointAccrualDisabledBlock = block.number
+    log GovPointAccrualDisabledGlobally(disabledBlock=block.number, caller=msg.sender)
+
+
+@external
+def disableGovPointAccrualForUser(_user: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    assert self.govPointAccrualDisabledBlock == 0 # dev: globally disabled
+    assert self.userGovPointAccrualDisabledBlock[_user] == 0 # dev: already disabled
+
+    self.userGovPointAccrualDisabledBlock[_user] = block.number
+    log GovPointAccrualDisabledForUser(user=_user, disabledBlock=block.number, caller=msg.sender)
+
+
+@view
+@internal
+def _isGovPointAccrualDisabled(_user: address) -> bool:
+    return self.govPointAccrualDisabledBlock != 0 or self.userGovPointAccrualDisabledBlock[_user] != 0
+
+
+######################
+# Position Migration #
+######################
+
+
+@nonreentrant
+@external
+def exportPositionForMigration(
+    _user: address,
+    _asset: address,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> RipeGovMigrationData:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert vaultData.isPaused # dev: vault not paused
+    assert empty(address) not in [_user, _asset, _targetVault] # dev: invalid migration address
+    assert _targetVault != self and _targetVault.is_contract # dev: invalid target vault
+    assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated
+
+    # check position
+    sourceShares: uint256 = vaultData.userBalances[_user][_asset]
+    assert sourceShares != 0 # dev: no position
+
+    # update gov points
+    a: addys.Addys = addys._getAddys(_a)
+    self._updateGovPointsForUserAsset(_user, _asset, a.missionControl)
+
+    # check gov data
+    userData: GovData = self.userGovData[_user][_asset]
+    assert userData.lastShares == sourceShares # dev: inconsistent position shares
+    assert self.totalUserGovPoints[_user] >= userData.govPoints # dev: inconsistent user gov points
+    assert self.totalGovPoints >= userData.govPoints # dev: inconsistent global gov points
+
+    # calculate withdrawal shares and amount
+    withdrawalShares: uint256 = 0
+    amount: uint256 = 0
+    withdrawalShares, amount = sharesVault._calcWithdrawalSharesAndAmount(_user, _asset, max_value(uint256))
+    assert withdrawalShares == sourceShares # dev: partial migration
+
+    # reduce balance
+    removedShares: uint256 = 0
+    isDepleted: bool = False
+    removedShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
+    assert removedShares == sourceShares and isDepleted # dev: incomplete migration
+
+    # update total gov points
+    self.totalUserGovPoints[_user] -= userData.govPoints
+    self.totalGovPoints -= userData.govPoints
+    self.userGovData[_user][_asset] = empty(GovData)
+    self.positionMigratedOut[_user][_asset] = True
+
+    # transfer tokens
+    assert extcall IERC20(_asset).transfer(_targetVault, amount, default_return_value=True) # dev: token transfer failed
+
+    # log event
+    log RipeGovPositionExported(
+        user=_user,
+        asset=_asset,
+        targetVault=_targetVault,
+        amount=amount,
+        sourceShares=sourceShares,
+        govPoints=userData.govPoints,
+        unlock=userData.unlock,
+    )
+    return RipeGovMigrationData(
+        amount=amount,
+        govPoints=userData.govPoints,
+        unlock=userData.unlock,
+        lastTerms=userData.lastTerms,
+    )
+
+
+@nonreentrant
+@external
+def importPositionForMigration(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _migration: RipeGovMigrationData,
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert vaultData.isPaused # dev: vault not paused
+    assert empty(address) not in [_user, _asset, _sourceVault] # dev: invalid migration address
+    assert _sourceVault != self and _sourceVault.is_contract # dev: invalid source vault
+    assert _migration.amount != 0 # dev: invalid migration amount
+    assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated out
+    assert vaultData.userBalances[_user][_asset] == 0 # dev: target balance exists
+
+    # check gov data -- cannot have any existing gov data
+    userData: GovData = self.userGovData[_user][_asset]
+    assert userData.govPoints == 0 and userData.lastShares == 0 # dev: target gov data exists
+    assert userData.lastPointsUpdate == 0 and userData.unlock == 0 # dev: target gov data exists
+    assert userData.lastTerms.minLockDuration == 0 and userData.lastTerms.maxLockDuration == 0 # dev: target terms exist
+    assert userData.lastTerms.maxLockBoost == 0 and not userData.lastTerms.canExit and userData.lastTerms.exitFee == 0 # dev: target terms exist
+
+    # check asset balance
+    totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    assert totalAssetBalance >= _migration.amount # dev: migration funds not received
+    previousAssetBalance: uint256 = totalAssetBalance - _migration.amount
+
+    # calculate target shares
+    targetShares: uint256 = sharesVault._amountToShares(
+        _migration.amount,
+        vaultData.totalBalances[_asset],
+        previousAssetBalance,
+        False,
+    )
+    assert targetShares != 0 # dev: invalid target shares
+
+    # add balance and update gov data
+    vaultData._addBalanceOnDeposit(_user, _asset, targetShares, True)
+    self.userGovData[_user][_asset] = GovData(
+        govPoints=_migration.govPoints,
+        lastShares=targetShares,
+        lastPointsUpdate=block.number,
+        unlock=_migration.unlock,
+        lastTerms=_migration.lastTerms,
+    )
+    self.totalUserGovPoints[_user] += _migration.govPoints
+    self.totalGovPoints += _migration.govPoints
+
+    log RipeGovPositionImported(
+        user=_user,
+        asset=_asset,
+        sourceVault=_sourceVault,
+        amount=_migration.amount,
+        targetShares=targetShares,
+        govPoints=_migration.govPoints,
+        unlock=_migration.unlock,
+    )
+    return targetShares
 
 
 ####################
@@ -472,6 +702,8 @@ def _updateUserGovPoints(
     _missionControl: address,
     _boardroom: address,
 ):
+    shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
+
     numUserAssets: uint256 = vaultData.numUserAssets[_user]
     if numUserAssets != 0:
         for i: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
@@ -479,6 +711,9 @@ def _updateUserGovPoints(
             if asset == _skipAsset or asset == empty(address):
                 continue
             self._updateGovPointsForUserAsset(_user, asset, _missionControl)
+
+    if not shouldUpdatePoints:
+        return
 
     # update boardroom
     if _boardroom != empty(address):
@@ -494,20 +729,25 @@ def _updateGovPointsForUserAsset(
     config: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
 
     userData: GovData = self.userGovData[_user][_asset]
-    newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, config.lockTerms, config.assetWeight)
+    shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
+    newPoints: uint256 = 0
+    if shouldUpdatePoints:
+        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, config.lockTerms, config.assetWeight)
 
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, config.lockTerms, userData.lastTerms)
     userData.lastTerms = config.lockTerms
 
     # save user data
-    userData.govPoints += newPoints
     userData.lastPointsUpdate = block.number
+    if shouldUpdatePoints:
+        userData.govPoints += newPoints
     self.userGovData[_user][_asset] = userData
 
     # save total gov points
-    self.totalUserGovPoints[_user] += newPoints
-    self.totalGovPoints += newPoints
+    if shouldUpdatePoints:
+        self.totalUserGovPoints[_user] += newPoints
+        self.totalGovPoints += newPoints
 
 
 ####################
@@ -522,7 +762,7 @@ def adjustLock(
     _newLockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     a: addys.Addys = addys._getAddys(_a)
 
     # do a full update first
@@ -554,7 +794,7 @@ def releaseLock(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     a: addys.Addys = addys._getAddys(_a)
 
     # they are probably wanting to exit early because of bad debt, crisis of confidence
@@ -634,9 +874,10 @@ def _getLatestGovPoints(
     if newPoints == 0:
         return 0
 
-    # asset weight
-    if _weight != 0:
-        newPoints = newPoints * _weight // HUNDRED_PERCENT
+    # asset weight -- a configured zero means zero points (GOV-WEIGHT-01).
+    # The multiplier is applied unconditionally: guarding on `_weight != 0` made a
+    # zero weight fall through to the unweighted base, i.e. behave as 100%.
+    newPoints = newPoints * _weight // HUNDRED_PERCENT
 
     # lock boost bonus (only if terms are set)
     if _terms.maxLockDuration != 0:

@@ -4,6 +4,281 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
+TELLER_ID = 17
+
+
+def _alternate_teller(name):
+    return boa.loads(
+        """
+# pragma version ~=0.4.3
+
+@external
+def marker():
+    pass
+""",
+        name=name,
+    )
+
+
+def _replace_teller_pointer(ripe_hq, governance, replacement):
+    ripe_hq.startAddressUpdateToRegistry(
+        TELLER_ID,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        TELLER_ID,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(TELLER_ID) == replacement.address
+
+
+def _disable_teller_pointer(ripe_hq, governance):
+    ripe_hq.startAddressDisableInRegistry(TELLER_ID, sender=governance.address)
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressDisableInRegistry(
+        TELLER_ID,
+        sender=governance.address,
+    )
+    assert ripe_hq.getAddr(TELLER_ID) == ZERO_ADDRESS
+
+
+def _seed_claimable_deposit_loot(
+    user,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    asset,
+    whale,
+):
+    setGeneralConfig()
+    setAssetConfig(asset)
+    setRipeRewardsConfig()
+    performDeposit(user, 100 * EIGHTEEN_DECIMALS, asset, whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(
+        user,
+        vault_id,
+        simple_erc20_vault,
+        asset,
+        sender=teller.address,
+    )
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        user,
+        vault_id,
+        simple_erc20_vault,
+        asset,
+        sender=teller.address,
+    )
+    return vault_id
+
+
+def test_claim_deposit_loot_uses_current_teller_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    alternate = _alternate_teller("alternate_loot_claim_teller")
+    _replace_teller_pointer(ripe_hq, governance, alternate)
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints
+    claimable = lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token)
+    assert points_before > 0
+    assert claimable > 0
+
+    with boa.reverts(dev="no perms"):
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_id,
+            alpha_token,
+            sender=teller.address,
+        )
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == points_before
+    assert ripe_token.balanceOf(bob) == 0
+
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alternate.address,
+    )
+    assert claimed == claimable
+    assert ripe_token.balanceOf(bob) == claimed
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+
+
+def test_claim_deposit_loot_reverts_atomically_when_teller_pointer_is_unset(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    global_before = ledger.globalDepositPoints()
+    last_touch_before = ledger.lastTouch(bob)
+    ripe_before = ripe_token.balanceOf(bob)
+    _disable_teller_pointer(ripe_hq, governance)
+
+    # The aggregate view does not depend on the Teller pointer and remains
+    # readable even though the state-changing claim path is now unavailable.
+    assert lootbox.getClaimableLoot(bob) > 0
+
+    with boa.reverts(dev="no perms"):
+        lootbox.claimDepositLootForAsset(
+            bob,
+            vault_id,
+            alpha_token,
+            sender=teller.address,
+        )
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token) == points_before
+    assert ledger.globalDepositPoints() == global_before
+    assert ledger.lastTouch(bob) == last_touch_before
+    assert ripe_token.balanceOf(bob) == ripe_before
+
+
+# Plan-substitution record: getClaimableLoot does not read the Teller pointer,
+# so an unset Teller cannot make this view revert. The state-changing Teller-
+# pointer failure is bound above. This replacement exercises the actual
+# position-dependent pointer lookup in the view: the core RipeGov vault ID.
+def test_get_claimable_loot_with_position_reverts_when_core_vault_pointer_is_unset(
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    mission_control,
+    alpha_token,
+    alpha_token_whale,
+):
+    _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    # There is no public zeroing transition for this pointer. The direct state
+    # setup isolates Lootbox's defensive read-time guard without pretending it
+    # is a reachable governance transition.
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    assert lootbox.getClaimableLoot(alice) == 0
+    with boa.reverts(dev="invalid vault id"):
+        lootbox.getClaimableLoot(bob)
+
+
+def test_get_claimable_loot_from_alternate_pointer_matches_claimed_amount(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_hq,
+    governance,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    vault_id = _seed_claimable_deposit_loot(
+        bob,
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        lootbox,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+    )
+    alternate = _alternate_teller("alternate_loot_view_teller")
+    _replace_teller_pointer(ripe_hq, governance, alternate)
+    viewed = lootbox.getClaimableLoot(bob)
+    assert viewed > 0
+
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alternate.address,
+    )
+    assert claimed == viewed
+    assert ripe_token.balanceOf(bob) == viewed
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+
+
 def test_loot_claim_basic(
     bob,
     setGeneralConfig,
@@ -57,6 +332,48 @@ def test_loot_claim_basic(
     # verify claimable amount is now zero
     claimable = lootbox.getClaimableLoot(bob)
     assert claimable == 0
+
+
+def test_accrued_loot_buckets_remain_claimable_while_new_points_are_disabled(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setRipeRewardsConfig(True)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    stored_points = ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints
+    claimable_before_disable = lootbox.getClaimableLoot(bob)
+    assert stored_points > 0
+    assert claimable_before_disable > 0
+
+    setRipeRewardsConfig(False)
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == stored_points
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed == claimable_before_disable
+    assert ripe_token.balanceOf(bob) == claimed
+
 
 
 def test_loot_claim_multiple_users(
@@ -1483,3 +1800,196 @@ def test_loot_claim_auto_stake_configuration_updates(
     assert second_claim > 0
     assert ripe_token.balanceOf(bob) == first_claim  # Wallet unchanged from first claim
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0  # Second claim went to vault
+
+
+def test_lootbox_auto_stake_uses_core_governance_vault_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_alpha,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    source_vault_id = vault_book.getRegId(simple_erc20_vault)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        source_vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert claimed > 0
+    assert alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+
+
+def test_lootbox_claim_routes_fail_closed_when_core_pointer_is_unset(
+    mission_control,
+    lootbox,
+    bob,
+    alpha_token,
+):
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+
+    assert lootbox.getClaimableLoot(bob) == 0
+    with boa.reverts("invalid vault id"):
+        lootbox.getClaimableDepositLootForAsset(bob, 3, alpha_token)
+
+
+def test_lootbox_borrow_auto_stake_uses_core_governance_vault_pointer(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    ledger,
+    lootbox,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    ripe_token,
+    mission_control,
+    switchboard_alpha,
+    ripe_gov_vault,
+    alternate_ripe_gov_vault,
+    registerVault,
+):
+    core_id = registerVault(alternate_ripe_gov_vault, "Borrow Loot Core RipeGov")
+    setGeneralConfig()
+    setAssetConfig(ripe_token, _vaultIds=[core_id])
+    setRipeRewardsConfig(
+        True,
+        _autoStakeRatio=100_00,
+        _autoStakeDurationRatio=50_00,
+    )
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1_000, 100_00, False, 0),
+        sender=switchboard_alpha.address,
+    )
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+
+    debt_terms = createDebtTerms()
+    user_debt = (
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        debt_terms,
+        0,
+        False,
+    )
+    ledger.setUserDebt(bob, user_debt, 0, (0, 0), sender=credit_engine.address)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+
+    claimable = lootbox.getClaimableBorrowLoot(bob)
+    assert claimable > 0
+    assert lootbox.claimBorrowLoot(bob, sender=teller.address) == claimable
+    assert (
+        alternate_ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+        == claimable
+    )
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_token.balanceOf(bob) == 0
+
+
+def test_lootbox_borrow_claim_unset_pointer_reverts_without_state_changes(
+    bob,
+    setGeneralConfig,
+    setRipeRewardsConfig,
+    ledger,
+    lootbox,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    ripe_token,
+    mission_control,
+):
+    setGeneralConfig()
+    setRipeRewardsConfig(
+        True,
+        _autoStakeRatio=100_00,
+        _autoStakeDurationRatio=50_00,
+    )
+
+    debt_terms = createDebtTerms()
+    user_debt = (
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        debt_terms,
+        0,
+        False,
+    )
+    ledger.setUserDebt(bob, user_debt, 0, (0, 0), sender=credit_engine.address)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateBorrowPoints(bob, sender=teller.address)
+
+    claimable_before = lootbox.getClaimableBorrowLoot(bob)
+    user_points_before = ledger.userBorrowPoints(bob)
+    global_points_before = ledger.globalBorrowPoints()
+    rewards_available_before = ledger.ripeAvailForRewards()
+    supply_before = ripe_token.totalSupply()
+    user_balance_before = ripe_token.balanceOf(bob)
+    allowance_before = ripe_token.allowance(lootbox, teller)
+    assert claimable_before > 0
+
+    mission_control.eval("self.coreRipeGovVaultId = 0")
+    with boa.reverts("invalid vault id"):
+        lootbox.claimBorrowLoot(bob, sender=teller.address)
+
+    user_points_after = ledger.userBorrowPoints(bob)
+    global_points_after = ledger.globalBorrowPoints()
+    assert lootbox.getClaimableBorrowLoot(bob) == claimable_before
+    assert (
+        user_points_after.lastPrincipal,
+        user_points_after.points,
+        user_points_after.lastUpdate,
+    ) == (
+        user_points_before.lastPrincipal,
+        user_points_before.points,
+        user_points_before.lastUpdate,
+    )
+    assert (
+        global_points_after.lastPrincipal,
+        global_points_after.points,
+        global_points_after.lastUpdate,
+    ) == (
+        global_points_before.lastPrincipal,
+        global_points_before.points,
+        global_points_before.lastUpdate,
+    )
+    assert ledger.ripeAvailForRewards() == rewards_available_before
+    assert ripe_token.totalSupply() == supply_before
+    assert ripe_token.balanceOf(bob) == user_balance_before
+    assert ripe_token.allowance(lootbox, teller) == allowance_before

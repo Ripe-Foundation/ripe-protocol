@@ -1,8 +1,52 @@
 import pytest
 import boa
 
-from constants import ZERO_ADDRESS
+from constants import MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
+
+
+def _asset_config(vault_ids):
+    return (
+        vault_ids,
+        0,
+        0,
+        MAX_UINT256,
+        MAX_UINT256,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        (False, 0, 0, 0, 0),
+        ZERO_ADDRESS,
+        False,
+    )
+
+
+def _support_asset(mission_control, switchboard_bravo, asset, vault_ids):
+    mission_control.setAssetConfig(
+        asset,
+        _asset_config(vault_ids),
+        sender=switchboard_bravo.address,
+    )
+
+
+def _register_vault(vault_book, governance, vault, description):
+    assert vault_book.startAddNewAddressToRegistry(
+        vault.address,
+        description,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    return vault_book.confirmNewAddressToRegistry(vault.address, sender=governance.address)
 
 
 ###############
@@ -17,17 +61,31 @@ def mock_auction_house():
 
 
 @pytest.fixture(scope="function")
-def new_mission_control(ripe_hq, defaults):
+def new_mission_control(ripe_hq, defaults, switchboard_charlie):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
 
     Uses the same RipeHq so SwitchboardBravo/Charlie are authorized as switchboards,
     but this MC itself is not registered in the HQ registry.
     """
-    return boa.load(
+    mission_control = boa.load(
         "contracts/data/MissionControl.vy",
         ripe_hq,
         defaults,
         name="new_mission_control",
+    )
+    mission_control.setCoreRipeGovVaultId(2, sender=switchboard_charlie.address)
+    mission_control.setPreferredStabVaultId(1, sender=switchboard_charlie.address)
+    return mission_control
+
+
+@pytest.fixture(scope="function")
+def zero_pointer_mission_control(ripe_hq, defaults):
+    """Deploy an unregistered MissionControl with both pointers intentionally unset."""
+    return boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        defaults,
+        name="zero_pointer_mission_control",
     )
 
 
@@ -1794,6 +1852,35 @@ def test_switchboard_three_set_underscore_send_interval_timelock(
     assert switchboard_charlie.actionType(action_id) == 0
 
 
+def test_switchboard_three_forwards_below_floor_rejection(
+    switchboard_charlie,
+    governance,
+    lootbox,
+):
+    """The timelocked governance path forwards the exact rejected value."""
+    original_interval = lootbox.underscoreSendInterval()
+    rejected_interval = lootbox.minUnderscoreSendInterval() - 1
+
+    action_id = switchboard_charlie.setUnderscoreSendInterval(
+        rejected_interval,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    with boa.reverts("invalid interval"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert lootbox.underscoreSendInterval() == original_interval
+    assert (
+        switchboard_charlie.pendingUnderscoreSendInterval(action_id)
+        == rejected_interval
+    )
+    assert switchboard_charlie.actionType(action_id) == 128
+
+
 def test_switchboard_three_set_undy_deposit_rewards_amount_timelock(
     switchboard_charlie,
     alice,
@@ -2881,6 +2968,543 @@ def test_deregister_vault_asset_cancellation(
 
     # Verify action was cancelled
     assert switchboard_charlie.actionType(aid) == 0
+
+
+################################
+# Canonical Vault ID Pointers  #
+################################
+
+
+def test_vault_pointer_actions_require_governance_and_reject_basic_invalid_ids(
+    switchboard_charlie,
+    governance,
+    alice,
+):
+    with boa.reverts("no perms"):
+        switchboard_charlie.setCoreRipeGovVaultId(2, sender=alice)
+    with boa.reverts("no perms"):
+        switchboard_charlie.setPreferredStabVaultId(1, sender=alice)
+
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.setCoreRipeGovVaultId(0, sender=governance.address)
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.setPreferredStabVaultId(0, sender=governance.address)
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.setCoreRipeGovVaultId(999, sender=governance.address)
+    with boa.reverts("invalid vault id"):
+        switchboard_charlie.setPreferredStabVaultId(999, sender=governance.address)
+
+    with boa.reverts("already set"):
+        switchboard_charlie.setCoreRipeGovVaultId(2, sender=governance.address)
+    with boa.reverts("already set"):
+        switchboard_charlie.setPreferredStabVaultId(1, sender=governance.address)
+
+
+def test_vault_pointer_actions_reject_contracts_with_wrong_interfaces(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    mock_rando_contract,
+    ripe_token,
+    savings_green,
+):
+    vault_id = _register_vault(vault_book, governance, mock_rando_contract, "Wrong Interface")
+    _support_asset(mission_control, switchboard_bravo, ripe_token.address, [vault_id])
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [vault_id])
+
+    with boa.reverts():
+        switchboard_charlie.setCoreRipeGovVaultId(vault_id, sender=governance.address)
+    with boa.reverts():
+        switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
+
+
+def test_vault_pointer_actions_reject_malformed_probe_return_data(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    ripe_token,
+    savings_green,
+):
+    malformed_vault = boa.loads(
+        """
+@external
+def totalGovPoints():
+    pass
+
+@external
+def totalClaimableBalances(_asset: address):
+    pass
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        name="malformed_pointer_vault",
+    )
+    vault_id = _register_vault(vault_book, governance, malformed_vault, "Malformed Probe Returns")
+    _support_asset(mission_control, switchboard_bravo, ripe_token.address, [vault_id])
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [vault_id])
+
+    with boa.reverts():
+        switchboard_charlie.setCoreRipeGovVaultId(vault_id, sender=governance.address)
+    with boa.reverts():
+        switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
+
+
+def test_vault_pointer_actions_reject_unsupported_and_paused_candidates(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+):
+    core_id = _register_vault(vault_book, governance, alternate_ripe_gov_vault, "Alternate RipeGov")
+    preferred_id = _register_vault(vault_book, governance, alternate_stability_pool, "Alternate Stability Pool")
+
+    with boa.reverts("unsupported asset"):
+        switchboard_charlie.setCoreRipeGovVaultId(core_id, sender=governance.address)
+    with boa.reverts("unsupported asset"):
+        switchboard_charlie.setPreferredStabVaultId(preferred_id, sender=governance.address)
+
+    _support_asset(mission_control, switchboard_bravo, ripe_token.address, [core_id])
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [preferred_id])
+    switchboard_charlie.pause(alternate_ripe_gov_vault.address, True, sender=governance.address)
+    switchboard_charlie.pause(alternate_stability_pool.address, True, sender=governance.address)
+
+    with boa.reverts("vault paused"):
+        switchboard_charlie.setCoreRipeGovVaultId(core_id, sender=governance.address)
+    with boa.reverts("vault paused"):
+        switchboard_charlie.setPreferredStabVaultId(preferred_id, sender=governance.address)
+
+
+def test_vault_pointer_actions_allow_explicit_initialization_from_zero(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    zero_pointer_mission_control,
+    ripe_token,
+    savings_green,
+):
+    _support_asset(zero_pointer_mission_control, switchboard_bravo, ripe_token.address, [2])
+    _support_asset(zero_pointer_mission_control, switchboard_bravo, savings_green.address, [1])
+
+    core_action = switchboard_charlie.setCoreRipeGovVaultId(
+        2,
+        zero_pointer_mission_control.address,
+        sender=governance.address,
+    )
+    core_pending = filter_logs(switchboard_charlie, "PendingCoreRipeGovVaultIdChange")[0]
+    assert core_pending.previousVaultId == 0
+    assert core_pending.newVaultId == 2
+    assert core_pending.actionId == core_action
+
+    preferred_action = switchboard_charlie.setPreferredStabVaultId(
+        1,
+        zero_pointer_mission_control.address,
+        sender=governance.address,
+    )
+    preferred_pending = filter_logs(switchboard_charlie, "PendingPreferredStabVaultIdChange")[0]
+    assert preferred_pending.previousVaultId == 0
+    assert preferred_pending.newVaultId == 1
+    assert preferred_pending.actionId == preferred_action
+
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    assert switchboard_charlie.executePendingAction(core_action, sender=governance.address)
+    assert switchboard_charlie.executePendingAction(preferred_action, sender=governance.address)
+    assert zero_pointer_mission_control.coreRipeGovVaultId() == 2
+    assert zero_pointer_mission_control.preferredStabVaultId() == 1
+
+
+def test_preferred_vault_pending_event_contains_new_address_and_confirmation_block(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    zero_pointer_mission_control,
+    savings_green,
+    stability_pool,
+):
+    _support_asset(
+        zero_pointer_mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1],
+    )
+    action_id = switchboard_charlie.setPreferredStabVaultId(
+        1,
+        zero_pointer_mission_control.address,
+        sender=governance.address,
+    )
+
+    logs = filter_logs(switchboard_charlie, "PendingPreferredStabVaultIdChange")
+    assert len(logs) == 1
+    event = logs[0]
+    assert event.previousVaultId == 0
+    assert event.newVaultId == 1
+    assert event.newVaultAddr == stability_pool.address
+    assert event.confirmationBlock == switchboard_charlie.getActionConfirmationBlock(action_id)
+    assert event.actionId == action_id
+    assert switchboard_charlie.pendingPreferredStabVaultId(action_id) == 1
+    assert switchboard_charlie.pendingMissionControl(action_id) == zero_pointer_mission_control.address
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+
+def test_core_pointer_action_lifecycle_and_candidate_mission_control(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    zero_pointer_mission_control,
+    alternate_ripe_gov_vault,
+    ripe_token,
+):
+    vault_id = _register_vault(vault_book, governance, alternate_ripe_gov_vault, "Alternate RipeGov")
+    _support_asset(zero_pointer_mission_control, switchboard_bravo, ripe_token.address, [vault_id])
+    assert zero_pointer_mission_control.coreRipeGovVaultId() == 0
+
+    action_id = switchboard_charlie.setCoreRipeGovVaultId(
+        vault_id,
+        zero_pointer_mission_control.address,
+        sender=governance.address,
+    )
+    pending_log = filter_logs(switchboard_charlie, "PendingCoreRipeGovVaultIdChange")[0]
+    assert pending_log.previousVaultId == 0
+    assert pending_log.newVaultId == vault_id
+    assert pending_log.newVaultAddr == alternate_ripe_gov_vault.address
+    assert pending_log.confirmationBlock == switchboard_charlie.getActionConfirmationBlock(action_id)
+    assert pending_log.actionId == action_id
+    assert switchboard_charlie.pendingCoreRipeGovVaultId(action_id) == vault_id
+    assert switchboard_charlie.pendingMissionControl(action_id) == zero_pointer_mission_control.address
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+    assert not switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    assert switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+
+    final_log = filter_logs(switchboard_charlie, "CoreRipeGovVaultIdSet")[0]
+    assert final_log.previousVaultId == 0
+    assert final_log.newVaultId == vault_id
+    assert final_log.newVaultAddr == alternate_ripe_gov_vault.address
+    assert zero_pointer_mission_control.coreRipeGovVaultId() == vault_id
+    assert mission_control.coreRipeGovVaultId() == 2
+    assert switchboard_charlie.actionType(action_id) == 0
+    assert not switchboard_charlie.hasPendingAction(action_id)
+
+
+def test_preferred_pointer_final_event_uses_execution_time_previous_id(
+    switchboard_charlie,
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_stability_pool,
+    savings_green,
+):
+    vault_id = _register_vault(vault_book, governance, alternate_stability_pool, "Alternate Stability Pool")
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [1, vault_id])
+    action_id = switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
+
+    mission_control.setPreferredStabVaultId(999, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    assert switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+
+    final_log = filter_logs(switchboard_charlie, "PreferredStabVaultIdSet")[0]
+    assert final_log.previousVaultId == 999
+    assert final_log.newVaultId == vault_id
+    assert final_log.newVaultAddr == alternate_stability_pool.address
+    assert mission_control.preferredStabVaultId() == vault_id
+
+
+def test_pointer_execution_revalidates_noop_pause_and_asset_support_changes(
+    switchboard_charlie,
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+):
+    core_id = _register_vault(vault_book, governance, alternate_ripe_gov_vault, "Alternate RipeGov")
+    preferred_id = _register_vault(vault_book, governance, alternate_stability_pool, "Alternate Stability Pool")
+    _support_asset(mission_control, switchboard_bravo, ripe_token.address, [2, core_id])
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [1, preferred_id])
+
+    noop_action = switchboard_charlie.setCoreRipeGovVaultId(core_id, sender=governance.address)
+    mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("already set"):
+        switchboard_charlie.executePendingAction(noop_action, sender=governance.address)
+
+    mission_control.setCoreRipeGovVaultId(2, sender=switchboard_alpha.address)
+    pause_action = switchboard_charlie.setCoreRipeGovVaultId(core_id, sender=governance.address)
+    switchboard_charlie.pause(alternate_ripe_gov_vault.address, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("vault paused"):
+        switchboard_charlie.executePendingAction(pause_action, sender=governance.address)
+    switchboard_charlie.pause(alternate_ripe_gov_vault.address, False, sender=governance.address)
+    assert switchboard_charlie.executePendingAction(pause_action, sender=governance.address)
+
+    support_action = switchboard_charlie.setPreferredStabVaultId(preferred_id, sender=governance.address)
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [1])
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("unsupported asset"):
+        switchboard_charlie.executePendingAction(support_action, sender=governance.address)
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [1, preferred_id])
+    assert switchboard_charlie.executePendingAction(support_action, sender=governance.address)
+
+
+def test_pointer_execution_uses_current_vault_book_binding(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    ripe_hq,
+    ripe_token,
+):
+    vault_id = _register_vault(vault_book, governance, alternate_ripe_gov_vault, "Alternate RipeGov")
+    _support_asset(mission_control, switchboard_bravo, ripe_token.address, [2, vault_id])
+    action_id = switchboard_charlie.setCoreRipeGovVaultId(vault_id, sender=governance.address)
+
+    replacement = boa.load(
+        "contracts/vaults/RipeGov.vy",
+        ripe_hq,
+        name="replacement_ripe_gov_vault",
+    )
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        replacement.address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(vault_id, sender=governance.address)
+
+    confirmation_block = switchboard_charlie.getActionConfirmationBlock(action_id)
+    if boa.env.evm.patch.block_number < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - boa.env.evm.patch.block_number)
+    assert switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+
+    final_log = filter_logs(switchboard_charlie, "CoreRipeGovVaultIdSet")[0]
+    assert final_log.newVaultAddr == replacement.address
+    assert vault_book.getAddr(vault_id) == replacement.address
+
+
+def test_pointer_actions_follow_normal_cancellation_and_expiration_paths(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_stability_pool,
+    savings_green,
+):
+    vault_id = _register_vault(vault_book, governance, alternate_stability_pool, "Alternate Stability Pool")
+    _support_asset(mission_control, switchboard_bravo, savings_green.address, [1, vault_id])
+
+    cancelled_action = switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
+    assert switchboard_charlie.cancelPendingAction(cancelled_action, sender=governance.address)
+    assert switchboard_charlie.actionType(cancelled_action) == 0
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    assert not switchboard_charlie.executePendingAction(cancelled_action, sender=governance.address)
+
+    expired_action = switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
+    boa.env.time_travel(
+        blocks=switchboard_charlie.actionTimeLock() + switchboard_charlie.expiration()
+    )
+    assert not switchboard_charlie.executePendingAction(expired_action, sender=governance.address)
+    assert switchboard_charlie.actionType(expired_action) == 0
+    assert mission_control.preferredStabVaultId() == 1
+
+
+@pytest.mark.parametrize("pointer_kind", ["core", "preferred"])
+@pytest.mark.parametrize("replacement_kind", ["wrong_interface", "malformed_probe"])
+def test_pointer_execution_rejects_invalid_rebound_contract(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+    pointer_kind,
+    replacement_kind,
+):
+    if pointer_kind == "core":
+        candidate = alternate_ripe_gov_vault
+        asset = ripe_token
+        initial_id = 2
+        setter = switchboard_charlie.setCoreRipeGovVaultId
+        pointer_view = mission_control.coreRipeGovVaultId
+        pending_view = switchboard_charlie.pendingCoreRipeGovVaultId
+        probe_source = """
+@external
+def totalGovPoints():
+    pass
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+"""
+    else:
+        candidate = alternate_stability_pool
+        asset = savings_green
+        initial_id = 1
+        setter = switchboard_charlie.setPreferredStabVaultId
+        pointer_view = mission_control.preferredStabVaultId
+        pending_view = switchboard_charlie.pendingPreferredStabVaultId
+        probe_source = """
+@external
+def totalClaimableBalances(_asset: address):
+    pass
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+"""
+
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        candidate,
+        f"Rebound {pointer_kind} candidate",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        asset.address,
+        [initial_id, vault_id],
+    )
+    action_id = setter(vault_id, sender=governance.address)
+
+    if replacement_kind == "wrong_interface":
+        replacement = boa.loads(
+            """
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+            name=f"rebound_{pointer_kind}_wrong_interface",
+        )
+    else:
+        replacement = boa.loads(
+            probe_source,
+            name=f"rebound_{pointer_kind}_malformed_probe",
+        )
+
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    confirmation_block = switchboard_charlie.getActionConfirmationBlock(action_id)
+    if boa.env.evm.patch.block_number < confirmation_block:
+        boa.env.time_travel(
+            blocks=confirmation_block - boa.env.evm.patch.block_number
+        )
+    with boa.reverts():
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert pointer_view() == initial_id
+    assert pending_view(action_id) == vault_id
+    assert switchboard_charlie.actionType(action_id) != 0
+    assert switchboard_charlie.hasPendingAction(action_id)
+
+
+@pytest.mark.parametrize("pointer_kind", ["core", "preferred"])
+def test_pointer_execution_rejects_disabled_vault_binding(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    alternate_ripe_gov_vault,
+    alternate_stability_pool,
+    ripe_token,
+    savings_green,
+    pointer_kind,
+):
+    if pointer_kind == "core":
+        candidate = alternate_ripe_gov_vault
+        asset = ripe_token
+        initial_id = 2
+        setter = switchboard_charlie.setCoreRipeGovVaultId
+        pointer_view = mission_control.coreRipeGovVaultId
+        pending_view = switchboard_charlie.pendingCoreRipeGovVaultId
+    else:
+        candidate = alternate_stability_pool
+        asset = savings_green
+        initial_id = 1
+        setter = switchboard_charlie.setPreferredStabVaultId
+        pointer_view = mission_control.preferredStabVaultId
+        pending_view = switchboard_charlie.pendingPreferredStabVaultId
+
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        candidate,
+        f"Disabled {pointer_kind} candidate",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        asset.address,
+        [initial_id, vault_id],
+    )
+    action_id = setter(vault_id, sender=governance.address)
+
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    confirmation_block = switchboard_charlie.getActionConfirmationBlock(action_id)
+    if boa.env.evm.patch.block_number < confirmation_block:
+        boa.env.time_travel(
+            blocks=confirmation_block - boa.env.evm.patch.block_number
+        )
+    with boa.reverts("invalid vault"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert pointer_view() == initial_id
+    assert pending_view(action_id) == vault_id
+    assert switchboard_charlie.actionType(action_id) != 0
+    assert switchboard_charlie.hasPendingAction(action_id)
 
 
 # Run the tests

@@ -54,6 +54,7 @@ interface PriceDesk:
 
 interface MissionControl:
     def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
@@ -99,7 +100,6 @@ event BondBoosterSet:
     bondBooster: address
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 bondBooster: public(address)
 
@@ -218,9 +218,11 @@ def purchaseRipeBond(
 
     # mint ripe tokens, deposit into gov vault or transfer tokens to user
     if lockDuration != 0:
+        coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert coreRipeGovVaultId != 0 # dev: invalid vault id
         extcall RipeToken(a.ripeToken).mint(self, totalRipePayout)
         assert extcall IERC20(a.ripeToken).approve(a.teller, totalRipePayout, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(a.teller).depositFromTrusted(_recipient, RIPE_GOV_VAULT_ID, a.ripeToken, totalRipePayout, lockDuration, a)
+        extcall Teller(a.teller).depositFromTrusted(_recipient, coreRipeGovVaultId, a.ripeToken, totalRipePayout, lockDuration, a)
         assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     else:
         extcall RipeToken(a.ripeToken).mint(_recipient, totalRipePayout)

@@ -106,6 +106,16 @@ def sample_ripe_rewards_config():
     )
 
 
+@pytest.fixture
+def fresh_mission_control(ripe_hq, defaults):
+    return boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        defaults,
+        name="fresh_mission_control",
+    )
+
+
 ####################
 # Initial State    #
 ####################
@@ -120,6 +130,171 @@ def test_mission_control_initial_state(mission_control):
     assert not mission_control.isPaused()
     assert not mission_control.canMintGreen()
     assert not mission_control.canMintRipe()
+
+
+def test_vault_id_pointers_initialize_to_robinhood_and_base_invariants(
+    fresh_mission_control,
+):
+    assert fresh_mission_control.coreRipeGovVaultId() == 2
+    assert fresh_mission_control.preferredStabVaultId() == 1
+    assert fresh_mission_control.isStabVaultId(1)
+
+
+def test_default_priority_stab_vaults_initialize_registry(ripe_hq):
+    base_defaults = boa.load(
+        "contracts/config/DefaultsBase.vy",
+        name="base_defaults_for_stab_registry",
+    )
+    initialized_mission_control = boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        base_defaults,
+        name="mission_control_with_base_defaults",
+    )
+
+    configured_stab_vaults = base_defaults.priorityStabVaults()
+    assert len(configured_stab_vaults) != 0
+    for vault in configured_stab_vaults:
+        assert initialized_mission_control.isStabVaultId(vault.vaultId)
+
+    assert not initialized_mission_control.isStabVaultId(0)
+    assert not initialized_mission_control.isStabVaultId(2)
+
+
+def test_every_registered_switchboard_can_set_exact_nonzero_vault_ids(
+    fresh_mission_control,
+    switchboard_alpha,
+    switchboard_bravo,
+    switchboard_charlie,
+    switchboard_delta,
+    switchboard_echo,
+):
+    switchboards = [
+        switchboard_alpha,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_delta,
+        switchboard_echo,
+    ]
+
+    for offset, switchboard in enumerate(switchboards, start=1):
+        core_id = 100 + offset
+        preferred_id = 200 + offset
+        fresh_mission_control.setCoreRipeGovVaultId(core_id, sender=switchboard.address)
+        assert fresh_mission_control.coreRipeGovVaultId() == core_id
+        assert fresh_mission_control.get_logs() == []
+
+        fresh_mission_control.setPreferredStabVaultId(preferred_id, sender=switchboard.address)
+        assert fresh_mission_control.preferredStabVaultId() == preferred_id
+        assert fresh_mission_control.isStabVaultId(preferred_id)
+        assert fresh_mission_control.get_logs() == []
+
+
+def test_preferred_stab_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_charlie,
+):
+    first_id = 41
+    second_id = 42
+
+    assert not fresh_mission_control.isStabVaultId(first_id)
+    assert not fresh_mission_control.isStabVaultId(second_id)
+
+    fresh_mission_control.setPreferredStabVaultId(
+        first_id,
+        sender=switchboard_charlie.address,
+    )
+    fresh_mission_control.setPreferredStabVaultId(
+        second_id,
+        sender=switchboard_charlie.address,
+    )
+
+    assert fresh_mission_control.preferredStabVaultId() == second_id
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+def test_priority_stab_vault_registry_tracks_multiple_assets_and_ignores_zero(
+    fresh_mission_control,
+    switchboard_alpha,
+    alpha_token,
+    bravo_token,
+):
+    first_id = 41
+    second_id = 42
+
+    fresh_mission_control.setPriorityStabVaults(
+        [
+            (first_id, alpha_token.address),
+            (first_id, bravo_token.address),
+            (second_id, alpha_token.address),
+            (0, bravo_token.address),
+        ],
+        sender=switchboard_alpha.address,
+    )
+
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+    assert not fresh_mission_control.isStabVaultId(0)
+
+    fresh_mission_control.setPriorityStabVaults([], sender=switchboard_alpha.address)
+    assert fresh_mission_control.getPriorityStabVaults() == []
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+def test_special_stab_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_bravo,
+    alpha_token,
+    sample_asset_config,
+):
+    first_id = 41
+    second_id = 42
+    asset_config = list(sample_asset_config)
+    asset_config[17] = first_id
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+    asset_config[17] = second_id
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+
+    asset_config[17] = 0
+    fresh_mission_control.setAssetConfig(
+        alpha_token,
+        tuple(asset_config),
+        sender=switchboard_bravo.address,
+    )
+
+    assert fresh_mission_control.assetConfig(alpha_token).specialStabPoolId == 0
+    assert fresh_mission_control.isStabVaultId(first_id)
+    assert fresh_mission_control.isStabVaultId(second_id)
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_zero(
+    fresh_mission_control,
+    switchboard_charlie,
+    setter_name,
+):
+    with boa.reverts("invalid vault id"):
+        getattr(fresh_mission_control, setter_name)(0, sender=switchboard_charlie.address)
+
+
+@pytest.mark.parametrize("setter_name", ["setCoreRipeGovVaultId", "setPreferredStabVaultId"])
+def test_vault_id_pointer_setters_reject_non_switchboards(
+    fresh_mission_control,
+    alice,
+    setter_name,
+):
+    with boa.reverts("no perms"):
+        getattr(fresh_mission_control, setter_name)(1, sender=alice)
 
 
 #######################

@@ -53,6 +53,7 @@ interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
+    def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface Teller:
@@ -189,13 +190,13 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
-RIPE_GOV_VAULT_ID: constant(uint256) = 2
-ONE_DAY: constant(uint256) = 43_200 # on Base
+MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
 @deploy
 def __init__(
     _ripeHq: address,
+    _minUnderscoreSendInterval: uint256,
     _underscoreSendInterval: uint256,
     _undyDepositRewardsAmount: uint256,
     _undyYieldBonusAmount: uint256,
@@ -204,8 +205,10 @@ def __init__(
     deptBasics.__init__(False, False, True) # can mint ripe only
 
     # underscore rewards
+    assert _minUnderscoreSendInterval != 0 and _minUnderscoreSendInterval != max_value(uint256) # dev: invalid floor
+    MIN_UNDERSCORE_SEND_INTERVAL = _minUnderscoreSendInterval
     if _underscoreSendInterval != 0:
-        assert _underscoreSendInterval >= ONE_DAY # dev: invalid interval
+        assert _underscoreSendInterval >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
         self.underscoreSendInterval = _underscoreSendInterval
         self.undyDepositRewardsAmount = _undyDepositRewardsAmount
         self.undyYieldBonusAmount = _undyYieldBonusAmount
@@ -285,6 +288,7 @@ def _claimLoot(
     if numUserVaults == 0:
         return totalRipeForUser
 
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(_a.missionControl)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
@@ -305,7 +309,7 @@ def _claimLoot(
                 assetsToRemove.append(asset)
 
             # claim loot
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, _a)
+            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, coreRipeGovVaultId, _a)
 
         # clean up user assets (storage optimization)
         stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
@@ -317,7 +321,7 @@ def _claimLoot(
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, config, _a)
+        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, config, coreRipeGovVaultId, _a)
 
     return totalRipeForUser
 
@@ -338,6 +342,7 @@ def getClaimableLoot(_user: address) -> uint256:
     if numUserVaults == 0:
         return totalRipeForUser
 
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
@@ -348,7 +353,7 @@ def getClaimableLoot(_user: address) -> uint256:
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
             if asset == empty(address):
                 continue
-            totalRipeForUser += self._getClaimableDepositLootForAsset(_user, vaultId, vaultAddr, asset, a)
+            totalRipeForUser += self._getClaimableDepositLootForAsset(_user, vaultId, vaultAddr, asset, coreRipeGovVaultId, a)
 
     return totalRipeForUser
 
@@ -367,10 +372,11 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, coreRipeGovVaultId, a)
     if totalRipeForUser != 0:
         config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
-        self._handleRipeMint(_user, totalRipeForUser, False, config, a)
+        self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
     return totalRipeForUser
 
 
@@ -381,6 +387,7 @@ def _claimDepositLoot(
     _vaultAddr: address,
     _asset: address,
     _shouldFlush: bool,
+    _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> uint256:
     userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
@@ -388,7 +395,7 @@ def _claimDepositLoot(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _coreRipeGovVaultId, _a)
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
@@ -408,6 +415,7 @@ def _getDepositLootData(
     _vaultAddr: address,
     _asset: address,
     _shouldFlush: bool,
+    _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
 
@@ -419,7 +427,7 @@ def _getDepositLootData(
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _coreRipeGovVaultId, _a)
 
     # user has no points
     if up.balancePoints == 0:
@@ -463,7 +471,8 @@ def _getDepositLootData(
 def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    return self._getClaimableDepositLootForAsset(_user, _vaultId, vaultAddr, _asset, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    return self._getClaimableDepositLootForAsset(_user, _vaultId, vaultAddr, _asset, coreRipeGovVaultId, a)
 
 
 @view
@@ -473,6 +482,7 @@ def _getClaimableDepositLootForAsset(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> uint256:
     userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
@@ -480,7 +490,7 @@ def _getClaimableDepositLootForAsset(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _coreRipeGovVaultId, _a)
     return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     
 
@@ -575,7 +585,8 @@ def updateDepositPoints(
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, coreRipeGovVaultId, a)
 
     # update points
     extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
@@ -601,7 +612,8 @@ def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, config, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, config, coreRipeGovVaultId, a)
 
     # reset user balance points
     ap.balancePoints -= min(up.balancePoints, ap.balancePoints)
@@ -631,7 +643,8 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(empty(address), _vaultId, vaultAddr, _asset, config, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    up, ap, gp = self._getLatestDepositPoints(empty(address), _vaultId, vaultAddr, _asset, config, coreRipeGovVaultId, a)
 
     # reset asset points
     gp.ripeStakerPoints -= min(ap.ripeStakerPoints, gp.ripeStakerPoints)
@@ -763,7 +776,8 @@ def getLatestDepositPoints(
     a: addys.Addys = addys._getAddys(_a)
     c: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, a)
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+    return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, coreRipeGovVaultId, a)
 
 
 @view
@@ -774,8 +788,10 @@ def _getLatestDepositPoints(
     _vaultAddr: address,
     _asset: address,
     _c: RewardsConfig,
+    _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
+    assert _coreRipeGovVaultId != 0 # dev: invalid vault id
     p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
 
     # latest global points
@@ -807,7 +823,7 @@ def _getLatestDepositPoints(
 
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    if userLootShare != 0 and _vaultId != 2: # skip for Ripe Gov Vault
+    if userLootShare != 0 and _vaultId != _coreRipeGovVaultId: # skip for Ripe Gov Vault
         userLootShare = userLootShare // assetPoints.precision
 
     # update `lastBalance`
@@ -989,7 +1005,8 @@ def claimBorrowLoot(_user: address) -> uint256:
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
     if totalRipeForUser != 0:
         config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
-        self._handleRipeMint(_user, totalRipeForUser, False, config, a)
+        coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+        self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
     return totalRipeForUser
 
 
@@ -1134,8 +1151,11 @@ def _handleRipeMint(
     _amount: uint256,
     _shouldStake: bool,
     _config: ClaimLootConfig,
+    _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ):
+    assert _coreRipeGovVaultId != 0 # dev: invalid vault id
+
     # if no auto stake, just mint to user
     if not _shouldStake and _config.autoStakeRatio == 0:
         extcall RipeToken(_a.ripeToken).mint(_user, _amount)
@@ -1154,7 +1174,7 @@ def _handleRipeMint(
     # stake ripe tokens
     if amountToStake != 0:
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, amountToStake, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, _config.rewardsLockDuration, _a)
+        extcall Teller(_a.teller).depositFromTrusted(_user, _coreRipeGovVaultId, _a.ripeToken, amountToStake, _config.rewardsLockDuration, _a)
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     # transfer ripe to user
@@ -1190,6 +1210,17 @@ def _cleanUpUserVaults(
         return
     for vid: uint256 in _vaultsToClean:
         extcall Ledger(_ledger).removeVaultFromUser(_user, vid)
+
+
+# ripe gov vault id
+
+
+@view
+@internal
+def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
+    vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert vaultId != 0 # dev: invalid vault id
+    return vaultId
 
 
 ###############################
@@ -1282,6 +1313,12 @@ def _getUnderscoreLootDistributor(_mc: address) -> address:
 # config setters
 
 
+@view
+@external
+def minUnderscoreSendInterval() -> uint256:
+    return MIN_UNDERSCORE_SEND_INTERVAL
+
+
 @external
 def setHasUnderscoreRewards(_hasRewards: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
@@ -1296,7 +1333,7 @@ def setUnderscoreSendInterval(_numBlocks: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     assert _numBlocks != max_value(uint256) # dev: invalid interval
-    assert _numBlocks >= ONE_DAY # dev: invalid interval
+    assert _numBlocks >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
     assert _numBlocks != self.underscoreSendInterval # dev: no change
     self.underscoreSendInterval = _numBlocks
     log UnderscoreSendIntervalUpdated(numBlocks=_numBlocks)

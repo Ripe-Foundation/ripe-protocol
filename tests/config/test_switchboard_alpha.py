@@ -5,6 +5,32 @@ from constants import MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
+def _asset_config(vault_ids):
+    return (
+        vault_ids,
+        0,
+        0,
+        MAX_UINT256,
+        MAX_UINT256,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        (False, 0, 0, 0, 0),
+        ZERO_ADDRESS,
+        False,
+    )
+
+
 @pytest.fixture(scope="function")
 def new_mission_control(ripe_hq, defaults):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
@@ -1973,7 +1999,8 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
             True,    # can exit
             sender=governance.address
         )
-    
+
+
     # Test with unsupported asset (not configured in vault 2)
     with boa.reverts("invalid ripe vault config"):
         switchboard_alpha.setRipeGovVaultConfig(
@@ -2071,6 +2098,105 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
             False,  # canExit = False
             sender=governance.address
         )
+
+
+def test_ripe_gov_vault_config_rejects_unset_target_core_pointer(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([2]),
+        sender=switchboard_bravo.address,
+    )
+
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_alpha.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            False,
+            100,
+            1_000,
+            200_00,
+            0,
+            False,
+            new_mission_control.address,
+            sender=governance.address,
+        )
+
+
+def test_ripe_gov_vault_config_uses_target_mission_control_pointer(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    mission_control,
+    new_mission_control,
+    alpha_token,
+):
+    target_core_id = 77
+    new_mission_control.setCoreRipeGovVaultId(target_core_id, sender=switchboard_alpha.address)
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([target_core_id]),
+        sender=switchboard_bravo.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        100,
+        1_000,
+        200_00,
+        0,
+        False,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+    assert switchboard_alpha.pendingMissionControl(action_id) == new_mission_control.address
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert new_mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 100_00
+    assert mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 0
+
+
+def test_ripe_gov_vault_config_execution_keeps_existing_no_revalidation_behavior(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    new_mission_control,
+    alpha_token,
+):
+    target_core_id = 77
+    new_mission_control.setCoreRipeGovVaultId(target_core_id, sender=switchboard_alpha.address)
+    new_mission_control.setAssetConfig(
+        alpha_token.address,
+        _asset_config([target_core_id]),
+        sender=switchboard_bravo.address,
+    )
+    action_id = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        False,
+        100,
+        1_000,
+        200_00,
+        0,
+        False,
+        new_mission_control.address,
+        sender=governance.address,
+    )
+
+    new_mission_control.setCoreRipeGovVaultId(88, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert new_mission_control.ripeGovVaultConfig(alpha_token.address).assetWeight == 100_00
 
 
 def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_token, setAssetConfig):

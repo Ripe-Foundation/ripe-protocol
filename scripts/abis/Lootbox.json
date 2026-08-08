@@ -1494,6 +1494,116 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
+    "name": "removeVaultFromUserForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeVaultFromUserForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
     "name": "distributeUnderscoreRewards",
     "inputs": [],
     "outputs": [
@@ -1501,6 +1611,18 @@
         "name": "",
         "type": "uint256"
       },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minUnderscoreSendInterval",
+    "inputs": [],
+    "outputs": [
       {
         "name": "",
         "type": "uint256"
@@ -1622,6 +1744,10 @@
       {
         "name": "_ripeHq",
         "type": "address"
+      },
+      {
+        "name": "_minUnderscoreSendInterval",
+        "type": "uint256"
       },
       {
         "name": "_underscoreSendInterval",
