@@ -691,6 +691,14 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 @external
 def updateUserGovPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+
+    # A gov-point refresh rewrites `unlock` and `lastTerms` from the CURRENT asset config
+    # (`_updateGovPointsForUserAsset`), unconditionally -- the accrual-disable flag gates only the
+    # POINTS, not that rewrite. While this vault is in its migration pause -- the window in which
+    # wind-down terms are live and imported positions carry preserved original terms -- that
+    # rewrite would destroy exactly what the migration preserves, so the route is closed.
+    assert not vaultData.isPaused # dev: contract paused
+
     a: addys.Addys = addys._getAddys(_a)
     self._updateUserGovPoints(_user, empty(address), a.missionControl, a.boardroom)
 
@@ -763,6 +771,7 @@ def adjustLock(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # do a full update first
@@ -795,6 +804,7 @@ def releaseLock(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # they are probably wanting to exit early because of bad debt, crisis of confidence
