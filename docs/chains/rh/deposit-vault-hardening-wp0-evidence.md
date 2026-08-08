@@ -96,11 +96,27 @@ guard and is included in §5.3.
 | **RH-LANE-01** | **RESOLVED by the owner's action.** The migration lane went first and is integrated as `24de5e6`. This plan is rebound onto it. No second live lane is modifying Teller. |
 | SP-PRICE-01 | Option A by default. Characterized; no production change needed for A. But see DV-14: option A's liveness claim does not hold for a reverting price source. |
 | GOV-WEIGHT-01 | **UNRESOLVED.** No autonomous default. |
-| RG-SIZE-01 | **UNRESOLVED.** §6 E-2 now shows Option A is feasible at a stated cost. |
+| RG-SIZE-01 | **RESOLVED by the owner 2026-08-08:** the 200-byte floor governs. See the disposition below. §6 E-2 shows Option A is feasible at a stated cost. |
 | RH-CHANGE-01 | **UNRESOLVED.** No row approved; no production source edited. |
 
-**Stop condition encountered:** GOV-WEIGHT-01, RG-SIZE-01 and RH-CHANGE-01
-remain unresolved, so no production-contract edit was made.
+**Stop condition encountered at WP0:** GOV-WEIGHT-01, RG-SIZE-01 and
+RH-CHANGE-01 were all unresolved *at the time this evidence was recorded*, so no
+production-contract edit was made in WP0. Dispositions reached after that point
+are recorded below rather than by rewriting the WP0 narrative.
+
+#### RG-SIZE-01 disposition — owner, 2026-08-08
+
+**The hardening plan's 200-byte floor governs.** `MIN_TELLER_MARGIN` in
+`tests/test_vault_pointer_runtime_sizes.py` is lowered from 300 to 200 to match,
+resolving E-8. This is a deliberate relaxation of the floor the vault-migration
+workstream set, made so that the §13 central receipt-window guard (M7c, **+81
+bytes → 237 deployed headroom**) is admissible; at 300 it would be blocked. The
+plan's requirement at §5.3 line 236 — that anything *below* 200 needs a separate
+exact owner waiver — is unchanged and still binding.
+
+Nothing about any deployed contract changed with this decision: Teller's measured
+headroom is 318 bytes, which cleared both floors already. The decision only
+governs what future Teller growth is admissible.
 
 ---
 
@@ -295,11 +311,17 @@ one of §16's lanes; it was run only to check E-3 exposure. The artifact
 *expectations* are current — `scripts/check_contract_artifacts.py` returns
 `CONTRACT_ARTIFACTS_OK`.
 
-**E-8 — NEW: two conflicting Teller size floors now exist.** This plan sets 200
-bytes; the merged migration work set `MIN_TELLER_MARGIN = 300` in
+**E-8 — RESOLVED 2026-08-08: two conflicting Teller size floors existed.** This
+plan sets 200 bytes; the merged migration work set `MIN_TELLER_MARGIN = 300` in
 `tests/test_vault_pointer_runtime_sizes.py`. The §13 central guard (M7c, +81)
 lands at **237 bytes deployed headroom** — passing this plan's floor and failing
-the merged one. The owner must reconcile the two before Work Package 6 proceeds.
+the merged one, which is why the two had to be reconciled before Work Package 6.
+
+**Disposition:** the owner ruled on 2026-08-08 that the 200-byte floor governs,
+and `MIN_TELLER_MARGIN` was lowered from 300 to 200 to match, so a single floor
+now exists in the tree. M7c is therefore admissible on size. Recorded in full
+under the RG-SIZE-01 disposition in §1. No deployed contract changed: Teller's
+measured headroom is 318 bytes, which already cleared both.
 
 ---
 
@@ -341,8 +363,11 @@ pre-existing failures.
 
 ## 8. What was deliberately NOT done, and why
 
-- **All production-contract edits.** RH-CHANGE-01 approves no row;
-  GOV-WEIGHT-01 and RG-SIZE-01 are unresolved. §17 applies.
+- **All production-contract edits.** At the time of WP0, RH-CHANGE-01 approved no
+  row and GOV-WEIGHT-01 and RG-SIZE-01 were both unresolved; §17 applied. *Both
+  of those have since moved — RG-SIZE-01 was resolved by the owner on 2026-08-08
+  (see §1), and a RH-CHANGE-01 row was subsequently approved and merged. This
+  bullet records the WP0 position, not the current one.*
 - **Work Package 3 §10.3 (RipeGov stateful model) and Work Package 7
   (StabilityPool stateful model).** Test-only, but their required invariants are
   the ones currently violated: RG-4 (DV-02/03/05), RG-5 (DV-04), SP-1 (DV-09),

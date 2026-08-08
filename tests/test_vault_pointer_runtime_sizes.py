@@ -16,14 +16,21 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # Teller carries the tightest budget of any contract here: the migration work left
 # 24_576 - 24_258 = 318 bytes of headroom. Treat any further Teller growth as gated.
 #
-# This floor was reconciled by the owner on 2026-08-07. Two floors had been written
-# down independently: 200 bytes in the deposit-vault hardening plan
-# (docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md
+# This floor was reconciled by the owner on 2026-08-08, resolving RG-SIZE-01. The
+# disposition is recorded in docs/chains/rh/deposit-vault-hardening-wp0-evidence.md
+# (section 1, "RG-SIZE-01 disposition"; it also closes finding E-8 there) -- update
+# both together if it is ever revisited.
+#
+# Two floors had been written down independently: 200 bytes in the deposit-vault
+# hardening plan (docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md
 # section 5.3, "RG-SIZE-01"), and 300 here, set by the vault-migration work. They
 # disagreed on the same proposed change -- the Section 13 Teller receipt-window
 # guard measures +81 bytes, landing at 237 bytes of headroom, which passes 200 and
 # fails 300. The owner ruled that the hardening plan's 200 governs, so this is
 # lowered to match rather than leaving two contradictory rules in the tree.
+#
+# The plan's other half is unchanged and still binding: anything landing *below*
+# 200 bytes needs a separate exact owner waiver (e.g. M9 at 127 bytes).
 #
 # Lowering it is a deliberate relaxation of a guard the migration workstream set.
 # The 318 bytes currently present still clear the old 300 as well; nothing about
