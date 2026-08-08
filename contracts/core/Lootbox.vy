@@ -41,6 +41,7 @@ interface Ledger:
     def setDepositPointsAndRipeRewards(_user: address, _vaultId: uint256, _asset: address, _userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints, _globalPoints: GlobalDepositPoints, _ripeRewards: RipeRewards): nonpayable
     def setBorrowPointsAndRipeRewards(_user: address, _userPoints: BorrowPoints, _globalPoints: BorrowPoints, _ripeRewards: RipeRewards): nonpayable
     def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -> DepositPointsBundle: view
+    def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
@@ -177,6 +178,26 @@ event UndyDepositRewardsAmountUpdated:
 event UndyYieldBonusAmountUpdated:
     amount: uint256
 
+event MigratedSourceAssetSettled:
+    user: indexed(address)
+    sourceVaultId: indexed(uint256)
+    asset: indexed(address)
+    ripeClaimed: uint256
+
+event MigratedSourceAssetDeregistered:
+    user: indexed(address)
+    sourceVaultId: indexed(uint256)
+    asset: indexed(address)
+
+event MigratedSourceSettledAndCleaned:
+    user: indexed(address)
+    sourceVaultId: indexed(uint256)
+    sourceVault: indexed(address)
+    numAssetsCleaned: uint256
+    numAssetsRemaining: uint256
+    ripeClaimed: uint256
+    didRemoveVaultFromLedger: bool
+
 # underscore rewards
 hasUnderscoreRewards: public(bool)
 underscoreSendInterval: public(uint256)
@@ -190,6 +211,10 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
+
+# Base legacy Ripe Gov vault (deployed, cannot be changed). Only ever a migration SOURCE.
+LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
+MAX_SOURCE_ASSET_INDEX: constant(uint256) = 21 # MAX_ASSETS_TO_CLEAN + 1 (raw `numUserAssets` bound)
 MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
@@ -823,7 +848,12 @@ def _getLatestDepositPoints(
 
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    if userLootShare != 0 and _vaultId != _coreRipeGovVaultId: # skip for Ripe Gov Vault
+    # skip the precision divisor for BOTH Ripe Gov vaults. `_coreRipeGovVaultId` covers the active
+    # one; the Base legacy source stays exempt too, because its positions remain enumerable and
+    # claimable until they are settled and deregistered during the wind-down. Dropping the legacy
+    # exemption would divide its governance loot share by `assetPoints.precision` (1e9 for an
+    # 18-decimal asset) for the whole migration window.
+    if userLootShare != 0 and _vaultId != _coreRipeGovVaultId and _vaultId != LEGACY_RIPE_GOV_VAULT_ID:
         userLootShare = userLootShare // assetPoints.precision
 
     # update `lastBalance`
@@ -1135,6 +1165,202 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
         rewards.newRipeRewards = newRipeDistro
 
     return rewards
+
+
+##############################
+# Migrated Source Settlement #
+##############################
+
+
+# Administrator settlement of the Base legacy source vault, once a migratable asset has been moved
+# out. Ledger authorizes only Lootbox to remove vault participation, and only Lootbox knows the
+# reward state, so Teller delegates the whole settle / claim / deregister / remove decision here
+# and post-checks the reported result.
+#
+# This is deliberately NOT the upstream behaviour. `Teller.migrateRipeGovPosition` removes the whole
+# source Ledger entry after depleting a single asset; on Base a user may hold both RIPE and the LP,
+# so source participation must survive until every asset, reward and registration is gone.
+#
+# Two further divergences from an ordinary claim, both forced by the wind-down window:
+#  - settled RIPE is minted straight to the user, because auto-staking routes through a Teller
+#    deposit and Teller is paused for the whole window;
+#  - the `canClaimLoot` gate is not applied. It governs USER claims; an administrator must not be
+#    blocked from flushing a reward the user can no longer reach on their own.
+
+
+# Can this (user, source asset) entitlement be settled with NO loss, in this block?
+#
+# `_getDepositLootData` has two branches that legitimately drop value during an ordinary claim,
+# because an ordinary claim leaves the position in place to keep accruing:
+#
+#  1. `userShareOfAsset == 0` with flushing on -- `_flushDepositPoints` zeroes the user's
+#     `balancePoints` and pays nothing at all;
+#  2. `didReceiveLoot` is driven by ANY single category being nonzero, yet it clears the one shared
+#     `balancePoints` that backs all three. A category whose reward rounds to zero while it still
+#     has attributable asset/global points and an available bucket therefore loses its claim.
+#
+# In a terminal wind-down both are permanent forfeiture. This returns False in either case so the
+# settlement reverts and the operator retries after the reward buckets have grown.
+
+
+@view
+@internal
+def _isCategorySettleable(
+    _userShareOfAsset: uint256,
+    _assetPoints: uint256,
+    _globalPoints: uint256,
+    _rewardsAvailable: uint256,
+) -> bool:
+    # nothing is attributable in this category, so clearing the shared points costs the user
+    # nothing. These are exactly `_calcSpecificLoot`'s own zero-payout edge cases.
+    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0:
+        return True
+
+    # something IS attributable here -- it must round to a nonzero payout
+    na1: uint256 = 0
+    na2: uint256 = 0
+    na3: uint256 = 0
+    userLoot: uint256 = 0
+    na1, na2, na3, userLoot = self._calcSpecificLoot(_userShareOfAsset, _assetPoints, _globalPoints, _rewardsAvailable)
+    return userLoot != 0
+
+
+@view
+@internal
+def _isSourceLootFullySettleable(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _coreRipeGovVaultId: uint256,
+    _a: addys.Addys,
+) -> bool:
+    # same fresh inputs `_getDepositLootData` uses, at this same block and state
+    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
+
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _coreRipeGovVaultId, _a)
+
+    # nothing is owed at all -- safe to deregister
+    if up.balancePoints == 0:
+        return True
+
+    # the user's share must be representable. If it is not, an ordinary claim would flush the
+    # points away unpaid (branch 1 above), so a terminal settlement must refuse.
+    if ap.balancePoints == 0:
+        return False
+
+    # identical expression to `_getDepositLootData`, so the two agree exactly
+    userShareOfAsset: uint256 = min(up.balancePoints * HUNDRED_PERCENT // ap.balancePoints, HUNDRED_PERCENT)
+    if userShareOfAsset == 0:
+        return False
+
+    # every category holding something attributable must actually pay out (branch 2 above)
+    return (
+        self._isCategorySettleable(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers) and
+        self._isCategorySettleable(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters) and
+        self._isCategorySettleable(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
+    )
+
+
+@nonreentrant
+@external
+def settleAndCleanupMigratedSource(
+    _user: address,
+    _sourceVaultId: uint256,
+    _sourceVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> (uint256, bool):
+    assert msg.sender == addys._getTellerAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
+
+    assert _user != empty(address) # dev: invalid user
+    assert _sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID # dev: invalid source vault id
+    assert _sourceVaultId != coreRipeGovVaultId # dev: source is target
+    assert staticcall AddressRegistry(a.vaultBook).getAddr(_sourceVaultId) == _sourceVault # dev: source vault not registered
+
+    # the user must still be in the source vault -- Teller relies on the returned flag being an
+    # exact description of the Ledger transition, so a no-op call must not report a removal
+    assert staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source ledger missing
+
+    # PASS 1 -- settle every DEPLETED source asset and collect it for deregistration.
+    # A still-positive asset is skipped untouched: it is not this asset's settlement turn, and
+    # claiming its reward here would reset the reward timing of a position that has not migrated.
+    # Nothing is deregistered inside the loop -- `deregisterUserAsset` reorders the vault's
+    # user-asset index by swap-and-pop, so removing mid-iteration would skip the moved entry.
+    totalRipeForUser: uint256 = 0
+    assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
+    numUserAssets: uint256 = staticcall Vault(_sourceVault).numUserAssets(_user)
+
+    # fail closed rather than silently cleaning a prefix of an over-cap enumeration
+    assert numUserAssets <= MAX_SOURCE_ASSET_INDEX # dev: source enumeration over cleanup cap
+
+    for y: uint256 in range(1, numUserAssets, bound=MAX_SOURCE_ASSET_INDEX):
+        asset: address = empty(address)
+        hasBalance: bool = False
+        asset, hasBalance = staticcall Vault(_sourceVault).getUserAssetAtIndexAndHasBalance(_user, y)
+
+        # an unclassifiable entry means the enumeration is not what this path assumes
+        assert asset != empty(address) # dev: unclassifiable source entry
+        if hasBalance:
+            continue
+
+        # GUARD 1 -- refuse to settle unless the entitlement can be paid IN FULL right now
+        assert self._isSourceLootFullySettleable(_user, _sourceVaultId, _sourceVault, asset, coreRipeGovVaultId, a) # dev: source loot not fully settleable
+
+        # GUARD 2 -- claim with `_shouldFlush = False`. Flushing is the code path that zeroes
+        # `balancePoints` while paying nothing, which is exactly the forfeiture this must not do.
+        ripeForAsset: uint256 = self._claimDepositLoot(_user, _sourceVaultId, _sourceVault, asset, False, coreRipeGovVaultId, a)
+
+        # GUARD 3 -- prove the points were actually consumed before deregistration is allowed.
+        # With flushing disabled, `balancePoints` reaches zero only by being paid out.
+        b: DepositPointsBundle = staticcall Ledger(a.ledger).getDepositPointsBundle(_user, _sourceVaultId, asset)
+        assert b.userPoints.balancePoints == 0 # dev: reward entitlement still stranded
+
+        totalRipeForUser += ripeForAsset
+        assetsToRemove.append(asset)
+        log MigratedSourceAssetSettled(user=_user, sourceVaultId=_sourceVaultId, asset=asset, ripeClaimed=ripeForAsset)
+
+    # PASS 2 -- deregister each settled asset and post-check it individually
+    for asset: address in assetsToRemove:
+        extcall Vault(_sourceVault).deregisterUserAsset(_user, asset)
+        assert not staticcall Vault(_sourceVault).isUserInVaultAsset(_user, asset) # dev: source asset not deregistered
+        log MigratedSourceAssetDeregistered(user=_user, sourceVaultId=_sourceVaultId, asset=asset)
+
+    # Authoritative remaining-registration count, read fresh from the source AFTER cleanup rather
+    # than inferred from the last `deregisterUserAsset` return value -- that value reports `True`
+    # when the asset still has a balance, and `_cleanUpUserAssets` reports `True` when there was
+    # nothing to remove at all, which would make an already-empty-but-enumerated source impossible
+    # to clean up. `numUserAssets` is `lastIndex + 1` over a 1-based index, so `<= 1` means no
+    # registrations. Used here only as a postcondition, never as an entry predicate.
+    numRemaining: uint256 = staticcall Vault(_sourceVault).numUserAssets(_user)
+    didRemoveVault: bool = numRemaining <= 1
+    if didRemoveVault:
+        extcall Ledger(a.ledger).removeVaultFromUser(_user, _sourceVaultId)
+        assert not staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source ledger remains
+    else:
+        assert staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source ledger removed early
+
+    # mint settled rewards directly to the user (see note above)
+    if totalRipeForUser != 0:
+        extcall RipeToken(a.ripeToken).mint(_user, totalRipeForUser)
+
+    log MigratedSourceSettledAndCleaned(
+        user=_user,
+        sourceVaultId=_sourceVaultId,
+        sourceVault=_sourceVault,
+        numAssetsCleaned=len(assetsToRemove),
+        numAssetsRemaining=numRemaining,
+        ripeClaimed=totalRipeForUser,
+        didRemoveVaultFromLedger=didRemoveVault,
+    )
+    return totalRipeForUser, didRemoveVault
 
 
 #########

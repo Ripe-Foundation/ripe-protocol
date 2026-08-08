@@ -32,16 +32,25 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC20
 
 interface MissionControl:
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
+
+interface RipeGovVault:
+    def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
+    def totalUserGovPoints(_user: address) -> uint256: view
+    def totalGovPoints() -> uint256: view
+    def userGovData(_user: address, _asset: address) -> GovData: view
+    def userBalances(_user: address, _asset: address) -> uint256: view
 
 interface AddressRegistry:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -53,6 +62,8 @@ interface CreditEngine:
     def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
 
 interface Ledger:
+    def userDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> UserDepositPoints: view
+    def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
 
 interface VaultRegistry:
@@ -66,6 +77,32 @@ interface UnderscoreWallet:
 
 interface UnderscoreWalletConfig:
     def owner() -> address: view
+
+# mirrors `Ledger.UserDepositPoints`, read to prove a source asset carries no residual entitlement
+struct UserDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUpdate: uint256
+
+# mirrors `RipeGov.GovData`. Declared here (and identically in Teller) because each contract is its
+# own compilation unit and Phase 1 may not add a shared file to `interfaces/`.
+struct GovData:
+    govPoints: uint256
+    lastShares: uint256
+    lastPointsUpdate: uint256
+    unlock: uint256
+    lastTerms: cs.LockTerms
+
+# the complete original legacy record, captured before the withdrawal destroys it, plus the target
+# point totals as they stood before the import (so the import's effect is checked as an exact delta)
+struct LegacySourceSnapshot:
+    sourceShares: uint256
+    sourceAmount: uint256
+    govPoints: uint256
+    unlock: uint256
+    lastTerms: cs.LockTerms
+    targetUserPointsBefore: uint256
+    targetTotalPointsBefore: uint256
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -274,6 +311,214 @@ def validateRipeGovMigration(
     assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
 
     return sourceVault, targetVault
+
+
+# BASE LEGACY ripe gov position migration
+#
+# Separate from `validateRipeGovMigration` on purpose. That validator requires BOTH endpoints
+# paused, which suits an exporter-capable source. The deployed Base legacy vault predates the
+# exporter and cannot be changed, so its migration drives the ordinary `SharesVault` withdrawal --
+# which means the legacy source must stay UNPAUSED. Only the target is paused, because that pause
+# is the migration-only mode in which `importPositionForMigration` is the sole way in.
+
+
+# EXCLUSIVE FREEZE. A Teller pause alone does NOT close the legacy vault. The DEPLOYED legacy vault
+# keeps its pre-migration permissions, so it authorizes AuctionHouse and CreditEngine on
+# `withdrawTokensFromVault` / `transferBalanceWithinVault`, HumanResources on the contributor
+# transfer and burn routes, and any valid Ripe department on `updateUserGovPoints` / `adjustLock` /
+# `releaseLock`. Deleverage is named explicitly rather than covered by the AuctionHouse pause: it is
+# reachable from a switchboard, checks only its OWN pause flag, and then withdraws through
+# AuctionHouse against a caller-supplied vault address.
+
+
+@view
+@internal
+def _assertExclusiveFreeze(_a: addys.Addys):
+    assert staticcall Department(_a.teller).isPaused() # dev: teller not paused
+    assert staticcall Department(_a.auctionHouse).isPaused() # dev: auction house not paused
+    assert staticcall Department(_a.creditEngine).isPaused() # dev: credit engine not paused
+    assert staticcall Department(_a.humanResources).isPaused() # dev: human resources not paused
+    assert staticcall Department(addys._getDeleverageAddr()).isPaused() # dev: deleverage not paused
+
+
+@view
+@external
+def validateLegacyRipeGovMigration(
+    _user: address,
+    _asset: address,
+    _sourceVaultId: uint256,
+    _sourceVault: address,
+    _targetVaultId: uint256,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    a: addys.Addys = addys._getAddys(_a)
+
+    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    assert _sourceVaultId != _targetVaultId # dev: same vault id
+    assert _sourceVault != _targetVault # dev: same vault
+    assert _sourceVault != empty(address) and _sourceVault.is_contract # dev: invalid source vault
+    assert _targetVault != empty(address) and _targetVault.is_contract # dev: invalid target vault
+
+    # exact registration -- id and address must agree in the live VaultBook
+    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
+    assert staticcall vaultBook.getAddr(_sourceVaultId) == _sourceVault # dev: source vault not registered
+    assert staticcall vaultBook.getAddr(_targetVaultId) == _targetVault # dev: target vault not registered
+
+    # Base asymmetry (see note above) -- deliberately NOT the both-paused upstream rule
+    assert not staticcall Vault(_sourceVault).isPaused() # dev: source vault paused
+    assert staticcall Vault(_targetVault).isPaused() # dev: target vault not in migration state
+
+    self._assertExclusiveFreeze(a)
+
+    # both endpoints must support the asset being moved
+    mc: MissionControl = MissionControl(a.missionControl)
+    assert staticcall mc.isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
+    assert staticcall mc.isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
+
+    # source position must exist and be enumerated in both the vault and the Ledger
+    assert staticcall Vault(_sourceVault).isUserInVaultAsset(_user, _asset) # dev: source asset not registered
+    assert staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _asset) # dev: no source balance
+    assert staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source vault missing from Ledger
+
+    # no target replay
+    assert not staticcall Vault(_targetVault).doesUserHaveBalance(_user, _asset) # dev: target position exists
+
+    return True
+
+
+@view
+@external
+def getLegacyRipeGovSourceSnapshot(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> LegacySourceSnapshot:
+    a: addys.Addys = addys._getAddys(_a)
+
+    gd: GovData = staticcall RipeGovVault(_sourceVault).userGovData(_user, _asset)
+    config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+
+    sourceShares: uint256 = staticcall RipeGovVault(_sourceVault).userBalances(_user, _asset)
+    sourceAmount: uint256 = staticcall Vault(_sourceVault).getTotalAmountForUser(_user, _asset)
+    assert sourceShares != 0 and sourceAmount != 0 # dev: no source position
+
+    # pending points through THIS block, using the source vault's own math, the user's original
+    # terms / unlock / last update / shares and the unchanged current asset weight. Off-chain
+    # manifest values are evidence, never the execution input for this number.
+    pending: uint256 = staticcall RipeGovVault(_sourceVault).getLatestGovPoints(
+        gd.lastShares,
+        gd.lastPointsUpdate,
+        gd.unlock,
+        gd.lastTerms,
+        config.assetWeight,
+    )
+
+    return LegacySourceSnapshot(
+        sourceShares=sourceShares,
+        sourceAmount=sourceAmount,
+        govPoints=gd.govPoints + pending,
+        unlock=gd.unlock,
+        lastTerms=gd.lastTerms,
+        targetUserPointsBefore=staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user),
+        targetTotalPointsBefore=staticcall RipeGovVault(_targetVault).totalGovPoints(),
+    )
+
+
+@view
+@external
+def verifyLegacyRipeGovImport(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _sourceVaultId: uint256,
+    _targetVault: address,
+    _targetVaultId: uint256,
+    _amount: uint256,
+    _targetShares: uint256,
+    _snapshot: LegacySourceSnapshot,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    a: addys.Addys = addys._getAddys(_a)
+
+    # complete source depletion for this asset
+    assert staticcall RipeGovVault(_sourceVault).userBalances(_user, _asset) == 0 # dev: source shares remain
+    assert staticcall Vault(_sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source amount remains
+    assert not staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _asset) # dev: source balance remains
+
+    # the source registration and its Ledger membership MUST still be here -- reward settlement has
+    # not happened yet, and the user may still hold the other source asset. This is the deliberate
+    # divergence from the upstream flow, which removes the source Ledger entry immediately.
+    assert staticcall Vault(_sourceVault).isUserInVaultAsset(_user, _asset) # dev: source asset deregistered
+    assert staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source ledger removed
+
+    # exact target position
+    assert _amount != 0 # dev: invalid migration amount
+    assert staticcall RipeGovVault(_targetVault).userBalances(_user, _asset) == _targetShares # dev: target shares mismatch
+    assert staticcall Vault(_targetVault).isUserInVaultAsset(_user, _asset) # dev: target asset not registered
+    assert staticcall Vault(_targetVault).doesUserHaveBalance(_user, _asset) # dev: target position missing
+    assert staticcall Ledger(a.ledger).isParticipatingInVault(_user, _targetVaultId) # dev: target ledger missing
+
+    # preserved governance record -- points stock plus pending, original unlock, original terms
+    newGd: GovData = staticcall RipeGovVault(_targetVault).userGovData(_user, _asset)
+    assert newGd.govPoints == _snapshot.govPoints # dev: target points mismatch
+    assert newGd.lastShares == _targetShares # dev: target last shares mismatch
+    assert newGd.lastPointsUpdate == block.number # dev: target last update mismatch
+    assert newGd.unlock == _snapshot.unlock # dev: target unlock mismatch
+    assert newGd.lastTerms.minLockDuration == _snapshot.lastTerms.minLockDuration # dev: target terms mismatch
+    assert newGd.lastTerms.maxLockDuration == _snapshot.lastTerms.maxLockDuration # dev: target terms mismatch
+    assert newGd.lastTerms.maxLockBoost == _snapshot.lastTerms.maxLockBoost # dev: target terms mismatch
+    assert newGd.lastTerms.canExit == _snapshot.lastTerms.canExit # dev: target terms mismatch
+    assert newGd.lastTerms.exitFee == _snapshot.lastTerms.exitFee # dev: target terms mismatch
+
+    # exact deltas on both target point totals
+    assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _snapshot.targetUserPointsBefore + _snapshot.govPoints # dev: target user total mismatch
+    assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _snapshot.targetTotalPointsBefore + _snapshot.govPoints # dev: target global total mismatch
+
+    return True
+
+
+@view
+@external
+def verifyLegacyRipeGovSettlement(
+    _user: address,
+    _sourceVault: address,
+    _sourceVaultId: uint256,
+    _settledAsset: address,
+    _lpAsset: address,
+    _didRemoveVault: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    a: addys.Addys = addys._getAddys(_a)
+
+    # the freeze must have held for the whole settlement. This runs after Lootbox has mutated
+    # state, but the call is atomic -- a failure here reverts the entire settlement.
+    self._assertExclusiveFreeze(a)
+
+    assert not staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _settledAsset) # dev: settled asset has balance
+    assert not staticcall Vault(_sourceVault).isUserInVaultAsset(_user, _settledAsset) # dev: settled asset not deregistered
+
+    stillParticipating: bool = staticcall Ledger(a.ledger).isParticipatingInVault(_user, _sourceVaultId)
+    assert stillParticipating != _didRemoveVault # dev: ledger state mismatch
+
+    if _didRemoveVault:
+        # nothing may remain REGISTERED in the source
+        assert staticcall Vault(_sourceVault).numUserAssets(_user) <= 1 # dev: source registrations remain
+
+        # ...and nothing may remain OWED on either live source asset. Registration count alone is
+        # not proof of reward-freeness: an asset deregistered in an earlier round could still hold
+        # residual Ledger deposit points, which no enumeration would surface again.
+        # LIMIT: the deprecated pool is not read here; its emptiness (including zero residual
+        # deposit points) is a hard Phase 2 census precondition.
+        ripePoints: UserDepositPoints = staticcall Ledger(a.ledger).userDepositPoints(_user, _sourceVaultId, a.ripeToken)
+        lpPoints: UserDepositPoints = staticcall Ledger(a.ledger).userDepositPoints(_user, _sourceVaultId, _lpAsset)
+        assert ripePoints.balancePoints == 0 # dev: ripe entitlement remains
+        assert lpPoints.balancePoints == 0 # dev: lp entitlement remains
+
+    return True
 
 
 # generic deposit vault position migration
