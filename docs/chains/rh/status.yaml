@@ -2,7 +2,7 @@ schema_version: 13
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-07
+  as_of: 2026-08-08
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
@@ -247,6 +247,36 @@ dashboard_governance:
     access_model: Explicit allowlist; no public or link-only access.
     fallback: Repository documents are the complete durable handoff.
     revisit_trigger: Move to a team-owned destination when another publisher needs rights.
+
+repository_ci:
+  observed_at: 2026-08-08
+  workflow: .github/workflows/python-tests.yml
+  triggers: [pull_request, "push:master", "push:rh", workflow_dispatch]
+  default_lane: lean
+  prior_state: >
+    Until 8 August 2026 this workflow declared only workflow_dispatch and was
+    additionally invalid: its job-level environment block referenced the runner
+    context, which exists only inside steps. GitHub reported that as a failed
+    run carrying no jobs and no annotations on every push, so the suite had
+    never run on a pull request and would have failed even by manual dispatch.
+    No automated test signal existed for the repository.
+  current_state: >
+    The context error is fixed and the workflow runs the lean lane on every pull
+    request and on pushes to master and rh. Runs are reproducible against local
+    execution: the merged branch reports 13 failed, 3392 passed, 25 errors both
+    in CI and locally, with node-for-node identical failure sets.
+  known_red: >
+    The lean lane is not green, and that condition is inherited rather than
+    introduced. All 13 failures and 25 errors reproduce on a pristine rh
+    checkout: BlueChip Morpho constructor arity, switchboard pointer lifecycle,
+    deleverage oracle cases, and the basic-vault consumer inventory. Three
+    artifact gates are separately red on rh - check_contract_artifacts.py
+    MissionControl source_sha256, export_abis.py --check, and the manifest
+    handoff test.
+  interpretation: >
+    Enabling CI made an existing red state visible; it did not create it. A
+    first green build requires the inherited failures to be addressed on their
+    own merits.
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
