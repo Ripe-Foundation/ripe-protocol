@@ -9,6 +9,45 @@ also blocks the test suite from running at all.
 
 ---
 
+## 0. Strategic context — read this first, it changes what "good" looks like
+
+**This codebase is shared across chains.** One repo, per-chain deployments.
+
+**The legacy migration is transitional.** The owner's stated plan: deploy a Teller carrying the
+legacy migration on Base, run the migration, then replace it with the forward-looking Teller and
+**delete the legacy migration code from the repo**. The "forward-looking Teller" already effectively
+exists — it is `rh`'s Teller plus the shared fixes in §5.2 and §5.3.
+
+Three consequences that should govern every decision on this branch:
+
+1. **Two classes of change live here, and they have opposite lifetimes.**
+
+   | Class | Commits | Lifetime |
+   |---|---|---|
+   | **Permanent, shared, all chains** | `74e7215` (Lootbox reward fixes), `4e64563` (Ledger multi-asset fix) | Keep forever |
+   | **Transitional, Base-only** | `2bc618f`, `5d9894c`, `848fc04` (legacy migration path) | Delete after Base migrates |
+
+   Whoever removes the legacy migration later must keep the first class. The commits are cleanly
+   separated for exactly this reason — preserve that separation.
+
+2. **Do not permanently refactor shared production code to make room for transitional code.**
+   This retires the earlier "move unrelated Teller functionality into TellerUtils" idea as the
+   preferred fix for §5.1. It would leave shared Teller permanently restructured to accommodate code
+   that is scheduled for deletion. Prefer trimming the transitional path instead — and since the
+   migration Teller is itself transitional and supervised, the 300-byte safety floor is arguably not
+   required for that deployment (it needs to fit, not to have room to grow).
+
+3. **Keep the legacy code cleanly separable.** Removal should be a delete, not surgery. Note the
+   tension this creates with `5d9894c`, which merged the legacy path *into*
+   `migrateRipeGovPosition` to recover 745 bytes: that trade bought size now at the cost of later
+   separability. If the size problem is solved another way, consider reverting to a standalone
+   function purely so the eventual deletion is trivial and low-risk.
+
+Everything below reflects the state as built. Where §0 conflicts with an earlier recommendation
+in §5 or §6, §0 wins.
+
+---
+
 ## 1. What this branch does
 
 The deployed Base legacy RipeGov vault (`0xe42b3dC546527EB70D741B185Dc57226cA01839D`, VaultBook id
@@ -108,13 +147,13 @@ Everything else is downstream of this.
 
 | Contract | rh baseline | This branch | Headroom |
 |---|---:|---:|---:|
-| **Teller** | 24,247 | **26,543** | **−1,967** |
+| **Teller** | 24,247 | **26,474** | **−1,898** |
 | Lootbox | 22,091 | 24,539 | +37 |
 | RipeGov | 24,522 | 24,540 | +36 |
 | SwitchboardEcho | 22,912 | 24,081 | +495 |
 | TellerUtils | 11,900 | 18,207 | +6,369 |
 
-With the project's 300-byte safety floor, Teller must shed **~2,267 bytes**.
+Teller must shed **1,898 bytes** to fit. The project's 300-byte safety floor would make it 2,198 — but per §0.2 that floor is arguably not required for a deployment that is itself transitional and scheduled for replacement. Confirm with the owner before relying on the lower target.
 
 **This also blocks all testing.** Boa cannot deploy an over-size contract, so the fixture chain dies
 with `RuntimeError: Contract address is not set` and *every* test errors. The same tests pass on an
@@ -127,9 +166,17 @@ Levers, with estimates:
 2. Shrink or drop `verifyLegacyRipeGovImport` — a 10-argument staticcall carrying a 7-field struct,
    the most expensive thing left in the legacy branch. Worth a few hundred bytes, but it is
    post-condition safety that review specifically asked for. Owner decision.
-3. **Move unrelated existing Teller functionality into TellerUtils** (6,369 bytes free). The only
-   lever that definitely closes the gap. Touches production paths outside this workstream's scope
-   and needs its own review. **Owner sign-off required.**
+3. **Move the settlement path and the asset window out of Teller entirely.** `Lootbox`'s
+   `settleAndCleanupMigratedSource` is gated on `msg.sender == addys._getTellerAddr()`, which is the
+   *only* reason `settleAndCleanupLegacyRipeGovSource` lives in Teller — settlement needs no Teller
+   privilege otherwise. Re-gate it to `addys._isSwitchboardAddr` and the whole path (plus
+   `setLegacyRipeGovMigrationAsset` and the `activeMigrationAsset` storage and getter) can move to
+   SwitchboardEcho, which has 495 bytes free. **This is the most promising remaining lever** and,
+   unlike option 4, it removes transitional code from shared Teller rather than adding permanent
+   scars to it. Unverified estimate; measure before committing to it.
+4. **Move unrelated existing Teller functionality into TellerUtils** (6,369 bytes free). Definitely
+   closes the gap, but **discouraged by §0.2** — it permanently restructures shared production code
+   to accommodate code scheduled for deletion. Last resort, owner sign-off required.
 
 Constraint that rules out the obvious alternative: the migration driver **must carry Teller's
 identity**, because the deployed legacy vault gates withdrawal on `addys._getTellerAddr()`. A new
@@ -181,6 +228,27 @@ fixed, collateral is preserved across a migration, so this would be a no-op safe
 value is catching a config mismatch if the target vault has different collateral parameters than the
 source. Adding it could make migrations revert for already-unhealthy users. **Deliberately not
 changed. Owner decision.**
+
+### 5.4b 🟠 No on-chain debt-health check is possible during the freeze
+
+Fixed in `848fc04`, but the consequence is permanent and must be carried into qualification.
+
+`_assertExclusiveFreeze` requires **CreditEngine paused**. `CreditEngine.updateDebtForUser` asserts
+`not deptBasics.isPaused`. So any `_performHousekeeping(..., _shouldUpdateDebt=True)` on a legacy
+path reverts unconditionally — both legacy paths originally did exactly that and **could never have
+succeeded**. This was invisible because §5.1 prevents the suite from deploying Teller.
+
+The freeze and an on-chain health assertion are therefore mutually exclusive by construction. Health
+now rests on two structural arguments that **the fork must prove**:
+
+1. no liquidation can occur during the window, because the protocol is frozen; and
+2. the migration preserves collateral — the position moves between two vaults the user is enumerated
+   in — **provided the target vault's MissionControl collateral parameters match the source's**.
+
+Point 2 is the one that can silently fail. If the target vault is configured with a different LTV,
+liquidation threshold or redemption threshold, a user's borrowing power changes across the migration
+with nothing on-chain to catch it. **Fork qualification must assert collateral parity per user,
+before and after.**
 
 ### 5.5 🟡 The MissionControl redeploy assumption is unverified
 
