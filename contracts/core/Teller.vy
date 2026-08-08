@@ -650,7 +650,16 @@ def migrateRipeGovPosition(
             _user, _asset, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, targetVault, _targetVaultId,
             migration.amount, targetShares, snap, a,
         ) # dev: invalid migration result
-        self._performHousekeeping(True, _user, True, a)
+
+        # NOTE: no debt-health housekeeping here, and it is not an oversight.
+        # `_assertExclusiveFreeze` requires CreditEngine paused for the whole window, and
+        # `CreditEngine.updateDebtForUser` asserts `not deptBasics.isPaused` -- so any
+        # `_performHousekeeping(..., _shouldUpdateDebt=True)` on this path would revert every time.
+        # Health is instead guaranteed structurally: the freeze means no liquidation can occur
+        # during the window, and the migration preserves collateral (the position moves from a
+        # vault the user is enumerated in to another one they are enumerated in). Collateral parity
+        # across the move -- including any difference in the target vault's MissionControl
+        # collateral parameters -- must be proved on the fork, not asserted per call.
 
     log RipeGovPositionMigrated(
         user=_user,
@@ -716,9 +725,9 @@ def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool):
         _user, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, activeAsset, didRemoveVault, a,
     ) # dev: invalid settlement result
 
-    # settlement can change collateral enumeration, so borrower health runs LAST here too --
-    # after the complete Ledger transition, not before it
-    self._performHousekeeping(True, _user, True, a)
+    # No debt-health housekeeping here either -- same reason as the migration path: the freeze
+    # requires CreditEngine paused, so `updateDebtForUser` would revert. Settlement only removes a
+    # source entry whose assets are already fully depleted, so it cannot reduce live collateral.
 
     log LegacyRipeGovSourceSettled(user=_user, caller=msg.sender, ripeClaimed=ripeClaimed, didRemoveSourceFromLedger=didRemoveVault)
     return ripeClaimed, didRemoveVault
