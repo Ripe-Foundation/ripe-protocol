@@ -26,9 +26,9 @@ concurrency:
 
 jobs:
   test:
-    name: Python 3.12 (${{ github.event.inputs.lane || 'lean' }})
+    name: Python 3.12
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ github.event.inputs.lane == 'comprehensive' && 120 || 45 }}
+    timeout-minutes: 120
     env:
       ETHERSCAN_API_KEY: local-placeholder
       HYPOTHESIS_STORAGE_DIRECTORY: ${{ runner.temp }}/hypothesis
