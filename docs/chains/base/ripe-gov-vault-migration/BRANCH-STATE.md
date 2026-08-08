@@ -1,7 +1,7 @@
 # Base Legacy RipeGov Migration — Branch State & Handoff
 
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
-**Status:** compiles, **not deployable**, **not tested** — Teller is 1,967 bytes over EIP-170, which
+**Status:** compiles, **not deployable**, **not tested** — Teller is 1,898 bytes over EIP-170, which
 also blocks the test suite from running at all.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
@@ -88,6 +88,8 @@ candidate is the fallback shape.
 | `4e64563` | Teller: don't drop the whole source Ledger entry after one asset | Multi-asset defect that could push a borrower toward liquidation. §5.3 |
 | `6a904de` | Drop three Teller immutables, restore constructor | The added constructor args broke every test fixture; they were also the wrong design on this base. §4.4 |
 | `5d9894c` | Merge legacy migration into `migrateRipeGovPosition` | Deduplicate; recovered 745 bytes toward the EIP-170 gap. §4.5 |
+| `848fc04` | Remove housekeeping the freeze guarantees would revert | Both legacy paths asserted a precondition that made their own final step revert. §5.4b |
+| `25cfe08`, `7f7c380` | This document | Handoff. |
 
 ---
 
@@ -135,13 +137,13 @@ fixture changes are required**.
 `migrateRipeGovPosition` branches on `_sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID`. Only source
 acquisition and validation differ; receipt check, import, depletion asserts, target Ledger
 registration, Lootbox points and the event are shared. The legacy branch additionally runs
-`verifyLegacyRipeGovImport` and `_performHousekeeping`.
+`verifyLegacyRipeGovImport`. It deliberately runs **no** debt-health housekeeping — see §5.4b.
 
 ---
 
 ## 5. Open issues
 
-### 5.1 🔴 BLOCKER — Teller exceeds EIP-170 by 1,967 bytes
+### 5.1 🔴 BLOCKER — Teller exceeds EIP-170 by 1,898 bytes
 
 Everything else is downstream of this.
 
@@ -223,11 +225,11 @@ against this change.
 
 ### 5.4 🟡 `migrateRipeGovPosition` runs no housekeeping on the upstream path
 
-The legacy branch calls `_performHousekeeping(True, …)`; the upstream branch does not. With §5.3
-fixed, collateral is preserved across a migration, so this would be a no-op safety net — its real
-value is catching a config mismatch if the target vault has different collateral parameters than the
-source. Adding it could make migrations revert for already-unhealthy users. **Deliberately not
-changed. Owner decision.**
+Neither branch runs debt-health housekeeping — the legacy one cannot (§5.4b), and the upstream one
+never did. Its value would be catching a config mismatch if the target vault has different
+collateral parameters than the source. For the upstream path (no freeze, so CreditEngine is not
+paused) adding it is technically possible, but could make migrations revert for already-unhealthy
+users. **Deliberately not changed. Owner decision.**
 
 ### 5.4b 🟠 No on-chain debt-health check is possible during the freeze
 
