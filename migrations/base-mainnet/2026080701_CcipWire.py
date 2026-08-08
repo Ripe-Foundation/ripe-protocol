@@ -24,9 +24,13 @@ from config.Ccip import CCIP, NO_RATE_LIMIT
 from scripts.utils import ccip, log
 from scripts.utils.migration import Migration
 
+SOURCE_FILE = "RipeCcipBurnMintTokenPools.sol"
+
+# (label, contract, token, canMintGreen, canMintRipe). The contract name is
+# also the manifest key -- one contract per token, so no aliasing needed.
 POOLS = (
-    ("RIPE", "RipeCcipPool", "RipeToken", False, True),
-    ("GREEN", "GreenCcipPool", "GreenToken", True, False),
+    ("RIPE", "RipeCcipBurnMintTokenPool", "RipeToken", False, True),
+    ("GREEN", "GreenCcipBurnMintTokenPool", "GreenToken", True, False),
 )
 
 
@@ -45,20 +49,20 @@ def migrate(migration: Migration):
 
     safe_steps = []
 
-    for label, pool_label, token_name, can_green, can_ripe in POOLS:
+    for label, contract_name, token_name, can_green, can_ripe in POOLS:
         token = migration.get_address(token_name)
-        pool = migration.get_solidity_contract("RipeTokenPool", label=pool_label)
+        pool = migration.get_solidity_contract(contract_name, source_file=SOURCE_FILE)
 
         log.h1(f"Wiring the {label} pool")
 
         for remote_chain in config["REMOTE_CHAINS"]:
             remote_selector = CCIP[remote_chain]["CHAIN_SELECTOR"]
             try:
-                remote_pool = migration.get_address_on_chain(remote_chain, pool_label)
+                remote_pool = migration.get_address_on_chain(remote_chain, contract_name)
                 remote_token = migration.get_address_on_chain(remote_chain, token_name)
             except (FileNotFoundError, KeyError):
                 raise Exception(
-                    f"no {pool_label} in the {remote_chain} manifest - run the "
+                    f"no {contract_name} in the {remote_chain} manifest - run the "
                     f"CcipPools migration on {remote_chain} before wiring {chain}"
                 )
 
@@ -119,7 +123,7 @@ def migrate(migration: Migration):
     log.info("\tset the administrator. BOTH tokens need it, not just RIPE.")
     log.info("")
     log.info("\tOnce they have, the Safe accepts on " + config["TOKEN_ADMIN_REGISTRY"] + ":")
-    for label, _pool_label, token_name, _g, _r in POOLS:
+    for label, _contract, token_name, _g, _r in POOLS:
         token = migration.get_address(token_name)
         log.info(f"\t  {label} acceptAdminRole(address)")
         log.info(f"\t    {_calldata('acceptAdminRole(address)', ['address'], [token])}")
@@ -137,7 +141,7 @@ def migrate(migration: Migration):
     log.info(f"\tRipeHq {hq.address}, once each pool has a regId from step 2.")
     log.info("\t  initiateHqConfigChange(regId, canMintGreen, canMintRipe, false)")
     log.info("\t  confirmHqConfigChange(regId)")
-    for label, _pool_label, _token, can_green, can_ripe in POOLS:
+    for label, _contract, _token, can_green, can_ripe in POOLS:
         log.info(f"\t  {label} pool -> canMintGreen={can_green}, canMintRipe={can_ripe}")
     log.info("")
     log.info("\tGranting before ownership moves would leave the deployer owning")
