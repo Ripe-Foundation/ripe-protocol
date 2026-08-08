@@ -409,6 +409,21 @@ def cli(
     else:
         with boa.set_network_env(final_rpc) as env:
             env.add_account(sender)
+            # Disable boa's transaction tracer. It probes the node with a
+            # dummy `debug_traceTransaction` on first use, which providers can
+            # be slow enough to time out -- and that probe runs AFTER the
+            # transaction has broadcast, so a deployment that actually
+            # succeeded raises before it is written to the log and manifest.
+            # The next run then has no idea it already happened and deploys a
+            # second copy. Traces only improve error messages; losing the
+            # record of a live deployment is the worse failure.
+            #
+            # boa catches HTTPError and RPCError there but not
+            # requests.ReadTimeout, so suppress_debug_tt() alone is not
+            # enough: `_tracer` is a cached_property, and seeding it skips
+            # the probe entirely.
+            env._tracer = None
+            env.suppress_debug_tt()
             total_gas = migrations.run(
                 deploy_args, start_timestamp, end_timestamp, not single)
 
