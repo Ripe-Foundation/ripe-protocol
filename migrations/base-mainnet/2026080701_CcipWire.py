@@ -1,8 +1,10 @@
 """Wire the CCIP pools to the remote chain and hand them to the Safe.
 
-Base note: the tokens here have no getCCIPAdmin(), so the CCIP admin role
-cannot be self-claimed and Chainlink has to set it. That gates setPool only --
-deploying, wiring, ownership, registration and mint rights are all unaffected.
+Base note: the tokens here have no getCCIPAdmin(), owner() or any other hook
+RegistryModuleOwnerCustom knows how to read, so the CCIP admin role cannot be
+self-claimed the way it can on Robinhood. Chainlink proposed the Safe as
+pending administrator for both tokens on 2026-08-07, so the Safe only has to
+accept -- there is no registerAdminViaGetCCIPAdmin step here.
 
 Run only after CcipPools has run on every chain in REMOTE_CHAINS -- the remote
 pool and token addresses are read from those chains' manifests.
@@ -116,20 +118,18 @@ def migrate(migration: Migration):
 
     log.h1("What the Safe has to run")
 
-    log.h2("1. Claim the CCIP admin role, once per token -- BLOCKED ON CHAINLINK")
-    log.info("\tRIPE and GREEN on Base predate getCCIPAdmin() on Erc20Token, so")
-    log.info("\tregisterAdminViaGetCCIPAdmin() reverts here and the self-service")
-    log.info("\tpath does not exist. Chainlink has to allowlist the tokens and")
-    log.info("\tset the administrator. BOTH tokens need it, not just RIPE.")
-    log.info("")
-    log.info("\tOnce they have, the Safe accepts on " + config["TOKEN_ADMIN_REGISTRY"] + ":")
+    log.h2("1. Accept the CCIP admin role, once per token")
+    log.info("\tRIPE and GREEN on Base predate getCCIPAdmin() on Erc20Token and")
+    log.info("\texpose no hook RegistryModuleOwnerCustom can read, so there is no")
+    log.info("\tregisterAdminViaGetCCIPAdmin step here -- Chainlink proposed the")
+    log.info("\tSafe directly. Accept on " + config["TOKEN_ADMIN_REGISTRY"] + ":")
     for label, _contract, token_name, _g, _r in POOLS:
         token = migration.get_address(token_name)
         log.info(f"\t  {label} acceptAdminRole(address)")
         log.info(f"\t    {_calldata('acceptAdminRole(address)', ['address'], [token])}")
     log.info("")
-    log.info("\tEverything else below can proceed without Chainlink; only the")
-    log.info("\tsetPool call has to wait for the admin role.")
+    log.info("\tacceptAdminRole must come before setPool below: setPool is")
+    log.info("\tadministrator-only, and the role is only pending until accepted.")
 
     log.h2("2. Ownership, registration and routing")
     for description, target, data in safe_steps:
