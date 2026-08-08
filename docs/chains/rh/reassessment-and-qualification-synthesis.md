@@ -25,21 +25,21 @@ The source reports are:
 
 ### Reassessment
 
-- [Ledger chain-abstraction reassessment](reassessment/ledger-chain-abstraction.md)
-- [Teller balance and receipt measurement reassessment](reassessment/teller-balance-measurement.md)
-- [GuardedErc20 vault architecture reassessment](reassessment/guarded-erc20-vault-architecture.md)
-- [Robinhood Uniswap price-source decision](reassessment/uniswap-price-source-decision.md)
+- Ledger chain-abstraction reassessment
+- Teller balance and receipt measurement reassessment
+- GuardedErc20 vault architecture reassessment
+- Robinhood Uniswap price-source decision
 
 ### Qualification
 
-- [Robinhood Curve and Profile 2 qualification](qualification/curve-profile2-qualification.md)
-- [Robinhood PSM, reserve, and launch-liquidity activation proposal](qualification/psm-liquidity-activation.md)
-- [Robinhood network, token, clock, and oracle qualification authority](qualification/network-token-oracle-authority.md)
-- [Robinhood fork-suite coverage census and implementation design](qualification/fork-suite-coverage-census.md)
+- Robinhood Curve and Profile 2 qualification
+- Robinhood PSM, reserve, and launch-liquidity activation proposal
+- Robinhood network, token, clock, and oracle qualification authority
+- Robinhood fork-suite coverage census and implementation design
 
 Subsequent decision/evidence record (does not rewrite the eight source reports):
 
-- [Robinhood PSM lite-permission split decision and evidence](reassessment/psm-lite-permission-split.md)
+- Robinhood PSM lite-permission split decision and evidence
 - [Robinhood Curve launch activation](curve-launch-activation.md)
 
 The Curve launch-activation record supersedes the earlier Profile 1/Profile 2
@@ -400,7 +400,7 @@ by itself authorize implementation or a later lifecycle phase.
 
 The owner exercised that reopening authority for both LP launch admissions on
 1 August 2026. The independent qualification in
-[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md)
+`qualification/lp-launch-admission.md`
 reaffirmed no LP-token protocol admission on fresh source-path evidence: the
 GREEN/USDG pool and bounded GREEN pricing route are selected launch work, but
 its LP token remains excluded; RIPE/WETH remains only a conditional externally

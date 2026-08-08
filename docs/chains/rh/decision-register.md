@@ -88,7 +88,7 @@ Every later Stock Token requires its own identity, proxy/implementation,
 runtime, transfer, oracle, administrative-control, and route evidence.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D005 — Stock routes remain unreachable until containment closes
 
@@ -100,8 +100,8 @@ the complete M1-M5 containment group, audit, exact configuration, and activation
 gates close.
 
 Sources:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md) and
-[`track-8-m1-exact-receipt.md`](track-8-m1-exact-receipt.md).
+`track-8-m0-owner-decision-packet.md` and
+`track-8-m1-exact-receipt.md`.
 
 ### RH-D006 — Exact receipt on every Teller deposit route
 
@@ -115,7 +115,7 @@ does not select a vault, configure AAPL, close M5, or authorize Stock
 registration, deployment, reachability, or activation.
 
 Source:
-[`evidence/stock-token-m1-exact-receipt.md`](evidence/stock-token-m1-exact-receipt.md).
+`evidence/stock-token-m1-exact-receipt.md`.
 
 ### RH-D007 — Chain-native sGREEN, never bridged
 
@@ -125,7 +125,7 @@ Chain-native sGREEN deposits and withdrawals are launch requirements. sGREEN
 must never receive a CCIP route.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D008 — CCIP complete or disabled
 
@@ -137,7 +137,7 @@ rollback, or state-independence gate is incomplete, launch and remain with CCIP
 disabled.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D009 — USDG price path
 
@@ -199,8 +199,8 @@ deployment evidence, negative-path verification, monitoring, activation, and
 release remain separately gated.
 
 Sources:
-[`track-6-s5-checkpoint-0-owner-decision-packet.md`](track-6-s5-checkpoint-0-owner-decision-packet.md)
-and [`track-6-s5-ledger-guard.md`](track-6-s5-ledger-guard.md).
+`track-6-s5-checkpoint-0-owner-decision-packet.md`
+and `track-6-s5-ledger-guard.md`.
 
 ## Deployment-system decisions
 
@@ -214,8 +214,8 @@ Blocked or unsupported operations fail before account, provider, path, or
 transaction work.
 
 Sources:
-[`track-7-h2-network-profiles-cli.md`](track-7-h2-network-profiles-cli.md) and
-[`evidence/network-profile-cli-implementation.md`](evidence/network-profile-cli-implementation.md).
+`track-7-h2-network-profiles-cli.md` and
+`evidence/network-profile-cli-implementation.md`.
 
 ### RH-D014 — Symbolic blueprint before concrete values
 
@@ -228,9 +228,9 @@ relation semantics, provenance, and blocker ownership. It does not approve
 concrete addresses, artifacts, parameters, roles, or activation.
 
 Sources:
-[`track-7-h3-robinhood-blueprint-omissions.md`](track-7-h3-robinhood-blueprint-omissions.md)
+`track-7-h3-robinhood-blueprint-omissions.md`
 and
-[`evidence/robinhood-blueprint-phase-a.md`](evidence/robinhood-blueprint-phase-a.md).
+`evidence/robinhood-blueprint-phase-a.md`.
 
 ### RH-D015 — One combined defaults and parameter workstream
 
@@ -251,7 +251,7 @@ preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
 
 Source:
-[`track-6-s6-track-7-h4-defaults-parameters.md`](track-6-s6-track-7-h4-defaults-parameters.md).
+`track-6-s6-track-7-h4-defaults-parameters.md`.
 
 ### RH-D016 — Shared migration source, isolated histories
 
@@ -267,7 +267,7 @@ retired historical evidence. Do not create history or infer an executable plan
 from repository migration files.
 
 Source:
-[`evidence/robinhood-migration-phase-a.md`](evidence/robinhood-migration-phase-a.md).
+`evidence/robinhood-migration-phase-a.md`.
 
 ### RH-D017 — Immutable manifest and evidence chain
 
@@ -293,7 +293,10 @@ deployment, promotion, activation, production use, or release.
 
 **Status:** Owner-ratified for the current handoff repository shape on 27 July
 2026, against exact candidate commit
-`330916b03d939c62bb8b05fc51691a2dbc70948f`.
+`330916b03d939c62bb8b05fc51691a2dbc70948f`. **Its repository-placement clause is
+superseded by [RH-D024](#rh-d024--the-dashboard-is-extracted-from-the-active-tree)
+on 7 August 2026.** The dependency-scope and H-01 isolation clauses below remain
+in force.
 
 Keep the self-contained dashboard application under
 `docs/chains/rh/dashboard/` during the current handoff phase. Co-locating it
@@ -321,6 +324,37 @@ Path-scoped CI must run the dashboard build, integrity tests, and lint whenever
 `docs/chains/rh/**`, [`../rh-summary.md`](../rh-summary.md), or that workflow
 changes. This workflow is a post-push backstop and manual verification surface,
 not a substitute for the required local validation or explicit merge authority.
+
+**Superseded in part.** The repository-placement clause above — "keep the
+self-contained dashboard application under `docs/chains/rh/dashboard/`" — and its
+path-scoped CI requirement are superseded by RH-D024. Everything else in RH-D018,
+including the dependency-scope boundary and the rule that no dashboard package
+state can affect an H-01 disposition, remains in force.
+
+### RH-D024 — The dashboard is extracted from the active tree
+
+**Status:** Owner-ratified on 7 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification` on baseline
+`610b43f4508e85628a1362532a79d68d71ea902c`.
+
+The self-contained dashboard application and its `rh-handoff-dashboard.yml`
+workflow are removed from the active tree. This supersedes the RH-D018
+repository-placement clause and its path-scoped CI requirement: there is no
+dashboard build, integrity-test, or lint job in this repository, and
+`docs/chains/rh/**` changes trigger no workflow.
+
+All 27 files remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c`, with per-file Git mode, blob ID, byte
+length, and SHA-256 in
+[`extracted-files.tsv`](../../simplification/extracted-files.tsv). Restoration is
+a Git checkout of that commit and requires no reconstruction.
+
+This decision changes repository placement only. It does not revoke the RH-D018
+dependency-scope boundary, does not alter the RH-D019 publication posture — Sites
+recovery, dashboard deployment, and access changes stay parked and nonblocking —
+and does not authorize any Sites action. [`status.yaml`](status.yaml) is
+unaffected as the sole machine-readable current-status authority; it was never
+part of the dashboard directory.
 
 ### RH-D019 — Private dashboard is a temporary presentation mirror
 
@@ -459,7 +493,7 @@ unfunded. Future owner, external, implementation, fork, and security work may
 explicitly reopen the result.
 
 See
-[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md).
+`qualification/lp-launch-admission.md`.
 This decision grants no pool creation, funding, custody, RPC, migration,
 registration, configuration, deployment, activation, or release authority.
 

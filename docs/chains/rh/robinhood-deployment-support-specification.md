@@ -288,6 +288,37 @@ backends empty until owner approval.
 
 ### 3.6 Existing migration and history conventions
 
+> [!NOTE]
+> **Active-tree extraction, 2026-08-07.** The numeric step manifests described
+> below were extracted from the active tree by the RH codebase simplification
+> pass. Both directories, both current manifests, and every
+> `config/network_profiles.py` declaration are unchanged. All 66 extracted step
+> manifests remain recoverable from
+> `610b43f4508e85628a1362532a79d68d71ea902c`, with per-file blob IDs and
+> SHA-256 values in
+> [`extracted-files.tsv`](../../simplification/extracted-files.tsv).
+>
+> **Current active-tree contents, and they are not symmetric:**
+>
+> ```text
+> migration_history/base-mainnet/v1/       current-manifest.json
+> migration_history/robinhood-mainnet/v1/  0008-manifest.json
+>                                          current-manifest.json
+> ```
+>
+> `0008-manifest.json` is **retained, not extracted**. It was produced after the
+> extraction baseline, it is live Robinhood deployment history, and the
+> extraction manifest is bound to `610b43f…` and makes no claim about material
+> created after it. Operators should expect numeric step manifests produced from
+> now on to accumulate here normally; nothing in this cleanup removes, rewrites,
+> or suppresses them, and the runner's write path is unchanged.
+>
+> This changes no operator behavior. `--start-timestamp` defaults to the string
+> `"0"`, so `MigrationRunner._migrations()` always takes the explicit-start
+> branch and `_latest_manifest_timestamp()` stays unreachable from the CLI, as
+> Section 2.4 of the simplification plan records. The counts below remain the
+> historical observation made at the starting commit.
+
 At the starting commit:
 
 - `migrations/base-mainnet/` contains 62 migration files.

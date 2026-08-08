@@ -757,11 +757,11 @@ Stock workflow, deployment, activation, or release.
   rebalance rollback.
 - [`test_stock_token_vault_comparison.py:616`](../../../../tests/vaults/test_stock_token_vault_comparison.py#L616):
   donation masking.
-- [`stock-token-m1-exact-receipt.md`](../evidence/stock-token-m1-exact-receipt.md):
+- `stock-token-m1-exact-receipt.md`:
   sealed historical evidence.
-- [`track-8-m1-exact-receipt.md`](../track-8-m1-exact-receipt.md):
+- `track-8-m1-exact-receipt.md`:
   implementation chronology.
-- [`stock-token-vault-change-specification.md`](../stock-token-vault-change-specification.md):
+- `stock-token-vault-change-specification.md`:
   owner specification and design constraints.
 
 ### Primary external specifications

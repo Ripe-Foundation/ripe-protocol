@@ -170,8 +170,14 @@ None is a production component, documentation example, or launch authority.
 | `contracts/mock/MockProbeErc20.vy` | Stock-token transferability probe double | `a367fbd89f3fc7d5dbafa3a5c118cabbc70e696b` | `7d84c3f995c7f06588cabda1c8a12d8376217c653a9c4371a69ac8e559bf6a48` | 3,069 |
 | `contracts/mock/MockStockTokenControls.vy` | Stock-control adversarial double | `b9ed997df86bffe529b93bf9b6b00a5d0a9ca331` | `5d1527262aad66642a6e0f6dfdaad03458abdc4085a0445ebff0af8969614ef7` | 4,971 |
 | `contracts/mock/MockRobinhoodCurveSystem.vy` | Test-only Curve address-provider, registry, factory, and pool double for launch-route assertions | `1420dbf2999405783726d64c64eb3c5007b95e37` | `6d180087f56b68ed7387cce91f391fddf6ae9845a1ab78fef095423d0f4279ea` | 2,666 |
-| `contracts/testing/ActionBlockIdentityProbe.vy` | Test-only action-block probe | `82a56a6770d07b6330ca19d55df10f05bef5e105` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` | 1,203 |
-| `contracts/testing/StockTokenTransferProbe.vy` | Test-only Stock transfer probe | `1460f97591ac2a98e244f37fd66ce540d3408391` | `dcf632f75def3d55203731856e5c2813237235bf72c6b8586400c9f858c3046a` | 4,602 |
+| ~~`contracts/testing/ActionBlockIdentityProbe.vy`~~ **(removed)** | Test-only action-block probe | `82a56a6770d07b6330ca19d55df10f05bef5e105` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` | 1,203 |
+| ~~`contracts/testing/StockTokenTransferProbe.vy`~~ **(removed)** | Test-only Stock transfer probe | `1460f97591ac2a98e244f37fd66ce540d3408391` | `dcf632f75def3d55203731856e5c2813237235bf72c6b8586400c9f858c3046a` | 4,602 |
+
+Both `contracts/testing/` probes were removed along with `tests/probes/` and the
+block-clock inventory that pinned their paths. Neither was ever deployed —
+neither appears in any manifest under `migration_history/` — and no migration,
+script, or config referenced them. Their rows are struck through rather than
+deleted so the recorded hashes stay auditable; the sources remain in git history.
 
 The committed ABI files and Python tests are supporting artifacts rather than
 additional Vyper production deltas. Their current paths are linked from the
@@ -196,13 +202,19 @@ dated exact-hash review evidence rather than a fresh current compilation.
 ## Automated enforcement boundary
 
 The repository currently contains one GitHub Actions workflow:
-[`rh-handoff-dashboard.yml`](../../../../.github/workflows/rh-handoff-dashboard.yml).
-It builds, tests, and lints the Robinhood dashboard only. It does not run the
-Python/Vyper contract suites, central artifact checker, block-clock inventory,
-Defaults generator, deterministic ABI export check, or any Solidity build/test
-package. The red four-file token ABI discrepancy and the Solidity reference
-gaps therefore have no repository CI enforcement. Every validation result in
-this directory is explicit audit evidence, not a continuously enforced gate.
+[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). It runs the
+lean or comprehensive pytest lane on manual dispatch only; it has no push or
+pull-request trigger. It does not run the central artifact checker, block-clock
+inventory, Defaults generator, deterministic ABI export check, or any Solidity
+build/test package as a required check. The red four-file token ABI discrepancy
+and the Solidity reference gaps therefore have no repository CI enforcement.
+Every validation result in this directory is explicit audit evidence, not a
+continuously enforced gate.
+
+The former `rh-handoff-dashboard.yml` workflow and the dashboard application it
+built were extracted from the active tree; both remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c` (see
+[`extracted-files.tsv`](../../../simplification/extracted-files.tsv)).
 
 ## Complete rationale page inventory
 

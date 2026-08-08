@@ -1,5 +1,12 @@
 # Ledger: portable action-block identity
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 > **Draft authority and scope.** This is an owner-education and independent
 > technical-audit record for the integrated Ledger change. It is not an owner
 > approval, deployment authorization, activation approval, or claim that a
@@ -622,7 +629,7 @@ All named tests below are in
 | [`reject non-ArbSys source`, 101](../../../../tests/data/test_ledger_action_block.py#L101) | Constructor allowlist | Every nonzero non-`0x64` source reverts | Detects arbitrary-provider acceptance | Does not test production deployment profile |
 | [`lazy runtime failure matrix`, 122](../../../../tests/data/test_ledger_action_block.py#L122) | Missing/revert/short/33/64/96/incompatible ArbSys | Construction succeeds; runtime health read reverts | Detects accidental constructor probing, malformed-response acceptance, or native fallback | Controlled code at `0x64` |
 | [`constructor stores without probe`, 134](../../../../tests/data/test_ledger_action_block.py#L134) | ArbSys absent at construction, valid afterward | Construction succeeds; immutable getter is `0x64`; later health read returns the installed value | Detects a constructor-time ArbSys dependency or wrong immutable | Local double |
-| [`ArbSys overrides native`, 141](../../../../tests/data/test_ledger_action_block.py#L141) | Native advances while child identity is held | Same child identity rejects | Detects native fallback | Does not prove live chain topology |
+| [ArbSys overrides native, 141](../../../../tests/data/test_ledger_action_block.py#L141) | Native advances while child identity is held | Same child identity rejects | Detects native fallback | Does not prove live chain topology |
 | [`equality-only`, 165](../../../../tests/data/test_ledger_action_block.py#L165) | Same, next, then `750 -> 749` | Equal rejects; different/decreasing succeeds | Detects monotonic comparison | Accepts monitored source-regression risk |
 | [`low/high ordering`, 180](../../../../tests/data/test_ledger_action_block.py#L180) | Low→high and high→low→high | Low arms high; second high rejects | Detects loss of unchecked writes or wrong ordering | Direct Ledger calls, not every enclosing route |
 | [`user isolation`, 201](../../../../tests/data/test_ledger_action_block.py#L201) | Two users in one child identity | Each mapping key is independent | Detects global rather than per-user guard | Does not model shared wallet ownership |
@@ -637,7 +644,7 @@ All named tests below are in
 | --- | --- | --- | --- |
 | [`classification matrix`](../../../../tests/core/teller/test_teller_action_block.py#L31) | All Teller housekeeping callsites, user identity, risk and debt flags | Static callsite contract remains exact | Strong against reclassification; source-shape evidence |
 | [`external housekeeping`](../../../../tests/core/teller/test_teller_action_block.py#L80) | Valid/invalid caller, selected victim/risk/Addys, zero user | Touch/write or complete rollback | Detects authority and propagation changes; also exposes separate broad-caller concern |
-| [`Underscore writes`](../../../../tests/core/teller/test_teller_action_block.py#L143) | Equality exemption only | Repeated call succeeds but touch updates | Detects skipping the entire Ledger call |
+| [Underscore writes](../../../../tests/core/teller/test_teller_action_block.py#L143) | Equality exemption only | Repeated call succeeds but touch updates | Detects skipping the entire Ledger call |
 | [`deposit arms`](../../../../tests/core/teller/test_teller_deposit.py#L634) | Lower-risk deposit | Repeats; arms current identity | Detects removal of unchecked write |
 | [`deposit then withdrawal`](../../../../tests/core/teller/test_teller_withdraw.py#L90) | Low-risk then checked | Withdrawal rejects in same identity | Directly proves arming across routes |
 | [`checked withdrawal`](../../../../tests/core/teller/test_teller_withdraw.py#L130) | High-risk twice | Second rejects; economic state rolls back | Detects missing equality guard |
@@ -645,7 +652,7 @@ All named tests below are in
 | [`rebalance rollback`](../../../../tests/core/teller/test_teller_rebalance.py#L83) | Guard occurs after both legs | Later rejection restores all legs | Sensitive to transaction ordering/atomicity |
 | [`borrow ordering`](../../../../tests/core/creditEngine/test_credit_borrow.py#L61) | Checked before credit effects | Second action rejects before mint/debt changes | Detects guard movement after credit effects |
 | [`repay ordering`](../../../../tests/core/creditEngine/test_credit_repay.py#L58) | Low-risk repay between checked actions | Repay succeeds and rearms; later checked rejects | Detects changing repay classification/write |
-| [`Stability claim`](../../../../tests/vaults/modules/test_stab_vault_claims.py#L450) | Checked single claim after effects | Second claim rejects and rolls back | Detects missing post-claim guard/rollback |
+| [Stability claim](../../../../tests/vaults/modules/test_stab_vault_claims.py#L450) | Checked single claim after effects | Second claim rejects and rolls back | Detects missing post-claim guard/rollback |
 | [`claimMany`](../../../../tests/vaults/modules/test_stab_vault_claims.py#L717) | Checked batch claim | Second same-child call rejects | Detects missing batch classification |
 | [`external-route rollback`](../../../../tests/core/deleverage/test_deleverage_swap_collateral.py#L210) | Integrated caller reaches external housekeeping | Later failure restores all earlier effects | Cited only for Ledger guard coverage; Deleverage itself is out of scope |
 
@@ -932,16 +939,16 @@ authorized live evidence at release time.
 
 - [`ledger-guard-security-decision.md`](../ledger-guard-security-decision.md)
 - [`ledger-guard-implementation-record.md`](../ledger-guard-implementation-record.md)
-- [`track-6-s5-ledger-guard.md`](../track-6-s5-ledger-guard.md)
-- [`track-6-s5-checkpoint-0-owner-decision-packet.md`](../track-6-s5-checkpoint-0-owner-decision-packet.md)
+- `track-6-s5-ledger-guard.md`
+- `track-6-s5-checkpoint-0-owner-decision-packet.md`
 - [`shared-block-clock-specification.md`](../shared-block-clock-specification.md)
 - [`block-clock-validation-plan.md`](../block-clock-validation-plan.md)
-- [`ledger-action-block-testnet-proof.md`](../evidence/ledger-action-block-testnet-proof.md)
-- [`ledger-action-block-mainnet-fork.json`](../evidence/ledger-action-block-mainnet-fork.json)
-- [`ledger-action-block-testnet-fork.json`](../evidence/ledger-action-block-testnet-fork.json)
-- [`Ledger ABI`](../../../../scripts/abis/Ledger.json)
-- [`block-clock inventory`](../../../../config/block-clock-inventory.json#L180)
-- [`inventory checker`](../../../../scripts/check_block_clock_inventory.py#L336)
+- `ledger-action-block-testnet-proof.md`
+- `ledger-action-block-mainnet-fork.json`
+- `ledger-action-block-testnet-fork.json`
+- [Ledger ABI](../../../../scripts/abis/Ledger.json)
+- `block-clock inventory`
+- `inventory checker`
 
 ### Primary external sources
 

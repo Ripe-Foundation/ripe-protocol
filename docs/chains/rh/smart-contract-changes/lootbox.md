@@ -1,5 +1,12 @@
 # Lootbox: portable per-deployment Underscore send floor
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 > **Draft and authority banner.** This explanatory owner-review record was
 > prepared against the immutable snapshot below. It explains integrated source;
 > it does not authorize a migration, deployment, registry or capability change,
@@ -422,8 +429,8 @@ policy. It does not make them forward-compatible.
 | Governance forwarding preserves rejected action/state | [`test_switchboard_three_forwards_below_floor_rejection`](../../../../tests/config/test_switchboard_charlie.py#L1797-L1823) | Executes the timelocked forwarded value, expects Lootbox revert, and checks interval plus pending action remain intact. Passed in the reviewed-snapshot two-test run. |
 | Authorized timelocked interval update still works | [`test_switchboard_three_set_underscore_send_interval_timelock`](../../../../tests/config/test_switchboard_charlie.py#L1746-L1794) | Covers caller, pending action, timelock, execution, state, event, and cleanup. Passed in the same reviewed-snapshot run. |
 | Claims, deposit/borrow points, and RIPE rewards remain unchanged by the floor source change | [borrow points](../../../../tests/core/lootbox/test_loot_borrow_points.py#L6-L49), [claims](../../../../tests/core/lootbox/test_loot_claim.py#L7-L61), [deposit points](../../../../tests/core/lootbox/test_loot_deposit_points.py#L7-L64), [RIPE rewards](../../../../tests/core/lootbox/test_loot_ripe_rewards.py#L9-L56) | These suites do not isolate the new floor. They were included in the reviewed-snapshot 175-pass run; later reward-launch tests changed the current suite and were not rerun for this refresh. |
-| Inventory classifies and content-pins production source | [path/content pin](../../../../config/block-clock-inventory.json#L15669-L15678), [BN-025 rows](../../../../config/block-clock-inventory.json#L1523-L1555) | Checker validates exact path/hash/occurrences. Current checker is green. |
-| Floor discovery fails on delete/rename/move | [exact pattern and mutations](../../../../tests/inventory/test_block_clock_inventory.py#L1666-L1714) | Explicit mutation-sensitive tests; all four cases passed within the reviewed-snapshot 95-test inventory run. |
+| Inventory classifies and content-pins production source | `path/content pin`, BN-025 rows | Checker validates exact path/hash/occurrences. Current checker is green. |
+| Floor discovery fails on delete/rename/move | `exact pattern and mutations` | Explicit mutation-sensitive tests; all four cases passed within the reviewed-snapshot 95-test inventory run. |
 | Local deployment profile supplies five correct arguments | [`test_lootbox_deployment_profiles.py`](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. Current `rh` now also has a deterministic Robinhood migration source; no migration has executed. |
 | Max-minus-one interval overflows `last + interval` | [`test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Current test establishes the accepted fail-closed checked-addition boundary; a sane upper limit would require a separate source/configuration decision. |
 | General mutation testing | No mutation framework run | **Gap:** boundary and inventory tests are demonstrably mutation-sensitive, but there is no broad compiler/source mutation score. |
@@ -623,13 +630,13 @@ Primary repository evidence:
 - [Underscore floor/boundary tests](../../../../tests/core/lootbox/test_underscore_rewards.py#L70-L428)
 - [Clock profiles and evidence labels](../../../../tests/utils/clock_profiles.py#L29-L93)
 - [Clock harness tests](../../../../tests/clock/test_clock_profiles.py#L109-L222)
-- [Inventory checker pattern](../../../../scripts/check_block_clock_inventory.py#L813-L819)
-- [Current-state inventory bindings](../../../../config/block-clock-inventory.json#L29-L40)
+- Inventory checker pattern
+- Current-state inventory bindings
 - [Lootbox implementation record](../lootbox-floor-implementation-record.md)
 - [Shared clock specification](../shared-block-clock-specification.md)
-- [Track 6 source specification](../track-6-shared-block-clock-specification.md)
+- Track 6 source specification
 - [Validation plan](../block-clock-validation-plan.md)
-- [S3 controlling brief](../track-6-s3-lootbox-floor.md)
+- S3 controlling brief
 - [Directory documentation standard](README.md#documentation-standard)
 
 Core identity and patch commands:
