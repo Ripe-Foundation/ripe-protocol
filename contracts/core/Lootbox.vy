@@ -1212,23 +1212,6 @@ def _cleanUpUserVaults(
         extcall Ledger(_ledger).removeVaultFromUser(_user, vid)
 
 
-# migration clean up
-
-
-@external
-def removeVaultFromUserForMigration(
-    _user: address,
-    _vaultId: uint256,
-    _a: addys.Addys = empty(addys.Addys),
-):
-    # Ledger authorizes only Lootbox to remove a user's vault participation, so Teller
-    # routes migration cleanup through here rather than calling Ledger directly.
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    extcall Ledger(a.ledger).removeVaultFromUser(_user, _vaultId)
-
-
 # ripe gov vault id
 
 
