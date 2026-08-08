@@ -95,7 +95,7 @@ guard and is included in §5.3.
 |---|---|
 | **RH-LANE-01** | **RESOLVED by the owner's action.** The migration lane went first and is integrated as `24de5e6`. This plan is rebound onto it. No second live lane is modifying Teller. |
 | SP-PRICE-01 | Option A by default. Characterized; no production change needed for A. But see DV-14: option A's liveness claim does not hold for a reverting price source. |
-| GOV-WEIGHT-01 | **UNRESOLVED.** No autonomous default. |
+| GOV-WEIGHT-01 | **RESOLVED by the owner 2026-08-08:** zero means zero — the multiplier is always applied. Implemented; see the disposition below. |
 | RG-SIZE-01 | **RESOLVED by the owner 2026-08-08:** the 200-byte floor governs. See the disposition below. §6 E-2 shows Option A is feasible at a stated cost. |
 | RH-CHANGE-01 | **PARTIALLY RESOLVED — 3 of 12 gated rows.** The owner approved the DV-01/02/03 RipeGov least-privilege row, merged 2026-08-07 as `30cf436` (PR #78). The other 9 rows (DV-04/05/06/08/09/10/13/14/15) remain unapproved and no production source is edited for them. See the disposition below. |
 
@@ -137,6 +137,82 @@ DV-10, DV-13, DV-14, DV-15) and no production source is edited for them, so §17
 continues to apply to each. Note that DV-10's candidate (M7c, §13) is now
 *admissible on size* following the RG-SIZE-01 disposition above, but admissibility
 is not approval — it still needs its own RH-CHANGE-01 row.
+
+#### GOV-WEIGHT-01 disposition — owner, 2026-08-08
+
+**Zero means zero.** The §5.2 preferred rule is selected and implemented: the asset
+weight multiplier in `RipeGov._getLatestGovPoints` is applied unconditionally, so a
+configured `assetWeight` of 0 yields 0 governance points. This closes DV-07.
+
+The defect was that the multiplier was guarded:
+
+```vyper
+    # asset weight
+    if _weight != 0:
+        newPoints = newPoints * _weight // HUNDRED_PERCENT
+```
+
+A zero weight skipped the multiplication and fell through to the unweighted base —
+i.e. it behaved as exactly 100.00%, the opposite of the intent. Zero was reachable:
+`SwitchboardAlpha._isValidRipeVaultConfig` bounds the weight only from above
+(`> 500_00` rejected), so governance could set zero at any time and silently get
+full weight.
+
+**Implemented by deleting the guard rather than early-returning.** §5.2 describes
+the rule as "always apply the multiplier, early-return on zero", and the §6 M5 row
+measured that shape at **+7 bytes**. Both shapes were compiled and measured here:
+
+| Shape | Template | Δ | Deployed | Headroom |
+|---|---:|---:|---:|---:|
+| baseline (guarded) | 24,490 | — | 24,522 | 54 |
+| early-return on zero (as written in §5.2) | 24,497 | **+7** | 24,529 | 47 |
+| **unconditional multiply (implemented)** | **24,480** | **−10** | **24,512** | **64** |
+
+The early-return reproduces the M5 estimate of +7 exactly, which validates the
+measurement method. The unconditional multiply is semantically identical — with a
+zero weight `newPoints` becomes 0, and `_getLockBonusPoints` already returns 0 for
+0 points, so the lock-bonus branch cannot resurrect value — and it *frees* 10
+bytes. A 17-byte swing on a contract with 54 bytes of headroom.
+
+**No RG-SIZE-01 waiver is required.** Headroom improves 54 → 64. Had the §5.2
+shape been implemented literally it would have landed at 47, far below the
+200-byte floor, and would have needed an exact waiver.
+
+**RipeGov must be redeployed.** Its runtime bytecode changed.
+`config/contract-artifact-expectations.json` was regenerated for RipeGov in the
+same change via `scripts/update_contract_artifact_expectations.py RipeGov`, and
+`scripts/check_contract_artifacts.py --contract RipeGov` returns
+`CONTRACT_ARTIFACTS_OK`.
+
+**Four contradictory tests were rewritten, not deleted** — §5.2 requires not
+retaining assertions that pass only because the multiplier was bypassed:
+
+- `test_ripe_gov_vault_get_latest_gov_points_with_asset_weight` asserted
+  `points_0 == expected_base`, annotated "0% weight doesn't zero out points". Now
+  asserts `points_0 == 0`.
+- `test_ripe_gov_vault_zero_asset_weight_no_points` asserted only `points >= 0`,
+  which is vacuous for a `uint256` and passed while full points accrued. Now
+  asserts zero, plus that the deposit itself is intact.
+- `test_zero_asset_weight_behaves_as_full_weight` (the DV-07 characterization) is
+  now `test_zero_asset_weight_yields_zero_points`.
+- `test_zero_weight_deposit_accrues_full_unweighted_points` is now
+  `test_zero_weight_deposit_accrues_no_points`, still exercised through real
+  deposits so the rule is bound to observable vault state.
+
+`test_zero_asset_weight_means_zero_points` kept its assertion and lost its
+`xfail(strict=True)` marker — with the marker retained it would XPASS and fail the
+suite. Two tests were added: the full §5.2 boundary matrix now also covers
+`HUNDRED_PERCENT + 1` and the `500_00` configuration ceiling, and
+`test_zero_weight_earns_no_lock_bonus` pins the multiplier-before-bonus ordering.
+
+**Launch impact: none.** `DefaultsRobinhood` sets RIPE `assetWeight = 100_00` and
+RIPE is the only asset configured for this vault, so the bound launch default is
+unchanged. The decision governs the meaning of a future governed zero.
+
+**Measured suite effect** (`tests/vaults`, `tests/core/lootbox`, `tests/config`):
+baseline on `9354d05` is 8 failed / 1,327 passed / 21 xfailed; with this change
+8 failed / 1,329 passed / 20 xfailed. The failing set is byte-identical and
+pre-existing — the removed xfail became a pass and one new test was added.
 
 ---
 
@@ -229,7 +305,7 @@ Deployed = template + immutables (RipeGov +32, StabilityPool +96, Teller +96).
 | **M2** | Same-address short-circuit in `transferBalanceWithinVault` | A same-user AuctionHouse/CreditEngine transfer burns the proportional point penalty and re-weights the unlock toward `minLockDuration`; a **full** same-address transfer destroys the user's entire point balance (DV-04) | Only via AuctionHouse/CreditEngine, not user-callable | Accept: current callers do not produce same-address transfers | Fix in the two callers instead, leaving RipeGov untouched | `if _fromUser == _toUser: return 0, False` before any mutation | **+31** | 14 | none | Low. §9.2 forbids changing SharesVault family-wide without a full consumer inventory. Residual: the same defect remains in any other vault sharing the helper |
 | **M3** | Clamp contributor lock duration to governance bounds | `transferContributorRipeTokens` forwards the raw configured duration into the weighted blend, dragging a max-locked recipient below `minLockDuration` (DV-05) | Needs an HR contributor payout; recipient is the contributor's owner | Accept | **Config alternative exists:** require every deployed `Contributor` to carry a `depositLockDuration` inside `[min,max]`. Zero contract change | `max(min, d)` then `min(max, …)` before `_handleGovDataOnTransfer` | **+50** | −5 | none | Low. Residual under the config alternative: a future misconfigured Contributor re-opens it |
 | **M4** | Pause gate on `adjustLock` / `releaseLock` | Both stay live while RipeGov is paused; `releaseLock` reduces balances via `vaultData._reduceBalanceOnWithdrawal`, bypassing SharesVault's pause check entirely (DV-06) | Post-M1 only Teller can reach them, and Teller has its own pause. Residual: switchboard-initiated `Teller.adjustLock` still works while the vault is paused | Accept: pause is a custody control, not a lock control | Pause Teller as well as the vault in the runbook. Zero contract change | `assert not vaultData.isPaused` in both | **+12** | 33 | none | Low. §9.4 requires migration and overflow escapes to stay available; both are separate methods and unaffected |
-| **M5** | GOV-WEIGHT-01 "zero means zero" | A configured zero weight silently behaves as 100 % (DV-07) | Governance-config only. `DefaultsRobinhood` sets RIPE `assetWeight = 100_00`, so **the bound launch default does not change**; only the meaning of a future governed zero | Accept and document | **Config alternative exists:** validate `assetWeight != 0` in the SwitchboardAlpha setter. Zero RipeGov delta | Always apply the multiplier, early-return on zero | **+7** | 38 | none | Low |
+| **M5** | GOV-WEIGHT-01 "zero means zero" | A configured zero weight silently behaves as 100 % (DV-07) | Governance-config only. `DefaultsRobinhood` sets RIPE `assetWeight = 100_00`, so **the bound launch default does not change**; only the meaning of a future governed zero | Accept and document | **Config alternative exists:** validate `assetWeight != 0` in the SwitchboardAlpha setter. Zero RipeGov delta | Always apply the multiplier. **Implemented 2026-08-08 by deleting the `if _weight != 0` guard rather than early-returning: −10 bytes, headroom 54 → 64.** See the GOV-WEIGHT-01 disposition in §1 | **+7 as written in §5.2; −10 as implemented** | 47 as written; **64 as implemented** | none | Low |
 
 **Combined M1+M2+M3+M4+M5 (`size-probes/s2.patch`): template 24,590 → deployed
 24,622 → EIP-170 headroom −46. This shape does not deploy.** §6 E-2 gives the
@@ -384,10 +460,12 @@ pre-existing failures.
 ## 8. What was deliberately NOT done, and why
 
 - **All production-contract edits.** At the time of WP0, RH-CHANGE-01 approved no
-  row and GOV-WEIGHT-01 and RG-SIZE-01 were both unresolved; §17 applied. *Both
-  of those have since moved — RG-SIZE-01 was resolved by the owner on 2026-08-08
-  (see §1), and a RH-CHANGE-01 row was subsequently approved and merged. This
-  bullet records the WP0 position, not the current one.*
+  row and GOV-WEIGHT-01 and RG-SIZE-01 were both unresolved; §17 applied. *All
+  three have since moved — GOV-WEIGHT-01 and RG-SIZE-01 were both resolved by the
+  owner on 2026-08-08 and a RH-CHANGE-01 row was approved and merged (see the
+  dispositions in §1). Two production-contract edits now exist, both in RipeGov:
+  the DV-01/02/03 Teller-only guards and the DV-07 unconditional weight
+  multiplier. This bullet records the WP0 position, not the current one.*
 - **Work Package 3 §10.3 (RipeGov stateful model) and Work Package 7
   (StabilityPool stateful model).** Test-only, but their required invariants are
   the ones currently violated: RG-4 (DV-02/03/05), RG-5 (DV-04), SP-1 (DV-09),
