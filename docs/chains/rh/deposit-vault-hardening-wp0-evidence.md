@@ -97,7 +97,7 @@ guard and is included in §5.3.
 | SP-PRICE-01 | Option A by default. Characterized; no production change needed for A. But see DV-14: option A's liveness claim does not hold for a reverting price source. |
 | GOV-WEIGHT-01 | **UNRESOLVED.** No autonomous default. |
 | RG-SIZE-01 | **RESOLVED by the owner 2026-08-08:** the 200-byte floor governs. See the disposition below. §6 E-2 shows Option A is feasible at a stated cost. |
-| RH-CHANGE-01 | **UNRESOLVED.** No row approved; no production source edited. |
+| RH-CHANGE-01 | **PARTIALLY RESOLVED — 3 of 12 gated rows.** The owner approved the DV-01/02/03 RipeGov least-privilege row, merged 2026-08-07 as `30cf436` (PR #78). The other 9 rows (DV-04/05/06/08/09/10/13/14/15) remain unapproved and no production source is edited for them. See the disposition below. |
 
 **Stop condition encountered at WP0:** GOV-WEIGHT-01, RG-SIZE-01 and
 RH-CHANGE-01 were all unresolved *at the time this evidence was recorded*, so no
@@ -117,6 +117,26 @@ exact owner waiver — is unchanged and still binding.
 Nothing about any deployed contract changed with this decision: Teller's measured
 headroom is 318 bytes, which cleared both floors already. The decision only
 governs what future Teller growth is admissible.
+
+#### RH-CHANGE-01 disposition — owner, 2026-08-07 (partial)
+
+**One row approved: DV-01/02/03, RipeGov least privilege.** All three call sites
+(`depositTokensWithLockDuration`, `adjustLock`, `releaseLock`) went from
+`assert addys._isValidRipeAddr(msg.sender)` to
+`assert msg.sender == addys._getTellerAddr()`. Merged as `30cf436` (PR #78) with
+RipeGov's own block in `config/contract-artifact-expectations.json` regenerated in
+the same change. Measured effect: runtime template 24,490 bytes, deployed 24,522
+with the +32 immutable, **EIP-170 headroom 45 → 54** — the only candidate row that
+*shrinks* RipeGov.
+
+**RipeGov must be redeployed.** Its runtime bytecode changed; this is not a
+source-only edit.
+
+**The remaining 9 rows are still unapproved** (DV-04, DV-05, DV-06, DV-08, DV-09,
+DV-10, DV-13, DV-14, DV-15) and no production source is edited for them, so §17
+continues to apply to each. Note that DV-10's candidate (M7c, §13) is now
+*admissible on size* following the RG-SIZE-01 disposition above, but admissibility
+is not approval — it still needs its own RH-CHANGE-01 row.
 
 ---
 
