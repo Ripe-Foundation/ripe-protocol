@@ -30,12 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      # The runner context is not available in jobs.<id>.env — only inside
+      # steps — so these use github.workspace, which is.
       ETHERSCAN_API_KEY: local-placeholder
-      HYPOTHESIS_STORAGE_DIRECTORY: ${{ runner.temp }}/hypothesis
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/pycache
-      RIPE_BOA_CACHE_DIR: ${{ runner.temp }}/boa
-      TMPDIR: ${{ runner.temp }}/tmp
-      XDG_CACHE_HOME: ${{ runner.temp }}/xdg
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -51,7 +53,7 @@ jobs:
         id: boa-cache
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: ${{ runner.temp }}/boa
+          path: ${{ github.workspace }}/.ci/boa
           key: boa-${{ runner.os }}-py312-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-${{ github.run_id }}
           restore-keys: |
             boa-${{ runner.os }}-py312-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-
@@ -93,5 +95,5 @@ jobs:
         if: ${{ always() && steps.boa-cache.outcome == 'success' }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: ${{ runner.temp }}/boa
+          path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
