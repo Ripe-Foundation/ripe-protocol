@@ -116,17 +116,21 @@ def constructor_args(name, *args, source_file=None):
 # to be told when an explorer is Blockscout rather than Etherscan. Keyed by the
 # chain names `scripts/migrate.py --chain` accepts.
 VERIFY_TARGETS = {
+    # Etherscan's V2 API is multichain off a single key, which is why both
+    # Base networks read ETHERSCAN_API_KEY rather than a Basescan-specific one.
+    # Note migrate.py's boa integration uses BASESCAN_API_KEY separately -- two
+    # tools, two keys.
     "base-mainnet": {
         "chain_id": 8453,
-        "verifier": None,  # etherscan/basescan, forge's default
+        "verifier": None,  # etherscan, forge's default
         "verifier_url": None,
-        "key_env": "BASESCAN_API_KEY",
+        "key_env": "ETHERSCAN_API_KEY",
     },
     "base-sepolia": {
         "chain_id": 84532,
         "verifier": None,
         "verifier_url": None,
-        "key_env": "BASESCAN_API_KEY",
+        "key_env": "ETHERSCAN_API_KEY",
     },
     "robinhood-mainnet": {
         "chain_id": 4663,
