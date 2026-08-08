@@ -1,5 +1,12 @@
 # RH Codebase Simplification Implementation Plan
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 - **Status:** Fresh-agent autonomous implementation handoff
 - **Prepared:** 2026-08-07
 - **Implementation baseline:** `rh` and `origin/rh` at `610b43f4508e85628a1362532a79d68d71ea902c`

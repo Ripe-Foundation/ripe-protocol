@@ -1,5 +1,13 @@
 # Track 6 S5 Ledger Guard Security and Architecture Decision
 
+> **8 August 2026 removal overlay:** The isolated probe package described below
+> — `contracts/testing/ActionBlockIdentityProbe.vy`, `scripts/probes/`, and
+> `tests/probes/` — has been removed, together with the block-clock inventory
+> that pinned its paths. The probe never left local dry-run and was never
+> deployed. The security decision and the one-immutable architecture it records
+> are unchanged; no production contract was modified. Path and source-hash rows
+> below are historical. Removed sources are recoverable from git history.
+
 **Status:** Stage A evidence reconciled through exact current `rh`
 `332ae2bc`; the owner replaced row 2's pre-Stage-B live signed-testnet
 requirement with deterministic fork evidence; exact mainnet/testnet fork

@@ -1,5 +1,12 @@
 # Lootbox: portable per-deployment Underscore send floor
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 > **Draft and authority banner.** This explanatory owner-review record was
 > prepared against the immutable snapshot below. It explains integrated source;
 > it does not authorize a migration, deployment, registry or capability change,

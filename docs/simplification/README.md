@@ -1,5 +1,21 @@
 # RH codebase simplification
 
+> **8 August 2026 — Train 3 de-scope superseded.** A later pass on this branch
+> removed the block-clock inventory
+> (`scripts/check_block_clock_inventory.py`, `config/block-clock-inventory.json`,
+> `tests/inventory/test_block_clock_inventory.py`) and the probe package
+> (`contracts/testing/`, `scripts/probes/`, `tests/probes/`), which the
+> "De-scopes, with evidence" section below records as retained. The blocker
+> that section describes was real at the time: those paths were pinned by the
+> inventory's own file census, so nothing could be removed without it. Removing
+> the census removed the blocker.
+>
+> The sections below are kept as the record of the original two trains. For what
+> the branch removes now, see [`REMOVED.md`](REMOVED.md) — a single index of all
+> 160 removed paths — and Section 13 of
+> [`validation-evidence.md`](validation-evidence.md) for the binding test
+> evidence. No production contract was modified in either pass.
+
 - **Branch:** `codex/rh-codebase-simplification`
 - **Worktree:** `/Users/wigglez/dev/ripe-protocol-rh-simplification`
 - **Baseline:** `610b43f4508e85628a1362532a79d68d71ea902c` (`rh` / `origin/rh` at plan time)

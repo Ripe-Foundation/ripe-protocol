@@ -1,5 +1,12 @@
 # RH hardening pass baseline, traceability, and path matrix
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 This originated as the sole Phase 0 repository artifact for the
 owner-authorized RH hardening and offline release-support pass. The historical
 hardening baseline remains immutable provenance. The post-H-05 reconciliation
