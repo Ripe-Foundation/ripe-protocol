@@ -1131,17 +1131,17 @@
         "committed_path": "scripts/abis/RipeGov.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "c4455879fbbc13d6354bbffcfb133dd4524730c2649ab70b559a9636c35bfa0c",
-        "creation_executable_prefix_size": 24601,
-        "creation_metadata_sha256": "5aae5c858c91aa4be505288b31d80e4bef742373c844c70741645114739c916d",
+        "creation_executable_prefix_sha256": "e516ddd3c49f5210eef2f0ee04a9f4b3c1a7b4165d373a067f554b784675798b",
+        "creation_executable_prefix_size": 24591,
+        "creation_metadata_sha256": "42dff8e8c92c2f9a2d9efd7b05d16a6d6381cefb83835bf990abead767b93019",
         "creation_metadata_size": 56,
-        "creation_sha256": "1310c7001227a46b73fe526a98546987472d9bff913ab770506cf005bf0214ca",
-        "creation_size": 24657,
-        "deployed_eip170_headroom": 54,
-        "deployed_runtime_size": 24522,
-        "eip170_headroom": 86,
-        "runtime_template_sha256": "66379801249c95f2db2fb2aaf280f4778783b6de5197c09deb472bc8abb0c774",
-        "runtime_template_size": 24490
+        "creation_sha256": "144ac9a8be2d2461d044343e626e92529a40715b493f1cc6c0b2fab57e3817b7",
+        "creation_size": 24647,
+        "deployed_eip170_headroom": 64,
+        "deployed_runtime_size": 24512,
+        "eip170_headroom": 96,
+        "runtime_template_sha256": "8ab834360cec9d4d8e7d939fd624829eae83b8e1ee3dbfb99227d21f259b2f3e",
+        "runtime_template_size": 24480
       },
       "code_layout": {
         "addys": {
@@ -1179,9 +1179,9 @@
         "canonical_sha256": "23c4d5f465b9913b6d55f4ad7d6d60b301ef3a51a66af988eba984fbe00b4b46",
         "count": 64
       },
-      "source_git_blob": "8aefda69d9fed79ebacc1915e11e0a29105009fc",
+      "source_git_blob": "1667032f7e43a31147257b4319abeb5b7c8ce2c9",
       "source_path": "contracts/vaults/RipeGov.vy",
-      "source_sha256": "99780b9633dbc09a0824e9fe03e0e479ce82a24dce6d10d93050e8a398fc9046",
+      "source_sha256": "812414e00fe2cd92f0e9174bf2323f05c9cde6843f460f744d6092b75487599f",
       "storage_layout": {
         "govPointAccrualDisabledBlock": {
           "n_slots": 1,
@@ -1268,7 +1268,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "ffa3195c86c434635da5e1485b2e55aa3544a029d002c2cb42246a747f713938"
+      "transitive_compiler_input_integrity": "ec5e044dabd71bcec9eeb5bc3786bff5a3ac61c935f606ab4432926d97b34a1f"
     },
     "SimpleErc20": {
       "abi": {

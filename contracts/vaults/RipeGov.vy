@@ -874,9 +874,10 @@ def _getLatestGovPoints(
     if newPoints == 0:
         return 0
 
-    # asset weight
-    if _weight != 0:
-        newPoints = newPoints * _weight // HUNDRED_PERCENT
+    # asset weight -- a configured zero means zero points (GOV-WEIGHT-01).
+    # The multiplier is applied unconditionally: guarding on `_weight != 0` made a
+    # zero weight fall through to the unweighted base, i.e. behave as 100%.
+    newPoints = newPoints * _weight // HUNDRED_PERCENT
 
     # lock boost bonus (only if terms are set)
     if _terms.maxLockDuration != 0:
