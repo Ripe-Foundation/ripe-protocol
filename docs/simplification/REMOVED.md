@@ -8,12 +8,17 @@ file remains in git history and is recoverable with `git show <commit>:<path>`.
 Archived copies are also kept outside the repo at
 `~/dev/ripe-protocol-review-archives/rh-machete-chop/`.
 
+Step manifests are removed on an ongoing basis as rh produces them: only the
+`current-manifest.json` of each chain/version is read at runtime, by
+`prepare_defaults.py`, `verify_blockscout.py`, `ccip_send.py`, and `console.py`.
+Every `current-manifest.json` is retained.
+
 Historical planning and gate records elsewhere under `docs/chains/rh/` still cite
 these paths. Those citations were accurate on the dates they were written and are
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**160 files removed.**
+**171 files removed.**
 
 ## Block-clock inventory (4)
 
@@ -22,7 +27,7 @@ top pointing here.
 - `scripts/check_block_clock_inventory.py`
 - `tests/inventory/test_block_clock_inventory.py`
 
-## Deployment step manifests (68)
+## Deployment step manifests (79)
 
 - `migration_history/base-mainnet/v1/0000-manifest.json`
 - `migration_history/base-mainnet/v1/1004-manifest.json`
@@ -81,8 +86,14 @@ top pointing here.
 - `migration_history/base-mainnet/v1/2026043000-manifest.json`
 - `migration_history/base-mainnet/v1/2026072800-manifest.json`
 - `migration_history/base-mainnet/v1/2026072801-manifest.json`
+- `migration_history/base-mainnet/v1/2026080700-manifest.json`
 - `migration_history/base-mainnet/v1/3001-manifest.json`
 - `migration_history/base-mainnet/v1/3002-manifest.json`
+- `migration_history/base-sepolia/v1/0000-manifest.json`
+- `migration_history/base-sepolia/v1/0002-manifest.json`
+- `migration_history/base-sepolia/v1/0003-manifest.json`
+- `migration_history/base-sepolia/v2/0000-manifest.json`
+- `migration_history/base-sepolia/v2/0001-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0000-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0001-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0002-manifest.json`
@@ -92,6 +103,11 @@ top pointing here.
 - `migration_history/robinhood-mainnet/v1/0006-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0008-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0009-manifest.json`
+- `migration_history/robinhood-mainnet/v1/0010-manifest.json`
+- `migration_history/robinhood-mainnet/v1/2026080700-manifest.json`
+- `migration_history/robinhood-testnet/v1/0000-manifest.json`
+- `migration_history/robinhood-testnet/v2/0000-manifest.json`
+- `migration_history/robinhood-testnet/v2/0001-manifest.json`
 
 ## Evidence records (13)
 
