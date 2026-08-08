@@ -26,9 +26,9 @@ concurrency:
 
 jobs:
   test:
-    name: Python 3.12 (${{ inputs.lane || 'lean' }})
+    name: Python 3.12 (${{ github.event.inputs.lane || 'lean' }})
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.lane == 'comprehensive' && 120 || 45 }}
+    timeout-minutes: ${{ github.event.inputs.lane == 'comprehensive' && 120 || 45 }}
     env:
       ETHERSCAN_API_KEY: local-placeholder
       HYPOTHESIS_STORAGE_DIRECTORY: ${{ runner.temp }}/hypothesis
@@ -71,7 +71,7 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Run lean default lane
-        if: inputs.lane != 'comprehensive'
+        if: github.event.inputs.lane != 'comprehensive'
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
@@ -80,7 +80,7 @@ jobs:
             --durations=50
 
       - name: Run manual comprehensive lane
-        if: inputs.lane == 'comprehensive'
+        if: github.event.inputs.lane == 'comprehensive'
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
