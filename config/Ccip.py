@@ -1,11 +1,38 @@
 # Chainlink CCIP infrastructure, per chain.
 #
+# The mainnet entries were derived on chain, not from a directory: the router
+# and RMN proxy were read off the BurnMintTokenPools already deployed on each
+# chain (13 of 15 agree on Base, 7 of 8 on Robinhood -- the outliers are pools
+# still pointing at a superseded router), the chain selector off an OffRamp's
+# static config, and every address was then confirmed by its typeAndVersion().
+# LINK is omitted rather than guessed: nothing in these migrations reads it,
+# and both explorers list several name-squatting "ChainLink Token" entries.
+#
 # Every value below was read straight off the chain it belongs to (router / rmn proxy
 # from the `BurnMintTokenPool 1.5.1` pools deployed via the CCIP token manager UI, token
 # admin registry from the OnRamp static config, registry module from the
 # `RegistryModuleAdded` event on the token admin registry).
 
 CCIP = {
+    "base-mainnet": {
+        "CHAIN_SELECTOR": 15971525489660198786,
+        "ROUTER": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD",
+        "RMN_PROXY": "0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8",
+        "TOKEN_ADMIN_REGISTRY": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+        "REGISTRY_MODULE_OWNER_CUSTOM": "0x1A5f2d0c090dDB7ee437051DA5e6f03b6bAE1A77",
+        # No pool to retire: nothing CCIP-shaped is registered in RipeHq here.
+        "PREVIOUS_RIPE_POOL": None,
+        "REMOTE_CHAINS": ["robinhood-mainnet"],
+    },
+    "robinhood-mainnet": {
+        "CHAIN_SELECTOR": 6180753054346818345,
+        "ROUTER": "0x06fC836cf9839B1cd891C440A0a45242DA6Ae1c9",
+        "RMN_PROXY": "0xe8464c353210Cc398A45dB2454FBc5BCd25fFf20",
+        "TOKEN_ADMIN_REGISTRY": "0x1912C3cFafE8A76A32a92861d815aC2837F237Ca",
+        "REGISTRY_MODULE_OWNER_CUSTOM": "0x3237c0D7B58BEc8Dc17F00103B784Bd6678f789E",
+        "PREVIOUS_RIPE_POOL": None,
+        "REMOTE_CHAINS": ["base-mainnet"],
+    },
     "base-sepolia": {
         "CHAIN_SELECTOR": 10344971235874465080,
         "ROUTER": "0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93",

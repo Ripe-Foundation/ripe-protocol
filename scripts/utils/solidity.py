@@ -112,12 +112,15 @@ def constructor_args(name, *args, source_file=None):
     return "0x" + encode(types, [_arg(arg) for arg in args]).hex()
 
 
-def log_verify_command(migration, name, *args, source_file=None):
+def log_verify_command(migration, name, *args, source_file=None, label=None):
     """
     Logs the `forge verify-contract` command for a deployed Solidity contract - boa's
     etherscan verification only knows how to bundle Vyper sources.
+
+    `label` is the manifest key, which differs from `name` when the same contract is
+    deployed more than once - one RipeTokenPool per token, for instance.
     """
-    address = migration.get_address(name)
+    address = migration.get_address(label or name)
     log.info(
         f"To verify {name}, run:\n"
         f"    forge verify-contract --root solidity --chain {migration.chain()} \\\n"
