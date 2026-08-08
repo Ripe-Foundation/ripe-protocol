@@ -391,26 +391,16 @@ def test_transaction_executor_cadence_batch_is_exact_and_additive(
     records = checker._transaction_executor_cadence_records(inventory)
 
     assert checker._is_exact_transaction_executor_cadence_batch(inventory)
-    assert len(records) == checker.TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT == 7
+    assert len(records) == checker.TRANSACTION_EXECUTOR_CADENCE_RECORD_COUNT == 1
     assert checker._records_fingerprint(records) == (
         checker.TRANSACTION_EXECUTOR_CADENCE_RECORDS_SHA256
     )
+    # PR #68 deleted robinhood_backends.py, robinhood_executor.py and
+    # robinhood_execution_support.py; migration_runner.py is the only member left.
     assert [record["path"] for record in records] == [
         "scripts/utils/migration_runner.py",
-        "scripts/utils/robinhood_backends.py",
-        "scripts/utils/robinhood_backends.py",
-        "scripts/utils/robinhood_backends.py",
-        "scripts/utils/robinhood_executor.py",
-        "scripts/utils/robinhood_executor.py",
-        "tests/deployment/robinhood_execution_support.py",
     ]
     assert [record["semanticIds"] for record in records] == [
-        ["BN-027", "BN-028"],
-        ["BN-024"],
-        ["BN-024"],
-        ["BN-024"],
-        [],
-        [],
         ["BN-027", "BN-028"],
     ]
     assert all(
