@@ -52,7 +52,7 @@ implementation/schema/test/dependency bytes and requires an operator to supply
 the exact frozen release-candidate commit and tree.
 
 The companion qualification record is
-[evidence/robinhood-manifest-macos-release-qualification.md](evidence/robinhood-manifest-macos-release-qualification.md).
+`evidence/robinhood-manifest-macos-release-qualification.md`.
 
 ## Supported claim
 

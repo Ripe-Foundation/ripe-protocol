@@ -59,7 +59,7 @@ is an admitted production component.
 
 ## Dated compiler and review evidence
 
-The [Round-3 independent review](../evidence/ccip-solidity-reference-round-3-review.md)
+The Round-3 independent review
 is bound to the current source SHA-256. It reported this exact profile:
 
 | Property | Reviewed result |

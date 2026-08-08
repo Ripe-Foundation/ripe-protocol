@@ -2448,7 +2448,7 @@ failure was suppressed.
 
 The four-test collection increase from the prior `2,868` selected cases is
 exactly the incoming H-02 correction. Section 13 of
-[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+`evidence/ledger-action-block-testnet-proof.md`
 records the exact launchers, paths, hashes, and result details.
 
 Production `contracts/data/Ledger.vy`, the test-only probe, runner, focused
@@ -2652,7 +2652,7 @@ cached `origin/rh`.
 ### 22.3 Fork-evidence decision and architecture preservation
 
 The exact fork evidence in
-[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+`evidence/ledger-action-block-testnet-proof.md`
 section 16 records two consecutive parent/child states on both Robinhood
 mainnet and testnet. Both environments reproduced:
 

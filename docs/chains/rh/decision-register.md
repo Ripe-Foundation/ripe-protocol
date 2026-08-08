@@ -88,7 +88,7 @@ Every later Stock Token requires its own identity, proxy/implementation,
 runtime, transfer, oracle, administrative-control, and route evidence.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D005 — Stock routes remain unreachable until containment closes
 
@@ -100,8 +100,8 @@ the complete M1-M5 containment group, audit, exact configuration, and activation
 gates close.
 
 Sources:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md) and
-[`track-8-m1-exact-receipt.md`](track-8-m1-exact-receipt.md).
+`track-8-m0-owner-decision-packet.md` and
+`track-8-m1-exact-receipt.md`.
 
 ### RH-D006 — Exact receipt on every Teller deposit route
 
@@ -115,7 +115,7 @@ does not select a vault, configure AAPL, close M5, or authorize Stock
 registration, deployment, reachability, or activation.
 
 Source:
-[`evidence/stock-token-m1-exact-receipt.md`](evidence/stock-token-m1-exact-receipt.md).
+`evidence/stock-token-m1-exact-receipt.md`.
 
 ### RH-D007 — Chain-native sGREEN, never bridged
 
@@ -125,7 +125,7 @@ Chain-native sGREEN deposits and withdrawals are launch requirements. sGREEN
 must never receive a CCIP route.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D008 — CCIP complete or disabled
 
@@ -137,7 +137,7 @@ rollback, or state-independence gate is incomplete, launch and remain with CCIP
 disabled.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D009 — USDG price path
 
@@ -199,8 +199,8 @@ deployment evidence, negative-path verification, monitoring, activation, and
 release remain separately gated.
 
 Sources:
-[`track-6-s5-checkpoint-0-owner-decision-packet.md`](track-6-s5-checkpoint-0-owner-decision-packet.md)
-and [`track-6-s5-ledger-guard.md`](track-6-s5-ledger-guard.md).
+`track-6-s5-checkpoint-0-owner-decision-packet.md`
+and `track-6-s5-ledger-guard.md`.
 
 ## Deployment-system decisions
 
@@ -214,8 +214,8 @@ Blocked or unsupported operations fail before account, provider, path, or
 transaction work.
 
 Sources:
-[`track-7-h2-network-profiles-cli.md`](track-7-h2-network-profiles-cli.md) and
-[`evidence/network-profile-cli-implementation.md`](evidence/network-profile-cli-implementation.md).
+`track-7-h2-network-profiles-cli.md` and
+`evidence/network-profile-cli-implementation.md`.
 
 ### RH-D014 — Symbolic blueprint before concrete values
 
@@ -228,9 +228,9 @@ relation semantics, provenance, and blocker ownership. It does not approve
 concrete addresses, artifacts, parameters, roles, or activation.
 
 Sources:
-[`track-7-h3-robinhood-blueprint-omissions.md`](track-7-h3-robinhood-blueprint-omissions.md)
+`track-7-h3-robinhood-blueprint-omissions.md`
 and
-[`evidence/robinhood-blueprint-phase-a.md`](evidence/robinhood-blueprint-phase-a.md).
+`evidence/robinhood-blueprint-phase-a.md`.
 
 ### RH-D015 — One combined defaults and parameter workstream
 
@@ -251,7 +251,7 @@ preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
 
 Source:
-[`track-6-s6-track-7-h4-defaults-parameters.md`](track-6-s6-track-7-h4-defaults-parameters.md).
+`track-6-s6-track-7-h4-defaults-parameters.md`.
 
 ### RH-D016 — Shared migration source, isolated histories
 
@@ -267,7 +267,7 @@ retired historical evidence. Do not create history or infer an executable plan
 from repository migration files.
 
 Source:
-[`evidence/robinhood-migration-phase-a.md`](evidence/robinhood-migration-phase-a.md).
+`evidence/robinhood-migration-phase-a.md`.
 
 ### RH-D017 — Immutable manifest and evidence chain
 
@@ -493,7 +493,7 @@ unfunded. Future owner, external, implementation, fork, and security work may
 explicitly reopen the result.
 
 See
-[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md).
+`qualification/lp-launch-admission.md`.
 This decision grants no pool creation, funding, custody, RPC, migration,
 registration, configuration, deployment, activation, or release authority.
 
