@@ -8,17 +8,60 @@ file remains in git history and is recoverable with `git show <commit>:<path>`.
 Archived copies are also kept outside the repo at
 `~/dev/ripe-protocol-review-archives/rh-machete-chop/`.
 
-Step manifests are removed on an ongoing basis as rh produces them: only the
+## Deployment manifests: what is kept and why
+
+Step manifests are removed on an ongoing basis as rh produces them. Only the
 `current-manifest.json` of each chain/version is read at runtime, by
 `prepare_defaults.py`, `verify_blockscout.py`, `ccip_send.py`, and `console.py`.
-Every `current-manifest.json` is retained.
+
+**Mainnet `current-manifest.json` files are retained. Testnet manifests are
+removed entirely** — `base-sepolia` v1/v2 and `robinhood-testnet` v1/v2, step
+manifests and current manifests alike. Those chains are disposable; if one is
+needed again it is redeployed, which regenerates its manifest. Two manifests
+remain in the tree, `base-mainnet/v1` and `robinhood-mainnet/v1`.
+
+### Why removing step manifests does not break a deployment
+
+The migration machinery never reads a *previous* step's numbered manifest.
+`Migration.__init__` loads prior state from `current-manifest.json`
+(`scripts/utils/migration.py:31`), which is the cumulative merge of every step.
+The `previous_timestamp` argument is assigned to `self._previous_timestamp` and
+never read anywhere else. The only numbered read is a step loading its *own*
+file in `_append_manifest` (`migration.py:281`), and it is wrapped in a
+`try/except` that falls back to `{}` and rebuilds.
+
+What is genuinely lost is per-step attribution: `current-manifest.json` gives
+the final address, ABI, and constructor arguments for each contract, but not
+which step deployed it, and not each generation of a redeployed contract. That
+history is intact in git — `git show <commit>:<path>` — and in the archives.
+
+### Caveat for whoever repairs the resume path
+
+`MigrationRunner._latest_manifest_timestamp()` derives the deployment resume
+point by scanning the history directory for `*-manifest.json` and taking the
+highest integer prefix. **It is already broken and was before this branch:** it
+calls `int(timestamp)` on every match, and `current-manifest.json` yields
+`int('current')`, a `ValueError`, whenever a numbered manifest and a current
+manifest coexist — which was always the case. Operators must pass an explicit
+start timestamp today.
+
+Removing the numbered manifests does not change that: the function now returns
+the string `'current'`, which raises at `int(start_timestamp)` in
+`_filtered_migration_filenames` instead. Behaviour is unchanged, but the failure
+moves.
+
+If that resume derivation is ever fixed, **do not assume the numbered manifests
+are on disk.** The resume pointer now lives in `current-manifest.json` and in
+git history. A correct fix should read the current manifest, or restore the step
+manifests deliberately for the chains that need them, rather than silently
+depending on files this branch removed.
 
 Historical planning and gate records elsewhere under `docs/chains/rh/` still cite
 these paths. Those citations were accurate on the dates they were written and are
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**171 files removed.**
+**175 files removed.**
 
 ## Block-clock inventory (4)
 
@@ -27,7 +70,7 @@ top pointing here.
 - `scripts/check_block_clock_inventory.py`
 - `tests/inventory/test_block_clock_inventory.py`
 
-## Deployment step manifests (79)
+## Deployment manifests (83)
 
 - `migration_history/base-mainnet/v1/0000-manifest.json`
 - `migration_history/base-mainnet/v1/1004-manifest.json`
@@ -92,8 +135,10 @@ top pointing here.
 - `migration_history/base-sepolia/v1/0000-manifest.json`
 - `migration_history/base-sepolia/v1/0002-manifest.json`
 - `migration_history/base-sepolia/v1/0003-manifest.json`
+- `migration_history/base-sepolia/v1/current-manifest.json`
 - `migration_history/base-sepolia/v2/0000-manifest.json`
 - `migration_history/base-sepolia/v2/0001-manifest.json`
+- `migration_history/base-sepolia/v2/current-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0000-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0001-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0002-manifest.json`
@@ -106,8 +151,10 @@ top pointing here.
 - `migration_history/robinhood-mainnet/v1/0010-manifest.json`
 - `migration_history/robinhood-mainnet/v1/2026080700-manifest.json`
 - `migration_history/robinhood-testnet/v1/0000-manifest.json`
+- `migration_history/robinhood-testnet/v1/current-manifest.json`
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`
+- `migration_history/robinhood-testnet/v2/current-manifest.json`
 
 ## Evidence records (13)
 
