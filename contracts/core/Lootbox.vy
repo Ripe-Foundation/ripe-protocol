@@ -329,12 +329,18 @@ def _claimLoot(
             if asset == empty(address):
                 continue
 
-            # save to clean up later
-            if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
-                assetsToRemove.append(asset)
+            # claim loot first -- whether this asset can be cleaned up depends on the result
+            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, coreRipeGovVaultId, _a)
 
-            # claim loot
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, coreRipeGovVaultId, _a)
+            # Save to clean up later, but ONLY once the entitlement is gone. A deferred claim
+            # leaves `balancePoints` intact, and deregistering here would put those points beyond
+            # ordinary enumeration -- `claimDepositLootForAsset` is department-gated, so the user
+            # could not recover them on their own. Deregistration does not depend on points
+            # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
+            if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
+                b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
+                if b.userPoints.balancePoints == 0:
+                    assetsToRemove.append(asset)
 
         # clean up user assets (storage optimization)
         stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
@@ -398,7 +404,7 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
-    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, coreRipeGovVaultId, a)
+    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, coreRipeGovVaultId, a)
     if totalRipeForUser != 0:
         config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
         self._handleRipeMint(_user, totalRipeForUser, False, config, coreRipeGovVaultId, a)
@@ -411,7 +417,6 @@ def _claimDepositLoot(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _shouldFlush: bool,
     _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> uint256:
@@ -420,7 +425,7 @@ def _claimDepositLoot(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _coreRipeGovVaultId, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _coreRipeGovVaultId, _a)
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
@@ -439,7 +444,6 @@ def _getDepositLootData(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _shouldFlush: bool,
     _coreRipeGovVaultId: uint256,
     _a: addys.Addys,
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
@@ -454,38 +458,86 @@ def _getDepositLootData(
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _coreRipeGovVaultId, _a)
 
-    # user has no points
-    if up.balancePoints == 0:
+    # user has no points, or the asset total is inconsistent -- nothing can be computed
+    if up.balancePoints == 0 or ap.balancePoints == 0:
         return empty(UserDepositLoot), up, ap, gp, globalRewards
 
-    # calc user's share
-    userShareOfAsset: uint256 = 0
-    if ap.balancePoints != 0:
-        userShareOfAsset = min(up.balancePoints * HUNDRED_PERCENT // ap.balancePoints, HUNDRED_PERCENT)
+    # Calculate each category into LOCALS. Nothing is committed until we know the whole claim can
+    # be settled: `up.balancePoints` is a single ticket backing all three reward pools, so a
+    # partial settlement would zero the ticket while leaving one pool's entitlement unpaid.
+    #
+    # The user's cut is taken directly against `up/ap.balancePoints` rather than through a
+    # basis-point share. The old intermediate quantised to 4 decimal places, so any holder under
+    # 0.01% of the asset's points was floored to a zero payout regardless of what they were owed.
+    apStaker: uint256 = 0
+    gpStaker: uint256 = 0
+    rewStaker: uint256 = 0
+    lootStaker: uint256 = 0
+    apStaker, gpStaker, rewStaker, lootStaker = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
 
-    # insufficient user share, may need to wait longer to claim
-    if userShareOfAsset == 0:
-        if _shouldFlush:
-            up, ap = self._flushDepositPoints(up, ap)
-        return empty(UserDepositLoot), up, ap, gp, globalRewards
+    apVote: uint256 = 0
+    gpVote: uint256 = 0
+    rewVote: uint256 = 0
+    lootVote: uint256 = 0
+    apVote, gpVote, rewVote, lootVote = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
 
-    # calc user's share of loot, per category
-    userLoot: UserDepositLoot = empty(UserDepositLoot)
-    ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, userLoot.ripeStakerLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
-    ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, userLoot.ripeVoteLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
-    ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, userLoot.ripeGenLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
+    apGen: uint256 = 0
+    gpGen: uint256 = 0
+    rewGen: uint256 = 0
+    lootGen: uint256 = 0
+    apGen, gpGen, rewGen, lootGen = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
 
-    # only zero out points if they actually received loot -- asset or user may not always have sufficient points (yet) to get loot
-    didReceiveLoot: bool = (
-        userLoot.ripeStakerLoot != 0 or
-        userLoot.ripeVoteLoot != 0 or
-        userLoot.ripeGenLoot != 0
+    # A category BLOCKS the claim if it had something attributable but still paid nothing. Zeroing
+    # the shared ticket in that case would erase its entitlement permanently, so instead the whole
+    # claim defers: nothing is paid, nothing is mutated, and the points stay claimable.
+    isBlocked: bool = (
+        self._isCategoryBlocked(ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, lootStaker) or
+        self._isCategoryBlocked(ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, lootVote) or
+        self._isCategoryBlocked(ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, lootGen)
     )
-    if didReceiveLoot:
-        ap.balancePoints -= up.balancePoints # do first
-        up.balancePoints = 0
 
-    return userLoot, up, ap, gp, globalRewards
+    # nothing attributable anywhere yet -- also defer, so the points survive until the pools refill
+    didReceiveLoot: bool = (lootStaker != 0 or lootVote != 0 or lootGen != 0)
+
+    if isBlocked or not didReceiveLoot:
+        return empty(UserDepositLoot), up, ap, gp, globalRewards
+
+    # every attributable category paid -- commit all three atomically and consume the ticket
+    ap.ripeStakerPoints = apStaker
+    ap.ripeVotePoints = apVote
+    ap.ripeGenPoints = apGen
+    gp.ripeStakerPoints = gpStaker
+    gp.ripeVotePoints = gpVote
+    gp.ripeGenPoints = gpGen
+    globalRewards.stakers = rewStaker
+    globalRewards.voters = rewVote
+    globalRewards.genDepositors = rewGen
+
+    ap.balancePoints -= up.balancePoints # do first
+    up.balancePoints = 0
+
+    return UserDepositLoot(
+        ripeStakerLoot=lootStaker,
+        ripeVoteLoot=lootVote,
+        ripeGenLoot=lootGen,
+    ), up, ap, gp, globalRewards
+
+
+# a category owes nothing only when it has no attributable points or no rewards available. If all
+# three inputs are nonzero and the payout is still zero, the rounding lost real entitlement.
+
+
+@view
+@internal
+def _isCategoryBlocked(
+    _assetPoints: uint256,
+    _globalPoints: uint256,
+    _rewardsAvailable: uint256,
+    _paid: uint256,
+) -> bool:
+    if _paid != 0:
+        return False
+    return _assetPoints != 0 and _globalPoints != 0 and _rewardsAvailable != 0
 
 
 # helper / views
@@ -515,21 +567,16 @@ def _getClaimableDepositLootForAsset(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _coreRipeGovVaultId, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _coreRipeGovVaultId, _a)
     return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     
 
-@view
-@internal
-def _flushDepositPoints(_userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints) -> (UserDepositPoints, AssetDepositPoints):
-    up: UserDepositPoints = _userPoints
-    ap: AssetDepositPoints = _assetPoints
-    ap.balancePoints -= up.balancePoints
-    up.balancePoints = 0
-    return up, ap
-
-
 # claim utils
+
+
+# NOTE: this external keeps its original basis-point signature so its ABI and expectations are
+# unchanged. It forwards `(_userShareOfAsset, HUNDRED_PERCENT)` as the ratio, which reproduces the
+# previous math exactly. The claim path passes the raw point counts instead, for full precision.
 
 
 @view
@@ -540,20 +587,21 @@ def calcSpecificLoot(
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
 ) -> (uint256, uint256, uint256, uint256):
-    return self._calcSpecificLoot(_userShareOfAsset, _assetPoints, _globalPoints, _rewardsAvailable)
+    return self._calcSpecificLoot(_userShareOfAsset, HUNDRED_PERCENT, _assetPoints, _globalPoints, _rewardsAvailable)
 
 
 @view
 @internal
 def _calcSpecificLoot(
-    _userShareOfAsset: uint256,
+    _userPoints: uint256,
+    _totalPoints: uint256,
     _assetPoints: uint256,
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
   ) -> (uint256, uint256, uint256, uint256):
 
     # early returns for edge cases
-    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0 or _userShareOfAsset == 0:
+    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0 or _userPoints == 0 or _totalPoints == 0:
         return _assetPoints, _globalPoints, _rewardsAvailable, 0
 
     # cap asset points to global points to prevent inconsistencies
@@ -562,15 +610,15 @@ def _calcSpecificLoot(
     # calc asset rewards
     assetRewards: uint256 = _rewardsAvailable * assetPoints // _globalPoints
 
-    # calc user rewards
-    userRewards: uint256 = assetRewards * _userShareOfAsset // HUNDRED_PERCENT
+    # calc user rewards -- the user's ratio is applied directly, with no intermediate quantisation
+    userRewards: uint256 = assetRewards * _userPoints // _totalPoints
 
     # early return if no user rewards
     if userRewards == 0:
         return assetPoints, _globalPoints, _rewardsAvailable, 0
 
-    # calc points to reduce
-    userAssetPoints: uint256 = assetPoints * _userShareOfAsset // HUNDRED_PERCENT
+    # calc points to reduce -- same ratio, same precision as the payout above
+    userAssetPoints: uint256 = assetPoints * _userPoints // _totalPoints
     pointsToReduce: uint256 = min(userAssetPoints, assetPoints)
     pointsToReduce = min(pointsToReduce, _globalPoints)
 
@@ -1188,84 +1236,6 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
 #    blocked from flushing a reward the user can no longer reach on their own.
 
 
-# Can this (user, source asset) entitlement be settled with NO loss, in this block?
-#
-# `_getDepositLootData` has two branches that legitimately drop value during an ordinary claim,
-# because an ordinary claim leaves the position in place to keep accruing:
-#
-#  1. `userShareOfAsset == 0` with flushing on -- `_flushDepositPoints` zeroes the user's
-#     `balancePoints` and pays nothing at all;
-#  2. `didReceiveLoot` is driven by ANY single category being nonzero, yet it clears the one shared
-#     `balancePoints` that backs all three. A category whose reward rounds to zero while it still
-#     has attributable asset/global points and an available bucket therefore loses its claim.
-#
-# In a terminal wind-down both are permanent forfeiture. This returns False in either case so the
-# settlement reverts and the operator retries after the reward buckets have grown.
-
-
-@view
-@internal
-def _isCategorySettleable(
-    _userShareOfAsset: uint256,
-    _assetPoints: uint256,
-    _globalPoints: uint256,
-    _rewardsAvailable: uint256,
-) -> bool:
-    # nothing is attributable in this category, so clearing the shared points costs the user
-    # nothing. These are exactly `_calcSpecificLoot`'s own zero-payout edge cases.
-    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0:
-        return True
-
-    # something IS attributable here -- it must round to a nonzero payout
-    na1: uint256 = 0
-    na2: uint256 = 0
-    na3: uint256 = 0
-    userLoot: uint256 = 0
-    na1, na2, na3, userLoot = self._calcSpecificLoot(_userShareOfAsset, _assetPoints, _globalPoints, _rewardsAvailable)
-    return userLoot != 0
-
-
-@view
-@internal
-def _isSourceLootFullySettleable(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _coreRipeGovVaultId: uint256,
-    _a: addys.Addys,
-) -> bool:
-    # same fresh inputs `_getDepositLootData` uses, at this same block and state
-    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
-
-    up: UserDepositPoints = empty(UserDepositPoints)
-    ap: AssetDepositPoints = empty(AssetDepositPoints)
-    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _coreRipeGovVaultId, _a)
-
-    # nothing is owed at all -- safe to deregister
-    if up.balancePoints == 0:
-        return True
-
-    # the user's share must be representable. If it is not, an ordinary claim would flush the
-    # points away unpaid (branch 1 above), so a terminal settlement must refuse.
-    if ap.balancePoints == 0:
-        return False
-
-    # identical expression to `_getDepositLootData`, so the two agree exactly
-    userShareOfAsset: uint256 = min(up.balancePoints * HUNDRED_PERCENT // ap.balancePoints, HUNDRED_PERCENT)
-    if userShareOfAsset == 0:
-        return False
-
-    # every category holding something attributable must actually pay out (branch 2 above)
-    return (
-        self._isCategorySettleable(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers) and
-        self._isCategorySettleable(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters) and
-        self._isCategorySettleable(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
-    )
-
-
 @nonreentrant
 @external
 def settleAndCleanupMigratedSource(
@@ -1311,15 +1281,13 @@ def settleAndCleanupMigratedSource(
         if hasBalance:
             continue
 
-        # GUARD 1 -- refuse to settle unless the entitlement can be paid IN FULL right now
-        assert self._isSourceLootFullySettleable(_user, _sourceVaultId, _sourceVault, asset, coreRipeGovVaultId, a) # dev: source loot not fully settleable
+        ripeForAsset: uint256 = self._claimDepositLoot(_user, _sourceVaultId, _sourceVault, asset, coreRipeGovVaultId, a)
 
-        # GUARD 2 -- claim with `_shouldFlush = False`. Flushing is the code path that zeroes
-        # `balancePoints` while paying nothing, which is exactly the forfeiture this must not do.
-        ripeForAsset: uint256 = self._claimDepositLoot(_user, _sourceVaultId, _sourceVault, asset, False, coreRipeGovVaultId, a)
-
-        # GUARD 3 -- prove the points were actually consumed before deregistration is allowed.
-        # With flushing disabled, `balancePoints` reaches zero only by being paid out.
+        # Prove the entitlement was consumed BY PAYMENT before this asset may be deregistered.
+        # `_getDepositLootData` now commits atomically: it zeroes `balancePoints` only when every
+        # attributable reward category actually paid, and otherwise defers without mutating
+        # anything. So a nonzero balance here means the claim deferred, and the whole settlement
+        # reverts -- the operator retries once the reward buckets have grown.
         b: DepositPointsBundle = staticcall Ledger(a.ledger).getDepositPointsBundle(_user, _sourceVaultId, asset)
         assert b.userPoints.balancePoints == 0 # dev: reward entitlement still stranded
 
