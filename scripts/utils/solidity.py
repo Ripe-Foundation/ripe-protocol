@@ -112,22 +112,69 @@ def constructor_args(name, *args, source_file=None):
     return "0x" + encode(types, [_arg(arg) for arg in args]).hex()
 
 
-def log_verify_command(migration, name, *args, source_file=None, label=None):
+# forge rejects our internal chain names and needs the EVM chain id, and it needs
+# to be told when an explorer is Blockscout rather than Etherscan. Keyed by the
+# chain names `scripts/migrate.py --chain` accepts.
+VERIFY_TARGETS = {
+    "base-mainnet": {
+        "chain_id": 8453,
+        "verifier": None,  # etherscan/basescan, forge's default
+        "verifier_url": None,
+        "key_env": "BASESCAN_API_KEY",
+    },
+    "base-sepolia": {
+        "chain_id": 84532,
+        "verifier": None,
+        "verifier_url": None,
+        "key_env": "BASESCAN_API_KEY",
+    },
+    "robinhood-mainnet": {
+        "chain_id": 4663,
+        "verifier": "blockscout",
+        "verifier_url": "https://robinhoodchain.blockscout.com/api",
+        "key_env": "BLOCKSCOUT_API_KEY",
+    },
+}
+
+
+def verify_command(migration, name, *args, source_file=None, label=None):
     """
-    Logs the `forge verify-contract` command for a deployed Solidity contract - boa's
-    etherscan verification only knows how to bundle Vyper sources.
+    The `forge verify-contract` command for a deployed Solidity contract, as a
+    string - boa's etherscan verification only knows how to bundle Vyper sources.
 
     `label` is the manifest key, which differs from `name` when the same contract is
-    deployed more than once - one RipeTokenPool per token, for instance.
+    deployed more than once. `source_file` is the file name within `src/`, needed
+    when it does not match the contract name - two pools share one file here.
     """
+    chain = migration.chain()
     address = migration.get_address(label or name)
-    log.info(
-        f"To verify {name}, run:\n"
-        f"    forge verify-contract --root solidity --chain {migration.chain()} \\\n"
-        f"        --constructor-args {constructor_args(name, *args, source_file=source_file)} \\\n"
-        f"        --etherscan-api-key $ETHERSCAN_API_KEY \\\n"
-        f"        {address} {source_file or f'src/{name}.sol'}:{name}"
+    target = VERIFY_TARGETS.get(chain)
+
+    # forge resolves the contract path relative to the foundry root, so it always
+    # needs the `src/` prefix -- passing a bare file name fails to resolve.
+    path = f"src/{source_file or f'{name}.sol'}:{name}"
+
+    if target is None:
+        return f"# no verifier configured for {chain}; {name} is at {address}"
+
+    lines = [
+        f"forge verify-contract --root solidity --chain {target['chain_id']} \\",
+        f"    --constructor-args {constructor_args(name, *args, source_file=source_file)} \\",
+    ]
+    if target["verifier"]:
+        lines.append(f"    --verifier {target['verifier']} \\")
+        lines.append(f"    --verifier-url {target['verifier_url']} \\")
+    lines.append(f"    --etherscan-api-key ${target['key_env']} \\")
+    lines.append(f"    {address} {path}")
+    return "\n".join(lines)
+
+
+def log_verify_command(migration, name, *args, source_file=None, label=None):
+    """Logs the `forge verify-contract` command for a deployed Solidity contract."""
+    command = verify_command(
+        migration, name, *args, source_file=source_file, label=label
     )
+    log.info(f"To verify {name}, run:\n    " + command.replace("\n", "\n    "))
 
 
 def _abi_type(item):
