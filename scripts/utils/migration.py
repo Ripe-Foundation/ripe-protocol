@@ -6,6 +6,7 @@ from mergedeep import merge
 import boa
 from scripts.utils import log
 from scripts.utils import json_file
+from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (deployed_contracts_manifest,
                                              execute_transaction)
@@ -87,6 +88,60 @@ class Migration:
         contract = self._run(name, boa.load, self._files[name], *args, name=label, **kwargs)
         return self._register_contract(name, label, contract, args)
 
+    def deploy_solidity(self, name, *args, **kwargs):
+        """
+        Deploys the Solidity contract with given name and args (built from `solidity/`
+        with foundry) or skips if already deployed.
+        Returns the deployed contract.
+        """
+        label = kwargs.pop("label", name)
+        source_file = kwargs.pop("source_file", None)
+
+        next_transaction = self._count + 1
+        log.h2(
+            f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - Deploying {name}"
+        )
+
+        if self._curr_transaction():
+            log.h3(f"Skipping transaction {next_transaction}")
+            self._count += 1
+            return solidity.at(name, self.get_address(label), source_file)
+
+        contract = solidity.deploy(
+            name,
+            *args,
+            sender=self._deploy_args.sender.address,
+            source_file=source_file,
+        )
+        log.h3(f"Contract {name} deployed at {contract.address}")
+
+        self._transactions.append(str(contract.address))
+        self._count += 1
+
+        # solidity contracts are recorded by address only - the manifest stores the
+        # vyper compiler output for everything else, which foundry artifacts have no
+        # equivalent for (use `get_solidity_contract` to load them back)
+        self.include_contract(label, str(contract.address))
+        self._save_log_file()
+
+        return contract
+
+    def get_solidity_contract(self, name, address=None, source_file=None, label=None):
+        """
+        Returns a previously deployed Solidity contract, with the abi from `solidity/`.
+        """
+        address = address or self.get_address(label or name)
+        return solidity.at(name, address, source_file)
+
+    def get_address_on_chain(self, chain, name):
+        """
+        Address of a contract deployed by another chain's migrations, same environment.
+        """
+        filename = self._manifest_filename("current").replace(
+            os.path.join("", self.chain(), ""), os.path.join("", chain, "")
+        )
+        return json_file.load(filename)["contracts"][name]["address"]
+
     def soft_deploy(self, name, *args, **kwargs):
         """
         Deploys contract with given name and args or skips if already deployed
@@ -122,6 +177,9 @@ class Migration:
 
     def chain(self):
         return self._deploy_args.chain
+
+    def timestamp(self):
+        return self._timestamp
 
     def blueprint(self):
         return self._deploy_args.blueprint

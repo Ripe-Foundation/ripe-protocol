@@ -626,6 +626,11 @@ def finishTokenSetup(_newHq: address, _timeLock: uint256 = 0) -> bool:
 ##################
 
 
+# read by RegistryModuleOwnerCustom.registerAdminViaGetCCIPAdmin(), which proposes this
+# address as the token's admin in the CCIP TokenAdminRegistry -- that admin is who
+# registers and replaces the CCIP token pool for this token
+
+
 @view
 @external
 def getCCIPAdmin() -> address:

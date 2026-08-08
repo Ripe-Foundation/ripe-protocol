@@ -966,14 +966,18 @@ def test_ripe_gov_vault_zero_asset_weight_no_points(
     boa.env.time_travel(blocks=100)
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     
-    # With zero asset weight, there may still be base/lock bonus points
+    # GOV-WEIGHT-01: zero weight means zero points. This previously asserted only
+    # `>= 0`, which is vacuous for a uint256 -- it passed while the multiplier was
+    # being skipped and the balance was accruing full unweighted points.
     points = ripe_gov_vault.userGovData(bob, ripe_token).govPoints
     total_points = ripe_gov_vault.totalUserGovPoints(bob)
-    
-    # Operations should work and points should be reasonable values
-    assert points >= 0
-    assert total_points >= 0
+
+    assert points == 0
+    assert total_points == 0
     assert total_points == points  # Should be consistent
+
+    # the deposit itself must still be intact -- zero points, not a failed deposit
+    assert ripe_gov_vault.userGovData(bob, ripe_token).lastShares > 0
 
 
 def test_ripe_gov_vault_max_lock_boost_comparison(
@@ -1117,14 +1121,17 @@ def test_ripe_gov_vault_get_latest_gov_points_with_asset_weight(ripe_gov_vault):
         (0, 0, 0, False, 0),  # no lock terms
         0  # 0% weight
     )
-    
+
     # Expected: 1000 shares * 100 blocks = 100,000 base points
     expected_base = 1000 * time_elapsed
     assert points_100 == expected_base
     assert points_200 == expected_base * 2
     assert points_50 == expected_base // 2
-    # Note: 0% weight doesn't zero out points, it just doesn't apply weight multiplier
-    assert points_0 == expected_base
+    # GOV-WEIGHT-01: 0% weight zeroes the points. This previously asserted
+    # `points_0 == expected_base` with the note that a zero weight "doesn't zero out
+    # points, it just doesn't apply weight multiplier" -- that was the DV-07 defect,
+    # not intended behavior, and a zero weight now earns nothing.
+    assert points_0 == 0
 
 
 def test_ripe_gov_vault_get_latest_gov_points_with_lock_bonus(ripe_gov_vault):
@@ -2823,24 +2830,34 @@ def _weighted_points(vault, weight, *, shares=1_000 * EIGHTEEN_DECIMALS, blocks=
     )
 
 
-def test_zero_asset_weight_behaves_as_full_weight(ripe_gov_vault):
-    """DV-07 characterization (GOV-WEIGHT-01).
+def test_zero_asset_weight_yields_zero_points(ripe_gov_vault):
+    """GOV-WEIGHT-01, resolved: a configured zero weight earns zero points.
 
-    RipeGov._getLatestGovPoints guards the multiplier with `if _weight != 0`,
-    so a configured zero weight skips the multiplication entirely and produces
-    exactly the unweighted base points -- identical to a 100.00% weight.
+    Replaces the DV-07 characterization, which asserted the defect -- the
+    multiplier was guarded by `if _weight != 0`, so a zero weight skipped the
+    multiplication and produced the unweighted base, i.e. behaved as 100.00%.
+    The multiplier is now applied unconditionally.
     """
     unweighted = 1_000 * 10  # shares normalized by PRECISION, times blocks held
 
     assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT) == unweighted
-    assert _weighted_points(ripe_gov_vault, 0) == unweighted
-    assert _weighted_points(ripe_gov_vault, 0) == _weighted_points(
+    assert _weighted_points(ripe_gov_vault, 0) == 0
+
+    # the specific confusion being closed: zero must not equal full weight
+    assert _weighted_points(ripe_gov_vault, 0) != _weighted_points(
         ripe_gov_vault, HUNDRED_PERCENT
     )
 
 
 def test_nonzero_asset_weight_boundaries_are_exact(ripe_gov_vault):
-    """GOV-WEIGHT-01 boundary matrix for every weight the decision must cover."""
+    """GOV-WEIGHT-01 boundary matrix for every weight the decision must cover.
+
+    Section 5.2 requires the selected rule to be asserted at zero, one unit, one
+    less than full scale, full scale, and greater than full scale. Zero lives in
+    test_zero_asset_weight_yields_zero_points; the rest are here. These values are
+    unchanged by the GOV-WEIGHT-01 fix, which only ever altered the zero case --
+    that they still hold is the evidence the fix was surgical.
+    """
     base = 1_000 * 10
 
     assert _weighted_points(ripe_gov_vault, 1) == base * 1 // HUNDRED_PERCENT
@@ -2849,10 +2866,16 @@ def test_nonzero_asset_weight_boundaries_are_exact(ripe_gov_vault):
         base * (HUNDRED_PERCENT - 1) // HUNDRED_PERCENT
     )
     assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT) == base
+    assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT + 1) == (
+        base * (HUNDRED_PERCENT + 1) // HUNDRED_PERCENT
+    )
     assert _weighted_points(ripe_gov_vault, 2 * HUNDRED_PERCENT) == base * 2
 
+    # 500_00 is the ceiling SwitchboardAlpha._isValidRipeVaultConfig permits
+    assert _weighted_points(ripe_gov_vault, 500_00) == base * 5
 
-def test_zero_weight_deposit_accrues_full_unweighted_points(
+
+def test_zero_weight_deposit_accrues_no_points(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -2862,10 +2885,11 @@ def test_zero_weight_deposit_accrues_full_unweighted_points(
     switchboard_alpha,
     setupRipeGovVaultConfig,
 ):
-    """DV-07 characterization at the deposit boundary (GOV-WEIGHT-01).
+    """GOV-WEIGHT-01 at the deposit boundary, resolved.
 
-    Exercised through real deposits rather than the pure view, so the decision
-    is bound to observable vault state and not just to the helper.
+    Exercised through real deposits rather than the pure view, so the decision is
+    bound to observable vault state and not just to the helper. Previously the DV-07
+    characterization, which asserted zero weight accrued at the full-weight rate.
     """
     amount = 100 * EIGHTEEN_DECIMALS
 
@@ -2884,16 +2908,43 @@ def test_zero_weight_deposit_accrues_full_unweighted_points(
     ripe_gov_vault.updateUserGovPoints(alice, sender=switchboard_alpha.address)
     zero_weight_points = ripe_gov_vault.userGovData(alice, ripe_token).govPoints
 
-    # A configured zero weight earns points at the same rate as full weight.
-    assert zero_weight_points > 0
-    assert zero_weight_points == full_weight_points
+    # A configured zero weight earns nothing, and the deposit itself still works.
+    assert zero_weight_points == 0
+    assert zero_weight_points != full_weight_points
+    assert ripe_gov_vault.userGovData(alice, ripe_token).lastShares > 0
+    assert ripe_gov_vault.totalUserGovPoints(alice) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GOV-WEIGHT-01 is unresolved: RipeGov._getLatestGovPoints still skips "
-    "the multiplier when the configured weight is zero",
-)
 def test_zero_asset_weight_means_zero_points(ripe_gov_vault):
-    """DV-07 hardening target: the Section 5.2 preferred rule."""
+    """GOV-WEIGHT-01: the Section 5.2 preferred rule, now implemented.
+
+    Was xfail(strict=True) while the gate was unresolved. The marker is removed
+    rather than the test, so the same assertion that pinned the defect now pins
+    the fix -- with strict=True still set it would XPASS and fail the suite.
+    """
     assert _weighted_points(ripe_gov_vault, 0) == 0
+
+
+def test_zero_weight_earns_no_lock_bonus(ripe_gov_vault):
+    """A zero weight must not earn a lock bonus on top of zero base points.
+
+    The bonus is applied after the weight multiplier, so this pins the ordering:
+    if the multiplier were ever moved after the bonus, a zero weight would still
+    accrue boost points and this would catch it.
+    """
+    current = boa.env.evm.patch.block_number
+    if current <= 10:
+        boa.env.time_travel(blocks=11 - current)
+        current = boa.env.evm.patch.block_number
+
+    boosted_terms = (0, 100, 200_00, True, 0)  # min, max, maxLockBoost, canExit, exitFee
+    unlock = current + 50
+
+    weighted = ripe_gov_vault.getLatestGovPoints(
+        1_000 * EIGHTEEN_DECIMALS, current - 10, unlock, boosted_terms, HUNDRED_PERCENT
+    )
+    assert weighted > 1_000 * 10  # base plus a real bonus, so the terms do boost
+
+    assert ripe_gov_vault.getLatestGovPoints(
+        1_000 * EIGHTEEN_DECIMALS, current - 10, unlock, boosted_terms, 0
+    ) == 0
