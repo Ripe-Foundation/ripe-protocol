@@ -265,8 +265,6 @@ _FIXED_PLANNING_INPUTS = (
     "scripts/utils/manifest_schema.py",
     "scripts/utils/migration.py",
     "scripts/utils/migration_runner.py",
-    "scripts/utils/robinhood_backends.py",
-    "scripts/utils/robinhood_executor.py",
 )
 
 
