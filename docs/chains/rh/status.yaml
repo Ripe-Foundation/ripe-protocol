@@ -695,8 +695,17 @@ workstreams:
     implementation_state: removed; checker, ledger, and its 180 tests deleted
     integration_state: removed
     review_state: superseded; the inventory pinned an exact repository file census rather than contract behaviour
-    owner_decision_state: removed under the codebase-simplification branch
-    remaining_blockers: [Production clock changes are now reviewed on their own merits; no inventory admission step exists.]
+    owner_decision_state: >
+      Removed under the codebase-simplification branch. The owner accepted on
+      2026-08-08 that production clock usage is no longer scanned. This is an
+      accepted coverage loss, not an oversight.
+    coverage_accepted_as_lost: >
+      The inventory scanned production sources for block.number and
+      block.timestamp usage, mixed-clock arithmetic, and unclassified Vyper
+      paths. Nothing replaces it. A new production timestamp occurrence, a moved
+      occurrence, or a new unclassified path can now enter with no scanner
+      objecting. Clock-affecting changes are reviewed on their own merits.
+    remaining_blockers: [None. The scanning obligation was retired, not deferred.]
     deployment_release_state: not deployment evidence; no longer produced
     exact_next_action: None. Occurrence, line, and file counts are no longer enforced by any test.
     authority: git history; see docs/simplification/REMOVED.md

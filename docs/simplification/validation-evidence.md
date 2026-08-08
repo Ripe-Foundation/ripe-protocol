@@ -793,6 +793,67 @@ ffd92b5988e8cb3c862cd06016d52fb99f30aaeb6e6ae6504ae3a79f85b60455  evidence-final
 
 ### Standing invariant, restated
 
-Sections 3–7 remain bound to the pre-merge pair. This section binds the
-delivered tip. Any future commit touching a path outside `docs/simplification/`
-requires repeating this Section 13 matrix.
+Sections 3–7 remain bound to the pre-merge pair.
+
+**Superseded: see Section 14.** This section was the binding evidence when it
+was written, but non-documentation commits landed after it. Section 14 binds the
+delivered tip against current `origin/rh`.
+
+## 14. Final matrix — supersedes Section 13
+
+Section 13 binds `6260726` versus `6781cb2`. Several non-documentation commits
+followed it — the rh merges, the step-manifest extractions, the testnet manifest
+removal and restoration, and the test-assertion corrections — so its result no
+longer describes what is being merged. **Section 13 is superseded. This section
+is the binding evidence.**
+
+### Pair
+
+```text
+baseline  = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
+candidate = 687321ceb896b71bb52837e1c0cde142ca655102   (+ post-review corrections)
+```
+
+Both lanes ran in separate `git clone --no-hardlinks` checkouts under the locked
+`rh-wave2-py312` interpreter, with private cache directories.
+
+| Lane | Baseline `5a664cd` | Candidate |
+| --- | --- | --- |
+| Lean | 18 failed, 3,387 passed, 25 errors | 13 failed, 3,392 passed, 25 errors |
+| Comprehensive | 127 failed, 4,571 passed, 33 errors | 42 failed, 4,321 passed, 33 errors |
+
+Compared per test node from the JUnit XML: **0 new red, 0 regressions.**
+
+### What the failure reduction is, stated accurately
+
+Earlier revisions of this document and of the pull request described the
+comprehensive delta as "85 failures fixed". **That was wrong, and the wording
+mattered — it implied production behaviour improved. It did not.** An
+independent review decomposed the 85 exactly, and the decomposition is:
+
+| Cause | Count |
+| --- | ---: |
+| Failing tests deleted with `tests/inventory/test_block_clock_inventory.py` | 78 |
+| Failing block-clock integration assertion deleted from `test_bluechip_yield_prices_artifacts.py` | 1 |
+| Failing mutant-identity IDs replaced by differently named passing IDs | 4 |
+| Surviving tests moved failure → pass by relaxing an assertion | 2 |
+| **Total** | **85** |
+
+No production defect was repaired by this branch. The correct statement is that
+**85 red nodes stopped being reported**, 79 of them because the test was removed.
+
+### Coverage accepted as lost
+
+The block-clock inventory scanned production sources for `block.number` and
+`block.timestamp` usage, mixed-clock arithmetic, and unclassified Vyper paths.
+Nothing replaces it. A new production timestamp occurrence, a moved occurrence,
+or a new unclassified path can now enter without any scanner objecting.
+
+The owner accepted this on 2026-08-08: production clock usage is not scanned,
+and clock-affecting changes are reviewed on their own merits. This is recorded
+so it is a decision on the record rather than an unnoticed gap.
+
+### Standing invariant
+
+Any future commit touching a path outside `docs/simplification/` requires
+repeating **this** matrix, against whatever `origin/rh` is at that time.

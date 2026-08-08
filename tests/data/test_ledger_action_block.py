@@ -382,6 +382,55 @@ def _deploy_ledger_source(
     )
 
 
+# Substrings that may legitimately appear in a line changed by each L3a mutant.
+# Stated here independently of _l3a_mutant_source so the two must agree: if the
+# generator grows an extra edit, or a mutant picks up an unrelated change, the
+# changed line will not match any marker and the test fails.
+L3A_EXPECTED_EDIT_MARKERS = {
+    "typed_call": (
+        "interface MutantArbSys:",
+        "def arbBlockNumber() -> uint256: view",
+        "staticcall MutantArbSys(ARB_SYS).arbBlockNumber()",
+        "response: Bytes[65] = raw_call(",
+        "ARB_SYS,",
+        'method_id("arbBlockNumber()", output_type=Bytes[4]),',
+        "max_outsize=65,",
+        "is_static_call=True,",
+        "revert_on_failure=True,",
+        ")",
+        "assert len(response) == 32",
+        "return abi_decode(response, uint256)",
+    ),
+    "truncation": (
+        "response: Bytes[65] = raw_call(",
+        "response: Bytes[32] = raw_call(",
+        "max_outsize=65,",
+        "max_outsize=32,",
+    ),
+    "native_fallback": (
+        "success: bool = False",
+        'response: Bytes[65] = b""',
+        "success, response = raw_call(",
+        "response: Bytes[65] = raw_call(",
+        "ARB_SYS,",
+        'method_id("arbBlockNumber()", output_type=Bytes[4]),',
+        "max_outsize=65,",
+        "is_static_call=True,",
+        "revert_on_failure=False,",
+        "revert_on_failure=True,",
+        ")",
+        "if not success or len(response) != 32:",
+        "return block.number",
+        "assert len(response) == 32",
+        "return abi_decode(response, uint256)",
+    ),
+    "monotonic": (
+        "assert self.lastTouch[_user] != actionBlock",
+        "assert self.lastTouch[_user] < actionBlock",
+    ),
+}
+
+
 def _replace_once(source, old, new):
     assert source.count(old) == 1
     return source.replace(old, new)
@@ -515,13 +564,24 @@ L3A_KILLING_TESTS = {
     "kind",
     ["typed_call", "truncation", "native_fallback", "monotonic"],
 )
-def test_l3a_mutant_source_actually_mutates_and_has_a_killing_test(kind):
-    # This used to pin a sha256 of the mutant source text. Those four constants
-    # reproduced only on macOS arm64 and failed on Linux x86_64 at the same
-    # commit with the same toolchain, so the assertion tracked the machine
-    # rather than the mutant. What it was really guarding is checked directly
-    # here: the mutation is applied, it is a real change, and a named test
-    # exists to kill it.
+def test_l3a_mutant_source_is_exactly_the_intended_edit(kind):
+    # This used to pin a sha256 of the whole mutant source.
+    #
+    # An earlier revision of this comment blamed those constants on a
+    # macOS-arm64 versus Linux-x86_64 difference. That was wrong. A sha256 of
+    # source text cannot depend on the CPU when the bytes are identical; the
+    # constants were stale because rh commit 3a5f840 changed Ledger.vy, and the
+    # comparison that suggested otherwise was a local run against a CI run of the
+    # pull_request *merge* ref, which already contained the newer contract.
+    #
+    # A whole-file hash is still the wrong assertion: it has to be regenerated on
+    # every legitimate Ledger change, which is what let it go stale unnoticed.
+    # What it was actually guarding is that the mutant differs from the baseline
+    # by the intended edit and nothing else — a mutant carrying a second,
+    # unrelated change would still have satisfied a hash refreshed without
+    # reading it, and would silently weaken the mutation test that consumes it.
+    # That property is asserted directly here, and it is source-drift immune.
+    import difflib
     from pathlib import Path
 
     baseline = Path(LEDGER_PATH).read_text()
@@ -529,7 +589,27 @@ def test_l3a_mutant_source_actually_mutates_and_has_a_killing_test(kind):
 
     assert L3A_KILLING_TESTS[kind] in globals()
     assert mutant != baseline
-    assert len(mutant) > 0
+
+    # Every changed line, in either direction, must belong to the intended edit.
+    # Anything else is an unrelated mutation riding along.
+    allowed = L3A_EXPECTED_EDIT_MARKERS[kind]
+    changed = [
+        line[1:].strip()
+        for line in difflib.unified_diff(
+            baseline.splitlines(), mutant.splitlines(), n=0, lineterm=""
+        )
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    ]
+    assert changed, "no lines changed"
+
+    unexpected = [
+        line
+        for line in changed
+        if line and not any(marker in line for marker in allowed)
+    ]
+    assert not unexpected, (
+        f"{kind} mutant changes lines outside the intended edit: {unexpected}"
+    )
 
 
 @pytest.mark.parametrize(

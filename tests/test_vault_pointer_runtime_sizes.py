@@ -1,5 +1,9 @@
 EIP170_LIMIT = 24_576
 
+# Reference sizes recorded by the deposit-vault position migration. These are a
+# review aid only; nothing asserts equality against them, because they go stale
+# whenever a contract legitimately changes. What is enforced is the EIP-170
+# ceiling and the headroom floors below.
 EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "MissionControl": 15_998,
     "SwitchboardBravo": 23_082,
@@ -13,11 +17,32 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "StabilityPool": 24_371,
 }
 
-# Teller carries the tightest budget of any contract here: the migration work left
-# 24_576 - 24_258 = 318 bytes of headroom. Treat any further Teller growth as gated.
+# Minimum EIP-170 headroom every contract in this set must keep.
 #
-# This floor was reconciled by the owner on 2026-08-08, resolving RG-SIZE-01. The
-# disposition is recorded in docs/chains/rh/deposit-vault-hardening-wp0-evidence.md
+# The EIP-170 ceiling alone is not a sufficient guard: a contract may consume all
+# of its remaining headroom and still sit one byte under the limit, leaving no
+# room for the next change and no warning that it happened. This floor fails
+# while there is still margin to react.
+#
+# Measured headroom at the time of writing, against the 24,576 limit:
+#   CreditEngine 184, StabilityPool 205, Teller 329, SwitchboardCharlie 1,091,
+#   SwitchboardAlpha 1,142, SwitchboardBravo 1,494, SwitchboardEcho 1,664,
+#   Lootbox 2,453, and the rest far larger.
+#
+# CreditEngine and StabilityPool are already tighter than Teller. The default is
+# set below their current headroom so this does not fail on arrival, while still
+# catching a contract that eats what it has left.
+DEFAULT_MIN_HEADROOM = 150
+
+# Per-contract overrides. Teller's 200 is owner-ratified (RG-SIZE-01, reconciled
+# 2026-08-08); see docs/chains/rh/deposit-vault-hardening-wp0-evidence.md section
+# 1. Do not lower it without the same owner decision that set it.
+MIN_HEADROOM_OVERRIDES = {
+    "Teller": 200,
+}
+
+# Teller's floor was reconciled by the owner on 2026-08-08, resolving RG-SIZE-01.
+# The disposition is recorded in docs/chains/rh/deposit-vault-hardening-wp0-evidence.md
 # (section 1, "RG-SIZE-01 disposition"; it also closes finding E-8 there) -- update
 # both together if it is ever revisited.
 #
@@ -26,16 +51,11 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # section 5.3, "RG-SIZE-01"), and 300 here, set by the vault-migration work. They
 # disagreed on the same proposed change -- the Section 13 Teller receipt-window
 # guard measures +81 bytes, landing at 237 bytes of headroom, which passes 200 and
-# fails 300. The owner ruled that the hardening plan's 200 governs, so this is
-# lowered to match rather than leaving two contradictory rules in the tree.
+# fails 300. The owner ruled that the hardening plan's 200 governs.
 #
 # The plan's other half is unchanged and still binding: anything landing *below*
 # 200 bytes needs a separate exact owner waiver (e.g. M9 at 127 bytes).
-#
-# Lowering it is a deliberate relaxation of a guard the migration workstream set.
-# The 318 bytes currently present still clear the old 300 as well; nothing about
-# the deployed contract changed.
-MIN_TELLER_MARGIN = 200
+MIN_TELLER_MARGIN = MIN_HEADROOM_OVERRIDES["Teller"]
 
 
 def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
@@ -72,15 +92,22 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     }
     print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
 
-    # Deliberately no exact-size equality against EXPECTED_DEPLOYED_RUNTIME_BYTES.
-    # Those byte counts do not reproduce across platforms: they hold on macOS
-    # arm64 and diverge on Linux x86_64 under an identical toolchain
-    # (vyper-0.4.3+bff19ea2, titanoboa 0.2.7), so pinning them made the suite
-    # pass only on the machine the numbers were recorded on. The two assertions
-    # below are the ones that actually protect a deployment — nothing exceeds
-    # EIP-170, and Teller keeps its headroom floor — and both are
-    # platform-independent. EXPECTED_DEPLOYED_RUNTIME_BYTES is retained above as
-    # a reference point for size review.
+    # No exact-size equality against EXPECTED_DEPLOYED_RUNTIME_BYTES.
+    #
+    # An earlier revision of this comment blamed those stale numbers on a
+    # macOS-arm64 versus Linux-x86_64 difference. That was wrong, and the
+    # correction matters because the wrong explanation invites the wrong fix.
+    # The sizes are deterministic for a given source: a Linux Actions runner and
+    # a local macOS arm64 run produce identical values on the same tree. What had
+    # actually happened is that rh commit 3a5f840 changed Teller, Ledger, and
+    # Lootbox, so the pinned dict was measuring an older source. The comparison
+    # that produced the false conclusion was local head against a CI run of the
+    # pull_request *merge* ref, which already contained those newer contracts.
+    #
+    # Equality is still not the right assertion — it fails on any legitimate
+    # change, in either direction, and says nothing about safety. What is
+    # enforced instead is the property that actually protects a deployment:
+    # nothing exceeds EIP-170, and every contract keeps usable headroom.
 
     oversized = {
         name: size
@@ -89,7 +116,19 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     }
     assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
 
-    teller_margin = EIP170_LIMIT - deployed_runtime_bytes["Teller"]
-    assert teller_margin >= MIN_TELLER_MARGIN, (
-        f"Teller deployed margin {teller_margin} is below the {MIN_TELLER_MARGIN}-byte floor"
+    headroom = {
+        name: EIP170_LIMIT - size for name, size in deployed_runtime_bytes.items()
+    }
+    tight = {
+        name: margin
+        for name, margin in headroom.items()
+        if margin < MIN_HEADROOM_OVERRIDES.get(name, DEFAULT_MIN_HEADROOM)
+    }
+    assert not tight, (
+        "EIP-170 headroom floor breached: "
+        + ", ".join(
+            f"{name} has {margin} bytes, floor is "
+            f"{MIN_HEADROOM_OVERRIDES.get(name, DEFAULT_MIN_HEADROOM)}"
+            for name, margin in sorted(tight.items())
+        )
     )

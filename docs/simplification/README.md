@@ -12,7 +12,7 @@
 >
 > The sections below are kept as the record of the original two trains. For what
 > the branch removes now, see [`REMOVED.md`](REMOVED.md) — a single index of all
-> 160 removed paths — and Section 13 of
+> 175 removed paths — and Section 14 of
 > [`validation-evidence.md`](validation-evidence.md) for the binding test
 > evidence. No production contract was modified in either pass.
 

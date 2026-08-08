@@ -14,11 +14,21 @@ Step manifests are removed on an ongoing basis as rh produces them. Only the
 `current-manifest.json` of each chain/version is read at runtime, by
 `prepare_defaults.py`, `verify_blockscout.py`, `ccip_send.py`, and `console.py`.
 
-**Mainnet `current-manifest.json` files are retained. Testnet manifests are
-removed entirely** — `base-sepolia` v1/v2 and `robinhood-testnet` v1/v2, step
-manifests and current manifests alike. Those chains are disposable; if one is
-needed again it is redeployed, which regenerates its manifest. Two manifests
-remain in the tree, `base-mainnet/v1` and `robinhood-mainnet/v1`.
+**Every `current-manifest.json` is retained — mainnet and testnet alike.** Six
+remain: `base-mainnet/v1`, `base-sepolia/v1`, `base-sepolia/v2`,
+`robinhood-mainnet/v1`, `robinhood-testnet/v1`, `robinhood-testnet/v2`. Only
+numbered and timestamped step manifests are removed.
+
+An earlier revision of this branch deleted the four testnet current manifests as
+"disposable". **That was wrong and has been reverted.** Retained tooling reads
+them: `scripts/ccip_send.py` defaults to `--chain base-sepolia --environment v2`
+and loads that manifest directly, and `migrations/base-sepolia/0002_CcipWire.py`
+and `migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run
+the step later with `--start-timestamp`, which needs the manifest to resolve
+local and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting
+them turned a documented recovery path into a `FileNotFoundError`. The test suite
+did not catch it because no test exercises `ccip_send`; an independent review
+did.
 
 ### Why removing step manifests does not break a deployment
 
@@ -61,7 +71,7 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**175 files removed.**
+**171 files removed.**
 
 ## Block-clock inventory (4)
 
@@ -70,7 +80,7 @@ top pointing here.
 - `scripts/check_block_clock_inventory.py`
 - `tests/inventory/test_block_clock_inventory.py`
 
-## Deployment manifests (83)
+## Deployment manifests (79)
 
 - `migration_history/base-mainnet/v1/0000-manifest.json`
 - `migration_history/base-mainnet/v1/1004-manifest.json`
@@ -135,10 +145,8 @@ top pointing here.
 - `migration_history/base-sepolia/v1/0000-manifest.json`
 - `migration_history/base-sepolia/v1/0002-manifest.json`
 - `migration_history/base-sepolia/v1/0003-manifest.json`
-- `migration_history/base-sepolia/v1/current-manifest.json`
 - `migration_history/base-sepolia/v2/0000-manifest.json`
 - `migration_history/base-sepolia/v2/0001-manifest.json`
-- `migration_history/base-sepolia/v2/current-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0000-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0001-manifest.json`
 - `migration_history/robinhood-mainnet/v1/0002-manifest.json`
@@ -151,10 +159,8 @@ top pointing here.
 - `migration_history/robinhood-mainnet/v1/0010-manifest.json`
 - `migration_history/robinhood-mainnet/v1/2026080700-manifest.json`
 - `migration_history/robinhood-testnet/v1/0000-manifest.json`
-- `migration_history/robinhood-testnet/v1/current-manifest.json`
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`
-- `migration_history/robinhood-testnet/v2/current-manifest.json`
 
 ## Evidence records (13)
 
