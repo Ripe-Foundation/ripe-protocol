@@ -141,6 +141,72 @@ registration, Lootbox points and the event are shared. The legacy branch additio
 
 ---
 
+### 4.6 Complete change inventory
+
+Every change in this PR, with its rationale. **T** = transitional (delete when the legacy migration
+is removed, §0.1 and §11); **P** = permanent, shared, all chains.
+
+#### `contracts/vaults/RipeGov.vy` (+10)
+
+| Change | Why | |
+|---|---|---|
+| `assert not vaultData.isPaused` on `updateUserGovPoints`, `adjustLock`, `releaseLock` | All three reach `_updateGovPointsForUserAsset`, which rewrites `unlock` and `lastTerms` from the *current* asset config **unconditionally** — the accrual-disable flag gates only the points. Under live wind-down terms that destroys the preserved unlock an import just wrote. These were the only gov-data mutators not already pause-gated; deposit/withdraw/transfer are gated inside `SharesVault`. | P |
+
+#### `contracts/core/TellerUtils.vy` (+255)
+
+| Change | Why | |
+|---|---|---|
+| `_assertExclusiveFreeze` | Teller's pause alone does not close the legacy vault. §4.3 | T |
+| `validateLegacyRipeGovMigration` | Asymmetric endpoint validation — source unpaused, target paused. §4.1 | T |
+| `getLegacyRipeGovSourceSnapshot` | Captures the complete original record *before* the withdrawal destroys it, and computes pending gov points **through this block** using the source vault's own `getLatestGovPoints` with the original terms/unlock/last-update/shares. Off-chain manifest values are evidence, never the execution input for a time-sensitive number. Also captures the target's point totals pre-import so the import's effect is checked as an exact delta. | T |
+| `verifyLegacyRipeGovImport` | Post-import sweep: source depletion, source registration and Ledger membership retained, exact target shares/registration/points/unlock/terms, and exact deltas on both target point totals. | T |
+| `verifyLegacyRipeGovSettlement` | Post-settlement sweep, including walking the source vault's own `vaultAssets` list to prove no residual deposit points remain on any supported asset. §4.4 | T |
+| `interface SourceVault` (`vaultAssets`, `numAssets`) | Vault-level asset enumeration, which is what makes the residual-points check complete rather than a hardcoded asset pair. | T |
+| `MAX_SOURCE_VAULT_ASSETS = 21` | Bound for that walk (1-based index, so cap + 1). Fails closed if the vault's asset list exceeds it, rather than silently checking a prefix. | T |
+| `struct UserDepositPoints`, `GovData`, `LegacySourceSnapshot` | Mirrors of `Ledger.UserDepositPoints` and `RipeGov.GovData`. Duplicated because **each contract is its own compilation unit** and this work may not add a shared file under `interfaces/`. Keep them byte-identical to their originals. | T |
+| Interface additions (`ripeGovVaultConfig`, `RipeGovVault` reads, `Ledger` reads), `cs` import | Support the above. | T |
+
+#### `contracts/core/Lootbox.vy` (+248/−54)
+
+| Change | Why | |
+|---|---|---|
+| `_calcSpecificLoot` takes raw point counts instead of a basis-point share | Removes the quantisation that floored any holder under 0.01% of an asset's points to a zero payout. §5.2 | P |
+| External `calcSpecificLoot` forwards `HUNDRED_PERCENT` as denominator | Keeps that view's ABI **and** behaviour byte-identical, so its existing expectations still hold. | P |
+| `_getDepositLootData` computes categories into locals and commits atomically; new `_isCategoryBlocked` | The old `didReceiveLoot` OR cleared the single shared `balancePoints` backing all three pools. Also fixes partial pool mutations that were written inline *before* the OR was evaluated. §5.2 | P |
+| `_flushDepositPoints` removed, `_shouldFlush` plumbing removed | It zeroed points while paying nothing. Points never blocked `deregisterUserAsset` (that only checks balance), so its stated rationale did not hold. §5.2 | P |
+| Claim loop defers deregistration until entitlement is gone | `claimDepositLootForAsset` is department-gated, so points on a deregistered asset are unrecoverable by the user. §8 | P |
+| Precision divisor exempts `LEGACY_RIPE_GOV_VAULT_ID` as well as `_coreRipeGovVaultId` | The legacy vault's positions stay enumerable and claimable until settled. Without the exemption its governance loot share is divided by `assetPoints.precision` (1e9 for an 18-decimal asset) for the whole window. **Must be removed with the legacy code (§11).** | T |
+| `settleAndCleanupMigratedSource` | Administrator settlement/cleanup; the only route that may remove source Ledger participation, and only after every asset, reward and registration is gone. Settles depleted assets only, leaving still-positive ones untouched. | T |
+| `MAX_SOURCE_ASSET_INDEX = 21` | Bound for the per-user source enumeration; fails closed above the cleanup cap rather than cleaning a prefix. | T |
+| `MigratedSourceAssetSettled`, `MigratedSourceAssetDeregistered`, `MigratedSourceSettledAndCleaned` | Per-asset reconciliation — the summary counts alone cannot prove *which* assets were cleaned. | T |
+| `Ledger.isParticipatingInVault` added to interface | Used by the settlement pre/post-conditions. | T |
+
+#### `contracts/core/Teller.vy` (+177/−16)
+
+| Change | Why | |
+|---|---|---|
+| `Ledger.removeVaultFromUserForMigration` call **and** interface line removed | Multi-asset defect. §5.3 | P |
+| `migrateRipeGovPosition` branches on `_sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID` | One entry point for both sources. §4.5 | T |
+| No debt-health housekeeping on either legacy path | The freeze requires CreditEngine paused, which would make it revert. §5.4b | T |
+| `activeMigrationAsset` storage + `setLegacyRipeGovMigrationAsset` | One open asset window at a time, enforced close-before-open so no single transaction hands the window from RIPE to LP. Does **not** prove MissionControl terms were restored — that is a runbook invariant. §5.6 | T |
+| `settleAndCleanupLegacyRipeGovSource` | Teller-side wrapper for the Lootbox settlement; exists in Teller only because the Lootbox function is Teller-gated (see §5.1 lever 3). | T |
+| `LEGACY_RIPE_GOV_VAULT_ID = 2` constant, `LegacySourceSnapshot` struct | Legacy binding and the snapshot mirror. | T |
+| `LegacyRipeGovMigrationAssetSet`, `LegacyRipeGovSourceSettled` events | Window and settlement observability. | T |
+| Interface additions (4 × TellerUtils, `MissionControl.isSupportedAssetInVault`, `Lootbox.settleAndCleanupMigratedSource`) | Support the above. | T |
+
+#### `contracts/config/SwitchboardEcho.vy` (+108)
+
+| Change | Why | |
+|---|---|---|
+| `setLegacyRipeGovMigrationAsset`, `migrateLegacyRipeGovPositions`, `settleAndCleanupLegacyRipeGovSources` | Governance-only batch layer — without it the flow is unreachable. Follows the existing `migrateRipeGovPositions` shape: bounded array, per-row extcall, per-row event, return count. | T |
+| Wrappers carry **no** source/target ids and no recipient | Teller binds the legacy source, resolves the target from `coreRipeGovVaultId`, and enforces the open asset window. Keeps the batch from becoming an arbitrary token-moving primitive. | T |
+| `MAX_LEGACY_MIGRATIONS = 25` | Hard ceiling, not a target size — the operational batch limit is measured on the fork and will be lower. | T |
+| `legacyUserDedupe` transient map | A repeated user hits the target's replay protection on the second row and reverts the whole batch after burning every preceding row's gas. Rejected up front with a specific reason. Uses the transient-dedupe pattern already in `SwitchboardAlpha`. | T |
+| 3 `…Executed` events | Per-row reconciliation. | T |
+| `MissionControl.coreRipeGovVaultId` added to interface | Echo resolves the target id to pass to the merged entry point. | T |
+
+---
+
 ## 5. Open issues
 
 ### 5.1 🔴 BLOCKER — Teller exceeds EIP-170 by 1,898 bytes
@@ -381,3 +447,36 @@ this branch — read them from there if available. Note the branch has since dep
 handoff's original phase structure by explicit owner direction: compiling, size checks, pushing, PR
 creation, reopening the Ledger prohibition, and folding shared-code changes into this PR were all
 authorized after the fact.
+
+---
+
+## 11. Removal checklist — when the legacy migration is deleted
+
+Per §0, the transitional code comes out once Base has migrated and the forward-looking Teller is
+deployed. Delete everything marked **T** in §4.6. Specifically:
+
+- **`RipeGov.vy`** — keep the three pause gates. They are marked **P**: they close a real hole
+  independent of the migration.
+- **`Lootbox.vy`** — remove `settleAndCleanupMigratedSource`, the three `MigratedSource*` events,
+  `MAX_SOURCE_ASSET_INDEX`, `LEGACY_RIPE_GOV_VAULT_ID`, and **the legacy arm of the precision-divisor
+  exemption** (`_vaultId != LEGACY_RIPE_GOV_VAULT_ID`). Do **not** touch the reward-math changes —
+  `_calcSpecificLoot`, `_isCategoryBlocked`, the atomic commit, the flush removal and the claim-loop
+  deregistration gating are all **P**.
+- **`TellerUtils.vy`** — the entire legacy block is **T**: `_assertExclusiveFreeze`, all four
+  `…Legacy…` functions, `interface SourceVault`, `MAX_SOURCE_VAULT_ASSETS`, and the three mirrored
+  structs. Check whether `cs` and the `RipeGovVault`/`Ledger` interface additions are still used by
+  anything else before removing them.
+- **`Teller.vy`** — remove the legacy branch inside `migrateRipeGovPosition`, `activeMigrationAsset`,
+  `setLegacyRipeGovMigrationAsset`, `settleAndCleanupLegacyRipeGovSource`, `LEGACY_RIPE_GOV_VAULT_ID`,
+  `LegacySourceSnapshot`, both `Legacy*` events, and the four TellerUtils interface lines. **Keep**
+  the Ledger-removal deletion (**P**) — do not reinstate `removeVaultFromUserForMigration`.
+- **`SwitchboardEcho.vy`** — the whole added block is **T**.
+- **This document** — delete it, or reduce it to a historical note.
+
+Two cautions:
+
+1. `5d9894c` merged the legacy path *into* `migrateRipeGovPosition`, so removal there is surgery
+   inside a shared function rather than deleting a standalone one. Diff against `rh` at `9354d05`
+   for the pre-merge shape of that function. See §0.3.
+2. After removal, re-measure. Teller should return to roughly its `rh` baseline; if it does not,
+   something transitional was missed.
