@@ -71,7 +71,6 @@ interface RipeGovVault:
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def removeVaultFromUserForMigration(_user: address, _vaultId: uint256): nonpayable
     def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
@@ -602,12 +601,25 @@ def migrateRipeGovPosition(
         migration,
     )
 
-    # make sure user has no balance in the source vault, remove from ledger
+    # make sure user has no balance in the source vault for THIS asset
     assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
     assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
-    extcall Ledger(a.ledger).removeVaultFromUserForMigration(_user, _sourceVaultId)
-    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert not sourceLedgerData.isParticipatingInVault # dev: source Ledger cleanup failed
+
+    # NOTE: source Ledger participation is deliberately NOT removed here.
+    #
+    # The checks above prove only that THIS asset is depleted. A user may hold more than one
+    # governance asset in the source vault, and removing the whole Ledger entry after migrating one
+    # of them drops the other from `Ledger.userVaults` -- the enumeration `CreditEngine`'s
+    # `_getUserBorrowTerms` walks to value collateral, and that `AuctionHouse` walks to seize it.
+    # The remaining position would stay physically in the vault but stop counting as collateral,
+    # degrading a borrower's health with nothing to revert it (this path runs no housekeeping), and
+    # a liquidation could not even see the asset to take it.
+    #
+    # `Lootbox._claimLoot` already performs exactly this cleanup correctly: it deregisters
+    # zero-balance assets and removes the vault only once the user is genuinely out of it. Note
+    # that `_reduceBalanceOnWithdrawal` does not deregister, so the migrated asset remains
+    # registered with a zero balance until that cleanup runs -- which is the ordinary steady state
+    # for any user who withdraws without claiming, and costs only loop gas.
 
     # add target vault to ledger
     targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
