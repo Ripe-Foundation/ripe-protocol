@@ -530,6 +530,73 @@ The following are explicitly not decided or authorized:
 
 See [`status.yaml`](status.yaml), `hard_gates`, for the current stop surface.
 
+### RH-D025 — Production clock usage is no longer scanned
+
+**Status:** Owner-accepted on 8 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification`.
+
+The block-clock inventory is removed from the active tree:
+`scripts/check_block_clock_inventory.py`,
+`config/block-clock-inventory.json`, and
+`tests/inventory/test_block_clock_inventory.py`. Nothing replaces it.
+
+**Scope of what is no longer checked.** The inventory scanned production sources
+for `block.number` and `block.timestamp` usage, for mixed-clock arithmetic, and
+for Vyper paths absent from its classification. None of those is scanned now. A
+new production timestamp occurrence, a moved occurrence, or a new unclassified
+path can enter with nothing objecting.
+
+**Rationale.** The inventory enforced an exact repository file census —
+`EXPECTED_PRODUCTION_COUNTS = (102, 97, 18)`, with remediation text forbidding
+mechanical updates — which made every deletion require a semantic-owner
+ceremony. It could not detect a contract defect, and it was itself contributing
+176 errors. Its cost was paid on every change; its benefit was a listing.
+
+**Residual risk, accepted.** A clock-semantics regression on Robinhood is the
+failure this guarded against, and it is now caught only by contract behaviour
+tests and human review of clock-affecting changes.
+
+**Reconsideration trigger.** Reopen if a clock-related defect reaches a
+deployment candidate, if a second chain with a divergent block clock is added,
+or if production clock usage is changed by someone without Robinhood cadence
+context. A replacement should be a narrower maintained scanner over
+`block.number`/`block.timestamp` occurrences, not a file census.
+
+**Source:** `docs/simplification/REMOVED.md`, `docs/simplification/validation-evidence.md` section 14.
+
+### RH-D026 — CreditEngine carries an exact headroom waiver at 184 bytes
+
+**Status:** Owner-granted on 8 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification`.
+
+The deposit-vault hardening plan section 11.5 sets at least 200 bytes of
+EIP-170 headroom as the acceptance threshold for a changed deployed contract,
+and anything below 200 requires an exact owner waiver under RG-SIZE-01. This is
+that waiver.
+
+**Scope.** `CreditEngine` only, at its measured 24,392-byte runtime, leaving
+**184 bytes** of headroom. `tests/test_vault_pointer_runtime_sizes.py` records
+it as a per-contract override; every other contract in that set is held to the
+ratified 200, and `Teller` states 200 explicitly.
+
+**Rationale.** The 184-byte position is inherited from `rh`. This branch changes
+no production Vyper, so it neither caused the shortfall nor can repair it. The
+alternative considered and rejected was lowering the default floor to 150 for
+every contract, which an independent review correctly identified as silently
+weakening a ratified rule — a synthetic StabilityPool at 176 bytes would have
+passed.
+
+**Residual risk, accepted.** CreditEngine has less margin than the ratified rule
+allows. A future change to it has 184 bytes to work in before the guard fails.
+
+**Reconsideration trigger.** Withdraw this waiver when CreditEngine is next
+changed on `rh`: either the change brings it back above 200, or it needs its own
+owner waiver at the new figure. Lowering the recorded 184 requires a new
+decision, not an edit to the test.
+
+**Source:** `tests/test_vault_pointer_runtime_sizes.py`,
+`docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

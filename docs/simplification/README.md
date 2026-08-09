@@ -12,7 +12,7 @@
 >
 > The sections below are kept as the record of the original two trains. For what
 > the branch removes now, see [`REMOVED.md`](REMOVED.md) — a single index of all
-> 175 removed paths — and Section 14 of
+> 171 removed paths — and Section 14 of
 > [`validation-evidence.md`](validation-evidence.md) for the binding test
 > evidence. No production contract was modified in either pass.
 
@@ -50,8 +50,7 @@ Train 3 no-change retention outcome this branch reached independently.
 
 For the commit series, exact per-commit tree sizes, and the commit each
 measurement is bound to, see [`validation-evidence.md`](validation-evidence.md).
-Commits are unsigned because the sandbox denies `~/.gnupg`; the landing owner can
-re-sign at integration.
+Commits on this branch are GPG-signed and verify as good.
 
 ## Before / after
 
@@ -127,18 +126,28 @@ EOF
 
 ## Test and invariant disposition
 
-**No test file was removed and no test identity disappeared.** At the original
-baseline comparison `tests/` held 170 files on both sides and both lanes
-collected identically (lean 3,244; comprehensive 4,539). Post-merge the absolute
-counts are larger because rh added tests; the invariant that this branch removes
-no test still holds and is re-verified in
-[`validation-evidence.md`](validation-evidence.md).
+**This no longer holds, and the original wording is corrected here.** Trains 1
+and 2 removed no test file: at that baseline `tests/` held 170 files on both
+sides and both lanes collected identically (lean 3,244; comprehensive 4,539).
 
-One test was adapted, the single change Section 4.1 permits:
+The later pass on this branch **does** remove test files — the block-clock
+inventory suite and the probe package — and 339 comprehensive node identities
+disappear with them. Of those, 79 were failing before removal. None of the
+removals is a passing test that was deleted to make a lane greener; the exact
+per-node accounting is in
+[`validation-evidence.md`](validation-evidence.md) section 14, and the removed
+paths are indexed in [`REMOVED.md`](REMOVED.md).
 
-| Test | Change | Invariant preserved |
+Five test files are adapted. This is more than the single change Section 4.1
+anticipated, and each is listed so a reviewer can read the whole surface:
+
+| Test file | Change | What still holds |
 | --- | --- | --- |
-| `tests/deployment/test_manifest_schema.py::test_every_committed_base_json_parses_without_rewrite` | Base-history corpus count `60` → `1` | Both glob expressions, the top-level-key assertion, the record-shape assertion, and the read-does-not-rewrite byte comparison are unchanged and still run against the retained `current-manifest.json`. Passed at final. |
+| `test_manifest_schema.py` | Base-history corpus count assertion removed entirely (it had been `60` → `1`) | Both globs, the top-level-key assertion, the record-shape assertion, and the read-does-not-rewrite byte comparison are unchanged and run against whatever is committed. |
+| `test_vault_pointer_runtime_sizes.py` | Exact runtime-size dict equality replaced by EIP-170 ceiling plus a per-contract headroom floor | The ratified 200-byte floor now applies to every contract, with one recorded waiver (CreditEngine 184, RH-D026). Verified to reject the defects the old equality caught. |
+| `test_ledger_action_block.py` | Frozen mutant sha256 replaced by an exact ordered-diff comparison, plus a negative regression | A mutant must differ from `Ledger.vy` by exactly the declared edit; a second change, even on the same line, fails. |
+| `test_collection_contract.py` | `len(ledger) == 31` census removed | Sortedness, uniqueness, prefix, ceiling, and filesystem-match all remain. |
+| `test_bluechip_yield_prices_artifacts.py` | Block-clock integration assertion removed | Nothing replaces it; the coverage loss is recorded as RH-D025. |
 
 Directory-scanning consumers were re-run rather than weakened:
 

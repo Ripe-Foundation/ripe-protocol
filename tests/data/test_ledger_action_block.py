@@ -382,51 +382,51 @@ def _deploy_ledger_source(
     )
 
 
-# Substrings that may legitimately appear in a line changed by each L3a mutant.
-# Stated here independently of _l3a_mutant_source so the two must agree: if the
-# generator grows an extra edit, or a mutant picks up an unrelated change, the
-# changed line will not match any marker and the test fails.
-L3A_EXPECTED_EDIT_MARKERS = {
-    "typed_call": (
-        "interface MutantArbSys:",
-        "def arbBlockNumber() -> uint256: view",
-        "staticcall MutantArbSys(ARB_SYS).arbBlockNumber()",
-        "response: Bytes[65] = raw_call(",
-        "ARB_SYS,",
-        'method_id("arbBlockNumber()", output_type=Bytes[4]),',
-        "max_outsize=65,",
-        "is_static_call=True,",
-        "revert_on_failure=True,",
-        ")",
-        "assert len(response) == 32",
-        "return abi_decode(response, uint256)",
+# The exact ordered diff each L3a mutant must produce against Ledger.vy,
+# declared here independently of _l3a_mutant_source. Entries are unified-diff
+# lines: '-' removed from the baseline, '+' added by the mutant, in order.
+#
+# This is deliberately exact rather than a substring match. A substring
+# allowlist accepts a changed line that merely *contains* the intended text, so
+# a mutant could carry a second semantic change on the same line -- for example
+# 'assert self.lastTouch[_user] < actionBlock and actionBlock < 10_000' -- and
+# still pass while silently weakening the mutation it is supposed to represent.
+L3A_EXPECTED_DIFF = {
+    'typed_call': (
+        '+interface MutantArbSys:',
+        '+    def arbBlockNumber() -> uint256: view',
+        '+',
+        '-    response: Bytes[65] = raw_call(',
+        '-        ARB_SYS,',
+        '-        method_id("arbBlockNumber()", output_type=Bytes[4]),',
+        '-        max_outsize=65,',
+        '-        is_static_call=True,',
+        '-        revert_on_failure=True,',
+        '-    )',
+        '-    assert len(response) == 32 # dev: invalid action block response',
+        '-    return abi_decode(response, uint256)',
+        '+    return staticcall MutantArbSys(ARB_SYS).arbBlockNumber()',
     ),
-    "truncation": (
-        "response: Bytes[65] = raw_call(",
-        "response: Bytes[32] = raw_call(",
-        "max_outsize=65,",
-        "max_outsize=32,",
+    'truncation': (
+        '-    response: Bytes[65] = raw_call(',
+        '+    response: Bytes[32] = raw_call(',
+        '-        max_outsize=65,',
+        '+        max_outsize=32,',
     ),
-    "native_fallback": (
-        "success: bool = False",
-        'response: Bytes[65] = b""',
-        "success, response = raw_call(",
-        "response: Bytes[65] = raw_call(",
-        "ARB_SYS,",
-        'method_id("arbBlockNumber()", output_type=Bytes[4]),',
-        "max_outsize=65,",
-        "is_static_call=True,",
-        "revert_on_failure=False,",
-        "revert_on_failure=True,",
-        ")",
-        "if not success or len(response) != 32:",
-        "return block.number",
-        "assert len(response) == 32",
-        "return abi_decode(response, uint256)",
+    'native_fallback': (
+        '-    response: Bytes[65] = raw_call(',
+        '+    success: bool = False',
+        '+    response: Bytes[65] = b""',
+        '+    success, response = raw_call(',
+        '-        revert_on_failure=True,',
+        '+        revert_on_failure=False,',
+        '-    assert len(response) == 32 # dev: invalid action block response',
+        '+    if not success or len(response) != 32:',
+        '+        return block.number',
     ),
-    "monotonic": (
-        "assert self.lastTouch[_user] != actionBlock",
-        "assert self.lastTouch[_user] < actionBlock",
+    'monotonic': (
+        '-        assert self.lastTouch[_user] != actionBlock # dev: one action per block',
+        '+        assert self.lastTouch[_user] < actionBlock # dev: one action per block',
     ),
 }
 
@@ -580,7 +580,12 @@ def test_l3a_mutant_source_is_exactly_the_intended_edit(kind):
     # by the intended edit and nothing else — a mutant carrying a second,
     # unrelated change would still have satisfied a hash refreshed without
     # reading it, and would silently weaken the mutation test that consumes it.
-    # That property is asserted directly here, and it is source-drift immune.
+    #
+    # The comparison is against the exact ordered diff declared in
+    # L3A_EXPECTED_DIFF. An earlier revision used a substring allowlist, which a
+    # review defeated: it accepted a changed line that merely *contained* the
+    # intended text, so an extra condition appended to the same line passed. Only
+    # full-line equality, in order, closes that.
     import difflib
     from pathlib import Path
 
@@ -590,26 +595,57 @@ def test_l3a_mutant_source_is_exactly_the_intended_edit(kind):
     assert L3A_KILLING_TESTS[kind] in globals()
     assert mutant != baseline
 
-    # Every changed line, in either direction, must belong to the intended edit.
-    # Anything else is an unrelated mutation riding along.
-    allowed = L3A_EXPECTED_EDIT_MARKERS[kind]
-    changed = [
-        line[1:].strip()
+    actual = tuple(
+        line
         for line in difflib.unified_diff(
             baseline.splitlines(), mutant.splitlines(), n=0, lineterm=""
         )
         if line[:1] in "+-" and not line.startswith(("---", "+++"))
-    ]
-    assert changed, "no lines changed"
-
-    unexpected = [
-        line
-        for line in changed
-        if line and not any(marker in line for marker in allowed)
-    ]
-    assert not unexpected, (
-        f"{kind} mutant changes lines outside the intended edit: {unexpected}"
     )
+    expected = L3A_EXPECTED_DIFF[kind]
+    assert actual == expected, (
+        f"{kind} mutant is not exactly the declared edit.\n"
+        f"expected ({len(expected)} lines):\n  " + "\n  ".join(expected) + "\n"
+        f"actual ({len(actual)} lines):\n  " + "\n  ".join(actual)
+    )
+
+
+def test_l3a_exact_diff_check_rejects_a_second_change_on_the_same_line():
+    # Negative regression for the check above.
+    #
+    # The predecessor of that check used a substring allowlist and a review
+    # defeated it with exactly this shape: the intended monotonic mutation with
+    # an extra condition appended to the same line. That mutant rejects otherwise
+    # valid action identities at or above 10_000 — a real, unrelated behaviour
+    # change — while still "containing" the intended text.
+    #
+    # This test pins the failure. If the comparison is ever loosened back to a
+    # containment match, this goes green and says so.
+    import difflib
+    from pathlib import Path
+
+    baseline = Path(LEDGER_PATH).read_text()
+    tampered = _replace_once(
+        baseline,
+        "assert self.lastTouch[_user] != actionBlock",
+        "assert self.lastTouch[_user] < actionBlock and actionBlock < 10_000",
+    )
+
+    actual = tuple(
+        line
+        for line in difflib.unified_diff(
+            baseline.splitlines(), tampered.splitlines(), n=0, lineterm=""
+        )
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    )
+
+    # It would pass a containment check: the intended text is a prefix of it.
+    intended_added = "+    assert self.lastTouch[_user] < actionBlock"
+    tampered_added = next(line for line in actual if line.startswith("+"))
+    assert intended_added[1:].strip() in tampered_added
+
+    # It must not pass the exact check.
+    assert actual != L3A_EXPECTED_DIFF["monotonic"]
 
 
 @pytest.mark.parametrize(

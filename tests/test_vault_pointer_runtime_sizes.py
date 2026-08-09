@@ -24,21 +24,35 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # room for the next change and no warning that it happened. This floor fails
 # while there is still margin to react.
 #
-# Measured headroom at the time of writing, against the 24,576 limit:
+# 200 is the ratified rule, not a number chosen here. The deposit-vault hardening
+# plan section 11.5 sets "at least 200 bytes of headroom" as the acceptance
+# threshold for a changed deployed contract, and its stop-condition list repeats
+# that anything below 200 requires an exact owner waiver under RG-SIZE-01.
+#
+# An earlier revision of this file set the default to 150. That silently lowered
+# a ratified rule for every contract, and a review caught it: a synthetic
+# StabilityPool at 176 bytes of headroom violated the recorded rule and still
+# passed. The default is now the ratified value.
+DEFAULT_MIN_HEADROOM = 200
+
+# Measured headroom against the 24,576 limit at the time of writing:
 #   CreditEngine 184, StabilityPool 205, Teller 329, SwitchboardCharlie 1,091,
 #   SwitchboardAlpha 1,142, SwitchboardBravo 1,494, SwitchboardEcho 1,664,
 #   Lootbox 2,453, and the rest far larger.
 #
-# CreditEngine and StabilityPool are already tighter than Teller. The default is
-# set below their current headroom so this does not fail on arrival, while still
-# catching a contract that eats what it has left.
-DEFAULT_MIN_HEADROOM = 150
-
-# Per-contract overrides. Teller's 200 is owner-ratified (RG-SIZE-01, reconciled
-# 2026-08-08); see docs/chains/rh/deposit-vault-hardening-wp0-evidence.md section
-# 1. Do not lower it without the same owner decision that set it.
+# CreditEngine sits at 184, below the ratified 200. That position is inherited
+# from rh — this branch changes no production contract — and it is carried here
+# as an explicit, dated owner waiver rather than by weakening the rule for
+# everything. See RH-D026 in docs/chains/rh/decision-register.md for the scope,
+# rationale, and reconsideration trigger.
+#
+# Teller's 200 is the ratified value reconciled on 2026-08-08 (RG-SIZE-01); see
+# docs/chains/rh/deposit-vault-hardening-wp0-evidence.md section 1. It is stated
+# explicitly rather than inherited from the default so that changing the default
+# cannot silently move it.
 MIN_HEADROOM_OVERRIDES = {
     "Teller": 200,
+    "CreditEngine": 184,  # RH-D026 waiver; do not lower without a new decision
 }
 
 # Teller's floor was reconciled by the owner on 2026-08-08, resolving RG-SIZE-01.
