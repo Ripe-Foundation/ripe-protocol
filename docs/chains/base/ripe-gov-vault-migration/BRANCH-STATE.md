@@ -1,9 +1,10 @@
 # Vault Migrator / Base Legacy RipeGov Migration — Branch State & Handoff
 
+**Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
-**Status (2026-08-08):** VaultMigrator architecture implemented and its critical authorization
-remediation locally tested. Every measured runtime fits EIP-170. Two owner decisions remain open;
-not deployable or fork-qualified. Worktree changes are not committed or pushed.
+**Status (2026-08-08):** VaultMigrator architecture implemented, committed and pushed to the draft
+PR. Its critical authorization remediation is locally tested, and every measured runtime fits
+EIP-170. Two owner decisions remain open; this remains a WIP and is not deployable or fork-qualified.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
@@ -136,8 +137,8 @@ by this remediation:
    intentionally paused during the legacy window, so no on-chain debt-health refresh can run.
 4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5 and VaultMigrator receives the
    intended RipeHQ id 23 before activation; no live RPC check against the replaced MissionControl is required.
-5. Production deployment/replacement sequencing and address evidence. No deployment, registry update,
-   activation, commit, push or PR publication is implied by the local implementation.
+5. Production deployment/replacement sequencing and address evidence. The published WIP branch does
+not imply deployment, registry update or activation authority.
 6. Keep Lootbox at or below 24,264 bytes unless an explicit size tradeoff is approved.
 
 ### Eventual removal boundary
