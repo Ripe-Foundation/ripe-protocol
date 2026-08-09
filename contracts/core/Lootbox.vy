@@ -1225,9 +1225,9 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
 # reward state, so Teller delegates the whole settle / claim / deregister / remove decision here
 # and post-checks the reported result.
 #
-# This is deliberately NOT the upstream behaviour. `Teller.migrateRipeGovPosition` removes the whole
-# source Ledger entry after depleting a single asset; on Base a user may hold both RIPE and the LP,
-# so source participation must survive until every asset, reward and registration is gone.
+# Source participation must survive until every asset, reward and registration is gone. On Base a
+# user may hold both RIPE and the LP, so depleting one asset cannot remove the whole source Ledger
+# entry.
 #
 # Two further divergences from an ordinary claim, both forced by the wind-down window:
 #  - settled RIPE is minted straight to the user, because auto-staking routes through a Teller
@@ -1242,11 +1242,10 @@ def settleAndCleanupMigratedSource(
     _user: address,
     _sourceVaultId: uint256,
     _sourceVault: address,
-    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
-    assert msg.sender == addys._getTellerAddr() # dev: no perms
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
+    a: addys.Addys = addys._getAddys()
 
     coreRipeGovVaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
 

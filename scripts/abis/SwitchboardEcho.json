@@ -1180,80 +1180,6 @@
     "type": "event"
   },
   {
-    "name": "RipeGovPositionMigrationExecuted",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "sourceVaultId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "targetVaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
-    "name": "VaultPositionMigrationExecuted",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "sourceVaultId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "targetVaultId",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "GovChangeTimeLockModified",
     "inputs": [
       {
@@ -1972,6 +1898,61 @@
             "type": "uint256"
           }
         ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLegacyRipeGovMigrationAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "migrateLegacyRipeGovPositions",
+    "inputs": [
+      {
+        "name": "_users",
+        "type": "address[]"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "settleAndCleanupLegacyRipeGovSources",
+    "inputs": [
+      {
+        "name": "_users",
+        "type": "address[]"
       }
     ],
     "outputs": [

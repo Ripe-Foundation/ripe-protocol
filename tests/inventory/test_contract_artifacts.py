@@ -31,6 +31,7 @@ REQUIRED_CONTRACTS = frozenset(
         "StabilityPool",
         "Teller",
         "UniswapV2Prices",
+        "VaultMigrator",
     }
 )
 NEW_CONTRACT_SOURCES = {
@@ -43,6 +44,7 @@ NEW_CONTRACT_SOURCES = {
     "StabilityPool": ROOT / "contracts" / "vaults" / "StabilityPool.vy",
     "SwitchboardBravo": ROOT / "contracts" / "config" / "SwitchboardBravo.vy",
     "UniswapV2Prices": ROOT / "contracts" / "priceSources" / "UniswapV2Prices.vy",
+    "VaultMigrator": ROOT / "contracts" / "core" / "VaultMigrator.vy",
 }
 
 # These are constructor-bound deployed-code measurements. They are deliberately
@@ -80,6 +82,22 @@ def _write_expectations(tmp_path: Path, values: dict) -> Path:
 def test_frozen_required_contract_set_is_exact():
     values = json.loads(EXPECTATIONS.read_text())
     assert set(values["contracts"]) == REQUIRED_CONTRACTS
+
+
+def test_migrated_source_settlement_has_no_caller_supplied_addys():
+    abi = json.loads((ROOT / "scripts" / "abis" / "Lootbox.json").read_text())
+    settlement = [
+        entry
+        for entry in abi
+        if entry.get("type") == "function"
+        and entry.get("name") == "settleAndCleanupMigratedSource"
+    ]
+    assert len(settlement) == 1
+    assert [item["name"] for item in settlement[0]["inputs"]] == [
+        "_user",
+        "_sourceVaultId",
+        "_sourceVault",
+    ]
 
 
 def test_robinhood_curve_launch_reuses_frozen_source_and_abi():

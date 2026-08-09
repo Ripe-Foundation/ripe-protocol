@@ -129,6 +129,97 @@
     "type": "event"
   },
   {
+    "name": "MigratedSourceAssetSettled",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "ripeClaimed",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "MigratedSourceAssetDeregistered",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "MigratedSourceSettledAndCleaned",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "sourceVaultId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "sourceVault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "numAssetsCleaned",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numAssetsRemaining",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "ripeClaimed",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "didRemoveVaultFromLedger",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "DepartmentPauseModified",
     "inputs": [
       {
@@ -1494,112 +1585,31 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "removeVaultFromUserForMigration",
+    "name": "settleAndCleanupMigratedSource",
     "inputs": [
       {
         "name": "_user",
         "type": "address"
       },
       {
-        "name": "_vaultId",
+        "name": "_sourceVaultId",
         "type": "uint256"
-      }
-    ],
-    "outputs": []
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "removeVaultFromUserForMigration",
-    "inputs": [
+      },
       {
-        "name": "_user",
+        "name": "_sourceVault",
         "type": "address"
-      },
+      }
+    ],
+    "outputs": [
       {
-        "name": "_vaultId",
+        "name": "",
         "type": "uint256"
       },
       {
-        "name": "_a",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "hq",
-            "type": "address"
-          },
-          {
-            "name": "greenToken",
-            "type": "address"
-          },
-          {
-            "name": "savingsGreen",
-            "type": "address"
-          },
-          {
-            "name": "ripeToken",
-            "type": "address"
-          },
-          {
-            "name": "ledger",
-            "type": "address"
-          },
-          {
-            "name": "missionControl",
-            "type": "address"
-          },
-          {
-            "name": "switchboard",
-            "type": "address"
-          },
-          {
-            "name": "priceDesk",
-            "type": "address"
-          },
-          {
-            "name": "vaultBook",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouse",
-            "type": "address"
-          },
-          {
-            "name": "auctionHouseNft",
-            "type": "address"
-          },
-          {
-            "name": "boardroom",
-            "type": "address"
-          },
-          {
-            "name": "bondRoom",
-            "type": "address"
-          },
-          {
-            "name": "creditEngine",
-            "type": "address"
-          },
-          {
-            "name": "endaoment",
-            "type": "address"
-          },
-          {
-            "name": "humanResources",
-            "type": "address"
-          },
-          {
-            "name": "lootbox",
-            "type": "address"
-          },
-          {
-            "name": "teller",
-            "type": "address"
-          }
-        ]
+        "name": "",
+        "type": "bool"
       }
-    ],
-    "outputs": []
+    ]
   },
   {
     "stateMutability": "nonpayable",

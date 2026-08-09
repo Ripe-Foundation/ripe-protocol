@@ -41,12 +41,6 @@ from ethereum.ercs import IERC4626
 interface TellerUtils:
     def validateOnDeposit(_asset: address, _amount: uint256, _user: address, _vaultId: uint256, _vaultAddr: address, _depositor: address, _didAlreadyValidateSender: bool, _areFundsHereAlready: bool, _d: DepositLedgerData, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def validateOnWithdrawal(_asset: address, _amount: uint256, _user: address, _vaultAddr: address, _vaultId: uint256, _caller: address, _config: TellerWithdrawConfig, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-    def validateVaultMigration(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256, _a: addys.Addys = empty(addys.Addys)) -> (address, address): view
-    def validateRipeGovMigration(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> (address, address): view
-    def verifyLegacyRipeGovImport(_user: address, _asset: address, _sourceVault: address, _sourceVaultId: uint256, _targetVault: address, _targetVaultId: uint256, _amount: uint256, _targetShares: uint256, _snapshot: LegacySourceSnapshot, _a: addys.Addys = empty(addys.Addys)) -> bool: view
-    def validateLegacyRipeGovMigration(_user: address, _asset: address, _sourceVaultId: uint256, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
-    def verifyLegacyRipeGovSettlement(_user: address, _sourceVault: address, _sourceVaultId: uint256, _settledAsset: address, _didRemoveVault: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: view
-    def getLegacyRipeGovSourceSnapshot(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> LegacySourceSnapshot: view
     def getVaultAddrAndId(_asset: address, _vaultAddr: address, _vaultId: uint256, _vaultBook: address, _missionControl: address) -> (address, uint256): view
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -56,7 +50,6 @@ interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
     def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
     def shouldCheckLastTouch() -> bool: view
@@ -92,7 +85,6 @@ interface CreditEngine:
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def settleAndCleanupMigratedSource(_user: address, _sourceVaultId: uint256, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
@@ -115,16 +107,6 @@ interface PriceDesk:
 
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
-
-# mirrors `TellerUtils.LegacySourceSnapshot`
-struct LegacySourceSnapshot:
-    sourceShares: uint256
-    sourceAmount: uint256
-    govPoints: uint256
-    unlock: uint256
-    lastTerms: cs.LockTerms
-    targetUserPointsBefore: uint256
-    targetTotalPointsBefore: uint256
 
 struct RipeGovMigrationData:
     amount: uint256
@@ -212,28 +194,6 @@ event TellerRebalance:
     depositVaultId: uint256
     withdrawVaultId: uint256
 
-event LegacyRipeGovMigrationAssetSet:
-    asset: indexed(address)
-    caller: indexed(address)
-
-event LegacyRipeGovSourceSettled:
-    user: indexed(address)
-    caller: indexed(address)
-    ripeClaimed: uint256
-    didRemoveSourceFromLedger: bool
-
-event RipeGovPositionMigrated:
-    user: indexed(address)
-    asset: indexed(address)
-    sourceVaultId: indexed(uint256)
-    targetVaultId: uint256
-    sourceVault: address
-    targetVault: address
-    amount: uint256
-    targetShares: uint256
-    govPoints: uint256
-    unlock: uint256
-
 event UserConfigSet:
     user: indexed(address)
     canAnyoneDeposit: bool
@@ -263,17 +223,6 @@ MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
 CURVE_PRICES_ID: constant(uint256) = 2
-
-# Base legacy Ripe Gov vault -- deployed, unchangeable, only ever a migration SOURCE.
-# Its address is resolved from the live VaultBook rather than bound at deploy, matching how every
-# other vault reference in this contract is resolved.
-LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
-
-# the one asset whose migration window is currently open. empty means no migration is allowed.
-# At most one asset may be MIGRATED at a time, and a window must be closed before the next opens.
-# This is not a claim about MissionControl's wind-down TERMS, which live in another contract --
-# see the scope note on `setLegacyRipeGovMigrationAsset`.
-activeMigrationAsset: public(address)
 
 
 @deploy
@@ -538,250 +487,109 @@ def rebalance(
 ####################
 
 
-# Ripe Gov migration
+# VaultMigrator owns all validation, batching, sequencing, lifecycle state and postconditions.
+# Teller exposes only exact-caller identity steps because the vault and Ledger permissions still
+# require Teller's identity. Splitting source and destination steps lets VaultMigrator validate
+# exact receipt and depletion before it authorizes the corresponding import or deposit.
 
 
-# Handles BOTH sources:
-#
-#  - an exporter-capable vault, via `exportPositionForMigration` (the qualified upstream path); and
-#  - the deployed Base LEGACY gov vault at id 2, which predates the exporter and cannot be changed.
-#    That source is synthesized from its own public state and drained through its ordinary
-#    `SharesVault` withdrawal, so it must stay UNPAUSED while the target is paused.
-#
-# The two differ only in how the source position is acquired and validated. Everything after --
-# import, target Ledger registration, Lootbox points, event -- is shared.
-#
-# Source Ledger participation is NEVER removed here, for either source. The depletion checks below
-# prove only that THIS asset is gone, and a user may hold more than one governance asset. Removing
-# the whole entry would drop the other from `Ledger.userVaults` -- the enumeration
-# `CreditEngine._getUserBorrowTerms` walks to value collateral and `AuctionHouse` walks to seize it
-# -- so the remaining position would stay in the vault but stop counting, degrading a borrower's
-# health with nothing to revert it. `Lootbox._claimLoot` already does this cleanup correctly,
-# removing the vault only once the user is genuinely out of it.
+@view
+@internal
+def _assertVaultMigrator():
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
 
 
 @nonreentrant
 @external
-def migrateRipeGovPosition(
+def executeRipeGovSource(
     _user: address,
     _asset: address,
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
-) -> uint256:
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    _sourceVault: address,
+    _targetVault: address,
+    _legacyMigration: RipeGovMigrationData,
+    _shouldUseVaultWithdrawal: bool,
+) -> RipeGovMigrationData:
     a: addys.Addys = addys._getAddys()
-    utils: address = addys._getTellerUtilsAddr()
+    self._assertVaultMigrator()
 
-    sourceVault: address = empty(address)
-    targetVault: address = empty(address)
-    migration: RipeGovMigrationData = empty(RipeGovMigrationData)
-    snap: LegacySourceSnapshot = empty(LegacySourceSnapshot)
-    targetBalanceBefore: uint256 = 0
+    migration: RipeGovMigrationData = _legacyMigration
 
-    if _sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID:
-        # the approved full-protocol freeze must be active for the whole migration window, and the
-        # asset must be the one whose window is currently open
+    if _shouldUseVaultWithdrawal:
         assert deptBasics.isPaused # dev: teller not paused
-        assert _asset != empty(address) and _asset == self.activeMigrationAsset # dev: asset window closed
-        assert _targetVaultId == staticcall MissionControl(a.missionControl).coreRipeGovVaultId() # dev: invalid target vault id
-
-        sourceVault = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
-        targetVault = staticcall AddressRegistry(a.vaultBook).getAddr(_targetVaultId)
-        assert staticcall TellerUtils(utils).validateLegacyRipeGovMigration(
-            _user, _asset, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, _targetVaultId, targetVault, a,
-        ) # dev: invalid migration
-
-        # capture the complete original record BEFORE the withdrawal destroys it
-        snap = staticcall TellerUtils(utils).getLegacyRipeGovSourceSnapshot(_user, _asset, sourceVault, targetVault, a)
-        targetBalanceBefore = staticcall IERC20(_asset).balanceOf(targetVault)
-        tellerBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
-
-        # drain the whole position DIRECTLY into the target -- no custody hop
         amount: uint256 = 0
         isDepleted: bool = False
-        amount, isDepleted = extcall Vault(sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), targetVault, a)
-        assert isDepleted # dev: source position not depleted
-        assert amount == snap.sourceAmount # dev: inexact source withdrawal
-        assert staticcall IERC20(_asset).balanceOf(self) == tellerBalanceBefore # dev: teller balance residue
-        assert staticcall IERC20(_asset).allowance(self, targetVault) == 0 # dev: teller allowance residue
-
-        migration = RipeGovMigrationData(
-            amount=amount,
-            govPoints=snap.govPoints,
-            unlock=snap.unlock,
-            lastTerms=snap.lastTerms,
-        )
-
+        amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), _targetVault, a)
+        migration.amount = amount
     else:
-        sourceVault, targetVault = staticcall TellerUtils(utils).validateRipeGovMigration(_user, _asset, _sourceVaultId, _targetVaultId)
-        targetBalanceBefore = staticcall IERC20(_asset).balanceOf(targetVault)
-        migration = extcall RipeGovVault(sourceVault).exportPositionForMigration(_user, _asset, targetVault, a)
+        migration = extcall RipeGovVault(_sourceVault).exportPositionForMigration(_user, _asset, _targetVault, a)
 
-    # exact receipt, for both routes
-    targetBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-    assert targetBalanceAfter >= targetBalanceBefore # dev: invalid migration receipt
-    assert targetBalanceAfter - targetBalanceBefore == migration.amount # dev: inexact migration receipt
+    return migration
 
-    # import position
-    targetShares: uint256 = extcall RipeGovVault(targetVault).importPositionForMigration(
+
+@nonreentrant
+@external
+def executeRipeGovImport(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _targetVaultId: uint256,
+    _targetVault: address,
+    _migration: RipeGovMigrationData,
+) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    self._assertVaultMigrator()
+
+    targetShares: uint256 = extcall RipeGovVault(_targetVault).importPositionForMigration(
         _user,
         _asset,
-        sourceVault,
-        migration,
+        _sourceVault,
+        _migration,
     )
 
-    # make sure user has no balance in the source vault for THIS asset
-    assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
-    assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
-
-    # add target vault to ledger
     targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
     if not targetLedgerData.isParticipatingInVault:
         extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
 
-    # update lootbox points
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _targetVaultId, targetVault, _asset, a)
-
-    # the legacy route additionally proves the preserved record landed exactly, and runs the real
-    # borrower health path last -- reverting the whole migration if the user would be left unsafe
-    if _sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID:
-        assert staticcall TellerUtils(utils).verifyLegacyRipeGovImport(
-            _user, _asset, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, targetVault, _targetVaultId,
-            migration.amount, targetShares, snap, a,
-        ) # dev: invalid migration result
-
-        # NOTE: no debt-health housekeeping here, and it is not an oversight.
-        # `_assertExclusiveFreeze` requires CreditEngine paused for the whole window, and
-        # `CreditEngine.updateDebtForUser` asserts `not deptBasics.isPaused` -- so any
-        # `_performHousekeeping(..., _shouldUpdateDebt=True)` on this path would revert every time.
-        # Health is instead guaranteed structurally: the freeze means no liquidation can occur
-        # during the window, and the migration preserves collateral (the position moves from a
-        # vault the user is enumerated in to another one they are enumerated in). Collateral parity
-        # across the move -- including any difference in the target vault's MissionControl
-        # collateral parameters -- must be proved on the fork, not asserted per call.
-
-    log RipeGovPositionMigrated(
-        user=_user,
-        asset=_asset,
-        sourceVaultId=_sourceVaultId,
-        targetVaultId=_targetVaultId,
-        sourceVault=sourceVault,
-        targetVault=targetVault,
-        amount=migration.amount,
-        targetShares=targetShares,
-        govPoints=migration.govPoints,
-        unlock=migration.unlock,
-    )
-    return migration.amount
-
-
-# BASE LEGACY window control and source settlement
-
-
-@external
-def setLegacyRipeGovMigrationAsset(_asset: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-    a: addys.Addys = addys._getAddys()
-
-    assert _asset == empty(address) or staticcall MissionControl(a.missionControl).isSupportedAssetInVault(LEGACY_RIPE_GOV_VAULT_ID, _asset) # dev: unapproved migration asset
-
-    # close-before-open: an open window must be explicitly closed before another asset opens, so no
-    # single transaction hands the window straight from RIPE to LP.
-    #
-    # SCOPE NOTE: this serialises which asset may be MIGRATED. It does not prove the prior asset's
-    # MissionControl wind-down terms were restored -- those move through SwitchboardAlpha's separate
-    # timelocked path. That restoration is a fail-closed runbook invariant proved on the fork.
-    if _asset != empty(address):
-        assert self.activeMigrationAsset == empty(address) # dev: window already open
-
-    self.activeMigrationAsset = _asset
-    log LegacyRipeGovMigrationAssetSet(asset=_asset, caller=msg.sender)
+    return targetShares
 
 
 @nonreentrant
 @external
-def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-    a: addys.Addys = addys._getAddys()
-    assert deptBasics.isPaused # dev: teller not paused
-    assert _user != empty(address) # dev: invalid user
-
-    activeAsset: address = self.activeMigrationAsset
-    assert activeAsset != empty(address) # dev: asset window closed
-
-    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
-    assert sourceVault != empty(address) # dev: legacy vault not registered
-    assert staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID) == sourceVault # dev: source vault not registered
-    assert not staticcall Vault(sourceVault).doesUserHaveBalance(_user, activeAsset) # dev: active asset not migrated
-
-    # Ledger authorizes only Lootbox to remove vault participation, and only Lootbox knows the
-    # reward state, so the whole settle/claim/deregister/remove decision lives there.
-    ripeClaimed: uint256 = 0
-    didRemoveVault: bool = False
-    ripeClaimed, didRemoveVault = extcall Lootbox(a.lootbox).settleAndCleanupMigratedSource(_user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, a)
-
-    assert staticcall TellerUtils(addys._getTellerUtilsAddr()).verifyLegacyRipeGovSettlement(
-        _user, sourceVault, LEGACY_RIPE_GOV_VAULT_ID, activeAsset, didRemoveVault, a,
-    ) # dev: invalid settlement result
-
-    # No debt-health housekeeping here either -- same reason as the migration path: the freeze
-    # requires CreditEngine paused, so `updateDebtForUser` would revert. Settlement only removes a
-    # source entry whose assets are already fully depleted, so it cannot reduce live collateral.
-
-    log LegacyRipeGovSourceSettled(user=_user, caller=msg.sender, ripeClaimed=ripeClaimed, didRemoveSourceFromLedger=didRemoveVault)
-    return ripeClaimed, didRemoveVault
-
-
-# normal vault migration
-
-
-@nonreentrant
-@external
-def migrateVaultPosition(
+def executeVaultWithdrawal(
     _user: address,
     _asset: address,
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
-) -> uint256:
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-
-    # IMPORTANT: teller must be paused for this path
+    _sourceVault: address,
+) -> (uint256, bool):
+    a: addys.Addys = addys._getAddys()
+    self._assertVaultMigrator()
     assert deptBasics.isPaused # dev: teller not paused
 
-    # validation
-    a: addys.Addys = addys._getAddys()
-    sourceVault: address = empty(address)
-    targetVault: address = empty(address)
-    sourceVault, targetVault = staticcall TellerUtils(addys._getTellerUtilsAddr()).validateVaultMigration(_user, _asset, _sourceVaultId, _targetVaultId, a)
-
-    # withdraw entire position into this contract
-    preBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     amount: uint256 = 0
     isDepleted: bool = False
-    amount, isDepleted = extcall Vault(sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, a)
-    assert isDepleted # dev: source position not depleted
+    amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, a)
+    return amount, isDepleted
 
-    # prove the receipt is exactly what the source vault reported
-    tellerBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    assert tellerBalance >= preBalance # dev: invalid migration receipt
-    assert tellerBalance - preBalance == amount # dev: inexact migration receipt
 
-    # deposit into target vault, reusing the normal deposit path
-    self._deposit(_asset, amount, _user, targetVault, _targetVaultId, msg.sender, 0, True, True, False, a)
+@nonreentrant
+@external
+def executeVaultDeposit(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _targetVaultId: uint256,
+    _targetVault: address,
+) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    self._assertVaultMigrator()
+    assert deptBasics.isPaused # dev: teller not paused
 
-    # prove nothing was retained here
-    tellerBalance = staticcall IERC20(_asset).balanceOf(self)
-    assert tellerBalance == preBalance # dev: teller balance remains
-
-    # settle source lootbox points through this block
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
+    depositedAmount: uint256 = self._deposit(_asset, _amount, _user, _targetVault, _targetVaultId, msg.sender, 0, True, True, False, a)
 
     # perform house keeping !!!
     # this ensures user's debt position is still healthy after the migration
     self._performHousekeeping(True, _user, True, a)
 
-    return amount
+    return depositedAmount
 
 
 ########

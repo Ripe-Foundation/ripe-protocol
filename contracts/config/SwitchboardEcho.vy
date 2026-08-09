@@ -63,11 +63,12 @@ interface RipeGovVault:
     def govPointAccrualDisabledBlock() -> uint256: view
     def disableGovPointAccrualGlobally(): nonpayable
 
-interface Teller:
-    def settleAndCleanupLegacyRipeGovSource(_user: address) -> (uint256, bool): nonpayable
-    def setLegacyRipeGovMigrationAsset(_asset: address): nonpayable
-    def migrateRipeGovPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
-    def migrateVaultPosition(_user: address, _asset: address, _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
+interface VaultMigrator:
+    def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS], _caller: address) -> uint256: nonpayable
+    def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS], _caller: address) -> uint256: nonpayable
+    def setLegacyRipeGovMigrationAsset(_asset: address, _caller: address) -> bool: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_LEGACY_MIGRATIONS], _asset: address, _caller: address) -> uint256: nonpayable
+    def settleAndCleanupLegacyRipeGovSources(_users: DynArray[address, MAX_LEGACY_MIGRATIONS], _caller: address) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -75,7 +76,6 @@ interface VaultBook:
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
-    def coreRipeGovVaultId() -> uint256: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -467,38 +467,6 @@ event RipeGovPointAccrualUserDisableExecuted:
     vaultAddr: indexed(address)
     user: indexed(address)
 
-event LegacyRipeGovMigrationAssetSetExecuted:
-    asset: indexed(address)
-    caller: indexed(address)
-
-event LegacyRipeGovPositionMigrationExecuted:
-    user: indexed(address)
-    asset: indexed(address)
-    caller: indexed(address)
-    amount: uint256
-
-event LegacyRipeGovSourceSettlementExecuted:
-    user: indexed(address)
-    caller: indexed(address)
-    ripeClaimed: uint256
-    didRemoveSourceFromLedger: bool
-
-event RipeGovPositionMigrationExecuted:
-    user: indexed(address)
-    asset: indexed(address)
-    sourceVaultId: indexed(uint256)
-    targetVaultId: uint256
-    amount: uint256
-    caller: address
-
-event VaultPositionMigrationExecuted:
-    user: indexed(address)
-    asset: indexed(address)
-    sourceVaultId: indexed(uint256)
-    targetVaultId: uint256
-    amount: uint256
-    caller: address
-
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingEndaoSwapActions: public(HashMap[uint256, DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
@@ -527,21 +495,14 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGACY_MIGRATIONS: constant(uint256) = 25
-LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
-
-# per-transaction duplicate-user guard for a legacy migration/settlement batch. A repeated user
-# would hit the target's replay protection on the second row and revert the whole batch after
-# burning every preceding row's gas, so it is rejected up front with a specific reason.
-legacyUserDedupe: transient(HashMap[address, bool])
-
 MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
 MAX_VAULT_MIGRATIONS: constant(uint256) = 25
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
 ENDAOMENT_ID: constant(uint256) = 14
-TELLER_ID: constant(uint256) = 17
 ENDAOMENT_PSM_ID: constant(uint256) = 22
+VAULT_MIGRATOR_ID: constant(uint256) = 23
 
 
 @deploy
@@ -586,8 +547,8 @@ def _getVaultBookAddr() -> address:
 
 @view
 @internal
-def _getTellerAddr() -> address:
-    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(TELLER_ID)
+def _getVaultMigratorAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_MIGRATOR_ID)
 
 
 @view
@@ -695,25 +656,7 @@ def migrateRipeGovPositions(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_migrations) != 0 # dev: no migrations
-
-    teller: Teller = Teller(self._getTellerAddr())
-    for migration: RipeGovMigration in _migrations:
-        amount: uint256 = extcall teller.migrateRipeGovPosition(
-            migration.user,
-            migration.asset,
-            migration.sourceVaultId,
-            migration.targetVaultId,
-        )
-        log RipeGovPositionMigrationExecuted(
-            user=migration.user,
-            asset=migration.asset,
-            sourceVaultId=migration.sourceVaultId,
-            targetVaultId=migration.targetVaultId,
-            amount=amount,
-            caller=msg.sender,
-        )
-
-    return len(_migrations)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_migrations, msg.sender)
 
 
 #################################
@@ -721,25 +664,14 @@ def migrateRipeGovPositions(
 #################################
 
 
-# Governance-only batch layer for the Base legacy RipeGov wind-down, following the same batch shape
-# as `migrateRipeGovPositions` above (bounded array, per-row extcall, per-row event, return count).
-#
-# This wrapper deliberately carries NO source/target ids and NO recipient: Teller hard-binds the
-# legacy source, resolves the target from `coreRipeGovVaultId`, and accepts only this exact
-# registered department. A batch is therefore always one asset -- whichever window Teller currently
-# has open -- over many users, and can never become an arbitrary token-moving primitive.
-#
-# User uniqueness within a batch is ENFORCED, not merely assumed, via `legacyUserDedupe`.
+# Governance remains in Echo; VaultMigrator owns the batch, legacy binding, target resolution,
+# duplicate rejection, active-asset window and reconciliation.
 
 
 @external
 def setLegacyRipeGovMigrationAsset(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-
-    extcall Teller(self._getTellerAddr()).setLegacyRipeGovMigrationAsset(_asset)
-
-    log LegacyRipeGovMigrationAssetSetExecuted(asset=_asset, caller=msg.sender)
-    return True
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).setLegacyRipeGovMigrationAsset(_asset, msg.sender)
 
 
 @external
@@ -750,25 +682,7 @@ def migrateLegacyRipeGovPositions(
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_users) != 0 # dev: no migrations
     assert _asset != empty(address) # dev: invalid asset
-
-    targetVaultId: uint256 = staticcall MissionControl(self._getMissionControlAddr()).coreRipeGovVaultId()
-    assert targetVaultId != 0 # dev: invalid target vault id
-
-    teller: Teller = Teller(self._getTellerAddr())
-    for user: address in _users:
-        assert user != empty(address) # dev: invalid user
-        assert not self.legacyUserDedupe[user] # dev: duplicate user
-        self.legacyUserDedupe[user] = True
-
-        amount: uint256 = extcall teller.migrateRipeGovPosition(user, _asset, LEGACY_RIPE_GOV_VAULT_ID, targetVaultId)
-        log LegacyRipeGovPositionMigrationExecuted(
-            user=user,
-            asset=_asset,
-            caller=msg.sender,
-            amount=amount,
-        )
-
-    return len(_users)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users, _asset, msg.sender)
 
 
 @external
@@ -777,24 +691,7 @@ def settleAndCleanupLegacyRipeGovSources(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_users) != 0 # dev: no settlements
-
-    teller: Teller = Teller(self._getTellerAddr())
-    for user: address in _users:
-        assert user != empty(address) # dev: invalid user
-        assert not self.legacyUserDedupe[user] # dev: duplicate user
-        self.legacyUserDedupe[user] = True
-
-        ripeClaimed: uint256 = 0
-        didRemoveVault: bool = False
-        ripeClaimed, didRemoveVault = extcall teller.settleAndCleanupLegacyRipeGovSource(user)
-        log LegacyRipeGovSourceSettlementExecuted(
-            user=user,
-            caller=msg.sender,
-            ripeClaimed=ripeClaimed,
-            didRemoveSourceFromLedger=didRemoveVault,
-        )
-
-    return len(_users)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).settleAndCleanupLegacyRipeGovSources(_users, msg.sender)
 
 
 ###########################
@@ -808,25 +705,7 @@ def migrateVaultPositions(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_migrations) != 0 # dev: no migrations
-
-    teller: Teller = Teller(self._getTellerAddr())
-    for migration: VaultMigration in _migrations:
-        amount: uint256 = extcall teller.migrateVaultPosition(
-            migration.user,
-            migration.asset,
-            migration.sourceVaultId,
-            migration.targetVaultId,
-        )
-        log VaultPositionMigrationExecuted(
-            user=migration.user,
-            asset=migration.asset,
-            sourceVaultId=migration.sourceVaultId,
-            targetVaultId=migration.targetVaultId,
-            amount=amount,
-            caller=msg.sender,
-        )
-
-    return len(_migrations)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_migrations, msg.sender)
 
 
 ######################

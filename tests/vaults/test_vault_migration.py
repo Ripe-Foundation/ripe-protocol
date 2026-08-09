@@ -44,13 +44,16 @@ def _seed_position(teller, vault, token, whale, user, amount=DEPOSIT_AMOUNT):
 
 
 def _migrate(teller, caller, user, token, source_id, target_id):
-    return teller.migrateVaultPosition(
-        user,
-        token,
-        source_id,
-        target_id,
-        sender=caller.address,
+    """Call VaultMigrator directly as Echo for focused migration-unit coverage."""
+    hq = boa.load_partial("contracts/registries/RipeHq.vy").at(teller.getRipeHq())
+    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(hq.getAddr(23))
+    caller_addr = caller.address if hasattr(caller, "address") else caller
+    vault_migrator.migrateVaultPositions(
+        [(user, token.address if hasattr(token, "address") else token, source_id, target_id)],
+        caller_addr,
+        sender=caller_addr,
     )
+    return filter_logs(vault_migrator, "VaultPositionMigrationExecuted")[-1].amount
 
 
 ############
@@ -115,28 +118,28 @@ def test_migration_rejects_non_switchboard_callers(
 ):
     _, target_id = simple_pair
 
-    with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=sally)
+    with boa.reverts("only switchboard echo allowed"):
+        _migrate(teller, sally, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
     # a ripe department that is not a switchboard
-    with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(
-            bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=lootbox.address
-        )
+    with boa.reverts("only switchboard echo allowed"):
+        _migrate(teller, lootbox, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
     # a registered vault
-    with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(
-            bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=stability_pool.address
-        )
+    with boa.reverts("only switchboard echo allowed"):
+        _migrate(teller, stability_pool, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
 
-def test_any_registered_switchboard_may_migrate(
-    teller, simple_pair, alpha_token, bob, switchboard_alpha, simple_erc20_vault,
+def test_only_switchboard_echo_may_call_vault_migrator(
+    teller, simple_pair, alpha_token, bob, switchboard_alpha, switchboard_echo,
+    simple_erc20_vault,
 ):
-    """Owner decision: authority is any registered switchboard, not Echo alone."""
+    """VaultMigrator accepts only the current Echo registered in Switchboard."""
     target_vault, target_id = simple_pair
-    migrated = _migrate(teller, switchboard_alpha, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    with boa.reverts("only switchboard echo allowed"):
+        _migrate(teller, switchboard_alpha, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+
+    migrated = _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
     assert migrated == DEPOSIT_AMOUNT
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
     assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
@@ -202,9 +205,7 @@ def test_zero_and_degenerate_arguments_fail(teller, simple_pair, alpha_token, bo
         _migrate(teller, switchboard_echo, ZERO_ADDRESS, alpha_token, SIMPLE_VAULT_ID, target_id)
 
     with boa.reverts("invalid user or asset"):
-        teller.migrateVaultPosition(
-            bob, ZERO_ADDRESS, SIMPLE_VAULT_ID, target_id, sender=switchboard_echo.address
-        )
+        _migrate(teller, switchboard_echo, bob, ZERO_ADDRESS, SIMPLE_VAULT_ID, target_id)
 
     with boa.reverts("invalid vault id"):
         _migrate(teller, switchboard_echo, bob, alpha_token, 0, target_id)

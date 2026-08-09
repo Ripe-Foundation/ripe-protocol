@@ -1,11 +1,158 @@
-# Base Legacy RipeGov Migration — Branch State & Handoff
+# Vault Migrator / Base Legacy RipeGov Migration — Branch State & Handoff
 
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
-**Status:** compiles, **not deployable**, **not tested** — Teller is 1,898 bytes over EIP-170, which
-also blocks the test suite from running at all.
+**Status (2026-08-08):** VaultMigrator architecture implemented and its critical authorization
+remediation locally tested. Every measured runtime fits EIP-170. Two owner decisions remain open;
+not deployable or fork-qualified. Worktree changes are not committed or pushed.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
+
+> **Controlling update:** the owner replaced the architecture described in historical §§0–9 below.
+> This section is the current source of truth wherever it conflicts with those sections. The old
+> material is retained after this update because its Base-specific safety rationale and rejected
+> failure modes remain useful evidence; its ownership map, size blocker, RPC task and statement that
+> a new department was rejected are superseded.
+
+---
+
+## Current architecture — controlling
+
+### One department owns all migration policy
+
+`contracts/core/VaultMigrator.vy` is a new top-level RipeHQ department at registry id **23**. It owns
+all orchestration, validation, lifecycle state, batching, reconciliation and migration events for:
+
+1. ordinary deposit-vault migration;
+2. exporter-capable RipeGov migration; and
+3. the immutable Base legacy RipeGov migration.
+
+`VaultMigrator` is also present in `contracts/modules/Addys.vy` with canonical id/address getters.
+The hot `Addys` struct was deliberately not widened. Teller and Lootbox authenticate through the
+canonical Addys getter, which is rooted in each contract's immutable RipeHQ address.
+
+### Authority and execution boundary
+
+```text
+governance -> SwitchboardEcho -> VaultMigrator -> Teller identity step(s) -> vault / Ledger
+                                         \-----> Lootbox settlement / points
+```
+
+- Echo remains the governance surface and forwards the original governance caller for events.
+- VaultMigrator accepts only the currently registered SwitchboardEcho (Switchboard registry id 5).
+- Teller accepts migration execution calls only from the current RipeHQ VaultMigrator (id 23).
+- Lootbox's legacy settlement accepts only the current RipeHQ VaultMigrator.
+- Lootbox's privileged settlement entry point has no caller-supplied Addys argument. It authenticates
+  first and generates every downstream address from its immutable RipeHQ binding, preventing a caller
+  from substituting the authorization registry, Ledger, MissionControl, VaultBook or RIPE token.
+- Teller contains no migration validation, batching, window state or postcondition logic. Its four
+  methods are thin identity steps: RipeGov source export/withdrawal, RipeGov import plus target
+  Ledger registration, ordinary vault withdrawal, and ordinary vault deposit plus housekeeping.
+- Source and destination are separate Teller calls so VaultMigrator proves exact receipt and source
+  depletion *before* authorizing import/deposit. The whole sequence remains one atomic transaction.
+- All migration-specific code was removed from TellerUtils.
+
+### Base legacy binding and freeze
+
+VaultMigrator's constructor is:
+
+```text
+(_ripeHq, _shouldPause, _legacyRipeGovVault, _legacyChainId)
+```
+
+Both legacy values must be zero (legacy route disabled) or both nonzero. The Base deployment binds
+the exact deployed legacy vault and chain id 8453. Opening or using the legacy route checks the chain
+and proves VaultBook id 2 resolves to the immutable vault. The generic RipeGov route also rejects that
+immutable source, forcing it through the legacy-only checks. This intentionally prevents the Base-only
+route from becoming usable on another chain, against a replacement source or through the wrong path.
+
+The legacy route preserves the asymmetric endpoint rule (legacy source unpaused, target paused), the
+full Teller/AuctionHouse/CreditEngine/HumanResources/Deleverage freeze, one open asset window at a
+time, exact position/points/lock import checks, retained source Ledger participation, and Lootbox-only
+final source cleanup. Migration and settlement use separate transient duplicate maps so the same user
+can migrate and later settle while duplicates inside either batch still fail.
+
+The planned replacement Base MissionControl supplies `coreRipeGovVaultId()`. Per owner direction,
+there is no live Base RPC-check task for the old MissionControl.
+
+### Current deployed runtime sizes
+
+Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these exact values:
+
+| Contract | Deployed runtime | EIP-170 headroom |
+|---|---:|---:|
+| VaultMigrator | 15,692 | 8,884 |
+| Teller | 23,485 | 1,091 |
+| TellerUtils | 8,976 | 15,600 |
+| SwitchboardEcho | 23,656 | 920 |
+| Lootbox | 24,264 | **312** |
+| Ledger | 13,392 | 11,184 |
+
+AuctionHouse remains 24,556 bytes (20 free) and Deleverage remains 24,569 bytes (7 free). Adding the
+new Addys id/getters changes their transitive compiler-input identity but dead-code elimination leaves
+their runtime unchanged. The exact-size regression pins Lootbox at 24,264 bytes and its independent
+20-byte minimum-margin floor remains in force.
+
+### Local verification completed
+
+- all changed/new production contracts compile;
+- `tests/vaults/test_vault_migration.py`: 38 passed, 4 deselected;
+- new `tests/vaults/test_vault_migrator_legacy.py`: 6 passed, including direct-call authorization;
+- focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
+- `tests/core/teller/`: 272 passed, 3 xfailed;
+- `tests/core/lootbox/`: 192 passed;
+- `tests/inventory/test_contract_artifacts.py`: 45 passed;
+- exact deployed-size regression: passed;
+- deterministic ABIs and compiler-backed artifact expectations include VaultMigrator and the changed
+  Teller/TellerUtils/Echo/Lootbox/Ledger interfaces.
+
+### Independent-review remediation and open decisions
+
+An independent review found that the first VaultMigrator version let callers supply Lootbox's Addys
+tuple before the VaultMigrator permission check. Because the check and reward dependencies were then
+rooted in caller-selected addresses, that version allowed a forged registry/reward graph to drive the
+real mint-authorized Lootbox. The remediated function has no Addys argument or overload: Lootbox first
+authenticates through its immutable-RipeHQ Addys getter and then generates all dependencies internally.
+The ABI-shape regression, direct-call regression, end-to-end legacy test and full Lootbox suite pass.
+
+The same review identified two separate branch decisions that remain open and are not silently resolved
+by this remediation:
+
+1. Three previously committed RipeGov pause gates produce five failures in the existing pause-policy
+   tests. The gates protect imported lock terms during migration, but the tests record that policy as
+   pending an owner decision. Keep/remove/scope the gates and update their test authority explicitly.
+2. Adding the canonical VaultMigrator getter to Addys changes compiler metadata for the frozen Robinhood
+   `SimpleErc20` artifact while leaving its executable prefix and runtime unchanged. The current artifact
+   inventory is internally consistent, but the separately frozen `ROBINHOOD_STOCK_ARTIFACT_BINDING`
+   still pins the earlier full creation hash, so its exact deployment test fails. Rebinding that frozen
+   artifact requires separate owner authority; do not change it as incidental Base cleanup.
+
+### Remaining work before deployment
+
+1. Independent re-review of the remediated authority boundary and the Base legacy constructor values.
+2. Base fork/census qualification and the serial asset-window runbook: close window, restore and
+   verify MissionControl terms, then open the next asset.
+3. Prove reward settlement liveness and per-user collateral parity on the fork. CreditEngine is
+   intentionally paused during the legacy window, so no on-chain debt-health refresh can run.
+4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5 and VaultMigrator receives the
+   intended RipeHQ id 23 before activation; no live RPC check against the replaced MissionControl is required.
+5. Production deployment/replacement sequencing and address evidence. No deployment, registry update,
+   activation, commit, push or PR publication is implied by the local implementation.
+6. Keep Lootbox at or below 24,264 bytes unless an explicit size tradeoff is approved.
+
+### Eventual removal boundary
+
+After Base legacy migration completes, delete only the Base-specific legacy constructor binding,
+asset window, legacy batch/settlement functions, snapshots/checks/events, and Lootbox migrated-source
+settlement/legacy precision exception. Keep VaultMigrator's ordinary vault and exporter-capable
+RipeGov paths, Addys/RipeHQ id 23, and the permanent Lootbox/Ledger no-forfeiture fixes.
+
+---
+
+## Historical pre-VaultMigrator snapshot
+
+Everything from historical §0 through §9 below describes the superseded oversized-Teller candidate.
+Use it for rationale only, not for current file ownership, status, next steps or rejected architecture.
 
 ---
 

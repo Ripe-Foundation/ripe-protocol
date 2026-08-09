@@ -54,6 +54,7 @@ def ripe_hq(
     teller_utils,
     endaoment_funds,
     endaoment_psm,
+    vault_migrator,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -141,6 +142,10 @@ def ripe_hq(
     # 22
     assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_psm, "Endaoment PSM", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_psm, sender=deploy3r) == 22
+
+    # 23
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_migrator, "Vault Migrator", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(vault_migrator, sender=deploy3r) == 23
 
     # special permission setup
 
@@ -476,6 +481,21 @@ def teller_utils(ripe_hq_deploy):
         "contracts/core/TellerUtils.vy",
         ripe_hq_deploy,
         name="teller_utils",
+    )
+
+
+# vault migrator
+
+
+@pytest.fixture(scope="session")
+def vault_migrator(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/VaultMigrator.vy",
+        ripe_hq_deploy,
+        False,
+        ZERO_ADDRESS,
+        0,
+        name="vault_migrator",
     )
 
 

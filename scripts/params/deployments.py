@@ -44,6 +44,7 @@ from params_utils import (
     TELLER_UTILS_ID,
     ENDAOMENT_FUNDS_ID,
     ENDAOMENT_PSM_ID,
+    VAULT_MIGRATOR_ID,
     setup_boa_etherscan,
     boa_fork_context,
     print_report_header,
@@ -106,6 +107,7 @@ def load_core_addresses(hq):
         TELLER_UTILS_ID: "TellerUtils",
         ENDAOMENT_FUNDS_ID: "EndaomentFunds",
         ENDAOMENT_PSM_ID: "EndaomentPSM",
+        VAULT_MIGRATOR_ID: "VaultMigrator",
     }
 
     num_addrs = hq.numAddrs()
