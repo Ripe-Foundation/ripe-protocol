@@ -440,6 +440,11 @@ def _getDepositLootData(
     if up.balancePoints == 0 or ap.balancePoints == 0:
         return empty(UserDepositLoot), up, ap, gp, globalRewards
 
+    hasBalance: bool = staticcall Vault(_vaultAddr).doesUserHaveBalance(_user, _asset)
+    rewardsBudget: uint256 = staticcall Ledger(_a.ledger).ripeAvailForRewards()
+    rewardsBudget -= min(globalRewards.newRipeRewards, rewardsBudget)
+    rewardsCanFlow: bool = config.ripePerBlock != 0 and rewardsBudget != 0
+
     # Calculate each category into LOCALS. Nothing is committed until we know the whole claim can
     # be settled: `up.balancePoints` is a single ticket backing all three reward pools, so a
     # partial settlement would zero the ticket while leaving one pool's entitlement unpaid.
@@ -451,33 +456,34 @@ def _getDepositLootData(
     gpStaker: uint256 = 0
     rewStaker: uint256 = 0
     lootStaker: uint256 = 0
-    apStaker, gpStaker, rewStaker, lootStaker = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
+    apStaker, gpStaker, rewStaker, lootStaker = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, not hasBalance and (globalRewards.stakers != 0 or not (rewardsCanFlow and config.stakersAlloc != 0)))
 
     apVote: uint256 = 0
     gpVote: uint256 = 0
     rewVote: uint256 = 0
     lootVote: uint256 = 0
-    apVote, gpVote, rewVote, lootVote = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
+    apVote, gpVote, rewVote, lootVote = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, not hasBalance and (globalRewards.voters != 0 or not (rewardsCanFlow and config.votersAlloc != 0)))
 
     apGen: uint256 = 0
     gpGen: uint256 = 0
     rewGen: uint256 = 0
     lootGen: uint256 = 0
-    apGen, gpGen, rewGen, lootGen = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
+    apGen, gpGen, rewGen, lootGen = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, not hasBalance and (globalRewards.genDepositors != 0 or not (rewardsCanFlow and config.genDepositorsAlloc != 0)))
 
-    # A category BLOCKS the claim if it had something attributable but still paid nothing. Zeroing
-    # the shared ticket in that case would erase its entitlement permanently, so instead the whole
-    # claim defers: nothing is paid, nothing is mutated, and the points stay claimable.
+    # Any attributable zero-paying category blocks the shared ticket while the user still has a
+    # balance or the empty category can refill. Exited terminal categories were resolved above.
     isBlocked: bool = (
-        self._isCategoryBlocked(ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, lootStaker) or
-        self._isCategoryBlocked(ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, lootVote) or
-        self._isCategoryBlocked(ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, lootGen)
+        self._isCategoryBlocked(ap.ripeStakerPoints, gp.ripeStakerPoints, lootStaker, hasBalance, rewardsCanFlow and config.stakersAlloc != 0) or
+        self._isCategoryBlocked(ap.ripeVotePoints, gp.ripeVotePoints, lootVote, hasBalance, rewardsCanFlow and config.votersAlloc != 0) or
+        self._isCategoryBlocked(ap.ripeGenPoints, gp.ripeGenPoints, lootGen, hasBalance, rewardsCanFlow and config.genDepositorsAlloc != 0)
     )
 
-    # nothing attributable anywhere yet -- also defer, so the points survive until the pools refill
     didReceiveLoot: bool = (lootStaker != 0 or lootVote != 0 or lootGen != 0)
 
-    if isBlocked or not didReceiveLoot:
+    # A live position never discards a zero-paying ticket. An exited position may finish only when
+    # every category either paid (including the one-wei terminal minimum), has no entitlement, or
+    # is both empty and unable to receive more rewards.
+    if isBlocked or (hasBalance and not didReceiveLoot):
         return empty(UserDepositLoot), up, ap, gp, globalRewards
 
     # every attributable category paid -- commit all three atomically and consume the ticket
@@ -501,21 +507,16 @@ def _getDepositLootData(
     ), up, ap, gp, globalRewards
 
 
-# a category owes nothing only when it has no attributable points or no rewards available. If all
-# three inputs are nonzero and the payout is still zero, the rounding lost real entitlement.
-
-
 @view
 @internal
 def _isCategoryBlocked(
     _assetPoints: uint256,
     _globalPoints: uint256,
-    _rewardsAvailable: uint256,
     _paid: uint256,
+    _hasBalance: bool,
+    _canReceiveRewards: bool,
 ) -> bool:
-    if _paid != 0:
-        return False
-    return _assetPoints != 0 and _globalPoints != 0 and _rewardsAvailable != 0
+    return _paid == 0 and _assetPoints != 0 and _globalPoints != 0 and (_hasBalance or _canReceiveRewards)
 
 
 # helper / views
@@ -565,7 +566,7 @@ def calcSpecificLoot(
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
 ) -> (uint256, uint256, uint256, uint256):
-    return self._calcSpecificLoot(_userShareOfAsset, HUNDRED_PERCENT, _assetPoints, _globalPoints, _rewardsAvailable)
+    return self._calcSpecificLoot(_userShareOfAsset, HUNDRED_PERCENT, _assetPoints, _globalPoints, _rewardsAvailable, False)
 
 
 @view
@@ -576,33 +577,40 @@ def _calcSpecificLoot(
     _assetPoints: uint256,
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
+    _resolveTerminalDust: bool,
   ) -> (uint256, uint256, uint256, uint256):
 
     # early returns for edge cases
-    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0 or _userPoints == 0 or _totalPoints == 0:
+    if _assetPoints == 0 or _globalPoints == 0 or _userPoints == 0 or _totalPoints == 0:
         return _assetPoints, _globalPoints, _rewardsAvailable, 0
+    if _rewardsAvailable == 0 and not _resolveTerminalDust:
+        return _assetPoints, _globalPoints, 0, 0
 
     # cap asset points to global points to prevent inconsistencies
     assetPoints: uint256 = min(_assetPoints, _globalPoints)
 
-    # calc asset rewards
-    assetRewards: uint256 = _rewardsAvailable * assetPoints // _globalPoints
+    userRewards: uint256 = 0
+    if _rewardsAvailable != 0:
+        # calc asset rewards, then the user's ratio directly with no intermediate quantisation
+        assetRewards: uint256 = _rewardsAvailable * assetPoints // _globalPoints
+        userRewards = assetRewards * _userPoints // _totalPoints
 
-    # calc user rewards -- the user's ratio is applied directly, with no intermediate quantisation
-    userRewards: uint256 = assetRewards * _userPoints // _totalPoints
-
-    # early return if no user rewards
-    if userRewards == 0:
+    if userRewards == 0 and not _resolveTerminalDust:
         return assetPoints, _globalPoints, _rewardsAvailable, 0
 
     # calc points to reduce -- same ratio, same precision as the payout above
     userAssetPoints: uint256 = assetPoints * _userPoints // _totalPoints
-    pointsToReduce: uint256 = min(userAssetPoints, assetPoints)
+    pointsToReduce: uint256 = userAssetPoints
+    if pointsToReduce == 0:
+        pointsToReduce = 1
+    pointsToReduce = min(pointsToReduce, assetPoints)
     pointsToReduce = min(pointsToReduce, _globalPoints)
 
     # update values
     newAssetPoints: uint256 = assetPoints - pointsToReduce
     newGlobalPoints: uint256 = _globalPoints - pointsToReduce
+    if userRewards == 0 and _rewardsAvailable != 0:
+        userRewards = 1
     newRewardsAvail: uint256 = _rewardsAvailable - userRewards
 
     return newAssetPoints, newGlobalPoints, newRewardsAvail, userRewards

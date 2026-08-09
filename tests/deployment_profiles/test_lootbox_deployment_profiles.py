@@ -52,11 +52,11 @@ def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
 
 
 def test_r5_compiles_reviewed_lootbox_with_source_owned_codesize(compiled):
-    assert len(compiled.creation) == 22_598
-    assert len(compiled.runtime_template) == 22_256
+    assert len(compiled.creation) == 23_224
+    assert len(compiled.runtime_template) == 22_882
     assert compiled.integrity == (
-        "7c3703c78b117bbc7e29902949c739fc3"
-        "7741d978b4a5c13c3f7b1f9d4c3e706"
+        "27a927ecab24d3b15c56eefc07906710"
+        "1e4432a22fa870dcc0fa11b736370960"
     )
 
 

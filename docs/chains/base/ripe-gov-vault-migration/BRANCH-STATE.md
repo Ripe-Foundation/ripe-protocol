@@ -4,8 +4,9 @@
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
 **Status (2026-08-08):** VaultMigrator architecture implemented, committed and pushed to the draft
 PR. Post-migration cleanup now uses the ordinary Lootbox claim path, the eager settlement route has
-been removed, and every measured runtime fits EIP-170. Two owner decisions remain open; this remains
-a WIP and is not deployable or fork-qualified.
+been removed, terminal reward dust can no longer brick an exited position, and every measured runtime
+fits EIP-170. Two owner decisions remain open; this remains a WIP and is not deployable or
+fork-qualified.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
@@ -60,6 +61,24 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
   entitlement is gone, and removes the source Ledger entry only after no source assets remain.
 - All migration-specific code was removed from TellerUtils.
 
+### Permanent Lootbox terminal-dust policy
+
+Deposit loot remains atomic across staker, voter and general-depositor categories because all three
+share one user balance-point ticket. Ordinary positive proportional payouts are unchanged. When a
+specific category rounds to zero:
+
+- a user who still has a vault balance defers without mutation;
+- an exited user with a funded category receives the minimum representable payout, exactly 1 wei of
+  RIPE, and consumes the associated residual points;
+- an exited user with an empty category defers only while that category can currently refill
+  (`ripePerBlock`, its allocation and the remaining Ledger reward budget are all nonzero); and
+- an exited user with an empty, inactive category consumes the terminal points at zero.
+
+The minimum is available only after exit, so a live position cannot repeatedly harvest 1 wei. A
+category that must defer blocks the whole shared ticket; otherwise all resolved categories commit
+together and the ordinary multi-asset cleanup runs. The public `calcSpecificLoot` ABI and its legacy
+basis-point behavior remain unchanged.
+
 ### Base legacy binding and freeze
 
 VaultMigrator's constructor is:
@@ -93,12 +112,12 @@ Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these
 | Teller | 23,485 | 1,091 |
 | TellerUtils | 8,976 | 15,600 |
 | SwitchboardEcho | 23,321 | 1,255 |
-| Lootbox | 22,384 | **2,192** |
+| Lootbox | 23,010 | **1,566** |
 | Ledger | 13,392 | 11,184 |
 
 AuctionHouse remains 24,556 bytes (20 free) and Deleverage remains 24,569 bytes (7 free). Adding the
 new Addys id/getters changes their transitive compiler-input identity but dead-code elimination leaves
-their runtime unchanged. The exact-size regression pins Lootbox at 22,384 bytes and its independent
+their runtime unchanged. The exact-size regression pins Lootbox at 23,010 bytes and its independent
 20-byte minimum-margin floor remains in force.
 
 ### Local verification completed
@@ -110,7 +129,7 @@ their runtime unchanged. The exact-size regression pins Lootbox at 22,384 bytes 
   the legacy freeze is lifted;
 - focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
 - `tests/core/teller/`: 272 passed, 3 xfailed;
-- `tests/core/lootbox/`: 192 passed;
+- `tests/core/lootbox/`: 196 passed, including the four terminal-dust liveness cases above;
 - `tests/inventory/test_contract_artifacts.py`: 45 passed;
 - exact deployed-size regression: passed;
 - RipeHQ id-25 checkpoint (migration, legacy, artifacts, sizes and Robinhood registry topology):
@@ -144,15 +163,16 @@ by this remediation:
 1. Independent re-review of the remediated authority boundary and the Base legacy constructor values.
 2. Base fork/census qualification and the serial asset-window runbook: close window, restore and
    verify MissionControl terms, then open the next asset.
-3. Prove ordinary-claim reward liveness after the freeze is lifted and per-user collateral parity on
-   the fork. CreditEngine is intentionally paused during the legacy window, so no on-chain
-   debt-health refresh can run during migration.
+3. Re-prove ordinary-claim reward liveness and per-user collateral parity on the Base fork. The local
+   terminal-dust matrix is covered. CreditEngine is intentionally paused during the legacy window,
+   so no on-chain debt-health refresh can run during migration.
 4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5, the CCIP pools receive RipeHQ
    ids 23 and 24, and VaultMigrator receives RipeHQ id 25 before activation; no live RPC check against
    the replaced MissionControl is required.
 5. Production deployment/replacement sequencing and address evidence. The published WIP branch does
    not imply deployment, registry update or activation authority.
-6. Keep Lootbox at or below 22,384 bytes unless an explicit size tradeoff is approved.
+6. Lootbox is now pinned at 23,010 bytes after the approved terminal-dust liveness work. Re-measure
+   every future Lootbox change and preserve the independent 20-byte minimum-margin floor.
 
 ### Eventual removal boundary
 
