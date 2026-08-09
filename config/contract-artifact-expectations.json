@@ -787,22 +787,22 @@
     },
     "Lootbox": {
       "abi": {
-        "canonical_sha256": "c93e80b6b5901496f5ca9fca9907fd8481af6bf05bd1be08c0ba732850392643",
-        "committed_file_sha256": "2dc93ef9113076ac96ef2fbd0d5299d3d737b9e80bf4dc89195dd9d780464c1f",
+        "canonical_sha256": "e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2",
+        "committed_file_sha256": "33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c",
         "committed_path": "scripts/abis/Lootbox.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "7f295c2ae507258efd5f854c04ab8454b83e3df6f086c093347f794d0029702c",
-        "creation_executable_prefix_size": 24415,
-        "creation_metadata_sha256": "a62f4eaa5077f6cd0f4b2de87f5e925a2b11209a85992291f3d475199a97ad5d",
+        "creation_executable_prefix_sha256": "d106af1538ccbc656b7c6302de00d9ad71c9e285836f9d2c5ec491175900963c",
+        "creation_executable_prefix_size": 22535,
+        "creation_metadata_sha256": "e118c10e073fd1b76745a641d8cca285e2842c3b7950922dfa5169c568fd55b3",
         "creation_metadata_size": 63,
-        "creation_sha256": "3b23ae96e7d8e1bba49b907944a9fcdd5ccc17ce7eb997ddf468b6afa7552edc",
-        "creation_size": 24478,
-        "deployed_eip170_headroom": 312,
-        "deployed_runtime_size": 24264,
-        "eip170_headroom": 440,
-        "runtime_template_sha256": "2dd8f3e0875c63a91a95d289636b08734751db4d0f68fb504422225bd79c1831",
-        "runtime_template_size": 24136
+        "creation_sha256": "272d97114583b5708f77f58991e7d664ca61908d292c3e30340bc400451791df",
+        "creation_size": 22598,
+        "deployed_eip170_headroom": 2192,
+        "deployed_runtime_size": 22384,
+        "eip170_headroom": 2320,
+        "runtime_template_sha256": "d8e50cd039223521bc0a338bf4c3c70048efd7125a2450bc719229c38fce9365",
+        "runtime_template_size": 22256
       },
       "code_layout": {
         "MIN_UNDERSCORE_SEND_INTERVAL": {
@@ -866,16 +866,16 @@
       "constructor_bound_runtime_template": true,
       "effective_optimization": "codesize",
       "events": {
-        "canonical_sha256": "f4bc90af6e06b234376c742bad4f94598790d5d116c47ba238d4ffa517610286",
-        "count": 12
+        "canonical_sha256": "6d9f708076df85443aaeae6b8218975f7c7f1a3c8aee0bcd0571ebee350e676e",
+        "count": 9
       },
       "selectors": {
-        "canonical_sha256": "81f3e973a029bdf6ee7841a0589265e2ea5e655a7fc490aa6b8ef019c7cfcf28",
-        "count": 42
+        "canonical_sha256": "6b2978141ca442d4bd271e8f5787a10037df01c307698d431e41229e042ead5c",
+        "count": 41
       },
-      "source_git_blob": "73167dc969e45ead8731f9c082f1bbbc373de24e",
+      "source_git_blob": "02f8c02fd56103e9a0c868cbb1d51692c2c9ead5",
       "source_path": "contracts/core/Lootbox.vy",
-      "source_sha256": "c7cb8fe8f44a5dae609ead37fa098bf5883ba547dd2a323184d1637dc876fcce",
+      "source_sha256": "048025a490d7b6c85139565429d410edff4143f8d73dde86bd1f81db5446263b",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -910,14 +910,8 @@
           "type": "uint256"
         }
       },
-      "transient_storage_layout": {
-        "$.nonreentrant_key": {
-          "n_slots": 1,
-          "slot": 0,
-          "type": "nonreentrant lock"
-        }
-      },
-      "transitive_compiler_input_integrity": "f4d3c74e5e8cbdf119f74b270356178606b6f1776790338b491da6a2cfcb5dbc"
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "7c3703c78b117bbc7e29902949c739fc37741d978b4a5c13c3f7b1f9d4c3e706"
     },
     "MissionControl": {
       "abi": {
@@ -2267,22 +2261,22 @@
     },
     "VaultMigrator": {
       "abi": {
-        "canonical_sha256": "98cfc9bc77193f0373073ca78ba59789e550bcc8164f13f673c00838455be331",
-        "committed_file_sha256": "a4257cc6db2f4e7fc6dbcd5073e1ab6d806d43c218492436d72db717a615f250",
+        "canonical_sha256": "085ec9d346913280532ad5c7db1e29ceff87bce4bb564d83852ac47fc848464e",
+        "committed_file_sha256": "90419c5401fcf8a3c8b5f526f6a6357bf1dff9ee99aebbb7372b93de78d10110",
         "committed_path": "scripts/abis/VaultMigrator.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "754004ccd4b8b5415876f6ab33eba7f23a718bdc05f80636218806462da7fc90",
-        "creation_executable_prefix_size": 15734,
-        "creation_metadata_sha256": "1c7faf514e276d1ce9c9fdaf9a153b06b250a6aa2285eadadb3d5e163b096b3c",
-        "creation_metadata_size": 59,
-        "creation_sha256": "c837af64d404b8b38b278ce314eebd9d21bc7286f0425d210e492f47f65fb3f7",
-        "creation_size": 15793,
-        "deployed_eip170_headroom": 8884,
-        "deployed_runtime_size": 15692,
-        "eip170_headroom": 9044,
-        "runtime_template_sha256": "a68997fca36467c62a2d5378267283ec68e0430d510bcd84e96cfb9e19499533",
-        "runtime_template_size": 15532
+        "creation_executable_prefix_sha256": "cf8da0792ee1785555b4718aeb79d04c75f929e93bbac8174df4707b1cb9a140",
+        "creation_executable_prefix_size": 14211,
+        "creation_metadata_sha256": "f7c19b4970c939fbfb8142b38ee4638b90ef95853ee530bae3b431797a3a03f7",
+        "creation_metadata_size": 57,
+        "creation_sha256": "89738eb37e26104b42d4ed9cfd2056cc4d8303e5b34b316bb16c87e62ab3778b",
+        "creation_size": 14268,
+        "deployed_eip170_headroom": 10407,
+        "deployed_runtime_size": 14169,
+        "eip170_headroom": 10567,
+        "runtime_template_sha256": "83b1fc9ca702cccbbe6a40a6e81df6c43274137b0bad15a5763a1f198a44fea1",
+        "runtime_template_size": 14009
       },
       "code_layout": {
         "LEGACY_CHAIN_ID": {
@@ -2347,16 +2341,16 @@
       "constructor_bound_runtime_template": true,
       "effective_optimization": "codesize",
       "events": {
-        "canonical_sha256": "f56e0f25f09dcaa99b3b0ada6515b5384dc55f47d79662daab66bce450ac75cf",
-        "count": 7
+        "canonical_sha256": "b7b443d364efc648e80f590bf14a5f265e6007a3a6baf09d56fa185cfeb8ddb5",
+        "count": 6
       },
       "selectors": {
-        "canonical_sha256": "e23a8c5fed89d786cf0a84e9aa2d560e739c5daef70393c35770213b9596d8be",
-        "count": 16
+        "canonical_sha256": "4b1791b9b51768a8b4f14acb0f169151b66efa8a789241e46ac0ed3c545ddbd3",
+        "count": 15
       },
-      "source_git_blob": "3fd25241aacc80e34ac016e46640048a887458ec",
+      "source_git_blob": "873906ee30e653f3f09ffbb87d1c435ed45a77cb",
       "source_path": "contracts/core/VaultMigrator.vy",
-      "source_sha256": "056c099a25b17645a26e63b9d298e2709ade6d4029530f2e8f57434554617ed1",
+      "source_sha256": "05d3b45c8c9204dd5cc4eed08620f6ff8240526037177643bbdb52b0859be3d9",
       "storage_layout": {
         "activeMigrationAsset": {
           "n_slots": 1,
@@ -2376,14 +2370,9 @@
           "n_slots": 1,
           "slot": 1,
           "type": "HashMap[address, bool]"
-        },
-        "legacySettlementUserDedupe": {
-          "n_slots": 1,
-          "slot": 2,
-          "type": "HashMap[address, bool]"
         }
       },
-      "transitive_compiler_input_integrity": "32dba1c5d2073a8bf60ca07c9a3c4a1e5ad1d8b064b46e7018b6de512f3457e3"
+      "transitive_compiler_input_integrity": "15981aa7b567e496bc7fed40aab1c06e2019dbc4e3f56866f8cfc8690b9e4cef"
     }
   },
   "schema_version": 1

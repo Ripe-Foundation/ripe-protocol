@@ -52,11 +52,11 @@ def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
 
 
 def test_r5_compiles_reviewed_lootbox_with_source_owned_codesize(compiled):
-    assert len(compiled.creation) == 21_911
-    assert len(compiled.runtime_template) == 21_569
+    assert len(compiled.creation) == 22_598
+    assert len(compiled.runtime_template) == 22_256
     assert compiled.integrity == (
-        "65a3999e25cc33caf88ff839fddae3ab7"
-        "601a8e72e4eb96f84fd854eab3c9718"
+        "7c3703c78b117bbc7e29902949c739fc3"
+        "7741d978b4a5c13c3f7b1f9d4c3e706"
     )
 
 
@@ -188,4 +188,5 @@ def test_x1_historical_call_site_inventory_is_complete():
         "migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py": [1],
         "migrations/base-mainnet/2025080900_Lootbox.py": [1],
         "migrations/base-mainnet/2025112500_New_Endaoment_Features.py": [4],
+        "migrations/robinhood-mainnet/0005_Departments.py": [5],
     }

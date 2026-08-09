@@ -1,5 +1,5 @@
 import boa
-from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID
+from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -43,6 +43,11 @@ def _pause_if_needed(contract, switchboard_alpha):
         contract.pause(True, sender=switchboard_alpha.address)
 
 
+def _unpause_if_needed(contract, switchboard_alpha):
+    if contract.isPaused():
+        contract.pause(False, sender=switchboard_alpha.address)
+
+
 def test_legacy_binding_requires_both_vault_and_chain(ripe_hq):
     with boa.reverts("incomplete legacy binding"):
         boa.load(
@@ -76,19 +81,7 @@ def test_teller_identity_steps_are_vault_migrator_only(
         )
 
 
-def test_lootbox_migrated_source_settlement_is_vault_migrator_only(
-    lootbox, ripe_gov_vault, bob,
-):
-    with boa.reverts("only vault migrator allowed"):
-        lootbox.settleAndCleanupMigratedSource(
-            bob,
-            LEGACY_RIPE_GOV_VAULT_ID,
-            ripe_gov_vault,
-            sender=bob,
-        )
-
-
-def test_base_legacy_route_preserves_position_then_cleans_source(
+def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
     ripe_hq,
     vault_book,
     governance,
@@ -184,18 +177,23 @@ def test_base_legacy_route_preserves_position_then_cleans_source(
     assert len(migration_logs) == 1
     assert migration_logs[0].caller == governance.address
 
-    assert switchboard_echo.settleAndCleanupLegacyRipeGovSources(
-        [bob], sender=governance.address,
-    ) == 1
+    assert switchboard_echo.setLegacyRipeGovMigrationAsset(
+        ZERO_ADDRESS, sender=governance.address,
+    )
+    for contract in (
+        target,
+        teller,
+        auction_house,
+        credit_engine,
+        human_resources,
+        deleverage,
+    ):
+        _unpause_if_needed(contract, switchboard_alpha)
+
+    teller.claimLoot(bob, False, sender=bob)
     assert not source.isUserInVaultAsset(bob, ripe_token)
     assert not ledger.isParticipatingInVault(bob, LEGACY_RIPE_GOV_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
-
-    settlement_logs = filter_logs(
-        switchboard_echo, "LegacyRipeGovSourceSettlementExecuted",
-    )
-    assert len(settlement_logs) == 1
-    assert settlement_logs[0].caller == governance.address
     assert migrator.LEGACY_RIPE_GOV_VAULT() == source.address
     assert migrator.LEGACY_CHAIN_ID() == boa.env.evm.patch.chain_id
 

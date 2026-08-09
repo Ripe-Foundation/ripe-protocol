@@ -1948,23 +1948,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "settleAndCleanupLegacyRipeGovSources",
-    "inputs": [
-      {
-        "name": "_users",
-        "type": "address[]"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "migrateVaultPositions",
     "inputs": [
       {

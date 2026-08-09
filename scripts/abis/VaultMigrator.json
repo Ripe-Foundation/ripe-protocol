@@ -158,33 +158,6 @@
     "type": "event"
   },
   {
-    "name": "LegacyRipeGovSourceSettlementExecuted",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "ripeClaimed",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "didRemoveSourceFromLedger",
-        "type": "bool",
-        "indexed": false
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "DepartmentPauseModified",
     "inputs": [
       {
@@ -507,27 +480,6 @@
       {
         "name": "_asset",
         "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "settleAndCleanupLegacyRipeGovSources",
-    "inputs": [
-      {
-        "name": "_users",
-        "type": "address[]"
       },
       {
         "name": "_caller",

@@ -21,12 +21,6 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 
 
-struct UserDepositPoints:
-    balancePoints: uint256
-    lastBalance: uint256
-    lastUpdate: uint256
-
-
 struct GovData:
     govPoints: uint256
     lastShares: uint256
@@ -43,11 +37,6 @@ struct LegacySourceSnapshot:
     lastTerms: cs.LockTerms
     targetUserPointsBefore: uint256
     targetTotalPointsBefore: uint256
-
-
-struct DepositLedgerData:
-    isParticipatingInVault: bool
-    numUserVaults: uint256
 
 
 struct RipeGovMigrationData:
@@ -83,11 +72,6 @@ interface MissionControl:
     def coreRipeGovVaultId() -> uint256: view
 
 
-interface SourceVault:
-    def vaultAssets(_index: uint256) -> address: view
-    def numAssets() -> uint256: view
-
-
 interface RipeGovVault:
     def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
     def totalUserGovPoints(_user: address) -> uint256: view
@@ -97,9 +81,7 @@ interface RipeGovVault:
 
 
 interface Ledger:
-    def userDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> UserDepositPoints: view
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
 
 
 interface Teller:
@@ -110,7 +92,6 @@ interface Teller:
 
 
 interface Lootbox:
-    def settleAndCleanupMigratedSource(_user: address, _sourceVaultId: uint256, _sourceVault: address) -> (uint256, bool): nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 
@@ -152,17 +133,9 @@ event LegacyRipeGovPositionMigrationExecuted:
     unlock: uint256
 
 
-event LegacyRipeGovSourceSettlementExecuted:
-    user: indexed(address)
-    caller: indexed(address)
-    ripeClaimed: uint256
-    didRemoveSourceFromLedger: bool
-
-
 MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
 MAX_VAULT_MIGRATIONS: constant(uint256) = 25
 MAX_LEGACY_MIGRATIONS: constant(uint256) = 25
-MAX_SOURCE_VAULT_ASSETS: constant(uint256) = 21
 
 SWITCHBOARD_ECHO_ID: constant(uint256) = 5
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
@@ -172,7 +145,6 @@ LEGACY_CHAIN_ID: public(immutable(uint256))
 
 activeMigrationAsset: public(address)
 legacyMigrationUserDedupe: transient(HashMap[address, bool])
-legacySettlementUserDedupe: transient(HashMap[address, bool])
 
 
 @deploy
@@ -418,49 +390,6 @@ def migrateLegacyRipeGovPositions(
     return len(_users)
 
 
-@external
-def settleAndCleanupLegacyRipeGovSources(
-    _users: DynArray[address, MAX_LEGACY_MIGRATIONS],
-    _caller: address,
-) -> uint256:
-    self._assertSwitchboardEcho()
-    assert not deptBasics.isPaused # dev: contract paused
-    assert _caller != empty(address) # dev: invalid caller
-    assert len(_users) != 0 # dev: no settlements
-
-    activeAsset: address = self.activeMigrationAsset
-    assert activeAsset != empty(address) # dev: asset window closed
-
-    a: addys.Addys = addys._getAddys()
-    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
-    self._assertLegacyBinding(sourceVault)
-    self._assertExclusiveFreeze(a)
-
-    for user: address in _users:
-        assert user != empty(address) # dev: invalid user
-        assert not self.legacySettlementUserDedupe[user] # dev: duplicate user
-        self.legacySettlementUserDedupe[user] = True
-        assert not staticcall Vault(sourceVault).doesUserHaveBalance(user, activeAsset) # dev: active asset not migrated
-
-        ripeClaimed: uint256 = 0
-        didRemoveVault: bool = False
-        ripeClaimed, didRemoveVault = extcall Lootbox(a.lootbox).settleAndCleanupMigratedSource(
-            user,
-            LEGACY_RIPE_GOV_VAULT_ID,
-            sourceVault,
-        )
-        self._verifyLegacyRipeGovSettlement(user, sourceVault, activeAsset, didRemoveVault, a)
-
-        log LegacyRipeGovSourceSettlementExecuted(
-            user=user,
-            caller=_caller,
-            ripeClaimed=ripeClaimed,
-            didRemoveSourceFromLedger=didRemoveVault,
-        )
-
-    return len(_users)
-
-
 @internal
 def _migrateRipeGovPosition(
     _user: address,
@@ -687,34 +616,6 @@ def _verifyLegacyRipeGovImport(
     assert newGd.lastTerms.exitFee == _snapshot.lastTerms.exitFee # dev: target terms mismatch
     assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _snapshot.targetUserPointsBefore + _snapshot.govPoints # dev: target user total mismatch
     assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _snapshot.targetTotalPointsBefore + _snapshot.govPoints # dev: target global total mismatch
-
-
-@view
-@internal
-def _verifyLegacyRipeGovSettlement(
-    _user: address,
-    _sourceVault: address,
-    _settledAsset: address,
-    _didRemoveVault: bool,
-    _a: addys.Addys,
-):
-    self._assertExclusiveFreeze(_a)
-    assert not staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _settledAsset) # dev: settled asset has balance
-    assert not staticcall Vault(_sourceVault).isUserInVaultAsset(_user, _settledAsset) # dev: settled asset not deregistered
-
-    stillParticipating: bool = staticcall Ledger(_a.ledger).isParticipatingInVault(_user, LEGACY_RIPE_GOV_VAULT_ID)
-    assert stillParticipating != _didRemoveVault # dev: ledger state mismatch
-
-    if _didRemoveVault:
-        assert staticcall Vault(_sourceVault).numUserAssets(_user) <= 1 # dev: source registrations remain
-        numAssets: uint256 = staticcall SourceVault(_sourceVault).numAssets()
-        assert numAssets <= MAX_SOURCE_VAULT_ASSETS # dev: source asset list over cap
-        for i: uint256 in range(1, numAssets, bound=MAX_SOURCE_VAULT_ASSETS):
-            asset: address = staticcall SourceVault(_sourceVault).vaultAssets(i)
-            if asset == empty(address):
-                continue
-            points: UserDepositPoints = staticcall Ledger(_a.ledger).userDepositPoints(_user, LEGACY_RIPE_GOV_VAULT_ID, asset)
-            assert points.balancePoints == 0 # dev: source entitlement remains
 
 
 @view

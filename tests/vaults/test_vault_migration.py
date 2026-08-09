@@ -648,6 +648,56 @@ def test_source_participation_survives_for_a_second_asset(
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
 
 
+def test_normal_claim_cleans_source_only_after_all_assets_migrate(
+    teller, simple_erc20_vault, target_simple_vault, alpha_token,
+    alpha_token_whale, bravo_token, bravo_token_whale, bob, setGeneralConfig,
+    setAssetConfig, setRipeRewardsConfig, switchboard_alpha, switchboard_echo,
+    ledger, ripe_token,
+):
+    """Ordinary Lootbox cleanup handles a source with multiple migrated assets."""
+    target_vault, target_id = target_simple_vault
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    setAssetConfig(bravo_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
+    _seed_position(teller, simple_erc20_vault, alpha_token, alpha_token_whale, bob)
+    _seed_position(teller, simple_erc20_vault, bravo_token, bravo_token_whale, bob)
+    boa.env.time_travel(blocks=20)
+    teller.pause(True, sender=switchboard_alpha.address)
+
+    _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+    assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert simple_erc20_vault.doesUserHaveBalance(bob, bravo_token)
+
+    # A normal claim may clean the depleted asset, but the second live asset keeps the
+    # source vault in Ledger.
+    teller.pause(False, sender=switchboard_alpha.address)
+    teller.claimLoot(bob, False, sender=bob)
+    assert not simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+
+    boa.env.time_travel(blocks=1)
+    teller.pause(True, sender=switchboard_alpha.address)
+    _migrate(teller, switchboard_echo, bob, bravo_token, SIMPLE_VAULT_ID, target_id)
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == 0
+    assert simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+
+    # Only after the final asset is gone does the next ordinary claim remove the
+    # remaining source registration and source Ledger entry.
+    teller.pause(False, sender=switchboard_alpha.address)
+    ripe_before = ripe_token.balanceOf(bob)
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert ripe_token.balanceOf(bob) == ripe_before + claimed
+    assert not simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert not ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+    assert ledger.isParticipatingInVault(bob, target_id)
+    assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+    assert target_vault.getTotalAmountForUser(bob, bravo_token) == DEPOSIT_AMOUNT
+
+
 def test_untouched_source_assets_are_unchanged(
     teller, simple_erc20_vault, target_simple_vault, alpha_token, alpha_token_whale,
     bravo_token, bravo_token_whale, bob, setGeneralConfig, setAssetConfig,

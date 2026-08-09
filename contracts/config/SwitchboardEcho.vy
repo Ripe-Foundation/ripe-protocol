@@ -68,7 +68,6 @@ interface VaultMigrator:
     def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS], _caller: address) -> uint256: nonpayable
     def setLegacyRipeGovMigrationAsset(_asset: address, _caller: address) -> bool: nonpayable
     def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_LEGACY_MIGRATIONS], _asset: address, _caller: address) -> uint256: nonpayable
-    def settleAndCleanupLegacyRipeGovSources(_users: DynArray[address, MAX_LEGACY_MIGRATIONS], _caller: address) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -683,15 +682,6 @@ def migrateLegacyRipeGovPositions(
     assert len(_users) != 0 # dev: no migrations
     assert _asset != empty(address) # dev: invalid asset
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users, _asset, msg.sender)
-
-
-@external
-def settleAndCleanupLegacyRipeGovSources(
-    _users: DynArray[address, MAX_LEGACY_MIGRATIONS],
-) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_users) != 0 # dev: no settlements
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).settleAndCleanupLegacyRipeGovSources(_users, msg.sender)
 
 
 ###########################

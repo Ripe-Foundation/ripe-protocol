@@ -5,12 +5,12 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "SwitchboardBravo": 23_082,
     # VaultMigrator centralizes all three migration paths. Adding its canonical
     # ID/getters to Addys also changes the runtime of Addys consumers.
-    "SwitchboardEcho": 23_656,
-    "VaultMigrator": 15_692,
+    "SwitchboardEcho": 23_321,
+    "VaultMigrator": 14_169,
     "Teller": 23_485,
     "TellerUtils": 8_976,
     "Ledger": 13_392,
-    "Lootbox": 24_264,
+    "Lootbox": 22_384,
     "CreditEngine": 24_392,
     "StabilityPool": 24_371,
 }
@@ -94,9 +94,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         f"Teller deployed margin {teller_margin} is below the {MIN_TELLER_MARGIN}-byte floor"
     )
 
-    # The canonical-auth fix removed Lootbox's external Addys overload and recovered
-    # material headroom. Keep the existing branch floor as an independent lower bound;
-    # exact deployed sizes above still make every future byte change explicit.
+    # Normal claims now own all post-migration reward and registration cleanup; removing
+    # the eager settlement path recovered material headroom. Keep the existing branch
+    # floor as an independent lower bound; exact deployed sizes above still make every
+    # future byte change explicit.
     lootbox_margin = EIP170_LIMIT - deployed_runtime_bytes["Lootbox"]
     assert lootbox_margin >= MIN_LOOTBOX_MARGIN, (
         f"Lootbox deployed margin {lootbox_margin} is below the {MIN_LOOTBOX_MARGIN}-byte floor"

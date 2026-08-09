@@ -3,8 +3,9 @@
 **Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
 **Status (2026-08-08):** VaultMigrator architecture implemented, committed and pushed to the draft
-PR. Its critical authorization remediation is locally tested, and every measured runtime fits
-EIP-170. Two owner decisions remain open; this remains a WIP and is not deployable or fork-qualified.
+PR. Post-migration cleanup now uses the ordinary Lootbox claim path, the eager settlement route has
+been removed, and every measured runtime fits EIP-170. Two owner decisions remain open; this remains
+a WIP and is not deployable or fork-qualified.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
@@ -30,28 +31,33 @@ all orchestration, validation, lifecycle state, batching, reconciliation and mig
 3. the immutable Base legacy RipeGov migration.
 
 `VaultMigrator` is also present in `contracts/modules/Addys.vy` with canonical id/address getters.
-The hot `Addys` struct was deliberately not widened. Teller and Lootbox authenticate through the
-canonical Addys getter, which is rooted in each contract's immutable RipeHQ address.
+The hot `Addys` struct was deliberately not widened. Teller authenticates VaultMigrator through the
+canonical Addys getter, which is rooted in Teller's immutable RipeHQ address. Lootbox has no
+migration-only authorization surface; its existing claim path resolves shared dependencies through
+its own immutable-RipeHQ Addys binding.
 
 ### Authority and execution boundary
 
 ```text
 governance -> SwitchboardEcho -> VaultMigrator -> Teller identity step(s) -> vault / Ledger
-                                         \-----> Lootbox settlement / points
+                                         \-----> Lootbox point checkpoints
+
+freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Ledger cleanup
 ```
 
 - Echo remains the governance surface and forwards the original governance caller for events.
 - VaultMigrator accepts only the currently registered SwitchboardEcho (Switchboard registry id 5).
 - Teller accepts migration execution calls only from the current RipeHQ VaultMigrator (id 25).
-- Lootbox's legacy settlement accepts only the current RipeHQ VaultMigrator.
-- Lootbox's privileged settlement entry point has no caller-supplied Addys argument. It authenticates
-  first and generates every downstream address from its immutable RipeHQ binding, preventing a caller
-  from substituting the authorization registry, Ledger, MissionControl, VaultBook or RIPE token.
 - Teller contains no migration validation, batching, window state or postcondition logic. Its four
   methods are thin identity steps: RipeGov source export/withdrawal, RipeGov import plus target
   Ledger registration, ordinary vault withdrawal, and ordinary vault deposit plus housekeeping.
 - Source and destination are separate Teller calls so VaultMigrator proves exact receipt and source
   depletion *before* authorizing import/deposit. The whole sequence remains one atomic transaction.
+- Each migration checkpoints deposit points for the source and target asset. It deliberately leaves
+  the depleted source asset registered and the source vault in Ledger.
+- After the migration window is closed and the freeze is lifted, the user's ordinary Teller/Lootbox
+  claim settles those checkpointed rewards, deregisters each zero-balance asset only after its
+  entitlement is gone, and removes the source Ledger entry only after no source assets remain.
 - All migration-specific code was removed from TellerUtils.
 
 ### Base legacy binding and freeze
@@ -70,9 +76,9 @@ route from becoming usable on another chain, against a replacement source or thr
 
 The legacy route preserves the asymmetric endpoint rule (legacy source unpaused, target paused), the
 full Teller/AuctionHouse/CreditEngine/HumanResources/Deleverage freeze, one open asset window at a
-time, exact position/points/lock import checks, retained source Ledger participation, and Lootbox-only
-final source cleanup. Migration and settlement use separate transient duplicate maps so the same user
-can migrate and later settle while duplicates inside either batch still fail.
+time, exact position/points/lock import checks, and retained source Ledger participation. A normal
+claim performs reward and registration cleanup only after the window is closed and the freeze is
+lifted. The migration batch's transient duplicate map still rejects a repeated user within a batch.
 
 The planned replacement Base MissionControl supplies `coreRipeGovVaultId()`. Per owner direction,
 there is no live Base RPC-check task for the old MissionControl.
@@ -83,23 +89,25 @@ Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these
 
 | Contract | Deployed runtime | EIP-170 headroom |
 |---|---:|---:|
-| VaultMigrator | 15,692 | 8,884 |
+| VaultMigrator | 14,169 | 10,407 |
 | Teller | 23,485 | 1,091 |
 | TellerUtils | 8,976 | 15,600 |
-| SwitchboardEcho | 23,656 | 920 |
-| Lootbox | 24,264 | **312** |
+| SwitchboardEcho | 23,321 | 1,255 |
+| Lootbox | 22,384 | **2,192** |
 | Ledger | 13,392 | 11,184 |
 
 AuctionHouse remains 24,556 bytes (20 free) and Deleverage remains 24,569 bytes (7 free). Adding the
 new Addys id/getters changes their transitive compiler-input identity but dead-code elimination leaves
-their runtime unchanged. The exact-size regression pins Lootbox at 24,264 bytes and its independent
+their runtime unchanged. The exact-size regression pins Lootbox at 22,384 bytes and its independent
 20-byte minimum-margin floor remains in force.
 
 ### Local verification completed
 
 - all changed/new production contracts compile;
-- `tests/vaults/test_vault_migration.py`: 38 passed, 4 deselected;
-- new `tests/vaults/test_vault_migrator_legacy.py`: 6 passed, including direct-call authorization;
+- `tests/vaults/test_vault_migration.py`: 39 passed, 4 deselected, including a two-asset source that
+  survives the first claim and is removed only after the second asset migrates and is claimed;
+- new `tests/vaults/test_vault_migrator_legacy.py`: 5 passed, including ordinary-claim cleanup after
+  the legacy freeze is lifted;
 - focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
 - `tests/core/teller/`: 272 passed, 3 xfailed;
 - `tests/core/lootbox/`: 192 passed;
@@ -115,9 +123,9 @@ their runtime unchanged. The exact-size regression pins Lootbox at 24,264 bytes 
 An independent review found that the first VaultMigrator version let callers supply Lootbox's Addys
 tuple before the VaultMigrator permission check. Because the check and reward dependencies were then
 rooted in caller-selected addresses, that version allowed a forged registry/reward graph to drive the
-real mint-authorized Lootbox. The remediated function has no Addys argument or overload: Lootbox first
-authenticates through its immutable-RipeHQ Addys getter and then generates all dependencies internally.
-The ABI-shape regression, direct-call regression, end-to-end legacy test and full Lootbox suite pass.
+real mint-authorized Lootbox. That privileged eager-settlement API has now been deleted entirely.
+Migration only checkpoints points; the existing ordinary claim path owns reward settlement and
+multi-asset-safe cleanup. ABI regressions assert that the removed entry point cannot reappear.
 
 The same review identified two separate branch decisions that remain open and are not silently resolved
 by this remediation:
@@ -136,21 +144,22 @@ by this remediation:
 1. Independent re-review of the remediated authority boundary and the Base legacy constructor values.
 2. Base fork/census qualification and the serial asset-window runbook: close window, restore and
    verify MissionControl terms, then open the next asset.
-3. Prove reward settlement liveness and per-user collateral parity on the fork. CreditEngine is
-   intentionally paused during the legacy window, so no on-chain debt-health refresh can run.
+3. Prove ordinary-claim reward liveness after the freeze is lifted and per-user collateral parity on
+   the fork. CreditEngine is intentionally paused during the legacy window, so no on-chain
+   debt-health refresh can run during migration.
 4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5, the CCIP pools receive RipeHQ
    ids 23 and 24, and VaultMigrator receives RipeHQ id 25 before activation; no live RPC check against
    the replaced MissionControl is required.
 5. Production deployment/replacement sequencing and address evidence. The published WIP branch does
    not imply deployment, registry update or activation authority.
-6. Keep Lootbox at or below 24,264 bytes unless an explicit size tradeoff is approved.
+6. Keep Lootbox at or below 22,384 bytes unless an explicit size tradeoff is approved.
 
 ### Eventual removal boundary
 
 After Base legacy migration completes, delete only the Base-specific legacy constructor binding,
-asset window, legacy batch/settlement functions, snapshots/checks/events, and Lootbox migrated-source
-settlement/legacy precision exception. Keep VaultMigrator's ordinary vault and exporter-capable
-RipeGov paths, Addys/RipeHQ id 25, and the permanent Lootbox/Ledger no-forfeiture fixes.
+asset window, legacy migration batch, snapshots/checks/events, and Lootbox legacy precision
+exception. Keep VaultMigrator's ordinary vault and exporter-capable RipeGov paths, Addys/RipeHQ id
+25, the ordinary Lootbox claim cleanup path, and the permanent Lootbox/Ledger no-forfeiture fixes.
 
 ---
 
@@ -609,20 +618,19 @@ deployed. Delete everything marked **T** in §4.6. Specifically:
 
 - **`RipeGov.vy`** — keep the three pause gates. They are marked **P**: they close a real hole
   independent of the migration.
-- **`Lootbox.vy`** — remove `settleAndCleanupMigratedSource`, the three `MigratedSource*` events,
-  `MAX_SOURCE_ASSET_INDEX`, `LEGACY_RIPE_GOV_VAULT_ID`, and **the legacy arm of the precision-divisor
-  exemption** (`_vaultId != LEGACY_RIPE_GOV_VAULT_ID`). Do **not** touch the reward-math changes —
-  `_calcSpecificLoot`, `_isCategoryBlocked`, the atomic commit, the flush removal and the claim-loop
-  deregistration gating are all **P**.
-- **`TellerUtils.vy`** — the entire legacy block is **T**: `_assertExclusiveFreeze`, all four
-  `…Legacy…` functions, `interface SourceVault`, `MAX_SOURCE_VAULT_ASSETS`, and the three mirrored
-  structs. Check whether `cs` and the `RipeGovVault`/`Ledger` interface additions are still used by
-  anything else before removing them.
-- **`Teller.vy`** — remove the legacy branch inside `migrateRipeGovPosition`, `activeMigrationAsset`,
-  `setLegacyRipeGovMigrationAsset`, `settleAndCleanupLegacyRipeGovSource`, `LEGACY_RIPE_GOV_VAULT_ID`,
-  `LegacySourceSnapshot`, both `Legacy*` events, and the four TellerUtils interface lines. **Keep**
-  the Ledger-removal deletion (**P**) — do not reinstate `removeVaultFromUserForMigration`.
-- **`SwitchboardEcho.vy`** — the whole added block is **T**.
+- **`Lootbox.vy`** — remove `LEGACY_RIPE_GOV_VAULT_ID` and **the legacy arm of the precision-divisor
+  exemption** (`_vaultId != LEGACY_RIPE_GOV_VAULT_ID`). The eager settlement function, its three
+  events and its bound have already been removed. Do **not** touch the reward-math changes or the
+  ordinary claim cleanup path — `_calcSpecificLoot`, `_isCategoryBlocked`, the atomic commit, the
+  flush removal and the claim-loop deregistration gating are all **P**.
+- **`VaultMigrator.vy`** — remove the Base-only constructor binding, chain/vault binding checks,
+  exclusive-freeze helper, active asset window, legacy migration batch, legacy snapshot/import
+  validation and legacy events. Keep the ordinary vault and exporter-capable RipeGov paths.
+- **`Teller.vy`** — remove only the legacy-specific branch/argument from the thin RipeGov source
+  identity step if it is no longer used. Keep the Ledger-removal deletion (**P**) — do not reinstate
+  `removeVaultFromUserForMigration`.
+- **`SwitchboardEcho.vy`** — remove the two remaining Base-only legacy wrappers and their interface
+  lines; keep the ordinary vault and exporter-capable RipeGov governance surfaces.
 - **This document** — delete it, or reduce it to a historical note.
 
 Two cautions:

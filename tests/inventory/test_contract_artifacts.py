@@ -84,20 +84,20 @@ def test_frozen_required_contract_set_is_exact():
     assert set(values["contracts"]) == REQUIRED_CONTRACTS
 
 
-def test_migrated_source_settlement_has_no_caller_supplied_addys():
-    abi = json.loads((ROOT / "scripts" / "abis" / "Lootbox.json").read_text())
-    settlement = [
-        entry
-        for entry in abi
-        if entry.get("type") == "function"
-        and entry.get("name") == "settleAndCleanupMigratedSource"
-    ]
-    assert len(settlement) == 1
-    assert [item["name"] for item in settlement[0]["inputs"]] == [
-        "_user",
-        "_sourceVaultId",
-        "_sourceVault",
-    ]
+def test_eager_migrated_source_settlement_entrypoints_are_absent():
+    removed_functions = {
+        "Lootbox": "settleAndCleanupMigratedSource",
+        "VaultMigrator": "settleAndCleanupLegacyRipeGovSources",
+        "SwitchboardEcho": "settleAndCleanupLegacyRipeGovSources",
+    }
+    for contract_name, function_name in removed_functions.items():
+        abi = json.loads(
+            (ROOT / "scripts" / "abis" / f"{contract_name}.json").read_text()
+        )
+        assert not any(
+            entry.get("type") == "function" and entry.get("name") == function_name
+            for entry in abi
+        )
 
 
 def test_robinhood_curve_launch_reuses_frozen_source_and_abi():
