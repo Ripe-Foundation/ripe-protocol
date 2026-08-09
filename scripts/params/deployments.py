@@ -44,6 +44,8 @@ from params_utils import (
     TELLER_UTILS_ID,
     ENDAOMENT_FUNDS_ID,
     ENDAOMENT_PSM_ID,
+    GREEN_CCIP_POOL_ID,
+    RIPE_CCIP_POOL_ID,
     VAULT_MIGRATOR_ID,
     setup_boa_etherscan,
     boa_fork_context,
@@ -107,6 +109,8 @@ def load_core_addresses(hq):
         TELLER_UTILS_ID: "TellerUtils",
         ENDAOMENT_FUNDS_ID: "EndaomentFunds",
         ENDAOMENT_PSM_ID: "EndaomentPSM",
+        GREEN_CCIP_POOL_ID: "GreenCcipBurnMintPool",
+        RIPE_CCIP_POOL_ID: "RipeCcipBurnMintPool",
         VAULT_MIGRATOR_ID: "VaultMigrator",
     }
 

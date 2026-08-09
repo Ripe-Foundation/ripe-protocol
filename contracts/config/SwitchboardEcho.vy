@@ -502,7 +502,7 @@ MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
 ENDAOMENT_ID: constant(uint256) = 14
 ENDAOMENT_PSM_ID: constant(uint256) = 22
-VAULT_MIGRATOR_ID: constant(uint256) = 23
+VAULT_MIGRATOR_ID: constant(uint256) = 25
 
 
 @deploy

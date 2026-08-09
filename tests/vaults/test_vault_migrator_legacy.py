@@ -1,10 +1,9 @@
 import boa
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID
 from conf_utils import filter_logs
 
 
 LEGACY_RIPE_GOV_VAULT_ID = 2
-VAULT_MIGRATOR_ID = 23
 ASSET_WEIGHT = 100_00
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
 
@@ -29,13 +28,13 @@ def _install_legacy_migrator(ripe_hq, source, governance):
         name="legacy_vault_migrator",
     )
     assert ripe_hq.startAddressUpdateToRegistry(
-        VAULT_MIGRATOR_ID, migrator, sender=governance.address,
+        VAULT_MIGRATOR_HQ_ID, migrator, sender=governance.address,
     )
     boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
     assert ripe_hq.confirmAddressUpdateToRegistry(
-        VAULT_MIGRATOR_ID, sender=governance.address,
+        VAULT_MIGRATOR_HQ_ID, sender=governance.address,
     )
-    assert ripe_hq.getAddr(VAULT_MIGRATOR_ID) == migrator.address
+    assert ripe_hq.getAddr(VAULT_MIGRATOR_HQ_ID) == migrator.address
     return migrator
 
 

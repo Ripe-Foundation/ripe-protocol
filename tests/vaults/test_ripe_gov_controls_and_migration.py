@@ -2,7 +2,12 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import (
+    EIGHTEEN_DECIMALS,
+    MAX_UINT256,
+    ZERO_ADDRESS,
+    VAULT_MIGRATOR_HQ_ID,
+)
 from conf_utils import filter_logs
 
 
@@ -83,7 +88,9 @@ def _migrate_ripe_gov(
 ):
     """Call VaultMigrator directly as Echo for focused migration-unit coverage."""
     hq = boa.load_partial("contracts/registries/RipeHq.vy").at(teller.getRipeHq())
-    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(hq.getAddr(23))
+    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(
+        hq.getAddr(VAULT_MIGRATOR_HQ_ID)
+    )
     caller_addr = sender.address if hasattr(sender, "address") else sender
     vault_migrator.migrateRipeGovPositions(
         [(user, token.address if hasattr(token, "address") else token, source_id, target_id)],

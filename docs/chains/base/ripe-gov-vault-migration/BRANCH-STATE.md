@@ -21,7 +21,8 @@ EIP-170. Two owner decisions remain open; this remains a WIP and is not deployab
 
 ### One department owns all migration policy
 
-`contracts/core/VaultMigrator.vy` is a new top-level RipeHQ department at registry id **23**. It owns
+`contracts/core/VaultMigrator.vy` is a new top-level RipeHQ department at registry id **25**. RipeHQ
+ids 23 and 24 are reserved for the GREEN and RIPE CCIP pools on both Base and Robinhood Chain. It owns
 all orchestration, validation, lifecycle state, batching, reconciliation and migration events for:
 
 1. ordinary deposit-vault migration;
@@ -41,7 +42,7 @@ governance -> SwitchboardEcho -> VaultMigrator -> Teller identity step(s) -> vau
 
 - Echo remains the governance surface and forwards the original governance caller for events.
 - VaultMigrator accepts only the currently registered SwitchboardEcho (Switchboard registry id 5).
-- Teller accepts migration execution calls only from the current RipeHQ VaultMigrator (id 23).
+- Teller accepts migration execution calls only from the current RipeHQ VaultMigrator (id 25).
 - Lootbox's legacy settlement accepts only the current RipeHQ VaultMigrator.
 - Lootbox's privileged settlement entry point has no caller-supplied Addys argument. It authenticates
   first and generates every downstream address from its immutable RipeHQ binding, preventing a caller
@@ -104,6 +105,8 @@ their runtime unchanged. The exact-size regression pins Lootbox at 24,264 bytes 
 - `tests/core/lootbox/`: 192 passed;
 - `tests/inventory/test_contract_artifacts.py`: 45 passed;
 - exact deployed-size regression: passed;
+- RipeHQ id-25 checkpoint (migration, legacy, artifacts, sizes and Robinhood registry topology):
+  91 passed, 4 intentionally deselected;
 - deterministic ABIs and compiler-backed artifact expectations include VaultMigrator and the changed
   Teller/TellerUtils/Echo/Lootbox/Ledger interfaces.
 
@@ -135,10 +138,11 @@ by this remediation:
    verify MissionControl terms, then open the next asset.
 3. Prove reward settlement liveness and per-user collateral parity on the fork. CreditEngine is
    intentionally paused during the legacy window, so no on-chain debt-health refresh can run.
-4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5 and VaultMigrator receives the
-   intended RipeHQ id 23 before activation; no live RPC check against the replaced MissionControl is required.
+4. Bind deployment evidence that SwitchboardEcho is Switchboard id 5, the CCIP pools receive RipeHQ
+   ids 23 and 24, and VaultMigrator receives RipeHQ id 25 before activation; no live RPC check against
+   the replaced MissionControl is required.
 5. Production deployment/replacement sequencing and address evidence. The published WIP branch does
-not imply deployment, registry update or activation authority.
+   not imply deployment, registry update or activation authority.
 6. Keep Lootbox at or below 24,264 bytes unless an explicit size tradeoff is approved.
 
 ### Eventual removal boundary
@@ -146,7 +150,7 @@ not imply deployment, registry update or activation authority.
 After Base legacy migration completes, delete only the Base-specific legacy constructor binding,
 asset window, legacy batch/settlement functions, snapshots/checks/events, and Lootbox migrated-source
 settlement/legacy precision exception. Keep VaultMigrator's ordinary vault and exporter-capable
-RipeGov paths, Addys/RipeHQ id 23, and the permanent Lootbox/Ledger no-forfeiture fixes.
+RipeGov paths, Addys/RipeHQ id 25, and the permanent Lootbox/Ledger no-forfeiture fixes.
 
 ---
 

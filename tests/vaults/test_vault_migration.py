@@ -2,7 +2,7 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, VAULT_MIGRATOR_HQ_ID
 from conf_utils import filter_logs
 
 
@@ -46,7 +46,9 @@ def _seed_position(teller, vault, token, whale, user, amount=DEPOSIT_AMOUNT):
 def _migrate(teller, caller, user, token, source_id, target_id):
     """Call VaultMigrator directly as Echo for focused migration-unit coverage."""
     hq = boa.load_partial("contracts/registries/RipeHq.vy").at(teller.getRipeHq())
-    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(hq.getAddr(23))
+    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(
+        hq.getAddr(VAULT_MIGRATOR_HQ_ID)
+    )
     caller_addr = caller.address if hasattr(caller, "address") else caller
     vault_migrator.migrateVaultPositions(
         [(user, token.address if hasattr(token, "address") else token, source_id, target_id)],
