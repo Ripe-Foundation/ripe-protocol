@@ -1,3 +1,12 @@
+import hashlib
+from pathlib import Path
+
+import boa
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
 EIP170_LIMIT = 24_576
 
 # Reference sizes recorded by the deposit-vault position migration. These are a
@@ -53,6 +62,54 @@ DEFAULT_MIN_HEADROOM = 200
 MIN_HEADROOM_OVERRIDES = {
     "Teller": 200,
     "CreditEngine": 184,  # RH-D026 waiver; do not lower without a new decision
+}
+
+# Exact identity of every contract carrying a below-floor waiver.
+#
+# A headroom floor is the wrong instrument on its own for a waived contract, and
+# a review demonstrated why. RH-D026 promises the waiver is withdrawn when
+# CreditEngine is next changed, but the floor only observes a byte count. The
+# reviewer changed a real production rule --
+#
+#     assert _discount <= HUNDRED_PERCENT   ->   assert _discount < HUNDRED_PERCENT
+#
+# which makes a 100% discount invalid, and the deployed runtime stayed at exactly
+# 24,392 bytes. The floor passed. The waived contract had changed behaviour and
+# the decision that waived it never reopened.
+#
+# So while a contract is below DEFAULT_MIN_HEADROOM it is pinned to the exact
+# artifact the owner waived, not merely to a size:
+#
+#   source_sha256   -- sha256 of the .vy source bytes. Compiler-independent, and
+#                      the check that catches the same-size semantic edit above.
+#   runtime_sha256  -- sha256 of the immutable-free runtime template
+#                      (`compiler_data.bytecode_runtime`). Catches a change in
+#                      what the compiler emits from unchanged source.
+#   deployed_runtime_bytes -- exact deployed size, immutables included. Pinned
+#                      rather than floored, so growth *and* shrinkage are visible.
+#
+# Any of the three moving fails this test, and the required response is a new
+# owner decision at the new figure -- not an edit to these constants. Refreshing
+# a hash to make this green is the exact move it exists to prevent.
+#
+# This binding is exceptional and self-retiring: it applies only while a contract
+# sits below the ratified floor. When CreditEngine returns to 200+ bytes of
+# headroom, its MIN_HEADROOM_OVERRIDES entry and this entry are both removed, and
+# it goes back to being governed by the floor like everything else.
+WAIVED_CONTRACT_IDENTITIES = {
+    "CreditEngine": {
+        "decision": "RH-D026",
+        "fixture": "credit_engine",
+        "source": "contracts/core/CreditEngine.vy",
+        "source_sha256": (
+            "d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43"
+        ),
+        "runtime_sha256": (
+            "e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943"
+        ),
+        "runtime_template_bytes": 24_296,
+        "deployed_runtime_bytes": 24_392,
+    },
 }
 
 # Teller's floor was reconciled by the owner on 2026-08-08, resolving RG-SIZE-01.
@@ -145,4 +202,75 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
             f"{MIN_HEADROOM_OVERRIDES.get(name, DEFAULT_MIN_HEADROOM)}"
             for name, margin in sorted(tight.items())
         )
+    )
+
+
+def test_every_below_floor_waiver_declares_an_exact_identity():
+    # The two tables cannot drift apart. Granting a new sub-floor override without
+    # pinning the artifact it waives would recreate exactly the gap RH-D026 had:
+    # a promise to reopen on the next change, enforced by a check that cannot see
+    # a change. Removing an override without removing its identity entry is the
+    # same mistake pointed the other way -- the contract is back above the floor
+    # and no longer needs the exceptional binding.
+    waived = {
+        name
+        for name, floor in MIN_HEADROOM_OVERRIDES.items()
+        if floor < DEFAULT_MIN_HEADROOM
+    }
+    assert waived == set(WAIVED_CONTRACT_IDENTITIES), (
+        "below-floor waivers and pinned identities disagree: "
+        f"waived={sorted(waived)}, pinned={sorted(WAIVED_CONTRACT_IDENTITIES)}"
+    )
+
+    for name, pinned in WAIVED_CONTRACT_IDENTITIES.items():
+        floor = MIN_HEADROOM_OVERRIDES[name]
+        assert EIP170_LIMIT - pinned["deployed_runtime_bytes"] == floor, (
+            f"{name}: pinned deployed size implies "
+            f"{EIP170_LIMIT - pinned['deployed_runtime_bytes']} bytes of headroom, "
+            f"but its recorded floor is {floor}"
+        )
+
+
+@pytest.mark.parametrize("name", sorted(WAIVED_CONTRACT_IDENTITIES))
+def test_waived_contract_is_exactly_the_artifact_the_owner_waived(name, request):
+    pinned = WAIVED_CONTRACT_IDENTITIES[name]
+    decision = pinned["decision"]
+    reopen = (
+        f"\n\n{name} is below the ratified {DEFAULT_MIN_HEADROOM}-byte floor under "
+        f"{decision}, which waives one exact artifact. This contract is no longer "
+        f"that artifact, so the waiver does not cover it. Withdraw {decision} and "
+        "record a new owner decision at the new figure. Do not refresh the "
+        "constants in this file to make this pass."
+    )
+
+    source_path = ROOT / pinned["source"]
+    source_sha = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    assert source_sha == pinned["source_sha256"], (
+        f"{pinned['source']} changed: sha256 is {source_sha}, "
+        f"{decision} waived {pinned['source_sha256']}." + reopen
+    )
+
+    # Immutable-free runtime template: identical for a given source and compiler,
+    # and independent of whatever constructor arguments a fixture happens to use.
+    runtime_template = boa.load_partial(
+        str(source_path)
+    ).compiler_data.bytecode_runtime
+    assert len(runtime_template) == pinned["runtime_template_bytes"], (
+        f"{name} runtime template is {len(runtime_template)} bytes, "
+        f"{decision} waived {pinned['runtime_template_bytes']}." + reopen
+    )
+    runtime_sha = hashlib.sha256(runtime_template).hexdigest()
+    assert runtime_sha == pinned["runtime_sha256"], (
+        f"{name} runtime template sha256 is {runtime_sha}, {decision} waived "
+        f"{pinned['runtime_sha256']}. The source is unchanged, so this is a "
+        "compiler-output change." + reopen
+    )
+
+    contract = request.getfixturevalue(pinned["fixture"])
+    deployed = len(contract.env.get_code(contract.address))
+    assert deployed == pinned["deployed_runtime_bytes"], (
+        f"{name} deploys {deployed} bytes, {decision} waived exactly "
+        f"{pinned['deployed_runtime_bytes']} "
+        f"({EIP170_LIMIT - deployed} bytes of headroom, not "
+        f"{EIP170_LIMIT - pinned['deployed_runtime_bytes']})." + reopen
     )

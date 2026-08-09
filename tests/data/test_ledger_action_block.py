@@ -431,6 +431,46 @@ L3A_EXPECTED_DIFF = {
 }
 
 
+def _l3a_diff_lines(baseline, candidate):
+    """The ordered added/removed lines between two sources, hunk headers dropped."""
+    import difflib
+
+    return tuple(
+        line
+        for line in difflib.unified_diff(
+            baseline.splitlines(), candidate.splitlines(), n=0, lineterm=""
+        )
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    )
+
+
+def assert_l3a_is_exactly_the_declared_edit(kind, candidate):
+    """The mutant-integrity check. Raises AssertionError if `candidate` is not
+    `Ledger.vy` plus exactly the edit declared in `L3A_EXPECTED_DIFF[kind]`.
+
+    This is deliberately one function with two callers. The positive tests below
+    assert it accepts each real mutant; the negative regression asserts it
+    rejects a tampered one. An earlier revision had the negative regression
+    recompute the diff and compare on its own, which meant it was testing a copy
+    of the logic rather than the logic. A review demonstrated the consequence:
+    loosening this comparison back to substring containment left every test
+    green, including the regression that claimed to detect exactly that.
+    Weakening the check now has to fail here, because there is only one check.
+    """
+    from pathlib import Path
+
+    baseline = Path(LEDGER_PATH).read_text()
+    assert candidate != baseline, f"{kind} candidate is identical to the baseline"
+
+    actual = _l3a_diff_lines(baseline, candidate)
+    expected = L3A_EXPECTED_DIFF[kind]
+    assert actual == expected, (
+        f"{kind} mutant is not exactly the declared edit.\n"
+        f"expected ({len(expected)} lines):\n  " + "\n  ".join(expected) + "\n"
+        f"actual ({len(actual)} lines):\n  " + "\n  ".join(actual)
+    )
+
+
 def _replace_once(source, old, new):
     assert source.count(old) == 1
     return source.replace(old, new)
@@ -586,28 +626,8 @@ def test_l3a_mutant_source_is_exactly_the_intended_edit(kind):
     # review defeated: it accepted a changed line that merely *contained* the
     # intended text, so an extra condition appended to the same line passed. Only
     # full-line equality, in order, closes that.
-    import difflib
-    from pathlib import Path
-
-    baseline = Path(LEDGER_PATH).read_text()
-    mutant = _l3a_mutant_source(kind)
-
     assert L3A_KILLING_TESTS[kind] in globals()
-    assert mutant != baseline
-
-    actual = tuple(
-        line
-        for line in difflib.unified_diff(
-            baseline.splitlines(), mutant.splitlines(), n=0, lineterm=""
-        )
-        if line[:1] in "+-" and not line.startswith(("---", "+++"))
-    )
-    expected = L3A_EXPECTED_DIFF[kind]
-    assert actual == expected, (
-        f"{kind} mutant is not exactly the declared edit.\n"
-        f"expected ({len(expected)} lines):\n  " + "\n  ".join(expected) + "\n"
-        f"actual ({len(actual)} lines):\n  " + "\n  ".join(actual)
-    )
+    assert_l3a_is_exactly_the_declared_edit(kind, _l3a_mutant_source(kind))
 
 
 def test_l3a_exact_diff_check_rejects_a_second_change_on_the_same_line():
@@ -619,9 +639,13 @@ def test_l3a_exact_diff_check_rejects_a_second_change_on_the_same_line():
     # valid action identities at or above 10_000 — a real, unrelated behaviour
     # change — while still "containing" the intended text.
     #
-    # This test pins the failure. If the comparison is ever loosened back to a
-    # containment match, this goes green and says so.
-    import difflib
+    # This test pins the failure by calling the *production* checker rather than
+    # recomputing the comparison. An earlier revision did recompute it, and a
+    # review showed that was worthless: the active check could be loosened all
+    # the way back to substring containment and this test still passed, while
+    # its docstring claimed it would catch exactly that. It now fails if
+    # assert_l3a_is_exactly_the_declared_edit stops rejecting this mutant, for
+    # any reason.
     from pathlib import Path
 
     baseline = Path(LEDGER_PATH).read_text()
@@ -631,21 +655,16 @@ def test_l3a_exact_diff_check_rejects_a_second_change_on_the_same_line():
         "assert self.lastTouch[_user] < actionBlock and actionBlock < 10_000",
     )
 
-    actual = tuple(
-        line
-        for line in difflib.unified_diff(
-            baseline.splitlines(), tampered.splitlines(), n=0, lineterm=""
-        )
-        if line[:1] in "+-" and not line.startswith(("---", "+++"))
-    )
-
     # It would pass a containment check: the intended text is a prefix of it.
-    intended_added = "+    assert self.lastTouch[_user] < actionBlock"
-    tampered_added = next(line for line in actual if line.startswith("+"))
-    assert intended_added[1:].strip() in tampered_added
+    intended_added = "assert self.lastTouch[_user] < actionBlock"
+    tampered_added = next(
+        line for line in _l3a_diff_lines(baseline, tampered) if line.startswith("+")
+    )
+    assert intended_added in tampered_added
 
-    # It must not pass the exact check.
-    assert actual != L3A_EXPECTED_DIFF["monotonic"]
+    # The checker the real mutant tests use must reject it.
+    with pytest.raises(AssertionError):
+        assert_l3a_is_exactly_the_declared_edit("monotonic", tampered)
 
 
 @pytest.mark.parametrize(

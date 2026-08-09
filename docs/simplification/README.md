@@ -31,7 +31,11 @@ from Git history at the baseline commit.
 
 **This branch is the owner-rebound implementation candidate.** It is open as
 [PR #77](https://github.com/Ripe-Foundation/ripe-protocol/pull/77) against `rh`,
-currently in **draft** pending completion of the post-merge validation matrix.
+and is still in **draft**. The post-merge validation matrix is complete and
+recorded in [`validation-evidence.md`](validation-evidence.md) section 14; an
+earlier revision of this line said the draft was pending that matrix, which
+stopped being true once section 14 landed. What the draft status now reflects is
+that marking the PR ready is an owner action, not a missing artifact.
 
 `implementation-plan.md` in this directory is the byte-exact copy of the plan
 that authorized this work (SHA-256
@@ -50,7 +54,24 @@ Train 3 no-change retention outcome this branch reached independently.
 
 For the commit series, exact per-commit tree sizes, and the commit each
 measurement is bound to, see [`validation-evidence.md`](validation-evidence.md).
-Commits on this branch are GPG-signed and verify as good.
+
+**Commit signatures, stated accurately.** An earlier revision of this line claimed
+"commits on this branch are GPG-signed and verify as good." A review checked the
+raw commit objects and refuted it. Measured over the 31 commits in
+`origin/rh..HEAD`:
+
+| | Count |
+| --- | ---: |
+| Carry a `gpgsig` header | 20 |
+| Carry no signature at all | 11 |
+| Report `G` (good) under local `git log --format=%G?` | 0 |
+
+The first branch commit, `56b6100`, is one of the unsigned ones, so the
+branch-wide assertion was false regardless of the later commits. The 20 signed
+commits report `E` rather than `G` locally — signature present, public key not in
+this keyring — so "verifies as good" is not something this checkout can assert
+either. Signature policy for this branch is an open question for the owner, not a
+claim this document should be making.
 
 ## Before / after
 
@@ -144,7 +165,7 @@ anticipated, and each is listed so a reviewer can read the whole surface:
 | Test file | Change | What still holds |
 | --- | --- | --- |
 | `test_manifest_schema.py` | Base-history corpus count assertion removed entirely (it had been `60` → `1`) | Both globs, the top-level-key assertion, the record-shape assertion, and the read-does-not-rewrite byte comparison are unchanged and run against whatever is committed. |
-| `test_vault_pointer_runtime_sizes.py` | Exact runtime-size dict equality replaced by EIP-170 ceiling plus a per-contract headroom floor | The ratified 200-byte floor now applies to every contract, with one recorded waiver (CreditEngine 184, RH-D026). Verified to reject the defects the old equality caught. |
+| `test_vault_pointer_runtime_sizes.py` | Exact runtime-size dict equality replaced by EIP-170 ceiling plus a per-contract headroom floor | The ratified 200-byte floor now applies to every contract, with one recorded waiver (CreditEngine 184, RH-D026). A contract below the floor is additionally pinned to the exact waived artifact — source sha256, immutable-free runtime-template sha256, and exact deployed size — because a review proved a floor alone passes a size-preserving semantic change. Verified to reject the defects the old equality caught, and to reject that mutation. |
 | `test_ledger_action_block.py` | Frozen mutant sha256 replaced by an exact ordered-diff comparison, plus a negative regression | A mutant must differ from `Ledger.vy` by exactly the declared edit; a second change, even on the same line, fails. |
 | `test_collection_contract.py` | `len(ledger) == 31` census removed | Sortedness, uniqueness, prefix, ceiling, and filesystem-match all remain. |
 | `test_bluechip_yield_prices_artifacts.py` | Block-clock integration assertion removed | Nothing replaces it; the coverage loss is recorded as RH-D025. |
@@ -161,13 +182,14 @@ Directory-scanning consumers were re-run rather than weakened:
 
 ## Mock-contract consumer inventory
 
-All 34 `contracts/mock/` files are retained; every one has at least one retained
-consumer. `scripts/export_abis.py` excludes `contracts/mock/` and
-`contracts/testing/`, so the 52-output ABI census is unaffected either way.
+All 34 `contracts/mock/` files are retained. **33 have at least one retained
+consumer; `MockSGreenPrice.vy` has none** — see the note below this table.
+`scripts/export_abis.py` excludes `contracts/mock/` and `contracts/testing/`, so
+the 52-output ABI census is unaffected either way.
 
 | Mock | Retained consumers (primary) |
 | --- | --- |
-| `MockSGreenPrice.vy` | `config/block-clock-inventory.json` |
+| `MockSGreenPrice.vy` | **None.** Orphan, pre-existing — see below |
 | `MockAuctionHouse.vy` | `tests/config/test_switchboard_charlie.py` |
 | `MockBadERC1271.vy`, `MockERC1271.vy` | `tests/tokens/test_signatures.py` |
 | `MockCurvePrices.vy`, `MockErc4626Vault.vy`, `MockErc4626VaultWithSafeGap.vy`, `MockUndyV2.vy`, `MockWhitelist.vy`, `MockRando.vy` | `tests/conf_mock.py` |
@@ -185,7 +207,32 @@ consumer. `scripts/export_abis.py` excludes `contracts/mock/` and
 | `MockErc20.vy` | `tests/conf_mock.py` and many behavior suites |
 | `MockStockTokenControls.vy` | `tests/vaults/test_stock_token_vault_comparison.py`, `tests/vaults/test_basic_vault_safety.py` |
 
-## Document disposition
+### `MockSGreenPrice.vy` is an orphan, and was one before this branch
+
+An earlier revision of the table above listed
+`config/block-clock-inventory.json` as this mock's consumer and concluded all 34
+were covered. An independent review caught it: that file is deleted by this
+branch, so the row named a consumer that no longer exists.
+
+The deeper problem is that it was never a consumer in the first place. Checking
+`rh` at `5a664cd` — before any of this branch's deletions —
+`git grep -l MockSGreenPrice` returns exactly one path, that same
+`config/block-clock-inventory.json`, which is a *census listing* of file paths,
+not code that deploys or imports the mock. No test, script, migration, or
+contract has ever referenced it. Removing the census did not orphan this mock; it
+removed the only thing that mentioned an orphan that already existed.
+
+The retained tree has been re-scanned across `contracts/`, `tests/`, `scripts/`,
+`config/`, and `migrations/`: `MockSGreenPrice.vy` has no consumer, and the other
+33 each have at least one.
+
+**Disposition: retained, and recorded as a follow-up rather than deleted.** This
+branch does not remove it, for two reasons. Deleting it is not needed to make
+anything here correct — the inventory claim was the defect, and that is now
+fixed. And whether an sGreen price mock is wanted for future work is a call for
+whoever owns that area, not a cleanup to fold into a branch whose deletion set
+has already been validated. It is 1 file of dead weight, carried knowingly.
+
 
 149 baseline documents − 26 removed + 3 added = **126 retained**. All 26 removed
 files are the dashboard application's own files; nothing else under `docs/` was

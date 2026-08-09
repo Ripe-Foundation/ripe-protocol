@@ -549,8 +549,23 @@ path can enter with nothing objecting.
 **Rationale.** The inventory enforced an exact repository file census —
 `EXPECTED_PRODUCTION_COUNTS = (102, 97, 18)`, with remediation text forbidding
 mechanical updates — which made every deletion require a semantic-owner
-ceremony. It could not detect a contract defect, and it was itself contributing
-176 errors. Its cost was paid on every change; its benefit was a listing.
+ceremony, and it was itself contributing 176 errors. The cost was paid on every
+change to the repository, whether or not that change went anywhere near a clock.
+
+An earlier revision of this rationale added that the inventory "could not detect
+a contract defect" and that "its benefit was a listing." A review judged that too
+categorical, and it was — it also contradicted this record's own scope paragraph
+above. Stated accurately: the inventory was a **static policy scanner**, and it
+did detect things. It flagged new `block.number`/`block.timestamp` occurrences,
+mixed-clock arithmetic, and Vyper paths missing from its classification. What it
+could not do is prove a clock-semantics defect in contract behaviour; it reported
+on the shape of the source, and a correct occurrence and an incorrect one look
+alike to it.
+
+So the trade being accepted is not "no benefit for a cost." It is: a real
+early-warning signal over clock-affecting source edits, given up because it was
+welded to a whole-repository file census that fired on every unrelated change.
+The reconsideration trigger below asks for the signal back without the census.
 
 **Residual risk, accepted.** A clock-semantics regression on Robinhood is the
 failure this guarded against, and it is now caught only by contract behaviour
@@ -579,6 +594,24 @@ that waiver.
 it as a per-contract override; every other contract in that set is held to the
 ratified 200, and `Teller` states 200 explicitly.
 
+**What exactly is waived.** One artifact, pinned by three identities, not a size
+band:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/CreditEngine.vy` sha256 | `d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43` |
+| Runtime template sha256 (immutable-free) | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` |
+| Runtime template bytes | 24,296 |
+| Deployed runtime bytes (with immutables) | 24,392 |
+
+An earlier revision of this decision recorded only the 184-byte floor, and an
+independent review defeated it. The reviewer changed a production rule —
+`assert _discount <= HUNDRED_PERCENT` to `assert _discount < HUNDRED_PERCENT`,
+which makes a 100% discount invalid — and the deployed runtime stayed at exactly
+24,392 bytes. The floor passed, so a semantic change to the waived contract could
+ship while this decision still claimed to cover it. The identities above close
+that: the source hash moves on any source edit, size-preserving or not.
+
 **Rationale.** The 184-byte position is inherited from `rh`. This branch changes
 no production Vyper, so it neither caused the shortfall nor can repair it. The
 alternative considered and rejected was lowering the default floor to 150 for
@@ -587,12 +620,29 @@ weakening a ratified rule — a synthetic StabilityPool at 176 bytes would have
 passed.
 
 **Residual risk, accepted.** CreditEngine has less margin than the ratified rule
-allows. A future change to it has 184 bytes to work in before the guard fails.
+allows. An earlier revision of this record said a future change "has 184 bytes to
+work in before the guard fails," which conflated two different quantities. Stated
+precisely:
+
+- **184 bytes** is the absolute EIP-170 headroom — the room a change could use
+  before the 24,576-byte limit itself is breached.
+- **0 bytes** is the growth this waiver permits. The deployed size is pinned at
+  exactly 24,392, so any change — larger, smaller, or size-preserving — fails the
+  guard and reopens this decision. That is the intent: the waiver covers one
+  artifact, not a range.
 
 **Reconsideration trigger.** Withdraw this waiver when CreditEngine is next
 changed on `rh`: either the change brings it back above 200, or it needs its own
-owner waiver at the new figure. Lowering the recorded 184 requires a new
-decision, not an edit to the test.
+owner waiver at the new figure. Lowering the recorded 184, or refreshing any
+pinned hash above, requires a new decision — not an edit to the test. Refreshing
+a constant to restore green is precisely the failure this record exists to
+prevent.
+
+**Self-retiring.** This exceptional binding applies only while CreditEngine sits
+below the ratified floor. Once it is back at 200+ bytes of headroom, its
+`MIN_HEADROOM_OVERRIDES` entry and its pinned identity are both removed, and it
+returns to being governed by the floor like every other contract. A test asserts
+the two tables cannot drift apart in either direction.
 
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
