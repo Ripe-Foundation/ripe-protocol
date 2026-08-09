@@ -809,16 +809,23 @@ the binding evidence, and it binds the exact tree below.**
 ```text
 baseline commit = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
 baseline tree   = c8208d58c53f352e492286a59f4b3350b79465e1
-candidate commit= de6566859c3455c8e0e017232f0d7546892b8833
-candidate tree  = 6cbb90477685ec226ed406404fbe1f559d6fedd4
+candidate commit= f0b6741813784a71e484e25efa8e9726d237557b
+candidate tree  = de825afab475b673d6502c24e03848e9de16df61
 ```
+
+This is the **second** binding of this section. The first bound `de65668` and was
+invalidated exactly as the standing invariant below requires: a further review
+found three assurance gaps, and the commit fixing them (`f0b6741`) touches
+`tests/`, which is outside `docs/simplification/`. All four lanes were re-run
+from scratch against the new pair rather than carried forward.
 
 Both lanes ran under the locked `rh-wave2-py312` interpreter (Python 3.12.0,
 Vyper 0.4.3, titanoboa 0.2.7) with private `RIPE_BOA_CACHE_DIR`, `XDG_CACHE_HOME`,
 `TMPDIR`, `HYPOTHESIS_STORAGE_DIRECTORY`, and `PYTHONPYCACHEPREFIX`, and with
-every RPC, key, and cloud variable unset. The candidate lanes ran in the branch
-worktree; the baseline comprehensive lane ran in a detached `git worktree` at
-`5a664cd`.
+every RPC, key, and cloud variable unset, each lane in its own set of those
+directories so no two runs shared a compiler or Hypothesis cache. The candidate
+lanes ran in the branch worktree; **both** baseline lanes ran in a detached
+`git worktree` at `5a664cd`, verified clean at tree `c8208d58`.
 
 **On the gap between the validated commit and the branch tip.** A previous
 revision of this section named a candidate commit and then wrote "+ post-review
@@ -841,28 +848,82 @@ regenerated before merge.
 
 ### Results
 
-| Lane | Baseline `5a664cd` | Candidate |
+All four lanes below were measured in this pass. Counts are pytest's own summary
+line, cross-checked against the archived JUnit XML.
+
+| Lane | Baseline `5a664cd` | Candidate `f0b6741` |
 | --- | --- | --- |
-| Lean | 18 failed, 3,387 passed, 25 errors, 24 xfailed | 13 failed, 3,395 passed, 25 errors, 24 xfailed |
-| Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 skipped | 42 failed, 4,330 passed, 33 errors, 24 skipped |
+| Lean | 18 failed, 3,389 passed, 25 errors, 24 xfailed | 13 failed, 3,405 passed, 25 errors, 24 xfailed |
+| Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 xfailed | 42 failed, 4,332 passed, 33 errors, 24 xfailed |
+
+**On "xfailed" versus "skipped".** An earlier revision of this table wrote
+`24 skipped` on the comprehensive row and `24 xfailed` on the lean row, for the
+same 24 tests. They are xfails. The inconsistency came from reading the JUnit
+XML, which has no xfail element and records them as `<skipped type="pytest.xfail">`.
+Both rows now say what pytest's summary says.
+
+**On the previous baseline lean figure.** The earlier revision recorded 3,387
+passed on the baseline lean lane. It is **3,389**, as measured here and as an
+independent reviewer measured separately. That row was the one lane of the four
+with no archived XML behind it, which is how it went unnoticed; all four are
+archived now.
 
 Compared per test node from the JUnit XML (`classname::name` plus status):
-**0 new red, 0 regressions.** Nothing that passes on `rh` is red here.
+**0 new red, 0 regressions, on both lanes.** Nothing that passes on `rh` is red
+here.
 
-Node deltas on the comprehensive lane: 339 baseline-only identities, all from the
-deleted block-clock and probe suites plus the four renamed mutant IDs; **13
-candidate-only identities**, all newly added guards — the four exact-diff mutant
-checks, the same-line negative regression, and the eight manifest-consumer tests.
+Node deltas, lean lane: 4 baseline-only identities, all failing — the retired
+mutant-hash IDs. **15 candidate-only identities, all passing.** One retained node
+moves failing → passing (`test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit`,
+which asserted the stale size dict).
+
+Node deltas, comprehensive lane: 339 baseline-only identities (256 passing, 83
+failing), from the deleted block-clock and probe suites plus the retired mutant
+IDs; **15 candidate-only identities, all passing**. Two retained nodes move
+failing → passing — the one above, plus
+`test_every_committed_base_json_parses_without_rewrite`.
+
+The 15 candidate-only identities are the same set on both lanes: the four
+exact-diff mutant checks, the same-line negative regression, the eight
+manifest-consumer tests, and the two waiver-identity tests added for RH-D026.
+
+**Why the candidate counts moved since the previous binding** (lean 3,395 → 3,405;
+comprehensive 4,330 → 4,332), with no test deleted and none newly failing:
+
+| Change | Lean | Comprehensive |
+| --- | ---: | ---: |
+| Previous binding | 3,395 | 4,330 |
+| RH-D026 waiver-identity tests, new | +2 | +2 |
+| Manifest-consumer tests moved out of `tests/deployment` | +8 | 0 |
+| This binding | **3,405** | **4,332** |
+
+The manifest tests are +8 on the lean lane and 0 on the comprehensive lane
+because comprehensive already collected them at their old path; only the lean
+lane, which passes `--ignore=tests/deployment`, could not see them. That is the
+defect their move fixed: the automatic pull request lane runs lean, so those
+eight guards had never executed in CI.
 
 ### Evidence files
 
-Archived to `~/dev/ripe-protocol-review-archives/rh-machete-chop/final-binding/`:
+Archived to `~/dev/ripe-protocol-review-archives/rh-machete-chop/final-binding-v2/`,
+alongside the pytest console log of each run:
 
 ```text
-c99d71f29a6190e8c4ad10a5c47c7e070c289d80c06b70ec3fbc5470b1fd849c  fl.xml   (candidate lean)
-10132fd1556a232948e6d915201537212c6ede4c16d513c1961be90687dd23be  fc.xml   (candidate comprehensive)
-706a0f40a507098e5dab5947ea0365242c0718428fc348d2d11ea601502e6f0e  zbc.xml  (baseline comprehensive)
+5b0b4114d289b222a603a218d06ddffe5ff61c2d3d39d2d1f941c1043264b9a6  bl.xml  (baseline  lean)
+3c9c2e7fe43b3565474bee71490246e4cd78dfcf655d9b1bffe7af0b0b1d0dee  cl.xml  (candidate lean)
+95c39b0843286fe820c2ae8f684601c4f6cb5fd0165867592442be45d110dd4d  bc.xml  (baseline  comprehensive)
+987147fb238031fa449f036a3a4a6a81320c8b638279a11133dc6c03b52f3841  cc.xml  (candidate comprehensive)
 ```
+
+**All four cells of the matrix are archived.** The previous binding claimed both
+lanes on both sides but archived only three XMLs — candidate lean, candidate
+comprehensive, and baseline comprehensive. The missing baseline lean run was
+precisely the row whose figure was wrong. A review caught both facts together,
+which is the expected relationship between them: an unarchived number is an
+unchecked number.
+
+The superseded three-file archive remains at `final-binding/` for comparison; it
+binds `de65668` and no longer describes this branch.
 
 ### Object-store dependency, disclosed
 
@@ -878,13 +939,31 @@ expect two extra inherited failures per side.
 ### Tree size
 
 Measured as tracked files, and lines over text blobs counting a final line with
-no trailing newline:
+no trailing newline. **Measured at the candidate commit named above, `f0b6741`:**
 
 | | Files | Lines |
 | --- | ---: | ---: |
 | `rh` `5a664cd` | 742 | 3,551,908 |
-| Candidate | 577 | 555,978 |
-| **Reduction** | **165** | **2,995,930 (−84.3%)** |
+| Candidate `f0b6741` | 577 | 556,403 |
+| **Reduction** | **165** | **2,995,505 (−84.3%)** |
+
+**Why this figure is bound to a commit rather than to "the branch tip."** A
+review found the previous revision recording 555,978 lines while the tip measured
+556,040. Both numbers were correctly measured; they were measured at different
+commits. The recorded figure was the code tree, and the tip included the
+documentation commit that recorded it.
+
+That gap is not a mistake to be corrected once — it is structural. A document
+that states the size of the tree containing it changes that size by being
+written. Any revision of this section makes the tip's line count differ from the
+number printed in this table, by exactly the size of that revision.
+
+So this table states the commit it measures, and that commit is the last one
+touching code. The commit adding this section is a documentation-only descendant
+of it and is larger by its own size. What is stable, and what the claim actually
+rests on, is the reduction: **165 files and ~2.996M lines, −84.3%**, a figure no
+documentation edit can move at this precision. Anyone reproducing the exact line
+count should check out `f0b6741`, not the branch tip.
 
 ### What the failure reduction is, stated accurately
 
@@ -912,7 +991,13 @@ Nothing replaces it. Recorded as **RH-D025** in the decision register, with scop
 rationale, residual risk, and reconsideration trigger; mirrored in `status.yaml`.
 
 `CreditEngine`'s 184-byte EIP-170 headroom, below the ratified 200, is recorded
-as **RH-D026** — an exact owner waiver rather than a weakening of the rule.
+as **RH-D026** — an exact owner waiver rather than a weakening of the rule. The
+waiver is bound to one artifact, not to a size band: source sha256, immutable-free
+runtime-template sha256, and an exact 24,392-byte deployed size. A review showed
+why a size floor was not enough — changing `assert _discount <= HUNDRED_PERCENT`
+to `<`, which makes a 100% discount invalid, leaves the runtime at exactly 24,392
+bytes and passed the floor. Re-applying that mutation against the current tree
+fails the identity test and names RH-D026 as the decision to withdraw.
 
 ### Standing invariant
 
