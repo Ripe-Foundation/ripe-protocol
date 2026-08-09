@@ -193,6 +193,7 @@ MAX_CLAIM_USERS: constant(uint256) = 25
 
 # Base legacy Ripe Gov vault (deployed, cannot be changed). Only ever a migration SOURCE.
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
+LEGACY_RIPE_GOV_CHAIN_ID: constant(uint256) = 8453
 MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
@@ -444,6 +445,24 @@ def _getDepositLootData(
     rewardsBudget: uint256 = staticcall Ledger(_a.ledger).ripeAvailForRewards()
     rewardsBudget -= min(globalRewards.newRipeRewards, rewardsBudget)
     rewardsCanFlow: bool = config.ripePerBlock != 0 and rewardsBudget != 0
+    stakerCanReceiveRewards: bool = rewardsCanFlow and config.stakersAlloc != 0
+    voterCanReceiveRewards: bool = rewardsCanFlow and config.votersAlloc != 0
+    genCanReceiveRewards: bool = rewardsCanFlow and config.genDepositorsAlloc != 0
+
+    # A category is terminal when its empty bucket cannot refill, or when the user has exited and
+    # its funded bucket rounded below one wei. Funded dust for a live position remains deferred.
+    resolveStakerTerminal: bool = (
+        (globalRewards.stakers == 0 and not stakerCanReceiveRewards) or
+        (globalRewards.stakers != 0 and not hasBalance)
+    )
+    resolveVoterTerminal: bool = (
+        (globalRewards.voters == 0 and not voterCanReceiveRewards) or
+        (globalRewards.voters != 0 and not hasBalance)
+    )
+    resolveGenTerminal: bool = (
+        (globalRewards.genDepositors == 0 and not genCanReceiveRewards) or
+        (globalRewards.genDepositors != 0 and not hasBalance)
+    )
 
     # Calculate each category into LOCALS. Nothing is committed until we know the whole claim can
     # be settled: `up.balancePoints` is a single ticket backing all three reward pools, so a
@@ -456,34 +475,36 @@ def _getDepositLootData(
     gpStaker: uint256 = 0
     rewStaker: uint256 = 0
     lootStaker: uint256 = 0
-    apStaker, gpStaker, rewStaker, lootStaker = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, not hasBalance and (globalRewards.stakers != 0 or not (rewardsCanFlow and config.stakersAlloc != 0)))
+    apStaker, gpStaker, rewStaker, lootStaker = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, resolveStakerTerminal, True)
 
     apVote: uint256 = 0
     gpVote: uint256 = 0
     rewVote: uint256 = 0
     lootVote: uint256 = 0
-    apVote, gpVote, rewVote, lootVote = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, not hasBalance and (globalRewards.voters != 0 or not (rewardsCanFlow and config.votersAlloc != 0)))
+    apVote, gpVote, rewVote, lootVote = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, resolveVoterTerminal, True)
 
     apGen: uint256 = 0
     gpGen: uint256 = 0
     rewGen: uint256 = 0
     lootGen: uint256 = 0
-    apGen, gpGen, rewGen, lootGen = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, not hasBalance and (globalRewards.genDepositors != 0 or not (rewardsCanFlow and config.genDepositorsAlloc != 0)))
+    apGen, gpGen, rewGen, lootGen = self._calcSpecificLoot(up.balancePoints, ap.balancePoints, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, resolveGenTerminal, True)
 
-    # Any attributable zero-paying category blocks the shared ticket while the user still has a
-    # balance or the empty category can refill. Exited terminal categories were resolved above.
+    # Any attributable zero-paying category blocks the shared ticket until it becomes terminal.
     isBlocked: bool = (
-        self._isCategoryBlocked(ap.ripeStakerPoints, gp.ripeStakerPoints, lootStaker, hasBalance, rewardsCanFlow and config.stakersAlloc != 0) or
-        self._isCategoryBlocked(ap.ripeVotePoints, gp.ripeVotePoints, lootVote, hasBalance, rewardsCanFlow and config.votersAlloc != 0) or
-        self._isCategoryBlocked(ap.ripeGenPoints, gp.ripeGenPoints, lootGen, hasBalance, rewardsCanFlow and config.genDepositorsAlloc != 0)
+        self._isCategoryBlocked(ap.ripeStakerPoints, gp.ripeStakerPoints, lootStaker, resolveStakerTerminal) or
+        self._isCategoryBlocked(ap.ripeVotePoints, gp.ripeVotePoints, lootVote, resolveVoterTerminal) or
+        self._isCategoryBlocked(ap.ripeGenPoints, gp.ripeGenPoints, lootGen, resolveGenTerminal)
     )
 
-    didReceiveLoot: bool = (lootStaker != 0 or lootVote != 0 or lootGen != 0)
+    hasCategoryEntitlement: bool = (
+        (ap.ripeStakerPoints != 0 and gp.ripeStakerPoints != 0) or
+        (ap.ripeVotePoints != 0 and gp.ripeVotePoints != 0) or
+        (ap.ripeGenPoints != 0 and gp.ripeGenPoints != 0)
+    )
 
-    # A live position never discards a zero-paying ticket. An exited position may finish only when
-    # every category either paid (including the one-wei terminal minimum), has no entitlement, or
-    # is both empty and unable to receive more rewards.
-    if isBlocked or (hasBalance and not didReceiveLoot):
+    # A live position with no category entitlement keeps its ticket. Otherwise every category must
+    # either pay or resolve terminally before the shared ticket can be consumed.
+    if isBlocked or (hasBalance and not hasCategoryEntitlement):
         return empty(UserDepositLoot), up, ap, gp, globalRewards
 
     # every attributable category paid -- commit all three atomically and consume the ticket
@@ -513,10 +534,9 @@ def _isCategoryBlocked(
     _assetPoints: uint256,
     _globalPoints: uint256,
     _paid: uint256,
-    _hasBalance: bool,
-    _canReceiveRewards: bool,
+    _resolveTerminalDust: bool,
 ) -> bool:
-    return _paid == 0 and _assetPoints != 0 and _globalPoints != 0 and (_hasBalance or _canReceiveRewards)
+    return _paid == 0 and _assetPoints != 0 and _globalPoints != 0 and not _resolveTerminalDust
 
 
 # helper / views
@@ -566,7 +586,7 @@ def calcSpecificLoot(
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
 ) -> (uint256, uint256, uint256, uint256):
-    return self._calcSpecificLoot(_userShareOfAsset, HUNDRED_PERCENT, _assetPoints, _globalPoints, _rewardsAvailable, False)
+    return self._calcSpecificLoot(_userShareOfAsset, HUNDRED_PERCENT, _assetPoints, _globalPoints, _rewardsAvailable, False, False)
 
 
 @view
@@ -578,6 +598,7 @@ def _calcSpecificLoot(
     _globalPoints: uint256,
     _rewardsAvailable: uint256,
     _resolveTerminalDust: bool,
+    _ensurePointProgress: bool,
   ) -> (uint256, uint256, uint256, uint256):
 
     # early returns for edge cases
@@ -601,7 +622,7 @@ def _calcSpecificLoot(
     # calc points to reduce -- same ratio, same precision as the payout above
     userAssetPoints: uint256 = assetPoints * _userPoints // _totalPoints
     pointsToReduce: uint256 = userAssetPoints
-    if pointsToReduce == 0:
+    if pointsToReduce == 0 and _ensurePointProgress:
         pointsToReduce = 1
     pointsToReduce = min(pointsToReduce, assetPoints)
     pointsToReduce = min(pointsToReduce, _globalPoints)
@@ -883,11 +904,10 @@ def _getLatestDepositPoints(
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
     # skip the precision divisor for BOTH Ripe Gov vaults. `_coreRipeGovVaultId` covers the active
-    # one; the Base legacy source stays exempt too, because its positions remain enumerable and
-    # claimable until they are settled and deregistered during the wind-down. Dropping the legacy
-    # exemption would divide its governance loot share by `assetPoints.precision` (1e9 for an
-    # 18-decimal asset) for the whole migration window.
-    if userLootShare != 0 and _vaultId != _coreRipeGovVaultId and _vaultId != LEGACY_RIPE_GOV_VAULT_ID:
+    # one; Base's legacy source stays exempt too, because its positions remain enumerable and
+    # claimable until settled. Chain-binding keeps id 2 from becoming a protocol-wide exemption.
+    isLegacyBaseRipeGov: bool = chain.id == LEGACY_RIPE_GOV_CHAIN_ID and _vaultId == LEGACY_RIPE_GOV_VAULT_ID
+    if userLootShare != 0 and _vaultId != _coreRipeGovVaultId and not isLegacyBaseRipeGov:
         userLootShare = userLootShare // assetPoints.precision
 
     # update `lastBalance`

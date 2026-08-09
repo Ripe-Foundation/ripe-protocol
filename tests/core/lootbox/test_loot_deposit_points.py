@@ -1837,7 +1837,7 @@ def test_calc_specific_loot_boundary_values(lootbox):
     ap, gp, ra, ur = lootbox.calcSpecificLoot(100_00, 1, 1, 1)
     assert ur == 1  # 100% of 1
     assert (ap, gp, ra) == (0, 0, 0)
-    
+
     # Test with maximum percentage
     ap, gp, ra, ur = lootbox.calcSpecificLoot(
         100_00,  # 100%
@@ -1847,6 +1847,23 @@ def test_calc_specific_loot_boundary_values(lootbox):
     )
     assert ur == 1000
     assert (ap, gp, ra) == (0, 0, 0)
+
+
+def test_calc_specific_loot_preserves_legacy_zero_point_reduction(lootbox):
+    # A positive public-view payout historically left points unchanged when the basis-point share
+    # was too small to reduce even one point. Internal claims use a separate progress guard.
+    assert lootbox.calcSpecificLoot(1, 9_999, 9_999, 10_000) == (
+        9_999,
+        9_999,
+        9_999,
+        1,
+    )
+    assert lootbox.calcSpecificLoot(1, 100, 100, EIGHTEEN_DECIMALS) == (
+        100,
+        100,
+        EIGHTEEN_DECIMALS - 100_000_000_000_000,
+        100_000_000_000_000,
+    )
 
 
 # reset deposit points

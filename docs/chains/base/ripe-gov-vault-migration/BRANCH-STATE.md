@@ -1,12 +1,12 @@
 # Vault Migrator / Base Legacy RipeGov Migration — Branch State & Handoff
 
 **Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
-**Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Base:** `rh` @ `9354d05`
-**Status (2026-08-08):** VaultMigrator architecture implemented, committed and pushed to the draft
+**Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Merged base:** `rh` @ `5a664cd`
+**Status (2026-08-09):** VaultMigrator architecture implemented, committed and pushed to the draft
 PR. Post-migration cleanup now uses the ordinary Lootbox claim path, the eager settlement route has
 been removed, terminal reward dust can no longer brick an exited position, and every measured runtime
-fits EIP-170. Two owner decisions remain open; this remains a WIP and is not deployable or
-fork-qualified.
+fits EIP-170. The RipeGov pause policy and SimpleErc20 metadata rebind are owner-approved and recorded
+below; this remains a WIP and is not deployable or fork-qualified.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
@@ -35,7 +35,9 @@ all orchestration, validation, lifecycle state, batching, reconciliation and mig
 The hot `Addys` struct was deliberately not widened. Teller authenticates VaultMigrator through the
 canonical Addys getter, which is rooted in Teller's immutable RipeHQ address. Lootbox has no
 migration-only authorization surface; its existing claim path resolves shared dependencies through
-its own immutable-RipeHQ Addys binding.
+its own immutable-RipeHQ Addys binding. `_getVaultMigratorId` and the CCIP id constants are canonical
+registry documentation/accessors; current in-repo code does not call them and dead-code elimination
+keeps them out of deployed consumers.
 
 ### Authority and execution boundary
 
@@ -54,6 +56,9 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
   Ledger registration, ordinary vault withdrawal, and ordinary vault deposit plus housekeeping.
 - Source and destination are separate Teller calls so VaultMigrator proves exact receipt and source
   depletion *before* authorizing import/deposit. The whole sequence remains one atomic transaction.
+- VaultMigrator resolves and validates both registered endpoints before calling Teller. Teller does
+  not repeat destination validation: this is the deliberate thin identity boundary, and avoids
+  spending Teller's limited bytecode headroom on duplicate migration policy.
 - Each migration checkpoints deposit points for the source and target asset. It deliberately leaves
   the depleted source asset registered and the source vault in Ledger.
 - After the migration window is closed and the freeze is lifted, the user's ordinary Teller/Lootbox
@@ -64,20 +69,22 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
 ### Permanent Lootbox terminal-dust policy
 
 Deposit loot remains atomic across staker, voter and general-depositor categories because all three
-share one user balance-point ticket. Ordinary positive proportional payouts are unchanged. When a
-specific category rounds to zero:
+share one user balance-point ticket. Ordinary positive proportional payouts are unchanged. Each
+category independently follows this matrix when its payout rounds to zero:
 
-- a user who still has a vault balance defers without mutation;
+- a funded category defers while the user still has a vault balance;
 - an exited user with a funded category receives the minimum representable payout, exactly 1 wei of
   RIPE, and consumes the associated residual points;
-- an exited user with an empty category defers only while that category can currently refill
-  (`ripePerBlock`, its allocation and the remaining Ledger reward budget are all nonzero); and
-- an exited user with an empty, inactive category consumes the terminal points at zero.
+- an empty category defers, for live and exited users alike, only while that category can currently
+  refill (`ripePerBlock`, its allocation and the remaining Ledger reward budget are all nonzero); and
+- an empty category that cannot refill consumes its terminal points at zero, even for a live user,
+  so it cannot block a funded category.
 
 The minimum is available only after exit, so a live position cannot repeatedly harvest 1 wei. A
 category that must defer blocks the whole shared ticket; otherwise all resolved categories commit
 together and the ordinary multi-asset cleanup runs. The public `calcSpecificLoot` ABI and its legacy
-basis-point behavior remain unchanged.
+basis-point behavior remain unchanged; exact-output regressions separate that compatibility surface
+from the internal claim path's point-progress guard.
 
 ### Base legacy binding and freeze
 
@@ -92,6 +99,11 @@ the exact deployed legacy vault and chain id 8453. Opening or using the legacy r
 and proves VaultBook id 2 resolves to the immutable vault. The generic RipeGov route also rejects that
 immutable source, forcing it through the legacy-only checks. This intentionally prevents the Base-only
 route from becoming usable on another chain, against a replacement source or through the wrong path.
+
+Lootbox's temporary id-2 precision exception is now also restricted to chain id 8453. The exact
+immutable-vault binding remains in VaultMigrator rather than becoming a new Lootbox runtime
+dependency: making ordinary claims depend on VaultMigrator availability would risk bricking claims
+before registry activation or after the legacy component is removed.
 
 The legacy route preserves the asymmetric endpoint rule (legacy source unpaused, target paused), the
 full Teller/AuctionHouse/CreditEngine/HumanResources/Deleverage freeze, one open asset window at a
@@ -112,13 +124,18 @@ Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these
 | Teller | 23,485 | 1,091 |
 | TellerUtils | 8,976 | 15,600 |
 | SwitchboardEcho | 23,321 | 1,255 |
-| Lootbox | 23,010 | **1,566** |
+| Lootbox | 23,131 | **1,445** |
 | Ledger | 13,392 | 11,184 |
 
 AuctionHouse remains 24,556 bytes (20 free) and Deleverage remains 24,569 bytes (7 free). Adding the
 new Addys id/getters changes their transitive compiler-input identity but dead-code elimination leaves
-their runtime unchanged. The exact-size regression pins Lootbox at 23,010 bytes and its independent
-20-byte minimum-margin floor remains in force.
+their runtime unchanged. Current `rh` deploys Lootbox at 22,123 bytes, so this candidate adds 1,008
+bytes. The exact-size regression pins it at 23,131 bytes and its independent 20-byte minimum-margin
+floor remains in force.
+
+The independent review measured a two-asset claim at 408,507 gas versus 403,496 on `rh`: +5,011
+(about 1.2%, or roughly 2.5k per asset). The increase comes from the balance/reward-flow reads needed
+for terminal-category liveness and is recorded here rather than treated as free.
 
 ### Local verification completed
 
@@ -129,13 +146,31 @@ their runtime unchanged. The exact-size regression pins Lootbox at 23,010 bytes 
   the legacy freeze is lifted;
 - focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
 - `tests/core/teller/`: 272 passed, 3 xfailed;
-- `tests/core/lootbox/`: 196 passed, including the four terminal-dust liveness cases above;
+- `tests/core/lootbox/`: 199 passed, including terminal-dust, structurally-unfunded live-category,
+  atomic-refill and public calculator compatibility regressions;
+- `tests/vaults/test_ripe_gov_controls_and_migration.py`: 145 passed, 10 xfailed after the approved
+  pause semantics replaced the five stale failure/strict-XPASS expectations;
+- the exact three pause-characterization nodes, two former strict-XPASS nodes and frozen
+  SimpleErc20 binding checkpoint: 6 passed;
 - `tests/inventory/test_contract_artifacts.py`: 45 passed;
 - exact deployed-size regression: passed;
 - RipeHQ id-25 checkpoint (migration, legacy, artifacts, sizes and Robinhood registry topology):
   91 passed, 4 intentionally deselected;
 - deterministic ABIs and compiler-backed artifact expectations include VaultMigrator and the changed
   Teller/TellerUtils/Echo/Lootbox/Ledger interfaces.
+
+The exact consolidated command below produced `301 passed, 4 deselected` on the merged candidate;
+the aggregate is reproducible and is not a substitute for the separately recorded pause and frozen-
+artifact policy evidence:
+
+```bash
+python -m pytest -q tests/core/lootbox \
+  tests/vaults/test_vault_migration.py \
+  tests/vaults/test_vault_migrator_legacy.py \
+  tests/test_vault_pointer_runtime_sizes.py \
+  tests/deployment_profiles/test_lootbox_deployment_profiles.py \
+  tests/inventory/test_contract_artifacts.py
+```
 
 ### Independent-review remediation and open decisions
 
@@ -146,17 +181,32 @@ real mint-authorized Lootbox. That privileged eager-settlement API has now been 
 Migration only checkpoints points; the existing ordinary claim path owns reward settlement and
 multi-asset-safe cleanup. ABI regressions assert that the removed entry point cannot reappear.
 
-The same review identified two separate branch decisions that remain open and are not silently resolved
-by this remediation:
+A second independent review found that the first terminal-dust implementation let any zero-paying
+category block whenever the user still had a balance, even if that category had zero reward
+allocation and could never pay. That could freeze funded categories behind residual voter/general
+points. The corrected matrix above resolves structurally inactive categories at zero, preserves
+funded live dust for later, and keeps active empty categories atomic until they refill. The same
+review also caught a public-calculator compatibility regression; the external legacy behavior is now
+separated from the internal point-progress rule and pinned by exact-output tests.
 
-1. Three previously committed RipeGov pause gates produce five failures in the existing pause-policy
-   tests. The gates protect imported lock terms during migration, but the tests record that policy as
-   pending an owner decision. Keep/remove/scope the gates and update their test authority explicitly.
+Only the legacy batch has a user-only transient dedupe because every row shares one asset and a
+repeated user is necessarily invalid. Ordinary RipeGov/vault batches may legitimately include the
+same user for different assets or endpoints, so they do not use that user-only map; an invalid exact
+repeat still reverts the atomic, governance-supervised batch through normal source depletion/replay
+checks. Adding tuple-level dedupe is not justified by the current 25-row bound.
+
+The same review identified two separate branch decisions. The owner resolved both explicitly on
+2026-08-09:
+
+1. **RipeGov pause gates approved.** `updateUserGovPoints`, `adjustLock` and `releaseLock` remain
+   blocked while RipeGov is paused. This prevents an imported position's preserved terms or balance
+   from being rewritten during the migration window. The pause matrix and DV-06 hardening checks now
+   record the approved semantics instead of the superseded Robinhood characterization.
 2. Adding the canonical VaultMigrator getter to Addys changes compiler metadata for the frozen Robinhood
    `SimpleErc20` artifact while leaving its executable prefix and runtime unchanged. The current artifact
-   inventory is internally consistent, but the separately frozen `ROBINHOOD_STOCK_ARTIFACT_BINDING`
-   still pins the earlier full creation hash, so its exact deployment test fails. Rebinding that frozen
-   artifact requires separate owner authority; do not change it as incidental Base cleanup.
+   inventory is internally consistent. The owner approved rebinding the full creation hash from
+   `cafe6aa7...` to `6df95ffc...`; the source Git blob, source SHA-256, runtime-template hash, ABI,
+   selectors and layouts remain unchanged. Both frozen-binding records now pin the reviewed artifact.
 
 ### Remaining work before deployment
 
@@ -171,7 +221,7 @@ by this remediation:
    the replaced MissionControl is required.
 5. Production deployment/replacement sequencing and address evidence. The published WIP branch does
    not imply deployment, registry update or activation authority.
-6. Lootbox is now pinned at 23,010 bytes after the approved terminal-dust liveness work. Re-measure
+6. Lootbox is now pinned at 23,131 bytes after the terminal-dust review remediation. Re-measure
    every future Lootbox change and preserve the independent 20-byte minimum-margin floor.
 
 ### Eventual removal boundary
@@ -450,8 +500,10 @@ the owner explicitly reopens it.
 
 **Behaviour changes to be aware of:** payouts shift **upward** for small holders and
 `ripeAvailForRewards` draws down marginally faster — a distribution change, not purely a bug fix.
-Claims now **defer** rather than partially pay and forfeit; a dust-level bucket can stall a claim
-until it refills (self-clearing; a zero-allocation category never blocks).
+Claims now **defer** rather than partially pay and forfeit; a funded dust-level bucket can stall a
+live claim until it becomes payable. An empty category blocks only while it has nonzero allocation,
+active emissions and remaining reward budget; a structurally inactive category resolves at zero and
+cannot freeze another funded category.
 
 `tests/core/lootbox/test_loot_deposit_points.py` exercises this math directly. **Any expectation that
 moves must be justified as the intended new behaviour, not fitted to make red go green.**

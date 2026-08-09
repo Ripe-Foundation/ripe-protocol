@@ -106,8 +106,10 @@ def _seed_exact_dust_ticket(
     asset,
     staker_rewards=0,
     voter_rewards=0,
+    gen_rewards=0,
     staker_points=0,
     voter_points=0,
+    gen_points=0,
 ):
     block_number = boa.env.evm.patch.block_number
     ledger.setDepositPointsAndRipeRewards(
@@ -121,7 +123,7 @@ def _seed_exact_dust_ticket(
             0,
             staker_points,
             voter_points,
-            0,
+            gen_points,
             block_number,
             1,
         ),
@@ -129,10 +131,10 @@ def _seed_exact_dust_ticket(
             0,
             100 if staker_points else 0,
             100 if voter_points else 0,
-            0,
+            100 if gen_points else 0,
             block_number,
         ),
-        (0, staker_rewards, voter_rewards, 0, 0, block_number),
+        (0, staker_rewards, voter_rewards, gen_rewards, 0, block_number),
         sender=lootbox.address,
     )
 
@@ -249,6 +251,122 @@ def test_live_funded_dust_defers_without_repeated_one_wei_minimum(
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
     assert ledger.getRipeRewardsBundle().ripeRewards.stakers == 1
     assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+
+
+def test_live_inactive_categories_do_not_block_funded_category(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=1, _voterPointsAlloc=1)
+    setRipeRewardsConfig(
+        _arePointsEnabled=False,
+        _ripePerBlock=0,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+    )
+    vault_id = _create_dust_ticket_position(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        teller,
+        False,
+    )
+    _seed_exact_dust_ticket(
+        ledger,
+        lootbox,
+        bob,
+        vault_id,
+        alpha_token,
+        staker_rewards=10_000,
+        staker_points=1,
+        voter_points=1,
+        gen_points=1,
+    )
+
+    assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == 1
+    assert teller.claimLoot(bob, False, sender=bob) == 1
+    assert ripe_token.balanceOf(bob) == 1
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeVotePoints == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeGenPoints == 0
+    assert simple_erc20_vault.doesUserHaveBalance(bob, alpha_token)
+    assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert ledger.isParticipatingInVault(bob, vault_id)
+
+
+def test_live_active_empty_category_blocks_funded_category_atomically(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=1, _voterPointsAlloc=1)
+    setRipeRewardsConfig(
+        _arePointsEnabled=False,
+        _ripePerBlock=1,
+        _borrowersAlloc=0,
+        _stakersAlloc=50_00,
+        _votersAlloc=50_00,
+        _genDepositorsAlloc=0,
+    )
+    vault_id = _create_dust_ticket_position(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        teller,
+        False,
+    )
+    ledger.setRipeAvailForRewards(10, sender=switchboard_alpha.address)
+    _seed_exact_dust_ticket(
+        ledger,
+        lootbox,
+        bob,
+        vault_id,
+        alpha_token,
+        staker_rewards=10_000,
+        staker_points=1,
+        voter_points=1,
+    )
+
+    assert lootbox.getClaimableDepositLootForAsset(bob, vault_id, alpha_token) == 0
+    assert teller.claimLoot(bob, False, sender=bob) == 0
+    assert ripe_token.balanceOf(bob) == 0
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).balancePoints == 1
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeStakerPoints == 1
+    assert ledger.assetDepositPoints(vault_id, alpha_token).ripeVotePoints == 1
+    assert ledger.getRipeRewardsBundle().ripeRewards.stakers == 10_000
 
 
 def test_exited_empty_active_category_defers_until_reward_flows(

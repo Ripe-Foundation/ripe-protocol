@@ -10,7 +10,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Teller": 23_485,
     "TellerUtils": 8_976,
     "Ledger": 13_392,
-    "Lootbox": 23_010,
+    "Lootbox": 23_131,
     "CreditEngine": 24_392,
     "StabilityPool": 24_371,
 }

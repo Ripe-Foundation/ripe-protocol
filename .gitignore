@@ -13,6 +13,10 @@ __pycache__
 
 out/
 
+# foundry (solidity/)
+cache/
+broadcast/
+
 migration_history/dev
 
 .hypothesis/

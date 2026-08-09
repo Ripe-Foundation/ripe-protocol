@@ -102,6 +102,7 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
     setAssetConfig,
     setGeneralConfig,
 ):
+    boa.env.evm.patch.chain_id = 8453
     source = ripe_gov_vault
     target, target_id = _register_target(ripe_hq, vault_book, governance)
     migrator = _install_legacy_migrator(ripe_hq, source, governance)

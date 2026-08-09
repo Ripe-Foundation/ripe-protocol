@@ -3459,9 +3459,9 @@ GOV_PAUSE_MATRIX = (
     ("withdrawContributorTokensToBurn", True),
     ("transferBalanceWithinVault", True),
     ("transferContributorRipeTokens", True),
-    ("updateUserGovPoints", False),
-    ("adjustLock", False),
-    ("releaseLock", False),
+    ("updateUserGovPoints", True),
+    ("adjustLock", True),
+    ("releaseLock", True),
     ("disableGovPointAccrualForUser", False),
     ("disableGovPointAccrualGlobally", False),
 )
@@ -3535,12 +3535,9 @@ def test_ripe_gov_pause_matrix_while_paused(
 ):
     """DV-06 characterization (SV-5, Section 9.4): exact pause policy per method.
 
-    VaultData.isPaused is consulted only by SharesVault's deposit, withdraw,
-    and transfer helpers. Everything else -- point updates, both point-disable
-    setters, and crucially adjustLock and releaseLock -- stays live while the
-    vault is paused. releaseLock is the sharpest case: it reduces balances via
-    vaultData._reduceBalanceOnWithdrawal directly, bypassing SharesVault
-    entirely, so it burns the exit fee out of a paused vault.
+    The owner-approved policy also pause-gates updateUserGovPoints, adjustLock,
+    and releaseLock. The two point-disable escape setters remain available while
+    paused; migration import/export and overflow-disable routes are separate.
     """
     boa.env.time_travel(blocks=10)
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
@@ -3597,11 +3594,6 @@ def test_ripe_gov_pause_matrix_while_unpaused(
 
 
 @pytest.mark.parametrize("method", ("adjustLock", "releaseLock"))
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-06: RipeGov pause semantics for adjustLock/releaseLock are "
-    "unchanged pending the Section 9.4 owner decision under RH-CHANGE-01",
-)
 def test_gov_lock_mutation_reverts_while_vault_is_paused(
     method,
     ripe_gov_vault,
@@ -3611,7 +3603,7 @@ def test_gov_lock_mutation_reverts_while_vault_is_paused(
     switchboard_alpha,
     locked_gov_position,
 ):
-    """DV-06 hardening target (SV-5, Section 9.4 preferred rule)."""
+    """DV-06 regression for the owner-approved Section 9.4 pause rule."""
     boa.env.time_travel(blocks=10)
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
