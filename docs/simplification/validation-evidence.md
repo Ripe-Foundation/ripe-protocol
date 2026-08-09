@@ -801,35 +801,97 @@ delivered tip against current `origin/rh`.
 
 ## 14. Final matrix — supersedes Section 13
 
-Section 13 binds `6260726` versus `6781cb2`. Several non-documentation commits
-followed it — the rh merges, the step-manifest extractions, the testnet manifest
-removal and restoration, and the test-assertion corrections — so its result no
-longer describes what is being merged. **Section 13 is superseded. This section
-is the binding evidence.**
+Section 13 binds `6260726` versus `6781cb2` and is superseded. **This section is
+the binding evidence, and it binds the exact tree below.**
 
-### Pair
+### Exact pair
 
 ```text
-baseline  = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
-candidate = 687321ceb896b71bb52837e1c0cde142ca655102   (+ post-review corrections)
+baseline commit = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
+baseline tree   = c8208d58c53f352e492286a59f4b3350b79465e1
+candidate commit= de6566859c3455c8e0e017232f0d7546892b8833
+candidate tree  = 6cbb90477685ec226ed406404fbe1f559d6fedd4
 ```
 
-Both lanes ran in separate `git clone --no-hardlinks` checkouts under the locked
-`rh-wave2-py312` interpreter, with private cache directories.
+Both lanes ran under the locked `rh-wave2-py312` interpreter (Python 3.12.0,
+Vyper 0.4.3, titanoboa 0.2.7) with private `RIPE_BOA_CACHE_DIR`, `XDG_CACHE_HOME`,
+`TMPDIR`, `HYPOTHESIS_STORAGE_DIRECTORY`, and `PYTHONPYCACHEPREFIX`, and with
+every RPC, key, and cloud variable unset. The candidate lanes ran in the branch
+worktree; the baseline comprehensive lane ran in a detached `git worktree` at
+`5a664cd`.
+
+**On the gap between the validated commit and the branch tip.** A previous
+revision of this section named a candidate commit and then wrote "+ post-review
+corrections", which a reviewer correctly rejected: that phrase binds nothing.
+The commit and tree above are exact and were measured, not inferred.
+
+The commit that *adds* this section is necessarily later than the run it
+records. That commit is documentation-only: it touches
+`docs/simplification/validation-evidence.md` alone. No test, script, config,
+workflow, or scanner reads `docs/simplification/` — the sole mention anywhere in
+`tests/`, `scripts/`, `config/`, `migrations/`, or `.github/` is a comment in
+`tests/deployment/test_manifest_schema.py`, not a file read. A documentation-only
+commit therefore cannot move a lane result.
+
+That exemption is narrow and deliberate. **Any commit touching a path outside
+`docs/simplification/` invalidates this section and requires re-running the
+matrix.** If the branch tip is not either the commit above or a
+documentation-only descendant of it, this evidence does not bind and must be
+regenerated before merge.
+
+### Results
 
 | Lane | Baseline `5a664cd` | Candidate |
 | --- | --- | --- |
-| Lean | 18 failed, 3,387 passed, 25 errors | 13 failed, 3,392 passed, 25 errors |
-| Comprehensive | 127 failed, 4,571 passed, 33 errors | 42 failed, 4,321 passed, 33 errors |
+| Lean | 18 failed, 3,387 passed, 25 errors, 24 xfailed | 13 failed, 3,395 passed, 25 errors, 24 xfailed |
+| Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 skipped | 42 failed, 4,330 passed, 33 errors, 24 skipped |
 
-Compared per test node from the JUnit XML: **0 new red, 0 regressions.**
+Compared per test node from the JUnit XML (`classname::name` plus status):
+**0 new red, 0 regressions.** Nothing that passes on `rh` is red here.
+
+Node deltas on the comprehensive lane: 339 baseline-only identities, all from the
+deleted block-clock and probe suites plus the four renamed mutant IDs; **13
+candidate-only identities**, all newly added guards — the four exact-diff mutant
+checks, the same-line negative regression, and the eight manifest-consumer tests.
+
+### Evidence files
+
+Archived to `~/dev/ripe-protocol-review-archives/rh-machete-chop/final-binding/`:
+
+```text
+c99d71f29a6190e8c4ad10a5c47c7e070c289d80c06b70ec3fbc5470b1fd849c  fl.xml   (candidate lean)
+10132fd1556a232948e6d915201537212c6ede4c16d513c1961be90687dd23be  fc.xml   (candidate comprehensive)
+706a0f40a507098e5dab5947ea0365242c0718428fc348d2d11ea601502e6f0e  zbc.xml  (baseline comprehensive)
+```
+
+### Object-store dependency, disclosed
+
+Two comprehensive tests request historical Git objects `0f79b626…` and
+`74c4120f…`. A `git clone` that fetches only reachable objects does not have
+them, so those two tests fail **on both sides** in a fresh clone and pass in a
+checkout with full history. An independent reviewer observed 129/44 rather than
+127/42 for exactly this reason. It does not change the differential — the two
+failures appear identically on baseline and candidate — but a reviewer
+reproducing these numbers needs a checkout carrying those objects, or should
+expect two extra inherited failures per side.
+
+### Tree size
+
+Measured as tracked files, and lines over text blobs counting a final line with
+no trailing newline:
+
+| | Files | Lines |
+| --- | ---: | ---: |
+| `rh` `5a664cd` | 742 | 3,551,908 |
+| Candidate | 577 | 555,978 |
+| **Reduction** | **165** | **2,995,930 (−84.3%)** |
 
 ### What the failure reduction is, stated accurately
 
 Earlier revisions of this document and of the pull request described the
 comprehensive delta as "85 failures fixed". **That was wrong, and the wording
 mattered — it implied production behaviour improved. It did not.** An
-independent review decomposed the 85 exactly, and the decomposition is:
+independent review decomposed the 85 exactly:
 
 | Cause | Count |
 | --- | ---: |
@@ -846,14 +908,14 @@ No production defect was repaired by this branch. The correct statement is that
 
 The block-clock inventory scanned production sources for `block.number` and
 `block.timestamp` usage, mixed-clock arithmetic, and unclassified Vyper paths.
-Nothing replaces it. A new production timestamp occurrence, a moved occurrence,
-or a new unclassified path can now enter without any scanner objecting.
+Nothing replaces it. Recorded as **RH-D025** in the decision register, with scope,
+rationale, residual risk, and reconsideration trigger; mirrored in `status.yaml`.
 
-The owner accepted this on 2026-08-08: production clock usage is not scanned,
-and clock-affecting changes are reviewed on their own merits. This is recorded
-so it is a decision on the record rather than an unnoticed gap.
+`CreditEngine`'s 184-byte EIP-170 headroom, below the ratified 200, is recorded
+as **RH-D026** — an exact owner waiver rather than a weakening of the rule.
 
 ### Standing invariant
 
 Any future commit touching a path outside `docs/simplification/` requires
-repeating **this** matrix, against whatever `origin/rh` is at that time.
+repeating **this** matrix against whatever `origin/rh` is at that time, and
+rebinding the commit, tree, and XML hashes above.
