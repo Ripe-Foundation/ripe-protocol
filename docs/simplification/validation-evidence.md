@@ -809,15 +809,28 @@ the binding evidence, and it binds the exact tree below.**
 ```text
 baseline commit = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
 baseline tree   = c8208d58c53f352e492286a59f4b3350b79465e1
-candidate commit= f0b6741813784a71e484e25efa8e9726d237557b
-candidate tree  = de825afab475b673d6502c24e03848e9de16df61
+candidate commit= 1e2d5902ad4604ed7ec802c825afb79c07e7a23e
+candidate tree  = 71ccb4722569272c0f8b51b31b6a8cec0e242ca7
 ```
 
-This is the **second** binding of this section. The first bound `de65668` and was
-invalidated exactly as the standing invariant below requires: a further review
-found three assurance gaps, and the commit fixing them (`f0b6741`) touches
-`tests/`, which is outside `docs/simplification/`. All four lanes were re-run
-from scratch against the new pair rather than carried forward.
+This is the **third** binding of this section, and the invariant below has now
+been honoured twice rather than argued around:
+
+1. The first binding named `de65668`. A review found three assurance gaps; the
+   commit fixing them, `f0b6741`, touches `tests/`. Rebound, all four lanes re-run
+   from scratch.
+2. `f0b6741` then gained one more change — deleting the orphaned
+   `contracts/mock/MockSGreenPrice.vy` on the owner's decision. Nothing references
+   that file and the ABI census provably does not move, so it would have been easy
+   to call inert and leave the matrix alone. It touches `contracts/`, so the
+   matrix was rebound anyway.
+
+The baseline lanes were **not** re-run for step 2: `origin/rh` is unmoved at
+`5a664cd`, verified before and after, so `bl.xml` and `bc.xml` describe the same
+commit and the same tree they always did. Only the candidate lanes were re-run.
+Both returned results identical to the previous binding, which is the expected
+outcome for a deletion of an unreferenced file and is recorded here as a measured
+result rather than assumed.
 
 Both lanes ran under the locked `rh-wave2-py312` interpreter (Python 3.12.0,
 Vyper 0.4.3, titanoboa 0.2.7) with private `RIPE_BOA_CACHE_DIR`, `XDG_CACHE_HOME`,
@@ -851,10 +864,13 @@ regenerated before merge.
 All four lanes below were measured in this pass. Counts are pytest's own summary
 line, cross-checked against the archived JUnit XML.
 
-| Lane | Baseline `5a664cd` | Candidate `f0b6741` |
+| Lane | Baseline `5a664cd` | Candidate `1e2d590` |
 | --- | --- | --- |
 | Lean | 18 failed, 3,389 passed, 25 errors, 24 xfailed | 13 failed, 3,405 passed, 25 errors, 24 xfailed |
 | Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 xfailed | 42 failed, 4,332 passed, 33 errors, 24 xfailed |
+
+Candidate figures are from the re-run at `1e2d590`; baseline figures are the
+`5a664cd` runs, unchanged and not re-executed because that commit did not move.
 
 **On "xfailed" versus "skipped".** An earlier revision of this table wrote
 `24 skipped` on the comprehensive row and `24 xfailed` on the lean row, for the
@@ -909,10 +925,10 @@ Archived to `~/dev/ripe-protocol-review-archives/rh-machete-chop/final-binding-v
 alongside the pytest console log of each run:
 
 ```text
-5b0b4114d289b222a603a218d06ddffe5ff61c2d3d39d2d1f941c1043264b9a6  bl.xml  (baseline  lean)
-3c9c2e7fe43b3565474bee71490246e4cd78dfcf655d9b1bffe7af0b0b1d0dee  cl.xml  (candidate lean)
-95c39b0843286fe820c2ae8f684601c4f6cb5fd0165867592442be45d110dd4d  bc.xml  (baseline  comprehensive)
-987147fb238031fa449f036a3a4a6a81320c8b638279a11133dc6c03b52f3841  cc.xml  (candidate comprehensive)
+5b0b4114d289b222a603a218d06ddffe5ff61c2d3d39d2d1f941c1043264b9a6  bl.xml  (baseline  lean,          5a664cd)
+0ecc1b8551208888f7bff067b2a45e9087b9854d66b3d297d19cf7184f463113  cl.xml  (candidate lean,          1e2d590)
+95c39b0843286fe820c2ae8f684601c4f6cb5fd0165867592442be45d110dd4d  bc.xml  (baseline  comprehensive, 5a664cd)
+78699115a38252b7148319097f49d2b1e6d47a24e16134a41cb51cf2a4238ede  cc.xml  (candidate comprehensive, 1e2d590)
 ```
 
 **All four cells of the matrix are archived.** The previous binding claimed both
@@ -939,13 +955,13 @@ expect two extra inherited failures per side.
 ### Tree size
 
 Measured as tracked files, and lines over text blobs counting a final line with
-no trailing newline. **Measured at the candidate commit named above, `f0b6741`:**
+no trailing newline. **Measured at the candidate commit named above, `1e2d590`:**
 
 | | Files | Lines |
 | --- | ---: | ---: |
 | `rh` `5a664cd` | 742 | 3,551,908 |
-| Candidate `f0b6741` | 577 | 556,403 |
-| **Reduction** | **165** | **2,995,505 (−84.3%)** |
+| Candidate `1e2d590` | 576 | 556,419 |
+| **Reduction** | **166** | **2,995,489 (−84.3%)** |
 
 **Why this figure is bound to a commit rather than to "the branch tip."** A
 review found the previous revision recording 555,978 lines while the tip measured
@@ -959,11 +975,11 @@ written. Any revision of this section makes the tip's line count differ from the
 number printed in this table, by exactly the size of that revision.
 
 So this table states the commit it measures, and that commit is the last one
-touching code. The commit adding this section is a documentation-only descendant
+touching anything outside `docs/simplification/`. The commit adding this section is a documentation-only descendant
 of it and is larger by its own size. What is stable, and what the claim actually
 rests on, is the reduction: **165 files and ~2.996M lines, −84.3%**, a figure no
 documentation edit can move at this precision. Anyone reproducing the exact line
-count should check out `f0b6741`, not the branch tip.
+count should check out `1e2d590`, not the branch tip.
 
 ### What the failure reduction is, stated accurately
 
