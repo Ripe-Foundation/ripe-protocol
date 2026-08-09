@@ -57,21 +57,31 @@ measurement is bound to, see [`validation-evidence.md`](validation-evidence.md).
 
 **Commit signatures, stated accurately.** An earlier revision of this line claimed
 "commits on this branch are GPG-signed and verify as good." A review checked the
-raw commit objects and refuted it. Measured over the 31 commits in
-`origin/rh..HEAD`:
+raw commit objects and refuted it.
 
-| | Count |
-| --- | ---: |
-| Carry a `gpgsig` header | 20 |
-| Carry no signature at all | 11 |
-| Report `G` (good) under local `git log --format=%G?` | 0 |
+The durable facts, which no later commit changes:
 
-The first branch commit, `56b6100`, is one of the unsigned ones, so the
-branch-wide assertion was false regardless of the later commits. The 20 signed
-commits report `E` rather than `G` locally — signature present, public key not in
-this keyring — so "verifies as good" is not something this checkout can assert
-either. Signature policy for this branch is an open question for the owner, not a
-claim this document should be making.
+- **11 commits on this branch carry no signature at all**, including the first,
+  `56b6100`. Any branch-wide "all commits are signed" claim is therefore false
+  and cannot be repaired by signing later work.
+- **No commit reports `G` (good) in this checkout.** Signed ones report `E` —
+  signature present, public key not in this keyring — so "verifies as good" is
+  not something a local clone can assert either way.
+
+The signed count necessarily moves with every commit, so it is not printed here.
+Recount both from the raw objects rather than trusting a number in a document:
+
+```bash
+for c in $(git rev-list origin/rh..HEAD); do
+  git cat-file commit "$c" | sed -n '1,30p' | grep -q '^gpgsig' && echo signed || echo unsigned
+done | sort | uniq -c
+```
+
+At the time of writing that returns 24 signed and 11 unsigned over 35 commits. A
+review found the previously printed figures (20 and 11 over 31) stale for exactly
+the reason this section now avoids: a printed count of a moving quantity is wrong
+the moment the next commit lands. Signature policy for this branch remains an
+open question for the owner, not a claim this document should be making.
 
 ## Before / after
 
@@ -165,7 +175,7 @@ anticipated, and each is listed so a reviewer can read the whole surface:
 | Test file | Change | What still holds |
 | --- | --- | --- |
 | `test_manifest_schema.py` | Base-history corpus count assertion removed entirely (it had been `60` → `1`) | Both globs, the top-level-key assertion, the record-shape assertion, and the read-does-not-rewrite byte comparison are unchanged and run against whatever is committed. |
-| `test_vault_pointer_runtime_sizes.py` | Exact runtime-size dict equality replaced by EIP-170 ceiling plus a per-contract headroom floor | The ratified 200-byte floor now applies to every contract, with one recorded waiver (CreditEngine 184, RH-D026). A contract below the floor is additionally pinned to the exact waived artifact — source sha256, immutable-free runtime-template sha256, and exact deployed size — because a review proved a floor alone passes a size-preserving semantic change. Verified to reject the defects the old equality caught, and to reject that mutation. |
+| `test_vault_pointer_runtime_sizes.py` | Exact runtime-size dict equality replaced by EIP-170 ceiling plus a per-contract headroom floor | The ratified 200-byte floor now applies to every contract, with one recorded waiver (CreditEngine 184, RH-D026). A contract below the floor is additionally pinned to the exact waived contract version — source sha256, immutable-free runtime-template sha256, exact deployed size, and the sha256 of the complete deployed runtime at a declared constructor input — because one review proved a floor alone passes a size-preserving semantic edit, and a second proved source and template hashes alone still pass a changed constructor immutable at identical length. Deployment constructor arguments are deliberately unbound; see RH-D026. Verified to reject the defects the old equality caught and both review mutations. |
 | `test_ledger_action_block.py` | Frozen mutant sha256 replaced by an exact ordered-diff comparison, plus a negative regression | A mutant must differ from `Ledger.vy` by exactly the declared edit; a second change, even on the same line, fails. |
 | `test_collection_contract.py` | `len(ledger) == 31` census removed | Sortedness, uniqueness, prefix, ceiling, and filesystem-match all remain. |
 | `test_bluechip_yield_prices_artifacts.py` | Block-clock integration assertion removed | Nothing replaces it; the coverage loss is recorded as RH-D025. |
@@ -182,15 +192,16 @@ Directory-scanning consumers were re-run rather than weakened:
 
 ## Mock-contract consumer inventory
 
-**33 of the baseline's 34 `contracts/mock/` files are retained, and every
-retained one has at least one retained consumer.** The 34th,
-`MockSGreenPrice.vy`, was an orphan and is removed — see the note below this
-table. `scripts/export_abis.py` excludes `contracts/mock/` and
-`contracts/testing/` (`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the
-52-output ABI census is unaffected.
+**All 34 `contracts/mock/` files are retained.** 33 have at least one consumer in
+the retained tree; `MockSGreenPrice.vy` has none, and is kept deliberately — see
+the note below this table, which also records how this inventory was wrong twice.
+`scripts/export_abis.py` excludes `contracts/mock/` and `contracts/testing/`
+(`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the 52-output ABI census is
+unaffected either way.
 
 | Mock | Retained consumers (primary) |
 | --- | --- |
+| `MockSGreenPrice.vy` | **None in the retained tree.** Deployed on Base Sepolia v1 — see below |
 | `MockAuctionHouse.vy` | `tests/config/test_switchboard_charlie.py` |
 | `MockBadERC1271.vy`, `MockERC1271.vy` | `tests/tokens/test_signatures.py` |
 | `MockCurvePrices.vy`, `MockErc4626Vault.vy`, `MockErc4626VaultWithSafeGap.vy`, `MockUndyV2.vy`, `MockWhitelist.vy`, `MockRando.vy` | `tests/conf_mock.py` |
@@ -208,39 +219,51 @@ table. `scripts/export_abis.py` excludes `contracts/mock/` and
 | `MockErc20.vy` | `tests/conf_mock.py` and many behavior suites |
 | `MockStockTokenControls.vy` | `tests/vaults/test_stock_token_vault_comparison.py`, `tests/vaults/test_basic_vault_safety.py` |
 
-### `MockSGreenPrice.vy`: an orphan that predates this branch, now removed
+### `MockSGreenPrice.vy` has no *current* consumer, but it was deployed
 
-An earlier revision of the table above listed
-`config/block-clock-inventory.json` as this mock's consumer and concluded all 34
-were covered. An independent review caught it: that file is deleted by this
-branch, so the row named a consumer that no longer exists.
+This entry has been wrong twice, in opposite directions, and the second error was
+worse than the first. Both are recorded because the second one procured an owner
+decision.
 
-The deeper problem is that it was never a consumer in the first place. Checking
-`rh` at `5a664cd` — before any of this branch's deletions —
-`git grep -l MockSGreenPrice` returns exactly one path, that same
-`config/block-clock-inventory.json`, which is a *census listing* of file paths,
-not code that deploys or imports the mock. No test, script, migration, or
-contract has ever referenced it. Removing the census did not orphan this mock; it
-removed the only thing that mentioned an orphan that already existed.
+**First error.** The table above listed `config/block-clock-inventory.json` as
+this mock's consumer and concluded all 34 were covered. That file is deleted by
+this branch, so the row named a consumer that no longer exists. A review caught
+it.
 
-**Disposition: removed, on the owner's decision of 9 August 2026.** The
-alternative offered was to retain it and record the orphan as a follow-up; the
-owner chose deletion. Confirmed safe before removing:
+**Second error, and the one that matters.** The correction claimed *"No test,
+script, migration, or contract has ever referenced it."* **That is false.** It was
+produced by running `git grep -l MockSGreenPrice 5a664cd` — a search of one
+commit's tree — and then stating the result as a fact about history. A tree at a
+commit is not a history. On that false premise the owner was asked to choose
+between retaining an unused orphan and deleting something never deployed, and
+chose deletion.
 
-- no reference to `MockSGreenPrice` remains anywhere in `contracts/`, `tests/`,
-  `scripts/`, `config/`, `migrations/`, or `.github/`;
-- `scripts/export_abis.py` excludes the `mock` directory outright
-  (`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the 52-output ABI census
-  does not move, and no test asserts a count of excluded files;
-- no census, glob, or inventory over `contracts/mock/` survives in the retained
-  tree — the one that existed was the block-clock inventory, which this branch
-  removes.
+**What is actually true**, from `git log --all -S` over `migrations/` and
+`migration_history/`:
 
-This deletion landed **after** the first four-lane matrix and therefore
-invalidated it under the standing invariant. The candidate lanes were re-run and
-section 14 rebound rather than the change being waved through as obviously inert.
+| | |
+| --- | --- |
+| Deployed to | Base Sepolia v1, `0xD10eD35EEcA84beEDC3e61d76db06857Aeb98Bb6` |
+| Deployed by | `migrations/base-sepolia/1006_PriceDesk.py` at `385ceae` |
+| Registered as | `"Mock SavingsGreen Price"` in PriceDesk, via `startAddNewAddressToRegistry` + `confirmNewAddressToRegistry` |
+| Constructor arg | `SavingsGreen` at `0xA7a5bD6fAc4AfB87908Add345c5baD82FB1A2e97` |
+| Appears in | 10 historical `base-sepolia/v1` step manifests (`0000`, `0001`, `1004`–`1011`) |
+| Size | 87 lines |
 
+Context that does *not* excuse the error but bounds it: `rh` itself had already
+dropped both `1006_PriceDesk.py` and the `MockSGreenPrice` entry from
+`base-sepolia/v1/current-manifest.json` before this branch existed — neither
+removal is this branch's doing — and `v1` is superseded by `v2`. Whether
+`0xD10e…Bb6` still holds code or is still registered in PriceDesk has **not**
+been checked; that needs an RPC query nobody has run.
 
+**Disposition: retained.** Presented with the corrected history on 9 August 2026,
+the owner reversed the deletion. The file is restored byte-identically. It is
+carried as source for a real, if obsolete, testnet deployment.
+
+What remains true, and is all the table above should ever have claimed: **no
+retained file in the current tree references it.** That is a statement about the
+tree, and it is the only kind of statement a tree search can support.
 149 baseline documents − 26 removed + 3 added = **126 retained**. All 26 removed
 files are the dashboard application's own files; nothing else under `docs/` was
 deleted. The 3 added are this report, the extraction manifest, and the tracked

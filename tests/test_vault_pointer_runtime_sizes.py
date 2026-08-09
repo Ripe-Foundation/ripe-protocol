@@ -87,6 +87,29 @@ MIN_HEADROOM_OVERRIDES = {
 #                      what the compiler emits from unchanged source.
 #   deployed_runtime_bytes -- exact deployed size, immutables included. Pinned
 #                      rather than floored, so growth *and* shrinkage are visible.
+#   pinned_hq / deployed_sha256 -- sha256 of the *complete deployed runtime*,
+#                      immutables included, for one declared constructor input.
+#
+# On that last pair, and on what "exact artifact" can honestly mean here. A
+# review showed the first four identities do not pin the deployed byte string:
+# deploying CreditEngine with a different `RIPE_HQ_FOR_ADDYS` changes the
+# deployed bytes -- including the registry authority the contract trusts -- while
+# the length stays at exactly 24,392, so every check above still passed. The
+# claim that this waiver covered "one exact artifact" was therefore false as
+# written.
+#
+# It is closed by deploying the contract here with a *declared* HQ constant and
+# hashing the result, which is fully deterministic and independent of whatever
+# the session fixture happens to wire up. `pinned_hq` is not a real address and
+# is not expected to be one; it exists only to make the immutable input fixed so
+# the deployed bytes are reproducible.
+#
+# What remains deliberately unbound is the immutable input of any *particular*
+# deployment. Constructor arguments are deployment configuration, not contract
+# version: a fixture or a chain wiring a different HQ produces different deployed
+# bytes without changing a line of CreditEngine. Binding those would make a code
+# *size* waiver fail on test-infrastructure changes that cannot affect code size.
+# The deployed size of the real fixture deployment is still checked exactly.
 #
 # Any of the three moving fails this test, and the required response is a new
 # owner decision at the new figure -- not an edit to these constants. Refreshing
@@ -109,6 +132,12 @@ WAIVED_CONTRACT_IDENTITIES = {
         ),
         "runtime_template_bytes": 24_296,
         "deployed_runtime_bytes": 24_392,
+        # Declared constructor input, so the deployed bytes below are fixed.
+        # Not a real HQ and not required to be one.
+        "pinned_hq": "0x00000000000000000000000000000000000000A1",
+        "deployed_sha256": (
+            "12a781ca7793d79a866c3285f67f80fce65342dffc86239054a00653e94f7ac5"
+        ),
     },
 }
 
@@ -273,4 +302,23 @@ def test_waived_contract_is_exactly_the_artifact_the_owner_waived(name, request)
         f"{pinned['deployed_runtime_bytes']} "
         f"({EIP170_LIMIT - deployed} bytes of headroom, not "
         f"{EIP170_LIMIT - pinned['deployed_runtime_bytes']})." + reopen
+    )
+
+    # The complete deployed byte string, immutables included, for the declared
+    # constructor input. The four checks above all pass when only an immutable
+    # changes -- a review demonstrated that -- so without this the waiver does
+    # not bind what it says it binds.
+    fixed = boa.load(
+        str(source_path), pinned["pinned_hq"], name=f"{name.lower()}_waiver_identity"
+    )
+    fixed_code = fixed.env.get_code(fixed.address)
+    assert len(fixed_code) == pinned["deployed_runtime_bytes"], (
+        f"{name} at the declared HQ deploys {len(fixed_code)} bytes, "
+        f"{decision} waived {pinned['deployed_runtime_bytes']}." + reopen
+    )
+    fixed_sha = hashlib.sha256(fixed_code).hexdigest()
+    assert fixed_sha == pinned["deployed_sha256"], (
+        f"{name} deployed at HQ {pinned['pinned_hq']} hashes to {fixed_sha}, "
+        f"{decision} waived {pinned['deployed_sha256']}. Same size, different "
+        "bytes: this is a change the size checks above cannot see." + reopen
     )

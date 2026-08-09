@@ -36,10 +36,19 @@ manifest of each supported chain/environment pair.
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from unittest import mock
 
+import boa
 import pytest
+from eth_utils import is_address
+
+# Methods `scripts/ccip_send.py` calls on the token it resolves: `balanceOf` at
+# the balance check and `approve` before the router send. A record can name a
+# real file at a real address and still be unusable if the artifact that file
+# compiles to lacks these.
+CCIP_SEND_TOKEN_METHODS = ("balanceOf", "approve")
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -128,9 +137,17 @@ def _ccip_send_option_default(name):
 def _assert_record_is_usable(chain, environment, key, mode, record):
     where = f"{chain}/{environment} {key}"
 
+    # Validated the way the consumer validates it, not by shape.
+    #
+    # A review defeated an earlier `startswith("0x")` and `int(address, 16) != 0`
+    # pair by setting an address to "0x1": both passed, and the real consumer
+    # then died on `boa.load_partial(...).at("0x1")` with
+    # `ValueError: Unknown format '0x1'`. `eth_utils.is_address` is the check
+    # that agrees with the consumer -- it requires exactly 20 bytes.
     address = record.get("address")
-    assert isinstance(address, str) and address.startswith("0x"), (
-        f"{where} has no usable address: {address!r}"
+    assert isinstance(address, str) and is_address(address), (
+        f"{where} address {address!r} is not a valid 20-byte address. "
+        "boa would reject it at the point of use."
     )
     assert int(address, 16) != 0, f"{where} is the zero address"
 
@@ -147,6 +164,39 @@ def _assert_record_is_usable(chain, environment, key, mode, record):
         f"{where} points at {source}, which does not exist. Its consumer calls "
         "boa.load_partial on that path and would raise at the point of use."
     )
+
+    # `file` must be *this record's own* compilation target, not merely some
+    # file that exists. The same review repointed a token's `file` at
+    # `contracts/core/CreditEngine.vy` -- a real path, so an existence check
+    # passed -- and the consumer then built a wrapper with no `balanceOf`, which
+    # it calls on the next line.
+    #
+    # The record carries its own compiler input. `solc_json.settings.outputSelection`
+    # names exactly the contract that was compiled to produce this address, so
+    # that is the binding. Membership in `solc_json.sources` is deliberately not
+    # used: sources also contains imported modules, and pointing `file` at an
+    # imported module -- e.g. `contracts/tokens/modules/Erc20Token.vy`, which
+    # does expose `balanceOf` and `approve` -- would satisfy a membership test
+    # and every method check while still naming the wrong artifact.
+    solc_json = record.get("solc_json", {})
+    targets = solc_json.get("settings", {}).get("outputSelection", {})
+    assert targets, (
+        f"{where} is loadable but carries no solc_json.settings.outputSelection "
+        "to bind its 'file' against"
+    )
+    assert source in targets, (
+        f"{where} names {source}, which is not this record's compilation target "
+        f"({sorted(targets)}). The address was produced by compiling that "
+        "target, so this file is not the artifact deployed there."
+    )
+
+    # Note on what is deliberately *not* asserted: `solc_json.sources[...]`
+    # carries a `sha256sum`, and it does not match the file on disk for several
+    # records (every `RipeHq`, and `RipeToken` on three chains). That is correct
+    # and expected -- production sources have moved on since those deployments.
+    # Asserting equality would fail on valid data and would be a claim about
+    # source drift, not about manifest usability, which is what this module
+    # guards.
 
 
 @pytest.mark.parametrize(("chain", "environment"), sorted(REQUIRED_CURRENT_MANIFESTS))
@@ -197,11 +247,27 @@ def test_ccip_send_default_target_is_declared_and_fully_resolvable(monkeypatch):
         )
         _assert_record_is_usable(chain, environment, key, mode, contracts[key])
 
-    # The exact two fields the script dereferences on the token it was told to
-    # send: `record["file"]` and `record["address"]`, in that order.
+    # Finally, perform the consumer's own resolution rather than approximating
+    # it. `ccip_send` does exactly this on the token it was told to send:
+    #
+    #     erc20 = boa.load_partial(manifest["file"]).at(manifest["address"])
+    #     ... erc20.balanceOf(sender) ... erc20.approve(router, amount)
+    #
+    # Anything that survives the checks above but cannot produce a usable token
+    # wrapper fails here, at the same call the operator would hit. This compiles
+    # one contract; boa caches it, and the lane already compiles this token.
     record = contracts[token]
-    assert (ROOT / record["file"]).is_file()
-    assert int(record["address"], 16) != 0
+    with warnings.catch_warnings():
+        # `.at()` on an address with no code in this env is expected and warns.
+        warnings.simplefilter("ignore")
+        erc20 = boa.load_partial(str(ROOT / record["file"])).at(record["address"])
+
+    missing = [m for m in CCIP_SEND_TOKEN_METHODS if not hasattr(erc20, m)]
+    assert not missing, (
+        f"ccip_send resolves {chain}/{environment} {token} to "
+        f"{record['file']}, which compiles to an artifact without {missing}. "
+        f"The script calls {list(CCIP_SEND_TOKEN_METHODS)} on it."
+    )
 
 
 def test_every_committed_current_manifest_is_declared_here():

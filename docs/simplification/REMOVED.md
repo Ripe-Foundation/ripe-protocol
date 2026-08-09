@@ -3,7 +3,16 @@
 Single index of everything the codebase-simplification branch removed from the
 active tree, so a grep for a path that no longer exists lands somewhere useful.
 
-Nothing here was ever deployed, and no production contract was modified. Every
+No contract listed here was ever deployed, and no production contract was
+modified. The only `.vy` files in this index are
+`contracts/testing/ActionBlockIdentityProbe.vy` and
+`contracts/testing/StockTokenTransferProbe.vy`; both were checked against the
+**full history** — `git log --all -S` over `migrations/` and
+`migration_history/` returns zero hits for either. That method matters: an
+earlier revision of this branch asserted the same thing about
+`contracts/mock/MockSGreenPrice.vy` on the strength of a single-commit tree
+search, and it was wrong — that file *was* deployed and registered on Base
+Sepolia v1. It is retained, and is no longer listed here. Every
 file remains in git history and is recoverable with `git show <commit>:<path>`.
 Archived copies are also kept outside the repo at
 `~/dev/ripe-protocol-review-archives/rh-machete-chop/`.
@@ -71,7 +80,7 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**172 files removed.**
+**171 files removed.**
 
 ## Block-clock inventory (4)
 
@@ -260,17 +269,6 @@ top pointing here.
 - `docs/chains/rh/track-8-m0-owner-decision-packet.md`
 - `docs/chains/rh/track-8-m1-exact-receipt.md`
 - `docs/chains/rh/track-8-stock-token-vault-change.md`
-
-## Orphaned mock (1)
-
-- `contracts/mock/MockSGreenPrice.vy`
-
-No consumer, and none on `rh` at `5a664cd` either: its only reference anywhere
-was a path listing inside `config/block-clock-inventory.json`, a census rather
-than code that deploys or imports it. Removing the census exposed an orphan that
-already existed rather than creating one. Removed on the owner's decision of
-9 August 2026. `scripts/export_abis.py` excludes the `mock` directory, so the
-ABI census is unaffected.
 
 ## Workflows (1)
 

@@ -594,8 +594,8 @@ that waiver.
 it as a per-contract override; every other contract in that set is held to the
 ratified 200, and `Teller` states 200 explicitly.
 
-**What exactly is waived.** One artifact, pinned by three identities, not a size
-band:
+**What exactly is waived.** One *contract version*, pinned by five identities,
+not a size band:
 
 | Identity | Value |
 | --- | --- |
@@ -603,14 +603,32 @@ band:
 | Runtime template sha256 (immutable-free) | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` |
 | Runtime template bytes | 24,296 |
 | Deployed runtime bytes (with immutables) | 24,392 |
+| Deployed runtime sha256 at declared HQ `0x…00A1` | `12a781ca7793d79a866c3285f67f80fce65342dffc86239054a00653e94f7ac5` |
 
-An earlier revision of this decision recorded only the 184-byte floor, and an
-independent review defeated it. The reviewer changed a production rule —
-`assert _discount <= HUNDRED_PERCENT` to `assert _discount < HUNDRED_PERCENT`,
-which makes a 100% discount invalid — and the deployed runtime stayed at exactly
-24,392 bytes. The floor passed, so a semantic change to the waived contract could
-ship while this decision still claimed to cover it. The identities above close
-that: the source hash moves on any source edit, size-preserving or not.
+Two reviews shaped this list, and each defeated the version before it.
+
+The first revision recorded only the 184-byte floor. A reviewer changed a
+production rule — `assert _discount <= HUNDRED_PERCENT` to
+`assert _discount < HUNDRED_PERCENT`, making a 100% discount invalid — and the
+deployed runtime stayed at exactly 24,392 bytes, so the floor passed. The source
+hash closes that: it moves on any source edit, size-preserving or not.
+
+The second revision added the source and template hashes and then claimed to bind
+"one exact artifact." **That was still false**, and a second reviewer proved it:
+deploying CreditEngine with a different `RIPE_HQ_FOR_ADDYS` changes the deployed
+byte string — including the registry authority the contract trusts — while the
+length stays at exactly 24,392, so every recorded identity still matched. The
+last row closes it, by deploying at a *declared* constructor input and hashing
+the complete result.
+
+**What this does not bind, deliberately.** The constructor arguments of any
+particular deployment. `0x…00A1` is a declared constant that exists only to make
+the deployed bytes reproducible; it is not a real HQ. Rewiring the test fixture
+to a different HQ still passes this guard, and that is correct: constructor
+arguments are deployment configuration, not contract version, and a code *size*
+waiver must not fail on test wiring that cannot affect code size. A wrong HQ in a
+real deployment is a deployment defect, caught by the behaviour suites that
+resolve addresses through it, not by an EIP-170 waiver.
 
 **Rationale.** The 184-byte position is inherited from `rh`. This branch changes
 no production Vyper, so it neither caused the shortfall nor can repair it. The
@@ -627,9 +645,11 @@ precisely:
 - **184 bytes** is the absolute EIP-170 headroom — the room a change could use
   before the 24,576-byte limit itself is breached.
 - **0 bytes** is the growth this waiver permits. The deployed size is pinned at
-  exactly 24,392, so any change — larger, smaller, or size-preserving — fails the
-  guard and reopens this decision. That is the intent: the waiver covers one
-  artifact, not a range.
+  exactly 24,392, so any change to the contract — larger, smaller, or
+  size-preserving — fails the guard and reopens this decision. That is the
+  intent: the waiver covers one contract version, not a range. (A change to a
+  *deployment's* constructor arguments is not a change to the contract; see the
+  exclusion recorded above.)
 
 **Reconsideration trigger.** Withdraw this waiver when CreditEngine is next
 changed on `rh`: either the change brings it back above 200, or it needs its own

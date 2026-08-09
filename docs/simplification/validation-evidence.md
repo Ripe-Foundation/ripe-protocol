@@ -1008,8 +1008,9 @@ rationale, residual risk, and reconsideration trigger; mirrored in `status.yaml`
 
 `CreditEngine`'s 184-byte EIP-170 headroom, below the ratified 200, is recorded
 as **RH-D026** — an exact owner waiver rather than a weakening of the rule. The
-waiver is bound to one artifact, not to a size band: source sha256, immutable-free
-runtime-template sha256, and an exact 24,392-byte deployed size. A review showed
+waiver is bound to one contract version, not to a size band: source sha256,
+immutable-free runtime-template sha256, an exact 24,392-byte deployed size, and
+the sha256 of the complete deployed runtime at a declared constructor input. A review showed
 why a size floor was not enough — changing `assert _discount <= HUNDRED_PERCENT`
 to `<`, which makes a 100% discount invalid, leaves the runtime at exactly 24,392
 bytes and passed the floor. Re-applying that mutation against the current tree
