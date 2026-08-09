@@ -182,14 +182,15 @@ Directory-scanning consumers were re-run rather than weakened:
 
 ## Mock-contract consumer inventory
 
-All 34 `contracts/mock/` files are retained. **33 have at least one retained
-consumer; `MockSGreenPrice.vy` has none** — see the note below this table.
-`scripts/export_abis.py` excludes `contracts/mock/` and `contracts/testing/`, so
-the 52-output ABI census is unaffected either way.
+**33 of the baseline's 34 `contracts/mock/` files are retained, and every
+retained one has at least one retained consumer.** The 34th,
+`MockSGreenPrice.vy`, was an orphan and is removed — see the note below this
+table. `scripts/export_abis.py` excludes `contracts/mock/` and
+`contracts/testing/` (`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the
+52-output ABI census is unaffected.
 
 | Mock | Retained consumers (primary) |
 | --- | --- |
-| `MockSGreenPrice.vy` | **None.** Orphan, pre-existing — see below |
 | `MockAuctionHouse.vy` | `tests/config/test_switchboard_charlie.py` |
 | `MockBadERC1271.vy`, `MockERC1271.vy` | `tests/tokens/test_signatures.py` |
 | `MockCurvePrices.vy`, `MockErc4626Vault.vy`, `MockErc4626VaultWithSafeGap.vy`, `MockUndyV2.vy`, `MockWhitelist.vy`, `MockRando.vy` | `tests/conf_mock.py` |
@@ -207,7 +208,7 @@ the 52-output ABI census is unaffected either way.
 | `MockErc20.vy` | `tests/conf_mock.py` and many behavior suites |
 | `MockStockTokenControls.vy` | `tests/vaults/test_stock_token_vault_comparison.py`, `tests/vaults/test_basic_vault_safety.py` |
 
-### `MockSGreenPrice.vy` is an orphan, and was one before this branch
+### `MockSGreenPrice.vy`: an orphan that predates this branch, now removed
 
 An earlier revision of the table above listed
 `config/block-clock-inventory.json` as this mock's consumer and concluded all 34
@@ -222,16 +223,22 @@ not code that deploys or imports the mock. No test, script, migration, or
 contract has ever referenced it. Removing the census did not orphan this mock; it
 removed the only thing that mentioned an orphan that already existed.
 
-The retained tree has been re-scanned across `contracts/`, `tests/`, `scripts/`,
-`config/`, and `migrations/`: `MockSGreenPrice.vy` has no consumer, and the other
-33 each have at least one.
+**Disposition: removed, on the owner's decision of 9 August 2026.** The
+alternative offered was to retain it and record the orphan as a follow-up; the
+owner chose deletion. Confirmed safe before removing:
 
-**Disposition: retained, and recorded as a follow-up rather than deleted.** This
-branch does not remove it, for two reasons. Deleting it is not needed to make
-anything here correct — the inventory claim was the defect, and that is now
-fixed. And whether an sGreen price mock is wanted for future work is a call for
-whoever owns that area, not a cleanup to fold into a branch whose deletion set
-has already been validated. It is 1 file of dead weight, carried knowingly.
+- no reference to `MockSGreenPrice` remains anywhere in `contracts/`, `tests/`,
+  `scripts/`, `config/`, `migrations/`, or `.github/`;
+- `scripts/export_abis.py` excludes the `mock` directory outright
+  (`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the 52-output ABI census
+  does not move, and no test asserts a count of excluded files;
+- no census, glob, or inventory over `contracts/mock/` survives in the retained
+  tree — the one that existed was the block-clock inventory, which this branch
+  removes.
+
+This deletion landed **after** the first four-lane matrix and therefore
+invalidated it under the standing invariant. The candidate lanes were re-run and
+section 14 rebound rather than the change being waved through as obviously inert.
 
 
 149 baseline documents − 26 removed + 3 added = **126 retained**. All 26 removed

@@ -27,7 +27,7 @@ and `migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run
 the step later with `--start-timestamp`, which needs the manifest to resolve
 local and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting
 them turned a documented recovery path into a `FileNotFoundError`. The test suite
-did not catch it because no test exercises `ccip_send`; an independent review
+did not catch it because nothing exercised `ccip_send`; an independent review
 did.
 
 ### Why removing step manifests does not break a deployment
@@ -71,7 +71,7 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**171 files removed.**
+**172 files removed.**
 
 ## Block-clock inventory (4)
 
@@ -260,6 +260,17 @@ top pointing here.
 - `docs/chains/rh/track-8-m0-owner-decision-packet.md`
 - `docs/chains/rh/track-8-m1-exact-receipt.md`
 - `docs/chains/rh/track-8-stock-token-vault-change.md`
+
+## Orphaned mock (1)
+
+- `contracts/mock/MockSGreenPrice.vy`
+
+No consumer, and none on `rh` at `5a664cd` either: its only reference anywhere
+was a path listing inside `config/block-clock-inventory.json`, a census rather
+than code that deploys or imports it. Removing the census exposed an orphan that
+already existed rather than creating one. Removed on the owner's decision of
+9 August 2026. `scripts/export_abis.py` excludes the `mock` directory, so the
+ABI census is unaffected.
 
 ## Workflows (1)
 
