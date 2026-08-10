@@ -111,14 +111,18 @@ event LegacyRipeGovPositionMigrationExecuted:
 
 MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
 MAX_VAULT_MIGRATIONS: constant(uint256) = 25
+BASE_CHAIN_ID: constant(uint256) = 8453
+LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
+LEGACY_RIPE_GOV_VAULT: immutable(address)
 
 legacyMigrationUserDedupe: transient(HashMap[address, bool])
 
 
 @deploy
-def __init__(_ripeHq: address, _shouldPause: bool):
+def __init__(_ripeHq: address, _shouldPause: bool, _legacyRipeGovVault: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(_shouldPause, False, False) # no minting
+    LEGACY_RIPE_GOV_VAULT = _legacyRipeGovVault
 
 
 ##########################
@@ -290,15 +294,16 @@ def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV
     return len(_migrations)
 
 
-# legacy ripe gov migration
+# legacy ripe gov migration (Base chain only)
 
 
 @external
-def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address, _legacyGovVaultId: uint256) -> uint256:
+def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
     assert len(_users) != 0 # dev: no migrations
     assert _asset != empty(address) # dev: invalid asset
+    assert chain.id == BASE_CHAIN_ID and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
 
     a: addys.Addys = addys._getAddys()
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
@@ -318,7 +323,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATI
         # validate migration
         sourceVault: address = empty(address)
         targetVault: address = empty(address)
-        sourceVault, targetVault = self._validateVaultMigration(user, _asset, _legacyGovVaultId, targetVaultId, a)
+        sourceVault, targetVault = self._validateVaultMigration(user, _asset, LEGACY_RIPE_GOV_VAULT_ID, targetVaultId, a)
+        assert sourceVault == LEGACY_RIPE_GOV_VAULT # dev: invalid legacy vault
 
         # source must NOT be paused, target must be paused
         assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
@@ -347,7 +353,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATI
         assert targetShares != 0 # dev: invalid migration result
 
         # update lootbox deposit points
-        extcall Lootbox(a.lootbox).updateDepositPoints(user, _legacyGovVaultId, sourceVault, _asset, a)
+        extcall Lootbox(a.lootbox).updateDepositPoints(user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, _asset, a)
         extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, _asset, a)
 
         # verify migration

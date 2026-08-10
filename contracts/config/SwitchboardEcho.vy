@@ -64,7 +64,7 @@ interface RipeGovVault:
     def disableGovPointAccrualGlobally(): nonpayable
 
 interface VaultMigrator:
-    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address, _legacyGovVaultId: uint256) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256: nonpayable
     def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS]) -> uint256: nonpayable
     def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS]) -> uint256: nonpayable
 
@@ -585,15 +585,14 @@ def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRAT
     return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_migrations)
 
 
-# legacy ripe gov migrations
+# legacy ripe gov migrations (Base chain only)
 
 @external
-def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address, _legacyGovVaultId: uint256) -> uint256:
+def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_users) != 0 # dev: no migrations
     assert _asset != empty(address) # dev: invalid asset
-    assert _legacyGovVaultId != 0 # dev: invalid legacy gov vault id
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users, _asset, _legacyGovVaultId)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users, _asset)
 
 
 ##################################
