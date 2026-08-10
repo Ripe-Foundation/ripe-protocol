@@ -19,10 +19,11 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 
 interface Teller:
-    def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _ledger: address) -> uint256: nonpayable
     def depositOnVaultMigration(_user: address, _asset: address, _amount: uint256, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForLegacyRipeGovMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
+    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
 
 interface RipeGovVault:
@@ -146,6 +147,7 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
         if user == empty(address):
             continue
 
+        numPositionsBefore: uint256 = numPositions
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
         for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
@@ -199,36 +201,11 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
                 amount=amount,
             )
 
+        # perform house keeping
+        if numPositions > numPositionsBefore:
+            extcall Teller(a.teller).performHousekeeping(True, user, True, a)
+
     return numPositions
-
-
-# validation
-
-
-@view
-@internal
-def _validateMigrationRoute(
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
-    _vaultBook: address,
-    _missionControl: address,
-) -> (address, address):
-    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
-    assert _sourceVaultId != _targetVaultId # dev: same vault
-
-    # validate source vault
-    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    sourceVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_sourceVaultId)
-    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-
-    # validate target vault
-    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_targetVaultId) # dev: invalid target vault id
-    targetVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_targetVaultId)
-    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-
-    assert sourceVault != targetVault # dev: same vault
-    assert staticcall MissionControl(_missionControl).isStabVaultId(_sourceVaultId) == staticcall MissionControl(_missionControl).isStabVaultId(_targetVaultId) # dev: stab vault mismatch
-    return sourceVault, targetVault
 
 
 #######################
@@ -260,8 +237,9 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
         if user == empty(address):
             continue
 
+        numPositionsBefore: uint256 = numPositions
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
-        for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
+        for i: uint256 in range(1, numUserAssets, bound=MAX_GOV_USER_ASSETS):
 
             # get user asset and amount
             asset: address = empty(address)
@@ -283,16 +261,13 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
             targetUserPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalUserGovPoints(user)
             targetTotalPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalGovPoints()
 
-            # get source snapshot
-            prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(user, asset, sourceVault, a.missionControl)
-
             # export position from source vault
             migData: RipeGovMigrationData = extcall Teller(a.teller).exportPositionForMigration(user, asset, sourceVault, targetVault, a)
             assert migData.amount != 0 # dev: invalid migration result
             self._verifyRipeGovExport(user, asset, sourceVault, targetVault, migData.amount, tellerBalanceBefore, sourceVaultBalanceBefore, targetVaultBalanceBefore, a.teller)
 
             # import position to target vault
-            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a)
+            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a.ledger)
             assert targetShares != 0 # dev: invalid migration result
 
             # update lootbox deposit points
@@ -300,7 +275,7 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
             extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, asset, a)
 
             # verify migration
-            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, targetShares, migData, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
             numPositions += 1
 
             log RipeGovPositionMigrationExecuted(
@@ -315,6 +290,10 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
                 govPoints=migData.govPoints,
                 unlock=migData.unlock,
             )
+
+        # perform house keeping
+        if numPositions > numPositionsBefore:
+            extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
     return numPositions
 
@@ -346,6 +325,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     for user: address in _users:
         if user == empty(address):
             continue
+
+        numPositionsBefore: uint256 = numPositions
 
         # snapshot all supported positions before the first legacy withdrawal
         positions: DynArray[LegacyMigrationPosition, MAX_GOV_USER_ASSETS] = []
@@ -395,7 +376,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
             self._verifyRipeGovExport(user, asset, sourceVault, targetVault, amount, tellerBalanceBefore, sourceVaultBalanceBefore, targetVaultBalanceBefore, a.teller)
 
             # import position to target vault
-            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a)
+            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a.ledger)
             assert targetShares != 0 # dev: invalid migration result
 
             # update lootbox deposit points
@@ -403,7 +384,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
             extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, asset, a)
 
             # verify migration
-            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, targetShares, migData, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
             numPositions += 1
 
             log LegacyRipeGovPositionMigrationExecuted(
@@ -415,12 +396,45 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
                 unlock=migData.unlock,
             )
 
+        # perform house keeping
+        if numPositions > numPositionsBefore:
+            extcall Teller(a.teller).performHousekeeping(True, user, True, a)
+
     return numPositions
 
 
 ####################
 # Validation Utils #
 ####################
+
+
+# migration route validation
+
+
+@view
+@internal
+def _validateMigrationRoute(
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+    _vaultBook: address,
+    _missionControl: address,
+) -> (address, address):
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    assert _sourceVaultId != _targetVaultId # dev: same vault
+
+    # validate source vault
+    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_sourceVaultId) # dev: invalid source vault id
+    sourceVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_sourceVaultId)
+    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
+
+    # validate target vault
+    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_targetVaultId) # dev: invalid target vault id
+    targetVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_targetVaultId)
+    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
+
+    assert sourceVault != targetVault # dev: same vault
+    assert staticcall MissionControl(_missionControl).isStabVaultId(_sourceVaultId) == staticcall MissionControl(_missionControl).isStabVaultId(_targetVaultId) # dev: stab vault mismatch
+    return sourceVault, targetVault
 
 
 # get pre-migration data
@@ -504,14 +518,13 @@ def _verifyRipeGovImport(
     _asset: address,
     _targetVault: address,
     _targetVaultId: uint256,
-    _amount: uint256,
     _targetShares: uint256,
-    _prevSnapShot: PrevSourceSnapshot,
+    _migration: RipeGovMigrationData,
     _targetUserPointsBefore: uint256,
     _targetTotalPointsBefore: uint256,
     _ledger: address,
 ):
-    assert _amount != 0 and _targetShares != 0 # dev: invalid migration result
+    assert _migration.amount != 0 and _targetShares != 0 # dev: invalid migration result
 
     # verify target position
     assert staticcall RipeGovVault(_targetVault).userBalances(_user, _asset) == _targetShares # dev: target shares mismatch
@@ -521,18 +534,18 @@ def _verifyRipeGovImport(
 
     # verify target gov data
     newGd: GovData = staticcall RipeGovVault(_targetVault).userGovData(_user, _asset)
-    assert newGd.govPoints == _prevSnapShot.govPoints # dev: target points mismatch
+    assert newGd.govPoints == _migration.govPoints # dev: target points mismatch
     assert newGd.lastShares == _targetShares # dev: target last shares mismatch
     assert newGd.lastPointsUpdate == block.number # dev: target last update mismatch
-    assert newGd.unlock == _prevSnapShot.unlock # dev: target unlock mismatch
+    assert newGd.unlock == _migration.unlock # dev: target unlock mismatch
 
     # last terms
-    assert newGd.lastTerms.minLockDuration == _prevSnapShot.lastTerms.minLockDuration # dev: target terms mismatch
-    assert newGd.lastTerms.maxLockDuration == _prevSnapShot.lastTerms.maxLockDuration # dev: target terms mismatch
-    assert newGd.lastTerms.maxLockBoost == _prevSnapShot.lastTerms.maxLockBoost # dev: target terms mismatch
-    assert newGd.lastTerms.canExit == _prevSnapShot.lastTerms.canExit # dev: target terms mismatch
-    assert newGd.lastTerms.exitFee == _prevSnapShot.lastTerms.exitFee # dev: target terms mismatch
+    assert newGd.lastTerms.minLockDuration == _migration.lastTerms.minLockDuration # dev: target terms mismatch
+    assert newGd.lastTerms.maxLockDuration == _migration.lastTerms.maxLockDuration # dev: target terms mismatch
+    assert newGd.lastTerms.maxLockBoost == _migration.lastTerms.maxLockBoost # dev: target terms mismatch
+    assert newGd.lastTerms.canExit == _migration.lastTerms.canExit # dev: target terms mismatch
+    assert newGd.lastTerms.exitFee == _migration.lastTerms.exitFee # dev: target terms mismatch
 
     # gov points
-    assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _targetUserPointsBefore + _prevSnapShot.govPoints # dev: target user total mismatch
-    assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _targetTotalPointsBefore + _prevSnapShot.govPoints # dev: target global total mismatch
+    assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _targetUserPointsBefore + _migration.govPoints # dev: target user total mismatch
+    assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _targetTotalPointsBefore + _migration.govPoints # dev: target global total mismatch
