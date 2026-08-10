@@ -4,7 +4,7 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
-def test_ripe_gov_precision_exception_follows_core_vault_pointer(
+def test_ripe_gov_precision_exception_survives_core_vault_pointer_rotation(
     alternate_ripe_gov_vault,
     registerVault,
     mission_control,
@@ -44,8 +44,9 @@ def test_ripe_gov_precision_exception_follows_core_vault_pointer(
     assert user_points.lastBalance == expected_governance_share
 
     mission_control.setCoreRipeGovVaultId(2, sender=switchboard_alpha.address)
-    noncore_user_points, _, _ = lootbox.getLatestDepositPoints(bob, core_id, ripe_token)
-    assert noncore_user_points.lastBalance == expected_governance_share // asset_points.precision
+    historical_user_points, _, _ = lootbox.getLatestDepositPoints(bob, core_id, ripe_token)
+    assert mission_control.isRipeGovVaultId(core_id)
+    assert historical_user_points.lastBalance == expected_governance_share
 
 
 def test_lootbox_deposit_point_routes_fail_closed_when_core_pointer_is_unset(

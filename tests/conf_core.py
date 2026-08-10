@@ -543,7 +543,6 @@ def vault_migrator(ripe_hq_deploy):
         ripe_hq_deploy,
         False,
         ZERO_ADDRESS,
-        0,
         name="vault_migrator",
     )
 

@@ -792,17 +792,17 @@
         "committed_path": "scripts/abis/Lootbox.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "675cd2a8c9304f4e51cef036ffd9cb58bebc674ab3db71bd612365355460abaf",
-        "creation_executable_prefix_size": 23282,
-        "creation_metadata_sha256": "e2a6da09563e327cff48f2099d8e25b276b37cbe6d2d60c5f50fb2cd36aa9138",
+        "creation_executable_prefix_sha256": "e3b06b6a1e0fdb8c15a04c6ce26c7b4082b16a328bb6cba2f6dd7331f3213fb5",
+        "creation_executable_prefix_size": 23144,
+        "creation_metadata_sha256": "80c8c4239b1fa4e113173c188e5096c973b1346e6e9a7283a8668e3457100989",
         "creation_metadata_size": 63,
-        "creation_sha256": "9df28b39db357aee6042acd556cff9418d4972d5176a39a8fb62fb1dd0192b63",
-        "creation_size": 23345,
-        "deployed_eip170_headroom": 1445,
-        "deployed_runtime_size": 23131,
-        "eip170_headroom": 1573,
-        "runtime_template_sha256": "493a933a9744e49414572515c68e909d3541a5748d08c825a0895b8275e80fc7",
-        "runtime_template_size": 23003
+        "creation_sha256": "4ce6571044ff7862ba0515a83999c9f7f271efbd590de58f2f242098c1813521",
+        "creation_size": 23207,
+        "deployed_eip170_headroom": 1583,
+        "deployed_runtime_size": 22993,
+        "eip170_headroom": 1711,
+        "runtime_template_sha256": "f0bdc9e023fd690b20722dd0d77f11cb1cc42547d34ef5514cf30dcd2bfea795",
+        "runtime_template_size": 22865
       },
       "code_layout": {
         "MIN_UNDERSCORE_SEND_INTERVAL": {
@@ -873,9 +873,9 @@
         "canonical_sha256": "6b2978141ca442d4bd271e8f5787a10037df01c307698d431e41229e042ead5c",
         "count": 41
       },
-      "source_git_blob": "ef2ebef6aedd702e952c4725c0af722de1567a82",
+      "source_git_blob": "0b5460f1d1d5dc5080be0ff74cc43beb037bb53b",
       "source_path": "contracts/core/Lootbox.vy",
-      "source_sha256": "895aff0c2cdd05d8f3f298a3a47c79e1f4458d801492cee088932e2ccd32727a",
+      "source_sha256": "be3060e201d8f4d850988282c3341f5c7fdaaf0d948ba7abaac07e3de5b13f67",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -911,26 +911,26 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "db93ba37b28dc256a64a95b05612145c9432d235e72ba4563d1d5ac369c7135d"
+      "transitive_compiler_input_integrity": "8328a99cf69a6d5c8d6f9e575737057cfbaddc3d15fe0f8d1554be1a5e37320f"
     },
     "MissionControl": {
       "abi": {
-        "canonical_sha256": "fb07a0bb2b5fdcfdd5fcca7980f13d67ce7d37b26ecdffcd206c88ef12f4e9c3",
-        "committed_file_sha256": "eae556b9c20e083539cf2879644813088a78559cc92aeb15b3a7460863fe55f4",
+        "canonical_sha256": "9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903",
+        "committed_file_sha256": "d7dfb5c4d03537fb38dba533196787622cf59b608615fc90d629b6804aa3c277",
         "committed_path": "scripts/abis/MissionControl.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "387119d12d30fcd4a12286e229cf34747026810a021e1caa6ffc2bfd56386bb7",
-        "creation_executable_prefix_size": 21549,
-        "creation_metadata_sha256": "a4d20403298431fc80dea4604820877a6f8951b643dd0b61a80e3581373aa886",
+        "creation_executable_prefix_sha256": "f4f87612d4b9c49d6436762794ff7a6ca4eb340d19bb849ffd8f039127aa80a0",
+        "creation_executable_prefix_size": 21631,
+        "creation_metadata_sha256": "08d684001404ab909a8016f1fa5035f277483cb1809b807a4d0b44b7e60998dc",
         "creation_metadata_size": 78,
-        "creation_sha256": "1a3bb02a9a34b2030cc00c9e3baf8689aa8c32b9564743341aba160feb53bdf5",
-        "creation_size": 21627,
-        "deployed_eip170_headroom": 8578,
-        "deployed_runtime_size": 15998,
-        "eip170_headroom": 8674,
-        "runtime_template_sha256": "d1fe5a9af241b8cfc601d5af8589c056d339283598005c92889954f0756897fb",
-        "runtime_template_size": 15902
+        "creation_sha256": "c7e782ef0c91c18a8cab7f701bdfacde3ca210b6eecc385982752f0f11625943",
+        "creation_size": 21709,
+        "deployed_eip170_headroom": 8512,
+        "deployed_runtime_size": 16064,
+        "eip170_headroom": 8608,
+        "runtime_template_sha256": "d449cfde315648a2d13fed883f84134aa7d08ca1d053dc4467ed5934bac5fd42",
+        "runtime_template_size": 15968
       },
       "code_layout": {
         "addys": {
@@ -981,12 +981,12 @@
         "count": 2
       },
       "selectors": {
-        "canonical_sha256": "7715a1c7cf9526f63f07a5882a98a175a20dd410afec30bac66a45925e4d768a",
-        "count": 82
+        "canonical_sha256": "5ed15c3111a296776a3db9edeecd11f27a68973572154e05a78210c1341c5d89",
+        "count": 83
       },
-      "source_git_blob": "9d79143492a677da5a8039ca643a9623541b5b1d",
+      "source_git_blob": "ea26c0abfa9b8b03cd174ca7841f0a6fbc3cc84e",
       "source_path": "contracts/data/MissionControl.vy",
-      "source_sha256": "9585e642c14034956f9503c9534f03c56f0e7de96c27561bb1ddcc00f0de4476",
+      "source_sha256": "e88aa25361c0a188b7ff463ba0c3cf13982cc5af842072eb8f771205cb788cd3",
       "storage_layout": {
         "assetConfig": {
           "n_slots": 1,
@@ -1034,6 +1034,11 @@
           "n_slots": 1,
           "slot": 154,
           "type": "HashMap[address, uint256]"
+        },
+        "isRipeGovVaultId": {
+          "n_slots": 1,
+          "slot": 170,
+          "type": "HashMap[uint256, bool]"
         },
         "isStabVaultId": {
           "n_slots": 1,
@@ -1122,7 +1127,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "8269e7918af64de2ac7b4a8cad3dc330cbf015d5f61c171d5bf1f44dd4c35ac4"
+      "transitive_compiler_input_integrity": "278c6154aabad3d5a7c75ed7b6d91a61bb8423bdd405fed18bc51fdc9b2ddb87"
     },
     "RipeGov": {
       "abi": {
