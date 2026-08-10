@@ -23,8 +23,8 @@ interface Teller:
     def depositOnVaultMigration(_user: address, _asset: address, _amount: uint256, _targetVaultId: uint256, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForLegacyRipeGovMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
-    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
+    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface RipeGovVault:
     def getLatestGovPoints(_lastShares: uint256, _lastPointsUpdate: uint256, _unlock: uint256, _terms: cs.LockTerms, _weight: uint256) -> uint256: view
@@ -103,6 +103,7 @@ event LegacyRipeGovPositionMigrationExecuted:
 MAX_MIGRATION_USERS: constant(uint256) = 25
 MAX_USER_ASSETS: constant(uint256) = 20
 MAX_GOV_USER_ASSETS: constant(uint256) = 5
+
 BASE_CHAIN_ID: constant(uint256) = 8453
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 LEGACY_RIPE_GOV_VAULT: immutable(address)
