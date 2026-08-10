@@ -100,6 +100,34 @@ def test_eager_migrated_source_settlement_entrypoints_are_absent():
         )
 
 
+def test_governance_migration_surface_has_exactly_three_use_cases():
+    expected = {
+        "migrateLegacyRipeGovPositions",
+        "migrateRipeGovPositions",
+        "migrateVaultPositions",
+    }
+    for contract_name in ("VaultMigrator", "SwitchboardEcho"):
+        abi = json.loads(
+            (ROOT / "scripts" / "abis" / f"{contract_name}.json").read_text()
+        )
+        migration_functions = {
+            entry["name"]
+            for entry in abi
+            if entry.get("type") == "function"
+            and "migrat" in entry.get("name", "").lower()
+        }
+        assert migration_functions == expected
+
+    vault_migrator_abi = json.loads(
+        (ROOT / "scripts" / "abis" / "VaultMigrator.json").read_text()
+    )
+    assert not any(
+        entry.get("type") == "event"
+        and entry.get("name") == "LegacyRipeGovMigrationAssetSet"
+        for entry in vault_migrator_abi
+    )
+
+
 def test_robinhood_curve_launch_reuses_frozen_source_and_abi():
     assert {
         path.relative_to(ROOT).as_posix(): hashlib.sha256(

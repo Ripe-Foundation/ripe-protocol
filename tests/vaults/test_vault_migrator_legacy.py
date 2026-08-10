@@ -1,5 +1,5 @@
 import boa
-from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, VAULT_MIGRATOR_HQ_ID
 from conf_utils import filter_logs
 
 
@@ -61,11 +61,11 @@ def test_legacy_binding_requires_both_vault_and_chain(ripe_hq):
 
 
 def test_default_vault_migrator_disables_base_legacy_route(
-    switchboard_echo, governance, ripe_token,
+    switchboard_echo, governance, ripe_token, bob,
 ):
     with boa.reverts("legacy migration disabled"):
-        switchboard_echo.setLegacyRipeGovMigrationAsset(
-            ripe_token, sender=governance.address,
+        switchboard_echo.migrateLegacyRipeGovPositions(
+            [bob], ripe_token, sender=governance.address,
         )
 
 
@@ -88,6 +88,8 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
     ripe_gov_vault,
     ripe_token,
     whale,
+    bravo_token,
+    bravo_token_whale,
     bob,
     teller,
     ledger,
@@ -114,8 +116,19 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
         LOCK_TERMS,
         sender=switchboard_alpha.address,
     )
+    mission_control.setRipeGovVaultConfig(
+        bravo_token,
+        ASSET_WEIGHT,
+        False,
+        LOCK_TERMS,
+        sender=switchboard_alpha.address,
+    )
     setAssetConfig(
         ripe_token,
+        _vaultIds=[LEGACY_RIPE_GOV_VAULT_ID, target_id],
+    )
+    setAssetConfig(
+        bravo_token,
         _vaultIds=[LEGACY_RIPE_GOV_VAULT_ID, target_id],
     )
     setGeneralConfig()
@@ -130,11 +143,21 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
         LOCK_TERMS[0],
         sender=teller.address,
     )
+    bravo_token.transfer(source, amount, sender=bravo_token_whale)
+    source.depositTokensWithLockDuration(
+        bob,
+        bravo_token,
+        amount,
+        LOCK_TERMS[0],
+        sender=teller.address,
+    )
     ledger.addVaultToUser(bob, LEGACY_RIPE_GOV_VAULT_ID, sender=teller.address)
     boa.env.time_travel(blocks=LOCK_TERMS[0] + 25)
     source.updateUserGovPoints(bob, sender=switchboard_alpha.address)
-    source_data = source.userGovData(bob, ripe_token)
-    assert source_data.govPoints > 0
+    ripe_source_data = source.userGovData(bob, ripe_token)
+    bravo_source_data = source.userGovData(bob, bravo_token)
+    assert ripe_source_data.govPoints > 0
+    assert bravo_source_data.govPoints > 0
 
     with boa.reverts("use legacy migration route"):
         switchboard_echo.migrateRipeGovPositions(
@@ -154,33 +177,47 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
     assert not source.isPaused()
     assert not lootbox.isPaused()
 
-    assert switchboard_echo.setLegacyRipeGovMigrationAsset(
-        ripe_token, sender=governance.address,
-    )
-    assert migrator.activeMigrationAsset() == ripe_token.address
-
     assert switchboard_echo.migrateLegacyRipeGovPositions(
         [bob], ripe_token, sender=governance.address,
     ) == 1
     assert source.getTotalAmountForUser(bob, ripe_token) == 0
+    assert source.getTotalAmountForUser(bob, bravo_token) == amount
     assert target.getTotalAmountForUser(bob, ripe_token) == amount
     assert ledger.isParticipatingInVault(bob, LEGACY_RIPE_GOV_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
-
-    target_data = target.userGovData(bob, ripe_token)
-    assert target_data.govPoints == source_data.govPoints
-    assert target_data.unlock == source_data.unlock
-    assert target_data.lastTerms == source_data.lastTerms
-
-    migration_logs = filter_logs(
+    ripe_migration_logs = filter_logs(
         switchboard_echo, "LegacyRipeGovPositionMigrationExecuted",
     )
-    assert len(migration_logs) == 1
-    assert migration_logs[0].caller == governance.address
+    assert len(ripe_migration_logs) == 1
+    assert ripe_migration_logs[0].asset == ripe_token.address
+    assert ripe_migration_logs[0].caller == governance.address
 
-    assert switchboard_echo.setLegacyRipeGovMigrationAsset(
-        ZERO_ADDRESS, sender=governance.address,
+    # The next direct call may select a different supported asset; no persistent
+    # operational window is required or left behind between batches.
+    # Titanoboa retains EIP-1153 values between simulated top-level calls;
+    # production EVMs clear them at the transaction boundary.
+    boa.env.evm.vm.state.clear_transient_storage()
+    assert switchboard_echo.migrateLegacyRipeGovPositions(
+        [bob], bravo_token, sender=governance.address,
+    ) == 1
+    assert source.getTotalAmountForUser(bob, bravo_token) == 0
+    assert target.getTotalAmountForUser(bob, bravo_token) == amount
+    bravo_migration_logs = filter_logs(
+        switchboard_echo, "LegacyRipeGovPositionMigrationExecuted",
     )
+    assert len(bravo_migration_logs) == 1
+    assert bravo_migration_logs[0].asset == bravo_token.address
+    assert bravo_migration_logs[0].caller == governance.address
+
+    ripe_target_data = target.userGovData(bob, ripe_token)
+    bravo_target_data = target.userGovData(bob, bravo_token)
+    assert ripe_target_data.govPoints == ripe_source_data.govPoints
+    assert ripe_target_data.unlock == ripe_source_data.unlock
+    assert ripe_target_data.lastTerms == ripe_source_data.lastTerms
+    assert bravo_target_data.govPoints == bravo_source_data.govPoints
+    assert bravo_target_data.unlock == bravo_source_data.unlock
+    assert bravo_target_data.lastTerms == bravo_source_data.lastTerms
+
     for contract in (
         target,
         teller,
@@ -193,6 +230,7 @@ def test_base_legacy_route_preserves_position_then_normal_claim_cleans_source(
 
     teller.claimLoot(bob, False, sender=bob)
     assert not source.isUserInVaultAsset(bob, ripe_token)
+    assert not source.isUserInVaultAsset(bob, bravo_token)
     assert not ledger.isParticipatingInVault(bob, LEGACY_RIPE_GOV_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
     assert migrator.LEGACY_RIPE_GOV_VAULT() == source.address
@@ -204,6 +242,7 @@ def test_legacy_binding_rejects_wrong_chain(
     governance,
     ripe_gov_vault,
     ripe_token,
+    bob,
     switchboard_echo,
 ):
     _install_legacy_migrator(ripe_hq, ripe_gov_vault, governance)
@@ -211,8 +250,8 @@ def test_legacy_binding_rejects_wrong_chain(
     boa.env.evm.patch.chain_id = original_chain_id + 1
     try:
         with boa.reverts("legacy migration disabled"):
-            switchboard_echo.setLegacyRipeGovMigrationAsset(
-                ripe_token, sender=governance.address,
+            switchboard_echo.migrateLegacyRipeGovPositions(
+                [bob], ripe_token, sender=governance.address,
             )
     finally:
         boa.env.evm.patch.chain_id = original_chain_id

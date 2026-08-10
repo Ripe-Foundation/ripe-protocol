@@ -5,8 +5,8 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "SwitchboardBravo": 23_082,
     # VaultMigrator centralizes all three migration paths. Adding its canonical
     # ID/getters to Addys also changes the runtime of Addys consumers.
-    "SwitchboardEcho": 23_321,
-    "VaultMigrator": 14_169,
+    "SwitchboardEcho": 23_147,
+    "VaultMigrator": 13_734,
     "Teller": 23_485,
     "TellerUtils": 8_976,
     "Ledger": 13_392,

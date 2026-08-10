@@ -2261,22 +2261,22 @@
     },
     "VaultMigrator": {
       "abi": {
-        "canonical_sha256": "085ec9d346913280532ad5c7db1e29ceff87bce4bb564d83852ac47fc848464e",
-        "committed_file_sha256": "90419c5401fcf8a3c8b5f526f6a6357bf1dff9ee99aebbb7372b93de78d10110",
+        "canonical_sha256": "ebf56d1303d2f9f4e59fdeb927dd18325acdeee4d8e2cbf3aeb2fed6e5e4e8e9",
+        "committed_file_sha256": "cc8f71f14a2d6a9c666bafffbe4fd04d4b9f1bd0ab76b0c1f8aeef6d3baf89d1",
         "committed_path": "scripts/abis/VaultMigrator.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "cf8da0792ee1785555b4718aeb79d04c75f929e93bbac8174df4707b1cb9a140",
-        "creation_executable_prefix_size": 14211,
-        "creation_metadata_sha256": "f7c19b4970c939fbfb8142b38ee4638b90ef95853ee530bae3b431797a3a03f7",
-        "creation_metadata_size": 57,
-        "creation_sha256": "89738eb37e26104b42d4ed9cfd2056cc4d8303e5b34b316bb16c87e62ab3778b",
-        "creation_size": 14268,
-        "deployed_eip170_headroom": 10407,
-        "deployed_runtime_size": 14169,
-        "eip170_headroom": 10567,
-        "runtime_template_sha256": "83b1fc9ca702cccbbe6a40a6e81df6c43274137b0bad15a5763a1f198a44fea1",
-        "runtime_template_size": 14009
+        "creation_executable_prefix_sha256": "420428bf35eff4acf7ef9a70e0f0be18eb4735a9628c0cb22483577bbd99a0b1",
+        "creation_executable_prefix_size": 13776,
+        "creation_metadata_sha256": "7a316af2c65a512f0dda2a126d51c720ba4f24fb26f7a7bb6e73af8c975519d8",
+        "creation_metadata_size": 59,
+        "creation_sha256": "d7b476492b5b14c192fb696d231f2dca3398ba87a26b5d82763d1fb34a62f61a",
+        "creation_size": 13835,
+        "deployed_eip170_headroom": 10842,
+        "deployed_runtime_size": 13734,
+        "eip170_headroom": 11002,
+        "runtime_template_sha256": "9c389ba5b7a927117d1f2e03601bf05704ece56bd1bc8494056b0ee6f48cfa41",
+        "runtime_template_size": 13574
       },
       "code_layout": {
         "LEGACY_CHAIN_ID": {
@@ -2341,22 +2341,17 @@
       "constructor_bound_runtime_template": true,
       "effective_optimization": "codesize",
       "events": {
-        "canonical_sha256": "b7b443d364efc648e80f590bf14a5f265e6007a3a6baf09d56fa185cfeb8ddb5",
-        "count": 6
+        "canonical_sha256": "d7fe5c786f846b321a236ead754cd35b782a59ec7a0fdaacb21f40ef0f476d24",
+        "count": 5
       },
       "selectors": {
-        "canonical_sha256": "4b1791b9b51768a8b4f14acb0f169151b66efa8a789241e46ac0ed3c545ddbd3",
-        "count": 15
+        "canonical_sha256": "bf389253fdfab5b242a09f45c07644017b6520314c49c569996baa06d06cbde0",
+        "count": 13
       },
-      "source_git_blob": "873906ee30e653f3f09ffbb87d1c435ed45a77cb",
+      "source_git_blob": "6841dab371ecfa85ceb54b6963e3a01bab9676a5",
       "source_path": "contracts/core/VaultMigrator.vy",
-      "source_sha256": "05d3b45c8c9204dd5cc4eed08620f6ff8240526037177643bbdb52b0859be3d9",
+      "source_sha256": "c8b64f6a7d95153a3d2f44bd553049cb5fb4f0dee4e7443d87dd8eea91cedd3c",
       "storage_layout": {
-        "activeMigrationAsset": {
-          "n_slots": 1,
-          "slot": 1,
-          "type": "address"
-        },
         "deptBasics": {
           "isPaused": {
             "n_slots": 1,
@@ -2372,7 +2367,7 @@
           "type": "HashMap[address, bool]"
         }
       },
-      "transitive_compiler_input_integrity": "15981aa7b567e496bc7fed40aab1c06e2019dbc4e3f56866f8cfc8690b9e4cef"
+      "transitive_compiler_input_integrity": "590723c85ca312cc0512c52765e00f2ae8cfa7ae3bdde4a57208ebcd69ae96b9"
     }
   },
   "schema_version": 1

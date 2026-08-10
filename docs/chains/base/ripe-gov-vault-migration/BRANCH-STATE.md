@@ -31,6 +31,16 @@ all orchestration, validation, lifecycle state, batching, reconciliation and mig
 2. exporter-capable RipeGov migration; and
 3. the immutable Base legacy RipeGov migration.
 
+The governance-facing surface now matches those three use cases exactly:
+
+1. `migrateVaultPositions` — ordinary registered vault to ordinary registered vault;
+2. `migrateRipeGovPositions` — exporter-capable RipeGov to another exporter-capable RipeGov; and
+3. `migrateLegacyRipeGovPositions` — immutable Base legacy RipeGov to the current core RipeGov.
+
+There is no separate legacy setup/window setter. Every legacy batch carries one explicit asset and
+re-runs the Base chain, immutable source, VaultBook id 2, target, support, pause/freeze, position and
+post-import checks. Different supported assets can be migrated in consecutive governance calls.
+
 `VaultMigrator` is also present in `contracts/modules/Addys.vy` with canonical id/address getters.
 The hot `Addys` struct was deliberately not widened. Teller authenticates VaultMigrator through the
 canonical Addys getter, which is rooted in Teller's immutable RipeHQ address. Lootbox has no
@@ -61,7 +71,7 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
   spending Teller's limited bytecode headroom on duplicate migration policy.
 - Each migration checkpoints deposit points for the source and target asset. It deliberately leaves
   the depleted source asset registered and the source vault in Ledger.
-- After the migration window is closed and the freeze is lifted, the user's ordinary Teller/Lootbox
+- After the migration batches finish and the freeze is lifted, the user's ordinary Teller/Lootbox
   claim settles those checkpointed rewards, deregisters each zero-balance asset only after its
   entitlement is gone, and removes the source Ledger entry only after no source assets remain.
 - All migration-specific code was removed from TellerUtils.
@@ -95,7 +105,7 @@ VaultMigrator's constructor is:
 ```
 
 Both legacy values must be zero (legacy route disabled) or both nonzero. The Base deployment binds
-the exact deployed legacy vault and chain id 8453. Opening or using the legacy route checks the chain
+the exact deployed legacy vault and chain id 8453. Using the legacy route checks the chain
 and proves VaultBook id 2 resolves to the immutable vault. The generic RipeGov route also rejects that
 immutable source, forcing it through the legacy-only checks. This intentionally prevents the Base-only
 route from becoming usable on another chain, against a replacement source or through the wrong path.
@@ -106,10 +116,10 @@ dependency: making ordinary claims depend on VaultMigrator availability would ri
 before registry activation or after the legacy component is removed.
 
 The legacy route preserves the asymmetric endpoint rule (legacy source unpaused, target paused), the
-full Teller/AuctionHouse/CreditEngine/HumanResources/Deleverage freeze, one open asset window at a
-time, exact position/points/lock import checks, and retained source Ledger participation. A normal
-claim performs reward and registration cleanup only after the window is closed and the freeze is
-lifted. The migration batch's transient duplicate map still rejects a repeated user within a batch.
+full Teller/AuctionHouse/CreditEngine/HumanResources/Deleverage freeze, per-call asset validation,
+exact position/points/lock import checks, and retained source Ledger participation. A normal claim
+performs reward and registration cleanup only after the freeze is lifted. The migration batch's
+transient duplicate map still rejects a repeated user within a batch.
 
 The planned replacement Base MissionControl supplies `coreRipeGovVaultId()`. Per owner direction,
 there is no live Base RPC-check task for the old MissionControl.
@@ -120,10 +130,10 @@ Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these
 
 | Contract | Deployed runtime | EIP-170 headroom |
 |---|---:|---:|
-| VaultMigrator | 14,169 | 10,407 |
+| VaultMigrator | 13,734 | 10,842 |
 | Teller | 23,485 | 1,091 |
 | TellerUtils | 8,976 | 15,600 |
-| SwitchboardEcho | 23,321 | 1,255 |
+| SwitchboardEcho | 23,147 | 1,429 |
 | Lootbox | 23,131 | **1,445** |
 | Ledger | 13,392 | 11,184 |
 
@@ -142,8 +152,8 @@ for terminal-category liveness and is recorded here rather than treated as free.
 - all changed/new production contracts compile;
 - `tests/vaults/test_vault_migration.py`: 39 passed, 4 deselected, including a two-asset source that
   survives the first claim and is removed only after the second asset migrates and is claimed;
-- new `tests/vaults/test_vault_migrator_legacy.py`: 5 passed, including ordinary-claim cleanup after
-  the legacy freeze is lifted;
+- new `tests/vaults/test_vault_migrator_legacy.py`: 5 passed, including consecutive migrations of
+  two assets for the same user and ordinary-claim cleanup after the legacy freeze is lifted;
 - focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
 - `tests/core/teller/`: 272 passed, 3 xfailed;
 - `tests/core/lootbox/`: 199 passed, including terminal-dust, structurally-unfunded live-category,
@@ -152,14 +162,15 @@ for terminal-category liveness and is recorded here rather than treated as free.
   pause semantics replaced the five stale failure/strict-XPASS expectations;
 - the exact three pause-characterization nodes, two former strict-XPASS nodes and frozen
   SimpleErc20 binding checkpoint: 6 passed;
-- `tests/inventory/test_contract_artifacts.py`: 45 passed;
+- `tests/inventory/test_contract_artifacts.py`: 46 passed, including the exact-three-function ABI
+  surface and absence of the removed legacy asset-window event;
 - exact deployed-size regression: passed;
 - RipeHQ id-25 checkpoint (migration, legacy, artifacts, sizes and Robinhood registry topology):
   91 passed, 4 intentionally deselected;
 - deterministic ABIs and compiler-backed artifact expectations include VaultMigrator and the changed
   Teller/TellerUtils/Echo/Lootbox/Ledger interfaces.
 
-The exact consolidated command below produced `301 passed, 4 deselected` on the merged candidate;
+The exact consolidated command below produced `302 passed, 4 deselected` on the merged candidate;
 the aggregate is reproducible and is not a substitute for the separately recorded pause and frozen-
 artifact policy evidence:
 
@@ -211,8 +222,8 @@ The same review identified two separate branch decisions. The owner resolved bot
 ### Remaining work before deployment
 
 1. Independent re-review of the remediated authority boundary and the Base legacy constructor values.
-2. Base fork/census qualification and the serial asset-window runbook: close window, restore and
-   verify MissionControl terms, then open the next asset.
+2. Base fork/census qualification and the serial asset runbook: finish an asset's batches, restore
+   and verify its MissionControl terms, then submit batches for the next asset.
 3. Re-prove ordinary-claim reward liveness and per-user collateral parity on the Base fork. The local
    terminal-dust matrix is covered. CreditEngine is intentionally paused during the legacy window,
    so no on-chain debt-health refresh can run during migration.
@@ -227,7 +238,7 @@ The same review identified two separate branch decisions. The owner resolved bot
 ### Eventual removal boundary
 
 After Base legacy migration completes, delete only the Base-specific legacy constructor binding,
-asset window, legacy migration batch, snapshots/checks/events, and Lootbox legacy precision
+legacy migration batch, snapshots/checks/events, and Lootbox legacy precision
 exception. Keep VaultMigrator's ordinary vault and exporter-capable RipeGov paths, Addys/RipeHQ id
 25, the ordinary Lootbox claim cleanup path, and the permanent Lootbox/Ledger no-forfeiture fixes.
 
@@ -419,21 +430,21 @@ is removed, §0.1 and §11); **P** = permanent, shared, all chains.
 | `Ledger.removeVaultFromUserForMigration` call **and** interface line removed | Multi-asset defect. §5.3 | P |
 | `migrateRipeGovPosition` branches on `_sourceVaultId == LEGACY_RIPE_GOV_VAULT_ID` | One entry point for both sources. §4.5 | T |
 | No debt-health housekeeping on either legacy path | The freeze requires CreditEngine paused, which would make it revert. §5.4b | T |
-| `activeMigrationAsset` storage + `setLegacyRipeGovMigrationAsset` | One open asset window at a time, enforced close-before-open so no single transaction hands the window from RIPE to LP. Does **not** prove MissionControl terms were restored — that is a runbook invariant. §5.6 | T |
+| ~~`activeMigrationAsset` storage + `setLegacyRipeGovMigrationAsset`~~ | **Removed in the three-use-case simplification.** The asset was already an explicit legacy-batch argument; the extra governance latch weakly modeled a runbook without proving configuration restoration. | removed |
 | `settleAndCleanupLegacyRipeGovSource` | Teller-side wrapper for the Lootbox settlement; exists in Teller only because the Lootbox function is Teller-gated (see §5.1 lever 3). | T |
 | `LEGACY_RIPE_GOV_VAULT_ID = 2` constant, `LegacySourceSnapshot` struct | Legacy binding and the snapshot mirror. | T |
-| `LegacyRipeGovMigrationAssetSet`, `LegacyRipeGovSourceSettled` events | Window and settlement observability. | T |
+| `LegacyRipeGovPositionMigrationExecuted` | Per-user legacy reconciliation. The separate asset-window event was removed with its setter. | T |
 | Interface additions (4 × TellerUtils, `MissionControl.isSupportedAssetInVault`, `Lootbox.settleAndCleanupMigratedSource`) | Support the above. | T |
 
 #### `contracts/config/SwitchboardEcho.vy` (+108)
 
 | Change | Why | |
 |---|---|---|
-| `setLegacyRipeGovMigrationAsset`, `migrateLegacyRipeGovPositions`, `settleAndCleanupLegacyRipeGovSources` | Governance-only batch layer — without it the flow is unreachable. Follows the existing `migrateRipeGovPositions` shape: bounded array, per-row extcall, per-row event, return count. | T |
-| Wrappers carry **no** source/target ids and no recipient | Teller binds the legacy source, resolves the target from `coreRipeGovVaultId`, and enforces the open asset window. Keeps the batch from becoming an arbitrary token-moving primitive. | T |
+| `migrateLegacyRipeGovPositions` | The sole governance-facing Base legacy function. It follows the other two migration shapes: bounded batch, explicit asset, per-user event and return count. | T |
+| Wrapper carries **no** source/target ids and no recipient | VaultMigrator binds the immutable legacy source and resolves the target from `coreRipeGovVaultId`; the explicit asset is fully revalidated on every call. Keeps the batch from becoming an arbitrary token-moving primitive. | T |
 | `MAX_LEGACY_MIGRATIONS = 25` | Hard ceiling, not a target size — the operational batch limit is measured on the fork and will be lower. | T |
 | `legacyUserDedupe` transient map | A repeated user hits the target's replay protection on the second row and reverts the whole batch after burning every preceding row's gas. Rejected up front with a specific reason. Uses the transient-dedupe pattern already in `SwitchboardAlpha`. | T |
-| 3 `…Executed` events | Per-row reconciliation. | T |
+| One legacy `…Executed` event | Per-user reconciliation; ordinary and exporter-capable paths have their own events. | T |
 | `MissionControl.coreRipeGovVaultId` added to interface | Echo resolves the target id to pass to the merged entry point. | T |
 
 ---
@@ -465,12 +476,14 @@ Levers, with estimates:
 2. Shrink or drop `verifyLegacyRipeGovImport` — a 10-argument staticcall carrying a 7-field struct,
    the most expensive thing left in the legacy branch. Worth a few hundred bytes, but it is
    post-condition safety that review specifically asked for. Owner decision.
-3. **Move the settlement path and the asset window out of Teller entirely.** `Lootbox`'s
+3. **Historical lever, resolved.** Move the settlement path and operational state out of Teller.
+   `Lootbox`'s
    `settleAndCleanupMigratedSource` is gated on `msg.sender == addys._getTellerAddr()`, which is the
    *only* reason `settleAndCleanupLegacyRipeGovSource` lives in Teller — settlement needs no Teller
    privilege otherwise. Re-gate it to `addys._isSwitchboardAddr` and the whole path (plus
-   `setLegacyRipeGovMigrationAsset` and the `activeMigrationAsset` storage and getter) can move to
-   SwitchboardEcho, which has 495 bytes free. **This is the most promising remaining lever** and,
+   legacy state could move to SwitchboardEcho, which had 495 bytes free. The final architecture
+   instead centralized migration policy in VaultMigrator, removed eager settlement, and later removed
+   the redundant active-asset state entirely. This preserved the intended outcome and,
    unlike option 4, it removes transitional code from shared Teller rather than adding permanent
    scars to it. Unverified estimate; measure before committing to it.
 4. **Move unrelated existing Teller functionality into TellerUtils** (6,369 bytes free). Definitely
@@ -570,9 +583,10 @@ previous value when changing it) — that contract is therefore also in the depl
 - **Reward liveness.** The settlement fails closed if an entitlement cannot be paid in full. "Retry
   when the buckets grow" is not a completion guarantee — the census must prove every manifest user
   can reach a payable state.
-- **Serial wind-down.** On-chain only enforces close-before-open. Restoring the prior asset's
-  MissionControl terms and reading them back is a **runbook** invariant: close window → restore terms
-  → read back and compare against pinned baseline → open next. Fail closed at each step.
+- **Serial wind-down.** Each call validates its explicit asset, but on-chain code does not claim to
+  prove operational sequencing. Restoring MissionControl terms and reading them back is a **runbook**
+  invariant: finish all batches for asset A → restore A → read back and compare against the pinned
+  baseline → begin asset B. Fail closed at each step.
 - **Target pause window.** The target must stay paused from registration until every migration
   completes. HR resolves the target from registration onward, so during that interval a contributor's
   real position is still in the legacy vault; every HR mutating path routes into the paused target
@@ -696,7 +710,7 @@ deployed. Delete everything marked **T** in §4.6. Specifically:
   ordinary claim cleanup path — `_calcSpecificLoot`, `_isCategoryBlocked`, the atomic commit, the
   flush removal and the claim-loop deregistration gating are all **P**.
 - **`VaultMigrator.vy`** — remove the Base-only constructor binding, chain/vault binding checks,
-  exclusive-freeze helper, active asset window, legacy migration batch, legacy snapshot/import
+  exclusive-freeze helper, legacy migration batch, legacy snapshot/import
   validation and legacy events. Keep the ordinary vault and exporter-capable RipeGov paths.
 - **`Teller.vy`** — remove only the legacy-specific branch/argument from the thin RipeGov source
   identity step if it is no longer used. Keep the Ledger-removal deletion (**P**) — do not reinstate

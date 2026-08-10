@@ -1910,23 +1910,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "setLegacyRipeGovMigrationAsset",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "migrateLegacyRipeGovPositions",
     "inputs": [
       {

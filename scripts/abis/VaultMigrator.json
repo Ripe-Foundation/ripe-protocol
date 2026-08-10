@@ -99,23 +99,6 @@
     "type": "event"
   },
   {
-    "name": "LegacyRipeGovMigrationAssetSet",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "indexed": true
-      }
-    ],
-    "anonymous": false,
-    "type": "event"
-  },
-  {
     "name": "LegacyRipeGovPositionMigrationExecuted",
     "inputs": [
       {
@@ -450,27 +433,6 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "setLegacyRipeGovMigrationAsset",
-    "inputs": [
-      {
-        "name": "_asset",
-        "type": "address"
-      },
-      {
-        "name": "_caller",
-        "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
     "name": "migrateLegacyRipeGovPositions",
     "inputs": [
       {
@@ -514,18 +476,6 @@
       {
         "name": "",
         "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "view",
-    "type": "function",
-    "name": "activeMigrationAsset",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
       }
     ]
   },

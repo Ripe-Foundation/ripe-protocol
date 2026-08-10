@@ -118,11 +118,6 @@ event VaultPositionMigrationExecuted:
     amount: uint256
 
 
-event LegacyRipeGovMigrationAssetSet:
-    asset: indexed(address)
-    caller: indexed(address)
-
-
 event LegacyRipeGovPositionMigrationExecuted:
     user: indexed(address)
     asset: indexed(address)
@@ -143,7 +138,6 @@ LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 LEGACY_RIPE_GOV_VAULT: public(immutable(address))
 LEGACY_CHAIN_ID: public(immutable(uint256))
 
-activeMigrationAsset: public(address)
 legacyMigrationUserDedupe: transient(HashMap[address, bool])
 
 
@@ -276,26 +270,6 @@ def migrateVaultPositions(
 
 
 @external
-def setLegacyRipeGovMigrationAsset(_asset: address, _caller: address) -> bool:
-    self._assertSwitchboardEcho()
-    assert not deptBasics.isPaused # dev: contract paused
-    assert _caller != empty(address) # dev: invalid caller
-    assert LEGACY_CHAIN_ID != 0 and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
-
-    a: addys.Addys = addys._getAddys()
-    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
-    self._assertLegacyBinding(sourceVault)
-    assert _asset == empty(address) or staticcall MissionControl(a.missionControl).isSupportedAssetInVault(LEGACY_RIPE_GOV_VAULT_ID, _asset) # dev: unapproved migration asset
-
-    if _asset != empty(address):
-        assert self.activeMigrationAsset == empty(address) # dev: window already open
-
-    self.activeMigrationAsset = _asset
-    log LegacyRipeGovMigrationAssetSet(asset=_asset, caller=_caller)
-    return True
-
-
-@external
 def migrateLegacyRipeGovPositions(
     _users: DynArray[address, MAX_LEGACY_MIGRATIONS],
     _asset: address,
@@ -305,14 +279,15 @@ def migrateLegacyRipeGovPositions(
     assert not deptBasics.isPaused # dev: contract paused
     assert _caller != empty(address) # dev: invalid caller
     assert len(_users) != 0 # dev: no migrations
-    assert _asset != empty(address) and _asset == self.activeMigrationAsset # dev: asset window closed
+    assert _asset != empty(address) # dev: invalid asset
+    assert LEGACY_CHAIN_ID != 0 and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
 
     a: addys.Addys = addys._getAddys()
+    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
+    self._assertLegacyBinding(sourceVault)
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
     assert targetVaultId != 0 and targetVaultId != LEGACY_RIPE_GOV_VAULT_ID # dev: invalid target vault id
-    sourceVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(LEGACY_RIPE_GOV_VAULT_ID)
     targetVault: address = staticcall AddressRegistry(a.vaultBook).getAddr(targetVaultId)
-    self._assertLegacyBinding(sourceVault)
 
     teller: Teller = Teller(a.teller)
     for user: address in _users:

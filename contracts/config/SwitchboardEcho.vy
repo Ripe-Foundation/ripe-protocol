@@ -66,7 +66,6 @@ interface RipeGovVault:
 interface VaultMigrator:
     def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS], _caller: address) -> uint256: nonpayable
     def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS], _caller: address) -> uint256: nonpayable
-    def setLegacyRipeGovMigrationAsset(_asset: address, _caller: address) -> bool: nonpayable
     def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_LEGACY_MIGRATIONS], _asset: address, _caller: address) -> uint256: nonpayable
 
 interface VaultBook:
@@ -664,13 +663,7 @@ def migrateRipeGovPositions(
 
 
 # Governance remains in Echo; VaultMigrator owns the batch, legacy binding, target resolution,
-# duplicate rejection, active-asset window and reconciliation.
-
-
-@external
-def setLegacyRipeGovMigrationAsset(_asset: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).setLegacyRipeGovMigrationAsset(_asset, msg.sender)
+# per-call asset validation, duplicate rejection and reconciliation.
 
 
 @external
