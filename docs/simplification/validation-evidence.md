@@ -809,28 +809,34 @@ the binding evidence, and it binds the exact tree below.**
 ```text
 baseline commit = 5a664cd5852c6c82aa649628afd04ca4b95ccdcf   (origin/rh)
 baseline tree   = c8208d58c53f352e492286a59f4b3350b79465e1
-candidate commit= 1e2d5902ad4604ed7ec802c825afb79c07e7a23e
-candidate tree  = 71ccb4722569272c0f8b51b31b6a8cec0e242ca7
+candidate commit= d98caee3a6351b6e26f60c2bc5e4f55b21deb706
+candidate tree  = 212741ca4c8eada05db29449273e77f1ac38db15
 ```
 
-This is the **third** binding of this section, and the invariant below has now
-been honoured twice rather than argued around:
+This is the **fourth** binding of this section. The invariant below has now been
+honoured three times rather than argued around, once at real cost:
 
 1. The first binding named `de65668`. A review found three assurance gaps; the
-   commit fixing them, `f0b6741`, touches `tests/`. Rebound, all four lanes re-run
-   from scratch.
-2. `f0b6741` then gained one more change — deleting the orphaned
-   `contracts/mock/MockSGreenPrice.vy` on the owner's decision. Nothing references
-   that file and the ABI census provably does not move, so it would have been easy
-   to call inert and leave the matrix alone. It touches `contracts/`, so the
-   matrix was rebound anyway.
+   commit fixing them, `f0b6741`, touches `tests/`. Rebound, all four lanes re-run.
+2. `f0b6741` then gained a deletion of `contracts/mock/MockSGreenPrice.vy`.
+   Nothing referenced it and the ABI census provably did not move, so it would
+   have been easy to call inert. It touches `contracts/`, so the matrix was
+   rebound anyway; both candidate lanes returned results identical to step 1.
+3. A third review established that the deletion in step 2 had been authorized on
+   a false claim — the file *was* deployed and registered on Base Sepolia v1 — and
+   the owner reversed it. That restore, two guard corrections, and a new index
+   test all touch `contracts/` or `tests/`. Rebound again.
 
-The baseline lanes were **not** re-run for step 2: `origin/rh` is unmoved at
-`5a664cd`, verified before and after, so `bl.xml` and `bc.xml` describe the same
-commit and the same tree they always did. Only the candidate lanes were re-run.
-Both returned results identical to the previous binding, which is the expected
-outcome for a deletion of an unreferenced file and is recorded here as a measured
-result rather than assumed.
+Step 3 also caught something a pass/fail summary would not have. The first run of
+the new index test emitted a `SyntaxWarning` from its own docstring — a backslash
+escape of a backtick, which is not a special character in Python. The lanes were
+green with it. Both were re-run against the corrected tree, because this branch
+has carried "zero warnings" as a stated property and shipping a self-inflicted
+one would have quietly retired it. The figures above are from the clean run.
+
+The baseline lanes were **not** re-run at any step: `origin/rh` is unmoved at
+`5a664cd`, verified before and after each, so `bl.xml` and `bc.xml` describe the
+same commit and tree they always did. Only candidate lanes were re-executed.
 
 Both lanes ran under the locked `rh-wave2-py312` interpreter (Python 3.12.0,
 Vyper 0.4.3, titanoboa 0.2.7) with private `RIPE_BOA_CACHE_DIR`, `XDG_CACHE_HOME`,
@@ -864,13 +870,14 @@ regenerated before merge.
 All four lanes below were measured in this pass. Counts are pytest's own summary
 line, cross-checked against the archived JUnit XML.
 
-| Lane | Baseline `5a664cd` | Candidate `1e2d590` |
+| Lane | Baseline `5a664cd` | Candidate `d98caee` |
 | --- | --- | --- |
-| Lean | 18 failed, 3,389 passed, 25 errors, 24 xfailed | 13 failed, 3,405 passed, 25 errors, 24 xfailed |
-| Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 xfailed | 42 failed, 4,332 passed, 33 errors, 24 xfailed |
+| Lean | 18 failed, 3,389 passed, 25 errors, 24 xfailed | 13 failed, 3,408 passed, 25 errors, 24 xfailed |
+| Comprehensive | 127 failed, 4,571 passed, 33 errors, 24 xfailed | 42 failed, 4,335 passed, 33 errors, 24 xfailed |
 
-Candidate figures are from the re-run at `1e2d590`; baseline figures are the
+Candidate figures are from the re-run at `d98caee`; baseline figures are the
 `5a664cd` runs, unchanged and not re-executed because that commit did not move.
+Both candidate lanes reported **zero warnings**.
 
 **On "xfailed" versus "skipped".** An earlier revision of this table wrote
 `24 skipped` on the comprehensive row and `24 xfailed` on the lean row, for the
@@ -889,29 +896,31 @@ Compared per test node from the JUnit XML (`classname::name` plus status):
 here.
 
 Node deltas, lean lane: 4 baseline-only identities, all failing — the retired
-mutant-hash IDs. **15 candidate-only identities, all passing.** One retained node
+mutant-hash IDs. **18 candidate-only identities, all passing.** One retained node
 moves failing → passing (`test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit`,
 which asserted the stale size dict).
 
 Node deltas, comprehensive lane: 339 baseline-only identities (256 passing, 83
 failing), from the deleted block-clock and probe suites plus the retired mutant
-IDs; **15 candidate-only identities, all passing**. Two retained nodes move
+IDs; **18 candidate-only identities, all passing**. Two retained nodes move
 failing → passing — the one above, plus
 `test_every_committed_base_json_parses_without_rewrite`.
 
-The 15 candidate-only identities are the same set on both lanes: the four
+The 18 candidate-only identities are the same set on both lanes: the four
 exact-diff mutant checks, the same-line negative regression, the eight
-manifest-consumer tests, and the two waiver-identity tests added for RH-D026.
+manifest-consumer tests, the two waiver-identity tests added for RH-D026, and the
+three `REMOVED.md` index-reconciliation tests.
 
-**Why the candidate counts moved since the previous binding** (lean 3,395 → 3,405;
-comprehensive 4,330 → 4,332), with no test deleted and none newly failing:
+**Why the candidate counts moved across the bindings**, with no test deleted and
+none newly failing:
 
 | Change | Lean | Comprehensive |
 | --- | ---: | ---: |
-| Previous binding | 3,395 | 4,330 |
+| First binding (`de65668`) | 3,395 | 4,330 |
 | RH-D026 waiver-identity tests, new | +2 | +2 |
 | Manifest-consumer tests moved out of `tests/deployment` | +8 | 0 |
-| This binding | **3,405** | **4,332** |
+| `REMOVED.md` index-reconciliation tests, new | +3 | +3 |
+| This binding (`d98caee`) | **3,408** | **4,335** |
 
 The manifest tests are +8 on the lean lane and 0 on the comprehensive lane
 because comprehensive already collected them at their old path; only the lean
@@ -919,17 +928,37 @@ lane, which passes `--ignore=tests/deployment`, could not see them. That is the
 defect their move fixed: the automatic pull request lane runs lean, so those
 eight guards had never executed in CI.
 
+Restoring `MockSGreenPrice.vy` contributes nothing to either column — no test
+referenced it before its deletion and none does now, which is the fact that made
+the original claim about it sound plausible and is not the same as the claim that
+was made.
+
 ### Evidence files
 
 Archived to `~/dev/ripe-protocol-review-archives/rh-machete-chop/final-binding-v2/`,
 alongside the pytest console log of each run:
 
+Archive moved to `final-binding-v3/`. Both the JUnit XML **and** the pytest
+console log of every lane are hashed, at a reviewer's suggestion — the log
+carries the warning summary and the failure list, neither of which the XML
+totals reveal, and it was a log that surfaced the self-inflicted warning above.
+
 ```text
 5b0b4114d289b222a603a218d06ddffe5ff61c2d3d39d2d1f941c1043264b9a6  bl.xml  (baseline  lean,          5a664cd)
-0ecc1b8551208888f7bff067b2a45e9087b9854d66b3d297d19cf7184f463113  cl.xml  (candidate lean,          1e2d590)
+733d475d6f825a45f5df1f3ba0410e2026094577d53bcc0d8bc36bfe16491440  cl.xml  (candidate lean,          d98caee)
 95c39b0843286fe820c2ae8f684601c4f6cb5fd0165867592442be45d110dd4d  bc.xml  (baseline  comprehensive, 5a664cd)
-78699115a38252b7148319097f49d2b1e6d47a24e16134a41cb51cf2a4238ede  cc.xml  (candidate comprehensive, 1e2d590)
+a01dab7b37aea74e77b24136d119329713f22681e32db49185b46beada888405  cc.xml  (candidate comprehensive, d98caee)
+5f69be752b497ae9238435a294d84a5ec4f4c23a3b701a9b29f4be8e81586ef0  bl.log
+7c98a567d978de0c63ede58ac889783fb84413428e4a35054e3d26ec5a140d06  cl.log
+a6fcfbad2f0c2b16cb42e0a1d0b3c60e1950aa11aa5e3a9e177ee028cbf21e1b  bc.log
+f84633b058ad1e610d112648198d6ce319e5c6c7f55ca60cf1917b0172184a60  cc.log
 ```
+
+`provenance.json` sits alongside them, also at a reviewer's suggestion: a
+machine-readable record of both commit/tree pairs, the exact pytest invocation
+per lane, the locked interpreter and package versions, the per-lane private cache
+directories, the environment variables unset before each run, and every artifact
+hash. It exists so reproducing a lane does not require reading prose.
 
 **All four cells of the matrix are archived.** The previous binding claimed both
 lanes on both sides but archived only three XMLs — candidate lean, candidate
@@ -955,15 +984,35 @@ expect two extra inherited failures per side.
 ### Tree size
 
 Measured as tracked files, and lines over text blobs counting a final line with
-no trailing newline. **Measured at the candidate commit named above, `1e2d590`:**
+no trailing newline. **Measured at the candidate commit named above, `d98caee`:**
 
 | | Files | Lines |
 | --- | ---: | ---: |
 | `rh` `5a664cd` | 742 | 3,551,908 |
-| Candidate `1e2d590` | 576 | 556,419 |
-| **Reduction** | **166** | **2,995,489 (−84.3%)** |
+| Candidate `d98caee` | 578 | 556,780 |
+| **Net reduction** | **164** | **2,995,128 (−84.3%)** |
 
-**Why this figure is bound to a commit rather than to "the branch tip."** A
+**Two different file counts, which a review found being conflated.** "171 removed
+paths" and "a 164-file reduction" are both correct and are not the same quantity.
+They differ because this branch adds files as well as removing them:
+
+| | Files |
+| --- | ---: |
+| `rh` `5a664cd` | 742 |
+| Deleted by this branch — what [`REMOVED.md`](REMOVED.md) indexes | −171 |
+| Added by this branch (3 docs, 4 tests) | +7 |
+| Candidate `d98caee` | **578** |
+| Net reduction | **164** |
+
+`git diff --name-status 5a664cd...d98caee` returns exactly 171 `D` entries, which
+is the same 171 `REMOVED.md` lists — the index is complete against the diff, not
+merely self-consistent. A test now enforces that self-consistency and that every
+listed path is absent from the tree; see
+`tests/test_removed_index_reconciles.py`. Earlier revisions printed 171 and 172
+for the removed count and 165 and 166 for the reduction, in both cases by
+treating two quantities as one.
+
+**Why the line figure is bound to a commit rather than to "the branch tip."** A
 review found the previous revision recording 555,978 lines while the tip measured
 556,040. Both numbers were correctly measured; they were measured at different
 commits. The recorded figure was the code tree, and the tip included the
@@ -977,9 +1026,10 @@ number printed in this table, by exactly the size of that revision.
 So this table states the commit it measures, and that commit is the last one
 touching anything outside `docs/simplification/`. The commit adding this section is a documentation-only descendant
 of it and is larger by its own size. What is stable, and what the claim actually
-rests on, is the reduction: **165 files and ~2.996M lines, −84.3%**, a figure no
-documentation edit can move at this precision. Anyone reproducing the exact line
-count should check out `1e2d590`, not the branch tip.
+rests on, is the reduction: **164 files net (171 removed, 7 added) and ~2.995M
+lines, −84.3%** — a figure no documentation edit can move at this precision.
+Anyone reproducing the exact line count should check out `d98caee`, not the
+branch tip.
 
 ### What the failure reduction is, stated accurately
 
