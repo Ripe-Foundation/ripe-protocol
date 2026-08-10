@@ -64,9 +64,9 @@ interface RipeGovVault:
     def disableGovPointAccrualGlobally(): nonpayable
 
 interface VaultMigrator:
-    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256: nonpayable
-    def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS]) -> uint256: nonpayable
-    def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS]) -> uint256: nonpayable
+    def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256: nonpayable
+    def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256: nonpayable
+    def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256: nonpayable
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -183,18 +183,6 @@ struct RipeGovPointAccrualDisableAction:
     vaultId: uint256
     vaultAddr: address
     user: address
-
-struct RipeGovMigration:
-    user: address
-    asset: address
-    sourceVaultId: uint256
-    targetVaultId: uint256
-
-struct VaultMigration:
-    user: address
-    asset: address
-    sourceVaultId: uint256
-    targetVaultId: uint256
 
 event EndaomentDepositPerformed:
     legoId: uint256
@@ -492,8 +480,7 @@ pendingRipeGovPointAccrualDisableActions: public(HashMap[uint256, RipeGovPointAc
 MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_PROOFS: constant(uint256) = 25
 MAX_ASSETS: constant(uint256) = 10
-MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
-MAX_VAULT_MIGRATIONS: constant(uint256) = 25
+MAX_MIGRATION_USERS: constant(uint256) = 25
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -569,30 +556,35 @@ def _getEndaomentPsmAddr() -> address:
 
 
 @external
-def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS]) -> uint256:
+def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_migrations) != 0 # dev: no migrations
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_migrations)
+    assert len(_users) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 # dev: invalid source vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateRipeGovPositions(_users, _sourceVaultId)
 
 
 # basic vault migrations
 
 
 @external
-def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS]) -> uint256:
+def migrateVaultPositions(
+    _users: DynArray[address, MAX_MIGRATION_USERS],
+    _sourceVaultId: uint256,
+    _targetVaultId: uint256,
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_migrations) != 0 # dev: no migrations
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_migrations)
+    assert len(_users) != 0 # dev: no migrations
+    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateVaultPositions(_users, _sourceVaultId, _targetVaultId)
 
 
 # legacy ripe gov migrations (Base chain only)
 
 @external
-def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256:
+def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_users) != 0 # dev: no migrations
-    assert _asset != empty(address) # dev: invalid asset
-    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users, _asset)
+    return extcall VaultMigrator(self._getVaultMigratorAddr()).migrateLegacyRipeGovPositions(_users)
 
 
 ##################################

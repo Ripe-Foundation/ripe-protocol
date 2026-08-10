@@ -61,26 +61,12 @@ struct PrevSourceSnapshot:
     govPoints: uint256
     unlock: uint256
     lastTerms: cs.LockTerms
-    targetUserPointsBefore: uint256
-    targetTotalPointsBefore: uint256
 
 struct RipeGovMigrationData:
     amount: uint256
     govPoints: uint256
     unlock: uint256
     lastTerms: cs.LockTerms
-
-struct RipeGovMigration:
-    user: address
-    asset: address
-    sourceVaultId: uint256
-    targetVaultId: uint256
-
-struct VaultMigration:
-    user: address
-    asset: address
-    sourceVaultId: uint256
-    targetVaultId: uint256
 
 event RipeGovPositionMigrationExecuted:
     user: indexed(address)
@@ -109,13 +95,11 @@ event LegacyRipeGovPositionMigrationExecuted:
     govPoints: uint256
     unlock: uint256
 
-MAX_RIPE_GOV_MIGRATIONS: constant(uint256) = 25
-MAX_VAULT_MIGRATIONS: constant(uint256) = 25
+MAX_MIGRATION_USERS: constant(uint256) = 25
+MAX_USER_ASSETS: constant(uint256) = 20
 BASE_CHAIN_ID: constant(uint256) = 8453
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 LEGACY_RIPE_GOV_VAULT: immutable(address)
-
-legacyMigrationUserDedupe: transient(HashMap[address, bool])
 
 
 @deploy
@@ -131,62 +115,81 @@ def __init__(_ripeHq: address, _shouldPause: bool, _legacyRipeGovVault: address)
 
 
 @external
-def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRATIONS]) -> uint256:
+def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256, _targetVaultId: uint256) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
-    assert len(_migrations) != 0 # dev: no migrations
+    assert len(_users) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
+
+    # validate migration route
+    sourceVault: address = empty(address)
+    targetVault: address = empty(address)
+    sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, _targetVaultId, a.vaultBook, a.missionControl)
+
+    # both must NOT be paused
+    assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
+    assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
+
+    # source and target must not be the core ripe gov vault
     coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+    assert _sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
+    assert _targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
 
-    for m: VaultMigration in _migrations:
+    numPositions: uint256 = 0
+    for user: address in _users:
+        numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
-        # validate migration
-        sourceVault: address = empty(address)
-        targetVault: address = empty(address)
-        sourceVault, targetVault = self._validateVaultMigration(m.user, m.asset, m.sourceVaultId, m.targetVaultId, a)
+            # get user asset and amount
+            asset: address = empty(address)
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(sourceVault).getUserAssetAtIndexAndHasBalance(user, i)
+            if not hasBalance or asset == empty(address):
+                continue
 
-        # both must NOT be paused
-        assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
-        assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
+            # validate target asset
+            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, asset) # dev: unsupported target asset
 
-        # source and target must not be the core ripe gov vault
-        assert m.sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
-        assert m.targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
-        
-        # check pre-migration teller balance
-        tellerBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(a.teller)
+            # check pre-migration balances
+            tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
+            sourceVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(sourceVault)
+            targetVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(targetVault)
 
-        # execute withdrawal
-        amount: uint256 = 0
-        isDepleted: bool = False
-        amount, isDepleted = extcall Teller(a.teller).withdrawOnVaultMigration(m.user, m.asset, sourceVault, a)
-        assert isDepleted # dev: source position not depleted
-        assert amount != 0 # dev: invalid migration amount
+            # execute withdrawal
+            amount: uint256 = 0
+            isDepleted: bool = False
+            amount, isDepleted = extcall Teller(a.teller).withdrawOnVaultMigration(user, asset, sourceVault, a)
+            assert isDepleted # dev: source position not depleted
+            assert amount != 0 # dev: invalid migration amount
 
-        # check post-withdrawal teller balance
-        tellerBalanceAfter: uint256 = staticcall IERC20(m.asset).balanceOf(a.teller)
-        assert tellerBalanceAfter > tellerBalanceBefore # dev: invalid migration receipt
-        assert tellerBalanceAfter - tellerBalanceBefore == amount # dev: inexact migration receipt
-        assert not staticcall Vault(sourceVault).doesUserHaveBalance(m.user, m.asset) # dev: source balance remains
+            # check post-withdrawal teller balance
+            tellerBalanceMid: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
+            assert tellerBalanceMid > tellerBalanceBefore # dev: invalid migration receipt
+            assert tellerBalanceMid - tellerBalanceBefore == amount # dev: inexact migration receipt
+            assert not staticcall Vault(sourceVault).doesUserHaveBalance(user, asset) # dev: source balance remains
 
-        # execute deposit
-        deposited: uint256 = extcall Teller(a.teller).depositOnVaultMigration(m.user, m.asset, amount, m.targetVaultId, targetVault, a)
-        assert deposited == amount # dev: inexact migration deposit
-        assert staticcall IERC20(m.asset).balanceOf(a.teller) == tellerBalanceBefore # dev: teller balance remains
+            # execute deposit
+            deposited: uint256 = extcall Teller(a.teller).depositOnVaultMigration(user, asset, amount, _targetVaultId, targetVault, a)
+            assert deposited == amount # dev: inexact migration deposit
 
-        # update lootbox deposit points
-        extcall Lootbox(a.lootbox).updateDepositPoints(m.user, m.sourceVaultId, sourceVault, m.asset, a)
+            # check post-deposit balances
+            assert staticcall IERC20(asset).balanceOf(a.teller) == tellerBalanceBefore # dev: teller balance remains
+            assert staticcall IERC20(asset).balanceOf(sourceVault) == sourceVaultBalanceBefore - amount # dev: source vault balance remains
+            assert staticcall IERC20(asset).balanceOf(targetVault) == targetVaultBalanceBefore + amount # dev: target vault balance remains
 
-        log VaultPositionMigrationExecuted(
-            user=m.user,
-            asset=m.asset,
-            sourceVaultId=m.sourceVaultId,
-            targetVaultId=m.targetVaultId,
-            amount=amount,
-        )
+            # update lootbox deposit points
+            extcall Lootbox(a.lootbox).updateDepositPoints(user, _sourceVaultId, sourceVault, asset, a)
 
-    return len(_migrations)
+            log VaultPositionMigrationExecuted(
+                user=user,
+                asset=asset,
+                sourceVaultId=_sourceVaultId,
+                targetVaultId=_targetVaultId,
+                amount=amount,
+            )
+
+    return numPositions
 
 
 # validation
@@ -194,38 +197,27 @@ def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRAT
 
 @view
 @internal
-def _validateVaultMigration(
-    _user: address,
-    _asset: address,
+def _validateMigrationRoute(
     _sourceVaultId: uint256,
     _targetVaultId: uint256,
-    _a: addys.Addys,
+    _vaultBook: address,
+    _missionControl: address,
 ) -> (address, address):
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
     assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
     assert _sourceVaultId != _targetVaultId # dev: same vault
-    assert staticcall Ledger(_a.ledger).isParticipatingInVault(_user, _sourceVaultId) # dev: source vault missing from Ledger
-
-    vaultBook: AddressRegistry = AddressRegistry(_a.vaultBook)
-    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
-
-    mc: MissionControl = MissionControl(_a.missionControl)
-    assert staticcall mc.isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
-    assert staticcall mc.isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
 
     # validate source vault
-    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
+    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_sourceVaultId) # dev: invalid source vault id
+    sourceVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_sourceVaultId)
     assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
 
     # validate target vault
-    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
+    assert staticcall AddressRegistry(_vaultBook).isValidRegId(_targetVaultId) # dev: invalid target vault id
+    targetVault: address = staticcall AddressRegistry(_vaultBook).getAddr(_targetVaultId)
     assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
+
     assert sourceVault != targetVault # dev: same vault
-
-    # validate core ripe gov vault id
-    assert staticcall mc.isStabVaultId(_sourceVaultId) == staticcall mc.isStabVaultId(_targetVaultId) # dev: stab vault mismatch
-
+    assert staticcall MissionControl(_missionControl).isStabVaultId(_sourceVaultId) == staticcall MissionControl(_missionControl).isStabVaultId(_targetVaultId) # dev: stab vault mismatch
     return sourceVault, targetVault
 
 
@@ -235,174 +227,170 @@ def _validateVaultMigration(
 
 
 @external
-def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV_MIGRATIONS]) -> uint256:
+def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourceVaultId: uint256) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
-    assert len(_migrations) != 0 # dev: no migrations
+    assert len(_users) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
-    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+    targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
-    for m: RipeGovMigration in _migrations:
+    # validate migration route
+    sourceVault: address = empty(address)
+    targetVault: address = empty(address)
+    sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, targetVaultId, a.vaultBook, a.missionControl)
 
-        # validate migration
-        sourceVault: address = empty(address)
-        targetVault: address = empty(address)
-        sourceVault, targetVault = self._validateVaultMigration(m.user, m.asset, m.sourceVaultId, m.targetVaultId, a)
+    # both must be paused
+    assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
+    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
 
-        # both must be paused
-        assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
-        assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
-        assert m.targetVaultId == coreRipeGovVaultId # dev: target is not core ripe gov
+    numPositions: uint256 = 0
 
-        # check pre-migration balances
-        targetBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(targetVault)
-        tellerBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(a.teller)
+    for user: address in _users:
+        numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
-        # get source snapshot
-        prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(m.user, m.asset, sourceVault, targetVault, a.missionControl)
+            # get user asset and amount
+            asset: address = empty(address)
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(sourceVault).getUserAssetAtIndexAndHasBalance(user, i)
+            if not hasBalance or asset == empty(address):
+                continue
 
-        # export position from source vault
-        migData: RipeGovMigrationData = extcall Teller(a.teller).exportPositionForMigration(m.user, m.asset, sourceVault, targetVault, a)
-        assert migData.amount != 0 # dev: invalid migration result
-        self._verifyRipeGovExport(m.user, m.asset, sourceVault, targetVault, migData.amount, targetBalanceBefore, tellerBalanceBefore, a.teller)
+            # validate target asset
+            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset) # dev: unsupported target asset
 
-        # import position to target vault
-        targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(m.user, m.asset, sourceVault, m.targetVaultId, targetVault, migData, a)
-        assert targetShares != 0 # dev: invalid migration result
+            # check pre-migration balances
+            tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
+            sourceVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(sourceVault)
+            targetVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(targetVault)
 
-        # update lootbox deposit points
-        extcall Lootbox(a.lootbox).updateDepositPoints(m.user, m.sourceVaultId, sourceVault, m.asset, a)
-        extcall Lootbox(a.lootbox).updateDepositPoints(m.user, m.targetVaultId, targetVault, m.asset, a)
+            # check pre-migration gov data
+            targetUserPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalUserGovPoints(user)
+            targetTotalPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalGovPoints()
 
-        # verify migration
-        self._verifyRipeGovImport(m.user, m.asset, targetVault, m.targetVaultId, migData.amount, targetShares, prevSnapShot, a.ledger)
+            # get source snapshot
+            prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(user, asset, sourceVault, a.missionControl)
 
-        log RipeGovPositionMigrationExecuted(
-            user=m.user,
-            asset=m.asset,
-            sourceVaultId=m.sourceVaultId,
-            targetVaultId=m.targetVaultId,
-            sourceVault=sourceVault,
-            targetVault=targetVault,
-            amount=migData.amount,
-            targetShares=targetShares,
-            govPoints=migData.govPoints,
-            unlock=migData.unlock,
-        )
+            # export position from source vault
+            migData: RipeGovMigrationData = extcall Teller(a.teller).exportPositionForMigration(user, asset, sourceVault, targetVault, a)
+            assert migData.amount != 0 # dev: invalid migration result
+            self._verifyRipeGovExport(user, asset, sourceVault, targetVault, migData.amount, tellerBalanceBefore, sourceVaultBalanceBefore, targetVaultBalanceBefore, a.teller)
 
-    return len(_migrations)
+            # import position to target vault
+            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a)
+            assert targetShares != 0 # dev: invalid migration result
+
+            # update lootbox deposit points
+            extcall Lootbox(a.lootbox).updateDepositPoints(user, _sourceVaultId, sourceVault, asset, a)
+            extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, asset, a)
+
+            # verify migration
+            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+
+            log RipeGovPositionMigrationExecuted(
+                user=user,
+                asset=asset,
+                sourceVaultId=_sourceVaultId,
+                targetVaultId=targetVaultId,
+                sourceVault=sourceVault,
+                targetVault=targetVault,
+                amount=migData.amount,
+                targetShares=targetShares,
+                govPoints=migData.govPoints,
+                unlock=migData.unlock,
+            )
+
+    return numPositions
 
 
 # legacy ripe gov migration (Base chain only)
 
 
 @external
-def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATIONS], _asset: address) -> uint256:
+def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
     assert len(_users) != 0 # dev: no migrations
-    assert _asset != empty(address) # dev: invalid asset
     assert chain.id == BASE_CHAIN_ID and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
 
     a: addys.Addys = addys._getAddys()
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
-    # these need to be paused
-    assert staticcall Department(a.teller).isPaused() # dev: teller not paused
-    assert staticcall Department(a.auctionHouse).isPaused() # dev: auction house not paused
-    assert staticcall Department(a.creditEngine).isPaused() # dev: credit engine not paused
-    assert staticcall Department(a.humanResources).isPaused() # dev: human resources not paused
-    assert staticcall Department(addys._getDeleverageAddr()).isPaused() # dev: deleverage not paused
+    # validate migration route
+    sourceVault: address = empty(address)
+    targetVault: address = empty(address)
+    sourceVault, targetVault = self._validateMigrationRoute(LEGACY_RIPE_GOV_VAULT_ID, targetVaultId, a.vaultBook, a.missionControl)
+    assert sourceVault == LEGACY_RIPE_GOV_VAULT # dev: invalid legacy vault
 
+    # source must NOT be paused, target must be paused
+    assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
+    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
+
+    numPositions: uint256 = 0
     for user: address in _users:
-        assert user != empty(address) # dev: invalid user
-        assert not self.legacyMigrationUserDedupe[user] # dev: duplicate user
-        self.legacyMigrationUserDedupe[user] = True
+        numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
-        # validate migration
-        sourceVault: address = empty(address)
-        targetVault: address = empty(address)
-        sourceVault, targetVault = self._validateVaultMigration(user, _asset, LEGACY_RIPE_GOV_VAULT_ID, targetVaultId, a)
-        assert sourceVault == LEGACY_RIPE_GOV_VAULT # dev: invalid legacy vault
+            # get user asset and amount
+            asset: address = empty(address)
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(sourceVault).getUserAssetAtIndexAndHasBalance(user, i)
+            if not hasBalance or asset == empty(address):
+                continue
 
-        # source must NOT be paused, target must be paused
-        assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
-        assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
+            # validate target asset
+            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset) # dev: unsupported target asset
 
-        # check pre-migration balances
-        targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-        tellerBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(a.teller)
+            # check pre-migration balances
+            tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
+            sourceVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(sourceVault)
+            targetVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(targetVault)
 
-        # get source snapshot
-        prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(user, _asset, sourceVault, targetVault, a.missionControl)
-        migData: RipeGovMigrationData = RipeGovMigrationData(
-            amount=prevSnapShot.sourceAmount,
-            govPoints=prevSnapShot.govPoints,
-            unlock=prevSnapShot.unlock,
-            lastTerms=prevSnapShot.lastTerms,
-        )
+            # check pre-migration gov data
+            targetUserPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalUserGovPoints(user)
+            targetTotalPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalGovPoints()
 
-        # export position from source vault
-        amount: uint256 = extcall Teller(a.teller).exportPositionForLegacyRipeGovMigration(user, _asset, sourceVault, targetVault, a)
-        assert amount == migData.amount # dev: migration amount mismatch
-        self._verifyRipeGovExport(user, _asset, sourceVault, targetVault, amount, targetBalanceBefore, tellerBalanceBefore, a.teller)
+            # get pre-migration data
+            prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(user, asset, sourceVault, a.missionControl)
+            migData: RipeGovMigrationData = RipeGovMigrationData(
+                amount=prevSnapShot.sourceAmount,
+                govPoints=prevSnapShot.govPoints,
+                unlock=prevSnapShot.unlock,
+                lastTerms=prevSnapShot.lastTerms,
+            )
 
-        # import position to target vault
-        targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, _asset, sourceVault, targetVaultId, targetVault, migData)
-        assert targetShares != 0 # dev: invalid migration result
+            # export position from source vault
+            amount: uint256 = extcall Teller(a.teller).exportPositionForLegacyRipeGovMigration(user, asset, sourceVault, targetVault, a)
+            assert amount == migData.amount # dev: migration amount mismatch
+            self._verifyRipeGovExport(user, asset, sourceVault, targetVault, amount, tellerBalanceBefore, sourceVaultBalanceBefore, targetVaultBalanceBefore, a.teller)
 
-        # update lootbox deposit points
-        extcall Lootbox(a.lootbox).updateDepositPoints(user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, _asset, a)
-        extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, _asset, a)
+            # import position to target vault
+            targetShares: uint256 = extcall Teller(a.teller).importPositionForMigration(user, asset, sourceVault, targetVaultId, targetVault, migData, a)
+            assert targetShares != 0 # dev: invalid migration result
 
-        # verify migration
-        self._verifyRipeGovImport(user, _asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, a.ledger)
+            # update lootbox deposit points
+            extcall Lootbox(a.lootbox).updateDepositPoints(user, LEGACY_RIPE_GOV_VAULT_ID, sourceVault, asset, a)
+            extcall Lootbox(a.lootbox).updateDepositPoints(user, targetVaultId, targetVault, asset, a)
 
-        log LegacyRipeGovPositionMigrationExecuted(
-            user=user,
-            asset=_asset,
-            amount=migData.amount,
-            targetShares=targetShares,
-            govPoints=migData.govPoints,
-            unlock=migData.unlock,
-        )
-    return len(_users)
+            # verify migration
+            self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+
+            log LegacyRipeGovPositionMigrationExecuted(
+                user=user,
+                asset=asset,
+                amount=migData.amount,
+                targetShares=targetShares,
+                govPoints=migData.govPoints,
+                unlock=migData.unlock,
+            )
+
+    return numPositions
 
 
 ####################
 # Validation Utils #
 ####################
-
-
-# post migration verification
-
-
-@view
-@internal
-def _verifyRipeGovExport(
-    _user: address,
-    _asset: address,
-    _sourceVault: address,
-    _targetVault: address,
-    _amount: uint256,
-    _targetBalanceBefore: uint256,
-    _tellerBalanceBefore: uint256,
-    _teller: address,
-):
-    # verify target position
-    targetBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(_targetVault)
-    assert targetBalanceAfter > _targetBalanceBefore # dev: invalid migration receipt
-    assert targetBalanceAfter - _targetBalanceBefore == _amount # dev: inexact migration receipt
-
-    # verify teller
-    assert staticcall IERC20(_asset).balanceOf(_teller) == _tellerBalanceBefore # dev: teller balance residue
-    assert staticcall IERC20(_asset).allowance(_teller, _targetVault) == 0 # dev: teller allowance residue
-
-    # verify source position
-    assert staticcall RipeGovVault(_sourceVault).userBalances(_user, _asset) == 0 # dev: source shares remain
-    assert staticcall Vault(_sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source amount remains
-    assert not staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _asset) # dev: source balance remains
 
 
 # get pre-migration data
@@ -414,7 +402,6 @@ def _getPreMigrationData(
     _user: address,
     _asset: address,
     _sourceVault: address,
-    _targetVault: address,
     _mc: address
 ) -> PrevSourceSnapshot:
 
@@ -439,12 +426,45 @@ def _getPreMigrationData(
         govPoints=gd.govPoints + pending,
         unlock=gd.unlock,
         lastTerms=gd.lastTerms,
-        targetUserPointsBefore=staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user),
-        targetTotalPointsBefore=staticcall RipeGovVault(_targetVault).totalGovPoints(),
     )
 
 
-# verify migration
+# after export from source vault
+
+
+@view
+@internal
+def _verifyRipeGovExport(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _targetVault: address,
+    _amount: uint256,
+    _tellerBalanceBefore: uint256,
+    _sourceVaultBalanceBefore: uint256,
+    _targetVaultBalanceBefore: uint256,
+    _teller: address,
+):
+    # verify target position
+    targetVaultBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(_targetVault)
+    assert targetVaultBalanceAfter > _targetVaultBalanceBefore # dev: invalid migration receipt
+    assert targetVaultBalanceAfter - _targetVaultBalanceBefore == _amount # dev: inexact migration receipt
+
+    # verify teller
+    assert staticcall IERC20(_asset).balanceOf(_teller) == _tellerBalanceBefore # dev: teller balance residue
+    assert staticcall IERC20(_asset).allowance(_teller, _targetVault) == 0 # dev: teller allowance residue
+
+    # verify source vault
+    assert staticcall IERC20(_asset).balanceOf(_sourceVault) == _sourceVaultBalanceBefore - _amount # dev: source vault balance remains
+
+    # verify source position
+    assert staticcall RipeGovVault(_sourceVault).userBalances(_user, _asset) == 0 # dev: source shares remain
+    assert staticcall Vault(_sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source amount remains
+    assert not staticcall Vault(_sourceVault).doesUserHaveBalance(_user, _asset) # dev: source balance remains
+
+
+
+# after import to target vault
 
 
 @view
@@ -457,6 +477,8 @@ def _verifyRipeGovImport(
     _amount: uint256,
     _targetShares: uint256,
     _prevSnapShot: PrevSourceSnapshot,
+    _targetUserPointsBefore: uint256,
+    _targetTotalPointsBefore: uint256,
     _ledger: address,
 ):
     assert _amount != 0 and _targetShares != 0 # dev: invalid migration result
@@ -482,5 +504,5 @@ def _verifyRipeGovImport(
     assert newGd.lastTerms.exitFee == _prevSnapShot.lastTerms.exitFee # dev: target terms mismatch
 
     # gov points
-    assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _prevSnapShot.targetUserPointsBefore + _prevSnapShot.govPoints # dev: target user total mismatch
-    assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _prevSnapShot.targetTotalPointsBefore + _prevSnapShot.govPoints # dev: target global total mismatch
+    assert staticcall RipeGovVault(_targetVault).totalUserGovPoints(_user) == _targetUserPointsBefore + _prevSnapShot.govPoints # dev: target user total mismatch
+    assert staticcall RipeGovVault(_targetVault).totalGovPoints() == _targetTotalPointsBefore + _prevSnapShot.govPoints # dev: target global total mismatch
