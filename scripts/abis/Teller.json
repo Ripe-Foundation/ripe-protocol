@@ -1042,7 +1042,287 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "executeRipeGovSource",
+    "name": "withdrawOnVaultMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVault",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawOnVaultMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVault",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositOnVaultMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositOnVaultMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "exportPositionForMigration",
     "inputs": [
       {
         "name": "_user",
@@ -1059,54 +1339,6 @@
       {
         "name": "_targetVault",
         "type": "address"
-      },
-      {
-        "name": "_legacyMigration",
-        "type": "tuple",
-        "components": [
-          {
-            "name": "amount",
-            "type": "uint256"
-          },
-          {
-            "name": "govPoints",
-            "type": "uint256"
-          },
-          {
-            "name": "unlock",
-            "type": "uint256"
-          },
-          {
-            "name": "lastTerms",
-            "type": "tuple",
-            "components": [
-              {
-                "name": "minLockDuration",
-                "type": "uint256"
-              },
-              {
-                "name": "maxLockDuration",
-                "type": "uint256"
-              },
-              {
-                "name": "maxLockBoost",
-                "type": "uint256"
-              },
-              {
-                "name": "canExit",
-                "type": "bool"
-              },
-              {
-                "name": "exitFee",
-                "type": "uint256"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "name": "_shouldUseVaultWithdrawal",
-        "type": "bool"
       }
     ],
     "outputs": [
@@ -1159,7 +1391,154 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "executeRipeGovImport",
+    "name": "exportPositionForMigration",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_sourceVault",
+        "type": "address"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "govPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "unlock",
+            "type": "uint256"
+          },
+          {
+            "name": "lastTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "importPositionForMigration",
     "inputs": [
       {
         "name": "_user",
@@ -1224,6 +1603,10 @@
             ]
           }
         ]
+      },
+      {
+        "name": "_ledger",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -1236,7 +1619,7 @@
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "executeVaultWithdrawal",
+    "name": "exportPositionForLegacyRipeGovMigration",
     "inputs": [
       {
         "name": "_user",
@@ -1249,23 +1632,23 @@
       {
         "name": "_sourceVault",
         "type": "address"
+      },
+      {
+        "name": "_targetVault",
+        "type": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
         "type": "uint256"
-      },
-      {
-        "name": "",
-        "type": "bool"
       }
     ]
   },
   {
     "stateMutability": "nonpayable",
     "type": "function",
-    "name": "executeVaultDeposit",
+    "name": "exportPositionForLegacyRipeGovMigration",
     "inputs": [
       {
         "name": "_user",
@@ -1276,16 +1659,90 @@
         "type": "address"
       },
       {
-        "name": "_amount",
-        "type": "uint256"
-      },
-      {
-        "name": "_targetVaultId",
-        "type": "uint256"
+        "name": "_sourceVault",
+        "type": "address"
       },
       {
         "name": "_targetVault",
         "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
       }
     ],
     "outputs": [

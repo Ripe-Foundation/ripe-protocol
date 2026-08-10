@@ -3606,7 +3606,8 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    assert len(runtime) <= 24_326
+    # Owner-accepted migration runtime; any further byte growth requires review.
+    assert len(runtime) <= 24_429
 
 
 ############################################################################

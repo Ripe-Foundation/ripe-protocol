@@ -150,6 +150,8 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
 
         numPositionsBefore: uint256 = numPositions
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        if numUserAssets == 0:
+            continue
         for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
             # get user asset and amount
@@ -240,6 +242,8 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
 
         numPositionsBefore: uint256 = numPositions
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        if numUserAssets == 0:
+            continue
         for i: uint256 in range(1, numUserAssets, bound=MAX_GOV_USER_ASSETS):
 
             # get user asset and amount
@@ -332,6 +336,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
         # snapshot all supported positions before the first legacy withdrawal
         positions: DynArray[LegacyMigrationPosition, MAX_GOV_USER_ASSETS] = []
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        if numUserAssets == 0:
+            continue
         for i: uint256 in range(1, numUserAssets, bound=MAX_GOV_USER_ASSETS):
 
             # get user asset

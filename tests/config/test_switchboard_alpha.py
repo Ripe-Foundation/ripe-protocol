@@ -2107,6 +2107,9 @@ def test_ripe_gov_vault_config_rejects_unset_target_core_pointer(
     new_mission_control,
     alpha_token,
 ):
+    # MissionControl now initializes the canonical pointer to 2. Force the
+    # historical/uninitialized state this validation test is meant to cover.
+    new_mission_control.eval("self.coreRipeGovVaultId = 0")
     new_mission_control.setAssetConfig(
         alpha_token.address,
         _asset_config([2]),

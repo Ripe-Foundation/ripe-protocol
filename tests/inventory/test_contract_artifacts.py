@@ -102,16 +102,16 @@ def test_eager_migrated_source_settlement_entrypoints_are_absent():
 
 def test_governance_migration_surface_has_exactly_three_use_cases():
     expected = {
-        "migrateLegacyRipeGovPositions",
-        "migrateRipeGovPositions",
-        "migrateVaultPositions",
+        "migrateLegacyRipeGovPositions": ["address[]"],
+        "migrateRipeGovPositions": ["address[]", "uint256"],
+        "migrateVaultPositions": ["address[]", "uint256", "uint256"],
     }
     for contract_name in ("VaultMigrator", "SwitchboardEcho"):
         abi = json.loads(
             (ROOT / "scripts" / "abis" / f"{contract_name}.json").read_text()
         )
         migration_functions = {
-            entry["name"]
+            entry["name"]: [item["type"] for item in entry["inputs"]]
             for entry in abi
             if entry.get("type") == "function"
             and "migrat" in entry.get("name", "").lower()
@@ -126,6 +126,17 @@ def test_governance_migration_surface_has_exactly_three_use_cases():
         and entry.get("name") == "LegacyRipeGovMigrationAssetSet"
         for entry in vault_migrator_abi
     )
+    for event_name in (
+        "LegacyRipeGovPositionMigrationExecuted",
+        "RipeGovPositionMigrationExecuted",
+        "VaultPositionMigrationExecuted",
+    ):
+        event = next(
+            entry
+            for entry in vault_migrator_abi
+            if entry.get("type") == "event" and entry.get("name") == event_name
+        )
+        assert "caller" not in {item["name"] for item in event["inputs"]}
 
 
 def test_robinhood_curve_launch_reuses_frozen_source_and_abi():
