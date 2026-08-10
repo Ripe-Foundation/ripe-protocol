@@ -140,6 +140,10 @@ def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRAT
         targetVault: address = empty(address)
         sourceVault, targetVault = self._validateVaultMigration(m.user, m.asset, m.sourceVaultId, m.targetVaultId, a)
 
+        # both must NOT be paused
+        assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
+        assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
+
         # check pre-migration teller balance
         tellerBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(a.teller)
 
@@ -203,12 +207,10 @@ def _validateVaultMigration(
     # validate source vault
     sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
     assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-    assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
 
     # validate target vault
     targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
     assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-    assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
     assert sourceVault != targetVault # dev: same vault
 
     # validate core ripe gov vault id
@@ -239,6 +241,10 @@ def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV
         sourceVault: address = empty(address)
         targetVault: address = empty(address)
         sourceVault, targetVault = self._validateVaultMigration(m.user, m.asset, m.sourceVaultId, m.targetVaultId, a)
+
+        # both must be paused
+        assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
+        assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
 
         # check pre-migration balances
         targetBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(targetVault)
@@ -308,6 +314,10 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_RIPE_GOV_MIGRATI
         sourceVault: address = empty(address)
         targetVault: address = empty(address)
         sourceVault, targetVault = self._validateVaultMigration(user, _asset, _legacyGovVaultId, targetVaultId, a)
+
+        # source must NOT be paused, target must be paused
+        assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
+        assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
 
         # check pre-migration balances
         targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
