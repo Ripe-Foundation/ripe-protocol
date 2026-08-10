@@ -138,6 +138,9 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
 
     numPositions: uint256 = 0
     for user: address in _users:
+        if user == empty(address):
+            continue
+
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
         for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
@@ -149,7 +152,8 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
                 continue
 
             # validate target asset
-            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, asset) # dev: unsupported target asset
+            if not staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, asset):
+                continue
 
             # check pre-migration balances
             tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
@@ -180,6 +184,7 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
 
             # update lootbox deposit points
             extcall Lootbox(a.lootbox).updateDepositPoints(user, _sourceVaultId, sourceVault, asset, a)
+            numPositions += 1
 
             log VaultPositionMigrationExecuted(
                 user=user,
@@ -247,6 +252,9 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     numPositions: uint256 = 0
 
     for user: address in _users:
+        if user == empty(address):
+            continue
+
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
         for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
@@ -258,7 +266,8 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
                 continue
 
             # validate target asset
-            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset) # dev: unsupported target asset
+            if not staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset):
+                continue
 
             # check pre-migration balances
             tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
@@ -287,6 +296,7 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
 
             # verify migration
             self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+            numPositions += 1
 
             log RipeGovPositionMigrationExecuted(
                 user=user,
@@ -329,6 +339,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
 
     numPositions: uint256 = 0
     for user: address in _users:
+        if user == empty(address):
+            continue
         numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
         for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
@@ -340,7 +352,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
                 continue
 
             # validate target asset
-            assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset) # dev: unsupported target asset
+            if not staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset):
+                continue
 
             # check pre-migration balances
             tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
@@ -375,6 +388,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
 
             # verify migration
             self._verifyRipeGovImport(user, asset, targetVault, targetVaultId, migData.amount, targetShares, prevSnapShot, targetUserPointsBefore, targetTotalPointsBefore, a.ledger)
+            numPositions += 1
 
             log LegacyRipeGovPositionMigrationExecuted(
                 user=user,
