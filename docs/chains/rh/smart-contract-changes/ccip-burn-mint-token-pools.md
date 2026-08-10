@@ -59,7 +59,7 @@ is an admitted production component.
 
 ## Dated compiler and review evidence
 
-The [Round-3 independent review](../evidence/ccip-solidity-reference-round-3-review.md)
+The Round-3 independent review
 is bound to the current source SHA-256. It reported this exact profile:
 
 | Property | Reviewed result |
@@ -115,9 +115,9 @@ package must:
 6. pass independent production-package review, testnet rehearsal, monitoring,
    activation, and release gates.
 
-The repository's only GitHub Actions workflow validates the Robinhood dashboard
-and does not compile or test this Solidity reference. None of the evidence on
-this page is continuously enforced by repository CI.
+The repository's only GitHub Actions workflow runs the Python/Vyper test lanes
+on manual dispatch and does not compile or test this Solidity reference. None of
+the evidence on this page is continuously enforced by repository CI.
 
 ## Reproducible source checks
 

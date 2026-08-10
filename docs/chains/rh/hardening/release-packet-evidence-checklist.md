@@ -56,7 +56,7 @@
   hardening snapshot the checker/test requires `vyper_paths=95`; the inventory
   document separately reports 95 matching production lines, 100 occurrences,
   and 17 files for its dated snapshot
-  ([test_block_clock_inventory.py:124](../../../../tests/inventory/test_block_clock_inventory.py#L124),
+  (`test_block_clock_inventory.py:124`,
   [block-number-inventory.md, exact occurrence coverage](../block-number-inventory.md#exact-occurrence-coverage-ledger)).
 - [ ] For every pytest invocation record passed, failed, skipped, xfailed,
   xpassed, warnings, errors, and deselected counts exactly as emitted; do not
@@ -114,8 +114,8 @@
 - [ ] Re-run the complete block-clock inventory and its tests; the checker
   fails closed on unclassified production, test, mock, testing, cadence, and
   timestamp drift
-  ([check_block_clock_inventory.py](../../../../scripts/check_block_clock_inventory.py),
-  [test_block_clock_inventory.py](../../../../tests/inventory/test_block_clock_inventory.py)).
+  (`check_block_clock_inventory.py`,
+  `test_block_clock_inventory.py`).
 
 ## 5. Deployment/profile evidence
 

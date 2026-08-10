@@ -1,5 +1,12 @@
 # RH Deposit-Vault Hardening — WP0 / WP1 evidence bundle (rev 2, rebound)
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 Produced by the implementation agent for
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md`.
 

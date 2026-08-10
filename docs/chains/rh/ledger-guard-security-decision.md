@@ -1,5 +1,13 @@
 # Track 6 S5 Ledger Guard Security and Architecture Decision
 
+> **8 August 2026 removal overlay:** The isolated probe package described below
+> — `contracts/testing/ActionBlockIdentityProbe.vy`, `scripts/probes/`, and
+> `tests/probes/` — has been removed, together with the block-clock inventory
+> that pinned its paths. The probe never left local dry-run and was never
+> deployed. The security decision and the one-immutable architecture it records
+> are unchanged; no production contract was modified. Path and source-hash rows
+> below are historical. Removed sources are recoverable from git history.
+
 **Status:** Stage A evidence reconciled through exact current `rh`
 `332ae2bc`; the owner replaced row 2's pre-Stage-B live signed-testnet
 requirement with deterministic fork evidence; exact mainnet/testnet fork
@@ -2440,7 +2448,7 @@ failure was suppressed.
 
 The four-test collection increase from the prior `2,868` selected cases is
 exactly the incoming H-02 correction. Section 13 of
-[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+`evidence/ledger-action-block-testnet-proof.md`
 records the exact launchers, paths, hashes, and result details.
 
 Production `contracts/data/Ledger.vy`, the test-only probe, runner, focused
@@ -2644,7 +2652,7 @@ cached `origin/rh`.
 ### 22.3 Fork-evidence decision and architecture preservation
 
 The exact fork evidence in
-[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+`evidence/ledger-action-block-testnet-proof.md`
 section 16 records two consecutive parent/child states on both Robinhood
 mainnet and testnet. Both environments reproduced:
 

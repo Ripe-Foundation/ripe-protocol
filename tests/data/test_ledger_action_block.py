@@ -382,6 +382,95 @@ def _deploy_ledger_source(
     )
 
 
+# The exact ordered diff each L3a mutant must produce against Ledger.vy,
+# declared here independently of _l3a_mutant_source. Entries are unified-diff
+# lines: '-' removed from the baseline, '+' added by the mutant, in order.
+#
+# This is deliberately exact rather than a substring match. A substring
+# allowlist accepts a changed line that merely *contains* the intended text, so
+# a mutant could carry a second semantic change on the same line -- for example
+# 'assert self.lastTouch[_user] < actionBlock and actionBlock < 10_000' -- and
+# still pass while silently weakening the mutation it is supposed to represent.
+L3A_EXPECTED_DIFF = {
+    'typed_call': (
+        '+interface MutantArbSys:',
+        '+    def arbBlockNumber() -> uint256: view',
+        '+',
+        '-    response: Bytes[65] = raw_call(',
+        '-        ARB_SYS,',
+        '-        method_id("arbBlockNumber()", output_type=Bytes[4]),',
+        '-        max_outsize=65,',
+        '-        is_static_call=True,',
+        '-        revert_on_failure=True,',
+        '-    )',
+        '-    assert len(response) == 32 # dev: invalid action block response',
+        '-    return abi_decode(response, uint256)',
+        '+    return staticcall MutantArbSys(ARB_SYS).arbBlockNumber()',
+    ),
+    'truncation': (
+        '-    response: Bytes[65] = raw_call(',
+        '+    response: Bytes[32] = raw_call(',
+        '-        max_outsize=65,',
+        '+        max_outsize=32,',
+    ),
+    'native_fallback': (
+        '-    response: Bytes[65] = raw_call(',
+        '+    success: bool = False',
+        '+    response: Bytes[65] = b""',
+        '+    success, response = raw_call(',
+        '-        revert_on_failure=True,',
+        '+        revert_on_failure=False,',
+        '-    assert len(response) == 32 # dev: invalid action block response',
+        '+    if not success or len(response) != 32:',
+        '+        return block.number',
+    ),
+    'monotonic': (
+        '-        assert self.lastTouch[_user] != actionBlock # dev: one action per block',
+        '+        assert self.lastTouch[_user] < actionBlock # dev: one action per block',
+    ),
+}
+
+
+def _l3a_diff_lines(baseline, candidate):
+    """The ordered added/removed lines between two sources, hunk headers dropped."""
+    import difflib
+
+    return tuple(
+        line
+        for line in difflib.unified_diff(
+            baseline.splitlines(), candidate.splitlines(), n=0, lineterm=""
+        )
+        if line[:1] in "+-" and not line.startswith(("---", "+++"))
+    )
+
+
+def assert_l3a_is_exactly_the_declared_edit(kind, candidate):
+    """The mutant-integrity check. Raises AssertionError if `candidate` is not
+    `Ledger.vy` plus exactly the edit declared in `L3A_EXPECTED_DIFF[kind]`.
+
+    This is deliberately one function with two callers. The positive tests below
+    assert it accepts each real mutant; the negative regression asserts it
+    rejects a tampered one. An earlier revision had the negative regression
+    recompute the diff and compare on its own, which meant it was testing a copy
+    of the logic rather than the logic. A review demonstrated the consequence:
+    loosening this comparison back to substring containment left every test
+    green, including the regression that claimed to detect exactly that.
+    Weakening the check now has to fail here, because there is only one check.
+    """
+    from pathlib import Path
+
+    baseline = Path(LEDGER_PATH).read_text()
+    assert candidate != baseline, f"{kind} candidate is identical to the baseline"
+
+    actual = _l3a_diff_lines(baseline, candidate)
+    expected = L3A_EXPECTED_DIFF[kind]
+    assert actual == expected, (
+        f"{kind} mutant is not exactly the declared edit.\n"
+        f"expected ({len(expected)} lines):\n  " + "\n  ".join(expected) + "\n"
+        f"actual ({len(actual)} lines):\n  " + "\n  ".join(actual)
+    )
+
+
 def _replace_once(source, old, new):
     assert source.count(old) == 1
     return source.replace(old, new)
@@ -512,33 +601,70 @@ L3A_KILLING_TESTS = {
 
 
 @pytest.mark.parametrize(
-    ("kind", "expected_sha256"),
-    [
-        (
-            "typed_call",
-            "a103c7f7e2a00a30dd62853b2baa23b5c711ffe34b281bc3a82adc2c283d3cf4",
-        ),
-        (
-            "truncation",
-            "c00c57bafe51a2072504deb77f4124d624cb61ebbc725f4aeae967d87d634d1d",
-        ),
-        (
-            "native_fallback",
-            "4ab9bae7fd56242ac8338292ad3b58d0ad7f4b44c3edfdffe0637e755660e993",
-        ),
-        (
-            "monotonic",
-            "8c213cd59ca43f27ff36f09ddc8f03610477ba0e109650e0fb3618edabb8fb9b",
-        ),
-    ],
+    "kind",
+    ["typed_call", "truncation", "native_fallback", "monotonic"],
 )
-def test_l3a_mutant_source_identities_are_frozen(kind, expected_sha256):
-    import hashlib
-
+def test_l3a_mutant_source_is_exactly_the_intended_edit(kind):
+    # This used to pin a sha256 of the whole mutant source.
+    #
+    # An earlier revision of this comment blamed those constants on a
+    # macOS-arm64 versus Linux-x86_64 difference. That was wrong. A sha256 of
+    # source text cannot depend on the CPU when the bytes are identical; the
+    # constants were stale because rh commit 3a5f840 changed Ledger.vy, and the
+    # comparison that suggested otherwise was a local run against a CI run of the
+    # pull_request *merge* ref, which already contained the newer contract.
+    #
+    # A whole-file hash is still the wrong assertion: it has to be regenerated on
+    # every legitimate Ledger change, which is what let it go stale unnoticed.
+    # What it was actually guarding is that the mutant differs from the baseline
+    # by the intended edit and nothing else — a mutant carrying a second,
+    # unrelated change would still have satisfied a hash refreshed without
+    # reading it, and would silently weaken the mutation test that consumes it.
+    #
+    # The comparison is against the exact ordered diff declared in
+    # L3A_EXPECTED_DIFF. An earlier revision used a substring allowlist, which a
+    # review defeated: it accepted a changed line that merely *contained* the
+    # intended text, so an extra condition appended to the same line passed. Only
+    # full-line equality, in order, closes that.
     assert L3A_KILLING_TESTS[kind] in globals()
-    assert hashlib.sha256(_l3a_mutant_source(kind).encode()).hexdigest() == (
-        expected_sha256
+    assert_l3a_is_exactly_the_declared_edit(kind, _l3a_mutant_source(kind))
+
+
+def test_l3a_exact_diff_check_rejects_a_second_change_on_the_same_line():
+    # Negative regression for the check above.
+    #
+    # The predecessor of that check used a substring allowlist and a review
+    # defeated it with exactly this shape: the intended monotonic mutation with
+    # an extra condition appended to the same line. That mutant rejects otherwise
+    # valid action identities at or above 10_000 — a real, unrelated behaviour
+    # change — while still "containing" the intended text.
+    #
+    # This test pins the failure by calling the *production* checker rather than
+    # recomputing the comparison. An earlier revision did recompute it, and a
+    # review showed that was worthless: the active check could be loosened all
+    # the way back to substring containment and this test still passed, while
+    # its docstring claimed it would catch exactly that. It now fails if
+    # assert_l3a_is_exactly_the_declared_edit stops rejecting this mutant, for
+    # any reason.
+    from pathlib import Path
+
+    baseline = Path(LEDGER_PATH).read_text()
+    tampered = _replace_once(
+        baseline,
+        "assert self.lastTouch[_user] != actionBlock",
+        "assert self.lastTouch[_user] < actionBlock and actionBlock < 10_000",
     )
+
+    # It would pass a containment check: the intended text is a prefix of it.
+    intended_added = "assert self.lastTouch[_user] < actionBlock"
+    tampered_added = next(
+        line for line in _l3a_diff_lines(baseline, tampered) if line.startswith("+")
+    )
+    assert intended_added in tampered_added
+
+    # The checker the real mutant tests use must reject it.
+    with pytest.raises(AssertionError):
+        assert_l3a_is_exactly_the_declared_edit("monotonic", tampered)
 
 
 @pytest.mark.parametrize(

@@ -77,7 +77,7 @@ contains both subclasses. It is an independently reviewed reference, not
 production deployment source. The review is bound to source SHA-256
 `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
 see the
-[`Round-3 review record`](evidence/ccip-solidity-reference-round-3-review.md).
+Round-3 review record.
 
 The reference was compiled on 2026-07-27 against:
 

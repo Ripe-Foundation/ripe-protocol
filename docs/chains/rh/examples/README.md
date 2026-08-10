@@ -13,7 +13,7 @@ deployment-authorized. The Round-3 independent review is bound to source
 SHA-256
 `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
 see the
-[`review record`](../evidence/ccip-solidity-reference-round-3-review.md).
+`review record`.
 
 Each contract inherits Chainlink contracts-CCIP v1.6.1's concrete
 `BurnMintTokenPool`, passes through the standard five constructor arguments,

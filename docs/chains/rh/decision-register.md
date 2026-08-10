@@ -88,7 +88,7 @@ Every later Stock Token requires its own identity, proxy/implementation,
 runtime, transfer, oracle, administrative-control, and route evidence.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D005 — Stock routes remain unreachable until containment closes
 
@@ -100,8 +100,8 @@ the complete M1-M5 containment group, audit, exact configuration, and activation
 gates close.
 
 Sources:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md) and
-[`track-8-m1-exact-receipt.md`](track-8-m1-exact-receipt.md).
+`track-8-m0-owner-decision-packet.md` and
+`track-8-m1-exact-receipt.md`.
 
 ### RH-D006 — Exact receipt on every Teller deposit route
 
@@ -115,7 +115,7 @@ does not select a vault, configure AAPL, close M5, or authorize Stock
 registration, deployment, reachability, or activation.
 
 Source:
-[`evidence/stock-token-m1-exact-receipt.md`](evidence/stock-token-m1-exact-receipt.md).
+`evidence/stock-token-m1-exact-receipt.md`.
 
 ### RH-D007 — Chain-native sGREEN, never bridged
 
@@ -125,7 +125,7 @@ Chain-native sGREEN deposits and withdrawals are launch requirements. sGREEN
 must never receive a CCIP route.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D008 — CCIP complete or disabled
 
@@ -137,7 +137,7 @@ rollback, or state-independence gate is incomplete, launch and remain with CCIP
 disabled.
 
 Source:
-[`track-8-m0-owner-decision-packet.md`](track-8-m0-owner-decision-packet.md).
+`track-8-m0-owner-decision-packet.md`.
 
 ### RH-D009 — USDG price path
 
@@ -199,8 +199,8 @@ deployment evidence, negative-path verification, monitoring, activation, and
 release remain separately gated.
 
 Sources:
-[`track-6-s5-checkpoint-0-owner-decision-packet.md`](track-6-s5-checkpoint-0-owner-decision-packet.md)
-and [`track-6-s5-ledger-guard.md`](track-6-s5-ledger-guard.md).
+`track-6-s5-checkpoint-0-owner-decision-packet.md`
+and `track-6-s5-ledger-guard.md`.
 
 ## Deployment-system decisions
 
@@ -214,8 +214,8 @@ Blocked or unsupported operations fail before account, provider, path, or
 transaction work.
 
 Sources:
-[`track-7-h2-network-profiles-cli.md`](track-7-h2-network-profiles-cli.md) and
-[`evidence/network-profile-cli-implementation.md`](evidence/network-profile-cli-implementation.md).
+`track-7-h2-network-profiles-cli.md` and
+`evidence/network-profile-cli-implementation.md`.
 
 ### RH-D014 — Symbolic blueprint before concrete values
 
@@ -228,9 +228,9 @@ relation semantics, provenance, and blocker ownership. It does not approve
 concrete addresses, artifacts, parameters, roles, or activation.
 
 Sources:
-[`track-7-h3-robinhood-blueprint-omissions.md`](track-7-h3-robinhood-blueprint-omissions.md)
+`track-7-h3-robinhood-blueprint-omissions.md`
 and
-[`evidence/robinhood-blueprint-phase-a.md`](evidence/robinhood-blueprint-phase-a.md).
+`evidence/robinhood-blueprint-phase-a.md`.
 
 ### RH-D015 — One combined defaults and parameter workstream
 
@@ -251,7 +251,7 @@ preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
 
 Source:
-[`track-6-s6-track-7-h4-defaults-parameters.md`](track-6-s6-track-7-h4-defaults-parameters.md).
+`track-6-s6-track-7-h4-defaults-parameters.md`.
 
 ### RH-D016 — Shared migration source, isolated histories
 
@@ -267,7 +267,7 @@ retired historical evidence. Do not create history or infer an executable plan
 from repository migration files.
 
 Source:
-[`evidence/robinhood-migration-phase-a.md`](evidence/robinhood-migration-phase-a.md).
+`evidence/robinhood-migration-phase-a.md`.
 
 ### RH-D017 — Immutable manifest and evidence chain
 
@@ -293,7 +293,10 @@ deployment, promotion, activation, production use, or release.
 
 **Status:** Owner-ratified for the current handoff repository shape on 27 July
 2026, against exact candidate commit
-`330916b03d939c62bb8b05fc51691a2dbc70948f`.
+`330916b03d939c62bb8b05fc51691a2dbc70948f`. **Its repository-placement clause is
+superseded by [RH-D024](#rh-d024--the-dashboard-is-extracted-from-the-active-tree)
+on 7 August 2026.** The dependency-scope and H-01 isolation clauses below remain
+in force.
 
 Keep the self-contained dashboard application under
 `docs/chains/rh/dashboard/` during the current handoff phase. Co-locating it
@@ -321,6 +324,37 @@ Path-scoped CI must run the dashboard build, integrity tests, and lint whenever
 `docs/chains/rh/**`, [`../rh-summary.md`](../rh-summary.md), or that workflow
 changes. This workflow is a post-push backstop and manual verification surface,
 not a substitute for the required local validation or explicit merge authority.
+
+**Superseded in part.** The repository-placement clause above — "keep the
+self-contained dashboard application under `docs/chains/rh/dashboard/`" — and its
+path-scoped CI requirement are superseded by RH-D024. Everything else in RH-D018,
+including the dependency-scope boundary and the rule that no dashboard package
+state can affect an H-01 disposition, remains in force.
+
+### RH-D024 — The dashboard is extracted from the active tree
+
+**Status:** Owner-ratified on 7 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification` on baseline
+`610b43f4508e85628a1362532a79d68d71ea902c`.
+
+The self-contained dashboard application and its `rh-handoff-dashboard.yml`
+workflow are removed from the active tree. This supersedes the RH-D018
+repository-placement clause and its path-scoped CI requirement: there is no
+dashboard build, integrity-test, or lint job in this repository, and
+`docs/chains/rh/**` changes trigger no workflow.
+
+All 27 files remain recoverable from
+`610b43f4508e85628a1362532a79d68d71ea902c`, with per-file Git mode, blob ID, byte
+length, and SHA-256 in
+[`extracted-files.tsv`](../../simplification/extracted-files.tsv). Restoration is
+a Git checkout of that commit and requires no reconstruction.
+
+This decision changes repository placement only. It does not revoke the RH-D018
+dependency-scope boundary, does not alter the RH-D019 publication posture — Sites
+recovery, dashboard deployment, and access changes stay parked and nonblocking —
+and does not authorize any Sites action. [`status.yaml`](status.yaml) is
+unaffected as the sole machine-readable current-status authority; it was never
+part of the dashboard directory.
 
 ### RH-D019 — Private dashboard is a temporary presentation mirror
 
@@ -459,7 +493,7 @@ unfunded. Future owner, external, implementation, fork, and security work may
 explicitly reopen the result.
 
 See
-[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md).
+`qualification/lp-launch-admission.md`.
 This decision grants no pool creation, funding, custody, RPC, migration,
 registration, configuration, deployment, activation, or release authority.
 
@@ -495,6 +529,143 @@ The following are explicitly not decided or authorized:
   closure.
 
 See [`status.yaml`](status.yaml), `hard_gates`, for the current stop surface.
+
+### RH-D025 — Production clock usage is no longer scanned
+
+**Status:** Owner-accepted on 8 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification`.
+
+The block-clock inventory is removed from the active tree:
+`scripts/check_block_clock_inventory.py`,
+`config/block-clock-inventory.json`, and
+`tests/inventory/test_block_clock_inventory.py`. Nothing replaces it.
+
+**Scope of what is no longer checked.** The inventory scanned production sources
+for `block.number` and `block.timestamp` usage, for mixed-clock arithmetic, and
+for Vyper paths absent from its classification. None of those is scanned now. A
+new production timestamp occurrence, a moved occurrence, or a new unclassified
+path can enter with nothing objecting.
+
+**Rationale.** The inventory enforced an exact repository file census —
+`EXPECTED_PRODUCTION_COUNTS = (102, 97, 18)`, with remediation text forbidding
+mechanical updates — which made every deletion require a semantic-owner
+ceremony, and it was itself contributing 176 errors. The cost was paid on every
+change to the repository, whether or not that change went anywhere near a clock.
+
+An earlier revision of this rationale added that the inventory "could not detect
+a contract defect" and that "its benefit was a listing." A review judged that too
+categorical, and it was — it also contradicted this record's own scope paragraph
+above. Stated accurately: the inventory was a **static policy scanner**, and it
+did detect things. It flagged new `block.number`/`block.timestamp` occurrences,
+mixed-clock arithmetic, and Vyper paths missing from its classification. What it
+could not do is prove a clock-semantics defect in contract behaviour; it reported
+on the shape of the source, and a correct occurrence and an incorrect one look
+alike to it.
+
+So the trade being accepted is not "no benefit for a cost." It is: a real
+early-warning signal over clock-affecting source edits, given up because it was
+welded to a whole-repository file census that fired on every unrelated change.
+The reconsideration trigger below asks for the signal back without the census.
+
+**Residual risk, accepted.** A clock-semantics regression on Robinhood is the
+failure this guarded against, and it is now caught only by contract behaviour
+tests and human review of clock-affecting changes.
+
+**Reconsideration trigger.** Reopen if a clock-related defect reaches a
+deployment candidate, if a second chain with a divergent block clock is added,
+or if production clock usage is changed by someone without Robinhood cadence
+context. A replacement should be a narrower maintained scanner over
+`block.number`/`block.timestamp` occurrences, not a file census.
+
+**Source:** `docs/simplification/REMOVED.md`, `docs/simplification/validation-evidence.md` section 14.
+
+### RH-D026 — CreditEngine carries an exact headroom waiver at 184 bytes
+
+**Status:** Owner-granted on 8 August 2026, against the RH codebase
+simplification branch `codex/rh-codebase-simplification`.
+
+The deposit-vault hardening plan section 11.5 sets at least 200 bytes of
+EIP-170 headroom as the acceptance threshold for a changed deployed contract,
+and anything below 200 requires an exact owner waiver under RG-SIZE-01. This is
+that waiver.
+
+**Scope.** `CreditEngine` only, at its measured 24,392-byte runtime, leaving
+**184 bytes** of headroom. `tests/test_vault_pointer_runtime_sizes.py` records
+it as a per-contract override; every other contract in that set is held to the
+ratified 200, and `Teller` states 200 explicitly.
+
+**What exactly is waived.** One *contract version*, pinned by five identities,
+not a size band:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/CreditEngine.vy` sha256 | `d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43` |
+| Runtime template sha256 (immutable-free) | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` |
+| Runtime template bytes | 24,296 |
+| Deployed runtime bytes (with immutables) | 24,392 |
+| Deployed runtime sha256 at declared HQ `0x…00A1` | `12a781ca7793d79a866c3285f67f80fce65342dffc86239054a00653e94f7ac5` |
+
+Two reviews shaped this list, and each defeated the version before it.
+
+The first revision recorded only the 184-byte floor. A reviewer changed a
+production rule — `assert _discount <= HUNDRED_PERCENT` to
+`assert _discount < HUNDRED_PERCENT`, making a 100% discount invalid — and the
+deployed runtime stayed at exactly 24,392 bytes, so the floor passed. The source
+hash closes that: it moves on any source edit, size-preserving or not.
+
+The second revision added the source and template hashes and then claimed to bind
+"one exact artifact." **That was still false**, and a second reviewer proved it:
+deploying CreditEngine with a different `RIPE_HQ_FOR_ADDYS` changes the deployed
+byte string — including the registry authority the contract trusts — while the
+length stays at exactly 24,392, so every recorded identity still matched. The
+last row closes it, by deploying at a *declared* constructor input and hashing
+the complete result.
+
+**What this does not bind, deliberately.** The constructor arguments of any
+particular deployment. `0x…00A1` is a declared constant that exists only to make
+the deployed bytes reproducible; it is not a real HQ. Rewiring the test fixture
+to a different HQ still passes this guard, and that is correct: constructor
+arguments are deployment configuration, not contract version, and a code *size*
+waiver must not fail on test wiring that cannot affect code size. A wrong HQ in a
+real deployment is a deployment defect, caught by the behaviour suites that
+resolve addresses through it, not by an EIP-170 waiver.
+
+**Rationale.** The 184-byte position is inherited from `rh`. This branch changes
+no production Vyper, so it neither caused the shortfall nor can repair it. The
+alternative considered and rejected was lowering the default floor to 150 for
+every contract, which an independent review correctly identified as silently
+weakening a ratified rule — a synthetic StabilityPool at 176 bytes would have
+passed.
+
+**Residual risk, accepted.** CreditEngine has less margin than the ratified rule
+allows. An earlier revision of this record said a future change "has 184 bytes to
+work in before the guard fails," which conflated two different quantities. Stated
+precisely:
+
+- **184 bytes** is the absolute EIP-170 headroom — the room a change could use
+  before the 24,576-byte limit itself is breached.
+- **0 bytes** is the growth this waiver permits. The deployed size is pinned at
+  exactly 24,392, so any change to the contract — larger, smaller, or
+  size-preserving — fails the guard and reopens this decision. That is the
+  intent: the waiver covers one contract version, not a range. (A change to a
+  *deployment's* constructor arguments is not a change to the contract; see the
+  exclusion recorded above.)
+
+**Reconsideration trigger.** Withdraw this waiver when CreditEngine is next
+changed on `rh`: either the change brings it back above 200, or it needs its own
+owner waiver at the new figure. Lowering the recorded 184, or refreshing any
+pinned hash above, requires a new decision — not an edit to the test. Refreshing
+a constant to restore green is precisely the failure this record exists to
+prevent.
+
+**Self-retiring.** This exceptional binding applies only while CreditEngine sits
+below the ratified floor. Once it is back at 200+ bytes of headroom, its
+`MIN_HEADROOM_OVERRIDES` entry and its pinned identity are both removed, and it
+returns to being governed by the floor like every other contract. A test asserts
+the two tables cannot drift apart in either direction.
+
+**Source:** `tests/test_vault_pointer_runtime_sizes.py`,
+`docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
 
 ## Maintenance rule
 
