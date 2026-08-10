@@ -133,6 +133,8 @@ def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRAT
     assert len(_migrations) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+
     for m: VaultMigration in _migrations:
 
         # validate migration
@@ -144,6 +146,10 @@ def migrateVaultPositions(_migrations: DynArray[VaultMigration, MAX_VAULT_MIGRAT
         assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
         assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
 
+        # source and target must not be the core ripe gov vault
+        assert m.sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
+        assert m.targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
+        
         # check pre-migration teller balance
         tellerBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(a.teller)
 
@@ -214,10 +220,6 @@ def _validateVaultMigration(
     assert sourceVault != targetVault # dev: same vault
 
     # validate core ripe gov vault id
-    coreRipeGovVaultId: uint256 = staticcall mc.coreRipeGovVaultId()
-    assert coreRipeGovVaultId != 0 # dev: invalid core ripe gov vault id
-    assert _sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
-    assert _targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
     assert staticcall mc.isStabVaultId(_sourceVaultId) == staticcall mc.isStabVaultId(_targetVaultId) # dev: stab vault mismatch
 
     return sourceVault, targetVault
@@ -235,6 +237,8 @@ def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV
     assert len(_migrations) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
+    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+
     for m: RipeGovMigration in _migrations:
 
         # validate migration
@@ -245,6 +249,7 @@ def migrateRipeGovPositions(_migrations: DynArray[RipeGovMigration, MAX_RIPE_GOV
         # both must be paused
         assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
         assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
+        assert m.targetVaultId == coreRipeGovVaultId # dev: target is not core ripe gov
 
         # check pre-migration balances
         targetBalanceBefore: uint256 = staticcall IERC20(m.asset).balanceOf(targetVault)
