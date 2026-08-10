@@ -62,6 +62,10 @@ struct PrevSourceSnapshot:
     unlock: uint256
     lastTerms: cs.LockTerms
 
+struct LegacyMigrationPosition:
+    asset: address
+    sourceSnapshot: PrevSourceSnapshot
+
 struct RipeGovMigrationData:
     amount: uint256
     govPoints: uint256
@@ -97,6 +101,7 @@ event LegacyRipeGovPositionMigrationExecuted:
 
 MAX_MIGRATION_USERS: constant(uint256) = 25
 MAX_USER_ASSETS: constant(uint256) = 20
+MAX_GOV_USER_ASSETS: constant(uint256) = 5
 BASE_CHAIN_ID: constant(uint256) = 8453
 LEGACY_RIPE_GOV_VAULT_ID: constant(uint256) = 2
 LEGACY_RIPE_GOV_VAULT: immutable(address)
@@ -341,10 +346,13 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     for user: address in _users:
         if user == empty(address):
             continue
-        numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
-        for i: uint256 in range(1, numUserAssets, bound=MAX_USER_ASSETS):
 
-            # get user asset and amount
+        # snapshot all supported positions before the first legacy withdrawal
+        positions: DynArray[LegacyMigrationPosition, MAX_GOV_USER_ASSETS] = []
+        numUserAssets: uint256 = staticcall Vault(sourceVault).numUserAssets(user)
+        for i: uint256 in range(1, numUserAssets, bound=MAX_GOV_USER_ASSETS):
+
+            # get user asset
             asset: address = empty(address)
             hasBalance: bool = False
             asset, hasBalance = staticcall Vault(sourceVault).getUserAssetAtIndexAndHasBalance(user, i)
@@ -355,6 +363,16 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
             if not staticcall MissionControl(a.missionControl).isSupportedAssetInVault(targetVaultId, asset):
                 continue
 
+            positions.append(LegacyMigrationPosition(
+                asset=asset,
+                sourceSnapshot=self._getPreMigrationData(user, asset, sourceVault, a.missionControl),
+            ))
+
+        # migrate from the saved pre-withdrawal snapshots
+        for p: LegacyMigrationPosition in positions:
+            asset: address = p.asset
+            prevSnapShot: PrevSourceSnapshot = p.sourceSnapshot
+
             # check pre-migration balances
             tellerBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(a.teller)
             sourceVaultBalanceBefore: uint256 = staticcall IERC20(asset).balanceOf(sourceVault)
@@ -364,8 +382,6 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
             targetUserPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalUserGovPoints(user)
             targetTotalPointsBefore: uint256 = staticcall RipeGovVault(targetVault).totalGovPoints()
 
-            # get pre-migration data
-            prevSnapShot: PrevSourceSnapshot = self._getPreMigrationData(user, asset, sourceVault, a.missionControl)
             migData: RipeGovMigrationData = RipeGovMigrationData(
                 amount=prevSnapShot.sourceAmount,
                 govPoints=prevSnapShot.govPoints,
