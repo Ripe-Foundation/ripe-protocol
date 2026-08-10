@@ -39,6 +39,10 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
+interface VaultBook:
+    def getRegId(_vaultAddr: address) -> uint256: view
+    def isValidAddr(_addr: address) -> bool: view
+
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
@@ -47,9 +51,6 @@ interface BoardRoom:
 
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
-
-interface VaultBook:
-    def getRegId(_vaultAddr: address) -> uint256: view
 
 interface Ledger:
     def badDebt() -> uint256: view
@@ -499,24 +500,21 @@ def _isGovPointAccrualDisabled(_user: address) -> bool:
 
 @nonreentrant
 @external
-def exportPositionForMigration(
-    _user: address,
-    _asset: address,
-    _targetVault: address,
-    _a: addys.Addys = empty(addys.Addys),
-) -> RipeGovMigrationData:
+def exportPositionForMigration(_user: address, _asset: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert vaultData.isPaused # dev: vault not paused
+    assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated
+
+    a: addys.Addys = addys._getAddys(_a)
     assert empty(address) not in [_user, _asset, _targetVault] # dev: invalid migration address
     assert _targetVault != self and _targetVault.is_contract # dev: invalid target vault
-    assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated
+    assert staticcall VaultBook(a.vaultBook).isValidAddr(_targetVault) # dev: invalid target vault
 
     # check position
     sourceShares: uint256 = vaultData.userBalances[_user][_asset]
     assert sourceShares != 0 # dev: no position
 
     # update gov points
-    a: addys.Addys = addys._getAddys(_a)
     self._updateGovPointsForUserAsset(_user, _asset, a.missionControl)
 
     # check gov data
@@ -543,10 +541,9 @@ def exportPositionForMigration(
     self.userGovData[_user][_asset] = empty(GovData)
     self.positionMigratedOut[_user][_asset] = True
 
-    # transfer tokens
+    # transfer tokens to target vault
     assert extcall IERC20(_asset).transfer(_targetVault, amount, default_return_value=True) # dev: token transfer failed
 
-    # log event
     log RipeGovPositionExported(
         user=_user,
         asset=_asset,
@@ -556,6 +553,7 @@ def exportPositionForMigration(
         govPoints=userData.govPoints,
         unlock=userData.unlock,
     )
+
     return RipeGovMigrationData(
         amount=amount,
         govPoints=userData.govPoints,
@@ -566,21 +564,21 @@ def exportPositionForMigration(
 
 @nonreentrant
 @external
-def importPositionForMigration(
-    _user: address,
-    _asset: address,
-    _sourceVault: address,
-    _migration: RipeGovMigrationData,
-) -> uint256:
+def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _migration: RipeGovMigrationData) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert vaultData.isPaused # dev: vault not paused
+
+    # address validation
     assert empty(address) not in [_user, _asset, _sourceVault] # dev: invalid migration address
     assert _sourceVault != self and _sourceVault.is_contract # dev: invalid source vault
-    assert _migration.amount != 0 # dev: invalid migration amount
+    assert staticcall VaultBook(addys._getVaultBookAddr()).isValidAddr(_sourceVault) # dev: invalid source vault
+
+    # user validation
     assert not self.positionMigratedOut[_user][_asset] # dev: position already migrated out
+    assert _migration.amount != 0 # dev: invalid migration amount
     assert vaultData.userBalances[_user][_asset] == 0 # dev: target balance exists
 
-    # check gov data -- cannot have any existing gov data
+    # gov data validation
     userData: GovData = self.userGovData[_user][_asset]
     assert userData.govPoints == 0 and userData.lastShares == 0 # dev: target gov data exists
     assert userData.lastPointsUpdate == 0 and userData.unlock == 0 # dev: target gov data exists

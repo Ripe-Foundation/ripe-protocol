@@ -46,14 +46,6 @@ interface TellerUtils:
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def preferredStabVaultId() -> uint256: view
-    def coreRipeGovVaultId() -> uint256: view
-    def shouldCheckLastTouch() -> bool: view
-
 interface RipeGovVault:
     def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForMigration(_user: address, _asset: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
@@ -63,10 +55,13 @@ interface RipeGovVault:
     def getTotalAmountForUser(_user: address, _asset: address) -> uint256: view
     def doesUserHaveBalance(_user: address, _asset: address) -> bool: view
 
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
-    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def shouldCheckLastTouch() -> bool: view
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -87,6 +82,11 @@ interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface Ledger:
+    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
+    def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
 interface StabVault:
     def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -487,101 +487,24 @@ def rebalance(
 ####################
 
 
-# VaultMigrator owns all validation, batching, sequencing, lifecycle state and postconditions.
-# Teller exposes only exact-caller identity steps because the vault and Ledger permissions still
-# require Teller's identity. Splitting source and destination steps lets VaultMigrator validate
-# exact receipt and depletion before it authorizes the corresponding import or deposit.
+# basic vault migration
 
 
-@view
-@internal
-def _assertVaultMigrator():
+@nonreentrant
+@external
+def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool):
     assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
-
-
-@nonreentrant
-@external
-def executeRipeGovSource(
-    _user: address,
-    _asset: address,
-    _sourceVault: address,
-    _targetVault: address,
-    _legacyMigration: RipeGovMigrationData,
-    _shouldUseVaultWithdrawal: bool,
-) -> RipeGovMigrationData:
-    a: addys.Addys = addys._getAddys()
-    self._assertVaultMigrator()
-
-    migration: RipeGovMigrationData = _legacyMigration
-
-    if _shouldUseVaultWithdrawal:
-        assert deptBasics.isPaused # dev: teller not paused
-        amount: uint256 = 0
-        isDepleted: bool = False
-        amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), _targetVault, a)
-        migration.amount = amount
-    else:
-        migration = extcall RipeGovVault(_sourceVault).exportPositionForMigration(_user, _asset, _targetVault, a)
-
-    return migration
-
-
-@nonreentrant
-@external
-def executeRipeGovImport(
-    _user: address,
-    _asset: address,
-    _sourceVault: address,
-    _targetVaultId: uint256,
-    _targetVault: address,
-    _migration: RipeGovMigrationData,
-) -> uint256:
-    a: addys.Addys = addys._getAddys()
-    self._assertVaultMigrator()
-
-    targetShares: uint256 = extcall RipeGovVault(_targetVault).importPositionForMigration(
-        _user,
-        _asset,
-        _sourceVault,
-        _migration,
-    )
-
-    targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
-    if not targetLedgerData.isParticipatingInVault:
-        extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
-
-    return targetShares
-
-
-@nonreentrant
-@external
-def executeVaultWithdrawal(
-    _user: address,
-    _asset: address,
-    _sourceVault: address,
-) -> (uint256, bool):
-    a: addys.Addys = addys._getAddys()
-    self._assertVaultMigrator()
     assert deptBasics.isPaused # dev: teller not paused
-
-    amount: uint256 = 0
-    isDepleted: bool = False
-    amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, a)
-    return amount, isDepleted
+    a: addys.Addys = addys._getAddys(_a)
+    return extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, a)
 
 
 @nonreentrant
 @external
-def executeVaultDeposit(
-    _user: address,
-    _asset: address,
-    _amount: uint256,
-    _targetVaultId: uint256,
-    _targetVault: address,
-) -> uint256:
-    a: addys.Addys = addys._getAddys()
-    self._assertVaultMigrator()
+def depositOnVaultMigration(_user: address,_asset: address,_amount: uint256,_targetVaultId: uint256,_targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
     assert deptBasics.isPaused # dev: teller not paused
+    a: addys.Addys = addys._getAddys(_a)
 
     depositedAmount: uint256 = self._deposit(_asset, _amount, _user, _targetVault, _targetVaultId, msg.sender, 0, True, True, False, a)
 
@@ -590,6 +513,56 @@ def executeVaultDeposit(
     self._performHousekeeping(True, _user, True, a)
 
     return depositedAmount
+
+
+# normal ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    a: addys.Addys = addys._getAddys(_a)
+    return extcall RipeGovVault(_sourceVault).exportPositionForMigration(_user, _asset, _targetVault, a)
+
+
+@nonreentrant
+@external
+def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    targetShares: uint256 = extcall RipeGovVault(_targetVault).importPositionForMigration(_user, _asset, _sourceVault, _migration)
+
+    # add vault to user
+    targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
+    if not targetLedgerData.isParticipatingInVault:
+        extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
+
+    return targetShares
+
+
+# legacy ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForLegacyRipeGovMigration(
+    _user: address,
+    _asset: address,
+    _sourceVault: address,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    amount: uint256 = 0
+    isDepleted: bool = False
+    amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), _targetVault, a)
+
+    return amount
 
 
 ########
