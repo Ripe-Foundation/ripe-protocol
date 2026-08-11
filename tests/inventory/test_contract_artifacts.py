@@ -11,6 +11,10 @@ from pathlib import Path
 import boa
 import pytest
 
+from config.artifact_expectations import (
+    ArtifactExpectationsError,
+    load_artifact_expectations,
+)
 from scripts import check_contract_artifacts as artifact_checker
 from scripts import capture_contract_runtimes as runtime_capture
 from scripts import export_abis as abi_exporter
@@ -81,6 +85,24 @@ CURVE_LAUNCH_ARTIFACTS = {
         "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
     ),
 }
+JSON_RESOURCE_COUNTEREXAMPLES = (
+    pytest.param(b"1" * 5_000, "invalid JSON", id="huge-integer"),
+    pytest.param(
+        b"[" * 1_500 + b"0" + b"]" * 1_500,
+        "invalid JSON",
+        id="parser-recursion",
+    ),
+    pytest.param(
+        b"[" * 500 + b"0" + b"]" * 500,
+        "JSON nesting exceeds maximum depth",
+        id="post-parse-depth",
+    ),
+    pytest.param(
+        b"[" + b"0," * 100_000 + b"0]",
+        "JSON value exceeds maximum node count",
+        id="post-parse-width",
+    ),
+)
 
 
 @pytest.fixture(scope="session")
@@ -463,10 +485,470 @@ def test_artifact_pipeline_checker_reports_deployed_size_and_headroom():
     assert "template-headroom=" in result.stdout
     assert "deployed-runtime=" in result.stdout
     assert "deployed-headroom=" in result.stdout
+def _load_expectations(path: Path = EXPECTATIONS, *, root: Path = ROOT) -> dict:
+    return load_artifact_expectations(path, root=root)
+
+
+def _json_bytes(value: object) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _write_v1_parser_counterexample(
+    directory: Path, counterexample: bytes
+) -> Path:
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["parser_counterexample"] = (
+        "__PARSER_COUNTEREXAMPLE__"
+    )
+    raw = _json_bytes(values).replace(
+        b'"__PARSER_COUNTEREXAMPLE__"', counterexample
+    )
+    index_path = directory / "parser-counterexample-v1.json"
+    index_path.write_bytes(raw)
+    return index_path
+
+
+def _write_v2_parser_counterexample(tmp_path: Path, counterexample: bytes):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["parser_counterexample"] = (
+        "__PARSER_COUNTEREXAMPLE__"
+    )
+    raw = _json_bytes(record).replace(
+        b'"__PARSER_COUNTEREXAMPLE__"', counterexample
+    )
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    assert hashlib.sha256(raw).hexdigest() == (
+        index["contracts"]["Lootbox"]["sha256"]
+    )
+    return repository, index_path
+
+
+def _write_v2_expectations(tmp_path: Path):
+    repository = tmp_path / "repository"
+    records_root = repository / "config" / "contract-artifacts"
+    records_root.mkdir(parents=True)
+    values = _load_expectations()
+    references = {}
+    record_paths = {}
+    for name, expectation in values["contracts"].items():
+        relative = Path("config") / "contract-artifacts" / f"{name}.json"
+        record_path = repository / relative
+        raw = _json_bytes(
+            {
+                "contract": name,
+                "expectation": expectation,
+                "schema_version": 1,
+            }
+        )
+        record_path.write_bytes(raw)
+        references[name] = {
+            "path": relative.as_posix(),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+        }
+        record_paths[name] = record_path
+
+    index = {
+        "compiler": values["compiler"],
+        "contracts": references,
+        "records_root": "config/contract-artifacts",
+        "schema_version": 2,
+    }
+    index_path = repository / "config" / "contract-artifact-expectations.json"
+    index_path.write_bytes(_json_bytes(index))
+    return repository, index_path, index, record_paths
+
+
+def _rewrite_v2_index(index_path: Path, index: dict) -> None:
+    index_path.write_bytes(_json_bytes(index))
+
+
+def _snapshot_regular_files(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+
+
+def test_v1_loader_preserves_the_current_in_memory_shape():
+    assert _load_expectations() == json.loads(EXPECTATIONS.read_bytes())
+
+
+def test_checker_accepts_canonical_relative_v1_expectations_path():
+    result = _run_checker(
+        "--contract",
+        "Lootbox",
+        "--expectations",
+        "config/contract-artifact-expectations.json",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[-1] == "CONTRACT_ARTIFACTS_OK"
+
+
+def test_v2_loader_is_equivalent_to_the_frozen_v1_shape(tmp_path):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    assert _load_expectations(index_path, root=repository) == _load_expectations()
+
+
+def test_v2_index_must_be_natively_contained_by_root(tmp_path):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    outside_index = tmp_path / "outside-index.json"
+    outside_index.write_bytes(index_path.read_bytes())
+    with pytest.raises(ArtifactExpectationsError, match="native path escapes"):
+        _load_expectations(outside_index, root=repository)
+
+
+def test_duplicate_json_keys_fail_closed(tmp_path):
+    duplicate = tmp_path / "duplicate.json"
+    duplicate.write_text(
+        '{"compiler": {}, "contracts": {}, "schema_version": 1, '
+        '"schema_version": 1}\n'
+    )
+    with pytest.raises(ArtifactExpectationsError, match="duplicate JSON key"):
+        _load_expectations(duplicate, root=tmp_path)
+
+
+def test_symlink_index_fails_closed(tmp_path):
+    target = _write_expectations(tmp_path, _load_expectations())
+    symlink = tmp_path / "expectations-symlink.json"
+    symlink.symlink_to(target)
+    result = _run_checker(
+        "--contract", "Lootbox", "--expectations", str(symlink)
+    )
+    assert result.returncode == 1
+    assert "symlink anchor components are forbidden" in result.stderr
+
+
+def test_relative_root_and_index_anchors_fail_closed(tmp_path):
+    index_path = _write_expectations(tmp_path, _load_expectations())
+    with pytest.raises(ArtifactExpectationsError, match="anchor must be absolute"):
+        _load_expectations("expectations.json", root=tmp_path)
+    with pytest.raises(ArtifactExpectationsError, match="anchor must be absolute"):
+        _load_expectations(index_path, root="repository")
+
+
+def test_dot_and_dotdot_anchor_spellings_fail_closed(tmp_path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    index_path = _write_expectations(repository, _load_expectations())
+    unsafe_indexes = (
+        f"{repository}/./{index_path.name}",
+        f"{repository}/unused/../{index_path.name}",
+    )
+    for unsafe_index in unsafe_indexes:
+        with pytest.raises(ArtifactExpectationsError, match="may not contain . or .."):
+            _load_expectations(unsafe_index, root=repository)
+
+    unsafe_roots = (
+        f"{tmp_path}/./repository",
+        f"{repository}/unused/..",
+    )
+    for unsafe_root in unsafe_roots:
+        with pytest.raises(ArtifactExpectationsError, match="may not contain . or .."):
+            _load_expectations(index_path, root=unsafe_root)
+
+
+def test_root_and_index_parent_symlinks_fail_closed(tmp_path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    index_path = _write_expectations(repository, _load_expectations())
+    linked_repository = tmp_path / "linked-repository"
+    linked_repository.symlink_to(repository, target_is_directory=True)
+
+    with pytest.raises(
+        ArtifactExpectationsError, match="symlink anchor components are forbidden"
+    ):
+        _load_expectations(
+            linked_repository / index_path.name, root=repository
+        )
+    with pytest.raises(
+        ArtifactExpectationsError, match="symlink anchor components are forbidden"
+    ):
+        _load_expectations(index_path, root=linked_repository)
+
+
+def test_root_and_index_component_casing_must_match_disk(tmp_path):
+    repository = tmp_path / "Repository"
+    repository.mkdir()
+    index_path = repository / "Expectations.json"
+    index_path.write_bytes(_json_bytes(_load_expectations()))
+
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
+        _load_expectations(
+            repository / "expectations.json", root=repository
+        )
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
+        _load_expectations(index_path, root=tmp_path / "repository")
+
+
+@pytest.mark.parametrize("schema_version", [3, True, 1.0])
+def test_unsupported_index_schema_fails_closed(tmp_path, schema_version):
+    values = _load_expectations()
+    values["schema_version"] = schema_version
+    unsupported = _write_expectations(tmp_path, values)
+    with pytest.raises(ArtifactExpectationsError, match="unsupported schema_version"):
+        _load_expectations(unsupported, root=tmp_path)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_v1_non_finite_constants_fail_closed(tmp_path, constant):
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["non_finite_counterexample"] = (
+        "__NON_FINITE__"
+    )
+    raw = _json_bytes(values).replace(b'"__NON_FINITE__"', constant.encode())
+    index_path = tmp_path / "non-finite-v1.json"
+    index_path.write_bytes(raw)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON constant"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_v2_nested_non_finite_constants_fail_closed(tmp_path, constant):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["non_finite_counterexample"] = "__NON_FINITE__"
+    raw = _json_bytes(record).replace(b'"__NON_FINITE__"', constant.encode())
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON constant"):
+        _load_expectations(index_path, root=repository)
+
+
+@pytest.mark.parametrize("overflow", ["1e9999", "-1e9999"])
+def test_v1_float_overflow_fails_closed(tmp_path, overflow):
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["float_overflow_counterexample"] = (
+        "__FLOAT_OVERFLOW__"
+    )
+    raw = _json_bytes(values).replace(b'"__FLOAT_OVERFLOW__"', overflow.encode())
+    index_path = tmp_path / "float-overflow-v1.json"
+    index_path.write_bytes(raw)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON float"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize("overflow", ["1e9999", "-1e9999"])
+def test_v2_nested_float_overflow_fails_closed(tmp_path, overflow):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["float_overflow_counterexample"] = (
+        "__FLOAT_OVERFLOW__"
+    )
+    raw = _json_bytes(record).replace(b'"__FLOAT_OVERFLOW__"', overflow.encode())
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON float"):
+        _load_expectations(index_path, root=repository)
+
+
+@pytest.mark.parametrize(
+    ("counterexample", "failure"),
+    JSON_RESOURCE_COUNTEREXAMPLES,
+)
+def test_v1_json_resource_failures_are_typed_before_materialization(
+    tmp_path, counterexample, failure
+):
+    index_path = _write_v1_parser_counterexample(tmp_path, counterexample)
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match=rf"artifact expectations: {failure}",
+    ):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("counterexample", "failure"),
+    JSON_RESOURCE_COUNTEREXAMPLES,
+)
+def test_v2_nested_json_resource_failures_are_typed_before_materialization(
+    tmp_path, counterexample, failure
+):
+    repository, index_path = _write_v2_parser_counterexample(
+        tmp_path, counterexample
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match=rf"contract record Lootbox: {failure}",
+    ):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_missing_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_paths["Lootbox"].unlink()
+    with pytest.raises(ArtifactExpectationsError, match="record set mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_extra_record_fails_closed(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_paths["Lootbox"].with_name("Unindexed.json").write_text("{}\n")
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="record set mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_record_hash_mismatch_fails_closed(tmp_path):
+    repository, index_path, index, _ = _write_v2_expectations(tmp_path)
+    index["contracts"]["Lootbox"]["sha256"] = "0" * 64
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="SHA-256 mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+@pytest.mark.parametrize(
+    ("unsafe_path", "failure"),
+    [
+        ("/tmp/Lootbox.json", "absolute paths are forbidden"),
+        ("../Lootbox.json", "may not escape its root"),
+        ("C:/Lootbox.json", "Windows drive paths are forbidden"),
+        ("C:Lootbox.json", "Windows drive paths are forbidden"),
+    ],
+)
+def test_v2_unsafe_record_paths_fail_closed(tmp_path, unsafe_path, failure):
+    repository, index_path, index, _ = _write_v2_expectations(tmp_path)
+    index["contracts"]["Lootbox"]["path"] = unsafe_path
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match=failure):
+        _load_expectations(index_path, root=repository)
+
+
+def test_contract_names_must_be_identifier_safe(tmp_path):
+    values = _load_expectations()
+    record = values["contracts"].pop("Lootbox")
+    values["contracts"]["Lootbox-unsafe"] = record
+    index_path = _write_expectations(tmp_path, values)
+    with pytest.raises(ArtifactExpectationsError, match="identifier-safe"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+def test_v2_record_filename_must_match_contract_exactly(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    renamed = record_path.with_name("Lootbox-record.json")
+    record_path.rename(renamed)
+    index["contracts"]["Lootbox"]["path"] = renamed.relative_to(
+        repository
+    ).as_posix()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="expected exact filename"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_relative_component_casing_must_match_disk(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    records_root = record_paths["Lootbox"].parent
+    records_root.rename(records_root.with_name("Contract-Artifacts"))
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_non_regular_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record_path.unlink()
+    record_path.mkdir()
+    with pytest.raises(ArtifactExpectationsError, match="not a regular file"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_symlink_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    target = tmp_path / "outside-record.json"
+    target.write_bytes(record_path.read_bytes())
+    record_path.unlink()
+    record_path.symlink_to(target)
+    with pytest.raises(ArtifactExpectationsError, match="symlink paths are forbidden"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_unsupported_record_schema_fails_closed(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["schema_version"] = 2
+    raw = _json_bytes(record)
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="unsupported record schema"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_updater_refuses_v2_before_compile_or_write(tmp_path, monkeypatch):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    before = _snapshot_regular_files(repository)
+
+    def unexpected_vyper_lookup():
+        pytest.fail("updater reached compiler discovery for read-only v2")
+
+    def unexpected_write(*_args, **_kwargs):
+        pytest.fail("updater attempted to write read-only v2")
+
+    monkeypatch.setattr(artifact_updater, "ROOT", repository)
+    monkeypatch.setattr(artifact_updater, "EXPECTATIONS", index_path)
+    monkeypatch.setattr(
+        artifact_updater.checker, "_vyper_path", unexpected_vyper_lookup
+    )
+    monkeypatch.setattr(Path, "write_text", unexpected_write)
+    monkeypatch.setattr(
+        sys, "argv", ["update_contract_artifact_expectations.py"]
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError, match="updates require an atomic v2 writer"
+    ):
+        artifact_updater.main()
+
+    assert _snapshot_regular_files(repository) == before
+
+
+def test_updater_refuses_deep_v1_before_compile_or_write(tmp_path, monkeypatch):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    counterexample = b"[" * 500 + b"0" + b"]" * 500
+    index_path = _write_v1_parser_counterexample(repository, counterexample)
+    before = _snapshot_regular_files(repository)
+
+    def unexpected_vyper_lookup():
+        pytest.fail("updater reached compiler discovery for deeply nested v1")
+
+    def unexpected_write(*_args, **_kwargs):
+        pytest.fail("updater attempted to write deeply nested v1")
+
+    monkeypatch.setattr(artifact_updater, "ROOT", repository)
+    monkeypatch.setattr(artifact_updater, "EXPECTATIONS", index_path)
+    monkeypatch.setattr(
+        artifact_updater.checker, "_vyper_path", unexpected_vyper_lookup
+    )
+    monkeypatch.setattr(Path, "write_text", unexpected_write)
+    monkeypatch.setattr(
+        sys, "argv", ["update_contract_artifact_expectations.py"]
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match="artifact expectations: JSON nesting exceeds maximum depth",
+    ):
+        artifact_updater.main()
+
+    assert _snapshot_regular_files(repository) == before
 
 
 def test_frozen_required_contract_set_is_exact():
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     assert set(values["contracts"]) == REQUIRED_CONTRACTS
     assert artifact_updater.GOVERNED_CONTRACTS == REQUIRED_CONTRACTS
 
@@ -566,7 +1048,7 @@ def test_new_contract_selection_succeeds(contract):
 
 
 def test_constructor_bound_deployed_runtime_facts_are_compiler_backed():
-    contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
+    contracts = _load_expectations()["contracts"]
 
     for name, deployed in DEPLOYED_RUNTIME_FACTS.items():
         artifacts = contracts[name]["artifacts"]
@@ -679,7 +1161,7 @@ def test_measured_boa_runtime_is_template_plus_exact_immutable_suffix():
 
 
 def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
-    contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
+    contracts = _load_expectations()["contracts"]
     metadata_sizes = {
         record["artifacts"]["creation_metadata_size"]
         for record in contracts.values()
@@ -733,7 +1215,7 @@ def test_prefix_or_metadata_byte_tampering_breaks_the_frozen_creation_binding():
         ROOT / "contracts" / "core" / "Teller.vy",
         vyper,
     )
-    expected = json.loads(EXPECTATIONS.read_text())["contracts"]["Teller"]
+    expected = _load_expectations()["contracts"]["Teller"]
     binding = artifact_checker._creation_binding(
         compiled.creation,
         integrity=compiled.integrity,
@@ -794,7 +1276,7 @@ def test_new_contract_tampered_source_copy_fails_closed(
 
 @pytest.mark.parametrize("contract", NEW_CONTRACT_SOURCES)
 def test_new_contract_tampered_expectation_fails_closed(tmp_path, contract):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"][contract]["abi"]["canonical_sha256"] = "00" * 32
     tampered = _write_expectations(tmp_path, values)
 
@@ -834,7 +1316,7 @@ def test_new_contract_tampered_expectation_fails_closed(tmp_path, contract):
 def test_deleverage_compiler_and_runtime_identity_drift_fails_closed(
     tmp_path, field_path, replacement, failure
 ):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     target = values["contracts"]["Deleverage"]
     for key in field_path[:-1]:
         target = target[key]
@@ -869,7 +1351,7 @@ def test_tampered_source_copy_fails_closed(tmp_path):
 
 
 def test_tampered_expectation_fails_closed(tmp_path):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"]["Teller"]["abi"]["canonical_sha256"] = "00" * 32
     tampered = _write_expectations(tmp_path, values)
 
@@ -887,7 +1369,7 @@ def test_tampered_expectation_fails_closed(tmp_path):
 
 
 def test_tampered_layout_expectation_fails_closed(tmp_path):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"]["Teller"]["storage_layout"] = {}
     tampered = _write_expectations(tmp_path, values)
 

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from config.artifact_expectations import load_artifact_expectations  # noqa: E402
 from scripts import check_contract_artifacts as checker
 from scripts import capture_contract_runtimes as runtime_capture
 
@@ -365,7 +366,9 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    values = json.loads(EXPECTATIONS.read_text())
+    values = load_artifact_expectations(
+        EXPECTATIONS, root=ROOT, allow_v2=False
+    )
     existing_names = set(values["contracts"])
     unexpected_existing_names = sorted(existing_names - GOVERNED_CONTRACTS)
     if unexpected_existing_names:

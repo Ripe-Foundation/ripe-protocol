@@ -20,6 +20,12 @@ from eth_utils import keccak, to_checksum_address
 
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from config.artifact_expectations import load_artifact_expectations  # noqa: E402
+
+
 MANIFEST_PATH = Path(__file__).with_name("ledger-robinhood-profile.json")
 EXPECTATIONS_PATH = ROOT / "config" / "contract-artifact-expectations.json"
 LEDGER_PATH = ROOT / "contracts" / "data" / "Ledger.vy"
@@ -165,9 +171,9 @@ def load_manifest(path: Path = MANIFEST_PATH) -> Mapping[str, Any]:
 
 
 def _expected_source_metadata() -> dict[str, Any]:
-    expectations = json.loads(EXPECTATIONS_PATH.read_text())["contracts"][
-        "Ledger"
-    ]
+    expectations = load_artifact_expectations(
+        EXPECTATIONS_PATH, root=ROOT
+    )["contracts"]["Ledger"]
     return {
         "compiler_settings": expectations["compiler_settings"],
         "effective_optimization": expectations["effective_optimization"],
@@ -246,9 +252,9 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
 
 
 def compile_reviewed_ledger() -> CompiledLedger:
-    expectations = json.loads(EXPECTATIONS_PATH.read_text())["contracts"][
-        "Ledger"
-    ]
+    expectations = load_artifact_expectations(
+        EXPECTATIONS_PATH, root=ROOT
+    )["contracts"]["Ledger"]
     if _sha256(LEDGER_PATH.read_bytes()) != expectations["source_sha256"]:
         raise ProfileGateError("reviewed Ledger source identity mismatch")
     if expectations["effective_optimization"] != "gas":
