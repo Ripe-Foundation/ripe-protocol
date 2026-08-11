@@ -74,7 +74,7 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_556, "headroom": 20},
+    "AuctionHouse": {"size": 23_761, "headroom": 815},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
 CURVE_LAUNCH_ARTIFACTS = {
@@ -240,7 +240,9 @@ def test_artifact_pipeline_strict_checker_rejects_noncanonical_record_set(
     mode,
 ):
     values = json.loads(EXPECTATIONS.read_text())
-    if mode == "unexpected":
+    if mode == "missing":
+        values["contracts"].pop("Teller")
+    else:
         for name in artifact_checker.GOVERNED_CONTRACTS:
             values["contracts"].setdefault(name, {})
         values["contracts"]["TellerAlias"] = values["contracts"]["Teller"]
@@ -1101,7 +1103,6 @@ def test_constructor_bound_runtime_binding_covers_exact_immutable_suffix(
         "Teller",
         "--expectations",
         str(expectations),
-        "--require-deployed-runtime-bindings",
     )
     assert result.returncode == 0, result.stderr
     assert "full deployed-runtime identity bound" in result.stdout
@@ -1115,7 +1116,6 @@ def test_constructor_bound_runtime_binding_covers_exact_immutable_suffix(
         "Teller",
         "--expectations",
         str(tampered),
-        "--require-deployed-runtime-bindings",
     )
     assert result.returncode == 1
     assert "constructor-bound deployed runtime SHA-256 mismatch" in result.stderr
