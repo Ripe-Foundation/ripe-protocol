@@ -535,7 +535,11 @@ def _t1_mutex_removal_mutant_source():
     )
     assert source.count(assertion) == 1
     source = source.replace(assertion, "", 1)
-    assert "assert not self.receiptMeasurementActive" not in source
+    assert assertion not in source
+    assert (
+        "    assert not self.receiptMeasurementActive"
+        " # dev: receipt window active\n"
+    ) in source
     return source
 
 
@@ -2875,14 +2879,9 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
-# Plan-substitution and deferred-risk record: the required nested batch-
-# redemption premise cannot be a receipt-mutex proof because
-# receiptMeasurementActive is checked only by _deposit. On the pinned tree,
-# depositFromTrusted also lacks @nonreentrant, so a callback may enter a
-# different custody-changing route while receipt measurement is active. The
-# test-only ceiling forbids repairing production Teller here. This replacement
-# binds the mutex's actual nested-deposit scope; the broader cross-route risk
-# remains production-hardening work and must not be inferred closed from it.
+# The deposit-local mutex and the central housekeeping guard jointly block a
+# nested deposit during receipt measurement. This regression separately pins
+# the deposit-local half and transient-state recovery.
 def test_receipt_measurement_mutex_blocks_nested_deposit(
     ripe_hq,
     governance,
@@ -3447,18 +3446,12 @@ def test_predeployment_withdrawal_responsibility_matrix(
 
 @pytest.mark.parametrize("outer_route", ("governance", "trusted"))
 @pytest.mark.parametrize(
-    ("nested_action", "nested_succeeds"),
-    (
-        pytest.param("protected-withdrawal", True, id="protected-withdrawal"),
-        pytest.param("rebalance", False, id="rebalance"),
-        pytest.param("redemption", False, id="redemption"),
-        pytest.param("liquidation", True, id="liquidation"),
-    ),
+    "nested_action",
+    ("protected-withdrawal", "rebalance", "redemption", "liquidation"),
 )
 def test_predeployment_undecorated_route_reentrancy_cross_product(
     outer_route,
     nested_action,
-    nested_succeeds,
     ripe_hq_deploy,
     governance,
     vault_book,
@@ -3570,19 +3563,12 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
         ) == amount
 
     assert token.callback_was_attempted()
-    assert token.callback_succeeded() is nested_succeeds
+    assert token.callback_succeeded() is False
     assert token.balanceValue(outer_vault) == amount
     assert outer_vault.getTotalAmountForUser(user, token) == amount
-    nested_withdrawal_succeeds = (
-        nested_action == "protected-withdrawal" and nested_succeeds
-    )
-    expected_protected = protected_position - int(nested_withdrawal_succeeds)
-    assert (
-        protected_vault.getTotalAmountForUser(user, token)
-        == expected_protected
-    )
-    assert token.balanceValue(protected_vault) == expected_protected
-    assert token.balanceValue(token) == 1 + int(nested_withdrawal_succeeds)
+    assert protected_vault.getTotalAmountForUser(user, token) == protected_position
+    assert token.balanceValue(protected_vault) == protected_position
+    assert token.balanceValue(token) == 1
 
 
 def test_m1_teller_runtime_size_dual_guard():
@@ -3606,29 +3592,19 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    # Owner-accepted migration runtime; any further byte growth requires review.
-    assert len(runtime) <= 24_429
+    # Owner-approved receipt-window guard; any further byte growth requires review.
+    assert len(runtime) <= 24_436
 
 
 ############################################################################
 # WP1 / WP6 (Section 8.4, Section 13): receipt-window interleaving checkpoint
 #
-# The characterization already exists on the bound baseline as
-# test_predeployment_undecorated_route_reentrancy_cross_product, which proves
-# that a token callback fired during the receipt-measurement window can
-# complete a nested protected withdrawal or a nested liquidation while the
-# outer governance/trusted deposit still succeeds. This adds only the missing
-# Section 6.1(B) hardening checkpoint for SV-6; it stays strict-xfail until
-# RH-CHANGE-01 authorizes the Section 13 central guard.
+# The full cross-product and the focused rows below pin the owner-approved
+# central guard: no custody-changing Teller route may complete during an active
+# receipt-measurement window.
 ############################################################################
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-10: Teller.receiptMeasurementActive is checked only by _deposit and "
-    "depositFromTrusted/depositIntoGovVault are undecorated, so custody-changing "
-    "nested routes stay reachable; the Section 13 guard is gated on RH-CHANGE-01",
-)
 @pytest.mark.parametrize("nested_action", ("protected-withdrawal", "liquidation"))
 def test_receipt_window_blocks_every_custody_changing_nested_route(
     nested_action,
@@ -3847,10 +3823,7 @@ def test_receipt_window_remaining_nested_routes(
     ) == amount
 
     assert token.callback_was_attempted()
-    # A nested deposit through any route is blocked by the mutex itself; the
-    # other two routes are not deposits, so the mutex never sees them.
-    if nested_action == "same_route_deposit":
-        assert token.callback_succeeded() is False
+    assert token.callback_succeeded() is False
     # The outer measurement still produced an exact receipt either way.
     assert simple_erc20_vault.getTotalAmountForUser(user, token) == amount
     assert protected_vault.getTotalAmountForUser(user, token) == 10
@@ -3904,23 +3877,12 @@ def test_after_credit_callback_cannot_corrupt_the_measured_receipt(
     )
 
     assert token.callback_was_attempted()
+    assert token.callback_succeeded() is False
     assert deposited == amount
-    # The outer deposit's own custody measurement still balances ...
     assert simple_erc20_vault.getTotalAmountForUser(user, token) == amount
-    # ... while the nested withdrawal against a DIFFERENT vault is recorded
-    # here exactly as it happened, so the checkpoint below states the invariant.
-    nested_succeeded = token.callback_succeeded()
-    assert protected_vault.getTotalAmountForUser(user, token) == (
-        10 - int(nested_succeeded)
-    )
+    assert protected_vault.getTotalAmountForUser(user, token) == 10
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-10: Teller.receiptMeasurementActive is checked only by _deposit and "
-    "depositFromTrusted is undecorated, so an after-credit callback still reaches "
-    "withdraw; the Section 13 guard is gated on RH-CHANGE-01",
-)
 def test_after_credit_callback_nested_withdrawal_is_blocked(
     ripe_hq_deploy,
     governance,

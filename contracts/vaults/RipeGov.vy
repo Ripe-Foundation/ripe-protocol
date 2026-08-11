@@ -387,6 +387,18 @@ def transferBalanceWithinVault(
     assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
 
+    # A seizure routed back to the same owner must not run withdrawal/deposit
+    # governance accounting. Preserve the normal input and position validation,
+    # but leave shares, points, locks, totals, and events untouched.
+    if _fromUser == _toUser:
+        assert not vaultData.isPaused # dev: contract paused
+        assert empty(address) not in [_fromUser, _asset] # dev: invalid users or asset
+        assert not self.positionMigratedOut[_toUser][_asset] # dev: recipient position migrated
+        ignoredShares: uint256 = 0
+        ignoredAmount: uint256 = 0
+        ignoredShares, ignoredAmount = sharesVault._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount)
+        return 0, False
+
     # transfer tokens (using shares module)
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
@@ -452,6 +464,15 @@ def transferContributorRipeTokens(
     # config
     config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
 
+    # Contributor configuration cannot bypass current governance bounds or
+    # shorten an existing lock that remains later after the normal terms
+    # refresh. The weighted-deposit helper receives this effective duration.
+    lockDuration: uint256 = min(max(_lockDuration, config.lockTerms.minLockDuration), config.lockTerms.maxLockDuration)
+    recipientData: GovData = self.userGovData[_toUser][a.ripeToken]
+    refreshedUnlock: uint256 = self._refreshUnlock(recipientData.unlock, config.lockTerms, recipientData.lastTerms)
+    if refreshedUnlock > block.number:
+        lockDuration = max(lockDuration, refreshedUnlock - block.number)
+
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
     transferShares: uint256 = 0
@@ -459,7 +480,7 @@ def transferContributorRipeTokens(
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
     # handle gov data/points
-    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount

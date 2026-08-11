@@ -3207,7 +3207,7 @@ def test_registered_non_teller_cannot_release_another_users_lock(
 
 
 # --------------------------------------------------------------------------
-# DV-04: same-address transferBalanceWithinVault is not a no-op
+# DV-04: same-address transferBalanceWithinVault is a validated no-op
 # --------------------------------------------------------------------------
 
 
@@ -3243,66 +3243,6 @@ def test_gov_same_user_zero_amount_transfer_reverts_without_state_change(
 
 @pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
 @pytest.mark.parametrize("portion", ("partial", "full"))
-def test_gov_same_user_transfer_mutates_lock_and_points(
-    caller_name,
-    portion,
-    ripe_gov_vault,
-    ripe_token,
-    bob,
-    auction_house,
-    credit_engine,
-    locked_gov_position,
-    switchboard_alpha,
-):
-    """DV-04 characterization (RG-5).
-
-    RipeGov.transferBalanceWithinVault has no owner-equals-recipient guard. The
-    AuctionHouse and CreditEngine paths run the full withdrawal-then-deposit
-    governance bookkeeping against a single user, so a same-address move burns
-    the proportional point penalty and re-weights the unlock toward the
-    configured minimum lock duration instead of being a no-op.
-
-    A full same-address transfer destroys the user's entire point balance:
-    _handleGovDataOnWithdrawal reduces all points when the moved shares equal
-    lastShares, and transferBalanceWithinVault passes _shouldTransferPoints
-    False, so nothing is credited back.
-    """
-    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
-    amount = locked_gov_position if portion == "full" else locked_gov_position // 4
-
-    boa.env.time_travel(blocks=50)
-    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
-    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
-    points_before = ripe_gov_vault.userGovData(bob, ripe_token).govPoints
-    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
-    assert points_before > 0
-
-    ripe_gov_vault.transferBalanceWithinVault(
-        ripe_token, bob, bob, amount, sender=caller.address
-    )
-
-    after = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
-    assert after != before
-
-    data = ripe_gov_vault.userGovData(bob, ripe_token)
-    # Shares are conserved (out and straight back in) ...
-    assert ripe_gov_vault.userBalances(bob, ripe_token) == shares_before
-    # ... but points were burned and the unlock was re-weighted down.
-    assert data.govPoints < points_before
-    assert data.unlock < unlock_before
-    if portion == "full":
-        assert data.govPoints == 0
-        assert ripe_gov_vault.totalUserGovPoints(bob) == 0
-
-
-@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
-@pytest.mark.parametrize("portion", ("partial", "full"))
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-04: RipeGov has no same-address short-circuit in "
-    "transferBalanceWithinVault; the Section 9.2 guard is gated on RH-CHANGE-01",
-)
 def test_gov_same_user_transfer_is_complete_noop(
     caller_name,
     portion,
@@ -3314,18 +3254,19 @@ def test_gov_same_user_transfer_is_complete_noop(
     locked_gov_position,
     switchboard_alpha,
 ):
-    """DV-04 hardening target (RG-5). One node per caller and per portion."""
+    """DV-04: valid same-address transfers leave all accounting untouched."""
     caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
     amount = locked_gov_position if portion == "full" else locked_gov_position // 4
 
     boa.env.time_travel(blocks=50)
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
-
-    ripe_gov_vault.transferBalanceWithinVault(
+    result = ripe_gov_vault.transferBalanceWithinVault(
         ripe_token, bob, bob, amount, sender=caller.address
     )
+    assert result == (0, False)
     assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
+    assert filter_logs(ripe_gov_vault, "RipeGovVaultTransfer") == []
 
 
 def test_gov_transfer_to_a_different_user_still_moves_shares(
@@ -3353,11 +3294,11 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
 
 
 # --------------------------------------------------------------------------
-# DV-05: contributor lock duration is not clamped to governance bounds
+# DV-05: contributor lock duration is clamped without shortening a later lock
 # --------------------------------------------------------------------------
 
 
-def test_contributor_transfer_shortens_recipient_lock_below_minimum(
+def test_contributor_transfer_cannot_shorten_existing_lock(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -3370,14 +3311,7 @@ def test_contributor_transfer_shortens_recipient_lock_below_minimum(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """DV-05 characterization (RG-4).
-
-    RipeGov.transferContributorRipeTokens forwards the contributor's configured
-    depositLockDuration straight into _getWeightedLockOnTokenDeposit without
-    clamping it to the governance lock bounds. A large contributor payout with
-    a short (or zero) configured duration therefore drags the recipient's
-    existing unlock down, and the result can land below minLockDuration.
-    """
+    """DV-05: a short contributor duration cannot reduce a later current lock."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3412,18 +3346,11 @@ def test_contributor_transfer_shortens_recipient_lock_below_minimum(
     )
 
     unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    remaining = unlock_after - boa.env.evm.patch.block_number
-    assert unlock_after < unlock_before
-    assert remaining < min_lock  # the unclamped duration wins the weighted average
+    assert unlock_after >= unlock_before
     assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-05: contributor lock duration is still unclamped in "
-    "RipeGov._handleGovDataOnTransfer; the Section 9.3 fix is gated on RH-CHANGE-01",
-)
-def test_contributor_transfer_cannot_shorten_existing_lock(
+def test_contributor_transfer_preserves_existing_lock_with_short_duration(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -3489,7 +3416,7 @@ CONTRIBUTOR_DURATIONS = CONTRIBUTOR_DURATIONS_IN_BOUNDS + CONTRIBUTOR_DURATIONS_
 @pytest.mark.parametrize(
     "duration", [d for _label, d in CONTRIBUTOR_DURATIONS], ids=[l for l, _d in CONTRIBUTOR_DURATIONS]
 )
-def test_contributor_duration_lands_unclamped_on_a_fresh_recipient(
+def test_contributor_duration_lands_clamped_on_a_fresh_recipient(
     duration,
     ripe_gov_vault,
     ripe_token,
@@ -3502,13 +3429,7 @@ def test_contributor_duration_lands_unclamped_on_a_fresh_recipient(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """DV-05 characterization at every Section 8.2 duration boundary.
-
-    With no prior recipient balance, _getWeightedLockOnTokenDeposit returns
-    block.number + the raw requested duration, so the resulting unlock is
-    exactly the unclamped input at every boundary -- including zero and values
-    far above maxLockDuration.
-    """
+    """DV-05: every fresh-recipient duration is clamped to current bounds."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3525,8 +3446,9 @@ def test_contributor_duration_lands_unclamped_on_a_fresh_recipient(
         sally, bob, duration, sender=human_resources.address
     )
 
+    expected_duration = min(max(duration, LOCK_TERMS[0]), LOCK_TERMS[1])
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
-        boa.env.evm.patch.block_number + duration
+        boa.env.evm.patch.block_number + expected_duration
     )
 
 
@@ -3581,11 +3503,6 @@ def test_contributor_duration_inside_bounds_already_satisfies_the_clamp(
     "duration",
     [d for _label, d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
     ids=[l for l, _d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
-)
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-05: contributor lock duration is still unclamped in "
-    "RipeGov._handleGovDataOnTransfer; the Section 9.3 fix is gated on RH-CHANGE-01",
 )
 def test_contributor_duration_is_clamped_to_current_governance_bounds(
     duration,

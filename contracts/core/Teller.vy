@@ -1006,6 +1006,8 @@ def _performHousekeeping(
     _shouldUpdateDebt: bool,
     _a: addys.Addys,
 ):
+    assert not self.receiptMeasurementActive # dev: receipt window active
+
     # one action per block
     shouldCheckLastTouch: bool = False
     if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():
