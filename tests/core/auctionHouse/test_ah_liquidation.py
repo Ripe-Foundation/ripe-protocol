@@ -1963,6 +1963,8 @@ def test_ah_liquidation_edge_cases(
     mock_price_source,
     createDebtTerms,
     credit_engine,
+    green_token,
+    ledger,
     sally,
 ):
     """Test edge cases in liquidation logic
@@ -2014,19 +2016,42 @@ def test_ah_liquidation_edge_cases(
     keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards == 0
 
-    # Test 4: User becomes liquidatable, then try to liquidate twice
+    # Test 4: A liquidatable position routed only to Deleverage makes no
+    # AuctionHouse progress. Repeated permissionless calls must remain
+    # retryable without charging the user or rewarding the keeper.
     new_price = 60 * EIGHTEEN_DECIMALS // 100  # 0.60 - makes user liquidatable
     mock_price_source.setPrice(alpha_token, new_price)
     
     assert credit_engine.canLiquidateUser(bob)
     
-    # First liquidation should work
+    debt_before = ledger.userDebt(bob).amount
+    keeper_green_before = green_token.balanceOf(sally)
+
     keeper_rewards1 = teller.liquidateUser(bob, False, sender=sally)
-    assert keeper_rewards1 > 0
-    
-    # Second liquidation should return 0 (already in liquidation)
+    assert keeper_rewards1 == 0
+    assert ledger.userDebt(bob).amount == debt_before
+    assert not ledger.userDebt(bob).inLiquidation
+    assert green_token.balanceOf(sally) == keeper_green_before
+    first_log = filter_logs(teller, "LiquidateUser")[0]
+    assert first_log.totalLiqFees == 0
+    assert first_log.keeperFee == 0
+    assert first_log.repayAmount == 0
+    assert first_log.numAuctionsStarted == 0
+
+    # Boa does not clear EIP-1153 state between direct top-level calls. This
+    # boundary models a second production transaction.
+    boa.env.evm.vm.state.clear_transient_storage()
+    assert credit_engine.canLiquidateUser(bob)
     keeper_rewards2 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards2 == 0
+    assert ledger.userDebt(bob).amount == debt_before
+    assert not ledger.userDebt(bob).inLiquidation
+    assert green_token.balanceOf(sally) == keeper_green_before
+    second_log = filter_logs(teller, "LiquidateUser")[0]
+    assert second_log.totalLiqFees == 0
+    assert second_log.keeperFee == 0
+    assert second_log.repayAmount == 0
+    assert second_log.numAuctionsStarted == 0
 
 
 def test_ah_liquidation_special_stab_pool(

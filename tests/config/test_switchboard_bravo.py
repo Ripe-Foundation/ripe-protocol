@@ -1855,6 +1855,59 @@ def test_special_stab_pool_rejects_paused_pool(
         )
 
 
+def test_special_stab_pool_accepts_reusable_pool_with_stale_removed_slot(
+    switchboard_bravo,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    stability_pool,
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    teller,
+):
+    """Emptiness follows the authoritative count, not a stale array slot."""
+    assert stability_pool.getNumVaultAssets() == 0
+
+    amount = 100 * 10**18
+    green_token.transfer(bob, amount, sender=whale)
+    green_token.approve(savings_green, amount, sender=bob)
+    shares = savings_green.deposit(amount, bob, sender=bob)
+    savings_green.transfer(stability_pool, shares, sender=bob)
+    assert stability_pool.depositTokensInVault(
+        bob,
+        savings_green,
+        shares,
+        sender=teller.address,
+    ) == shares
+    assert stability_pool.getNumVaultAssets() == 1
+
+    withdrawn, depleted = stability_pool.withdrawTokensFromVault(
+        bob,
+        savings_green,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert withdrawn == shares
+    assert depleted
+    assert stability_pool.deregisterVaultAsset(
+        savings_green,
+        sender=switchboard_alpha.address,
+    )
+    assert stability_pool.getNumVaultAssets() == 0
+    assert stability_pool.vaultAssets(1) == savings_green.address
+
+    action_id = switchboard_bravo.addAsset(
+        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+        False, False, True, True, True, True, True, True, True, True, 1,
+        sender=governance.address,
+    )
+    assert action_id > 0
+
+
 def test_whitelist_interface_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):
     """Test whitelist interface validation"""
     # First add the asset

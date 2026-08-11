@@ -44,6 +44,7 @@ interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
 interface StabilityPool:
+    def getNumVaultAssets() -> uint256: view
     def vaultAssets(_index: uint256) -> address: view
     def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def totalClaimableBalances(_asset: address) -> uint256: view
@@ -503,10 +504,13 @@ def _isValidAssetLiqConfig(
         stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
         if stabPool == empty(address) or not stabPool.is_contract:
             return False
-        stabAsset: address = staticcall StabilityPool(stabPool).vaultAssets(1)
-        hasStabAsset: bool = stabAsset != empty(address)
-        if stabAsset == empty(address):
-            stabAsset = savingsGreen
+        numStabAssets: uint256 = staticcall StabilityPool(stabPool).getNumVaultAssets()
+        hasStabAsset: bool = numStabAssets != 0
+        stabAsset: address = savingsGreen
+        if hasStabAsset:
+            stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
+            if stabAsset == empty(address):
+                return False
         canAccept: bool = staticcall StabilityPool(stabPool).canAcceptLiquidationAsset(stabAsset, _asset)
         if hasStabAsset and not canAccept:
             return False

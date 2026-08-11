@@ -360,6 +360,14 @@ def _liquidateUser(
     # would permanently latch a deficient remainder that created no auction.
     userDebt.inLiquidation = self.numUserAssetsForAuction[_liqUser] != 0
 
+    # Retryable no-progress calls must also be economically inert. Charging
+    # liquidation fees or minting a keeper reward when no debt was repaid and
+    # no asset was queued lets repeated calls increase debt without advancing
+    # liquidation.
+    if repayValueIn == 0 and not userDebt.inLiquidation:
+        totalLiqFees = 0
+        keeperFee = 0
+
     # check if liq fees were already covered (stability pool swaps)
     liqFeesUnpaid: uint256 = totalLiqFees
     if collateralValueOut > repayValueIn:
