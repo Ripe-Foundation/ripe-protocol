@@ -6,6 +6,8 @@ import hashlib
 import io
 import json
 import re
+import socket
+import stat
 from importlib import metadata
 from pathlib import Path
 
@@ -34,8 +36,8 @@ EVIDENCE = ROOT / "docs/chains/rh/evidence/dependency-security-gate.md"
 S1 = ROOT / "tests/clock/test_clock_profiles.py"
 
 APPROVED_HASHES = {
-    DIRECT_INPUT: "1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9",
-    LOCK: "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010",
+    DIRECT_INPUT: "56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf",
+    LOCK: "781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007",
 }
 SELECTED = {
     "cbor2": "5.9.0",
@@ -46,7 +48,21 @@ SELECTED = {
     "python-dotenv": "1.2.2",
     "requests": "2.33.0",
     "urllib3": "2.7.0",
+    "web3": "7.16.0",
     "wheel": "0.46.2",
+}
+WEB3_CLOSURE = {
+    "aiohappyeyeballs": "2.7.1",
+    "aiohttp": "3.14.3",
+    "aiosignal": "1.4.0",
+    "frozenlist": "1.8.0",
+    "multidict": "6.7.1",
+    "propcache": "0.5.2",
+    "pyunormalize": "17.0.0",
+    "types-requests": "2.33.0.20260712",
+    "web3": "7.16.0",
+    "websockets": "15.0.1",
+    "yarl": "1.24.5",
 }
 HELD = {
     "pytest": "8.4.2",
@@ -67,6 +83,7 @@ RESIDUAL_FINDINGS = {
     "PYSEC-2023-142": "authoritative range exclusion",
     "PYSEC-2025-33": "authoritative range exclusion",
 }
+CURRENT_REVIEW_BLOCKERS: dict[str, str] = {}
 RETIRED_EXCEPTION_IDS = {
     "EX-H01-CLICK-01",
     "EX-H01-PYGMENTS-01",
@@ -138,6 +155,31 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
 }
+CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
+    Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
+    Path("migrations/base-mainnet/2026080701_CcipWire.py"),
+    Path("migrations/robinhood-mainnet/0001_Registries.py"),
+    Path("migrations/robinhood-mainnet/0009_RedeployStaleContracts.py"),
+    Path("migrations/robinhood-mainnet/0010_RedeployLedger.py"),
+    Path("migrations/robinhood-mainnet/2026080701_CcipWire.py"),
+    Path("scripts/ledger_signing_smoke.py"),
+    Path("scripts/prepare_defaults.py"),
+    Path("scripts/utils/ledger_account.py"),
+    Path("scripts/utils/safe_account.py"),
+}
+DECLARED_RUNTIME_IMPORTS = {
+    "colorama": (
+        "0.4.6",
+        Path("scripts/utils/log.py"),
+        ("from:colorama", (("Fore", None), ("Style", None))),
+    ),
+    "mergedeep": (
+        "1.3.4",
+        Path("scripts/utils/migration.py"),
+        ("from:mergedeep", (("merge", None),)),
+    ),
+}
+ImportSignature = tuple[str, tuple[tuple[str, str | None], ...]]
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
 PYMDOWN_REDOS_EXTENSION_NAMES = {
     "pymdownx.betterem",
@@ -174,6 +216,197 @@ def _pins(path: Path) -> dict[str, str]:
         if match:
             pins[_canonical_name(match.group(1))] = match.group(2)
     return pins
+
+
+def _distribution_direct_url(package: str) -> str | None:
+    return metadata.distribution(package).read_text("direct_url.json")
+
+
+def _leading_absolute_imports(path: Path) -> list[ImportSignature]:
+    tree = ast.parse(path.read_text(), filename=str(path))
+    statements = tree.body
+    position = 0
+    if (
+        statements
+        and isinstance(statements[0], ast.Expr)
+        and isinstance(statements[0].value, ast.Constant)
+        and isinstance(statements[0].value.value, str)
+    ):
+        position += 1
+    while (
+        position < len(statements)
+        and isinstance(statements[position], ast.ImportFrom)
+        and statements[position].level == 0
+        and statements[position].module == "__future__"
+    ):
+        position += 1
+
+    imports: list[ImportSignature] = []
+    while position < len(statements):
+        node = statements[position]
+        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+            break
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                imports.append(
+                    (
+                        f"import:{imported.name}",
+                        ((imported.name, imported.asname),),
+                    )
+                )
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module is not None
+        ):
+            imports.append(
+                (
+                    f"from:{node.module}",
+                    tuple((imported.name, imported.asname) for imported in node.names),
+                )
+            )
+        position += 1
+    return imports
+
+
+def _import_root(signature: ImportSignature) -> str:
+    return signature[0].partition(":")[2].partition(".")[0]
+
+
+def _assert_exact_declared_import(
+    path: Path,
+    package: str,
+    expected_import: ImportSignature,
+) -> None:
+    observed = [
+        signature
+        for signature in _leading_absolute_imports(path)
+        if _import_root(signature) == package
+    ]
+    assert observed == [expected_import]
+
+
+def _assert_web3_closure(
+    lock: Path,
+    *,
+    version_reader=metadata.version,
+    direct_url_reader=_distribution_direct_url,
+) -> None:
+    pins = _pins(lock)
+    for package, expected_version in WEB3_CLOSURE.items():
+        assert pins.get(package) == expected_version, (
+            f"{package} lock version must be {expected_version}"
+        )
+        assert version_reader(package) == expected_version, (
+            f"{package} runtime version must be {expected_version}"
+        )
+        assert direct_url_reader(package) is None, (
+            f"{package} must not have direct URL installation metadata"
+        )
+
+
+def _supported_literal_import_target(
+    node: ast.AST,
+    importlib_aliases: set[str],
+    import_module_aliases: set[str],
+) -> str | None:
+    if not isinstance(node, ast.Call):
+        return None
+    target = (
+        node.args[0]
+        if node.args
+        else next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "name"),
+            None,
+        )
+    )
+    if not isinstance(target, ast.Constant) or not isinstance(target.value, str):
+        return None
+
+    if isinstance(node.func, ast.Name):
+        if node.func.id == "__import__" or node.func.id in import_module_aliases:
+            return target.value
+        return None
+    if (
+        isinstance(node.func, ast.Attribute)
+        and node.func.attr == "import_module"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id in importlib_aliases
+    ):
+        return target.value
+    return None
+
+
+def _supported_web3_import_paths(root: Path) -> set[Path]:
+    paths: set[Path] = set()
+    for source_root in (root / "migrations", root / "scripts"):
+        try:
+            source_root_mode = source_root.lstat().st_mode
+        except FileNotFoundError:
+            continue
+        assert stat.S_ISDIR(source_root_mode), (
+            f"{source_root.relative_to(root)} must be a real directory"
+        )
+        for path in sorted(source_root.rglob("*")):
+            relative = path.relative_to(root)
+            mode = path.lstat().st_mode
+            assert not stat.S_ISLNK(mode), (
+                f"{relative}: symlink entries are not allowed in Web3 inventory roots"
+            )
+            if path.suffix != ".py":
+                continue
+            assert stat.S_ISREG(mode), (
+                f"{relative}: Python source must be a regular file"
+            )
+            tree = ast.parse(path.read_text(), filename=str(relative))
+            # Deliberately syntax-limited: callable assignment, builtins aliases,
+            # and dataflow-derived targets remain explicit code-review triggers.
+            importlib_aliases: set[str] = set()
+            import_module_aliases: set[str] = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for imported in node.names:
+                        if imported.name == "importlib":
+                            importlib_aliases.add(imported.asname or "importlib")
+                elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+                    for imported in node.names:
+                        if imported.name == "import_module":
+                            import_module_aliases.add(
+                                imported.asname or "import_module"
+                            )
+            imports_web3 = any(
+                (
+                    isinstance(node, ast.Import)
+                    and any(
+                        imported.name == "web3"
+                        or imported.name.startswith("web3.")
+                        for imported in node.names
+                    )
+                )
+                or (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module is not None
+                    and (
+                        node.module == "web3"
+                        or node.module.startswith("web3.")
+                    )
+                )
+                or (
+                    (
+                        dynamic_target := _supported_literal_import_target(
+                            node,
+                            importlib_aliases,
+                            import_module_aliases,
+                        )
+                    )
+                    is not None
+                    and (dynamic_target == "web3" or dynamic_target.startswith("web3."))
+                )
+                for node in ast.walk(tree)
+            )
+            if imports_web3:
+                paths.add(relative)
+    return paths
 
 
 def _exception_section(evidence: str, exception_id: str) -> str:
@@ -612,6 +845,283 @@ def test_approved_inputs_and_generated_lock_are_exact():
         assert expected_hash in evidence
 
 
+def test_web3_direct_dependency_and_supported_current_tree_inventory():
+    assert _pins(DIRECT_INPUT)["web3"] == "7.16.0"
+    assert _pins(LOCK)["web3"] == "7.16.0"
+    # Equality is a drift check only for the explicitly supported syntax below;
+    # it is not whole-program Python import reachability.
+    assert _supported_web3_import_paths(ROOT) == CURRENT_SUPPORTED_WEB3_IMPORT_PATHS
+    evidence = EVIDENCE.read_text()
+    normalized_evidence = " ".join(evidence.split())
+    assert "GHSA-5hr4-253g-cpx2" in evidence
+    assert "`web3==7.12.0` is rejected" in evidence
+    assert "not whole-program Python import reachability" in normalized_evidence
+    assert "code-review trigger" in evidence
+
+
+def test_migration_runtime_dependencies_are_direct_and_reachable():
+    direct_pins = _pins(DIRECT_INPUT)
+    lock_pins = _pins(LOCK)
+    for package, import_details in DECLARED_RUNTIME_IMPORTS.items():
+        version, relative_path, expected_import = import_details
+        assert direct_pins.get(package) == version
+        assert lock_pins.get(package) == version
+        assert metadata.version(package) == version
+        assert _distribution_direct_url(package) is None
+        _assert_exact_declared_import(
+            ROOT / relative_path,
+            package,
+            expected_import,
+        )
+
+    evidence = EVIDENCE.read_text()
+    normalized_evidence = " ".join(evidence.split())
+    assert "## Declared migration runtime dependencies — 11 August 2026" in evidence
+    assert "`colorama==0.4.6`" in evidence
+    assert "`mergedeep==1.3.4`" in evidence
+    assert (
+        "zero package additions, removals, or version changes"
+        in normalized_evidence
+    )
+    assert "does not transfer H-06" in normalized_evidence
+
+
+def test_migration_runtime_import_gate_ignores_dead_code(tmp_path):
+    source = tmp_path / "dead_code.py"
+    source.write_text(
+        "if False:\n"
+        "    from colorama import Fore, Style\n"
+        "    from mergedeep import merge\n"
+    )
+    assert _leading_absolute_imports(source) == []
+
+
+def test_migration_runtime_import_gate_ignores_relative_imports(tmp_path):
+    source = tmp_path / "relative.py"
+    source.write_text(
+        "from .colorama import Fore, Style\n"
+        "from ..mergedeep import merge\n"
+    )
+    assert _leading_absolute_imports(source) == []
+
+
+def test_migration_runtime_import_gate_rejects_post_raise_import(tmp_path):
+    source = tmp_path / "post_raise.py"
+    source.write_text(
+        "raise RuntimeError('stop')\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_rejects_import_after_true_exit(tmp_path):
+    source = tmp_path / "post_true_exit.py"
+    source.write_text(
+        "if True:\n"
+        "    raise RuntimeError('stop')\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_rejects_duplicate_exact_import(tmp_path):
+    source = tmp_path / "duplicate.py"
+    source.write_text(
+        "from colorama import Fore, Style\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+@pytest.mark.parametrize(
+    "candidate_import",
+    (
+        "from colorama import Fore as Color, Style\n",
+        "from colorama import Back, Style\n",
+        "from colors import Fore, Style\n",
+    ),
+)
+def test_migration_runtime_import_gate_rejects_alias_or_wrong_name(
+    tmp_path,
+    candidate_import,
+):
+    source = tmp_path / "wrong_signature.py"
+    source.write_text(candidate_import)
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_allows_docstring_and_future(tmp_path):
+    source = tmp_path / "leading_import.py"
+    source.write_text(
+        '"""Module docstring."""\n'
+        "from __future__ import annotations\n"
+        "from colorama import Fore, Style\n"
+    )
+    _assert_exact_declared_import(
+        source,
+        "colorama",
+        DECLARED_RUNTIME_IMPORTS["colorama"][2],
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "import web3\n",
+        "from web3 import Web3\n",
+        "__import__('web3')\n",
+        "import importlib\nimportlib.import_module('web3')\n",
+        "import importlib as loader\nloader.import_module('web3.eth')\n",
+        "import importlib as loader\nloader.import_module(name='web3')\n",
+        "from importlib import import_module\nimport_module('web3')\n",
+        ("from importlib import import_module as load_module\nload_module('web3')\n"),
+    ),
+)
+def test_web3_supported_inventory_detects_listed_syntax(tmp_path, source):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    candidate = scripts / "candidate.py"
+    candidate.write_text(source)
+    assert _supported_web3_import_paths(tmp_path) == {Path("scripts/candidate.py")}
+
+
+def test_web3_inventory_rejects_symlink_entries(tmp_path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    target = tmp_path / "target.py"
+    target.write_text("import web3\n")
+    (scripts / "candidate.py").symlink_to(target)
+
+    with pytest.raises(AssertionError, match="symlink entries are not allowed"):
+        _supported_web3_import_paths(tmp_path)
+
+
+def test_web3_inventory_rejects_nonregular_python_sources(tmp_path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "candidate.py").mkdir()
+
+    with pytest.raises(AssertionError, match="Python source must be a regular"):
+        _supported_web3_import_paths(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        (
+            "from importlib import import_module\n"
+            "assigned_callable = import_module\n"
+            "assigned_callable('web3')\n"
+        ),
+        (
+            "import builtins as python_builtins\n"
+            "python_builtins.__import__('web3')\n"
+        ),
+        (
+            "import importlib\n"
+            "module_alias = 'web3'\n"
+            "importlib.import_module(module_alias)\n"
+        ),
+    ),
+)
+def test_web3_inventory_leaves_callable_builtins_and_dataflow_aliases_to_review(
+    tmp_path, source
+):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "candidate.py").write_text(source)
+    assert _supported_web3_import_paths(tmp_path) == set()
+
+
+def test_web3_closure_matches_lock_runtime_and_install_metadata():
+    _assert_web3_closure(LOCK)
+
+
+@pytest.mark.parametrize(("package", "version"), WEB3_CLOSURE.items())
+def test_web3_closure_rejects_lock_version_mutation(tmp_path, package, version):
+    mutated = LOCK.read_text().replace(f"{package}=={version}", f"{package}==0", 1)
+    assert mutated != LOCK.read_text()
+    lock = tmp_path / "requirements.txt"
+    lock.write_text(mutated)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} lock"):
+        _assert_web3_closure(lock)
+
+
+@pytest.mark.parametrize("package", WEB3_CLOSURE)
+def test_web3_closure_rejects_runtime_version_mutation(package):
+    actual_version = metadata.version
+
+    def mutated_version(name):
+        return "0" if name == package else actual_version(name)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} runtime"):
+        _assert_web3_closure(LOCK, version_reader=mutated_version)
+
+
+@pytest.mark.parametrize("package", WEB3_CLOSURE)
+def test_web3_closure_rejects_direct_url_metadata(package):
+    def mutated_direct_url(name):
+        if name == package:
+            return '{"url": "https://example.invalid/package.whl"}'
+        return _distribution_direct_url(name)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} must not"):
+        _assert_web3_closure(LOCK, direct_url_reader=mutated_direct_url)
+
+
+def test_web3_checksum_and_keccak_make_no_network_attempt(monkeypatch):
+    from web3 import Web3
+
+    attempts: list[str] = []
+
+    def deny(operation):
+        def denied(*args, **kwargs):
+            attempts.append(operation)
+            raise AssertionError(f"network attempt through {operation}")
+
+        return denied
+
+    for operation in (
+        "socket",
+        "create_connection",
+        "getaddrinfo",
+        "gethostbyaddr",
+        "gethostbyname",
+        "gethostbyname_ex",
+    ):
+        monkeypatch.setattr(socket, operation, deny(f"socket.{operation}"))
+
+    assert (
+        Web3.to_checksum_address("0x52908400098527886e0f7030069857d2e4169ee7")
+        == "0x52908400098527886E0F7030069857D2E4169EE7"
+    )
+    assert Web3.keccak(text="ripe-web3-offline-gate").hex() == (
+        "1d17285abbb738ef53dadaa05ee534ef754ed12345f9c7c31b08c1819d611824"
+    )
+    assert attempts == []
+
+
 def test_selected_and_held_versions_match_lock_and_runtime():
     pins = _pins(LOCK)
     expected = SELECTED | HELD
@@ -619,8 +1129,8 @@ def test_selected_and_held_versions_match_lock_and_runtime():
         assert pins[package] == version
         assert metadata.version(package) == version
 
-    # These lower versions are the vulnerable frozen-lock values displaced by
-    # Candidate A. Exact approved pins above make the range check fail closed.
+    # These reviewed lower versions are displaced or explicitly rejected.
+    # Exact approved pins above make the range check fail closed.
     forbidden = {
         "cbor2": {"5.7.0"},
         "click": {"8.2.1"},
@@ -630,6 +1140,7 @@ def test_selected_and_held_versions_match_lock_and_runtime():
         "python-dotenv": {"1.2.1"},
         "requests": {"2.32.5"},
         "urllib3": {"2.5.0", "2.6.0", "2.6.2", "2.6.3"},
+        "web3": {"7.12.0"},
         "wheel": {"0.45.1"},
     }
     for package, versions in forbidden.items():
@@ -660,7 +1171,7 @@ def test_dependency_sources_are_public_pypi_only():
     assert "--extra-index-url" not in combined
     assert "--find-links" not in combined
     assert "private-index" not in combined.lower()
-    for package in SELECTED | HELD:
+    for package in SELECTED | HELD | WEB3_CLOSURE:
         assert metadata.distribution(package).read_text("direct_url.json") is None
 
 
@@ -669,9 +1180,12 @@ def test_evidence_reconciles_every_selected_package_and_residual_finding():
     normalized = " ".join(evidence.split())
     transition = _latest_transition_section(evidence)
     normalized_transition = " ".join(transition.split())
-    for package in SELECTED | HELD:
+    for package in SELECTED | HELD | WEB3_CLOSURE:
         assert package in evidence.lower()
     for finding, disposition in RESIDUAL_FINDINGS.items():
+        assert finding in evidence
+        assert disposition in evidence
+    for finding, disposition in CURRENT_REVIEW_BLOCKERS.items():
         assert finding in evidence
         assert disposition in evidence
     for finding, disposition in RETIRED_REMEDIATED_FINDINGS.items():
@@ -1324,7 +1838,7 @@ def test_cbor_and_wheel_metadata_are_stable():
     assert "Wheel-Version: 1.0" in wheel_metadata
 
 
-def test_dependency_gate_has_no_live_query_capability():
+def test_dependency_gate_has_no_external_query_or_process_runner():
     source = Path(__file__).read_text()
     tree = ast.parse(source)
     imported_roots = {
@@ -1338,8 +1852,6 @@ def test_dependency_gate_has_no_live_query_capability():
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert imported_roots.isdisjoint(
-        {"http", "socket", "subprocess", "urllib", "aiohttp"}
-    )
+    assert imported_roots.isdisjoint({"http", "subprocess", "urllib", "aiohttp"})
     assert "gh " + "api" not in source
     assert "pip_" + "audit" not in source
