@@ -503,8 +503,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         overrides = _parse_source_overrides(args.source_override)
+        expectations_path = Path.cwd() / args.expectations
         results = check(
-            args.expectations,
+            expectations_path,
             args.contract,
             overrides,
         )

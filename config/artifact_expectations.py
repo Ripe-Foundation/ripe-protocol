@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -47,6 +48,13 @@ def _reject_non_finite_constant(value: str) -> None:
     raise ArtifactExpectationsError(f"non-finite JSON constant: {value}")
 
 
+def _parse_finite_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ArtifactExpectationsError(f"non-finite JSON float: {value}")
+    return parsed
+
+
 def _load_json(raw: bytes, *, label: str) -> Any:
     try:
         text = raw.decode("utf-8")
@@ -57,6 +65,7 @@ def _load_json(raw: bytes, *, label: str) -> Any:
             text,
             object_pairs_hook=_reject_duplicate_keys,
             parse_constant=_reject_non_finite_constant,
+            parse_float=_parse_finite_float,
         )
     except json.JSONDecodeError as exc:
         raise ArtifactExpectationsError(f"{label}: invalid JSON: {exc}") from exc

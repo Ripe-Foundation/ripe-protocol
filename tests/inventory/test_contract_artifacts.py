@@ -143,6 +143,17 @@ def test_v1_loader_preserves_the_current_in_memory_shape():
     assert _load_expectations() == json.loads(EXPECTATIONS.read_bytes())
 
 
+def test_checker_accepts_canonical_relative_v1_expectations_path():
+    result = _run_checker(
+        "--contract",
+        "Lootbox",
+        "--expectations",
+        "config/contract-artifact-expectations.json",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[-1] == "CONTRACT_ARTIFACTS_OK"
+
+
 def test_v2_loader_is_equivalent_to_the_frozen_v1_shape(tmp_path):
     repository, index_path, _, _ = _write_v2_expectations(tmp_path)
     assert _load_expectations(index_path, root=repository) == _load_expectations()
@@ -272,6 +283,35 @@ def test_v2_nested_non_finite_constants_fail_closed(tmp_path, constant):
     index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
     _rewrite_v2_index(index_path, index)
     with pytest.raises(ArtifactExpectationsError, match="non-finite JSON constant"):
+        _load_expectations(index_path, root=repository)
+
+
+@pytest.mark.parametrize("overflow", ["1e9999", "-1e9999"])
+def test_v1_float_overflow_fails_closed(tmp_path, overflow):
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["float_overflow_counterexample"] = (
+        "__FLOAT_OVERFLOW__"
+    )
+    raw = _json_bytes(values).replace(b'"__FLOAT_OVERFLOW__"', overflow.encode())
+    index_path = tmp_path / "float-overflow-v1.json"
+    index_path.write_bytes(raw)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON float"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize("overflow", ["1e9999", "-1e9999"])
+def test_v2_nested_float_overflow_fails_closed(tmp_path, overflow):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["float_overflow_counterexample"] = (
+        "__FLOAT_OVERFLOW__"
+    )
+    raw = _json_bytes(record).replace(b'"__FLOAT_OVERFLOW__"', overflow.encode())
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON float"):
         _load_expectations(index_path, root=repository)
 
 
