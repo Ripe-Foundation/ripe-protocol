@@ -174,6 +174,7 @@ DECLARED_RUNTIME_IMPORTS = {
         ("from:mergedeep", (("merge", None),)),
     ),
 }
+ImportSignature = tuple[str, tuple[tuple[str, str | None], ...]]
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
 PYMDOWN_EXTENSION_NAMES = {"pymdownx.b64", "pymdownx.snippets"}
 
@@ -205,15 +206,33 @@ def _distribution_direct_url(package: str) -> str | None:
     return metadata.distribution(package).read_text("direct_url.json")
 
 
-def _top_level_absolute_imports(
-    path: Path,
-) -> set[tuple[str, tuple[tuple[str, str | None], ...]]]:
+def _leading_absolute_imports(path: Path) -> list[ImportSignature]:
     tree = ast.parse(path.read_text(), filename=str(path))
-    imports: set[tuple[str, tuple[tuple[str, str | None], ...]]] = set()
-    for node in tree.body:
+    statements = tree.body
+    position = 0
+    if (
+        statements
+        and isinstance(statements[0], ast.Expr)
+        and isinstance(statements[0].value, ast.Constant)
+        and isinstance(statements[0].value.value, str)
+    ):
+        position += 1
+    while (
+        position < len(statements)
+        and isinstance(statements[position], ast.ImportFrom)
+        and statements[position].level == 0
+        and statements[position].module == "__future__"
+    ):
+        position += 1
+
+    imports: list[ImportSignature] = []
+    while position < len(statements):
+        node = statements[position]
+        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+            break
         if isinstance(node, ast.Import):
             for imported in node.names:
-                imports.add(
+                imports.append(
                     (
                         f"import:{imported.name}",
                         ((imported.name, imported.asname),),
@@ -224,19 +243,31 @@ def _top_level_absolute_imports(
             and node.level == 0
             and node.module is not None
         ):
-            imports.add(
+            imports.append(
                 (
                     f"from:{node.module}",
                     tuple((imported.name, imported.asname) for imported in node.names),
                 )
             )
+        position += 1
     return imports
 
 
-def _import_root(
-    signature: tuple[str, tuple[tuple[str, str | None], ...]],
-) -> str:
+def _import_root(signature: ImportSignature) -> str:
     return signature[0].partition(":")[2].partition(".")[0]
+
+
+def _assert_exact_declared_import(
+    path: Path,
+    package: str,
+    expected_import: ImportSignature,
+) -> None:
+    observed = [
+        signature
+        for signature in _leading_absolute_imports(path)
+        if _import_root(signature) == package
+    ]
+    assert observed == [expected_import]
 
 
 def _assert_web3_closure(
@@ -788,12 +819,11 @@ def test_migration_runtime_dependencies_are_direct_and_reachable():
         assert lock_pins.get(package) == version
         assert metadata.version(package) == version
         assert _distribution_direct_url(package) is None
-        observed = {
-            signature
-            for signature in _top_level_absolute_imports(ROOT / relative_path)
-            if _import_root(signature) == package
-        }
-        assert observed == {expected_import}
+        _assert_exact_declared_import(
+            ROOT / relative_path,
+            package,
+            expected_import,
+        )
 
     evidence = EVIDENCE.read_text()
     normalized_evidence = " ".join(evidence.split())
@@ -814,7 +844,7 @@ def test_migration_runtime_import_gate_ignores_dead_code(tmp_path):
         "    from colorama import Fore, Style\n"
         "    from mergedeep import merge\n"
     )
-    assert _top_level_absolute_imports(source) == set()
+    assert _leading_absolute_imports(source) == []
 
 
 def test_migration_runtime_import_gate_ignores_relative_imports(tmp_path):
@@ -823,7 +853,86 @@ def test_migration_runtime_import_gate_ignores_relative_imports(tmp_path):
         "from .colorama import Fore, Style\n"
         "from ..mergedeep import merge\n"
     )
-    assert _top_level_absolute_imports(source) == set()
+    assert _leading_absolute_imports(source) == []
+
+
+def test_migration_runtime_import_gate_rejects_post_raise_import(tmp_path):
+    source = tmp_path / "post_raise.py"
+    source.write_text(
+        "raise RuntimeError('stop')\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_rejects_import_after_true_exit(tmp_path):
+    source = tmp_path / "post_true_exit.py"
+    source.write_text(
+        "if True:\n"
+        "    raise RuntimeError('stop')\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_rejects_duplicate_exact_import(tmp_path):
+    source = tmp_path / "duplicate.py"
+    source.write_text(
+        "from colorama import Fore, Style\n"
+        "from colorama import Fore, Style\n"
+    )
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+@pytest.mark.parametrize(
+    "candidate_import",
+    (
+        "from colorama import Fore as Color, Style\n",
+        "from colorama import Back, Style\n",
+        "from colors import Fore, Style\n",
+    ),
+)
+def test_migration_runtime_import_gate_rejects_alias_or_wrong_name(
+    tmp_path,
+    candidate_import,
+):
+    source = tmp_path / "wrong_signature.py"
+    source.write_text(candidate_import)
+    with pytest.raises(AssertionError):
+        _assert_exact_declared_import(
+            source,
+            "colorama",
+            DECLARED_RUNTIME_IMPORTS["colorama"][2],
+        )
+
+
+def test_migration_runtime_import_gate_allows_docstring_and_future(tmp_path):
+    source = tmp_path / "leading_import.py"
+    source.write_text(
+        '"""Module docstring."""\n'
+        "from __future__ import annotations\n"
+        "from colorama import Fore, Style\n"
+    )
+    _assert_exact_declared_import(
+        source,
+        "colorama",
+        DECLARED_RUNTIME_IMPORTS["colorama"][2],
+    )
 
 
 @pytest.mark.parametrize(

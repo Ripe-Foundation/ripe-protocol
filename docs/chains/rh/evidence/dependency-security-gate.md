@@ -5396,10 +5396,11 @@ The candidate declares exact direct roots `colorama==0.4.6` and
 `mergedeep==1.3.4`. It does not change either operator module, migration merge
 semantics, logging behavior, Web3 closure, or any selected version. A narrow
 AST check reads only those two exact paths and verifies each exact current
-unconditional, top-level, absolute import statement, including imported names
-and aliases. It ignores nested or dead-code imports and relative imports. It
-does not expand the Web3 directory scanner or claim dynamic or whole-program
-import analysis.
+absolute import statement in the module's leading import-only block after an
+optional module docstring and any `from __future__` imports. It preserves
+statement order, imported names, aliases, and repeated occurrences. It ignores
+nested or dead-code imports and relative imports. It does not expand the Web3
+directory scanner or claim dynamic or whole-program import analysis.
 
 ### Reproducible zero-drift lock
 
@@ -5431,7 +5432,7 @@ byte-identical lock SHA-256
 |---|---|---|
 | `requirements.in` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
 | `requirements.txt` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
-| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `d6fad04d96f19e058a5178020286e3462aada6ad65d60deb010d4a99ad5a5ca9` |
+| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `fa1d9269bdbf4d85de0189a9a3d417b56f25ff0a5abfd49114480541477af29d` |
 
 PEP 508-normalized comparison found 103 exact pin lines on each side and zero
 package additions, removals, or version changes. The generated header is
@@ -5474,10 +5475,10 @@ accepted any `ImportFrom` node. That proved syntax presence but also counted
 imports nested under dead code and relative imports, which are not the runtime
 dependency relationship this declaration is intended to preserve.
 
-The additive amendment changes only the dependency gate and this candidate
-evidence. It iterates only the parsed module's top-level statement list,
-accepts `ImportFrom` only when `level == 0`, records imported names and aliases,
-and requires exact equality for the current statements:
+The first additive amendment changed only the dependency gate and this
+candidate evidence. It iterated the parsed module's top-level statement list,
+accepted `ImportFrom` only when `level == 0`, recorded imported names and
+aliases, and required exact equality for the current statements:
 
 ```text
 scripts/utils/log.py
@@ -5500,3 +5501,41 @@ runtime/operator file or dependency version changed.
 
 This test-boundary correction does not change the Pymdown blocker, Web3
 closure, exception status, H-06 boundary, or any deployment authority.
+
+### Second independent-review amendment — leading block and multiplicity
+
+Second independent review found two residual structural gaps. Iterating the
+whole module body still accepted a matching import after an unconditional
+`raise` or an `if True` block that raises, and a set erased duplicate exact
+import occurrences.
+
+The second additive amendment keeps the same two-file scope. The helper now:
+
+1. skips at most one module docstring;
+2. skips the following zero or more absolute `from __future__` imports;
+3. reads only the consecutive import statements before the first non-import
+   module statement;
+4. records only absolute imports; and
+5. returns an ordered list, so one exact expected occurrence is distinct from
+   zero, two, or differently ordered occurrences.
+
+The regression matrix retains nested/dead-code, relative, aliased, and wrong
+module/member-name cases. It adds exact failures for a matching import after a
+module-level `raise`, after an `if True` block that raises, and for two matching
+imports in the leading block. A positive case preserves the optional
+docstring/`from __future__` allowance.
+
+This is a structural source assertion only. It proves exact placement and
+multiplicity in the leading import block; it does not prove that earlier
+imports succeed, that the whole module finishes importing, or general runtime
+control flow. Requirement and operator/migration bytes remain unchanged.
+
+| Second-amendment validation | Result |
+|---|---|
+| focused declared-import matrix | 10 passed, 94 deselected in 0.18 s; 2.57 s wall |
+| import smoke for both unchanged modules with RPC and credential variables unset | pass; 1.69 s wall |
+| complete dependency gate with repository addopts cleared | 104 passed, one preserved Websockets deprecation warning, in 3.62 s; 6.11 s wall |
+| dependency-gate module compilation and `git diff --check` | pass |
+
+The amendment does not change dependency selection, Web3 closure, the pending
+Pymdown disposition, exception authority, H-06, deployment, or release state.
