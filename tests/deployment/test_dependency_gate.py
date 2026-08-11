@@ -61,6 +61,9 @@ RETIRED_REMEDIATED_FINDINGS = {
 RESIDUAL_FINDINGS = {
     "PYSEC-2026-1845": "EX-H01-PYTEST-01",
     "CVE-2026-61632": "EX-H01-PYMDOWN-B64-01",
+    "PYSEC-2026-3654": "EX-H01-PYMDOWN-REDOS-01",
+    "GHSA-gm37-52c6-37mw": "EX-H01-PYMDOWN-REDOS-01",
+    "CVE-2026-67422": "EX-H01-PYMDOWN-REDOS-01",
     "PYSEC-2023-142": "authoritative range exclusion",
     "PYSEC-2025-33": "authoritative range exclusion",
 }
@@ -72,17 +75,21 @@ RETIRED_EXCEPTION_IDS = {
 RETAINED_EXCEPTION_IDS = {
     "EX-H01-PYTEST-01",
     "EX-H01-PYMDOWN-B64-01",
+    "EX-H01-PYMDOWN-REDOS-01",
 }
+PENDING_EXCEPTION_IDS: set[str] = set()
 OPERATIVE_EXCEPTION_IDS = RETAINED_EXCEPTION_IDS
 KNOWN_EXCEPTION_IDS = {
     *RETIRED_EXCEPTION_IDS,
     *RETAINED_EXCEPTION_IDS,
+    *PENDING_EXCEPTION_IDS,
 }
 TRANSITION_MARKER = "## H-01 three-exception retirement transition"
 RETAINED_TERMS_MARKER = "### Operative retained exception terms"
 RETAINED_REVIEW_FIELD = "scheduled security review on **15 August 2026**"
 RETAINED_EXPIRY_FIELD = "hard expiry at **2026-08-31T23:59:59Z**"
 RETAINED_STATUS = "**Status:** Retained—operative."
+PENDING_STATUS = "**Status:** Pending owner authorization—not operative."
 RETIRED_STATUS = "**Status:** Retired—historical and non-operative."
 EXPECTED_HEADER = (
     "#    pip-compile --cert=None --client-cert=None "
@@ -132,7 +139,18 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/verify.py"),
 }
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
-PYMDOWN_EXTENSION_NAMES = {"pymdownx.b64", "pymdownx.snippets"}
+PYMDOWN_REDOS_EXTENSION_NAMES = {
+    "pymdownx.betterem",
+    "pymdownx.caret",
+    "pymdownx.extra",
+    "pymdownx.magiclink",
+    "pymdownx.tilde",
+}
+PYMDOWN_EXTENSION_NAMES = {
+    "pymdownx.b64",
+    "pymdownx.snippets",
+    *PYMDOWN_REDOS_EXTENSION_NAMES,
+}
 
 
 @pytest.fixture(scope="session")
@@ -239,6 +257,39 @@ def _assert_retained_exception_control(
     assert "**Scope:**" in normalized
     assert "**Compensating controls:**" in normalized
     assert "**Re-review/invalidation triggers:**" in normalized
+
+
+def _pending_exception_control(evidence: str, exception_id: str) -> str:
+    transition = _latest_transition_section(evidence)
+    sections = [
+        section
+        for _, section in _exception_heading_sections(
+            transition, exception_id
+        )
+    ]
+    assert (
+        len(sections) == 1
+    ), f"expected one pending control section for {exception_id}"
+    return sections[0]
+
+
+def _assert_pending_exception_control(
+    control: str, exception_id: str
+) -> None:
+    normalized = " ".join(control.split())
+    assert exception_id in normalized
+    assert PENDING_STATUS in normalized
+    assert RETAINED_STATUS not in normalized
+    assert normalized.count(RETAINED_REVIEW_FIELD) == 1
+    assert normalized.count(RETAINED_EXPIRY_FIELD) == 1
+    assert "**Threat model:**" in normalized
+    assert "**Scope:**" in normalized
+    assert "**Compensating controls:**" in normalized
+    assert "**Re-review/invalidation triggers:**" in normalized
+    assert "**Authorization required:**" in normalized
+    assert "**Integration boundary:**" in normalized
+    assert "runtime-computed extension value" in normalized
+    assert "the AST gate cannot prove that value" in normalized
 
 
 def _assert_no_retired_exception_shadow(
@@ -505,7 +556,7 @@ def _configuration_reachability_violations(path: Path, root: Path) -> list[str]:
     relative = path.relative_to(root)
     source = path.read_text(errors="ignore").lower()
     violations = []
-    for extension in ("pymdownx.snippets", "pymdownx.b64"):
+    for extension in sorted(PYMDOWN_EXTENSION_NAMES):
         if extension in source:
             violations.append(f"{relative}: enables {extension}")
     if "adllexer" in source or "archetypelexer" in source:
@@ -658,9 +709,18 @@ def test_bounded_exceptions_are_explicit_and_workflow_gated():
     assert OPERATIVE_EXCEPTION_IDS == {
         "EX-H01-PYTEST-01",
         "EX-H01-PYMDOWN-B64-01",
+        "EX-H01-PYMDOWN-REDOS-01",
     }
+    assert not PENDING_EXCEPTION_IDS
     assert RETIRED_EXCEPTION_IDS.isdisjoint(OPERATIVE_EXCEPTION_IDS)
-    assert RETIRED_EXCEPTION_IDS | OPERATIVE_EXCEPTION_IDS == KNOWN_EXCEPTION_IDS
+    assert RETIRED_EXCEPTION_IDS.isdisjoint(PENDING_EXCEPTION_IDS)
+    assert OPERATIVE_EXCEPTION_IDS.isdisjoint(PENDING_EXCEPTION_IDS)
+    assert (
+        RETIRED_EXCEPTION_IDS
+        | OPERATIVE_EXCEPTION_IDS
+        | PENDING_EXCEPTION_IDS
+        == KNOWN_EXCEPTION_IDS
+    )
 
     for exception_id in RETIRED_EXCEPTION_IDS:
         assert (
@@ -707,6 +767,26 @@ def test_bounded_exceptions_are_explicit_and_workflow_gated():
                     mutated_control, exception_id
                 )
 
+    for exception_id in PENDING_EXCEPTION_IDS:
+        assert (
+            f"| `{exception_id}` | "
+            "**Pending owner authorization—not operative.**"
+            in transition
+        )
+        control = _pending_exception_control(evidence, exception_id)
+        _assert_pending_exception_control(control, exception_id)
+        with pytest.raises(AssertionError):
+            _assert_pending_exception_control(
+                control.replace(PENDING_STATUS, RETAINED_STATUS, 1),
+                exception_id,
+            )
+
+    assert PENDING_STATUS not in transition
+    assert (
+        "Mick Hagen, H-01 owner, explicitly adopted this exact bounded "
+        "exception on 11 August 2026" in normalized_transition
+    )
+
     assert "There is no general wall-clock freshness window." in normalized
     assert "Evidence becomes stale on any of these events:" in normalized
     assert "immediately before the Stage B reviewer gate" in normalized
@@ -717,7 +797,7 @@ def test_exception_reachability_controls_remain_true():
     _assert_exception_reachability_controls(ROOT)
 
 
-@pytest.mark.parametrize("extension", ("pymdownx.snippets", "pymdownx.b64"))
+@pytest.mark.parametrize("extension", sorted(PYMDOWN_EXTENSION_NAMES))
 def test_reachability_gate_rejects_root_mkdocs_extension(tmp_path, extension):
     (tmp_path / "mkdocs.yml").write_text(
         f"markdown_extensions:\n  - {extension}\n"
@@ -779,6 +859,26 @@ def test_reachability_gate_rejects_programmatic_pymdown_import(tmp_path):
 
     with pytest.raises(
         AssertionError, match="adds a Pymdown programmatic activation surface"
+    ):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "extension", sorted(PYMDOWN_REDOS_EXTENSION_NAMES)
+)
+def test_reachability_gate_rejects_redos_markdown_activation(
+    tmp_path, extension
+):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "render.py").write_text(
+        "import markdown\n"
+        f"markdown.markdown(text, extensions=[{extension!r}])\n"
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match=rf"activates {re.escape(repr(extension))}",
     ):
         _assert_exception_reachability_controls(tmp_path)
 
@@ -1090,6 +1190,27 @@ def test_pymdown_b64_remains_affected_and_exception_governed(tmp_path):
     assert "11.0.0" in evidence
     assert "**Compensating controls:**" in section
     assert "EX-H01-PYMDOWN-B64-01" in RETAINED_EXCEPTION_IDS
+
+
+def test_pymdown_redos_finding_is_affected_contained_and_operative():
+    evidence = EVIDENCE.read_text()
+    section = _exception_section(
+        evidence, "EX-H01-PYMDOWN-REDOS-01"
+    )
+    normalized_section = " ".join(section.split())
+
+    assert SELECTED["pymdown-extensions"] == "10.21.3"
+    for finding in (
+        "PYSEC-2026-3654",
+        "GHSA-gm37-52c6-37mw",
+        "CVE-2026-67422",
+    ):
+        assert finding in section
+    assert "Affected versions are `<=11.0`" in normalized_section
+    assert "first fixed release is `11.0.1`" in normalized_section
+    assert RETAINED_STATUS in section
+    assert "EX-H01-PYMDOWN-REDOS-01" in OPERATIVE_EXCEPTION_IDS
+    assert "EX-H01-PYMDOWN-REDOS-01" not in PENDING_EXCEPTION_IDS
 
 
 def test_s1_exact_runtime_profile_matches_the_approved_lock():
