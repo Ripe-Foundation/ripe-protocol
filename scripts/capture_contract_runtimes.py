@@ -369,10 +369,11 @@ def _deploy_graph():
     pair.configureIdentity(ZERO, WETH, RIPE)
 
     deployed = {}
-    for name in sorted(checker.DEPLOYED_RUNTIME_CONTRACTS):
+    for index, name in enumerate(sorted(checker.DEPLOYED_RUNTIME_CONTRACTS), 1):
         deployed[name] = boa.load(
             checker.GOVERNED_SOURCES[name],
             *_constructor_values(name),
+            override_address=f"0x{0xC000 + index:040x}",
         )
     return boa, deployed
 
