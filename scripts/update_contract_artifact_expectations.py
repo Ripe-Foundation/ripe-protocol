@@ -21,6 +21,7 @@ REMEDIATION_CONTRACTS = {
     "StabilityPool",
     "SwitchboardBravo",
     "UniswapV2Prices",
+    "VaultMigrator",
 }
 
 

@@ -1,5 +1,7 @@
 """DRAFT — owner approval required before integration or use."""
 
+import json
+
 import pytest
 
 from scripts.proposals import lootbox_deployment_profiles as profiles
@@ -23,6 +25,20 @@ def test_r5_manifest_is_canonical_draft_and_path_free(manifest):
     assert b"\r" not in raw
     assert b"/Users/" not in raw
     assert b"timestamp" not in raw.lower()
+
+    expected = json.loads(profiles.EXPECTATIONS_PATH.read_text())["contracts"][
+        "Lootbox"
+    ]
+    assert manifest["source"] == {
+        "compiler_settings": expected["compiler_settings"],
+        "effective_optimization": expected["effective_optimization"],
+        "path": "contracts/core/Lootbox.vy",
+        "sha256": expected["source_sha256"],
+        "transitive_compiler_input_integrity": expected[
+            "transitive_compiler_input_integrity"
+        ],
+        "vyper_version": profiles.PINNED_VYPER_VERSION,
+    }
 
 
 def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
@@ -52,11 +68,11 @@ def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
 
 
 def test_r5_compiles_reviewed_lootbox_with_source_owned_codesize(compiled):
-    assert len(compiled.creation) == 21_911
-    assert len(compiled.runtime_template) == 21_569
+    assert len(compiled.creation) == 23_207
+    assert len(compiled.runtime_template) == 22_865
     assert compiled.integrity == (
-        "65a3999e25cc33caf88ff839fddae3ab7"
-        "601a8e72e4eb96f84fd854eab3c9718"
+        "935d1b79e47f91abdd1b9550c32e7c85"
+        "fe992770d3bbb7bb963b05b9c528371c"
     )
 
 
@@ -81,8 +97,6 @@ def test_r5_each_posture_deploys_and_completes_constructor_readbacks(
 
 
 def test_x1_current_constructor_abi_maps_exactly_to_manifest_order(manifest):
-    import json
-
     abi = json.loads((profiles.ROOT / "scripts/abis/Lootbox.json").read_text())
     constructors = [entry for entry in abi if entry["type"] == "constructor"]
     assert len(constructors) == 1
@@ -188,4 +202,5 @@ def test_x1_historical_call_site_inventory_is_complete():
         "migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py": [1],
         "migrations/base-mainnet/2025080900_Lootbox.py": [1],
         "migrations/base-mainnet/2025112500_New_Endaoment_Features.py": [4],
+        "migrations/robinhood-mainnet/0005_Departments.py": [5],
     }

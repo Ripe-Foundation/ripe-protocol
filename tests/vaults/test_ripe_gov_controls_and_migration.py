@@ -2,7 +2,12 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import (
+    EIGHTEEN_DECIMALS,
+    MAX_UINT256,
+    ZERO_ADDRESS,
+    VAULT_MIGRATOR_HQ_ID,
+)
 from conf_utils import filter_logs
 
 
@@ -76,6 +81,32 @@ def _save_points(vault, user, asset, switchboard_alpha, blocks=25):
 def _pause_pair(source, target, switchboard_alpha):
     source.pause(True, sender=switchboard_alpha.address)
     target.pause(True, sender=switchboard_alpha.address)
+
+
+def _migrate_ripe_gov(
+    teller, user, token, source_id, target_id, *, sender, return_event=False,
+):
+    """Point core governance at the target, then migrate all supported user assets."""
+    hq = boa.load_partial("contracts/registries/RipeHq.vy").at(teller.getRipeHq())
+    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(
+        hq.getAddr(VAULT_MIGRATOR_HQ_ID)
+    )
+    caller_addr = sender.address if hasattr(sender, "address") else sender
+    switchboard = boa.load_partial("contracts/registries/Switchboard.vy").at(hq.getAddr(6))
+    if switchboard.isSwitchboardAddr(caller_addr) and target_id != 0:
+        mission_control = boa.load_partial("contracts/data/MissionControl.vy").at(hq.getAddr(5))
+        mission_control.setCoreRipeGovVaultId(target_id, sender=caller_addr)
+    count = vault_migrator.migrateRipeGovPositions(
+        [user], source_id, sender=caller_addr
+    )
+    events = filter_logs(vault_migrator, "RipeGovPositionMigrationExecuted")
+    assert len(events) == count
+    token_addr = token.address if hasattr(token, "address") else token
+    matching = [event for event in events if event.asset == token_addr]
+    event = matching[-1] if matching else None
+    if return_event:
+        return (event.amount if event else 0), vault_migrator
+    return event.amount if event else 0
 
 
 def _deposit_through_teller(
@@ -1460,17 +1491,18 @@ def test_teller_migration_preserves_position_and_updates_ledger_and_deposit_poin
     assert ledger.getNumUserVaults(bob) == 1
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
-    migrated = teller.migrateRipeGovPosition(
+    migrated, vault_migrator = _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
         target_id,
         sender=switchboard_echo.address,
+        return_event=True,
     )
-    # The source and target events are child logs of the outer Teller transaction.
-    export_logs = filter_logs(teller, "RipeGovPositionExported")
-    import_logs = filter_logs(teller, "RipeGovPositionImported")
-    teller_logs = filter_logs(teller, "RipeGovPositionMigrated")
+    # Vault export/import events are child logs of the outer VaultMigrator transaction.
+    export_logs = filter_logs(vault_migrator, "RipeGovPositionExported")
+    import_logs = filter_logs(vault_migrator, "RipeGovPositionImported")
+    migration_logs = filter_logs(vault_migrator, "RipeGovPositionMigrationExecuted")
     assert migrated == amount
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
     assert target.getTotalAmountForUser(bob, ripe_token) == amount
@@ -1484,9 +1516,11 @@ def test_teller_migration_preserves_position_and_updates_ledger_and_deposit_poin
     _assert_lock_terms_equal(target_data.lastTerms, source_data.lastTerms)
     assert target.totalUserGovPoints(bob) == source_data.govPoints
     assert target.totalGovPoints() == source_data.govPoints
-    assert not ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    # Source participation is intentionally retained until Lootbox proves every
+    # source asset and reward entitlement has been cleaned up.
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
-    assert ledger.getNumUserVaults(bob) == 1
+    assert ledger.getNumUserVaults(bob) == 2
 
     source_bundle = ledger.getDepositPointsBundle(bob, SOURCE_VAULT_ID, ripe_token)
     target_bundle = ledger.getDepositPointsBundle(bob, target_id, ripe_token)
@@ -1495,11 +1529,11 @@ def test_teller_migration_preserves_position_and_updates_ledger_and_deposit_poin
     assert target_bundle.userPoints.lastUpdate == boa.env.evm.patch.block_number
     assert target_bundle.userPoints.lastBalance > 0
 
-    assert len(export_logs) == len(import_logs) == len(teller_logs) == 1
+    assert len(export_logs) == len(import_logs) == len(migration_logs) == 1
     assert export_logs[0].amount == amount
     assert import_logs[0].govPoints == source_data.govPoints
-    assert teller_logs[0].sourceVaultId == SOURCE_VAULT_ID
-    assert teller_logs[0].targetVaultId == target_id
+    assert migration_logs[0].sourceVaultId == SOURCE_VAULT_ID
+    assert migration_logs[0].targetVaultId == target_id
 
 
 def test_enabled_migration_performs_one_final_governance_point_save(
@@ -1541,7 +1575,7 @@ def test_enabled_migration_performs_one_final_governance_point_save(
     )
     assert pending > 0
 
-    teller.migrateRipeGovPosition(
+    _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -1549,96 +1583,6 @@ def test_enabled_migration_performs_one_final_governance_point_save(
         sender=switchboard_echo.address,
     )
     assert target.userGovData(bob, ripe_token).govPoints == before.govPoints + pending
-
-
-def test_migration_requires_source_ledger_entry_before_export_and_rolls_back(
-    target_ripe_gov_vault,
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    bob,
-    teller,
-    ledger,
-    switchboard_alpha,
-    switchboard_echo,
-    mission_control,
-    setAssetConfig,
-    setGeneralConfig,
-):
-    target, target_id = target_ripe_gov_vault
-    amount, _ = _prepare_teller_migration(
-        teller=teller,
-        source=ripe_gov_vault,
-        target=target,
-        target_id=target_id,
-        token=ripe_token,
-        funder=whale,
-        user=bob,
-        mission_control=mission_control,
-        setAssetConfig=setAssetConfig,
-        setGeneralConfig=setGeneralConfig,
-        switchboard_alpha=switchboard_alpha,
-    )
-    # Arrange the missing-ledger precondition through the same Teller-only Ledger
-    # entry point used by the migration path.
-    ledger.removeVaultFromUserForMigration(
-        bob,
-        SOURCE_VAULT_ID,
-        sender=teller.address,
-    )
-    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-
-    with boa.reverts("source vault missing from Ledger"):
-        teller.migrateRipeGovPosition(
-            bob,
-            ripe_token,
-            SOURCE_VAULT_ID,
-            target_id,
-            sender=switchboard_echo.address,
-        )
-    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
-    assert target.getTotalAmountForUser(bob, ripe_token) == 0
-    assert not ripe_gov_vault.positionMigratedOut(bob, ripe_token)
-
-
-def test_migration_ledger_cleanup_is_teller_only_and_pause_guarded(
-    ledger,
-    teller,
-    lootbox,
-    bob,
-    switchboard_alpha,
-):
-    ledger.addVaultToUser(bob, SOURCE_VAULT_ID, sender=teller.address)
-    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
-
-    with boa.reverts("only Teller allowed"):
-        ledger.removeVaultFromUserForMigration(
-            bob,
-            SOURCE_VAULT_ID,
-            sender=lootbox.address,
-        )
-    with boa.reverts("only Teller allowed"):
-        ledger.removeVaultFromUserForMigration(
-            bob,
-            SOURCE_VAULT_ID,
-            sender=bob,
-        )
-
-    ledger.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("not activated"):
-        ledger.removeVaultFromUserForMigration(
-            bob,
-            SOURCE_VAULT_ID,
-            sender=teller.address,
-        )
-    ledger.pause(False, sender=switchboard_alpha.address)
-
-    ledger.removeVaultFromUserForMigration(
-        bob,
-        SOURCE_VAULT_ID,
-        sender=teller.address,
-    )
-    assert not ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
 
 
 def test_existing_target_ledger_entry_is_not_duplicated_during_migration(
@@ -1673,15 +1617,15 @@ def test_existing_target_ledger_entry_is_not_duplicated_during_migration(
     assert ledger.getNumUserVaults(bob) == 2
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
-    teller.migrateRipeGovPosition(
+    _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
         target_id,
         sender=switchboard_echo.address,
     )
-    assert ledger.getNumUserVaults(bob) == 1
-    assert not ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    assert ledger.getNumUserVaults(bob) == 2
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
 
 
@@ -1731,7 +1675,7 @@ def test_migration_accepts_exact_stale_zero_target_asset_registration(
     assert not ledger.isParticipatingInVault(bob, target_id)
 
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    assert teller.migrateRipeGovPosition(
+    assert _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -1744,8 +1688,8 @@ def test_migration_accepts_exact_stale_zero_target_asset_registration(
     assert target.numUserAssets(bob) == 2
     assert target.getTotalAmountForUser(bob, ripe_token) == amount
     assert target.userGovData(bob, ripe_token).govPoints == source_data.govPoints
-    assert ledger.getNumUserVaults(bob) == 1
-    assert not ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    assert ledger.getNumUserVaults(bob) == 2
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
     assert ledger.isParticipatingInVault(bob, target_id)
 
 
@@ -1786,7 +1730,7 @@ def test_migration_carries_frozen_points_without_accruing_more(
     boa.env.time_travel(blocks=100)
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
-    teller.migrateRipeGovPosition(
+    _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -1797,8 +1741,9 @@ def test_migration_carries_frozen_points_without_accruing_more(
     assert target.totalUserGovPoints(bob) == frozen_points
 
 
-def test_teller_migration_validates_authority_addresses_and_ids(
+def test_teller_migration_validates_authority_users_and_route_ids(
     target_ripe_gov_vault,
+    ripe_gov_vault,
     ripe_token,
     bob,
     teller,
@@ -1807,7 +1752,7 @@ def test_teller_migration_validates_authority_addresses_and_ids(
     setAssetConfig,
     switchboard_alpha,
 ):
-    _, target_id = target_ripe_gov_vault
+    target, target_id = target_ripe_gov_vault
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -1816,27 +1761,19 @@ def test_teller_migration_validates_authority_addresses_and_ids(
         [SOURCE_VAULT_ID, target_id],
     )
     with boa.reverts("only switchboard allowed"):
-        teller.migrateRipeGovPosition(bob, ripe_token, SOURCE_VAULT_ID, target_id, sender=bob)
-    with boa.reverts("invalid user or asset"):
-        teller.migrateRipeGovPosition(
-            ZERO_ADDRESS,
-            ripe_token,
-            SOURCE_VAULT_ID,
-            target_id,
-            sender=switchboard_echo.address,
-        )
-    with boa.reverts("invalid user or asset"):
-        teller.migrateRipeGovPosition(
-            bob,
-            ZERO_ADDRESS,
-            SOURCE_VAULT_ID,
-            target_id,
-            sender=switchboard_echo.address,
-        )
+        _migrate_ripe_gov(teller, bob, ripe_token, SOURCE_VAULT_ID, target_id, sender=bob)
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+    assert _migrate_ripe_gov(teller,
+        ZERO_ADDRESS,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == 0
     with boa.reverts("invalid vault id"):
-        teller.migrateRipeGovPosition(bob, ripe_token, 0, target_id, sender=switchboard_echo.address)
+        _migrate_ripe_gov(teller, bob, ripe_token, 0, target_id, sender=switchboard_echo.address)
     with boa.reverts("same vault"):
-        teller.migrateRipeGovPosition(
+        _migrate_ripe_gov(teller,
             bob,
             ripe_token,
             SOURCE_VAULT_ID,
@@ -1844,9 +1781,9 @@ def test_teller_migration_validates_authority_addresses_and_ids(
             sender=switchboard_echo.address,
         )
     with boa.reverts("invalid source vault id"):
-        teller.migrateRipeGovPosition(bob, ripe_token, 999, target_id, sender=switchboard_echo.address)
+        _migrate_ripe_gov(teller, bob, ripe_token, 999, target_id, sender=switchboard_echo.address)
     with boa.reverts("invalid target vault id"):
-        teller.migrateRipeGovPosition(bob, ripe_token, SOURCE_VAULT_ID, 999, sender=switchboard_echo.address)
+        _migrate_ripe_gov(teller, bob, ripe_token, SOURCE_VAULT_ID, 999, sender=switchboard_echo.address)
 
 
 def test_teller_migration_requires_both_vaults_paused(
@@ -1877,7 +1814,7 @@ def test_teller_migration_requires_both_vaults_paused(
         switchboard_alpha=switchboard_alpha,
     )
     with boa.reverts("source vault not paused"):
-        teller.migrateRipeGovPosition(
+        _migrate_ripe_gov(teller,
             bob,
             ripe_token,
             SOURCE_VAULT_ID,
@@ -1887,7 +1824,7 @@ def test_teller_migration_requires_both_vaults_paused(
 
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("target vault not paused"):
-        teller.migrateRipeGovPosition(
+        _migrate_ripe_gov(teller,
             bob,
             ripe_token,
             SOURCE_VAULT_ID,
@@ -1896,7 +1833,7 @@ def test_teller_migration_requires_both_vaults_paused(
         )
 
     target.pause(True, sender=switchboard_alpha.address)
-    assert teller.migrateRipeGovPosition(
+    assert _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -1905,7 +1842,7 @@ def test_teller_migration_requires_both_vaults_paused(
     ) == amount
 
 
-def test_unsupported_target_asset_reverts_without_mutating_source(
+def test_unsupported_target_asset_is_skipped_without_mutating_source(
     target_ripe_gov_vault,
     ripe_gov_vault,
     ripe_token,
@@ -1929,20 +1866,19 @@ def test_unsupported_target_asset_reverts_without_mutating_source(
     _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, amount, teller)
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
-    with boa.reverts("unsupported target asset"):
-        teller.migrateRipeGovPosition(
-            bob,
-            ripe_token,
-            SOURCE_VAULT_ID,
-            target_id,
-            sender=switchboard_echo.address,
-        )
+    assert _migrate_ripe_gov(teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == 0
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
     assert not ripe_gov_vault.positionMigratedOut(bob, ripe_token)
     assert target.getTotalAmountForUser(bob, ripe_token) == 0
 
 
-def test_migrate_ripe_gov_position_rejects_unsupported_source_asset_atomically(
+def test_migrate_ripe_gov_position_uses_live_source_position_when_config_deprecated(
     target_ripe_gov_vault,
     ripe_gov_vault,
     ripe_token,
@@ -1973,62 +1909,18 @@ def test_migrate_ripe_gov_position_rejects_unsupported_source_asset_atomically(
     )
     setAssetConfig(ripe_token, _vaultIds=[target_id])
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    source_snapshot = (
-        ripe_token.balanceOf(ripe_gov_vault),
-        ripe_gov_vault.userBalances(bob, ripe_token),
-        ripe_gov_vault.userGovData(bob, ripe_token),
-        ripe_gov_vault.totalUserGovPoints(bob),
-        ripe_gov_vault.totalGovPoints(),
-        ripe_gov_vault.positionMigratedOut(bob, ripe_token),
-    )
-    target_snapshot = (
-        ripe_token.balanceOf(target),
-        target.userBalances(bob, ripe_token),
-        target.userGovData(bob, ripe_token),
-        target.totalUserGovPoints(bob),
-        target.totalGovPoints(),
-    )
-    ledger_snapshot = (
-        ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID),
-        ledger.isParticipatingInVault(bob, target_id),
-        ledger.userDepositPoints(bob, SOURCE_VAULT_ID, ripe_token),
-        ledger.userDepositPoints(bob, target_id, ripe_token),
-        ledger.globalDepositPoints(),
-    )
-    claimable_before = lootbox.getClaimableLoot(bob)
-
-    with boa.reverts(dev="unsupported source asset"):
-        teller.migrateRipeGovPosition(
-            bob,
-            ripe_token,
-            SOURCE_VAULT_ID,
-            target_id,
-            sender=switchboard_echo.address,
-        )
-    assert source_snapshot == (
-        ripe_token.balanceOf(ripe_gov_vault),
-        ripe_gov_vault.userBalances(bob, ripe_token),
-        ripe_gov_vault.userGovData(bob, ripe_token),
-        ripe_gov_vault.totalUserGovPoints(bob),
-        ripe_gov_vault.totalGovPoints(),
-        ripe_gov_vault.positionMigratedOut(bob, ripe_token),
-    )
-    assert target_snapshot == (
-        ripe_token.balanceOf(target),
-        target.userBalances(bob, ripe_token),
-        target.userGovData(bob, ripe_token),
-        target.totalUserGovPoints(bob),
-        target.totalGovPoints(),
-    )
-    assert ledger_snapshot == (
-        ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID),
-        ledger.isParticipatingInVault(bob, target_id),
-        ledger.userDepositPoints(bob, SOURCE_VAULT_ID, ripe_token),
-        ledger.userDepositPoints(bob, target_id, ripe_token),
-        ledger.globalDepositPoints(),
-    )
-    assert lootbox.getClaimableLoot(bob) == claimable_before
-    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
+    assert _migrate_ripe_gov(teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.positionMigratedOut(bob, ripe_token)
+    assert target.getTotalAmountForUser(bob, ripe_token) == amount
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    assert ledger.isParticipatingInVault(bob, target_id)
 
 
 def test_migrate_ripe_gov_position_emits_complete_event(
@@ -2059,15 +1951,16 @@ def test_migrate_ripe_gov_position_emits_complete_event(
         switchboard_alpha=switchboard_alpha,
     )
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    teller.migrateRipeGovPosition(
+    _, vault_migrator = _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
         target_id,
         sender=switchboard_echo.address,
+        return_event=True,
     )
 
-    logs = filter_logs(teller, "RipeGovPositionMigrated")
+    logs = filter_logs(vault_migrator, "RipeGovPositionMigrationExecuted")
     assert len(logs) == 1
     event = logs[0]
     assert event.user == bob
@@ -2111,7 +2004,7 @@ def test_existing_target_position_makes_entire_migration_atomic(
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
     with boa.reverts("target balance exists"):
-        teller.migrateRipeGovPosition(
+        _migrate_ripe_gov(teller,
             bob,
             ripe_token,
             SOURCE_VAULT_ID,
@@ -2157,7 +2050,7 @@ def test_fee_on_transfer_receipt_check_reverts_atomically(
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
     with boa.reverts("inexact migration receipt"):
-        teller.migrateRipeGovPosition(
+        _migrate_ripe_gov(teller,
             bob,
             fee_token,
             SOURCE_VAULT_ID,
@@ -2208,7 +2101,7 @@ def test_migrated_source_position_is_permanently_tombstoned(
         teller,
     )
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    teller.migrateRipeGovPosition(
+    _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -2276,7 +2169,7 @@ def test_non_core_registered_ripe_gov_vault_can_be_the_migration_source(
     _save_points(source, bob, ripe_token, switchboard_alpha)
     _pause_pair(source, target, switchboard_alpha)
 
-    assert teller.migrateRipeGovPosition(
+    assert _migrate_ripe_gov(teller,
         bob,
         ripe_token,
         source_id,
@@ -2285,7 +2178,7 @@ def test_non_core_registered_ripe_gov_vault_can_be_the_migration_source(
     ) == amount
     assert source.positionMigratedOut(bob, ripe_token)
     assert target.getTotalAmountForUser(bob, ripe_token) == amount
-    assert not ledger.isParticipatingInVault(bob, source_id)
+    assert ledger.isParticipatingInVault(bob, source_id)
     assert ledger.isParticipatingInVault(bob, target_id)
 
 
@@ -2357,7 +2250,7 @@ def test_actual_hr_contributor_position_migrates_with_points_and_lock(
     )
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
 
-    teller.migrateRipeGovPosition(
+    _migrate_ripe_gov(teller,
         contributor,
         ripe_token,
         SOURCE_VAULT_ID,
@@ -2634,13 +2527,10 @@ def test_echo_batch_migrates_many_users_and_emits_one_event_each(
         _direct_deposit(ripe_gov_vault, ripe_token, whale, user, amount, teller)
         ledger.addVaultToUser(user, SOURCE_VAULT_ID, sender=teller.address)
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    migrations = [
-        (user, ripe_token.address, SOURCE_VAULT_ID, target_id)
-        for user in amounts
-    ]
+    mission_control.setCoreRipeGovVaultId(target_id, sender=switchboard_alpha.address)
 
     assert switchboard_echo.migrateRipeGovPositions(
-        migrations,
+        list(amounts), SOURCE_VAULT_ID,
         sender=governance.address,
     ) == 2
     for user, amount in amounts.items():
@@ -2651,7 +2541,100 @@ def test_echo_batch_migrates_many_users_and_emits_one_event_each(
     assert {log.user for log in logs} == set(amounts)
 
 
-def test_echo_batch_is_governance_only_nonempty_and_atomic(
+def test_one_user_migrates_all_governance_assets_with_one_housekeeping_call(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    teller,
+    governance,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    target, target_id = target_ripe_gov_vault
+    setGeneralConfig()
+    for asset in (alpha_token, bravo_token):
+        _configure_ripe_gov_asset(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            [SOURCE_VAULT_ID, target_id],
+        )
+    positions = (
+        (alpha_token, alpha_token_whale, 20 * EIGHTEEN_DECIMALS),
+        (bravo_token, bravo_token_whale, 30 * EIGHTEEN_DECIMALS),
+    )
+    for asset, funder, amount in positions:
+        _deposit_through_teller(
+            teller, ripe_gov_vault, asset, funder, bob, amount, 0
+        )
+
+    mission_control.setShouldCheckLastTouch(True, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=1)
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+    mission_control.setCoreRipeGovVaultId(target_id, sender=switchboard_alpha.address)
+
+    assert switchboard_echo.migrateRipeGovPositions(
+        [bob], SOURCE_VAULT_ID, sender=governance.address
+    ) == 2
+    for asset, _, amount in positions:
+        assert ripe_gov_vault.getTotalAmountForUser(bob, asset) == 0
+        assert target.getTotalAmountForUser(bob, asset) == amount
+    logs = filter_logs(switchboard_echo, "RipeGovPositionMigrationExecuted")
+    assert len(logs) == 2
+    assert {log.asset for log in logs} == {alpha_token.address, bravo_token.address}
+
+
+def test_governance_migration_rejects_more_than_five_source_asset_slots(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    target, target_id = target_ripe_gov_vault
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID, target_id],
+    )
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+    ripe_gov_vault.eval(f"vaultData.numUserAssets[{bob}] = 6")
+    assert _migrate_ripe_gov(
+        teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == 0
+
+    ripe_gov_vault.eval(f"vaultData.numUserAssets[{bob}] = 7")
+    with pytest.raises(BoaError):
+        _migrate_ripe_gov(
+            teller,
+            bob,
+            ripe_token,
+            SOURCE_VAULT_ID,
+            target_id,
+            sender=switchboard_echo.address,
+        )
+
+
+def test_echo_batch_is_governance_only_nonempty_and_skips_empty_users(
     target_ripe_gov_vault,
     ripe_gov_vault,
     ripe_token,
@@ -2668,9 +2651,11 @@ def test_echo_batch_is_governance_only_nonempty_and_atomic(
 ):
     target, target_id = target_ripe_gov_vault
     with boa.reverts("no perms"):
-        switchboard_echo.migrateRipeGovPositions([], sender=bob)
+        switchboard_echo.migrateRipeGovPositions([], SOURCE_VAULT_ID, sender=bob)
     with boa.reverts("no migrations"):
-        switchboard_echo.migrateRipeGovPositions([], sender=governance.address)
+        switchboard_echo.migrateRipeGovPositions(
+            [], SOURCE_VAULT_ID, sender=governance.address
+        )
 
     _configure_ripe_gov_asset(
         mission_control,
@@ -2684,16 +2669,15 @@ def test_echo_batch_is_governance_only_nonempty_and_atomic(
     ledger.addVaultToUser(bob, SOURCE_VAULT_ID, sender=teller.address)
     ledger.addVaultToUser(alice, SOURCE_VAULT_ID, sender=teller.address)
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
-    migrations = [
-        (bob, ripe_token.address, SOURCE_VAULT_ID, target_id),
-        (alice, ripe_token.address, SOURCE_VAULT_ID, target_id),
-    ]
+    mission_control.setCoreRipeGovVaultId(target_id, sender=switchboard_alpha.address)
 
-    with boa.reverts("no position"):
-        switchboard_echo.migrateRipeGovPositions(migrations, sender=governance.address)
-    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
-    assert target.getTotalAmountForUser(bob, ripe_token) == 0
-    assert not ripe_gov_vault.positionMigratedOut(bob, ripe_token)
+    # Alice has no live source assets, so she is skipped after Bob migrates.
+    assert switchboard_echo.migrateRipeGovPositions(
+        [bob, alice], SOURCE_VAULT_ID, sender=governance.address
+    ) == 1
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert target.getTotalAmountForUser(bob, ripe_token) == amount
+    assert ripe_gov_vault.positionMigratedOut(bob, ripe_token)
 
 
 ############################################################################
@@ -3428,9 +3412,9 @@ GOV_PAUSE_MATRIX = (
     ("withdrawContributorTokensToBurn", True),
     ("transferBalanceWithinVault", True),
     ("transferContributorRipeTokens", True),
-    ("updateUserGovPoints", False),
-    ("adjustLock", False),
-    ("releaseLock", False),
+    ("updateUserGovPoints", True),
+    ("adjustLock", True),
+    ("releaseLock", True),
     ("disableGovPointAccrualForUser", False),
     ("disableGovPointAccrualGlobally", False),
 )
@@ -3504,12 +3488,9 @@ def test_ripe_gov_pause_matrix_while_paused(
 ):
     """DV-06 characterization (SV-5, Section 9.4): exact pause policy per method.
 
-    VaultData.isPaused is consulted only by SharesVault's deposit, withdraw,
-    and transfer helpers. Everything else -- point updates, both point-disable
-    setters, and crucially adjustLock and releaseLock -- stays live while the
-    vault is paused. releaseLock is the sharpest case: it reduces balances via
-    vaultData._reduceBalanceOnWithdrawal directly, bypassing SharesVault
-    entirely, so it burns the exit fee out of a paused vault.
+    The owner-approved policy also pause-gates updateUserGovPoints, adjustLock,
+    and releaseLock. The two point-disable escape setters remain available while
+    paused; migration import/export and overflow-disable routes are separate.
     """
     boa.env.time_travel(blocks=10)
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
@@ -3566,11 +3547,6 @@ def test_ripe_gov_pause_matrix_while_unpaused(
 
 
 @pytest.mark.parametrize("method", ("adjustLock", "releaseLock"))
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-06: RipeGov pause semantics for adjustLock/releaseLock are "
-    "unchanged pending the Section 9.4 owner decision under RH-CHANGE-01",
-)
 def test_gov_lock_mutation_reverts_while_vault_is_paused(
     method,
     ripe_gov_vault,
@@ -3580,7 +3556,7 @@ def test_gov_lock_mutation_reverts_while_vault_is_paused(
     switchboard_alpha,
     locked_gov_position,
 ):
-    """DV-06 hardening target (SV-5, Section 9.4 preferred rule)."""
+    """DV-06 regression for the owner-approved Section 9.4 pause rule."""
     boa.env.time_travel(blocks=10)
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
     before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])

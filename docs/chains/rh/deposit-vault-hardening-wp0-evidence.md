@@ -104,7 +104,7 @@ guard and is included in §5.3.
 | SP-PRICE-01 | Option A by default. Characterized; no production change needed for A. But see DV-14: option A's liveness claim does not hold for a reverting price source. |
 | GOV-WEIGHT-01 | **RESOLVED by the owner 2026-08-08:** zero means zero — the multiplier is always applied. Implemented; see the disposition below. |
 | RG-SIZE-01 | **RESOLVED by the owner 2026-08-08:** the 200-byte floor governs. See the disposition below. §6 E-2 shows Option A is feasible at a stated cost. |
-| RH-CHANGE-01 | **PARTIALLY RESOLVED — 3 of 12 gated rows.** The owner approved the DV-01/02/03 RipeGov least-privilege row, merged 2026-08-07 as `30cf436` (PR #78). The other 9 rows (DV-04/05/06/08/09/10/13/14/15) remain unapproved and no production source is edited for them. See the disposition below. |
+| RH-CHANGE-01 | **PARTIALLY RESOLVED — 4 of 12 gated rows.** The owner approved the DV-01/02/03 RipeGov least-privilege row, merged 2026-08-07 as `30cf436` (PR #78), and approved the DV-06 RipeGov pause rule on 2026-08-09 in the unified VaultMigrator branch. The other 8 rows (DV-04/05/08/09/10/13/14/15) remain unapproved. See the dispositions below. |
 
 **Stop condition encountered at WP0:** GOV-WEIGHT-01, RG-SIZE-01 and
 RH-CHANGE-01 were all unresolved *at the time this evidence was recorded*, so no
@@ -125,7 +125,17 @@ Nothing about any deployed contract changed with this decision: Teller's measure
 headroom is 318 bytes, which cleared both floors already. The decision only
 governs what future Teller growth is admissible.
 
-#### RH-CHANGE-01 disposition — owner, 2026-08-07 (partial)
+#### RG-SIZE-01 VaultMigrator follow-on — owner, 2026-08-10
+
+The 200-byte rule remains controlling, but PR #83's final Teller measures 24,525
+deployed bytes and therefore needs the separate exact waiver recorded as
+RH-D027. That waiver is bound to one source, compiler output, exact deployed
+size, and complete deployed-byte identity at declared constructor inputs. It
+permits no Teller growth and does not lower the default floor. The historical
+200-byte reconciliation above remains the rule against which this exception is
+measured.
+
+#### RH-CHANGE-01 disposition — owner, 2026-08-07 and 2026-08-09 (partial)
 
 **One row approved: DV-01/02/03, RipeGov least privilege.** All three call sites
 (`depositTokensWithLockDuration`, `adjustLock`, `releaseLock`) went from
@@ -139,11 +149,20 @@ with the +32 immutable, **EIP-170 headroom 45 → 54** — the only candidate ro
 **RipeGov must be redeployed.** Its runtime bytecode changed; this is not a
 source-only edit.
 
-**The remaining 9 rows are still unapproved** (DV-04, DV-05, DV-06, DV-08, DV-09,
+**The remaining 8 rows are still unapproved** (DV-04, DV-05, DV-08, DV-09,
 DV-10, DV-13, DV-14, DV-15) and no production source is edited for them, so §17
 continues to apply to each. Note that DV-10's candidate (M7c, §13) is now
 *admissible on size* following the RG-SIZE-01 disposition above, but admissibility
 is not approval — it still needs its own RH-CHANGE-01 row.
+
+**DV-06 approved on 2026-08-09.** The owner approved the Section 9.4 rule that
+`adjustLock` and `releaseLock` revert while RipeGov is paused. The same approval
+keeps the migration-specific pause gate on `updateUserGovPoints`, because that
+route otherwise rewrites the lock terms an import just preserved. Migration
+import/export and both overflow point-disable escape routes remain separate and
+available under their existing permissions. The pause characterization and the
+two former strict-xfail checkpoints are updated to passing regressions; this
+approval does not authorize any of the eight remaining hardening rows.
 
 #### GOV-WEIGHT-01 disposition — owner, 2026-08-08
 
@@ -273,7 +292,7 @@ every node ID is `expected-red-table.md` beside this file; the raw run is
 | DV-03 | SV-4, RG-4 | one per registered non-Teller caller (13) | RH-CHANGE-01 |
 | DV-04 | RG-5 | caller × portion (2 × 2) | RH-CHANGE-01 §9.2 |
 | DV-05 | RG-4 | shorten-existing (1) + out-of-bounds duration (5) | RH-CHANGE-01 §9.3 |
-| DV-06 | SV-5 | adjustLock, releaseLock (2) | RH-CHANGE-01 §9.4 |
+| DV-06 | SV-5 | adjustLock, releaseLock (2) | **RESOLVED — owner 2026-08-09** |
 | DV-07 | GOV-WEIGHT-01 | 1 | GOV-WEIGHT-01 |
 | DV-08 | SV-1, SP-6 | 1 | RH-CHANGE-01 §11.2 |
 | DV-09 | SP-1 | deposit, withdrawal, total value (3) | RH-CHANGE-01 §11.1 |
@@ -311,7 +330,7 @@ Deployed = template + immutables (RipeGov +32, StabilityPool +96, Teller +96).
 | **M1** | Teller-only on `depositTokensWithLockDuration`, `adjustLock`, `releaseLock` | Any registered RIPE address mints governance shares for an arbitrary beneficiary against custody already owned by another user, moving no tokens (DV-01); can extend or force-release any lock (DV-02/03) | Needs control of a registered address (core dept, registered vault, or switchboard) — not EOA-reachable. Blast radius: total dilution of every RipeGov depositor for that asset | Accept: the vault trusts the whole registry | None. The predicate *is* the authority; no config narrows it | Replace the predicate with `msg.sender == addys._getTellerAddr()` in three places | **−9** | 54 | none | Very low in production. **Test blast radius is the cost:** 25 direct call sites (20 sending as `switchboard_alpha`), one of which is the `_direct_deposit` helper reused at 9 more sites. Residual after fix: Teller's own callers still choose `_user` |
 | **M2** | Same-address short-circuit in `transferBalanceWithinVault` | A same-user AuctionHouse/CreditEngine transfer burns the proportional point penalty and re-weights the unlock toward `minLockDuration`; a **full** same-address transfer destroys the user's entire point balance (DV-04) | Only via AuctionHouse/CreditEngine, not user-callable | Accept: current callers do not produce same-address transfers | Fix in the two callers instead, leaving RipeGov untouched | `if _fromUser == _toUser: return 0, False` before any mutation | **+31** | 14 | none | Low. §9.2 forbids changing SharesVault family-wide without a full consumer inventory. Residual: the same defect remains in any other vault sharing the helper |
 | **M3** | Clamp contributor lock duration to governance bounds | `transferContributorRipeTokens` forwards the raw configured duration into the weighted blend, dragging a max-locked recipient below `minLockDuration` (DV-05) | Needs an HR contributor payout; recipient is the contributor's owner | Accept | **Config alternative exists:** require every deployed `Contributor` to carry a `depositLockDuration` inside `[min,max]`. Zero contract change | `max(min, d)` then `min(max, …)` before `_handleGovDataOnTransfer` | **+50** | −5 | none | Low. Residual under the config alternative: a future misconfigured Contributor re-opens it |
-| **M4** | Pause gate on `adjustLock` / `releaseLock` | Both stay live while RipeGov is paused; `releaseLock` reduces balances via `vaultData._reduceBalanceOnWithdrawal`, bypassing SharesVault's pause check entirely (DV-06) | Post-M1 only Teller can reach them, and Teller has its own pause. Residual: switchboard-initiated `Teller.adjustLock` still works while the vault is paused | Accept: pause is a custody control, not a lock control | Pause Teller as well as the vault in the runbook. Zero contract change | `assert not vaultData.isPaused` in both | **+12** | 33 | none | Low. §9.4 requires migration and overflow escapes to stay available; both are separate methods and unaffected |
+| **M4** | Pause gate on `adjustLock` / `releaseLock` | Both stay live while RipeGov is paused; `releaseLock` reduces balances via `vaultData._reduceBalanceOnWithdrawal`, bypassing SharesVault's pause check entirely (DV-06) | Post-M1 only Teller can reach them, and Teller has its own pause. Residual: switchboard-initiated `Teller.adjustLock` still works while the vault is paused | Accept: pause is a custody control, not a lock control | Pause Teller as well as the vault in the runbook. Zero contract change | `assert not vaultData.isPaused` in both. **Approved and implemented 2026-08-09; `updateUserGovPoints` is also gated to preserve imported migration terms.** | **+12** | 33 | none | Low. §9.4 requires migration and overflow escapes to stay available; both are separate methods and unaffected |
 | **M5** | GOV-WEIGHT-01 "zero means zero" | A configured zero weight silently behaves as 100 % (DV-07) | Governance-config only. `DefaultsRobinhood` sets RIPE `assetWeight = 100_00`, so **the bound launch default does not change**; only the meaning of a future governed zero | Accept and document | **Config alternative exists:** validate `assetWeight != 0` in the SwitchboardAlpha setter. Zero RipeGov delta | Always apply the multiplier. **Implemented 2026-08-08 by deleting the `if _weight != 0` guard rather than early-returning: −10 bytes, headroom 54 → 64.** See the GOV-WEIGHT-01 disposition in §1 | **+7 as written in §5.2; −10 as implemented** | 47 as written; **64 as implemented** | none | Low |
 
 **Combined M1+M2+M3+M4+M5 (`size-probes/s2.patch`): template 24,590 → deployed
@@ -470,9 +489,10 @@ pre-existing failures.
   row and GOV-WEIGHT-01 and RG-SIZE-01 were both unresolved; §17 applied. *All
   three have since moved — GOV-WEIGHT-01 and RG-SIZE-01 were both resolved by the
   owner on 2026-08-08 and a RH-CHANGE-01 row was approved and merged (see the
-  dispositions in §1). Two production-contract edits now exist, both in RipeGov:
-  the DV-01/02/03 Teller-only guards and the DV-07 unconditional weight
-  multiplier. This bullet records the WP0 position, not the current one.*
+  dispositions in §1). Three approved production-policy groups now exist in
+  RipeGov: the DV-01/02/03 Teller-only guards, the DV-07 unconditional weight
+  multiplier, and the DV-06/migration pause gates. This bullet records the WP0
+  position, not the current one.*
 - **Work Package 3 §10.3 (RipeGov stateful model) and Work Package 7
   (StabilityPool stateful model).** Test-only, but their required invariants are
   the ones currently violated: RG-4 (DV-02/03/05), RG-5 (DV-04), SP-1 (DV-09),

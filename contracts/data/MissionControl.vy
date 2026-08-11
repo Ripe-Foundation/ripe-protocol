@@ -210,6 +210,7 @@ priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
 underscoreRegistry: public(address)
 trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
+isRipeGovVaultId: public(HashMap[uint256, bool])
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -227,6 +228,7 @@ def __init__(_ripeHq: address, _defaults: address):
     self.preferredStabVaultId = 1
     self.isStabVaultId[1] = True
     self.coreRipeGovVaultId = 2
+    self.isRipeGovVaultId[2] = True
 
     # defaults
     if _defaults != empty(address):
@@ -411,6 +413,8 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
 def setCoreRipeGovVaultId(_vaultId: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _vaultId != 0 # dev: invalid vault id
+    self.isRipeGovVaultId[self.coreRipeGovVaultId] = True
+    self.isRipeGovVaultId[_vaultId] = True
     self.coreRipeGovVaultId = _vaultId
 
 

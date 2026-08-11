@@ -2,7 +2,7 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, VAULT_MIGRATOR_HQ_ID
 from conf_utils import filter_logs
 
 
@@ -44,13 +44,20 @@ def _seed_position(teller, vault, token, whale, user, amount=DEPOSIT_AMOUNT):
 
 
 def _migrate(teller, caller, user, token, source_id, target_id):
-    return teller.migrateVaultPosition(
-        user,
-        token,
-        source_id,
-        target_id,
-        sender=caller.address,
+    """Migrate every supported source asset for one user through VaultMigrator."""
+    hq = boa.load_partial("contracts/registries/RipeHq.vy").at(teller.getRipeHq())
+    vault_migrator = boa.load_partial("contracts/core/VaultMigrator.vy").at(
+        hq.getAddr(VAULT_MIGRATOR_HQ_ID)
     )
+    caller_addr = caller.address if hasattr(caller, "address") else caller
+    count = vault_migrator.migrateVaultPositions(
+        [user], source_id, target_id, sender=caller_addr
+    )
+    logs = filter_logs(vault_migrator, "VaultPositionMigrationExecuted")
+    assert len(logs) == count
+    token_addr = token.address if hasattr(token, "address") else token
+    matching = [log for log in logs if log.asset == token_addr]
+    return matching[-1].amount if matching else 0
 
 
 ############
@@ -116,27 +123,26 @@ def test_migration_rejects_non_switchboard_callers(
     _, target_id = simple_pair
 
     with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=sally)
+        _migrate(teller, sally, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
     # a ripe department that is not a switchboard
     with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(
-            bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=lootbox.address
-        )
+        _migrate(teller, lootbox, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
     # a registered vault
     with boa.reverts("only switchboard allowed"):
-        teller.migrateVaultPosition(
-            bob, alpha_token, SIMPLE_VAULT_ID, target_id, sender=stability_pool.address
-        )
+        _migrate(teller, stability_pool, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
 
-def test_any_registered_switchboard_may_migrate(
-    teller, simple_pair, alpha_token, bob, switchboard_alpha, simple_erc20_vault,
+def test_any_registered_switchboard_may_call_vault_migrator(
+    teller, simple_pair, alpha_token, bob, switchboard_alpha, switchboard_echo,
+    simple_erc20_vault,
 ):
-    """Owner decision: authority is any registered switchboard, not Echo alone."""
+    """VaultMigrator trusts registered Switchboards; Echo provides the governance ABI."""
     target_vault, target_id = simple_pair
-    migrated = _migrate(teller, switchboard_alpha, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    migrated = _migrate(
+        teller, switchboard_alpha, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    )
     assert migrated == DEPOSIT_AMOUNT
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
     assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
@@ -171,13 +177,16 @@ def test_echo_batch_requires_governance(switchboard_echo, simple_pair, alpha_tok
     _, target_id = simple_pair
     with boa.reverts("no perms"):
         switchboard_echo.migrateVaultPositions(
-            [(bob, alpha_token.address, SIMPLE_VAULT_ID, target_id)], sender=sally
+            [bob], SIMPLE_VAULT_ID, target_id, sender=sally
         )
 
 
-def test_echo_batch_rejects_empty_list(switchboard_echo, governance):
+def test_echo_batch_rejects_empty_list(switchboard_echo, simple_pair, governance):
+    _, target_id = simple_pair
     with boa.reverts("no migrations"):
-        switchboard_echo.migrateVaultPositions([], sender=governance.address)
+        switchboard_echo.migrateVaultPositions(
+            [], SIMPLE_VAULT_ID, target_id, sender=governance.address
+        )
 
 
 def test_echo_batch_caps_at_twenty_five_entries(
@@ -185,9 +194,47 @@ def test_echo_batch_caps_at_twenty_five_entries(
 ):
     """26 entries cannot be encoded at the ABI boundary."""
     _, target_id = simple_pair
-    oversized = [(bob, alpha_token.address, SIMPLE_VAULT_ID, target_id)] * 26
+    oversized = [bob] * 26
     with pytest.raises(Exception):
-        switchboard_echo.migrateVaultPositions(oversized, sender=governance.address)
+        switchboard_echo.migrateVaultPositions(
+            oversized, SIMPLE_VAULT_ID, target_id, sender=governance.address
+        )
+
+
+def test_normal_migration_rejects_more_than_twenty_source_asset_slots(
+    teller, simple_pair, simple_erc20_vault, alpha_token, bob, switchboard_echo,
+):
+    """Twenty positions are accepted; the twenty-first exceeds the loop bound."""
+    _, target_id = simple_pair
+    simple_erc20_vault.eval(f"vaultData.numUserAssets[{bob}] = 21")
+    assert _migrate(
+        teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == DEPOSIT_AMOUNT
+
+    simple_erc20_vault.eval(f"vaultData.numUserAssets[{bob}] = 22")
+    with pytest.raises(BoaError):
+        _migrate(
+            teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+        )
+
+
+def test_teller_migration_steps_are_vault_migrator_only(
+    teller, simple_pair, simple_erc20_vault, alpha_token, bob, switchboard_echo,
+):
+    target_vault, target_id = simple_pair
+    with boa.reverts("only vault migrator allowed"):
+        teller.withdrawOnVaultMigration(
+            bob, alpha_token, simple_erc20_vault, sender=switchboard_echo.address
+        )
+    with boa.reverts("only vault migrator allowed"):
+        teller.depositOnVaultMigration(
+            bob,
+            alpha_token,
+            DEPOSIT_AMOUNT,
+            target_id,
+            target_vault,
+            sender=switchboard_echo.address,
+        )
 
 
 ######################
@@ -195,16 +242,14 @@ def test_echo_batch_caps_at_twenty_five_entries(
 ######################
 
 
-def test_zero_and_degenerate_arguments_fail(teller, simple_pair, alpha_token, bob, switchboard_echo):
+def test_zero_user_is_skipped_and_degenerate_routes_fail(
+    teller, simple_pair, alpha_token, bob, switchboard_echo,
+):
     _, target_id = simple_pair
 
-    with boa.reverts("invalid user or asset"):
-        _migrate(teller, switchboard_echo, ZERO_ADDRESS, alpha_token, SIMPLE_VAULT_ID, target_id)
-
-    with boa.reverts("invalid user or asset"):
-        teller.migrateVaultPosition(
-            bob, ZERO_ADDRESS, SIMPLE_VAULT_ID, target_id, sender=switchboard_echo.address
-        )
+    assert _migrate(
+        teller, switchboard_echo, ZERO_ADDRESS, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == 0
 
     with boa.reverts("invalid vault id"):
         _migrate(teller, switchboard_echo, bob, alpha_token, 0, target_id)
@@ -224,7 +269,7 @@ def test_unregistered_vault_ids_fail(teller, simple_pair, alpha_token, bob, swit
         _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, 999)
 
 
-def test_unsupported_asset_on_either_endpoint_fails(
+def test_unsupported_target_asset_is_skipped_and_left_in_source(
     teller, simple_erc20_vault, target_simple_vault, alpha_token, alpha_token_whale, bob,
     setGeneralConfig, setAssetConfig, switchboard_alpha, switchboard_echo,
 ):
@@ -235,20 +280,28 @@ def test_unsupported_asset_on_either_endpoint_fails(
     setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID])
     _seed_position(teller, simple_erc20_vault, alpha_token, alpha_token_whale, bob)
     teller.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("unsupported target asset"):
-        _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert _migrate(
+        teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
 
-    # only the target supports the asset
+    # A live source position remains enumerable even if current configuration no
+    # longer lists that source vault. Target support is the migration gate.
     setAssetConfig(alpha_token, _vaultIds=[target_id])
-    with boa.reverts("unsupported source asset"):
-        _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert _migrate(
+        teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == DEPOSIT_AMOUNT
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
 
 
-def test_missing_source_ledger_participation_fails(teller, simple_pair, alpha_token, sally, switchboard_echo):
-    """Sally never deposited, so she has no source Ledger participation."""
+def test_user_without_source_positions_is_a_noop(
+    teller, simple_pair, alpha_token, sally, switchboard_echo,
+):
+    """A user with no source assets is skipped without housekeeping or events."""
     _, target_id = simple_pair
-    with boa.reverts("source vault missing from Ledger"):
-        _migrate(teller, switchboard_echo, sally, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert _migrate(
+        teller, switchboard_echo, sally, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == 0
 
 
 def test_core_ripe_gov_id_rejected_as_target(
@@ -501,33 +554,48 @@ def test_prefunded_teller_balance_is_preserved_and_cannot_subsidize(
     assert alpha_token.balanceOf(target_vault) == DEPOSIT_AMOUNT
 
 
-def test_replay_of_successful_migration_reverts(teller, simple_pair, alpha_token, bob, switchboard_echo):
-    """Successful calls are not idempotent: a replay finds no source position."""
+def test_replay_of_successful_migration_is_a_noop(
+    teller, simple_pair, alpha_token, bob, switchboard_echo,
+):
+    """A replay sees no live source balance and performs no second migration."""
     _, target_id = simple_pair
     _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
-    with pytest.raises(BoaError):
-        _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert _migrate(
+        teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id
+    ) == 0
 
 
 def test_failed_entry_rolls_back_the_whole_echo_batch(
-    teller, simple_pair, simple_erc20_vault, alpha_token, bob, sally,
-    switchboard_echo, governance, ledger,
+    teller, simple_erc20_vault, target_simple_vault, alpha_token,
+    alpha_token_whale, bravo_token, bravo_token_whale, bob, sally,
+    setGeneralConfig, setGeneralDebtConfig, setAssetConfig, mock_price_source,
+    switchboard_alpha, switchboard_echo, governance, ledger,
 ):
     """A later-user failure restores complete pre-call state for every earlier entry."""
-    target_vault, target_id = simple_pair
+    target_vault, target_id = target_simple_vault
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    setAssetConfig(bravo_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    _seed_position(teller, simple_erc20_vault, alpha_token, alpha_token_whale, bob)
+    _seed_position(teller, simple_erc20_vault, bravo_token, bravo_token_whale, sally)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    teller.borrow(40 * EIGHTEEN_DECIMALS, sally, False, sender=sally)
+    mock_price_source.setPrice(bravo_token, 0)
+    teller.pause(True, sender=switchboard_alpha.address)
+    boa.env.time_travel(blocks=1)
 
     source_before = alpha_token.balanceOf(simple_erc20_vault)
     target_before = alpha_token.balanceOf(target_vault)
     bob_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     assert bob_before == DEPOSIT_AMOUNT
 
-    # sally has no source position, so the second entry reverts the whole batch
+    # Bob migrates first. Sally's later housekeeping fails debt health after her
+    # collateral loses its price, reverting both users atomically.
     with pytest.raises(BoaError):
         switchboard_echo.migrateVaultPositions(
-            [
-                (bob, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-                (sally, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-            ],
+            [bob, sally], SIMPLE_VAULT_ID, target_id,
             sender=governance.address,
         )
 
@@ -535,7 +603,10 @@ def test_failed_entry_rolls_back_the_whole_echo_batch(
     assert alpha_token.balanceOf(target_vault) == target_before
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == bob_before
     assert target_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(sally, bravo_token) == DEPOSIT_AMOUNT
+    assert target_vault.getTotalAmountForUser(sally, bravo_token) == 0
     assert not ledger.getDepositLedgerData(bob, target_id).isParticipatingInVault
+    assert filter_logs(switchboard_echo, "VaultPositionMigrationExecuted") == []
 
 
 def test_batch_migrates_several_users_atomically(
@@ -550,10 +621,7 @@ def test_batch_migrates_several_users_atomically(
     teller.pause(True, sender=switchboard_alpha.address)
 
     count = switchboard_echo.migrateVaultPositions(
-        [
-            (bob, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-            (sally, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-        ],
+        [bob, sally], SIMPLE_VAULT_ID, target_id,
         sender=governance.address,
     )
     assert count == 2
@@ -563,17 +631,12 @@ def test_batch_migrates_several_users_atomically(
     assert simple_erc20_vault.getTotalAmountForUser(sally, alpha_token) == 0
 
 
-def test_same_user_twice_in_one_action_block_reverts_when_last_touch_enforced(
+def test_all_user_assets_migrate_with_one_housekeeping_call(
     teller, simple_erc20_vault, target_simple_vault, alpha_token, alpha_token_whale,
     bravo_token, bravo_token_whale, bob, setGeneralConfig, setAssetConfig,
     switchboard_alpha, switchboard_echo, governance, mission_control,
 ):
-    """Documented operational limit: at most one migration per user per action block.
-
-    Each migration runs higher-risk housekeeping, and Ledger rejects a second higher-risk
-    action for the same ordinary user in one action block. The runbook must therefore
-    deduplicate the manifest by USER, not merely by user/asset/source.
-    """
+    """All supported assets move before one per-user higher-risk housekeeping call."""
     target_vault, target_id = target_simple_vault
     setGeneralConfig()
     setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
@@ -587,21 +650,23 @@ def test_same_user_twice_in_one_action_block_reverts_when_last_touch_enforced(
     # the seeding deposits stamped bob's last touch in this block; move past them
     boa.env.time_travel(blocks=1)
 
-    with boa.reverts("one action per block"):
-        switchboard_echo.migrateVaultPositions(
-            [
-                (bob, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-                (bob, bravo_token.address, SIMPLE_VAULT_ID, target_id),
-            ],
-            sender=governance.address,
-        )
-
-    # one entry per user per block succeeds
-    boa.env.time_travel(blocks=1)
     assert switchboard_echo.migrateVaultPositions(
-        [(bob, alpha_token.address, SIMPLE_VAULT_ID, target_id)],
+        [bob], SIMPLE_VAULT_ID, target_id,
         sender=governance.address,
+    ) == 2
+    assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+    assert target_vault.getTotalAmountForUser(bob, bravo_token) == DEPOSIT_AMOUNT
+
+
+def test_duplicate_user_is_harmless_after_first_entry_migrates_all_assets(
+    teller, simple_pair, alpha_token, bob, switchboard_echo, governance,
+):
+    """A duplicate manifest user is a no-op after that user's first full migration."""
+    target_vault, target_id = simple_pair
+    assert switchboard_echo.migrateVaultPositions(
+        [bob, bob], SIMPLE_VAULT_ID, target_id, sender=governance.address
     ) == 1
+    assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
 
 
 #####################################
@@ -643,6 +708,57 @@ def test_source_participation_survives_for_a_second_asset(
     assert ledger.getDepositLedgerData(bob, SIMPLE_VAULT_ID).isParticipatingInVault
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == DEPOSIT_AMOUNT
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+
+
+def test_normal_claim_cleans_source_only_after_all_assets_migrate(
+    teller, simple_erc20_vault, target_simple_vault, alpha_token,
+    alpha_token_whale, bravo_token, bravo_token_whale, bob, setGeneralConfig,
+    setAssetConfig, setRipeRewardsConfig, switchboard_alpha, switchboard_echo,
+    ledger, ripe_token,
+):
+    """Ordinary Lootbox cleanup handles a source with multiple migrated assets."""
+    target_vault, target_id = target_simple_vault
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    setAssetConfig(bravo_token, _vaultIds=[SIMPLE_VAULT_ID])
+    setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
+    _seed_position(teller, simple_erc20_vault, alpha_token, alpha_token_whale, bob)
+    _seed_position(teller, simple_erc20_vault, bravo_token, bravo_token_whale, bob)
+    boa.env.time_travel(blocks=20)
+    teller.pause(True, sender=switchboard_alpha.address)
+
+    _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+    assert simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert simple_erc20_vault.doesUserHaveBalance(bob, bravo_token)
+
+    # A normal claim may clean the depleted asset, but the second live asset keeps the
+    # source vault in Ledger.
+    teller.pause(False, sender=switchboard_alpha.address)
+    teller.claimLoot(bob, False, sender=bob)
+    assert not simple_erc20_vault.isUserInVaultAsset(bob, alpha_token)
+    assert simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+
+    boa.env.time_travel(blocks=1)
+    setAssetConfig(bravo_token, _vaultIds=[SIMPLE_VAULT_ID, target_id])
+    teller.pause(True, sender=switchboard_alpha.address)
+    _migrate(teller, switchboard_echo, bob, bravo_token, SIMPLE_VAULT_ID, target_id)
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == 0
+    assert simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+
+    # Only after the final asset is gone does the next ordinary claim remove the
+    # remaining source registration and source Ledger entry.
+    teller.pause(False, sender=switchboard_alpha.address)
+    ripe_before = ripe_token.balanceOf(bob)
+    claimed = teller.claimLoot(bob, False, sender=bob)
+    assert ripe_token.balanceOf(bob) == ripe_before + claimed
+    assert not simple_erc20_vault.isUserInVaultAsset(bob, bravo_token)
+    assert not ledger.isParticipatingInVault(bob, SIMPLE_VAULT_ID)
+    assert ledger.isParticipatingInVault(bob, target_id)
+    assert target_vault.getTotalAmountForUser(bob, alpha_token) == DEPOSIT_AMOUNT
+    assert target_vault.getTotalAmountForUser(bob, bravo_token) == DEPOSIT_AMOUNT
 
 
 def test_untouched_source_assets_are_unchanged(
@@ -707,7 +823,7 @@ def test_migration_emits_withdrawal_deposit_and_echo_events(
     target_vault, target_id = simple_pair
 
     switchboard_echo.migrateVaultPositions(
-        [(bob, alpha_token.address, SIMPLE_VAULT_ID, target_id)],
+        [bob], SIMPLE_VAULT_ID, target_id,
         sender=governance.address,
     )
 
@@ -739,24 +855,6 @@ def test_migration_emits_withdrawal_deposit_and_echo_events(
     assert log.sourceVaultId == SIMPLE_VAULT_ID
     assert log.targetVaultId == target_id
     assert log.amount == DEPOSIT_AMOUNT
-    assert log.caller == governance.address
-
-
-def test_no_migration_event_survives_a_reverted_batch(
-    teller, simple_pair, alpha_token, bob, sally, switchboard_echo, governance,
-):
-    _, target_id = simple_pair
-
-    with pytest.raises(BoaError):
-        switchboard_echo.migrateVaultPositions(
-            [
-                (bob, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-                (sally, alpha_token.address, SIMPLE_VAULT_ID, target_id),
-            ],
-            sender=governance.address,
-        )
-
-    assert filter_logs(switchboard_echo, "VaultPositionMigrationExecuted") == []
 
 
 ######################
@@ -857,8 +955,9 @@ def test_migration_batch_gas(
     teller.pause(True, sender=switchboard_alpha.address)
     boa.env.time_travel(blocks=1)
 
-    batch = [(u, alpha_token.address, SIMPLE_VAULT_ID, target_id) for u in users]
-    count = switchboard_echo.migrateVaultPositions(batch, sender=governance.address)
+    count = switchboard_echo.migrateVaultPositions(
+        users, SIMPLE_VAULT_ID, target_id, sender=governance.address
+    )
     gas_used = switchboard_echo._computation.get_gas_used()
 
     assert count == num_users

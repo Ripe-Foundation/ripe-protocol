@@ -37,10 +37,7 @@ from ethereum.ercs import IERC20
 
 interface MissionControl:
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
-    def isStabVaultId(_vaultId: uint256) -> bool: view
-    def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface AddressRegistry:
@@ -231,102 +228,6 @@ def validateOnWithdrawal(
     assert maxWithdrawable != 0 # dev: cannot withdraw anything
 
     return min(_amount, maxWithdrawable)
-
-
-##############################
-# Vault Migration Validation #
-##############################
-
-
-# ripe gov position migration
-
-
-@view
-@external
-def validateRipeGovMigration(
-    _user: address,
-    _asset: address,
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
-) -> (address, address):
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
-    assert _sourceVaultId != _targetVaultId # dev: same vault
-
-    # validation
-    a: addys.Addys = addys._getAddys()
-    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
-    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
-
-    # get vault addresses
-    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
-    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
-    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-    assert sourceVault != targetVault # dev: same vault
-    assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
-    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
-
-    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
-
-    return sourceVault, targetVault
-
-
-# generic deposit vault position migration
-
-
-@view
-@external
-def validateVaultMigration(
-    _user: address,
-    _asset: address,
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
-    _a: addys.Addys = empty(addys.Addys),
-) -> (address, address):
-    a: addys.Addys = addys._getAddys(_a)
-
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
-    assert _sourceVaultId != _targetVaultId # dev: same vault
-
-    # validation
-    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
-    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
-
-    mc: MissionControl = MissionControl(a.missionControl)
-    assert staticcall mc.isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
-    assert staticcall mc.isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
-
-    # get vault addresses
-    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
-    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
-    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-    assert sourceVault != targetVault # dev: same vault
-    assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
-    assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
-
-    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
-
-    # the current core ripe gov vault is never an eligible endpoint.
-    coreRipeGovVaultId: uint256 = staticcall mc.coreRipeGovVaultId()
-    assert coreRipeGovVaultId != 0 # dev: invalid core ripe gov vault id
-    assert _sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
-    assert _targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
-
-    # both endpoints must share stability classification
-    isSourceStabVault: bool = staticcall mc.isStabVaultId(_sourceVaultId)
-    isTargetStabVault: bool = staticcall mc.isStabVaultId(_targetVaultId)
-    assert isSourceStabVault == isTargetStabVault # dev: stab vault mismatch
-
-    return sourceVault, targetVault
 
 
 ##############

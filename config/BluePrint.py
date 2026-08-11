@@ -625,7 +625,7 @@ ROBINHOOD_STOCK_ARTIFACT_BINDING = (
     ),
     (
         "creationSha256",
-        "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
+        "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
     ),
     (
         "runtimeTemplateSha256",
@@ -710,7 +710,7 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/vaults/SimpleErc20.vy",
             "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
             "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
+            "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
             "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
             "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
             "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",

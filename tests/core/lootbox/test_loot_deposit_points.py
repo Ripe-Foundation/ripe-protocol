@@ -4,7 +4,7 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
-def test_ripe_gov_precision_exception_follows_core_vault_pointer(
+def test_ripe_gov_precision_exception_survives_core_vault_pointer_rotation(
     alternate_ripe_gov_vault,
     registerVault,
     mission_control,
@@ -44,8 +44,9 @@ def test_ripe_gov_precision_exception_follows_core_vault_pointer(
     assert user_points.lastBalance == expected_governance_share
 
     mission_control.setCoreRipeGovVaultId(2, sender=switchboard_alpha.address)
-    noncore_user_points, _, _ = lootbox.getLatestDepositPoints(bob, core_id, ripe_token)
-    assert noncore_user_points.lastBalance == expected_governance_share // asset_points.precision
+    historical_user_points, _, _ = lootbox.getLatestDepositPoints(bob, core_id, ripe_token)
+    assert mission_control.isRipeGovVaultId(core_id)
+    assert historical_user_points.lastBalance == expected_governance_share
 
 
 def test_lootbox_deposit_point_routes_fail_closed_when_core_pointer_is_unset(
@@ -1837,7 +1838,7 @@ def test_calc_specific_loot_boundary_values(lootbox):
     ap, gp, ra, ur = lootbox.calcSpecificLoot(100_00, 1, 1, 1)
     assert ur == 1  # 100% of 1
     assert (ap, gp, ra) == (0, 0, 0)
-    
+
     # Test with maximum percentage
     ap, gp, ra, ur = lootbox.calcSpecificLoot(
         100_00,  # 100%
@@ -1847,6 +1848,23 @@ def test_calc_specific_loot_boundary_values(lootbox):
     )
     assert ur == 1000
     assert (ap, gp, ra) == (0, 0, 0)
+
+
+def test_calc_specific_loot_preserves_legacy_zero_point_reduction(lootbox):
+    # A positive public-view payout historically left points unchanged when the basis-point share
+    # was too small to reduce even one point. Internal claims use a separate progress guard.
+    assert lootbox.calcSpecificLoot(1, 9_999, 9_999, 10_000) == (
+        9_999,
+        9_999,
+        9_999,
+        1,
+    )
+    assert lootbox.calcSpecificLoot(1, 100, 100, EIGHTEEN_DECIMALS) == (
+        100,
+        100,
+        EIGHTEEN_DECIMALS - 100_000_000_000_000,
+        100_000_000_000_000,
+    )
 
 
 # reset deposit points
