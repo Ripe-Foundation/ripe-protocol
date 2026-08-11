@@ -1,5 +1,6 @@
 """DRAFT — owner approval required before integration or use."""
 
+import copy
 import json
 
 import pytest
@@ -39,6 +40,16 @@ def test_r5_manifest_is_canonical_draft_and_path_free(manifest):
         ],
         "vyper_version": profiles.PINNED_VYPER_VERSION,
     }
+
+
+def test_r5_manifest_rejects_stale_source_metadata():
+    manifest = copy.deepcopy(profiles.load_manifest())
+    manifest["source"]["transitive_compiler_input_integrity"] = "0" * 64
+    with pytest.raises(
+        profiles.LootboxProfileError,
+        match="source metadata does not match governed expectations",
+    ):
+        profiles.validate_manifest(manifest)
 
 
 def test_r5_placeholders_are_deterministic_and_unapproved(manifest):

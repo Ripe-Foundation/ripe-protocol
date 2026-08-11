@@ -196,8 +196,10 @@ Directory-scanning consumers were re-run rather than weakened:
 the retained tree; `MockSGreenPrice.vy` has none, and is kept deliberately — see
 the note below this table, which also records how this inventory was wrong twice.
 `scripts/export_abis.py` excludes `contracts/mock/` and `contracts/testing/`
-(`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the 52-output ABI census is
-unaffected either way.
+(`DEFAULT_EXCLUDE_DIRS = ("mock", "testing")`), so the historical 52-output ABI
+census at the simplification candidate was unaffected either way. The merged RH
+tree later added `DefaultsRobinhoodLive`; the current post-merge ABI census is
+53 outputs.
 
 | Mock | Retained consumers (primary) |
 | --- | --- |
@@ -334,31 +336,32 @@ committed authority that Section 0.4 says to respect.
 | Parked CCIP examples | `examples/ExampleGreenCcipBurnMintPool.vy` is read by the retained checker and pinned in the retained inventory; the other two files in that directory are its README and reference source. |
 | One-time scripts | None found without a consumer. All six `scripts/params/*.py` reports are invoked by `scripts/params/run_all.py`; `scripts/utils/log.py` is imported by `migrate.py` and the runner; `check_contract_artifacts.py`, `update_contract_artifact_expectations.py`, `export_abis.py`, and `verify_blockscout.py` are on the Section 3.4 retention list. `scripts/ledger_signing_smoke.py` has no textual consumer but is deployment-owner signing tooling protected by Section 0.5 precedence 3. |
 
-## Artifact gates: left to rh, deliberately
+## Artifact gates: post-merge remediation
 
-Three integrity checks are red on this branch. **All three are red on rh itself
-at `6260726`**, reproduced on a pristine checkout, and this PR causes none of
-them. They are left unrepaired here so the diff stays pure cleanup and artifact
-authority stays with the contract's author — particularly relevant while a
-deployment is in flight and may regenerate these files.
+The simplification PR deliberately left three pre-existing RH integrity
+failures untouched while deployment-owned artifacts were in flight. The
+follow-up repository-health remediation resolves them without changing live
+state or granting deployment authority:
 
-| Check | Condition on rh `6260726` | Owner |
+| Check | Condition inherited from RH | Follow-up resolution |
 | --- | --- | --- |
-| `scripts/export_abis.py --check` | `contracts/config/DefaultsRobinhoodLive.vy` exists with no exported ABI → `ABI_EXPORT_FAILED: missing ABI output: DefaultsRobinhoodLive.json`. Also fails `tests/deployment/test_abi_export.py::test_repository_default_abi_directory_is_byte_current`. | whoever added `DefaultsRobinhoodLive.vy` |
-| `scripts/check_contract_artifacts.py` | `MissionControl.vy` hashes `9585e6…`; `contract-artifact-expectations.json` records `37558b…` → `CONTRACT_ARTIFACTS_FAILED`. The file already carries the new *sizes*, so it was partially refreshed and the hashes left stale. | whoever landed rh `be6e4e9` |
-| `tests/deployment/test_manifest_schema.py::test_robinhood_migration_handoff_is_in_memory_typed_and_write_free` | `AttributeError: 'Migration' object has no attribute 'handoff_manifest_v2_action_result'`. Also failed at `610b43f`. | deployment owner; needs a migration-runner change, out of scope per Sections 1.2 and 6 |
+| ABI export | `DefaultsRobinhoodLive.vy` had no committed ABI and the census still expected 52 outputs. | Regenerate the committed ABI set and bind the test to all 53 current outputs. |
+| Governed contract artifacts | Source, compiler-input, creation, and runtime expectations drifted for merged contracts. | Regenerate governed expectations for Ledger, Lootbox, MissionControl, and Teller, and bind the Ledger/Lootbox profile manifests to those expectations. |
+| Migration manifest safety | The retained runner lacked the in-memory typed handoff action required by the manifest safety test. | Layer the reviewed H-06 typed handoff and fail-closed guards onto the current runner while retaining the CCIP helpers used by eight migration files. Add a call-graph regression gate for every retained `migration.<method>(...)` call. |
 
-The MissionControl mismatch is narrow: rh `be6e4e9` removed two constants and
-inlined their identical literal values, reordering three constructor
-assignments. Creation and runtime **sizes are unchanged** — a no-op refactor
-whose expectation hashes simply were not refreshed.
+The earlier red state and its baseline/candidate parity remain historical facts
+for the cleanup PR. Generated ABIs, hashes, profiles, and migration-runner code
+are repository evidence only; they do not select production constructor values,
+sign a transaction, register a contract, or authorize deployment.
 
-These repairs were briefly applied and then **reverted at the owner's
-direction** once a deployment was known to be in flight, since
-`config/contract-artifact-expectations.json` and `scripts/abis/` are exactly what
-a deployment regenerates. `config/contract-artifact-expectations.json`,
-`tests/deployment/test_abi_export.py`, and the whole of `scripts/abis/` are now
-byte-identical to rh `6260726`; the ABI census is back to rh's 52.
+An initial health-remediation commit restored the historical H-06 runner blob
+verbatim. That blob predated the August 7 CCIP additions and therefore removed
+`deploy_solidity`, `get_solidity_contract`, `get_address_on_chain`, and
+`timestamp` even though retained migrations still call them. Independent review
+caught the compatibility regression before publication. This follow-up restores
+all four methods, blocks `deploy_solidity` before any Foundry side effect when
+H-06 manifest-v2 mode is active, and binds the live migration call graph in a
+root-level lean/comprehensive test.
 
 ## Validation
 
@@ -404,19 +407,24 @@ parametrized IDs containing spaces, so six JUnit identities map onto four
 truncated terminal prefixes; those four were reconciled by prefix match rather
 than exact equality, which is weaker evidence than the lean lane's exact match.
 
-### Gates at the candidate tip
+### Gates at the candidate tip and after merge
 
-The artifact and ABI gates are red on rh itself and are left that way here; see
-**Artifact gates: left to rh** above. Every gate this cleanup is responsible for
-is green. ABI export parity (52 outputs), the
-dependency-security gate, contract artifact inventory, current-manifest
-promotion, network profiles, base profile regression, the Robinhood blueprint
-census, and the offline fork suite are all GREEN. The full table, including the
-gates carrying pre-existing failures, is in `validation-evidence.md`.
+At the historical simplification candidate, every cleanup-owned gate was green
+while the inherited artifact failures above remained red; the exact table is in
+`validation-evidence.md`. The post-merge remediation advances ABI export parity
+to 53 outputs and repairs the governed contract-artifact and in-memory migration
+handoff gates. Historical candidate counts remain historical rather than being
+silently rewritten as current results.
 
-The Python workflow was **not dispatched**. It has no push or pull-request
-trigger — it is `workflow_dispatch` only — so opening PR #77 starts no CI run and
-no CI result is claimed anywhere in this report.
+The Python workflow was **not dispatched for PR #77** because the workflow at
+that time was `workflow_dispatch` only. The post-merge remediation changes the
+workflow to run both lean and comprehensive lanes automatically for pull
+requests and for pushes to `master` or `rh`, while preserving manual
+single-lane dispatch. It checks out full history for commit-bound gates, gives
+the comprehensive lane a 180-minute limit, cancels superseded PR/branch runs,
+and adds a focused macOS job for the platform-gated H-06 promotion suite. No
+remote CI result is claimed until the remediation PR exists and GitHub actually
+runs it; macOS-local and Ubuntu CI pass/skip totals are not expected to match.
 
 ### Benchmarks (process wall time from `/usr/bin/time -p`, authoritative)
 

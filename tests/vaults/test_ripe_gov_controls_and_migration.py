@@ -1629,6 +1629,115 @@ def test_existing_target_ledger_entry_is_not_duplicated_during_migration(
     assert ledger.isParticipatingInVault(bob, target_id)
 
 
+def test_migration_at_configured_vault_limit_retains_source_until_cleanup(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    ledger,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    target, target_id = target_ripe_gov_vault
+    _prepare_teller_migration(
+        teller=teller,
+        source=ripe_gov_vault,
+        target=target,
+        target_id=target_id,
+        token=ripe_token,
+        funder=whale,
+        user=bob,
+        mission_control=mission_control,
+        setAssetConfig=setAssetConfig,
+        setGeneralConfig=setGeneralConfig,
+        switchboard_alpha=switchboard_alpha,
+    )
+    max_vaults = mission_control.genConfig().perUserMaxVaults
+    assert max_vaults == 5
+    sentinel_ids = list(range(100, 100 + max_vaults - 1))
+    for sentinel_id in sentinel_ids:
+        ledger.addVaultToUser(bob, sentinel_id, sender=teller.address)
+    assert ledger.getNumUserVaults(bob) == max_vaults
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+
+    assert _migrate_ripe_gov(
+        teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) > 0
+
+    # VaultMigrator must not forfeit unsettled source rewards merely to stay
+    # under the ordinary deposit limit. Lootbox owns terminal source cleanup.
+    assert ledger.getNumUserVaults(bob) == max_vaults + 1
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    assert ledger.isParticipatingInVault(bob, target_id)
+    for sentinel_id in sentinel_ids:
+        assert ledger.isParticipatingInVault(bob, sentinel_id)
+
+
+def test_repeated_migration_is_a_noop_for_completed_position(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    ledger,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    target, target_id = target_ripe_gov_vault
+    amount, _ = _prepare_teller_migration(
+        teller=teller,
+        source=ripe_gov_vault,
+        target=target,
+        target_id=target_id,
+        token=ripe_token,
+        funder=whale,
+        user=bob,
+        mission_control=mission_control,
+        setAssetConfig=setAssetConfig,
+        setGeneralConfig=setGeneralConfig,
+        switchboard_alpha=switchboard_alpha,
+    )
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+    assert _migrate_ripe_gov(
+        teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == amount
+
+    assert _migrate_ripe_gov(
+        teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) == 0
+
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert target.getTotalAmountForUser(bob, ripe_token) == amount
+    assert ripe_gov_vault.positionMigratedOut(bob, ripe_token)
+    assert ledger.getNumUserVaults(bob) == 2
+    assert ledger.isParticipatingInVault(bob, SOURCE_VAULT_ID)
+    assert ledger.isParticipatingInVault(bob, target_id)
+
+
 def test_migration_accepts_exact_stale_zero_target_asset_registration(
     target_ripe_gov_vault,
     ripe_gov_vault,

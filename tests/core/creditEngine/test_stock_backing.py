@@ -12,6 +12,12 @@ import pytest
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
+C2_MEASUREMENT_INTERPRETER = Path(
+    "/Users/wigglez/dev/ripe-protocol-validation-envs/"
+    "rh-wave2-py312/bin/python"
+)
+
+
 M3_BACKING_OBSERVER_SOURCE = """
 # @version 0.4.3
 
@@ -844,6 +850,10 @@ def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
         )
 
 
+@pytest.mark.skipif(
+    Path(sys.executable).resolve() != C2_MEASUREMENT_INTERPRETER,
+    reason="sealed C2 gas protocol requires the attested RH validation venv",
+)
 @pytest.mark.gas
 def test_c2_marginal_gas_protocol(
     alpha_token,
@@ -887,10 +897,7 @@ def test_c2_marginal_gas_protocol(
         "9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92"
     )
     interpreter = Path(sys.executable).resolve()
-    assert str(interpreter) == (
-        "/Users/wigglez/dev/ripe-protocol-validation-envs/"
-        "rh-wave2-py312/bin/python"
-    )
+    assert interpreter == C2_MEASUREMENT_INTERPRETER
     assert hashlib.sha256(interpreter.read_bytes()).hexdigest() == (
         "d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765"
     )

@@ -515,34 +515,31 @@ Owner-selected closure:
   appreciation can make aggregate dormant value exceed the per-pair entry
   threshold.
 
-### F-10 — Position migration cleanup is not atomic and can violate position assumptions
+### F-10 — RipeGov position migration cleanup preserves Ledger invariants
 
 **Severity:** MEDIUM-HIGH
 
-**Area:** `RipeGov`, `Ledger`, and Lootbox-mediated migration
-**Status:** Open
+**Area:** `RipeGov`, `Ledger`, and Teller-mediated migration
+**Status:** Closed in integrated `rh` source; deployment remains separately gated
 
-The migration path moves balances and zeroes the source vault balance, but the
-source vault can remain registered in the user's Ledger position list.
+The migration now proves source Ledger participation before export, proves the
+source position is empty after export, and performs atomic cleanup through a
+narrow `Ledger.removeVaultFromUserForMigration` entry point authorized only to
+the current Teller. Teller verifies the removal before proceeding.
 
-The consequences are broader than consuming one stale slot:
+Source removal occurs before the conditional target add. Therefore a user at
+the configured position limit never needs a transient extra slot: replacing a
+source with a new target preserves the count, while a pre-existing target
+reduces it by one. The target import accepts only a coherent stale-zero asset
+registration; a nonzero target position reverts. A completed migration cannot
+be replayed because the source Ledger-participation proof fails before export.
 
-- `Ledger.addVaultToUser` does not enforce the configured per-user position
-  maximum on this path.
-- Migration can leave the user beyond the intended position count.
-- Removal is restricted to Lootbox.
-- A stale target registration can block migration because the destination
-  index checks treat it as already present.
-
-Required closure:
-
-- Make source cleanup atomic and mandatory when the source balance becomes
-  zero.
-- Define behavior when the destination is already registered.
-- Enforce the position maximum or formally prove why the migration path is
-  exempt.
-- Add tests for maximum-count, stale-source, pre-existing-target, and repeated
-  migration cases.
+Focused tests cover missing-source rollback, Teller-only and Ledger-pause
+authorization, maximum-count replacement, pre-existing target participation,
+stale-zero target registration, nonzero-target rejection, and repeated
+migration failure without mutation. These source and test guarantees close the
+repository finding; they do not authorize a production transaction or relax
+the separate deployment gates.
 
 ### F-11 — Bravo special Stability Pool IDs are not type-safe
 

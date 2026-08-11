@@ -1,8 +1,9 @@
 # BasicVault consumer inventory
 
-> **4 August 2026 candidate currentness:** the shared BasicVault safety change
-> is feature-branch source only. It does not modify an immutable deployed vault,
-> integrate into `rh`, configure an asset, or activate a launch route.
+> **10 August 2026 repository currentness:** the shared BasicVault safety change
+> is integrated in the current `rh` source tree. This source state does not
+> modify an immutable deployed vault, configure an asset, or activate a launch
+> route.
 
 This is the G4 inventory rooted at feature baseline
 `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`

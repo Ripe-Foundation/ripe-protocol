@@ -164,6 +164,22 @@ def load_manifest(path: Path = MANIFEST_PATH) -> Mapping[str, Any]:
     return manifest
 
 
+def _expected_source_metadata() -> dict[str, Any]:
+    expectations = json.loads(EXPECTATIONS_PATH.read_text())["contracts"][
+        "Ledger"
+    ]
+    return {
+        "compiler_settings": expectations["compiler_settings"],
+        "effective_optimization": expectations["effective_optimization"],
+        "path": str(LEDGER_PATH.relative_to(ROOT)),
+        "sha256": expectations["source_sha256"],
+        "transitive_compiler_input_integrity": expectations[
+            "transitive_compiler_input_integrity"
+        ],
+        "vyper_version": PINNED_VYPER_VERSION,
+    }
+
+
 def validate_robinhood_source(source: str) -> str:
     try:
         normalized = to_checksum_address(source)
@@ -185,6 +201,10 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
         raise ProfileGateError("missing draft status")
     if manifest.get("profile") != "robinhood":
         raise ProfileGateError("not the Robinhood Ledger profile")
+    if manifest.get("source") != _expected_source_metadata():
+        raise ProfileGateError(
+            "profile source metadata does not match governed expectations"
+        )
 
     constructor = manifest.get("constructor", {})
     source = validate_robinhood_source(

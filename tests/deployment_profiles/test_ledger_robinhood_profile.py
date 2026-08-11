@@ -26,12 +26,12 @@ L3B_MANIFEST_MUTATION_SHA256 = {
 }
 L3B_SOURCE_MUTATION_SHA256 = {
     "immutable_readback": (
-        "03c63ca6744e62024fe7ffaa573110554f"
-        "c68f08513cf505afd4dd05cea48785"
+        "6e044f13cc1111829c047a73a73f9a8f"
+        "fe4711c3dab814af3d90bc664e745bc1"
     ),
     "post_deploy_assertions": (
-        "9fd01fe6ee51b2f15162670761516e227"
-        "f6b5fcfce38b837366e6c0e87e6dd6d"
+        "477f615580e98b12a79601d0e5d5bd68"
+        "afe2b5a6e3c3bdae0167fcf3ca088beb"
     ),
 }
 
@@ -100,6 +100,16 @@ def test_r1_manifest_is_canonical_draft_with_deterministic_placeholders():
             label
         )
         assert entry["approval_status"] == "unapproved_placeholder"
+
+
+def test_r1_manifest_rejects_stale_source_metadata():
+    manifest = copy.deepcopy(profile.load_manifest())
+    manifest["source"]["sha256"] = "0" * 64
+    with pytest.raises(
+        profile.ProfileGateError,
+        match="source metadata does not match governed expectations",
+    ):
+        profile.validate_manifest(manifest)
 
 
 def test_r1_compiles_reviewed_ledger_with_pinned_source_owned_settings():

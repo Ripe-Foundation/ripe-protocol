@@ -1008,7 +1008,7 @@ def test_credit_redemption_price_oracle_issues(
     mock_price_source.setPrice(alpha_token, 0)
 
     # Should fail due to price calculation issues
-    with boa.reverts("no redemptions occurred"):
+    with boa.reverts("has price config, no price"):
         redeem_collateral(teller, bob, vault_id, alpha_token, green_amount, sender=alice)
 
 

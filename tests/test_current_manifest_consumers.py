@@ -26,15 +26,16 @@ below: the modes distinguish an address-only read from a `load_partial`, and the
 defaults come from `scripts.ccip_send.cli` itself.
 
 These tests are offline: they read committed JSON and touch no network, RPC, or
-private key. They live at `tests/` root rather than `tests/deployment/` for one
-reason — `pytest.ini` passes `--ignore=tests/deployment`, and the automatic pull
-request workflow runs only the lean lane, so a guard placed there would never run
-in CI. Numbered step manifests are deliberately not required; only the current
-manifest of each supported chain/environment pair.
+private key. They live at `tests/` root rather than `tests/deployment/` because
+`pytest.ini` passes `--ignore=tests/deployment`; root placement keeps the guard
+in the lean lane as well as the comprehensive lane. Numbered step manifests are
+deliberately not required; only the current manifest of each supported
+chain/environment pair.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import warnings
 from pathlib import Path
@@ -43,6 +44,7 @@ from unittest import mock
 import boa
 import pytest
 from eth_utils import is_address
+from scripts.utils.migration import Migration
 
 # Methods `scripts/ccip_send.py` calls on the token it resolves: `balanceOf` at
 # the balance check and `approve` before the router send. A record can name a
@@ -53,6 +55,32 @@ CCIP_SEND_TOKEN_METHODS = ("balanceOf", "approve")
 
 ROOT = Path(__file__).resolve().parents[1]
 HISTORY = ROOT / "migration_history"
+MIGRATIONS = ROOT / "migrations"
+
+CCIP_RUNNER_CONSUMERS = {
+    "deploy_solidity": {
+        "migrations/base-mainnet/2026080700_CcipPools.py",
+        "migrations/base-sepolia/0001_CcipPool.py",
+        "migrations/robinhood-mainnet/2026080700_CcipPools.py",
+        "migrations/robinhood-testnet/0001_CcipPool.py",
+    },
+    "get_address_on_chain": {
+        "migrations/base-mainnet/2026080701_CcipWire.py",
+        "migrations/base-sepolia/0002_CcipWire.py",
+        "migrations/robinhood-mainnet/2026080701_CcipWire.py",
+        "migrations/robinhood-testnet/0002_CcipWire.py",
+    },
+    "get_solidity_contract": {
+        "migrations/base-mainnet/2026080701_CcipWire.py",
+        "migrations/base-sepolia/0002_CcipWire.py",
+        "migrations/robinhood-mainnet/2026080701_CcipWire.py",
+        "migrations/robinhood-testnet/0002_CcipWire.py",
+    },
+    "timestamp": {
+        "migrations/base-sepolia/0002_CcipWire.py",
+        "migrations/robinhood-testnet/0002_CcipWire.py",
+    },
+}
 
 # How a consumer reads a record, which is what decides the record's obligations.
 #
@@ -115,6 +143,20 @@ def _ccip_send_module():
         import scripts.ccip_send as module
 
     return module
+
+
+def _migration_runner_calls(path):
+    calls = set()
+    tree = ast.parse(path.read_bytes(), filename=str(path))
+    for node in ast.walk(tree):
+        function = node.func if isinstance(node, ast.Call) else None
+        if (
+            isinstance(function, ast.Attribute)
+            and isinstance(function.value, ast.Name)
+            and function.value.id == "migration"
+        ):
+            calls.add(function.attr)
+    return calls
 
 
 def _ccip_send_option_default(name):
@@ -281,3 +323,27 @@ def test_every_committed_current_manifest_is_declared_here():
         f"committed current manifests {sorted(on_disk)} do not match the "
         f"declared set {sorted(REQUIRED_CURRENT_MANIFESTS)}"
     )
+
+
+def test_every_retained_migration_runner_call_resolves_to_a_callable_method():
+    consumers = {}
+    for path in sorted(MIGRATIONS.rglob("*.py")):
+        relative = path.relative_to(ROOT).as_posix()
+        for method in _migration_runner_calls(path):
+            consumers.setdefault(method, set()).add(relative)
+
+    missing = sorted(
+        method
+        for method in consumers
+        if not callable(getattr(Migration, method, None))
+    )
+    assert not missing, (
+        "retained migrations call methods missing from scripts.utils.migration."
+        f"Migration: {missing}"
+    )
+
+    for method, expected_paths in CCIP_RUNNER_CONSUMERS.items():
+        assert consumers.get(method) == expected_paths, (
+            f"{method} consumer census changed; update the runner and this "
+            "explicit recovery-path inventory together"
+        )

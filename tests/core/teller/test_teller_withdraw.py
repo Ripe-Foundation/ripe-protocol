@@ -53,6 +53,10 @@ def _set_withdraw_many_child_identity(child_identity):
     boa.env.set_storage(ARB_SYS, 0, child_identity)
 
 
+def _repr_without_storage(contract):
+    return f"<{contract.compiler_data.contract_path} at {contract.address}>"
+
+
 def test_teller_basic_withdraw(
     simple_erc20_vault,
     alpha_token,
@@ -432,6 +436,7 @@ def test_withdraw_many_arb_sys_rejects_second_same_action_block(
     ripe_hq_deploy,
     defaults,
     governance,
+    monkeypatch,
 ):
     arb_ledger = _replace_ledger_with_arb_source(
         ripe_hq_deploy,
@@ -493,8 +498,14 @@ def test_withdraw_many_arb_sys_rejects_second_same_action_block(
             vault_id,
         ),
     ]
-    with boa.reverts():
-        teller.withdrawMany(bob, second_withdrawals, sender=bob)
+    # Titanoboa 0.2.7 can retain an incompatible storage model for a reused
+    # address in the aggregate suite, then crash while formatting the expected
+    # child revert. Suppress storage rendering only around this diagnostic
+    # path; execution and exact revert matching remain unchanged.
+    with monkeypatch.context() as patch:
+        patch.setattr(type(teller), "__repr__", _repr_without_storage)
+        with boa.reverts("one action per block"):
+            teller.withdrawMany(bob, second_withdrawals, sender=bob)
     after = (
         simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
         simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),

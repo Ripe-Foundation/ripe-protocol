@@ -68,7 +68,7 @@ shared ERC-20 modules alter their transitive compiled artifacts:
 | `contracts/data/Ledger.vy` | [`ledger.md`](ledger.md) | `590341e3f9091105036c1cc497bd862ea3769248` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` | 26,492 | Immutable native/ArbSys action-block selection |
 | `contracts/core/Lootbox.vy` | [`lootbox.md`](lootbox.md) | `12d7b6afcc660bc502ad749b7d624fe8f38ab0cb` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | 47,731 | Per-deployment immutable Underscore interval floor |
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
-| `contracts/tokens/modules/Erc20Token.vy` | [`erc20-token.md`](erc20-token.md) | `f00e5655567612e3f8c95182de75701424eeea2b` | `54ffb5d2dcdf5dd2c5990e0bcd3a67b0ebcbae32b8dc3ef6c00d2e84ea447af7` | 17,435 | Adds governance-backed `getCCIPAdmin()` discovery to GREEN, RIPE, and sGREEN compiler outputs; owner authorization is unresolved, committed ABIs are stale, direct tests are missing, and the final LF was removed |
+| `contracts/tokens/modules/Erc20Token.vy` | [`erc20-token.md`](erc20-token.md) | `e9ec81672ed5ea973487d3ae44a633c13b06b572` | `6593a28f791f9e6b3fdaf0ff14abd7379894833d62026a9092237de7033398c1` | 17,668 | Adds governance-backed `getCCIPAdmin()` discovery to GREEN, RIPE, and sGREEN compiler outputs; deterministic ABIs and direct behavior tests are current, while owner authorization, Base live-version policy, and the missing final LF remain unresolved |
 
 All rows other than Teller record integrated source facts. The Teller row is
 the uncommitted review candidate described above. No row proves that the
@@ -121,37 +121,39 @@ and release remain separate.
 
 ## Relevant current artifact identities
 
-The Teller candidate was freshly compiled and passed the central artifact
-checker. Other rows preserve the previously recorded artifact evidence; the
-complete nine-contract checker was not rerun for this review candidate.
+The repository-health remediation reran the complete central artifact checker.
+These are the authoritative values in
+[`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json):
 
-| Contract | Runtime-template bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
-| --- | ---: | ---: | --- | --- |
-| AuctionHouse | 24,453 | 123 | `cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
-| CreditEngine | 24,151 | 425 | `082c3f6c124447a43bcd4835237c134864ba3036f9a8d190ef6b16ac6e8e3696` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
-| Deleverage | 24,473 | 103 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
-| DefaultsRobinhood | 2,687 | 21,889 | `aede1fc73290eeb071e1b67a7c7b367dbec0536e406391a03f12275663370d99` | `a2b3232606060b9b296666a2cfbc6a328c2b92897ac6e1dcf9f82920a449bddb` |
-| SimpleErc20 | 9,368 | 15,208 | `750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6` | `cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57` |
-| StabilityPool | 23,960 | 616 | `2417f094a3ae75fb4c6c9d742b8fbaafadb977a04d7d3485cb2a4e27206d3a58` | `16267810e14746f1091d6343187ffff1b2144fb90aa0dfe150add68515cd146f` |
-| Ledger | 13,125 | 11,451 | `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7` | `69f5e1c1cccf0f8bfbfa0cae30879635bca241d40af1e95615026b264658fb32` |
-| Lootbox | 21,569 | 3,007 | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
-| SwitchboardDelta | 23,102 | 1,474 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
-| Teller | 24,082 | 494 | `76abbbfc443f0e7ff84d9800df0145858344096d4342e9a9e3941887f2055502` | `319169528ec22722c7f912a0f93d3a0560feb17c2d6349770c17a643e1f00e20` |
-| BlueChipYieldPrices | 22,054 | 2,522 | `84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578` | `d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73` |
-| UniswapV2Prices | 13,669 | 10,907 | `2dc8fa0469958bc4d829be6b10ede1210152dacfa3e2c95a847250cb286677d8` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
-| Erc20Token module | 6,767 | 17,809 | `d13a59c2961a981a444ce6defd59a2d4c4d0a0b079f5cb322dc2c4fc2715c7fb` | `49c87121ab8eec9d6472e7e7401e54d78bf47022d54346ae1020dce01f546f39` |
-| GreenToken | 7,085 | 17,491 | `74f3f1c818d951f6c5c2e755e0b1667f3f1b13f91cc483da7923809bb7038f16` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
-| RipeToken | 7,085 | 17,491 | `0338e28a3787286430139234127c9953945bca3fd7d4084cbd19fdfc62943962` | `5b399bea8005b337b822e7d7b00b165650d6b4e9af1d170b29878870d0a152e2` |
-| SavingsGreen | 10,602 | 13,974 | `214218d00cc1cce8fa32160769e73c686c532bc13790f42ad4a4f83c14e6fc92` | `9234529ab0fc8a20a1b78ff1c1609a43629f5f6fd756debbe89b6606031f19cd` |
+| Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| AuctionHouse | 24,460 | 116 | 24,556 | 20 | `4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,296 | 280 | 24,392 | 184 | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| DefaultsRobinhood | 2,474 | 22,102 | 2,698 | 21,878 | `b424af2dc57a90b7332aab302df9acfbb716f91e6a11f31446ea109f3ac075c9` | `6878e6b5bd5b34906a96ac60e03df7db322dc01d546de6385ec6a70fc9fae1a2` |
+| Deleverage | 24,473 | 103 | 24,569 | 7 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
+| Ledger | 13,264 | 11,312 | 13,392 | 11,184 | `fe65aaa826003b14518824bf6219b33cde311db63687a9b9c23baf7fb4708380` | `0a10ba343608af86094ef62417285e32e3abe6a976bdf63590706310e9771f34` |
+| Lootbox | 21,995 | 2,581 | 22,123 | 2,453 | `1b1a969fedeaa4d430d4fa81bd6cde2bfb937239dde48ce39e7e24052d8884f4` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` |
+| MissionControl | 15,902 | 8,674 | 15,998 | 8,578 | `d1fe5a9af241b8cfc601d5af8589c056d339283598005c92889954f0756897fb` | `fb07a0bb2b5fdcfdd5fcca7980f13d67ce7d37b26ecdffcd206c88ef12f4e9c3` |
+| RipeGov | 24,480 | 96 | 24,512 | 64 | `8ab834360cec9d4d8e7d939fd624829eae83b8e1ee3dbfb99227d21f259b2f3e` | `9c54e3cec9e471e776e16f1f6454ec27c23d8b319281d8ee0b792931c4e22137` |
+| SimpleErc20 | 9,368 | 15,208 | 9,400 | 15,176 | `750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6` | `cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57` |
+| StabilityPool | 24,275 | 301 | 24,371 | 205 | `d47f9d2c92cbac07fb7ed6e86b4c55cfab09bc19d3de8bc717e5b99d58955361` | `8086009513c4557dc8a12fec7829c0f3782693001ebc7d21dddab2944084812a` |
+| SwitchboardBravo | 22,922 | 1,654 | 23,082 | 1,494 | `d7af2f3f3adf8ddc1088f19bc7295e07b058eee18420eb6f227ce4912c1da65f` | `8a30c7b4483192513051c1162f235d02549e708aab4173d79597609ffab39202` |
+| SwitchboardDelta | 23,102 | 1,474 | 23,262 | 1,314 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
+| Teller | 24,151 | 425 | 24,247 | 329 | `21d15c2b77d9f513cb8a0957daa42910150ba5661883913ea8bbf4a9ec6343d1` | `9cca03351cd8ead87160401be263732376fb4ab7d4913b0d59ce6ad271e4dabb` |
+| UniswapV2Prices | 13,866 | 10,710 | 14,122 | 10,454 | `8a54a6b8ac9c746a43e59a06d10dcf4a7454996a0adaa1b8be3021c31a207a88` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
 
 Runtime templates with constructor-bound immutables are compiler artifacts,
 not final deployed-runtime identities.
 
-The repository-wide deterministic ABI export check is not green: the committed
-`Erc20Token.json`, `GreenToken.json`, `RipeToken.json`, and `SavingsGreen.json`
-files omit `getCCIPAdmin()`. The source commit added no direct test for the new
-selector. The green central artifact gate does not cover those token artifacts;
-see [`erc20-token.md`](erc20-token.md) for exact expected and committed hashes.
+The tightest EIP-170 margins are therefore the constructor-bound deployed
+values: Deleverage has 7 bytes, AuctionHouse 20, RipeGov 64, and CreditEngine
+184 under its exact owner-granted waiver. The corresponding 103-, 116-, 96-,
+and 280-byte values are runtime-template margins and must not be described as
+the final deployed headroom.
+
+The health remediation also regenerated all 53 committed ABI outputs. The
+repository-wide deterministic ABI export check now covers the token artifacts,
+including `getCCIPAdmin()`.
 
 ## Supporting and test-only Vyper delta
 
@@ -202,14 +204,28 @@ dated exact-hash review evidence rather than a fresh current compilation.
 ## Automated enforcement boundary
 
 The repository currently contains one GitHub Actions workflow:
-[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). It runs the
-lean or comprehensive pytest lane on manual dispatch only; it has no push or
-pull-request trigger. It does not run the central artifact checker, block-clock
-inventory, Defaults generator, deterministic ABI export check, or any Solidity
-build/test package as a required check. The red four-file token ABI discrepancy
-and the Solidity reference gaps therefore have no repository CI enforcement.
-Every validation result in this directory is explicit audit evidence, not a
-continuously enforced gate.
+[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). Pull
+requests, plus pushes to `master` or `rh`, run both lean and comprehensive
+pytest lanes on exact Python 3.12.0; manual dispatch can select either lane.
+Checkout is full-history because release, M4, and manifest gates bind historical
+commits. Superseded runs are cancelled by pull-request number or branch ref,
+while manual lane selections remain separate. Jobs use task-private
+pytest/cache roots, verify the resolved environment with `pip check`, and
+preserve deterministic hashing. The comprehensive lane has a 180-minute limit
+and collects the repository's artifact, release, fuzz, gas, and offline fork
+gates in addition to the default suite.
+
+The Ubuntu comprehensive job intentionally skips the macOS/APFS-only H-06
+publication tests. A separate `manifest-promotion-macos` job runs
+`tests/deployment/test_current_manifest_promotion.py` on `macos-latest`,
+including both multiprocessing cleanup regressions. Local macOS comprehensive
+totals and Ubuntu CI totals are therefore platform-specific and must not be
+presented as identical expected counts.
+
+This makes repository CI execution automatic, but GitHub branch-protection and
+required-check policy remain external controls and must be configured on the
+repository. No workflow run proves a deployment, live-chain binding, Solidity
+production package, or owner release decision.
 
 The former `rh-handoff-dashboard.yml` workflow and the dashboard application it
 built were extracted from the active tree; both remain recoverable from

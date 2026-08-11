@@ -5058,3 +5058,12 @@ GitHub or Dependabot alert is closed, dismissed, resolved, or otherwise
 changed. No authenticated alert-state query was required or performed. Any
 future alert-state statement requires separate authority and fresh
 authenticated evidence.
+
+### Post-retirement CCIP CLI surface review
+
+`scripts/ccip_send.py` uses Click only for a bounded command and option
+declaration surface. It does not import, reference, or invoke `click.edit`,
+wildcard Click imports, or shell execution. The reachability gate therefore
+includes it in the reviewed CLI allowlist while continuing to reject the
+editor surface. This defense-in-depth update does not reopen the retired Click
+exception.

@@ -1254,6 +1254,10 @@ def test_robinhood_migration_handoff_is_in_memory_typed_and_write_free(
         ManifestError, match="H06_LEGACY_EXECUTION_FORBIDDEN"
     ):
         migration.execute(lambda: None)
+    with pytest.raises(
+        ManifestError, match="H06_LEGACY_EXECUTION_FORBIDDEN"
+    ):
+        migration.deploy_solidity("ForbiddenBeforeFoundry")
     assert not history.exists()
 
 
