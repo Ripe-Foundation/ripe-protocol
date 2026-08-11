@@ -1,0 +1,2364 @@
+{
+  "compiler": {
+    "artifact_recipe": "vyper -p . -f bytecode,bytecode_runtime <file>",
+    "integrity_recipe": "vyper -p . -f integrity <file>",
+    "optimization_rule": "source pragma when present; Vyper default gas otherwise; no -O override",
+    "version": "0.4.3+commit.bff19ea2"
+  },
+  "contracts": {
+    "AuctionHouse": {
+      "abi": {
+        "canonical_sha256": "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
+        "committed_file_sha256": "97b39517f9b527e4bcdf9dc50b4f418d4036367e5f3f4d62a0ffdd68d29ee276",
+        "committed_path": "scripts/abis/AuctionHouse.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "9ee087039c3002890cdaa0ea24f7c6326f38adc0824cf6ee07836ed3b1a2dac8",
+        "creation_executable_prefix_size": 24584,
+        "creation_metadata_sha256": "a9947d43b71c20935811d949d4c3439b9302335a23acda57c6b784c6ded7c032",
+        "creation_metadata_size": 59,
+        "creation_sha256": "860e58dc7cc7242e1311efd33c58a273640417790084bcf1c7c0fbda98a6482d",
+        "creation_size": 24643,
+        "deployed_eip170_headroom": 20,
+        "deployed_runtime_size": 24556,
+        "eip170_headroom": 116,
+        "runtime_template_sha256": "4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf",
+        "runtime_template_size": 24460
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "0a38c831994ffd4f25ee300fbba93152dbc996085da6d4e35f87ad5f6de9a1dd",
+        "count": 7
+      },
+      "selectors": {
+        "canonical_sha256": "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
+        "count": 28
+      },
+      "source_git_blob": "1317483e5abf1980c852efab628f1c766c45f421",
+      "source_path": "contracts/core/AuctionHouse.vy",
+      "source_sha256": "d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f",
+      "storage_layout": {
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "assetLiqConfig": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "HashMap[address, AssetLiqConfig]"
+        },
+        "didHandleLiqAsset": {
+          "n_slots": 1,
+          "slot": 3,
+          "type": "HashMap[address, HashMap[uint256, HashMap[address, bool]]]"
+        },
+        "didHandleVaultId": {
+          "n_slots": 1,
+          "slot": 4,
+          "type": "HashMap[address, HashMap[uint256, bool]]"
+        },
+        "numUserAssetsForAuction": {
+          "n_slots": 1,
+          "slot": 5,
+          "type": "HashMap[address, uint256]"
+        },
+        "userAssetForAuction": {
+          "n_slots": 1,
+          "slot": 6,
+          "type": "HashMap[address, HashMap[uint256, VaultData]]"
+        },
+        "vaultAddrs": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "HashMap[uint256, address]"
+        }
+      },
+      "transitive_compiler_input_integrity": "42a7c049a1bbd548f06ebb09b5d298c41dcd41e1e48af6256b9abeabe085e8a7"
+    },
+    "CreditEngine": {
+      "abi": {
+        "canonical_sha256": "1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24",
+        "committed_file_sha256": "3fda93ab4569e9bf4da3f628b97228b44e2f37575486dc014fc9cf6a0cc5414e",
+        "committed_path": "scripts/abis/CreditEngine.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "a342bd815a21d604b0df8f8cd758f3a6fa0399026d89d200b8f2a3f45e2c627e",
+        "creation_executable_prefix_size": 24430,
+        "creation_metadata_sha256": "cefe11ac97caacfe59160290c7dd89ca1bc677d90dd5fbcaea4a681265c9d1f5",
+        "creation_metadata_size": 70,
+        "creation_sha256": "83654b62d2327af13b225afb9f2413e6483559bac1e72aff7ccdf6ccdd016982",
+        "creation_size": 24500,
+        "deployed_eip170_headroom": 184,
+        "deployed_runtime_size": 24392,
+        "eip170_headroom": 280,
+        "runtime_template_sha256": "e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943",
+        "runtime_template_size": 24296
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "ec7065e372f9482ed13689519ee9057dfa620ee91b70a34b4c1bfc92e8e35e56",
+        "count": 6
+      },
+      "selectors": {
+        "canonical_sha256": "4fd29412b11eab9b8406f18f7209bb4022902293893e17c6cf1f0429735a4c38",
+        "count": 51
+      },
+      "source_git_blob": "800cc44bcb13439f5007d79143e545b4c3357014",
+      "source_path": "contracts/core/CreditEngine.vy",
+      "source_sha256": "d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43",
+      "storage_layout": {
+        "buybackRatio": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "uint256"
+        },
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        },
+        "undyVaulDiscount": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "uint256"
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "e505f043c37ef69cf99b3339435e39925ec42ffd798203ef9849e026cc13c5f9"
+    },
+    "DefaultsRobinhood": {
+      "abi": {
+        "canonical_sha256": "6878e6b5bd5b34906a96ac60e03df7db322dc01d546de6385ec6a70fc9fae1a2",
+        "committed_file_sha256": "5f06b45de81e79b4eadc81de26e3c5c46fd137094e828847b03b8fd376898ce8",
+        "committed_path": "scripts/abis/DefaultsRobinhood.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "89929f1006efe0f5b7176d7e23b2180d62ffdd2465c712cd5d14c49b52fb55cb",
+        "creation_executable_prefix_size": 2696,
+        "creation_metadata_sha256": "d0ace4317ccc7cbea895d2288b08945b9bbad81883cd105800708b6ca0ccf98c",
+        "creation_metadata_size": 56,
+        "creation_sha256": "ceb194547c1c4541ead59ed3bd9d8e9f7123cf58d648155b2183c52dfcc31bf1",
+        "creation_size": 2752,
+        "deployed_eip170_headroom": 21878,
+        "deployed_runtime_size": 2698,
+        "eip170_headroom": 22102,
+        "runtime_template_sha256": "b424af2dc57a90b7332aab302df9acfbb716f91e6a11f31446ea109f3ac075c9",
+        "runtime_template_size": 2474
+      },
+      "code_layout": {
+        "CONTRIB_TEMPLATE": {
+          "length": 32,
+          "offset": 0,
+          "type": "address"
+        },
+        "GREEN_TOKEN": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
+        },
+        "RIPE_TOKEN": {
+          "length": 32,
+          "offset": 64,
+          "type": "address"
+        },
+        "SGREEN_TOKEN": {
+          "length": 32,
+          "offset": 128,
+          "type": "address"
+        },
+        "TRAINING_WHEELS": {
+          "length": 32,
+          "offset": 32,
+          "type": "address"
+        },
+        "USDG_TOKEN": {
+          "length": 32,
+          "offset": 160,
+          "type": "address"
+        },
+        "WETH_TOKEN": {
+          "length": 32,
+          "offset": 192,
+          "type": "address"
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_contribTemplate",
+              "type": "address"
+            },
+            {
+              "name": "_trainingWheels",
+              "type": "address"
+            },
+            {
+              "name": "_ripeToken",
+              "type": "address"
+            },
+            {
+              "name": "_greenToken",
+              "type": "address"
+            },
+            {
+              "name": "_sgreenToken",
+              "type": "address"
+            },
+            {
+              "name": "_usdgToken",
+              "type": "address"
+            },
+            {
+              "name": "_wethToken",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "count": 0
+      },
+      "selectors": {
+        "canonical_sha256": "47a9316a506fe7fc4d50d878451f93bd629152c603a110085e06fbf0c7a3e28a",
+        "count": 17
+      },
+      "source_git_blob": "bccedd7aa7aaec426b1d9f9bed2d64f51ff51f59",
+      "source_path": "contracts/config/DefaultsRobinhood.vy",
+      "source_sha256": "8318961baa851c44fda6f09d59a636a024056167e647fc78760b27cf83317de7",
+      "storage_layout": {},
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "639e929e1991503a5756be3c75bedcff06813ab58bea0a3e14d88ca8879d285e"
+    },
+    "Deleverage": {
+      "abi": {
+        "canonical_sha256": "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
+        "committed_file_sha256": "d0480bf6b0d7d05c461b33b31dd0e85b48135fa66d850a4c8526e0d9fefaea8d",
+        "committed_path": "scripts/abis/Deleverage.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "26ff82b5e245dbcc146adc36452a4352581c81d04820d95194fe58611d49e219",
+        "creation_executable_prefix_size": 24833,
+        "creation_metadata_sha256": "90f8a41eb2c46c456353bd24a50e2a8a1a9d9c35022b93fcb8d1aa6c51a6e8e8",
+        "creation_metadata_size": 61,
+        "creation_sha256": "434f2475eb7a20ae27c1ae4dd80948706b3d7078bf0f736fa0d7fae8a01b376b",
+        "creation_size": 24894,
+        "deployed_eip170_headroom": 7,
+        "deployed_runtime_size": 24569,
+        "eip170_headroom": 103,
+        "runtime_template_sha256": "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
+        "runtime_template_size": 24473
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_minDeleverageBps",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageBuffer",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageCooldown",
+              "type": "uint256"
+            },
+            {
+              "name": "_underscoreSafeSpreadBps",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageFullPayoffBuffer",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageOverageBps",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageDustThreshold",
+              "type": "uint256"
+            },
+            {
+              "name": "_deleverageDustBps",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "53aa3231c6be94da3846b30f735e2b71483ada71ef5f3ce57a77c42ef36aa62b",
+        "count": 12
+      },
+      "selectors": {
+        "canonical_sha256": "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
+        "count": 34
+      },
+      "source_git_blob": "b43d373039b352d6eab240be714134764901b947",
+      "source_path": "contracts/core/Deleverage.vy",
+      "source_sha256": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
+      "storage_layout": {
+        "deleverageBuffer": {
+          "n_slots": 1,
+          "slot": 3,
+          "type": "uint256"
+        },
+        "deleverageCooldown": {
+          "n_slots": 1,
+          "slot": 4,
+          "type": "uint256"
+        },
+        "deleverageDustBps": {
+          "n_slots": 1,
+          "slot": 9,
+          "type": "uint256"
+        },
+        "deleverageDustThreshold": {
+          "n_slots": 1,
+          "slot": 8,
+          "type": "uint256"
+        },
+        "deleverageFullPayoffBuffer": {
+          "n_slots": 1,
+          "slot": 6,
+          "type": "uint256"
+        },
+        "deleverageOverageBps": {
+          "n_slots": 1,
+          "slot": 7,
+          "type": "uint256"
+        },
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        },
+        "lastDeleverageBlock": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "HashMap[address, uint256]"
+        },
+        "minDeleverageBps": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "uint256"
+        },
+        "underscoreSafeSpreadBps": {
+          "n_slots": 1,
+          "slot": 5,
+          "type": "uint256"
+        }
+      },
+      "transient_storage_layout": {
+        "assetLiqConfig": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "HashMap[address, AssetLiqConfig]"
+        },
+        "didHandleAsset": {
+          "n_slots": 1,
+          "slot": 3,
+          "type": "HashMap[address, HashMap[uint256, HashMap[address, bool]]]"
+        },
+        "didHandleVaultId": {
+          "n_slots": 1,
+          "slot": 4,
+          "type": "HashMap[address, HashMap[uint256, bool]]"
+        },
+        "underscoreVaultRegistry": {
+          "n_slots": 1,
+          "slot": 5,
+          "type": "HashMap[address, address]"
+        },
+        "vaultAddrs": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "HashMap[uint256, address]"
+        }
+      },
+      "transitive_compiler_input_integrity": "a6a0aa9c99a1ab5effb4ebff707b1ddb017b8a3396c2e64620f91d54a6e06438"
+    },
+    "Ledger": {
+      "abi": {
+        "canonical_sha256": "2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c",
+        "committed_file_sha256": "d5dc29b53051f37a56a1e92b6787ef286f97f764ca06d7d2b5ed96a8057b8f33",
+        "committed_path": "scripts/abis/Ledger.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "f6bc1a1a8e128b9df3122e46940ea8256f5321d38de881f08f9866da3c5bb15d",
+        "creation_executable_prefix_size": 13541,
+        "creation_metadata_sha256": "3fd46a9bce041b372c03fec9f94c72a2c048335027814fa448f1930a327d7a22",
+        "creation_metadata_size": 56,
+        "creation_sha256": "516c111fe8d220eb79a4f3a0cc7e1915c43510b8a0ab6651882309cef896f0aa",
+        "creation_size": 13597,
+        "deployed_eip170_headroom": 11270,
+        "deployed_runtime_size": 13306,
+        "eip170_headroom": 11398,
+        "runtime_template_sha256": "913b4299ce27692de499c022acd9d2dbf361563cda0e7763607879df402eefa9",
+        "runtime_template_size": 13178
+      },
+      "code_layout": {
+        "ACTION_BLOCK_SOURCE": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_defaults",
+              "type": "address"
+            },
+            {
+              "name": "_actionBlockSource",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "0173a8c1b1923a31dea9b5c4805796b7df11106a20e21a34be4040d47628d05e",
+        "count": 2
+      },
+      "selectors": {
+        "canonical_sha256": "ed7e0f1f8783723901b4aae63587a7d5f92b0bcb52dd17ac9f501e84c115878a",
+        "count": 90
+      },
+      "source_git_blob": "ec345579b350de3bda04686e656ef936c331873f",
+      "source_path": "contracts/data/Ledger.vy",
+      "source_sha256": "c98c748511a26da7a7e7cc9ae158db008e4c95fca18d393232081188ed1ef5a6",
+      "storage_layout": {
+        "assetDepositPoints": {
+          "n_slots": 1,
+          "slot": 25,
+          "type": "HashMap[uint256, HashMap[address, AssetDepositPoints]]"
+        },
+        "badDebt": {
+          "n_slots": 1,
+          "slot": 43,
+          "type": "uint256"
+        },
+        "borrowIntervals": {
+          "n_slots": 1,
+          "slot": 11,
+          "type": "HashMap[address, IntervalBorrow]"
+        },
+        "borrowers": {
+          "n_slots": 1,
+          "slot": 8,
+          "type": "HashMap[uint256, address]"
+        },
+        "contributors": {
+          "n_slots": 1,
+          "slot": 38,
+          "type": "HashMap[uint256, address]"
+        },
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        },
+        "epochEnd": {
+          "n_slots": 1,
+          "slot": 42,
+          "type": "uint256"
+        },
+        "epochStart": {
+          "n_slots": 1,
+          "slot": 41,
+          "type": "uint256"
+        },
+        "fungLiqUsers": {
+          "n_slots": 1,
+          "slot": 34,
+          "type": "HashMap[uint256, address]"
+        },
+        "fungibleAuctionIndex": {
+          "n_slots": 1,
+          "slot": 32,
+          "type": "HashMap[address, HashMap[uint256, HashMap[address, uint256]]]"
+        },
+        "fungibleAuctions": {
+          "n_slots": 1,
+          "slot": 31,
+          "type": "HashMap[address, HashMap[uint256, FungibleAuction]]"
+        },
+        "globalBorrowPoints": {
+          "n_slots": 3,
+          "slot": 28,
+          "type": "BorrowPoints"
+        },
+        "globalDepositPoints": {
+          "n_slots": 5,
+          "slot": 20,
+          "type": "GlobalDepositPoints"
+        },
+        "greenPoolDebt": {
+          "n_slots": 1,
+          "slot": 47,
+          "type": "HashMap[address, uint256]"
+        },
+        "indexOfBorrower": {
+          "n_slots": 1,
+          "slot": 9,
+          "type": "HashMap[address, uint256]"
+        },
+        "indexOfContributor": {
+          "n_slots": 1,
+          "slot": 39,
+          "type": "HashMap[address, uint256]"
+        },
+        "indexOfFungLiqUser": {
+          "n_slots": 1,
+          "slot": 35,
+          "type": "HashMap[address, uint256]"
+        },
+        "indexOfVault": {
+          "n_slots": 1,
+          "slot": 4,
+          "type": "HashMap[address, HashMap[uint256, uint256]]"
+        },
+        "isLockedAccount": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "HashMap[address, bool]"
+        },
+        "lastTouch": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "HashMap[address, uint256]"
+        },
+        "numBorrowers": {
+          "n_slots": 1,
+          "slot": 10,
+          "type": "uint256"
+        },
+        "numContributors": {
+          "n_slots": 1,
+          "slot": 40,
+          "type": "uint256"
+        },
+        "numFungLiqUsers": {
+          "n_slots": 1,
+          "slot": 36,
+          "type": "uint256"
+        },
+        "numFungibleAuctions": {
+          "n_slots": 1,
+          "slot": 33,
+          "type": "HashMap[address, uint256]"
+        },
+        "numUserVaults": {
+          "n_slots": 1,
+          "slot": 5,
+          "type": "HashMap[address, uint256]"
+        },
+        "paymentAmountAvailInEpoch": {
+          "n_slots": 1,
+          "slot": 45,
+          "type": "uint256"
+        },
+        "ripeAvailForBonds": {
+          "n_slots": 1,
+          "slot": 46,
+          "type": "uint256"
+        },
+        "ripeAvailForHr": {
+          "n_slots": 1,
+          "slot": 37,
+          "type": "uint256"
+        },
+        "ripeAvailForRewards": {
+          "n_slots": 1,
+          "slot": 19,
+          "type": "uint256"
+        },
+        "ripePaidOutForBadDebt": {
+          "n_slots": 1,
+          "slot": 44,
+          "type": "uint256"
+        },
+        "ripeRewards": {
+          "n_slots": 6,
+          "slot": 13,
+          "type": "RipeRewards"
+        },
+        "totalDebt": {
+          "n_slots": 1,
+          "slot": 7,
+          "type": "uint256"
+        },
+        "unrealizedYield": {
+          "n_slots": 1,
+          "slot": 12,
+          "type": "uint256"
+        },
+        "userBorrowPoints": {
+          "n_slots": 1,
+          "slot": 27,
+          "type": "HashMap[address, BorrowPoints]"
+        },
+        "userDebt": {
+          "n_slots": 1,
+          "slot": 6,
+          "type": "HashMap[address, UserDebt]"
+        },
+        "userDepositPoints": {
+          "n_slots": 1,
+          "slot": 26,
+          "type": "HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]"
+        },
+        "userVaults": {
+          "n_slots": 1,
+          "slot": 3,
+          "type": "HashMap[address, HashMap[uint256, uint256]]"
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "9fb8e2769edfadc839c478c40859a4c89b53ac5a4548c520b32bf5f8c8052d80"
+    },
+    "Lootbox": {
+      "abi": {
+        "canonical_sha256": "e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2",
+        "committed_file_sha256": "33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c",
+        "committed_path": "scripts/abis/Lootbox.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "58605c8df524ecaa69e087c65b0c0792305be759fc800e14716a3c76379520f8",
+        "creation_executable_prefix_size": 23144,
+        "creation_metadata_sha256": "1a086b73407cf069b16d802535a7bbe46cac0847669e3ea858b7b045de57e44b",
+        "creation_metadata_size": 63,
+        "creation_sha256": "fa0a7c6608d1589e3931f5146ecaa4710fcd3f82152b3d151e08db1765be7da9",
+        "creation_size": 23207,
+        "deployed_eip170_headroom": 1583,
+        "deployed_runtime_size": 22993,
+        "eip170_headroom": 1711,
+        "runtime_template_sha256": "0e3eb71ebff4e39e044da454ca50c85f1eee8714c7504ec8165dfcd10ef6c649",
+        "runtime_template_size": 22865
+      },
+      "code_layout": {
+        "MIN_UNDERSCORE_SEND_INTERVAL": {
+          "length": 32,
+          "offset": 96,
+          "type": "uint256"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_minUnderscoreSendInterval",
+              "type": "uint256"
+            },
+            {
+              "name": "_underscoreSendInterval",
+              "type": "uint256"
+            },
+            {
+              "name": "_undyDepositRewardsAmount",
+              "type": "uint256"
+            },
+            {
+              "name": "_undyYieldBonusAmount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "6d9f708076df85443aaeae6b8218975f7c7f1a3c8aee0bcd0571ebee350e676e",
+        "count": 9
+      },
+      "selectors": {
+        "canonical_sha256": "6b2978141ca442d4bd271e8f5787a10037df01c307698d431e41229e042ead5c",
+        "count": 41
+      },
+      "source_git_blob": "02bdb73351ced44d892441a44f2c345584fd004c",
+      "source_path": "contracts/core/Lootbox.vy",
+      "source_sha256": "279b859a6e5234676e091cecb8736aeadac68bc8f1b909267b7a06c69a901f43",
+      "storage_layout": {
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        },
+        "hasUnderscoreRewards": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "bool"
+        },
+        "lastUnderscoreSend": {
+          "n_slots": 1,
+          "slot": 3,
+          "type": "uint256"
+        },
+        "underscoreSendInterval": {
+          "n_slots": 1,
+          "slot": 2,
+          "type": "uint256"
+        },
+        "undyDepositRewardsAmount": {
+          "n_slots": 1,
+          "slot": 4,
+          "type": "uint256"
+        },
+        "undyYieldBonusAmount": {
+          "n_slots": 1,
+          "slot": 5,
+          "type": "uint256"
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "935d1b79e47f91abdd1b9550c32e7c85fe992770d3bbb7bb963b05b9c528371c"
+    },
+    "MissionControl": {
+      "abi": {
+        "canonical_sha256": "9778661b26a575626b7319a95f81281d39be6d4d081250f27be26f32de138903",
+        "committed_file_sha256": "d7dfb5c4d03537fb38dba533196787622cf59b608615fc90d629b6804aa3c277",
+        "committed_path": "scripts/abis/MissionControl.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "f4f87612d4b9c49d6436762794ff7a6ca4eb340d19bb849ffd8f039127aa80a0",
+        "creation_executable_prefix_size": 21631,
+        "creation_metadata_sha256": "08d684001404ab909a8016f1fa5035f277483cb1809b807a4d0b44b7e60998dc",
+        "creation_metadata_size": 78,
+        "creation_sha256": "c7e782ef0c91c18a8cab7f701bdfacde3ca210b6eecc385982752f0f11625943",
+        "creation_size": 21709,
+        "deployed_eip170_headroom": 8512,
+        "deployed_runtime_size": 16064,
+        "eip170_headroom": 8608,
+        "runtime_template_sha256": "d449cfde315648a2d13fed883f84134aa7d08ca1d053dc4467ed5934bac5fd42",
+        "runtime_template_size": 15968
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_defaults",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "0173a8c1b1923a31dea9b5c4805796b7df11106a20e21a34be4040d47628d05e",
+        "count": 2
+      },
+      "selectors": {
+        "canonical_sha256": "5ed15c3111a296776a3db9edeecd11f27a68973572154e05a78210c1341c5d89",
+        "count": 83
+      },
+      "source_git_blob": "ea26c0abfa9b8b03cd174ca7841f0a6fbc3cc84e",
+      "source_path": "contracts/data/MissionControl.vy",
+      "source_sha256": "e88aa25361c0a188b7ff463ba0c3cf13982cc5af842072eb8f771205cb788cd3",
+      "storage_layout": {
+        "assetConfig": {
+          "n_slots": 1,
+          "slot": 50,
+          "type": "HashMap[address, AssetConfig]"
+        },
+        "assets": {
+          "n_slots": 1,
+          "slot": 51,
+          "type": "HashMap[uint256, address]"
+        },
+        "coreRipeGovVaultId": {
+          "n_slots": 1,
+          "slot": 67,
+          "type": "uint256"
+        },
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        },
+        "genConfig": {
+          "n_slots": 13,
+          "slot": 1,
+          "type": "GenConfig"
+        },
+        "genDebtConfig": {
+          "n_slots": 21,
+          "slot": 14,
+          "type": "GenDebtConfig"
+        },
+        "hrConfig": {
+          "n_slots": 6,
+          "slot": 35,
+          "type": "HrConfig"
+        },
+        "indexOfAsset": {
+          "n_slots": 1,
+          "slot": 52,
+          "type": "HashMap[address, uint256]"
+        },
+        "indexOfLiteSigner": {
+          "n_slots": 1,
+          "slot": 154,
+          "type": "HashMap[address, uint256]"
+        },
+        "isRipeGovVaultId": {
+          "n_slots": 1,
+          "slot": 170,
+          "type": "HashMap[uint256, bool]"
+        },
+        "isStabVaultId": {
+          "n_slots": 1,
+          "slot": 69,
+          "type": "HashMap[uint256, bool]"
+        },
+        "liteSigners": {
+          "n_slots": 1,
+          "slot": 153,
+          "type": "HashMap[uint256, address]"
+        },
+        "numAssets": {
+          "n_slots": 1,
+          "slot": 53,
+          "type": "uint256"
+        },
+        "numLiteSigners": {
+          "n_slots": 1,
+          "slot": 155,
+          "type": "uint256"
+        },
+        "preferredStabVaultId": {
+          "n_slots": 1,
+          "slot": 68,
+          "type": "uint256"
+        },
+        "priorityLiqAssetVaults": {
+          "n_slots": 41,
+          "slot": 71,
+          "type": "DynArray[VaultLite, 20]"
+        },
+        "priorityPriceSourceIds": {
+          "n_slots": 11,
+          "slot": 156,
+          "type": "DynArray[uint256, 10]"
+        },
+        "priorityStabVaults": {
+          "n_slots": 41,
+          "slot": 112,
+          "type": "DynArray[VaultLite, 20]"
+        },
+        "rewardsConfig": {
+          "n_slots": 9,
+          "slot": 56,
+          "type": "RipeRewardsConfig"
+        },
+        "ripeBondConfig": {
+          "n_slots": 9,
+          "slot": 41,
+          "type": "RipeBondConfig"
+        },
+        "ripeGovVaultConfig": {
+          "n_slots": 1,
+          "slot": 70,
+          "type": "HashMap[address, RipeGovVaultConfig]"
+        },
+        "shouldCheckLastTouch": {
+          "n_slots": 1,
+          "slot": 169,
+          "type": "bool"
+        },
+        "totalPointsAllocs": {
+          "n_slots": 2,
+          "slot": 65,
+          "type": "TotalPointsAllocs"
+        },
+        "trainingWheels": {
+          "n_slots": 1,
+          "slot": 168,
+          "type": "address"
+        },
+        "underscoreRegistry": {
+          "n_slots": 1,
+          "slot": 167,
+          "type": "address"
+        },
+        "userConfig": {
+          "n_slots": 1,
+          "slot": 54,
+          "type": "HashMap[address, UserConfig]"
+        },
+        "userDelegation": {
+          "n_slots": 1,
+          "slot": 55,
+          "type": "HashMap[address, HashMap[address, ActionDelegation]]"
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "278c6154aabad3d5a7c75ed7b6d91a61bb8423bdd405fed18bc51fdc9b2ddb87"
+    },
+    "RipeGov": {
+      "abi": {
+        "canonical_sha256": "9c54e3cec9e471e776e16f1f6454ec27c23d8b319281d8ee0b792931c4e22137",
+        "committed_file_sha256": "677f785043e355c0b1c5521a790c3c776f6aefe138a0bcf827e020ebcc771e3c",
+        "committed_path": "scripts/abis/RipeGov.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "c067bb66f09e1007f8c5cc7b3e6c6fc23c1bb4ea97477a1284fb52006cf7026b",
+        "creation_executable_prefix_size": 23336,
+        "creation_metadata_sha256": "e019b63e1ffe84bca4165c1ab700ff16ac914e8db20e99dccf3878340d472fa7",
+        "creation_metadata_size": 70,
+        "creation_sha256": "40ea08a942367c13181077b9f73da905fdb7befc6b5327850c13f710a6af8b2c",
+        "creation_size": 23406,
+        "deployed_eip170_headroom": 1319,
+        "deployed_runtime_size": 23257,
+        "eip170_headroom": 1351,
+        "runtime_template_sha256": "396f90f68181b60d4832a5e97d00848b7dbb9cb4ef6f952fb37405b973115f95",
+        "runtime_template_size": 23225
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "2287223c9db092666fb7ca41a4eeddb4ab18285e8c0e366703fa0df77edae858",
+        "count": 13
+      },
+      "selectors": {
+        "canonical_sha256": "23c4d5f465b9913b6d55f4ad7d6d60b301ef3a51a66af988eba984fbe00b4b46",
+        "count": 64
+      },
+      "source_git_blob": "cf48856795f2f0c140522615302738b3b319d5e6",
+      "source_path": "contracts/vaults/RipeGov.vy",
+      "source_sha256": "5e5d58f557e149c5b4d964bae22a3df14ebf3520ff14335c63d4a042bbf0c81f",
+      "storage_layout": {
+        "govPointAccrualDisabledBlock": {
+          "n_slots": 1,
+          "slot": 12,
+          "type": "uint256"
+        },
+        "positionMigratedOut": {
+          "n_slots": 1,
+          "slot": 14,
+          "type": "HashMap[address, HashMap[address, bool]]"
+        },
+        "totalGovPoints": {
+          "n_slots": 1,
+          "slot": 11,
+          "type": "uint256"
+        },
+        "totalUserGovPoints": {
+          "n_slots": 1,
+          "slot": 10,
+          "type": "HashMap[address, uint256]"
+        },
+        "userGovData": {
+          "n_slots": 1,
+          "slot": 9,
+          "type": "HashMap[address, HashMap[address, GovData]]"
+        },
+        "userGovPointAccrualDisabledBlock": {
+          "n_slots": 1,
+          "slot": 13,
+          "type": "HashMap[address, uint256]"
+        },
+        "vaultData": {
+          "indexOfAsset": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "HashMap[address, uint256]"
+          },
+          "indexOfUserAsset": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          },
+          "numAssets": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "uint256"
+          },
+          "numUserAssets": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "HashMap[address, uint256]"
+          },
+          "totalBalances": {
+            "n_slots": 1,
+            "slot": 2,
+            "type": "HashMap[address, uint256]"
+          },
+          "userAssets": {
+            "n_slots": 1,
+            "slot": 3,
+            "type": "HashMap[address, HashMap[uint256, address]]"
+          },
+          "userBalances": {
+            "n_slots": 1,
+            "slot": 1,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "vaultAssets": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "HashMap[uint256, address]"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        }
+      },
+      "transitive_compiler_input_integrity": "c1d1dd1e0fa1639b906d81c2568fbfe18fd298eb42d90ab54f110dc1f9031589"
+    },
+    "SimpleErc20": {
+      "abi": {
+        "canonical_sha256": "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
+        "committed_file_sha256": "be44f9050d4467c3cb22787a691979f7c670b43c474cfe0aeb93b26568f96d3c",
+        "committed_path": "scripts/abis/SimpleErc20.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "ee58a1eea39f21f6b4babfe3f36473ffff4374fa319af11b16457fb15c37727e",
+        "creation_executable_prefix_size": 9479,
+        "creation_metadata_sha256": "c3557c7fe46286b020c2616740112fedb2fa9a72698c3df78f3649a8e1e91618",
+        "creation_metadata_size": 56,
+        "creation_sha256": "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
+        "creation_size": 9535,
+        "deployed_eip170_headroom": 15176,
+        "deployed_runtime_size": 9400,
+        "eip170_headroom": 15208,
+        "runtime_template_sha256": "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
+        "runtime_template_size": 9368
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "b09b8d33db359626843043467ab71b4cc65b28a2496d799200446f0357187a19",
+        "count": 5
+      },
+      "selectors": {
+        "canonical_sha256": "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
+        "count": 34
+      },
+      "source_git_blob": "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
+      "source_path": "contracts/vaults/SimpleErc20.vy",
+      "source_sha256": "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
+      "storage_layout": {
+        "vaultData": {
+          "indexOfAsset": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "HashMap[address, uint256]"
+          },
+          "indexOfUserAsset": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          },
+          "numAssets": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "uint256"
+          },
+          "numUserAssets": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "HashMap[address, uint256]"
+          },
+          "totalBalances": {
+            "n_slots": 1,
+            "slot": 2,
+            "type": "HashMap[address, uint256]"
+          },
+          "userAssets": {
+            "n_slots": 1,
+            "slot": 3,
+            "type": "HashMap[address, HashMap[uint256, address]]"
+          },
+          "userBalances": {
+            "n_slots": 1,
+            "slot": 1,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "vaultAssets": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "HashMap[uint256, address]"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        }
+      },
+      "transitive_compiler_input_integrity": "56255221db690406b83380c56066a8f17846881e2d927ba017f692f3e9823b56"
+    },
+    "StabilityPool": {
+      "abi": {
+        "canonical_sha256": "8086009513c4557dc8a12fec7829c0f3782693001ebc7d21dddab2944084812a",
+        "committed_file_sha256": "4b720ba58cb96db1eb5e3b9cb30698283da0d5e7d90db55e2170a8674982a543",
+        "committed_path": "scripts/abis/StabilityPool.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "a4cc04535e1a9186214862741eb35f84123ef905cf1b4c09a139f48b2c984434",
+        "creation_executable_prefix_size": 24594,
+        "creation_metadata_sha256": "beac1621245547daf729e367fe79e83cc96e31c22d82c11dd9d179063e420947",
+        "creation_metadata_size": 66,
+        "creation_sha256": "e4e96e9346a27e17a0b23f10a1d6324f3459ab658ea17c52710204fc5a9d4d5b",
+        "creation_size": 24660,
+        "deployed_eip170_headroom": 205,
+        "deployed_runtime_size": 24371,
+        "eip170_headroom": 301,
+        "runtime_template_sha256": "d47f9d2c92cbac07fb7ed6e86b4c55cfab09bc19d3de8bc717e5b99d58955361",
+        "runtime_template_size": 24275
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "stabVault": {
+          "GREEN_TOKEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "address"
+          },
+          "SAVINGS_GREEN": {
+            "length": 32,
+            "offset": 64,
+            "type": "address"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "8a1a66ef65ce809b5946019923847f60e51e85b516881e88abb81baa0fa27b77",
+        "count": 8
+      },
+      "selectors": {
+        "canonical_sha256": "7524780e1d548349e7a65ebffeb9c6a24d0207e5dcf77abdf8f8a09341c620bd",
+        "count": 56
+      },
+      "source_git_blob": "22f6225b952608f65c9f5a8bc50b808f1c4b47c0",
+      "source_path": "contracts/vaults/StabilityPool.vy",
+      "source_sha256": "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158",
+      "storage_layout": {
+        "stabVault": {
+          "claimableAssets": {
+            "n_slots": 1,
+            "slot": 11,
+            "type": "HashMap[address, HashMap[uint256, address]]"
+          },
+          "claimableBalances": {
+            "n_slots": 1,
+            "slot": 9,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "indexOfClaimableAsset": {
+            "n_slots": 1,
+            "slot": 12,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "numClaimableAssets": {
+            "n_slots": 1,
+            "slot": 13,
+            "type": "HashMap[address, uint256]"
+          },
+          "totalClaimableBalances": {
+            "n_slots": 1,
+            "slot": 10,
+            "type": "HashMap[address, uint256]"
+          }
+        },
+        "vaultData": {
+          "indexOfAsset": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "HashMap[address, uint256]"
+          },
+          "indexOfUserAsset": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          },
+          "numAssets": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "uint256"
+          },
+          "numUserAssets": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "HashMap[address, uint256]"
+          },
+          "totalBalances": {
+            "n_slots": 1,
+            "slot": 2,
+            "type": "HashMap[address, uint256]"
+          },
+          "userAssets": {
+            "n_slots": 1,
+            "slot": 3,
+            "type": "HashMap[address, HashMap[uint256, address]]"
+          },
+          "userBalances": {
+            "n_slots": 1,
+            "slot": 1,
+            "type": "HashMap[address, HashMap[address, uint256]]"
+          },
+          "vaultAssets": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "HashMap[uint256, address]"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        }
+      },
+      "transitive_compiler_input_integrity": "732ab99b49d7146ae5e6b9197357b781038b980a2ed40f04b6c3b881907f5c9c"
+    },
+    "SwitchboardBravo": {
+      "abi": {
+        "canonical_sha256": "8a30c7b4483192513051c1162f235d02549e708aab4173d79597609ffab39202",
+        "committed_file_sha256": "3f655e6d966fcffacb58b506fa0cee984e35c4b5b7296f3d3f6b5309bd7b90b4",
+        "committed_path": "scripts/abis/SwitchboardBravo.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "c87f19c0170292354b63b25c3428ba0952e7eeea0c8d1c442368dae238136126",
+        "creation_executable_prefix_size": 24125,
+        "creation_metadata_sha256": "6e43baefb5d5a884c9d67529bf887167b19d7d4f4cd97220418c9508fde64850",
+        "creation_metadata_size": 74,
+        "creation_sha256": "d9822aeaaba6bb2887110ab612d1f8105da9989f93701aef3d4b6e5c2b536234",
+        "creation_size": 24199,
+        "deployed_eip170_headroom": 1494,
+        "deployed_runtime_size": 23082,
+        "eip170_headroom": 1654,
+        "runtime_template_sha256": "d7af2f3f3adf8ddc1088f19bc7295e07b058eee18420eb6f227ce4912c1da65f",
+        "runtime_template_size": 22922
+      },
+      "code_layout": {
+        "gov": {
+          "MAX_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 64,
+            "type": "uint256"
+          },
+          "MIN_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 32,
+            "type": "uint256"
+          },
+          "RIPE_HQ_FOR_GOV": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "timeLock": {
+          "MAX_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 128,
+            "type": "uint256"
+          },
+          "MIN_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 96,
+            "type": "uint256"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_tempGov",
+              "type": "address"
+            },
+            {
+              "name": "_minConfigTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxConfigTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "e5f85d8890e6f2f26e681a73d6e264369577f7de5fedcb3a6cdecb5da33c829c",
+        "count": 18
+      },
+      "selectors": {
+        "canonical_sha256": "06cf2d9b23a48b003915009348ff097586900e59a5b62e30c18f3f0bdd75d4cf",
+        "count": 66
+      },
+      "source_git_blob": "013acf9083d98568d37d065ca28a98f4b9a3dfec",
+      "source_path": "contracts/config/SwitchboardBravo.vy",
+      "source_sha256": "7b611ee4b14d7b428dd6d8a95414fc2b606db6d42f9d8cc89ea747ab9722309b",
+      "storage_layout": {
+        "actionType": {
+          "n_slots": 1,
+          "slot": 10,
+          "type": "HashMap[uint256, ActionType]"
+        },
+        "gov": {
+          "govChangeTimeLock": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "uint256"
+          },
+          "governance": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "address"
+          },
+          "numGovChanges": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "uint256"
+          },
+          "pendingGov": {
+            "n_slots": 3,
+            "slot": 1,
+            "type": "PendingGovernance"
+          }
+        },
+        "pendingAssetConfig": {
+          "n_slots": 1,
+          "slot": 11,
+          "type": "HashMap[uint256, AssetUpdate]"
+        },
+        "pendingMissionControl": {
+          "n_slots": 1,
+          "slot": 12,
+          "type": "HashMap[uint256, address]"
+        },
+        "timeLock": {
+          "actionId": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "uint256"
+          },
+          "actionTimeLock": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "uint256"
+          },
+          "expiration": {
+            "n_slots": 1,
+            "slot": 9,
+            "type": "uint256"
+          },
+          "pendingActions": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "HashMap[uint256, PendingAction]"
+          }
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "e696a22a5d1266b3560fb55995eae3652be43f113b8a4c25e85b27355e7fbe8c"
+    },
+    "SwitchboardDelta": {
+      "abi": {
+        "canonical_sha256": "6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f",
+        "committed_file_sha256": "1f2d7ff329d4e470e1d684ddb139bb1268b4104909f8373b0b1e1c01e2da7eda",
+        "committed_path": "scripts/abis/SwitchboardDelta.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "5d7e5a00144259460b75b0e623b3371b05e122c4491423f42c6ca7e49ae6fe4f",
+        "creation_executable_prefix_size": 24305,
+        "creation_metadata_sha256": "cc1bcadb5528be3f406a18544734a3a08de07719ec230abf79ff988ac1428f18",
+        "creation_metadata_size": 84,
+        "creation_sha256": "b2d2fad0e1562628e6b4def697731e85f78b4e99bf78f41fe9659c5bfc6cff5e",
+        "creation_size": 24389,
+        "deployed_eip170_headroom": 1314,
+        "deployed_runtime_size": 23262,
+        "eip170_headroom": 1474,
+        "runtime_template_sha256": "77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61",
+        "runtime_template_size": 23102
+      },
+      "code_layout": {
+        "gov": {
+          "MAX_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 64,
+            "type": "uint256"
+          },
+          "MIN_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 32,
+            "type": "uint256"
+          },
+          "RIPE_HQ_FOR_GOV": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "timeLock": {
+          "MAX_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 128,
+            "type": "uint256"
+          },
+          "MIN_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 96,
+            "type": "uint256"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_tempGov",
+              "type": "address"
+            },
+            {
+              "name": "_minConfigTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxConfigTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "544b4a9837e8e7803bc83fdf7325d2c117bdb538098bd78273f36640c0468001",
+        "count": 76
+      },
+      "selectors": {
+        "canonical_sha256": "5640d4bc1386e0064078a5ec79e4f7d1b0c250a4ac69622e2a34e52821cf508d",
+        "count": 114
+      },
+      "source_git_blob": "4e234df7626eb332836aceb5cbca2daaef2a0390",
+      "source_path": "contracts/config/SwitchboardDelta.vy",
+      "source_sha256": "12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79",
+      "storage_layout": {
+        "actionType": {
+          "n_slots": 1,
+          "slot": 10,
+          "type": "HashMap[uint256, ActionType]"
+        },
+        "gov": {
+          "govChangeTimeLock": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "uint256"
+          },
+          "governance": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "address"
+          },
+          "numGovChanges": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "uint256"
+          },
+          "pendingGov": {
+            "n_slots": 3,
+            "slot": 1,
+            "type": "PendingGovernance"
+          }
+        },
+        "pendingAssetReset": {
+          "n_slots": 1,
+          "slot": 20,
+          "type": "HashMap[uint256, DynArray[AssetReset, 20]]"
+        },
+        "pendingBondBooster": {
+          "n_slots": 1,
+          "slot": 16,
+          "type": "HashMap[uint256, address]"
+        },
+        "pendingBoosterBoundaries": {
+          "n_slots": 1,
+          "slot": 18,
+          "type": "HashMap[uint256, BoosterBoundaries]"
+        },
+        "pendingBoosterConfigs": {
+          "n_slots": 1,
+          "slot": 17,
+          "type": "HashMap[uint256, DynArray[BoosterConfig, 50]]"
+        },
+        "pendingCancelPaycheck": {
+          "n_slots": 1,
+          "slot": 13,
+          "type": "HashMap[uint256, address]"
+        },
+        "pendingDeleverageBuffer": {
+          "n_slots": 1,
+          "slot": 26,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingDeleverageCooldown": {
+          "n_slots": 1,
+          "slot": 27,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingDeleverageDustBps": {
+          "n_slots": 1,
+          "slot": 32,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingDeleverageDustThreshold": {
+          "n_slots": 1,
+          "slot": 31,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingDeleverageFullPayoffBuffer": {
+          "n_slots": 1,
+          "slot": 29,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingDeleverageOverageBps": {
+          "n_slots": 1,
+          "slot": 30,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingHrConfig": {
+          "n_slots": 1,
+          "slot": 11,
+          "type": "HashMap[uint256, HrConfig]"
+        },
+        "pendingManager": {
+          "n_slots": 1,
+          "slot": 12,
+          "type": "HashMap[uint256, PendingManager]"
+        },
+        "pendingMinDeleverageBps": {
+          "n_slots": 1,
+          "slot": 25,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingMissionControl": {
+          "n_slots": 1,
+          "slot": 33,
+          "type": "HashMap[uint256, address]"
+        },
+        "pendingRipeAvailable": {
+          "n_slots": 1,
+          "slot": 22,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingRipeBondConfig": {
+          "n_slots": 1,
+          "slot": 14,
+          "type": "HashMap[uint256, RipeBondConfig]"
+        },
+        "pendingRipeBondConfigValue": {
+          "n_slots": 1,
+          "slot": 15,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingShouldCheckLastTouch": {
+          "n_slots": 1,
+          "slot": 24,
+          "type": "HashMap[uint256, bool]"
+        },
+        "pendingUnderscoreRegistry": {
+          "n_slots": 1,
+          "slot": 23,
+          "type": "HashMap[uint256, address]"
+        },
+        "pendingUnderscoreSafeSpreadBps": {
+          "n_slots": 1,
+          "slot": 28,
+          "type": "HashMap[uint256, uint256]"
+        },
+        "pendingUserBalanceReset": {
+          "n_slots": 1,
+          "slot": 19,
+          "type": "HashMap[uint256, DynArray[UserBalanceReset, 40]]"
+        },
+        "pendingUserBorrowReset": {
+          "n_slots": 1,
+          "slot": 21,
+          "type": "HashMap[uint256, DynArray[address, 40]]"
+        },
+        "timeLock": {
+          "actionId": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "uint256"
+          },
+          "actionTimeLock": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "uint256"
+          },
+          "expiration": {
+            "n_slots": 1,
+            "slot": 9,
+            "type": "uint256"
+          },
+          "pendingActions": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "HashMap[uint256, PendingAction]"
+          }
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "4c4d2bb4f27d32dd216d6dbac903538a179ff71ec0d7644bb29056bf24001a99"
+    },
+    "Teller": {
+      "abi": {
+        "canonical_sha256": "d2ca4f2e5a45eab697b376d8aa7a7f792fe96a26aa05902192d723c581355318",
+        "committed_file_sha256": "2affb9bace3696cbb95525945746546a1517ea23ca691ee8ea492f90c2387193",
+        "committed_path": "scripts/abis/Teller.json"
+      },
+      "artifacts": {
+        "accepted_runtime_ceiling": 24429,
+        "creation_executable_prefix_sha256": "2a0b6b6f27774ad8d7aa83de284dcdbf1801c074c11bbc6b4385b49340fd4edd",
+        "creation_executable_prefix_size": 24572,
+        "creation_metadata_sha256": "29be0ae6d0395a89ed1d0635a70d37e100ac1ff04fbbf9ea56fae9dee3da553b",
+        "creation_metadata_size": 83,
+        "creation_sha256": "9fe39cbdc27dfd1140402edf6dd657acd9a35d41513562c34cf69773907ab44e",
+        "creation_size": 24655,
+        "deployed_eip170_headroom": 51,
+        "deployed_runtime_size": 24525,
+        "eip170_headroom": 147,
+        "runtime_template_sha256": "e2031902065284ce34ad4f6634672db466862696d34c12cb8d3a73b3ed77962a",
+        "runtime_template_size": 24429
+      },
+      "code_layout": {
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_shouldPause",
+              "type": "bool"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "6cf880b9dec0c0fc1ca0c68aff47b48e5efdd2519e366436e02a9872f02f9d4a",
+        "count": 7
+      },
+      "selectors": {
+        "canonical_sha256": "ca59ea101febde31384c85ac9711488501aba09ba55269f56c7dac42861ab0d3",
+        "count": 110
+      },
+      "source_git_blob": "24f91fa2d0b1bac385607685a8805374a7b29e87",
+      "source_path": "contracts/core/Teller.vy",
+      "source_sha256": "cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc",
+      "storage_layout": {
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        },
+        "receiptMeasurementActive": {
+          "n_slots": 1,
+          "slot": 1,
+          "type": "bool"
+        }
+      },
+      "transitive_compiler_input_integrity": "d7967821d4c97ea031c4cffded7d248f1a1df405e19fa449a1aa0ddecb5ced64"
+    },
+    "UniswapV2Prices": {
+      "abi": {
+        "canonical_sha256": "e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b",
+        "committed_file_sha256": "1171f61c3eeed8930165c6851e64985da75e1352d31bc1862dceffa5813afe23",
+        "committed_path": "scripts/abis/UniswapV2Prices.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "49eda5cbbb7af34751541dc8b063d5b02c21ca8a05d31729aabb9a8dfb110053",
+        "creation_executable_prefix_size": 15576,
+        "creation_metadata_sha256": "1786eaef508e5984abeeddf2d7528d02172068147db3c5364f58b173f515a24c",
+        "creation_metadata_size": 57,
+        "creation_sha256": "53d2f64272d905a251fe406154ee76941f69fad14254510b97dd5f65117e7e13",
+        "creation_size": 15633,
+        "deployed_eip170_headroom": 10454,
+        "deployed_runtime_size": 14122,
+        "eip170_headroom": 10710,
+        "runtime_template_sha256": "8a54a6b8ac9c746a43e59a06d10dcf4a7454996a0adaa1b8be3021c31a207a88",
+        "runtime_template_size": 13866
+      },
+      "code_layout": {
+        "RIPE_TOKEN": {
+          "length": 32,
+          "offset": 224,
+          "type": "address"
+        },
+        "RIPE_WETH_POOL": {
+          "length": 32,
+          "offset": 192,
+          "type": "address"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 96,
+            "type": "address"
+          }
+        },
+        "gov": {
+          "MAX_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 64,
+            "type": "uint256"
+          },
+          "MIN_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 32,
+            "type": "uint256"
+          },
+          "RIPE_HQ_FOR_GOV": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "timeLock": {
+          "MAX_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 160,
+            "type": "uint256"
+          },
+          "MIN_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 128,
+            "type": "uint256"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_tempGov",
+              "type": "address"
+            },
+            {
+              "name": "_ripeWethPool",
+              "type": "address"
+            },
+            {
+              "name": "_ripeToken",
+              "type": "address"
+            },
+            {
+              "name": "_minPriceChangeTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxPriceChangeTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "d7e26b475d553e99be3796a7ba71fc8776984097ce69dbac1408c0fbf39121e0",
+        "count": 14
+      },
+      "selectors": {
+        "canonical_sha256": "8cc33e90638e1bef83520ae5ebd9b3566da9e470cfa0f08ba1fec5f300b86813",
+        "count": 69
+      },
+      "source_git_blob": "c0d1f7c0ade755d589241d49d03d46778c7b9d76",
+      "source_path": "contracts/priceSources/UniswapV2Prices.vy",
+      "source_sha256": "45bf2a96fbd286eb2b8111287104f53e868baedf3739bad6d91ae8608d4721a7",
+      "storage_layout": {
+        "gov": {
+          "govChangeTimeLock": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "uint256"
+          },
+          "governance": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "address"
+          },
+          "numGovChanges": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "uint256"
+          },
+          "pendingGov": {
+            "n_slots": 3,
+            "slot": 1,
+            "type": "PendingGovernance"
+          }
+        },
+        "pendingPriceConfigs": {
+          "n_slots": 1,
+          "slot": 16,
+          "type": "HashMap[address, PendingPriceConfig]"
+        },
+        "priceConfigs": {
+          "n_slots": 1,
+          "slot": 14,
+          "type": "HashMap[address, PriceConfig]"
+        },
+        "priceData": {
+          "assets": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "HashMap[uint256, address]"
+          },
+          "indexOfAsset": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "HashMap[address, uint256]"
+          },
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "bool"
+          },
+          "numAssets": {
+            "n_slots": 1,
+            "slot": 9,
+            "type": "uint256"
+          }
+        },
+        "snapShots": {
+          "n_slots": 1,
+          "slot": 15,
+          "type": "HashMap[address, HashMap[uint256, PriceSnapshot]]"
+        },
+        "timeLock": {
+          "actionId": {
+            "n_slots": 1,
+            "slot": 11,
+            "type": "uint256"
+          },
+          "actionTimeLock": {
+            "n_slots": 1,
+            "slot": 12,
+            "type": "uint256"
+          },
+          "expiration": {
+            "n_slots": 1,
+            "slot": 13,
+            "type": "uint256"
+          },
+          "pendingActions": {
+            "n_slots": 1,
+            "slot": 10,
+            "type": "HashMap[uint256, PendingAction]"
+          }
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "f3269ddad3e48731b818e980e7751342dbe9cc05af603971949b459dfb9292cf"
+    },
+    "VaultMigrator": {
+      "abi": {
+        "canonical_sha256": "9ff39b336f0e93643ecfedbbf957ba1e3db17d22b4565b83bd816a83cd08d9d4",
+        "committed_file_sha256": "34b3d57e75d465d6e310fe0b7d47a9a10c1938c23e437e424223658493f848c3",
+        "committed_path": "scripts/abis/VaultMigrator.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "550bbab359f534c5892df5a04935e539bdd43e3943d26b7469dc7def65815e52",
+        "creation_executable_prefix_size": 12084,
+        "creation_metadata_sha256": "50047ccf8b011d7495360e8909adc524041e638c40ac7b3134cd55b523ea4c44",
+        "creation_metadata_size": 56,
+        "creation_sha256": "1ef7465ac6480a7f7429be99d0b6258ca65e4c140366b757f5668133d75b0616",
+        "creation_size": 12140,
+        "deployed_eip170_headroom": 12534,
+        "deployed_runtime_size": 12042,
+        "eip170_headroom": 12662,
+        "runtime_template_sha256": "efd194460cd4ab59c881d8377a2b1a0c5485bc571445190f6b488ddc3b21c1a8",
+        "runtime_template_size": 11914
+      },
+      "code_layout": {
+        "LEGACY_RIPE_GOV_VAULT": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_shouldPause",
+              "type": "bool"
+            },
+            {
+              "name": "_legacyRipeGovVault",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "bce9fc7df4ccab8be6f01b3a879775173cd646ec78ba6d1ed8734a663005bb7b",
+        "count": 5
+      },
+      "selectors": {
+        "canonical_sha256": "4237d98aa75e1ef728e62b9e0cb601412d4741cd5882e90a14831061f228d8dc",
+        "count": 11
+      },
+      "source_git_blob": "8865d0bd6991b1f39436ebd019026b9707c9ac48",
+      "source_path": "contracts/core/VaultMigrator.vy",
+      "source_sha256": "34d249c01405aeda0167fdfa1650a477c3dd60a64a729b45d5e7d90b17de36a8",
+      "storage_layout": {
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "17533a19f199ffa45d91aeae652c73f3371bd329e7c2291a610b413840a05a8a"
+    }
+  },
+  "schema_version": 1
+}
