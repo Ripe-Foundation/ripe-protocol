@@ -11,6 +11,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     "Lootbox": 22_993,
+    "RipeGov": 23_257,
     "CreditEngine": 24_392,
     "StabilityPool": 24_371,
 }
@@ -20,6 +21,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # 51-byte margin as hard gates: any further growth requires a new disposition.
 MIN_TELLER_MARGIN = 51
 MIN_LOOTBOX_MARGIN = 20
+MIN_RIPE_GOV_MARGIN = 1_000
 
 
 def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
@@ -34,6 +36,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     bond_room,
     ledger,
     lootbox,
+    ripe_gov_vault,
     human_resources,
     credit_engine,
     credit_redeem,
@@ -51,6 +54,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),
         "Ledger": len(ledger.env.get_code(ledger.address)),
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
+        "RipeGov": len(ripe_gov_vault.env.get_code(ripe_gov_vault.address)),
         "HumanResources": len(human_resources.env.get_code(human_resources.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
@@ -82,4 +86,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     lootbox_margin = EIP170_LIMIT - deployed_runtime_bytes["Lootbox"]
     assert lootbox_margin >= MIN_LOOTBOX_MARGIN, (
         f"Lootbox deployed margin {lootbox_margin} is below the {MIN_LOOTBOX_MARGIN}-byte floor"
+    )
+
+    ripe_gov_margin = EIP170_LIMIT - deployed_runtime_bytes["RipeGov"]
+    assert ripe_gov_margin >= MIN_RIPE_GOV_MARGIN, (
+        f"RipeGov deployed margin {ripe_gov_margin} is below the "
+        f"{MIN_RIPE_GOV_MARGIN}-byte floor"
     )
