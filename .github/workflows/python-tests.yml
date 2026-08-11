@@ -98,12 +98,10 @@ jobs:
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          # H-06 publication is macOS/APFS-bound and runs in the dedicated job.
           /usr/bin/time -p python -m pytest \
             -o addopts='' \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            --ignore=tests/deployment/test_current_manifest_promotion.py \
             --durations=50
 
       - name: Save Titanoboa compiler artifacts
@@ -112,56 +110,3 @@ jobs:
         with:
           path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
-
-  manifest-promotion-macos:
-    name: Python 3.12.0 / manifest-promotion-macos
-    if: github.event_name != 'workflow_dispatch' || inputs.lane == 'comprehensive'
-    runs-on: macos-latest
-    timeout-minutes: 60
-    env:
-      ETHERSCAN_API_KEY: local-placeholder
-      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
-      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
-      PYTHONHASHSEED: "0"
-      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
-      TMPDIR: ${{ github.workspace }}/.ci/tmp
-      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
-    steps:
-      - name: Check out full source history
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Use Python 3.12.0
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12.0"
-          cache: pip
-          cache-dependency-path: requirements.txt
-
-      - name: Create private runtime directories
-        run: |
-          mkdir -p \
-            "$HYPOTHESIS_STORAGE_DIRECTORY" \
-            "$PYTHONPYCACHEPREFIX" \
-            "$RIPE_BOA_CACHE_DIR" \
-            "$TMPDIR" \
-            "$XDG_CACHE_HOME" \
-            "$RUNNER_TEMP/pytest-cache" \
-            "$RUNNER_TEMP/pytest-basetemp"
-
-      - name: Install pinned requirements
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pip check
-
-      - name: Run macOS manifest-promotion coverage
-        run: |
-          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
-          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          /usr/bin/time -p python -m pytest \
-            -o addopts='' \
-            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
-            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            --durations=20 \
-            tests/deployment/test_current_manifest_promotion.py
