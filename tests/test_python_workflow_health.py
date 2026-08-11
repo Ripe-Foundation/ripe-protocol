@@ -24,12 +24,27 @@ def _step(job, name):
     return next(step for step in job["steps"] if step.get("name") == name)
 
 
-def test_python_workflow_uses_full_history_and_bounded_lane_timeouts():
+def test_python_workflow_routes_automatic_events_to_one_lean_lane():
     workflow = _workflow()
-    assert workflow["on"]["push"]["branches"] == ["master", "rh"]
-    assert "pull_request" in workflow["on"]
+    assert workflow["on"]["pull_request"]["branches"] == ["rh"]
+    assert workflow["on"]["merge_group"]["branches"] == ["rh"]
+    assert workflow["on"]["push"]["branches"] == ["master"]
+    assert workflow["permissions"] == {"contents": "read"}
+
+    dispatch_lane = workflow["on"]["workflow_dispatch"]["inputs"]["lane"]
+    assert dispatch_lane["default"] == "lean"
+    assert dispatch_lane["options"] == ["lean", "comprehensive"]
 
     test_job = workflow["jobs"]["test"]
+    lane_matrix = test_job["strategy"]["matrix"]["lane"]
+    assert "github.event_name == 'workflow_dispatch'" in lane_matrix
+    assert "inputs.lane" in lane_matrix
+    assert "'[\"lean\"]'" in lane_matrix
+    assert "lean\",\"comprehensive" not in lane_matrix
+
+
+def test_python_workflow_uses_full_history_and_bounded_lane_timeouts():
+    test_job = _workflow()["jobs"]["test"]
     checkout = _step(test_job, "Check out source")
     assert checkout["with"]["fetch-depth"] == "0"
     assert test_job["timeout-minutes"] == (
@@ -68,13 +83,29 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
     assert "head.sha" not in group
 
 
-def test_python_workflow_runs_manifest_promotion_on_macos():
+def test_python_workflow_exposes_stable_rh_pr_gate():
+    job = _workflow()["jobs"]["rh-pr-gate"]
+    assert job["name"] == "rh-pr-gate"
+    assert job["needs"] == ["test"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == "5"
+    assert "always()" in job["if"]
+    assert "github.event_name == 'pull_request'" in job["if"]
+    assert "github.event_name == 'merge_group'" in job["if"]
+
+    step = _step(job, "Require successful lean lane")
+    assert step["env"]["TEST_RESULT"] == "${{ needs.test.result }}"
+    assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
+    assert "exit 1" in step["run"]
+
+
+def test_python_workflow_runs_manifest_promotion_only_for_manual_comprehensive():
     jobs = _workflow()["jobs"]
     job = jobs["manifest-promotion-macos"]
     assert job["runs-on"] == "macos-latest"
     assert job["timeout-minutes"] == "60"
     assert job["if"] == (
-        "github.event_name != 'workflow_dispatch' || "
+        "github.event_name == 'workflow_dispatch' && "
         "inputs.lane == 'comprehensive'"
     )
     checkout = _step(job, "Check out full source history")
