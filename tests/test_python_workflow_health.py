@@ -1,3 +1,8 @@
+import ast
+import json
+import re
+import shlex
+from configparser import ConfigParser
 from pathlib import Path
 
 import pytest
@@ -6,6 +11,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github/workflows/python-tests.yml"
+PYTEST_INI_PATH = ROOT / "pytest.ini"
 CHECKOUT_ACTION = (
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 )
@@ -15,6 +21,41 @@ SETUP_PYTHON_ACTION = (
 CACHE_ACTION = (
     "actions/cache/{mode}@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 )
+BOA_CACHE_PREFIX = "boa-${{ runner.os }}-py312-${{ matrix.lane }}"
+BOA_INPUT_HASH = (
+    "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
+    "'interfaces/**/*.vyi') }}"
+)
+LEAN_SHARD_TARGETS = {
+    "core": ("tests/core",),
+    "vaults-tokens": ("tests/vaults", "tests/tokens"),
+    "supporting": (
+        "tests/config",
+        "tests/priceSources",
+        "tests/data",
+        "tests/clock",
+        "tests/modules",
+        "tests/registries",
+        "tests/test_current_manifest_consumers.py",
+        "tests/test_python_workflow_health.py",
+        "tests/test_removed_index_reconciles.py",
+        "tests/test_vault_pointer_runtime_sizes.py",
+    ),
+}
+LEAN_MATRIX = [{"lane": "lean", "shard": shard} for shard in LEAN_SHARD_TARGETS]
+COMPREHENSIVE_MATRIX = [{"lane": "comprehensive", "shard": "all"}]
+LEAN_MATRIX_JSON = json.dumps(LEAN_MATRIX, separators=(",", ":"))
+COMPREHENSIVE_MATRIX_JSON = json.dumps(COMPREHENSIVE_MATRIX, separators=(",", ":"))
+MATRIX_INCLUDE_EXPRESSION = (
+    "${{ fromJSON(github.event_name == 'workflow_dispatch' && "
+    "inputs.lane == 'comprehensive' && "
+    f"'{COMPREHENSIVE_MATRIX_JSON}' || '{LEAN_MATRIX_JSON}') }}}}"
+)
+PYTEST_IGNORED_DIRECTORIES = {
+    "tests/deployment",
+    "tests/deployment_profiles",
+    "tests/inventory",
+}
 
 
 @pytest.fixture(scope="session")
@@ -30,8 +71,73 @@ def _step(job, name):
     return next(step for step in job["steps"] if step.get("name") == name)
 
 
+def _pytest_addopts():
+    config = ConfigParser()
+    config.read(PYTEST_INI_PATH)
+    return shlex.split(config["pytest"]["addopts"])
+
+
+def _workflow_lean_shard_targets():
+    command = _step(_workflow()["jobs"]["test"], "Run lean default lane")[
+        "run"
+    ]
+    pattern = re.compile(
+        r"^  (?P<shard>[a-z][a-z-]*)\)\n"
+        r"    shard_targets=\((?P<targets>.*?)\)\n"
+        r"    ;;$",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    branches = [
+        (match.group("shard"), tuple(shlex.split(match.group("targets"))))
+        for match in pattern.finditer(command)
+    ]
+    targets = dict(branches)
+    assert len(targets) == len(branches), "Lean shard names must be unique"
+    return targets
+
+
+def _uses_serial_pytest_marker(path):
+    tree = ast.parse(path.read_text(), filename=path)
+    pytest_names = set()
+    mark_names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            pytest_names.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "pytest"
+            )
+        elif isinstance(node, ast.ImportFrom) and node.module == "pytest":
+            mark_names.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "mark"
+            )
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute) or node.attr != "serial":
+            continue
+        marker = node.value
+        if isinstance(marker, ast.Name) and marker.id in mark_names:
+            return True
+        if (
+            isinstance(marker, ast.Attribute)
+            and marker.attr == "mark"
+            and isinstance(marker.value, ast.Name)
+            and marker.value.id in pytest_names
+        ):
+            return True
+    return False
+
+
 def test_python_workflow_routes_automatic_events_to_one_lean_lane():
     workflow = _workflow()
+    assert set(workflow["on"]) == {
+        "pull_request",
+        "merge_group",
+        "push",
+        "workflow_dispatch",
+    }
     assert workflow["on"]["pull_request"]["branches"] == ["rh"]
     assert workflow["on"]["merge_group"]["branches"] == ["rh"]
     assert workflow["on"]["push"]["branches"] == ["master"]
@@ -42,11 +148,109 @@ def test_python_workflow_routes_automatic_events_to_one_lean_lane():
     assert dispatch_lane["options"] == ["lean", "comprehensive"]
 
     test_job = workflow["jobs"]["test"]
-    lane_matrix = test_job["strategy"]["matrix"]["lane"]
-    assert "github.event_name == 'workflow_dispatch'" in lane_matrix
-    assert "inputs.lane" in lane_matrix
-    assert "'[\"lean\"]'" in lane_matrix
-    assert "lean\",\"comprehensive" not in lane_matrix
+    assert test_job["name"] == (
+        "Python 3.12.0 / ${{ matrix.lane }} / ${{ matrix.shard }}"
+    )
+    assert test_job["strategy"]["fail-fast"] == "false"
+    assert test_job["strategy"]["matrix"] == {"include": MATRIX_INCLUDE_EXPRESSION}
+
+
+def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
+    test_job = _workflow()["jobs"]["test"]
+    step = _step(test_job, "Run lean default lane")
+    assert step["if"] == "matrix.lane == 'lean'"
+    assert step["env"] == {"TEST_SHARD": "${{ matrix.shard }}"}
+
+    assert _workflow_lean_shard_targets() == LEAN_SHARD_TARGETS
+
+    command = step["run"]
+    assert command.count('case "$TEST_SHARD" in') == 1
+    assert command.count("\nesac\n") == 1
+    assert (
+        '  *)\n    echo "Unknown lean test shard: $TEST_SHARD"\n'
+        "    exit 2\n    ;;\nesac"
+    ) in command
+    assert command.count('"${shard_targets[@]}"') == 1
+
+
+def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
+    configured_ignores = {
+        option.removeprefix("--ignore=")
+        for option in _pytest_addopts()
+        if option.startswith("--ignore=")
+    }
+    assert configured_ignores == PYTEST_IGNORED_DIRECTORIES
+
+    test_files = {
+        path.relative_to(ROOT).as_posix()
+        for pattern in ("test_*.py", "*_test.py")
+        for path in (ROOT / "tests").rglob(pattern)
+    }
+    lean_test_files = {
+        path
+        for path in test_files
+        if not any(
+            path == ignored or path.startswith(f"{ignored}/")
+            for ignored in PYTEST_IGNORED_DIRECTORIES
+        )
+    }
+
+    shard_targets = _workflow_lean_shard_targets()
+    unmatched = []
+    multiply_matched = {}
+    for path in sorted(lean_test_files):
+        matches = [
+            shard
+            for shard, targets in shard_targets.items()
+            if any(
+                path == target or path.startswith(f"{target}/") for target in targets
+            )
+        ]
+        if not matches:
+            unmatched.append(path)
+        elif len(matches) != 1:
+            multiply_matched[path] = matches
+
+    assert unmatched == [], f"Add new lean tests to one shard: {unmatched}"
+    assert multiply_matched == {}, (
+        f"Lean tests belong to multiple shards: {multiply_matched}"
+    )
+
+
+def test_python_workflow_lean_shards_reject_unisolated_serial_tests():
+    serial_tests = []
+    for pattern in ("test_*.py", "*_test.py"):
+        for path in (ROOT / "tests").rglob(pattern):
+            relative_path = path.relative_to(ROOT).as_posix()
+            if any(
+                relative_path == ignored or relative_path.startswith(f"{ignored}/")
+                for ignored in PYTEST_IGNORED_DIRECTORIES
+            ):
+                continue
+            if _uses_serial_pytest_marker(path):
+                serial_tests.append(relative_path)
+
+    assert sorted(set(serial_tests)) == [], (
+        "Move serial tests into a dedicated nonparallel lane before marking "
+        f"them serial: {sorted(set(serial_tests))}"
+    )
+
+
+def test_python_workflow_cache_is_partitioned_by_shard():
+    step = _step(
+        _workflow()["jobs"]["test"],
+        "Restore Titanoboa compiler artifacts",
+    )
+    assert step["with"]["key"] == (
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-"
+        "${{ matrix.shard }}-${{ github.run_id }}"
+    )
+    assert step["with"]["restore-keys"].splitlines() == [
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-${{{{ matrix.shard }}}}-",
+        f"{BOA_CACHE_PREFIX}-{BOA_INPUT_HASH}-",
+        f"{BOA_CACHE_PREFIX}-",
+        "boa-${{ runner.os }}-py312-",
+    ]
 
 
 def test_python_workflow_uses_full_history_and_bounded_lane_timeouts():
@@ -95,9 +299,10 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert job["needs"] == ["test"]
     assert job["runs-on"] == "ubuntu-latest"
     assert job["timeout-minutes"] == "5"
-    assert "always()" in job["if"]
-    assert "github.event_name == 'pull_request'" in job["if"]
-    assert "github.event_name == 'merge_group'" in job["if"]
+    assert job["if"] == (
+        "${{ always() && (github.event_name == 'pull_request' || "
+        "github.event_name == 'merge_group') }}"
+    )
 
     step = _step(job, "Require successful lean lane")
     assert step["env"]["TEST_RESULT"] == "${{ needs.test.result }}"
