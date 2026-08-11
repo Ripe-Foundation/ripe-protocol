@@ -1,4 +1,5 @@
 titanoboa==0.2.7
+web3==7.16.0
 vyper==0.4.3
 rlp~=4.0.1
 ipython

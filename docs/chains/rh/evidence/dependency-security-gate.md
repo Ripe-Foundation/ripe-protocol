@@ -5067,3 +5067,249 @@ wildcard Click imports, or shell execution. The reachability gate therefore
 includes it in the reviewed CLI allowlist while continuing to reject the
 editor surface. This defense-in-depth update does not reopen the retired Click
 exception.
+
+## Declared Web3 operator dependency prerequisite — 11 August 2026
+
+**Status:** Local candidate pending independent review. This section records a
+four-file prerequisite only; it is not operative on `rh`, merge approval, H-06
+requalification, deployment authorization, or evidence that any external alert
+was closed.
+
+### Immutable candidate boundary
+
+The isolated implementation worktree was created mode `0700` from the exact
+cached `origin/rh` commit requested by the owner:
+
+```text
+base commit:
+  02468586d710e2cce2360c2bc07e94de6ebdab29
+base tree:
+  082a460d0ee190ac74a87ab29828d9c867ddff06
+branch:
+  codex/rh-declare-web3-dependency
+worktree:
+  /private/tmp/rh-declare-web3-dependency.ch0yCQ/worktree
+```
+
+The exact file ceiling is:
+
+```text
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+docs/chains/rh/evidence/dependency-security-gate.md
+```
+
+No workflow, operator script, migration, H-06 runbook, historical measurement,
+PR87 byte, contract, interface, RPC setting, branch setting, or secret was
+changed. No RPC, explorer, chain, hardware wallet, Safe service, push, PR,
+merge, deployment, or external alert-state mutation was performed.
+
+### Why Web3 is a required direct dependency
+
+The exact base and PR87 head
+`4b60cffbb0613efd7e628bdbaa9f644af71dd744` had byte-identical requirement
+files and did not declare Web3. The clean pinned RH Python 3.12 validation
+environment therefore failed at `from web3 import Web3` while exercising
+PR87's defaults snapshot path. Static AST reachability found exactly these ten
+production/operator import sites:
+
+```text
+migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py
+migrations/base-mainnet/2026080701_CcipWire.py
+migrations/robinhood-mainnet/0001_Registries.py
+migrations/robinhood-mainnet/0009_RedeployStaleContracts.py
+migrations/robinhood-mainnet/0010_RedeployLedger.py
+migrations/robinhood-mainnet/2026080701_CcipWire.py
+scripts/ledger_signing_smoke.py
+scripts/prepare_defaults.py
+scripts/utils/ledger_account.py
+scripts/utils/safe_account.py
+```
+
+This is shared production/operator reachability, not one optional test extra.
+An exact main-lock pin gives local developers, CI, migrations, and operator
+scripts one reproducible environment. A separate ops lock would duplicate and
+drift the same Vyper/Boa/eth graph, while replacing Web3 in ten historical and
+current callers would be a larger behavioral change. The smallest reviewed
+fix is therefore an exact direct main-lock dependency.
+
+### Pin selection and primary-source security review
+
+The review was refreshed at `2026-08-11T18:42:39Z` using primary official
+package and upstream security sources only:
+
+- [PyPI release metadata for Web3 7.16.0](https://pypi.org/pypi/web3/7.16.0/json)
+  reported exact version `7.16.0`, `yanked: false`, Python `>=3.8,<4`, and an
+  empty release vulnerability list.
+- [PyPI's Web3 project page](https://pypi.org/project/web3/) reported `7.16.0`
+  as the latest stable release; the newer `8.0.0b3` is a prerelease and was
+  not selected.
+- [The upstream v7.16.0 release](https://github.com/ApeWorX/web3.py/releases/tag/v7.16.0)
+  is a verified release for commit `efbc6eb`.
+- The upstream security page and the official GitHub global-advisory API
+  returned one Web3 advisory,
+  [GHSA-5hr4-253g-cpx2 / CVE-2026-40072](https://github.com/advisories/GHSA-5hr4-253g-cpx2).
+  Its stable affected range is `>=6.0.0b3,<7.15.0`, and `7.15.0` is the first
+  stable patched version. The issue is default-on CCIP Read SSRF.
+
+Consequently, `web3==7.12.0` is rejected even though it passed an earlier
+local compatibility probe. Exact `web3==7.16.0` is the latest non-yanked
+stable Python 3.12-compatible release, is beyond the advisory's stable patch
+boundary, and passed the repository compatibility checks below. This review
+does not claim future advisories cannot appear.
+
+### Deterministic seeded resolution
+
+Two independent mode-`0700` disposable resolver environments used exact
+CPython `3.12.0`, interpreter SHA-256
+`d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`,
+pip `23.2.1`, pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`, packaging
+`26.3`, pyproject-hooks `1.2.0`, setuptools `84.0.0`, and wheel `0.47.0`.
+Each resolver had its own private cache and its own copy of the exact old
+output lock. Both used public `https://pypi.org/simple` only, with no extra or
+private index:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+pip-compile \
+  --cache-dir=PRIVATE_DISPOSABLE_CACHE \
+  --index-url=https://pypi.org/simple \
+  --no-emit-index-url \
+  --output-file=requirements.txt requirements.in
+```
+
+The truthful generated header remains:
+
+```text
+#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+```
+
+One non-authoritative preflight mistakenly passed the display-only header
+value `--cert=None` back to pip-tools. It stopped before resolution with
+`OSError: Could not find a suitable TLS CA certificate bundle, invalid path:
+None` and did not change the seeded output. The two authoritative runs used
+the documented invocation above and completed in 19.29 s and 11.49 s wall.
+
+Both candidate inputs and generated locks were byte-identical:
+
+| Artifact | Old RH SHA-256 | Candidate SHA-256 |
+|---|---|---|
+| `requirements.in` | `1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` |
+| `requirements.txt` | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` |
+| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `a497bae8881b555baa97d2bc24056a1aa0d6406030fd7ce6a59068144282ff70` |
+
+Normalized comparison found zero version change among the 92 existing lock
+pin lines. The candidate adds exactly eleven distributions:
+
+```text
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+frozenlist==1.8.0
+multidict==6.7.1
+propcache==0.5.2
+pyunormalize==17.0.0
+types-requests==2.33.0.20260712
+web3==7.16.0
+websockets==15.0.1
+yarl==1.24.5
+```
+
+Every remaining literal lock change is a resolver annotation adding Web3 or
+one of those eleven packages to an existing package's `via` list. Neither
+input nor lock contains a direct URL, VCS URL, editable path, find-links,
+extra index, or private index.
+
+### Fresh installation, size, and advisory evidence
+
+Separate fresh mode-`0700` CPython `3.12.0` environments installed the exact
+old and candidate locks from public PyPI with `--no-cache-dir`. These are
+single cold-install samples, not performance benchmarks:
+
+| Measurement | Old RH lock | Candidate lock | Delta |
+|---|---:|---:|---:|
+| installation wall time | 20.87 s | 26.26 s | +5.39 s |
+| installed distributions, including environment tooling | 93 | 104 | +11 |
+| site-packages disk allocation | 219,772 KiB | 234,144 KiB | +14,372 KiB (14.04 MiB) |
+
+Both installations passed `python -m pip check`. The candidate inventory
+differed only by the exact eleven-package closure above. No installed
+distribution contained `direct_url.json`; install logs resolved artifacts from
+public `files.pythonhosted.org` under the explicit public PyPI index.
+
+A separate CPython `3.12.0` / pip `23.2.1` environment installed exact
+`pip-audit==2.10.1`. A fresh raw no-ignore audit used `--no-deps`,
+`--disable-pip`, no fix, no suppression, and no `--ignore-vuln` flags. Its raw
+JSON SHA-256 is
+`5581a4c9316cc50901b83dbb31b2af092a22d53d5432c2220492c52ea2942cde`.
+All eleven new closure packages, including Web3, had zero findings.
+
+The full unchanged-plus-new lock currently reports five rows in three
+pre-existing packages:
+
+| Package | Finding | Current disposition |
+|---|---|---|
+| Pymdown Extensions `10.21.3` | `PYSEC-2026-3609`, aliases `CVE-2026-61632` and `GHSA-9xwg-3r6f-jcx2`; fixed `11.0.0` | existing `EX-H01-PYMDOWN-B64-01` record |
+| Pymdown Extensions `10.21.3` | `PYSEC-2026-3654`, aliases `CVE-2026-67422` and `GHSA-gm37-52c6-37mw`; fixed `11.0.1` | **separate H-01 review blocker**; newly observed and not accepted by this prerequisite |
+| pytest `8.4.2` | `PYSEC-2026-1845`; fixed `9.0.3` | existing `EX-H01-PYTEST-01` record |
+| Vyper `0.4.3` | `PYSEC-2023-142` | existing authoritative range exclusion; not an exception |
+| Vyper `0.4.3` | `PYSEC-2025-33` | existing authoritative range exclusion; not an exception |
+
+The newly published Pymdown ReDoS row is outside the Web3 dependency closure
+and exact four-file remediation authority. This candidate does not suppress,
+accept, retire, reclassify, or fix it. Its owner must review it separately
+before integration; floating Pymdown would violate the zero-drift lock scope
+and may conflict with the retained Titanoboa/docs graph.
+
+### Offline regressions and focused validation
+
+The dependency gate now fails closed on the two candidate hashes, exact direct
+`web3==7.16.0` pin, runtime version, absence of `direct_url.json`, exact ten-file
+AST import set, and provider-free EIP-55 checksum and Keccak outputs. The test
+constructs no provider and exposes no HTTP, WebSocket, subprocess, audit, or
+GitHub query path.
+
+All validation unset RPC/provider credentials, private keys, mnemonic and AWS
+credentials; used only an explorer placeholder for collection-time guards;
+redirected bytecode, Boa, pytest, XDG, and Hypothesis state to private
+disposable paths; and made no live query.
+
+| Validation | Result |
+|---|---|
+| Web3 `7.16.0` import, `scripts.utils.safe_account` import, EIP-55 checksum, and Keccak smoke | pass; no provider constructed |
+| exact PR87 head `4b60cffbb0613efd7e628bdbaa9f644af71dd744`, `tests/test_prepare_defaults_snapshot.py`, addopts cleared | 30 passed in 0.27 s; 2.06 s wall; PR87 worktree clean before and after |
+| default lean collection | 3,550 selected of 3,832 total; 282 expected deselections; 7.08 s pytest / 8.93 s wall |
+| comprehensive collection with addopts cleared | 4,523 selected of 4,666 total; 143 expected safe-default deselections; 7.26 s pytest / 9.46 s wall |
+| dependency gate with addopts cleared | 47 passed in 2.91 s; 4.84 s wall |
+
+Web3 import and the PR87 snapshot suite emit one dependency-specific warning:
+`websockets.legacy is deprecated` from Websockets `15.0.1`. It is not hidden or
+suppressed. It does not affect the synchronous checksum, Keccak, or HTTPProvider
+callers under review, but it remains an upstream compatibility/deprecation
+signal for a future Web3/Websockets update.
+
+An attempted broad operator-helper import progressed past Web3 and then failed
+at `scripts/utils/ledger_account.py:4` because `hid` is also undeclared;
+`ledgerblue` and `ledgereth` are further module-level imports in that helper.
+Those hardware-wallet dependencies predate this candidate and are not needed
+by PR87's snapshot path. They require a separate operator-dependency decision;
+this prerequisite does not claim every optional Ledger helper is importable
+from the main lock.
+
+### Effectivity and H-06 boundary
+
+This candidate changes the dependency input and lock identities. Therefore no
+historical H-06, fork, deployment, or full-suite result recorded against old
+lock `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`
+transfers to the candidate. The focused offline PR87 result proves only that
+the missing Web3 dependency is resolved and its 30 snapshots remain stable.
+
+Before merge or deployment reliance, the separate Pymdown H-01 blocker must be
+disposed by its owner, this candidate must pass independent review, and the
+final integrated PR87-plus-prerequisite tree must repeat the required H-06
+qualification under the new lock. No H-06 runbook or historical measurement
+was edited to imply otherwise.

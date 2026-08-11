@@ -34,8 +34,8 @@ EVIDENCE = ROOT / "docs/chains/rh/evidence/dependency-security-gate.md"
 S1 = ROOT / "tests/clock/test_clock_profiles.py"
 
 APPROVED_HASHES = {
-    DIRECT_INPUT: "1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9",
-    LOCK: "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010",
+    DIRECT_INPUT: "77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72",
+    LOCK: "3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569",
 }
 SELECTED = {
     "cbor2": "5.9.0",
@@ -46,6 +46,7 @@ SELECTED = {
     "python-dotenv": "1.2.2",
     "requests": "2.33.0",
     "urllib3": "2.7.0",
+    "web3": "7.16.0",
     "wheel": "0.46.2",
 }
 HELD = {
@@ -63,6 +64,9 @@ RESIDUAL_FINDINGS = {
     "CVE-2026-61632": "EX-H01-PYMDOWN-B64-01",
     "PYSEC-2023-142": "authoritative range exclusion",
     "PYSEC-2025-33": "authoritative range exclusion",
+}
+CURRENT_REVIEW_BLOCKERS = {
+    "PYSEC-2026-3654": "separate H-01 review blocker",
 }
 RETIRED_EXCEPTION_IDS = {
     "EX-H01-CLICK-01",
@@ -131,6 +135,18 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
 }
+EXPECTED_WEB3_IMPORT_PATHS = {
+    Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
+    Path("migrations/base-mainnet/2026080701_CcipWire.py"),
+    Path("migrations/robinhood-mainnet/0001_Registries.py"),
+    Path("migrations/robinhood-mainnet/0009_RedeployStaleContracts.py"),
+    Path("migrations/robinhood-mainnet/0010_RedeployLedger.py"),
+    Path("migrations/robinhood-mainnet/2026080701_CcipWire.py"),
+    Path("scripts/ledger_signing_smoke.py"),
+    Path("scripts/prepare_defaults.py"),
+    Path("scripts/utils/ledger_account.py"),
+    Path("scripts/utils/safe_account.py"),
+}
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
 PYMDOWN_EXTENSION_NAMES = {"pymdownx.b64", "pymdownx.snippets"}
 
@@ -156,6 +172,39 @@ def _pins(path: Path) -> dict[str, str]:
         if match:
             pins[_canonical_name(match.group(1))] = match.group(2)
     return pins
+
+
+def _web3_import_paths(root: Path) -> set[Path]:
+    paths: set[Path] = set()
+    for source_root in (root / "migrations", root / "scripts"):
+        for path in source_root.rglob("*.py"):
+            if path.is_symlink():
+                continue
+            tree = ast.parse(
+                path.read_text(), filename=str(path.relative_to(root))
+            )
+            imports_web3 = any(
+                (
+                    isinstance(node, ast.Import)
+                    and any(
+                        imported.name == "web3"
+                        or imported.name.startswith("web3.")
+                        for imported in node.names
+                    )
+                )
+                or (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module is not None
+                    and (
+                        node.module == "web3"
+                        or node.module.startswith("web3.")
+                    )
+                )
+                for node in ast.walk(tree)
+            )
+            if imports_web3:
+                paths.add(path.relative_to(root))
+    return paths
 
 
 def _exception_section(evidence: str, exception_id: str) -> str:
@@ -561,6 +610,26 @@ def test_approved_inputs_and_generated_lock_are_exact():
         assert expected_hash in evidence
 
 
+def test_web3_is_a_direct_dependency_with_exact_production_reachability():
+    assert _pins(DIRECT_INPUT)["web3"] == "7.16.0"
+    assert _pins(LOCK)["web3"] == "7.16.0"
+    assert _web3_import_paths(ROOT) == EXPECTED_WEB3_IMPORT_PATHS
+    evidence = EVIDENCE.read_text()
+    assert "GHSA-5hr4-253g-cpx2" in evidence
+    assert "`web3==7.12.0` is rejected" in evidence
+
+
+def test_web3_checksum_and_keccak_are_stable_without_a_provider():
+    from web3 import Web3
+
+    assert Web3.to_checksum_address(
+        "0x52908400098527886e0f7030069857d2e4169ee7"
+    ) == "0x52908400098527886E0F7030069857D2E4169EE7"
+    assert Web3.keccak(text="ripe-web3-offline-gate").hex() == (
+        "1d17285abbb738ef53dadaa05ee534ef754ed12345f9c7c31b08c1819d611824"
+    )
+
+
 def test_selected_and_held_versions_match_lock_and_runtime():
     pins = _pins(LOCK)
     expected = SELECTED | HELD
@@ -568,8 +637,8 @@ def test_selected_and_held_versions_match_lock_and_runtime():
         assert pins[package] == version
         assert metadata.version(package) == version
 
-    # These lower versions are the vulnerable frozen-lock values displaced by
-    # Candidate A. Exact approved pins above make the range check fail closed.
+    # These reviewed lower versions are displaced or explicitly rejected.
+    # Exact approved pins above make the range check fail closed.
     forbidden = {
         "cbor2": {"5.7.0"},
         "click": {"8.2.1"},
@@ -579,6 +648,7 @@ def test_selected_and_held_versions_match_lock_and_runtime():
         "python-dotenv": {"1.2.1"},
         "requests": {"2.32.5"},
         "urllib3": {"2.5.0", "2.6.0", "2.6.2", "2.6.3"},
+        "web3": {"7.12.0"},
         "wheel": {"0.45.1"},
     }
     for package, versions in forbidden.items():
@@ -621,6 +691,9 @@ def test_evidence_reconciles_every_selected_package_and_residual_finding():
     for package in SELECTED | HELD:
         assert package in evidence.lower()
     for finding, disposition in RESIDUAL_FINDINGS.items():
+        assert finding in evidence
+        assert disposition in evidence
+    for finding, disposition in CURRENT_REVIEW_BLOCKERS.items():
         assert finding in evidence
         assert disposition in evidence
     for finding, disposition in RETIRED_REMEDIATED_FINDINGS.items():
@@ -1222,3 +1295,5 @@ def test_dependency_gate_has_no_live_query_capability():
     )
     assert "gh " + "api" not in source
     assert "pip_" + "audit" not in source
+    assert ".HTTP" + "Provider" not in source
+    assert "WebSocket" + "Provider" not in source
