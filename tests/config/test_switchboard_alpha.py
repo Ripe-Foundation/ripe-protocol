@@ -31,6 +31,61 @@ def _asset_config(vault_ids):
     )
 
 
+def _support_asset(mission_control, switchboard_bravo, asset, vault_ids):
+    mission_control.setAssetConfig(
+        asset,
+        _asset_config(vault_ids),
+        sender=switchboard_bravo.address,
+    )
+
+
+def _register_vault(vault_book, governance, vault, description):
+    assert vault_book.startAddNewAddressToRegistry(
+        vault.address,
+        description,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    return vault_book.confirmNewAddressToRegistry(
+        vault.address,
+        sender=governance.address,
+    )
+
+
+def _legacy_partial_stability_pool(asset, name):
+    return boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256:
+    return 0
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        asset,
+        name=name,
+    )
+
+
 @pytest.fixture(scope="function")
 def new_mission_control(ripe_hq, defaults):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
@@ -627,6 +682,86 @@ def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
     ]
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityStabVaults(multiple_vaults, sender=governance.address)
+
+
+def test_priority_stab_vault_rejects_legacy_partial_interface(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    savings_green,
+):
+    legacy_pool = _legacy_partial_stability_pool(
+        savings_green,
+        "legacy_partial_priority_stability_pool",
+    )
+    vault_id = _register_vault(
+        vault_book,
+        governance,
+        legacy_pool,
+        "Legacy Partial Priority Pool",
+    )
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1, vault_id],
+    )
+
+    with boa.reverts():
+        switchboard_alpha.setPriorityStabVaults(
+            [(vault_id, savings_green.address)],
+            sender=governance.address,
+        )
+
+
+def test_priority_stab_vault_revalidates_interface_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    stability_pool,
+    savings_green,
+):
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        savings_green.address,
+        [1],
+    )
+    action_id = switchboard_alpha.setPriorityStabVaults(
+        [(1, savings_green.address)],
+        sender=governance.address,
+    )
+    legacy_pool = _legacy_partial_stability_pool(
+        savings_green,
+        "replacement_partial_priority_stability_pool",
+    )
+    assert vault_book.startAddressUpdateToRegistry(
+        1,
+        legacy_pool.address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        1,
+        sender=governance.address,
+    )
+
+    confirmation_block = switchboard_alpha.getActionConfirmationBlock(action_id)
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+    with boa.reverts():
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert vault_book.getAddr(1) == legacy_pool.address
+    assert stability_pool.address != legacy_pool.address
 
 
 def test_invalid_priority_vaults(switchboard_alpha, governance):

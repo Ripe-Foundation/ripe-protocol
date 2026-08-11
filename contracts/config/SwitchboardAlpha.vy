@@ -44,6 +44,11 @@ interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
+interface StabilityPool:
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def isPaused() -> bool: view
+
 interface CreditEngine:
     def setUnderscoreVaultDiscount(_discount: uint256): nonpayable
     def setBuybackRatio(_ratio: uint256): nonpayable
@@ -1235,11 +1240,13 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
 
     priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
     assert len(priorityVaults) == len(_priorityStabVaults) # dev: invalid priority vaults
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert self._areValidPriorityStabVaults(priorityVaults, mc) # dev: invalid priority stab vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
     self.pendingPriorityStabVaults[aid] = priorityVaults
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingMissionControl[aid] = mc
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityStabVaultsChange(
         numPriorityStabVaults=len(priorityVaults),
@@ -1253,7 +1260,9 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
 
 
 @internal
-def _sanitizePriorityVaults(_priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]) -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
+def _sanitizePriorityVaults(
+    _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
+) -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
     sanitizedVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = []
     vaultBook: address = self._getVaultBookAddr()
     mc: address = self._getMissionControlAddr()
@@ -1267,6 +1276,32 @@ def _sanitizePriorityVaults(_priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAU
         sanitizedVaults.append(vault)
         self.vaultDedupe[vault.vaultId][vault.asset] = True
     return sanitizedVaults
+
+
+@view
+@internal
+def _areValidPriorityStabVaults(
+    _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
+    _missionControl: address,
+) -> bool:
+    vaultBook: address = self._getVaultBookAddr()
+    for vault: cs.VaultLite in _priorityVaults:
+        if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
+            return False
+        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vault.vaultId)
+        if vaultAddr == empty(address) or not vaultAddr.is_contract:
+            return False
+        if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(vault.vaultId, vault.asset):
+            return False
+
+        # Capability probes only: zero is deliberately not asserted as a live
+        # claim asset. AuctionHouse calls both selectors before either pool
+        # mutation, so a legacy/partial implementation must fail here instead.
+        naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
+        naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
+        if staticcall StabilityPool(vaultAddr).isPaused():
+            return False
+    return True
 
 
 #############################
@@ -1580,6 +1615,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.OTHER_PRIORITY_STAB_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityStabVaults[_aid]
+        assert self._areValidPriorityStabVaults(priorityVaults, mc) # dev: invalid priority stab vaults
         extcall MissionControl(mc).setPriorityStabVaults(priorityVaults)
         log PriorityStabVaultsSet(numVaults=len(priorityVaults))
 
