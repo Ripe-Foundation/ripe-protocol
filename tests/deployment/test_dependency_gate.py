@@ -150,7 +150,7 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
 }
-EXPECTED_WEB3_IMPORT_PATHS = {
+CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
     Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
     Path("migrations/base-mainnet/2026080701_CcipWire.py"),
     Path("migrations/robinhood-mainnet/0001_Registries.py"),
@@ -212,7 +212,7 @@ def _assert_web3_closure(
         )
 
 
-def _literal_dynamic_import(
+def _supported_literal_import_target(
     node: ast.AST,
     importlib_aliases: set[str],
     import_module_aliases: set[str],
@@ -244,7 +244,7 @@ def _literal_dynamic_import(
     return None
 
 
-def _web3_import_paths(root: Path) -> set[Path]:
+def _supported_web3_import_paths(root: Path) -> set[Path]:
     paths: set[Path] = set()
     for source_root in (root / "migrations", root / "scripts"):
         try:
@@ -258,7 +258,7 @@ def _web3_import_paths(root: Path) -> set[Path]:
             relative = path.relative_to(root)
             mode = path.lstat().st_mode
             assert not stat.S_ISLNK(mode), (
-                f"{relative}: symlink entries are not allowed in Web3 census roots"
+                f"{relative}: symlink entries are not allowed in Web3 inventory roots"
             )
             if path.suffix != ".py":
                 continue
@@ -266,6 +266,8 @@ def _web3_import_paths(root: Path) -> set[Path]:
                 f"{relative}: Python source must be a regular file"
             )
             tree = ast.parse(path.read_text(), filename=str(relative))
+            # Deliberately syntax-limited: callable assignment, builtins aliases,
+            # and dataflow-derived targets remain explicit code-review triggers.
             importlib_aliases: set[str] = set()
             import_module_aliases: set[str] = set()
             for node in ast.walk(tree):
@@ -298,7 +300,7 @@ def _web3_import_paths(root: Path) -> set[Path]:
                 )
                 or (
                     (
-                        dynamic_target := _literal_dynamic_import(
+                        dynamic_target := _supported_literal_import_target(
                             node,
                             importlib_aliases,
                             import_module_aliases,
@@ -717,13 +719,18 @@ def test_approved_inputs_and_generated_lock_are_exact():
         assert expected_hash in evidence
 
 
-def test_web3_is_a_direct_dependency_with_exact_production_reachability():
+def test_web3_direct_dependency_and_supported_current_tree_inventory():
     assert _pins(DIRECT_INPUT)["web3"] == "7.16.0"
     assert _pins(LOCK)["web3"] == "7.16.0"
-    assert _web3_import_paths(ROOT) == EXPECTED_WEB3_IMPORT_PATHS
+    # Equality is a drift check only for the explicitly supported syntax below;
+    # it is not whole-program Python import reachability.
+    assert _supported_web3_import_paths(ROOT) == CURRENT_SUPPORTED_WEB3_IMPORT_PATHS
     evidence = EVIDENCE.read_text()
+    normalized_evidence = " ".join(evidence.split())
     assert "GHSA-5hr4-253g-cpx2" in evidence
     assert "`web3==7.12.0` is rejected" in evidence
+    assert "not whole-program Python import reachability" in normalized_evidence
+    assert "code-review trigger" in evidence
 
 
 @pytest.mark.parametrize(
@@ -739,15 +746,15 @@ def test_web3_is_a_direct_dependency_with_exact_production_reachability():
         ("from importlib import import_module as load_module\nload_module('web3')\n"),
     ),
 )
-def test_web3_census_detects_direct_and_literal_dynamic_imports(tmp_path, source):
+def test_web3_supported_inventory_detects_listed_syntax(tmp_path, source):
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     candidate = scripts / "candidate.py"
     candidate.write_text(source)
-    assert _web3_import_paths(tmp_path) == {Path("scripts/candidate.py")}
+    assert _supported_web3_import_paths(tmp_path) == {Path("scripts/candidate.py")}
 
 
-def test_web3_census_rejects_symlink_entries(tmp_path):
+def test_web3_inventory_rejects_symlink_entries(tmp_path):
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     target = tmp_path / "target.py"
@@ -755,27 +762,44 @@ def test_web3_census_rejects_symlink_entries(tmp_path):
     (scripts / "candidate.py").symlink_to(target)
 
     with pytest.raises(AssertionError, match="symlink entries are not allowed"):
-        _web3_import_paths(tmp_path)
+        _supported_web3_import_paths(tmp_path)
 
 
-def test_web3_census_rejects_nonregular_python_sources(tmp_path):
+def test_web3_inventory_rejects_nonregular_python_sources(tmp_path):
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     (scripts / "candidate.py").mkdir()
 
     with pytest.raises(AssertionError, match="Python source must be a regular"):
-        _web3_import_paths(tmp_path)
+        _supported_web3_import_paths(tmp_path)
 
 
-def test_web3_census_does_not_claim_computed_dynamic_imports(tmp_path):
+@pytest.mark.parametrize(
+    "source",
+    (
+        (
+            "from importlib import import_module\n"
+            "assigned_callable = import_module\n"
+            "assigned_callable('web3')\n"
+        ),
+        (
+            "import builtins as python_builtins\n"
+            "python_builtins.__import__('web3')\n"
+        ),
+        (
+            "import importlib\n"
+            "module_alias = 'web3'\n"
+            "importlib.import_module(module_alias)\n"
+        ),
+    ),
+)
+def test_web3_inventory_leaves_callable_builtins_and_dataflow_aliases_to_review(
+    tmp_path, source
+):
     scripts = tmp_path / "scripts"
     scripts.mkdir()
-    (scripts / "candidate.py").write_text(
-        "import importlib\n"
-        "module_name = ''.join(('web', '3'))\n"
-        "importlib.import_module(module_name)\n"
-    )
-    assert _web3_import_paths(tmp_path) == set()
+    (scripts / "candidate.py").write_text(source)
+    assert _supported_web3_import_paths(tmp_path) == set()
 
 
 def test_web3_closure_matches_lock_runtime_and_install_metadata():

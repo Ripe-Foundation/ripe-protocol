@@ -5111,8 +5111,9 @@ The exact base and PR87 head
 `4b60cffbb0613efd7e628bdbaa9f644af71dd744` had byte-identical requirement
 files and did not declare Web3. The clean pinned RH Python 3.12 validation
 environment therefore failed at `from web3 import Web3` while exercising
-PR87's defaults snapshot path. Static AST reachability found exactly these ten
-production/operator import sites:
+PR87's defaults snapshot path. The syntax-limited AST inventory described
+below measured these ten current-tree production/operator files using its
+supported import forms:
 
 ```text
 migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py
@@ -5127,12 +5128,13 @@ scripts/utils/ledger_account.py
 scripts/utils/safe_account.py
 ```
 
-This is shared production/operator reachability, not one optional test extra.
-An exact main-lock pin gives local developers, CI, migrations, and operator
-scripts one reproducible environment. A separate ops lock would duplicate and
-drift the same Vyper/Boa/eth graph, while replacing Web3 in ten historical and
-current callers would be a larger behavioral change. The smallest reviewed
-fix is therefore an exact direct main-lock dependency.
+These are known production/operator callers, not one optional test extra. The
+list is a bounded current-tree measurement, not whole-program Python import
+reachability. An exact main-lock pin gives local developers, CI, migrations,
+and operator scripts one reproducible environment. A separate ops lock would
+duplicate and drift the same Vyper/Boa/eth graph, while replacing Web3 in ten
+historical and current callers would be a larger behavioral change. The
+smallest reviewed fix is therefore an exact direct main-lock dependency.
 
 ### Pin selection and primary-source security review
 
@@ -5200,7 +5202,7 @@ Both candidate inputs and generated locks were byte-identical:
 |---|---|---|
 | `requirements.in` | `1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` |
 | `requirements.txt` | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` |
-| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `beda706d1bb67e478295e85e849e9276aa97bfa98079ace164fb25538faf2bfa` |
+| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` |
 
 Normalized comparison found zero version change among the 92 existing lock
 pin lines. The candidate adds exactly eleven distributions:
@@ -5267,37 +5269,48 @@ and may conflict with the retained Titanoboa/docs graph.
 
 ### Offline regressions and focused validation
 
-Reviewer hardening is based on local commit
-`202f97c11960ab1a4327dc57aefacf4877c231bc` in the fresh mode-`0700`
-worktree `/private/tmp/rh-declare-web3-dependency-hardened.5vIdYY/worktree` on
-branch `codex/rh-declare-web3-dependency-hardened`. The two requirement files
-remain byte-identical to that parent. Reviewer hardening replaces the parent
-test hash `a497bae8881b555baa97d2bc24056a1aa0d6406030fd7ce6a59068144282ff70`
-with the test hash recorded in the artifact table above.
+Reviewer hardening began from local commit
+`202f97c11960ab1a4327dc57aefacf4877c231bc`; this final simplicity amendment
+began from local commit `9f37272f3d438a8d4afee880c5f43308beb7c870` in the same fresh
+mode-`0700` worktree
+`/private/tmp/rh-declare-web3-dependency-hardened.5vIdYY/worktree` on branch
+`codex/rh-declare-web3-dependency-hardened`. The two requirement files remain
+byte-identical across both amendments. The final test hash is recorded in the
+artifact table above; the immediate parent test hash was
+`beda706d1bb67e478295e85e849e9276aa97bfa98079ace164fb25538faf2bfa`.
 
-The dependency gate fails closed on the two candidate requirement hashes and
-the exact direct `web3==7.16.0` pin. It defines the complete eleven-package
-Web3 closure above as an exact name/version mapping. Every closure member must
-match the lock and installed runtime version and must have no
-`direct_url.json`; per-package mutation regressions prove that a changed lock
-version, changed runtime version, or direct-URL installation record is
-rejected.
+The dependency gate asserts the two candidate requirement hashes and the exact
+direct `web3==7.16.0` pin. It defines the complete eleven-package Web3 closure
+above as an exact name/version mapping. Every closure member must match the
+lock and installed runtime version and must have no `direct_url.json`;
+per-package mutation regressions prove that a changed lock version, changed
+runtime version, or direct-URL installation record is rejected.
 
-The production census covers `migrations/**/*.py` and `scripts/**/*.py`. It
-rejects a symlink anywhere in those roots and rejects a matching `.py` path
-that is not a regular file. It detects direct `import web3` / `from web3`
-forms, literal `__import__("web3")`, and literal
-`importlib.import_module("web3")`, including ordinary aliases for `importlib`
-and `import_module`. Mutation regressions exercise every listed form and the
-symlink/nonregular failures. This is a static, literal census: it does not
-claim to execute code or prove import targets assembled from runtime or
-otherwise computed values.
+The syntax-limited inventory scans `migrations/**/*.py` and `scripts/**/*.py`.
+It rejects a symlink anywhere in those roots and rejects a matching `.py` path
+that is not a regular file. Its supported syntax is direct `import web3` /
+`from web3`, literal `__import__("web3")`, and literal
+`importlib.import_module("web3")`, including ordinary aliases introduced by
+the `import importlib as ...` and `from importlib import import_module as ...`
+statements themselves. Regressions exercise every supported form and the
+symlink/nonregular failures. Equality with the ten-file list is only a drift
+check over that supported syntax and is not whole-program Python import
+reachability.
+
+Callable assignment such as `loader = importlib.import_module`, builtins
+aliases such as `import builtins as python_builtins` followed by
+`python_builtins.__import__`, and module-name aliases or other dataflow-derived
+call targets are deliberately outside the static inventory. Regression cases
+make that boundary visible. Any such construct in operator or migration code
+is a code-review trigger for an explicit dependency/inventory update; this
+gate does not implement callable assignment, builtins, scope, or dataflow
+alias analysis.
 
 The checksum/Keccak regression imports Web3, then replaces `socket.socket`,
 `socket.create_connection`, and the low-level DNS lookup functions with
-fail-closed hooks. The EIP-55 checksum and Keccak operations complete with an
-empty attempt log. That proves only that this executed offline regression made
-no socket or DNS attempt; it does not claim that every possible provider
+denial hooks. The EIP-55 checksum and Keccak operations complete with an empty
+attempt log. That proves only that this executed offline regression made no
+socket or DNS attempt; it does not claim that every possible provider
 construction or arbitrary Web3 caller is statically prohibited. The gate
 still has no subprocess, audit-service, GitHub API, or direct external-query
 implementation.
@@ -5317,6 +5330,9 @@ disposable paths; and made no live query.
 | reviewer-hardening Web3 selection | 47 passed, 45 deselected in 0.76 s |
 | reviewer-hardened dependency gate with addopts cleared | 92 passed in 3.70 s; 6.35 s wall |
 | reviewer-hardened PR87 snapshot recheck at exact `4b60cffbb0613efd7e628bdbaa9f644af71dd744` | 30 passed in 0.29 s; 2.23 s wall; detached worktree clean |
+| final simplicity-amendment Web3 selection | 49 passed, 45 deselected in 0.74 s |
+| final simplicity-amendment dependency gate with addopts cleared | 94 passed in 3.32 s; 5.51 s wall |
+| final simplicity-amendment PR87 snapshot recheck at exact `4b60cffbb0613efd7e628bdbaa9f644af71dd744` | 30 passed in 0.31 s; 2.35 s wall; detached worktree clean |
 
 Web3 import and the PR87 snapshot suite emit one dependency-specific warning:
 `websockets.legacy is deprecated` from Websockets `15.0.1`. It is not hidden or
