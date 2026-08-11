@@ -4,10 +4,16 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import boa
 import pytest
 
 import scripts.utils.migration as migration_module
 from scripts.utils.migration import Migration
+from scripts.utils.migration_helpers import (
+    NO_OUTPUT_TRANSACTION_RESULT,
+    TransactionExecutionError,
+    execute_transaction,
+)
 from scripts.utils.migration_runner import MigrationRunner
 
 
@@ -23,6 +29,25 @@ def _migration(tmp_path: Path, *, timestamp: str = "2") -> Migration:
     return Migration(_args(), {}, timestamp, "1", str(tmp_path))
 
 
+class _AbiCallable:
+    def __init__(self, outputs, result=None, error=None):
+        self._abi = {
+            "type": "function",
+            "name": "synthetic",
+            "inputs": [],
+            "outputs": outputs,
+        }
+        self._result = result
+        self._error = error
+        self.calls = 0
+
+    def __call__(self):
+        self.calls += 1
+        if self._error is not None:
+            raise self._error
+        return self._result
+
+
 class _Registry:
     def __init__(self, address: str):
         self.address = address
@@ -30,6 +55,66 @@ class _Registry:
     def getAddr(self, registry_id: int) -> str:
         assert registry_id == 7
         return self.address
+
+
+def test_vyper_zero_output_success_is_durably_logged_and_resumable(tmp_path):
+    contract = boa.loads(
+        """
+stored: public(uint256)
+
+@external
+def set_stored(new_value: uint256):
+    self.stored = new_value
+"""
+    )
+    deploy_args = SimpleNamespace(
+        ignore_logs=False,
+        rpc="redacted",
+        sender=SimpleNamespace(address=boa.env.eoa),
+    )
+
+    migration = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    result = migration.execute(contract.set_stored, 41)
+
+    assert result == NO_OUTPUT_TRANSACTION_RESULT
+    assert result
+    assert contract.stored() == 41
+    assert json.loads((tmp_path / "2-log.json").read_text()) == {
+        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    }
+
+    resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    assert resumed.execute(contract.set_stored, 99) == NO_OUTPUT_TRANSACTION_RESULT
+    assert contract.stored() == 41
+
+
+def test_abi_none_requires_explicit_zero_outputs():
+    no_output_transaction = _AbiCallable([])
+    assert (
+        execute_transaction(no_output_transaction, no_retry=True)
+        == NO_OUTPUT_TRANSACTION_RESULT
+    )
+    assert no_output_transaction.calls == 1
+
+    transaction = _AbiCallable([{"name": "", "type": "uint256"}])
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        execute_transaction(transaction, no_retry=True)
+
+    assert transaction.calls == 1
+
+
+def test_raised_zero_output_function_remains_fail_closed():
+    transaction = _AbiCallable([], error=RuntimeError("synthetic failure"))
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        execute_transaction(transaction, no_retry=True)
+
+    assert transaction.calls == 1
 
 
 def test_deployment_stays_pending_until_migration_end(

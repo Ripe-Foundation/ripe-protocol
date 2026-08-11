@@ -26,6 +26,47 @@ class TransactionExecutionError(RuntimeError):
     """A migration transaction never produced a confirmed result."""
 
 
+NO_OUTPUT_TRANSACTION_RESULT = "MIGRATION_TRANSACTION_CONFIRMED_NO_OUTPUT"
+
+
+def _transaction_abi_entry(transaction):
+    """Return explicit callable ABI metadata, or ``None`` if it is ambiguous."""
+    direct_abi = getattr(transaction, "_abi", None)
+    if isinstance(direct_abi, Mapping):
+        return direct_abi
+
+    # Boa's source-backed VyperFunction keeps the ABI on its contract and the
+    # function name on its AST node.  ABI-backed Boa functions take the direct
+    # path above.  Requiring exactly one match keeps unknown/overloaded shapes
+    # fail-closed instead of inferring success from a Python ``None``.
+    function_ast = getattr(transaction, "fn_ast", None)
+    function_name = getattr(function_ast, "name", None)
+    contract = getattr(transaction, "contract", None)
+    contract_abi = getattr(contract, "abi", None)
+    if not isinstance(function_name, str) or not isinstance(contract_abi, list):
+        return None
+
+    matches = [
+        entry
+        for entry in contract_abi
+        if isinstance(entry, Mapping)
+        and entry.get("type") == "function"
+        and entry.get("name") == function_name
+    ]
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _declares_zero_outputs(transaction):
+    abi_entry = _transaction_abi_entry(transaction)
+    return (
+        abi_entry is not None
+        and abi_entry.get("type") == "function"
+        and abi_entry.get("outputs") == []
+    )
+
+
 def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR], excluded_dirs=("testing",)):
     """
     Load all Vyper files from the specified directories and their subdirectories.
@@ -153,6 +194,8 @@ def execute_transaction(transaction, *args, **kwargs):
         try:
             result = transaction(*args, **kwargs)
             if result is None:
+                if _declares_zero_outputs(transaction):
+                    return NO_OUTPUT_TRANSACTION_RESULT
                 raise TransactionExecutionError(
                     "MIGRATION_TRANSACTION_RESULT_MISSING"
                 )
