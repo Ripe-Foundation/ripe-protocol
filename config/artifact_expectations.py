@@ -29,6 +29,8 @@ _REFERENCE_KEYS = frozenset({"path", "sha256"})
 _RECORD_KEYS = frozenset({"contract", "expectation", "schema_version"})
 _SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 _CONTRACT_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_MAX_JSON_DEPTH = 100
+_MAX_JSON_NODES = 100_000
 
 
 class ArtifactExpectationsError(ValueError):
@@ -55,20 +57,51 @@ def _parse_finite_float(value: str) -> float:
     return parsed
 
 
+def _validate_json_complexity(value: Any, *, label: str) -> None:
+    stack = [(value, 0)]
+    nodes = 0
+    while stack:
+        current, depth = stack.pop()
+        nodes += 1
+        if nodes > _MAX_JSON_NODES:
+            raise ArtifactExpectationsError(
+                f"{label}: JSON value exceeds maximum node count "
+                f"{_MAX_JSON_NODES}"
+            )
+        if depth > _MAX_JSON_DEPTH:
+            raise ArtifactExpectationsError(
+                f"{label}: JSON nesting exceeds maximum depth "
+                f"{_MAX_JSON_DEPTH}"
+            )
+        if isinstance(current, dict):
+            stack.extend((nested, depth + 1) for nested in current.values())
+        elif isinstance(current, list):
+            stack.extend((nested, depth + 1) for nested in current)
+
+
 def _load_json(raw: bytes, *, label: str) -> Any:
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ArtifactExpectationsError(f"{label}: invalid UTF-8") from exc
     try:
-        return json.loads(
+        value = json.loads(
             text,
             object_pairs_hook=_reject_duplicate_keys,
             parse_constant=_reject_non_finite_constant,
             parse_float=_parse_finite_float,
         )
-    except json.JSONDecodeError as exc:
+    except ArtifactExpectationsError:
+        raise
+    except (
+        json.JSONDecodeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+    ) as exc:
         raise ArtifactExpectationsError(f"{label}: invalid JSON: {exc}") from exc
+    _validate_json_complexity(value, label=label)
+    return value
 
 
 def _require_exact_keys(

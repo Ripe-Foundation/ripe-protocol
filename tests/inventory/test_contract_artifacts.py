@@ -66,6 +66,24 @@ CURVE_LAUNCH_ARTIFACTS = {
         "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
     ),
 }
+JSON_RESOURCE_COUNTEREXAMPLES = (
+    pytest.param(b"1" * 5_000, "invalid JSON", id="huge-integer"),
+    pytest.param(
+        b"[" * 1_500 + b"0" + b"]" * 1_500,
+        "invalid JSON",
+        id="parser-recursion",
+    ),
+    pytest.param(
+        b"[" * 500 + b"0" + b"]" * 500,
+        "JSON nesting exceeds maximum depth",
+        id="post-parse-depth",
+    ),
+    pytest.param(
+        b"[" + b"0," * 100_000 + b"0]",
+        "JSON value exceeds maximum node count",
+        id="post-parse-width",
+    ),
+)
 
 
 def _run_checker(*args: str) -> subprocess.CompletedProcess[str]:
@@ -90,6 +108,40 @@ def _load_expectations(path: Path = EXPECTATIONS, *, root: Path = ROOT) -> dict:
 
 def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _write_v1_parser_counterexample(
+    directory: Path, counterexample: bytes
+) -> Path:
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["parser_counterexample"] = (
+        "__PARSER_COUNTEREXAMPLE__"
+    )
+    raw = _json_bytes(values).replace(
+        b'"__PARSER_COUNTEREXAMPLE__"', counterexample
+    )
+    index_path = directory / "parser-counterexample-v1.json"
+    index_path.write_bytes(raw)
+    return index_path
+
+
+def _write_v2_parser_counterexample(tmp_path: Path, counterexample: bytes):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["parser_counterexample"] = (
+        "__PARSER_COUNTEREXAMPLE__"
+    )
+    raw = _json_bytes(record).replace(
+        b'"__PARSER_COUNTEREXAMPLE__"', counterexample
+    )
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    assert hashlib.sha256(raw).hexdigest() == (
+        index["contracts"]["Lootbox"]["sha256"]
+    )
+    return repository, index_path
 
 
 def _write_v2_expectations(tmp_path: Path):
@@ -315,6 +367,40 @@ def test_v2_nested_float_overflow_fails_closed(tmp_path, overflow):
         _load_expectations(index_path, root=repository)
 
 
+@pytest.mark.parametrize(
+    ("counterexample", "failure"),
+    JSON_RESOURCE_COUNTEREXAMPLES,
+)
+def test_v1_json_resource_failures_are_typed_before_materialization(
+    tmp_path, counterexample, failure
+):
+    index_path = _write_v1_parser_counterexample(tmp_path, counterexample)
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match=rf"artifact expectations: {failure}",
+    ):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("counterexample", "failure"),
+    JSON_RESOURCE_COUNTEREXAMPLES,
+)
+def test_v2_nested_json_resource_failures_are_typed_before_materialization(
+    tmp_path, counterexample, failure
+):
+    repository, index_path = _write_v2_parser_counterexample(
+        tmp_path, counterexample
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match=rf"contract record Lootbox: {failure}",
+    ):
+        _load_expectations(index_path, root=repository)
+
+
 def test_v2_missing_record_fails_closed(tmp_path):
     repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
     record_paths["Lootbox"].unlink()
@@ -440,6 +526,38 @@ def test_updater_refuses_v2_before_compile_or_write(tmp_path, monkeypatch):
 
     with pytest.raises(
         ArtifactExpectationsError, match="updates require an atomic v2 writer"
+    ):
+        artifact_updater.main()
+
+    assert _snapshot_regular_files(repository) == before
+
+
+def test_updater_refuses_deep_v1_before_compile_or_write(tmp_path, monkeypatch):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    counterexample = b"[" * 500 + b"0" + b"]" * 500
+    index_path = _write_v1_parser_counterexample(repository, counterexample)
+    before = _snapshot_regular_files(repository)
+
+    def unexpected_vyper_lookup():
+        pytest.fail("updater reached compiler discovery for deeply nested v1")
+
+    def unexpected_write(*_args, **_kwargs):
+        pytest.fail("updater attempted to write deeply nested v1")
+
+    monkeypatch.setattr(artifact_updater, "ROOT", repository)
+    monkeypatch.setattr(artifact_updater, "EXPECTATIONS", index_path)
+    monkeypatch.setattr(
+        artifact_updater.checker, "_vyper_path", unexpected_vyper_lookup
+    )
+    monkeypatch.setattr(Path, "write_text", unexpected_write)
+    monkeypatch.setattr(
+        sys, "argv", ["update_contract_artifact_expectations.py"]
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError,
+        match="artifact expectations: JSON nesting exceeds maximum depth",
     ):
         artifact_updater.main()
 
