@@ -1,447 +1,521 @@
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Design proposal / rationale. Planning and discussion only.
+**Status:** Economic rationale for the owner-approved revision-20 mechanism now
+implemented in the working candidate. Contract, test, model, and ABI implementation
+work and local validation are complete; the owner approved the revision-20 project-size
+ceilings recorded in the normative specification. Economic calibration is explicitly
+**not approved**.
 
-> **Note (read first):** This is the pricing *rationale and intuition* only. The
-> **decided v1 shape lives in [`implementation-spec.md`](implementation-spec.md)**,
-> which supersedes this document wherever they differ. Superseded here: v1 uses
-> **flexible configurable locks with a linear bonus** (not a single fixed lock); the
-> **DECAY** empty-epoch policy (not HOLD); **governed-like-the-bonds** configuration
-> with a **governed, raisable mint budget** (not an immutable pilot / immutable
-> budget); a **dedicated Switchboard** for config (there *are* governance changes, not
-> "no Switchboard changes"); a **deployment-selected dollar-denominated payment
-> token with a derived decimal scale** (not USDC-only or a fixed six-decimal scale);
-> and **no hard sunset** (governance disables instead). Read the sections below for
-> the *why*; take the *what* from the spec.
+> **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
+> source and supersedes this document wherever they differ. The companion
+> [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
+> controller and override derivation in more detail. This rationale does not authorize
+> deployment, configuration, RIPE minting, activation, merge, or pull-request
+> publication.
 
-**Prepared:** 5 August 2026 · **Revised:** 6 August 2026 after implementation reconciliation
+**Prepared:** 5 August 2026 · **Revised:** 11 August 2026 for the implemented
+revision-20 controller and next-successful-rollover override.
 
-**Purpose:** This document explains how the Instant Bond Lane sets its Buy Now
-price and why. The broader feature scope (shared Bonding UI, inventory, settlement
-into the RIPE governance vault) is covered by the original design doc kept outside
-this repo, in `hightop-notes/ripe/`; this file focuses only on price.
+**Purpose:** Explain how the Instant Bond Lane sets its Buy Now rate, why the mechanism
+uses these signals, and which economic risks remain for calibration and operations.
 
 **What this mechanism is, stated plainly:** a **cap-clearing controller**, not a
-fair-value oracle. It finds the price at which a small, fixed sale budget clears
-near a target level of demand, and it manages that budget conservatively. It does
-not attempt to discover what RIPE is worth on external venues. Arbitrage keeps its
-price tethered to the external market — the tether tighter the smaller the cap —
-but the controller's job is to sell a bounded budget at a self-adjusting price, not
-to be an oracle.
-
-**Implementation authority:** None. Nothing here authorizes contract changes,
-deployment, configuration, RIPE minting, or activation.
+fair-value oracle. It finds a rate at which a bounded sale capacity clears near a
+target level of demand. It does not read external venues or claim to know RIPE's fair
+value. Arbitrage can tether its price to external value, but the tether is indirect,
+lagged, and safest when capacity and the lifetime mint budget are conservative.
 
 ---
 
-## 1. The core idea
+## 1. Implemented mechanism in one page
 
-Let the sale set its own price. Each lane epoch has one fixed Buy Now price,
-computed once at rollover from a single fact the contract already knows: **how
-much of the previous epoch's capacity actually sold.** If an epoch clears its cap,
-the next epoch's price steps up. If it clears weakly, the next epoch's price steps
-down, above a hard floor. Nothing else feeds the price — no reference feed, no
-observation buffer, no DEX read, no per-epoch admin transaction.
+Each deterministic Lane epoch has one fixed base payout rate. At the first successful
+purchase in a later epoch, the Lane lazily computes a new rate from the prior stored
+epoch's payment utilization, amount-weighted purchase timing, and any skipped epochs:
 
-The safety of the design lives in three immutable limits, not in the controller:
-a small per-epoch capacity cap, a hard price floor, and a small lifetime mint
-ceiling. The controller is convenience automation that moves the price between
-epochs; the limits are what protect the treasury and RIPE supply.
+- high utilization raises RIPE's implied price by a governed step in
+  `minUpBps..maxUpBps`;
+- low-utilization positive-payment epochs lower price by a governed step in
+  `minDownBps..maxDownBps`;
+- the dead band applies no utilization step;
+- empty and skipped epochs apply fixed `decayBps`, capped by `maxDecayEpochs`;
+- every result is bounded by `MIN_BASE_RATE` and the live config's all-in effective-rate
+  ceiling; and
+- one timelocked exact-rate override may replace the final result at the first later
+  **successful** rollover.
+
+The override has no target epoch, execution window, expiry, or maximum lead. Preview
+does not consume it, same-epoch purchases retain it, failed settlement rolls back its
+provisional application, and any successful full config write invalidates it. The
+following rollover resumes ordinary control from the committed target.
+
+The fixed base rate does not make every locked quote identical. The epoch snapshots
+`maxLockBonus`, while live MissionControl lock terms and the buyer's requested duration
+determine the bonus within that ceiling. The buyer is always `msg.sender`.
 
 ---
 
-## 2. How the controller works
+## 2. Controller arithmetic
 
-A three-state rule keyed on the previous epoch's utilization. Reasoning in price
-space (USD per RIPE):
+The Lane stores an inverse rate:
 
 ```text
-u = acceptedPayment[prev] / paymentCap[prev]  # same payment-token units; see §2.1
-
-if   u >= uHigh:   price steps up    (price *= 1 + upBps/10_000)
-elif u <= uLow:    price steps down  (price *= 1 - downBps/10_000)
-else:              price unchanged
-
-price = max(price, floor)                     # hard floor; lock-adjusted if locks are used
+R = RIPE-wei per whole dollar-denominated payment token
+B = 10_000
+C = snapshotted epoch payment cap
+A = accepted payment in the stored epoch
+U = floor(A * B / C)
 ```
 
-The two thresholds `uHigh`/`uLow` are the dead band. There is deliberately no
-separate target, gain, or clamp — a bounded step in one of three directions is the
-whole controller, which keeps it trivial to audit and reason about.
+A lower `R` means a higher RIPE price. The contract therefore uses exact inverse-price
+arithmetic rather than approximating a price increase as a same-percentage rate
+decrease.
 
-### 2.1 One consistent domain: payment-token utilization
+### 2.1 Amount-weighted timing
 
-Utilization is measured as **accepted payment over the snapshotted payment cap** —
-a single domain end to end. This matches the Bond Room's payment-domain capacity
-and directly measures how much fundraising capacity cleared. (Because the price is
-fixed within an epoch, payment and RIPE are proportional inside that epoch, so the
-signal is the same either way; what matters is that the cap and the "sold" figure
-are the same unit.)
-
-A payment-token cap does not by itself bound RIPE dilution — at a low price a fixed
-payment cap mints more RIPE. That second boundary is provided explicitly by the
-**hard floor** (which caps RIPE-per-payment-token, so worst-case per-epoch issuance
-is `paymentCap × floorRate / PAYMENT_SCALE`) and the **mint budget**. The configured
-dollar-denominated payment token supplies the capacity domain; the floor and mint
-budget carry dilution control.
-
-### 2.2 Exact inverse-price arithmetic
-
-The lane stores a rate `R` = RIPE-wei per whole payment token, which is the inverse
-of price, so a price *increase* is a rate *decrease* — and not by the same
-percentage. Bind it exactly, rounding to the treasury-protective side (fewer RIPE
-out):
+For a purchase at zero-based deterministic epoch offset `o` and immutable epoch length
+`L`:
 
 ```text
-price up   -> R = R * 10_000 / (10_000 + upBps)     # round down
-price down -> R = R * 10_000 / (10_000 - downBps)    # round down
-R = min(R, floorRate)                                # max RIPE-wei per whole payment token
+lateness = 0                              if L == 1
+lateness = floor(o * B / (L - 1))         otherwise
 
-ripeOut = paymentAmount * R / PAYMENT_SCALE          # derive scale from token decimals
+epochWeightedLateness += paymentAmount * lateness
+averageLateness = floor(epochWeightedLateness / A)
+earliness = B - averageLateness
 ```
 
-Naively multiplying the rate by `(1 - upBps)` for a price rise introduces roughly a
-0.16% per-step error that compounds; the exact form above avoids it.
+Weighting by payment makes same-block splitting, merging, and reordering invariant. A
+tiny early probe cannot make a large late purchase appear early, and delaying only a
+marginal tail cannot control the signal as a final-sellout timestamp would.
 
-### 2.3 Downward movement and empty epochs
+A first initialized epoch is timing-eligible only when initialization occurs at its
+deterministic offset zero. A later cold start still records timing for observability but
+uses zero earliness at its first rollover, producing `minUpBps` if utilization is high.
+`EPOCH_LENGTH == 1` is offset-zero and eligible. Every later stored epoch is eligible.
 
-The price rises only when buyers actually pay for it. It falls on weak demand — and
-"weak demand" needs an honest definition, because an epoch with **zero** buyers is
-ambiguous: it can mean genuine absence of demand, or it can mean an operational
-outage (frontend down, lane paused, mint budget exhausted, payment token paused,
-chain congestion). Two options, presented as a dial the owner sets once:
+### 2.2 High-utilization adjustment
 
-- **Treasury-protective (recommended default):** only epochs with real but
-  insufficient demand (`u <= uLow` with nonzero sales) step the price down. A fully
-  empty epoch **holds** the price. This closes the "wait it down for free" option,
-  at the cost that after a sharp downward regime change the price can sit stale-high
-  and the lane goes dormant until the pilot sunsets (acceptable for a small,
-  time-boxed pilot — see §7).
-- **Availability:** a fully empty epoch applies a small bounded decay. This gives
-  automatic downward discovery but is honestly a *free waiting option* for a patient
-  buyer (cost = time and front-run risk, not capital). The floor, small cap, and
-  sunset bound what that option is worth.
-
-Either way, the honest statement is: **moving the price up costs real money;
-moving it down costs only patience.** The floor and the small cap — not any claim
-that waiting is expensive — are what bound the downside.
-
----
-
-## 3. What the controller does and does not give you
-
-**It gives you a price with no routine configuration and no oracle.** The step
-sizes and thresholds are set once. They are invariant to the price *level* — the
-controller adjusts multiplicatively from wherever the price already is, so the same
-`upBps`/`downBps` keep working whether RIPE is at 3 cents or 30 cents.
-
-**It does not give you fast tracking of external value, and its equilibrium is not
-purely a function of the price level.** The controller finds a *cap-clearing*
-price, and where that clears depends on capacity, epoch length, buyer
-concentration, lock terms, and demand elasticity — not just the level. Arbitrage
-pulls the cap-clearing price toward external value (below market → sells out →
-steps up; above market → sits → steps down), and the smaller the cap relative to
-real market volume, the tighter that tether. So "tracks the market" is true only in
-the limited, arbitrage-mediated, lagged sense, and only while the cap stays small.
-
-**Its response is bounded and, for large moves, slow.** With an illustrative 4%
-up-step and 8-hour epochs:
-
-| Move | Sold-out epochs to track it | Wall-clock |
-| --- | --- | --- |
-| +30% | ~7 | ~2.3 days |
-| 2× | ~18 | ~5.9 days |
-| 10× | ~59 | ~19.6 days |
-
-A downward 1.5% step halves the price in ~46 epochs (~15 days). A sellout is also
-*censored* information: it tells you demand was at least the cap, not whether it was
-1.1× or 100× the cap, so the controller cannot leap — it can only ratchet. This is
-fine when the cap is small (the per-epoch cost of lagging is bounded, §4); it is the
-core reason this is a pilot mechanism for a bounded budget, not a large-issuance
-oracle.
-
----
-
-## 4. The lag cost, quantified
-
-Because the controller is reactive, a fast upward move opens a temporary gap during
-which the lane sells its capacity below external value to whoever moves first. The
-cost is bounded and self-correcting, and it has a clean rule of thumb:
+For `U >= uHighBps`:
 
 ```text
-leak  ≈  capacity  ×  gap²  /  (2 × upStep)
+utilizationStrength = floor(
+    (U - uHighBps) * B / (B - uHighBps)
+)
+demandStrength = floor(utilizationStrength * earliness / B)
+
+effectiveAdjustmentBps = minUpBps + floor(
+    (maxUpBps - minUpBps) * demandStrength / B
+)
+
+boundedOldRate = min(oldRate, newBaseRateCeiling)
+newRate = max(
+    floor(boundedOldRate * B / (B + effectiveAdjustmentBps)),
+    MIN_BASE_RATE,
+)
 ```
 
-For a $50k/epoch cap, a sudden +30% move, and 4% steps, that is ≈ $56k of value left
-on the table over the whole ~7-epoch catch-up — a one-time transient, not a standing
-leak. The formula shows the three levers: the cost is **quadratic** in the size of
-the move (gentle drift costs almost nothing), **inversely proportional** to the step
-size (faster catch-up, less leak), and **linear** in capacity — which is why a small
-cap is the primary control. The leak is a transfer to fast arbitrageurs, and the
-same sellouts that hand it to them are what feed the controller the signal to close
-the gap.
+Exactly `uHighBps` receives `minUpBps`. A full first-block eligible epoch receives
+`maxUpBps`; a full last-block epoch receives `minUpBps`. Intermediate utilization and
+timing interpolate monotonically within the governed range.
 
-Two later refinements (§6.6) attack this directly if the pilot shows it matters:
-*sellout-time acceleration* (step up harder when an epoch sells out very early,
-using early sellout as a proxy for the censored excess demand) shortens the catch-up,
-and a *within-epoch tranche schedule* (sell the cap along a rising ramp) captures
-part of the gap for the treasury and de-censors the demand signal. Both are
-deliberately out of the minimal pilot.
+### 2.3 Low-utilization adjustment
+
+For a positive-payment epoch with `U <= uLowBps`:
+
+```text
+weakness = floor((uLowBps - U) * B / uLowBps)
+
+effectiveAdjustmentBps = minDownBps + floor(
+    (maxDownBps - minDownBps) * weakness / B
+)
+
+newRate = min(
+    floor(boundedOldRate * B / (B - effectiveAdjustmentBps)),
+    newBaseRateCeiling,
+)
+```
+
+Exactly `uLowBps` receives `minDownBps`. A positive payment whose floored utilization
+is zero receives `maxDownBps`. Timing is not used for this branch because utilization
+shortfall is the direct weakness signal.
+
+### 2.4 Dead band, empty epochs, and skipped time
+
+For `uLowBps < U < uHighBps`, the utilization controller applies no step, although a
+newly lowered effective-rate ceiling may still clamp the old rate.
+
+Fully empty time uses fixed decay:
+
+```text
+rate = min(
+    floor(rate * B / (B - decayBps)),
+    newBaseRateCeiling,
+)
+```
+
+After a positive stored epoch, its utilization transition runs once and
+`min(elapsed - 1, maxDecayEpochs)` skipped-epoch steps follow. The source retains a
+defensive zero-accepted stored-epoch branch that applies `min(elapsed,
+maxDecayEpochs)` steps, although current atomic purchase sequencing cannot commit such
+a stored epoch. Epochs before first initialization are ignored.
+
+Pause, `canBuyNow=false`, exhausted budget, frontend failure, and other unavailable
+time are not separately clocked. They decay like other empty time. This gives patient
+buyers a waiting option, bounded by the rate ceiling, decay cap, per-epoch capacity,
+and lifetime mint budget.
 
 ---
 
-## 5. Precedent
+## 3. Exact manual override
 
-This design draws on a family of on-chain issuance mechanisms, though it is its own
-mechanism — a once-per-epoch, prior-utilization feedback rule rather than any of
-these exactly. What they collectively validate are the **primitives**: bounded
-capacity, a hard price floor, demand-responsive pricing, asymmetric adjustment
-(raise faster than you lower), and conservative issuance.
+Revision 20 implements a one-shot recovery tool for exceptional pricing errors. The
+Lane stores only:
 
-- **Bond Protocol's Sequential Dutch Auctioneer** — oracle-free pricing driven by
-  the market's own realized sales versus a target, with increases applied faster
-  than decreases and a debt-buffer circuit breaker (worth borrowing as a velocity
-  breaker). It tunes continuously through purchases rather than once per epoch.
-- **Paradigm's GDA / VRGDA** — price responds to sales being ahead of or behind an
-  explicit issuance schedule; validates schedule-vs-price feedback, a different
-  signal than prior-epoch cap utilization.
-- **Frax FXB** — a live gradual Dutch auction with a governed price floor;
-  validates the `max(demand-driven price, floor)` safety shape.
-- **Olympus's Emissions Manager** — a surviving admin-light issuance rule anchored
-  to a stored solvency figure via an explicit governance path; a conceptual
-  reference for a backing-linked floor, not a template for reading a wallet balance
-  as a solvency oracle.
+```text
+rateOverride       # exact target; zero means none installed
+overrideVersion    # independent optimistic lifecycle version
+```
 
-The consistent lesson across all of them is that the **floor and the capacity cap,
-not pricing sophistication, are what protect the treasury.**
+There is no stored config-version binding. Installation validates the exact current
+config version and records it only as the `boundConfigVersion` event field in
+`RateOverrideInstalled`; every subsequent full config write synchronously invalidates
+an installed target. The override version advances
+once on installation, successful application, installed cancellation, or config
+invalidation. Preview, same-epoch purchases, failed execution, expired queued-action
+cleanup, and reverted settlement do not advance it.
+
+Installation requires an initialized Lane, an empty override slot, exact expected
+config and override versions, and a target between `MIN_BASE_RATE` and the live derived
+base-rate ceiling. Invalid targets revert rather than being clamped.
+
+For stored epoch `S` and projected deterministic epoch `E`:
+
+```text
+E == S: retain the target and use the committed stored rate
+E > S:  calculate the ordinary controllerRate, then store target exactly
+```
+
+The result is identical whether one or many calendar epochs elapsed. The target is not
+clamped or decayed after installation; config invalidation prevents it from surviving
+a ceiling change. `RateOverrideApplied` emits the exact target and the ordinary
+counterfactual `controllerRate` for auditability.
+
+Authority uses the protocol's existing registered-switchboard trust boundary.
+`SwitchboardFoxtrot` is the intended timelocked route and has an immutable Lane target,
+but the Lane is not immutably pinned to Foxtrot. Foxtrot separately queues full config
+replacement, exact override installation, and installed-override cancellation.
+
+---
+
+## 4. Safety boundaries
+
+The controller is not the primary supply boundary. Revision 20 relies on layered
+controls:
+
+1. governed cumulative `mintBudget`, which may never be set below
+   `cumulativeMinted`;
+2. snapshotted `paymentCapPerEpoch` and `minPaymentAmount`;
+3. `maxEffectiveRate`, which limits total RIPE after the maximum lock bonus;
+4. `MIN_BASE_RATE` and bounded controller adjustments;
+5. Lane `canBuyNow` and Department pause;
+6. Lane-specific and global RipeHq mint authorization; and
+7. the exact-payment settlement requirement.
+
+The base-rate ceiling is derived from the all-in effective ceiling:
+
+```text
+baseRateCeiling =
+    maxEffectiveRate * B
+    // (B + maxLockBonus)
+```
+
+Every successful purchase therefore satisfies the treasury-protective cross-product
+bound specified in `implementation-spec.md`. A governed payment cap alone would not
+bound dilution at a low price; the all-in ceiling and lifetime mint budget provide the
+second and third boundaries.
+
+Neither the budget nor the rate ceiling is immutable. Changes are full, versioned,
+timelocked config replacements through Foxtrot's intended route. A budget increase is
+an explicit governance action and economic decision, never an automatic post-sellout
+replenishment. Live `canBuyNow` and `mintBudget` changes apply immediately; rate, cap,
+minimum-payment, and maximum-bonus fields are snapshotted only at initialization or the
+next successful rollover and never rewrite the running epoch.
+
+---
+
+## 5. What the controller does and does not provide
+
+**It provides an admin-light, oracle-free rate.** Direction follows realized Lane
+utilization, while bounded severity responds to utilization and, on the high branch,
+amount-weighted timing.
+
+**It does not provide fair value.** The equilibrium depends on capacity, epoch length,
+buyer concentration, live lock terms, demand elasticity, and external arbitrage.
+
+**It remains lagged.** A sellout proves demand was at least the cap, not whether it was
+slightly or massively above it. Timing extracts more information than a binary
+sellout, but it does not reveal the full demand curve.
+
+**Lag transfers value to fast buyers.** A constant-step approximation gives the useful
+historical intuition:
+
+```text
+leak ≈ capacity * gap² / (2 * priceUpStep)
+```
+
+This is a heuristic, not revision-20 calibration. The dynamic controller reduces some
+lag by assigning stronger increases to earlier, higher utilization, but all concrete
+catch-up, oscillation, and leakage limits remain unapproved until the owner selects
+production parameters.
+
+**Waiting can lower price.** Empty-epoch decay deliberately gives patient buyers a
+free waiting option. The honest protection is bounded exposure, not a claim that
+waiting is costly.
+
+### 5.1 Mechanism precedent
+
+The Lane is not a copy of another auction. Its design draws on a family of mechanisms
+that support the underlying primitives:
+
+- Bond Protocol's Sequential Dutch Auctioneer demonstrates oracle-free pricing from
+  realized sales against a target, with asymmetric movement;
+- Paradigm's GDA/VRGDA work demonstrates schedule-versus-sales feedback, although its
+  signal differs from prior-epoch utilization;
+- Frax FXB demonstrates a gradual Dutch auction bounded by a governed floor; and
+- Olympus's Emissions Manager is a conceptual reference for admin-light issuance with
+  an explicit governance path, not a template for a solvency oracle.
+
+The shared lesson is limited but useful: bounded capacity, explicit rate bounds, and
+conservative issuance controls protect the treasury more directly than pricing
+sophistication does.
 
 ---
 
 ## 6. Supporting design choices
 
-### 6.1 Mint at purchase against an immutable lifetime ceiling
+### 6.1 Independent deterministic Lane epoch
 
-The lane mints exactly the RIPE it sells, at purchase time, decrementing an
-allowance **before** any external call. For the pilot the lifetime ceiling is
-**immutable and small** — no replenishment path exists. This eliminates the
-pre-minted bucket, inventory retirement, excess-balance reconciliation, and
-circulating-supply ambiguity, and it keeps the global kill-switch honest (RipeHq's
-`mintEnabled` halts minting instantly). Scaling the budget later is a fresh
-deployment and a fresh decision, not an automatic top-up.
-
-### 6.2 An independent lane epoch — a deliberate reversal
-
-Because the controller needs nothing from the Bond Room at runtime, the lane runs
-its own deterministic clock:
+The Lane does not follow Bond Room or Ledger epochs:
 
 ```text
-laneEpoch = (block.number - genesis) // EPOCH_LENGTH
+laneEpoch = (block.number - GENESIS_BLOCK) // EPOCH_LENGTH
 ```
 
-No stored clock, no cross-contract refresh, no epoch-key handshake, no coupling to
-Bond Room pause or sellout. This must be recorded as a **deliberate reversal** of
-the broader design's agreed direction (which specified strict Bond Room / Ledger
-following and one canonical epoch): call it the *lane epoch*, not the canonical Bond
-epoch; do not promise a single shared countdown unless the two schedules genuinely
-stay aligned; accept that a Bond Room sellout or restart no longer closes the Buy
-Now epoch; and reconcile the broader document if this is approved. The upside is a
-markedly smaller, self-contained contract, which is why the reversal is worth
-proposing.
+This removes cross-contract epoch handshakes and preserves deterministic history.
+Rollover is lazy inside `buyNow`; `previewBuyNow` projects the same state read-only.
+There is no external initialization or rollover transaction.
 
-(Implementer's note, if strict following is ever revived instead: the Bond Room
-schedules a post-sellout epoch at a *future* start, and the one-line "fix"
-`newStartBlock = max(block.number, epochEnd + restartDelayBlocks)` is a no-op because
-`block.number < epochEnd` always holds at sellout. The independent clock avoids the
-whole issue.)
+### 6.2 Flexible lock bonus
 
-### 6.3 A fixed, conservative floor for v1
+The buyer may take RIPE unlocked or request a lock. Live RipeGov min/max duration terms
+select the actual deposit duration, while the epoch's `maxLockBonus` bounds a linear
+bonus. The all-in rate ceiling includes that maximum bonus. The purchase event reports
+the actual current core RipeGov vault ID used for locked settlement.
 
-The pilot uses **one immutable, conservative effective-price floor**, enforced in
-the stored rate domain as a maximum RIPE-per-payment-token. No PriceDesk call, no
-backing calculation. A solvency-linked, self-updating floor is attractive in
-principle but is a real subsystem — it needs definitions and failure semantics for which
-Endaoment assets count, their pricing, liabilities and encumbrances, "circulating
-RIPE" exclusions, depeg behavior, and last-good handling, and a naive
-`max(governedFloor, k × backing)` can fall automatically when backing falls, which
-would contradict a "lower only deliberately" rule. It is deferred to §6.6, not part
-of v1.
+RipeGov combines deposits into an account-level weighted unlock. The requested deposit
+duration is not necessarily the final position unlock; this inherited behavior and its
+accepted economic exposure are detailed in the implementation specification.
 
-### 6.4 Buyer is the recipient
+### 6.3 Buyer is the recipient
 
-The `buyNow` entry requires `recipient == msg.sender` for the pilot. The Bond Room
-explicitly gates bonding-for-another (`BondRoom.vy:144-145`), and because RipeGov
-merges deposits into one weighted, blended-unlock position per user
-(`RipeGov.vy:936-961`), a third party locking on someone's behalf can move that
-person's unlock schedule — a griefing surface. Gifting and delegated-wallet support
-can be added later with an explicit authorization and lock-interaction spec.
+`buyNow` has no recipient argument. `msg.sender` receives unlocked RIPE or the RipeGov
+deposit. Delegated purchases and gifting remain out of scope.
+
+### 6.4 Configured payment-token settlement
+
+The immutable payment token is deployment-selected, dollar-denominated, and may use
+any supported decimal count. `PAYMENT_SCALE` is derived once from `decimals()`; the
+contract does not assume USDC or six decimals.
+
+Payment transfers directly from the buyer to Endaoment Funds. The Lane compares the
+destination balance before and after transfer and requires an exact increase, rejecting
+false-return, zero, short, fee-on-transfer, and excess-receipt behavior atomically.
 
 ### 6.5 Isolation limits code risk, not economic risk
 
-A separate contract protects the Bond Room and Ledger from regressions. It does
-**not** bound RIPE supply risk: once the lane is a registered minter, RipeHq's check
-is binary (`RipeHq.vy:389`), and the global `mintEnabled` switch stops every minter
-at once, not just this one. The lane therefore needs, as first-class requirements:
-its own pause; an immutable, small lifetime mint ceiling; the decrement-before-
-external-call budget invariant; a deliberately small per-epoch cap; and an explicit
-sunset. The pause can reuse the existing generic Switchboard pause
-(`SwitchboardCharlie.vy:491` pauses an arbitrary contract), so no Switchboard change
-is required for a fully-immutable pilot.
+Production-contract changes are limited to `InstantBondLane` and its dedicated
+`SwitchboardFoxtrot`; the exact document, model, ABI, and test scope is listed in
+§20.1 of `implementation-spec.md`. The feature does not modify BondRoom, Ledger,
+RipeToken, or RipeGov.
+Isolation reduces regression risk but does not isolate RIPE supply. The Lane remains a
+registered minter subject to protocol-wide mint controls, and monitoring must account
+for its budget alongside the Ledger's reward, HR, and bond allowances.
 
-### 6.6 Deferred refinements (post-pilot, each with a trigger)
+### 6.6 Bad debt and shutdown
 
-Kept out of v1 on purpose; revisit only if pilot data calls for it:
+Purchases remain available during bad debt and do not participate in debt repayment
+accounting. Locked-position early exit can still be frozen by live RipeGov terms, which
+preview discloses.
 
-- **Continuous controller** (target + gain + clamped step) if the three-state rule
-  proves too coarse.
-- **Sellout-time acceleration** and a **within-epoch tranche schedule** if the lag
-  cost (§4) or the censored-demand signal proves material.
-- **Self-updating solvency floor** (§6.3) if a fixed floor drifts too far from
-  reality over time — with the full backing definitions specified.
-- **Flexible lock bonuses** (see §6.7) if a single fixed lock is too limiting.
-- **Replenishable mint budget and governed setters** if the pilot graduates to a
-  standing mechanism — which requires a Switchboard change or an internal timelock
-  (there is no generic timelocked-call executor today).
-- **Third-party recipients / gifting** with proper authorization (§6.4).
+There is no hard sunset or reactivation reset. Governance disables the Lane with
+`canBuyNow`, Department pause, or deregistration. The global mint switch is the broader
+protocol circuit breaker.
 
-### 6.7 Lock terms: one fixed lock for the pilot
+### 6.7 Deferred mechanisms
 
-The broader design wants flexible lock selection (an agreed direction there), and
-that remains the destination. For the minimal pilot, though, a **single fixed lock
-duration with one all-in payout rate** (or no lock at all) is cleaner: it removes a
-second continuous pricing dimension, and it avoids a governance-concentration edge —
-a maximum-lock purchase can receive up to 3× the RIPE *and* accrue up to a further
-3× RipeGov points on that larger position (up to ~9× point accrual per dollar versus
-an unlocked base unit; `RipeGov.vy:858-885,903-916`), which the small per-epoch cap and
-short pilot are what keep in check. If flexible locks are retained instead, measuring
-utilization in the payment/base domain (§2.1) keeps the control signal clean, since a
-buyer's lock choice does not change how much of the cap their payment consumes. A
-transaction-size-based minimum-lock rule is **not** recommended — it is evadable by
-splitting across recipients or transactions, and is dropped in favor of a uniform
-lock decision.
+The implemented revision deliberately excludes:
 
-### 6.8 Configured payment-token settlement math
+- external fair-value or solvency oracles;
+- DEX guards;
+- within-epoch ramps or tranche schedules;
+- automatic target-epoch override scheduling or expiry;
+- delegated recipients;
+- partial fills; and
+- historical on-chain epoch mappings.
 
-The single configured payment token needs no unit-flooring (the Bond Room floors to
-whole units, `BondRoom.vy:164`, because it is multi-asset). Use every smallest unit —
-`ripeOut = paymentAmount * R / PAYMENT_SCALE` — and forward the exact accepted
-payment straight to Endaoment Funds. `PAYMENT_SCALE` is derived from the token's
-declared decimals at deployment. No dust, no temporary balance, no refund branch.
-
-### 6.9 Booster excluded; bad debt scoped
-
-The Bond Booster stays out of Buy Now (the single largest per-dollar dilution
-improvement). On bad debt: there is no special *pricing* branch (a buyer's
-payment-to-payout ratio is unaffected), but integration decisions remain and should
-be settled before launch — whether Buy Now is available during bad debt, whether its
-proceeds count toward recorded debt reduction, whether its mint budget sits outside
-the global Bond allowance, and how combined Bond + Buy Now dilution is reported.
+Each would add a new signal, authority path, or state machine and requires a separate
+owner-approved design.
 
 ---
 
-## 7. The minimal pilot to build
+## 7. Implemented contract shape
 
-One immutable, non-upgradeable contract. Achievable as a *single* new contract
-precisely because everything is fixed at deployment — no setters, no replenishment,
-generic pause reused. Roughly 150–250 lines of Vyper; zero changes to `BondRoom`,
-`Ledger`, `RipeToken`, or `RipeGov`. The only external step is registering it as a
-RIPE minter in RipeHq (a governance action, not a contract change), and it should
-carry an explicit sunset and eventual deregistration.
+The feature uses two nonupgradeable Vyper contracts:
 
-**Immutable at deploy:**
+1. `contracts/core/InstantBondLane.vy` — purchase, preview, controller, settlement,
+   state, and registered-switchboard mutators.
+2. `contracts/config/SwitchboardFoxtrot.vy` — LocalGov/TimeLock adapter for three
+   tagged action types.
 
-```text
-EPOCH_LENGTH            # lane epoch, in blocks
-uHigh / uLow            # utilization thresholds (the dead band)
-upBps / downBps         # asymmetric step sizes (up larger than down)
-floorRate               # max RIPE-wei per whole payment token
-paymentCapPerEpoch      # small per-epoch capacity, payment-token domain
-lifetimeMintCeiling     # small hard cap on total RIPE the lane can ever mint
-seedRate                # the one-time human price judgment
-sunsetEpoch             # lane stops selling after this
-emptyEpochPolicy        # hold (default) or bounded-decay (§2.3)
-```
-
-**Stored state (bounded — current and previous only; history via events):**
+The 15-field config is:
 
 ```text
-currentEpoch, currentRate
-prevEpochAcceptedPayment, prevEpochPaymentCap
-cumulativeMinted
+canBuyNow
+paymentCapPerEpoch
+minPaymentAmount
+mintBudget
+maxEffectiveRate
+seedRate
+uHighBps
+uLowBps
+minUpBps
+maxUpBps
+minDownBps
+maxDownBps
+decayBps
+maxDecayEpochs
+maxLockBonus
 ```
 
-**Functions:**
+Key Lane views and entry points are:
 
 ```text
-buyNow(paymentAmount, expectedEpoch, minRipeOut, deadline)   # recipient == msg.sender
-previewBuyNow(paymentAmount)                                  # mirrors lazy rollover read-only
-# rollover is lazy inside buyNow; no external initializeEpoch
-# pause via the existing generic Switchboard pause; global mint switch also applies
+isValidConfig(config)
+setConfig(config, expectedVersion)
+isValidRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+setRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+canCancelRateOverride(expectedOverrideVersion)
+cancelRateOverride(expectedOverrideVersion)
+buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock)
+previewBuyNow(paymentAmount, requestedLock)
+
+rateOverride
+overrideVersion
+epochWeightedLateness
+epochTimingEligible
 ```
 
-**Purchase path:** lazily roll the epoch if `laneEpoch` advanced (compute the new
-rate from `prevEpochAcceptedPayment / prevEpochPaymentCap` via §2.2, apply the empty-epoch
-policy for any fully-skipped epochs, clamp to `floorRate`) → validate
-`expectedEpoch`, sunset, pause, `deadline`, remaining epoch cap, and lifetime
-ceiling → `ripeOut = paymentAmount * R / PAYMENT_SCALE`, check `>= minRipeOut` →
-decrement the mint ceiling and epoch cap **before** external calls → mint `ripeOut`
-→ forward exact payment to Endaoment Funds → settle RIPE (transfer, or
-trusted-deposit if a fixed lock is used). Revert on cap exceed (no partial fills).
+The public immutables are `PAYMENT_TOKEN`, `PAYMENT_DECIMALS`, `PAYMENT_SCALE`,
+`GENESIS_BLOCK`, and `EPOCH_LENGTH`. Public stored state is `config`,
+`configVersion`, `isInitialized`, `currentEpoch`, `epochRate`, `epochPaymentCap`,
+`epochMinPaymentAmount`, `epochMaxLockBonus`, `epochPricingVersion`,
+`epochAcceptedPayment`, `epochWeightedLateness`, `epochTimingEligible`,
+`rateOverride`, `overrideVersion`, and `cumulativeMinted`.
 
-If a fixed lock is included, settlement adds the Teller/RipeGov trusted-deposit path;
-the controller and all math above are unchanged.
+Key Foxtrot workflows are:
+
+```text
+setInstantBondConfig(config, expectedVersion)
+setInstantBondRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
+cancelInstantBondRateOverride(expectedOverrideVersion)
+executePendingAction(aid)
+cancelPendingAction(aid)
+```
+
+Foxtrot publicly exposes immutable `LANE` plus the tagged action maps `actionType`,
+`pendingConfig`, and `pendingRateOverride`.
+
+`EpochRolled` exposes the prior accepted payment, cap, weighted lateness, timing
+eligibility, utilization, applied adjustment, decay steps, ordinary `controllerRate`,
+and complete new epoch snapshot. Override installation, application, installed
+cancellation, and config invalidation have distinct Lane events; queued installation,
+queued installed-cancellation, execution, and action cleanup have distinct Foxtrot
+events.
+
+The Lane event set is `EpochInitialized`, `EpochRolled`, `InstantBondPurchased`,
+`InstantBondConfigSet`, `RateOverrideInstalled`, `RateOverrideApplied`,
+`RateOverrideCancelled`, and `RateOverrideInvalidated`. The Foxtrot event set is
+`PendingInstantBondConfigSet`, `InstantBondConfigExecuted`,
+`InstantBondConfigCancelled`, `PendingRateOverrideSet`,
+`PendingRateOverrideCancellationSet`, `RateOverrideExecuted`,
+`RateOverrideCancellationExecuted`, and `RateOverrideActionCancelled`. Exact field
+order and indexing are normative only in `implementation-spec.md` and the generated
+ABIs.
 
 ---
 
-## 8. Where this design lands on the open questions
+## 8. Economic calibration remains open
 
-| ID | Question | Pilot position |
-| --- | --- | --- |
-| IBL-003 | Effective-price floor | Fixed, conservative, immutable; solvency-linked floor deferred (§6.3) |
-| IBL-004 | Price behavior within an epoch | One immutable price per epoch; tranche schedule deferred |
-| IBL-005 | Capacity cap domain | Configured payment token per epoch; dilution bounded by the floor + mint budget (§2.1) |
-| IBL-007 | Payment asset | Deployment-selected dollar-denominated ERC-20, with derived decimal scale (§6.8) |
-| IBL-009 | Bond Booster | Excluded |
-| IBL-010 | Minimum lock | One fixed lock (or none); no size-threshold rule (§6.7) |
-| IBL-013 | Purchase entry / recipient | Direct call, `recipient == msg.sender` (§6.4) |
-| IBL-014/15/18/22 | Inventory and supply | Mint-at-purchase against an immutable lifetime ceiling; no replenishment in the pilot (§6.1) |
-| IBL-016/17 | Epoch clock and pause | Independent lane epoch — a deliberate reversal (§6.2); generic pause |
-| IBL-024 | Cold-start price | One immutable `seedRate`; the acknowledged human judgment |
-| IBL-025 | Bad debt | No special pricing branch; integration decisions remain open (§6.9) |
+The deterministic model and canonical
+[`controller-simulation-v2.json`](controller-simulation-v2.json) exercise integer
+mechanism behavior. Their fixture remains marked `calibration_status: not_approved`.
+It is not a recommendation for production step ranges, thresholds, caps, budgets,
+epoch duration, rate ceiling, seed rate, or lock bonus.
+
+Before deployment or any configuration proposal, the owner must approve limits for:
+
+- fast-demand catch-up time and maximum tolerated leakage;
+- weak-demand decline and empty-epoch half-life;
+- alternating-demand oscillation;
+- per-epoch and rolling-day issuance;
+- lifetime Lane budget;
+- lock-bonus exposure; and
+- acceptable manual-target deviation from the ordinary controller.
+
+Calibration must use the configured token's actual decimal scale and target-chain
+block time. A short epoch can turn a modest-looking cap into a large rolling-day
+issuance allowance.
 
 ---
 
-## 9. Next steps
+## 9. Execution status and remaining gates
 
-1. **Approve the framing:** a small, immutable, capped pilot that clears a bounded
-   sale budget at a self-adjusting price — explicitly *not* a fair-value oracle and
-   not (yet) a large-issuance mechanism.
-2. **Approve the two reversals/scope calls explicitly:** the independent lane epoch
-   (§6.2) and a single fixed lock for the pilot (§6.7).
-3. **Calibrate the pilot constants.** Historical Bond activity gives rough context
-   but not clean Buy Now elasticity (different auction shape, capacity, and
-   incentives), so size `paymentCapPerEpoch`, `upBps`/`downBps`, `uHigh`/`uLow`, and
-   `floorRate` conservatively and small, and let the pilot itself produce the
-   elasticity data.
-4. **Simulate** the three-state controller across a fast rally, a decline, a quiet
-   stretch, a cold start, and whale-dominated flow — checking tracking, oscillation,
-   and the fraction of epochs live versus dormant.
-5. **Spec and audit** the immutable pilot as a new, isolated registered minter, with
-   the mint-ceiling and settlement invariants as the focus.
-6. **Gate scaling on a fresh decision.** Any capacity or budget increase is a new
-   economic and security review and a fresh deployment — never an automatic
-   post-sellout increase.
+Completed in the working candidate:
+
+- owner approval of revision-20 controller and next-successful-rollover semantics;
+- Lane and Foxtrot implementation;
+- normative specification reconciliation;
+- controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
+- deterministic ABI regeneration;
+- fresh revision-20 validation evidence; and
+- the owner-approved Lane/Foxtrot project-size rebaseline.
+
+The owner authorized the bounded branch commit and push. Its Git identities belong in
+the external handoff because a commit cannot include its own identity. Economic
+calibration remains pending before any deployment or configuration proposal.
+
+Historical revision-18/19 measurements are preserved only in
+`implementation-spec.md` and must not be presented as current evidence. The exact
+revision-20 runtime sizes, hashes, selectors, layouts, coverage, and test results are
+recorded in that specification's final-evidence block.
+
+The completed local checks satisfy the bounded commit-and-push prerequisite. Merge,
+pull-request publication, deployment, configuration, RIPE minting, and activation
+remain separately unauthorized.
 
 ---
 
 ## 10. Summary
 
-The way to a fully on-chain Buy Now price that needs no routine configuration is to
-let the sale move the price: raise it when the lane clears its cap, lower it
-(boundedly, above a hard floor) when it does not. Kept honest, the mechanism is a
-**cap-clearing controller for a small, bounded budget** — its price rises only when
-buyers pay for it, falls only on weak demand, tracks external value only loosely and
-through arbitrage, and responds to large moves over days, not minutes. Its safety
-comes from three immutable limits — a small per-epoch cap, a hard floor, and a small
-lifetime mint ceiling — plus its own pause and an explicit sunset. Build that pilot,
-learn the real demand curve from it, and let a fresh decision — not the mechanism
-itself — decide whether to scale.
+The revision-20 Lane is a bounded, oracle-free cap-clearing controller. It raises price
+when payment utilization is high, uses amount-weighted timing to distinguish early from
+late demand, lowers price on weak or empty demand, and keeps one base rate fixed within
+each stored epoch. A versioned, timelocked exact target gives governance a narrow
+recovery tool without rewriting the active epoch or creating a calendar scheduler.
+
+Its safety does not come from claiming fair-value discovery. It comes from the all-in
+rate ceiling, per-epoch cap, cumulative mint budget, pause and mint controls, exact
+payment settlement, and the requirement for conservative owner-approved calibration
+before deployment. That calibration is still open; the mechanism implementation is
+not.

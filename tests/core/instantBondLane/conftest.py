@@ -20,8 +20,10 @@ def make_config(scale, **overrides):
         "seedRate": 10**18,
         "uHighBps": 8_000,
         "uLowBps": 2_000,
-        "upBps": 1_000,
-        "downBps": 500,
+        "minUpBps": 1_000,
+        "maxUpBps": 1_000,
+        "minDownBps": 500,
+        "maxDownBps": 500,
         "decayBps": 1_000,
         "maxDecayEpochs": 4,
         "maxLockBonus": 5_000,
@@ -36,8 +38,10 @@ def make_config(scale, **overrides):
         values["seedRate"],
         values["uHighBps"],
         values["uLowBps"],
-        values["upBps"],
-        values["downBps"],
+        values["minUpBps"],
+        values["maxUpBps"],
+        values["minDownBps"],
+        values["maxDownBps"],
         values["decayBps"],
         values["maxDecayEpochs"],
         values["maxLockBonus"],
@@ -54,8 +58,10 @@ def config_dict(config):
         "seedRate",
         "uHighBps",
         "uLowBps",
-        "upBps",
-        "downBps",
+        "minUpBps",
+        "maxUpBps",
+        "minDownBps",
+        "maxDownBps",
         "decayBps",
         "maxDecayEpochs",
         "maxLockBonus",
@@ -176,6 +182,30 @@ def lane_factory(
                 lane.setConfig(config, expected_version, sender=switchboard_alpha.address)
                 return config
 
+            def set_rate_override(
+                target_rate,
+                expected_config_version=None,
+                expected_override_version=None,
+            ):
+                if expected_config_version is None:
+                    expected_config_version = lane.configVersion()
+                if expected_override_version is None:
+                    expected_override_version = lane.overrideVersion()
+                return lane.setRateOverride(
+                    target_rate,
+                    expected_config_version,
+                    expected_override_version,
+                    sender=switchboard_alpha.address,
+                )
+
+            def cancel_rate_override(expected_override_version=None):
+                if expected_override_version is None:
+                    expected_override_version = lane.overrideVersion()
+                return lane.cancelRateOverride(
+                    expected_override_version,
+                    sender=switchboard_alpha.address,
+                )
+
             def setup_lock_terms(
                 min_lock=100,
                 max_lock=1_000,
@@ -242,6 +272,8 @@ def lane_factory(
                 )
 
             ctx.set_config = set_config
+            ctx.set_rate_override = set_rate_override
+            ctx.cancel_rate_override = cancel_rate_override
             ctx.make_config = lambda **overrides: make_config(scale, **overrides)
             ctx.setup_lock_terms = setup_lock_terms
             ctx.quote = quote

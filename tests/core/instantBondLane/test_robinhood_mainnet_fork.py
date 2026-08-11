@@ -401,6 +401,8 @@ def _fork_config(scale: int) -> tuple[object, ...]:
         8_000,
         2_000,
         800,
+        800,
+        300,
         300,
         400,
         12,

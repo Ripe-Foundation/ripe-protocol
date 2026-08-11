@@ -6,6 +6,7 @@ from constants import ZERO_ADDRESS
 
 
 MAX_UINT256 = 2**256 - 1
+MAX_EPOCH_LENGTH = MAX_UINT256 // 10_000 + 1
 
 
 REVERTING_DECIMALS = """
@@ -50,6 +51,8 @@ def test_constructor_derives_payment_scale(ripe_hq, governance, decimals):
         assert lane.isPaused()
         assert not lane.isInitialized()
         assert lane.configVersion() == 0
+        assert lane.rateOverride() == 0
+        assert lane.overrideVersion() == 0
         assert lane.cumulativeMinted() == 0
 
 
@@ -83,6 +86,14 @@ def test_constructor_rejects_invalid_payment_token_and_epoch_length(
                 token,
                 genesis,
                 0,
+            )
+        with boa.reverts("invalid epoch length"):
+            boa.load(
+                "contracts/core/InstantBondLane.vy",
+                ripe_hq,
+                token,
+                genesis,
+                MAX_EPOCH_LENGTH + 1,
             )
         with boa.reverts():
             boa.load(
@@ -130,15 +141,36 @@ def test_constructor_rejects_ripe_as_payment_token(ripe_hq, ripe_token):
             )
 
 
+def test_constructor_accepts_largest_overflow_safe_epoch_length(
+    ripe_hq, governance
+):
+    with boa.env.anchor():
+        token = deploy_token(governance.address, 6)
+        lane = boa.load(
+            "contracts/core/InstantBondLane.vy",
+            ripe_hq,
+            token,
+            boa.env.evm.patch.block_number,
+            MAX_EPOCH_LENGTH,
+        )
+        assert lane.EPOCH_LENGTH() == MAX_EPOCH_LENGTH
+
+
 def test_valid_config_boundaries(lane_env):
     lane = lane_env.lane
     scale = lane_env.scale
 
     valid_cases = [
-        lane_env.make_config(uLowBps=0, uHighBps=1),
-        lane_env.make_config(uHighBps=10_000),
-        lane_env.make_config(downBps=1, upBps=2, decayBps=1),
-        lane_env.make_config(upBps=10_000),
+        lane_env.make_config(uLowBps=1, uHighBps=2),
+        lane_env.make_config(uHighBps=9_999),
+        lane_env.make_config(
+            minDownBps=1,
+            maxDownBps=1,
+            minUpBps=2,
+            maxUpBps=2,
+            decayBps=1,
+        ),
+        lane_env.make_config(maxUpBps=10_000),
         lane_env.make_config(decayBps=9_999),
         lane_env.make_config(maxDecayEpochs=1),
         lane_env.make_config(maxDecayEpochs=32),
@@ -168,16 +200,27 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
     cap = 1_000 * scale
 
     invalid_cases = [
+        lane_env.make_config(uLowBps=0),
         lane_env.make_config(uLowBps=8_000, uHighBps=8_000),
         lane_env.make_config(uLowBps=8_001, uHighBps=8_000),
+        lane_env.make_config(uHighBps=10_000),
         lane_env.make_config(uHighBps=10_001),
-        lane_env.make_config(downBps=0),
-        lane_env.make_config(downBps=1_000, upBps=1_000),
-        lane_env.make_config(downBps=1_001, upBps=1_000),
-        lane_env.make_config(upBps=10_001),
+        lane_env.make_config(minUpBps=0),
+        lane_env.make_config(minUpBps=1_001, maxUpBps=1_000),
+        lane_env.make_config(maxUpBps=10_001),
+        lane_env.make_config(minDownBps=0),
+        lane_env.make_config(minDownBps=501, maxDownBps=500),
+        lane_env.make_config(maxDownBps=1_000, minUpBps=1_000),
         lane_env.make_config(decayBps=0),
         lane_env.make_config(decayBps=10_000),
-        lane_env.make_config(downBps=501, decayBps=500),
+        lane_env.make_config(maxDownBps=501, decayBps=500),
+        lane_env.make_config(
+            minUpBps=1,
+            maxUpBps=1,
+            minDownBps=1,
+            maxDownBps=1,
+            decayBps=1,
+        ),
         lane_env.make_config(maxDecayEpochs=0),
         lane_env.make_config(maxDecayEpochs=33),
         lane_env.make_config(maxEffectiveRate=0),
@@ -223,6 +266,8 @@ def test_low_decimal_bonus_intermediate_overflow_config_rejects(
             8_000,
             2_000,
             1_000,
+            1_000,
+            500,
             500,
             1_000,
             4,
@@ -239,7 +284,7 @@ def test_set_config_authorization_versioning_storage_and_event(lane_env, alice):
     with boa.reverts("no perms"):
         lane.setConfig(config, 0, sender=alice)
 
-    lane.setConfig(config, 0, sender=lane_env.switchboard.address)
+    assert lane.setConfig(config, 0, sender=lane_env.switchboard.address) == 1
     logs = filter_logs(lane, "InstantBondConfigSet")
     assert lane.configVersion() == 1
     assert tuple(lane.config()) == config
@@ -255,20 +300,121 @@ def test_set_config_authorization_versioning_storage_and_event(lane_env, alice):
     assert event.seedRate == config[5]
     assert event.uHighBps == config[6]
     assert event.uLowBps == config[7]
-    assert event.upBps == config[8]
-    assert event.downBps == config[9]
-    assert event.decayBps == config[10]
-    assert event.maxDecayEpochs == config[11]
-    assert event.maxLockBonus == config[12]
+    assert event.minUpBps == config[8]
+    assert event.maxUpBps == config[9]
+    assert event.minDownBps == config[10]
+    assert event.maxDownBps == config[11]
+    assert event.decayBps == config[12]
+    assert event.maxDecayEpochs == config[13]
+    assert event.maxLockBonus == config[14]
 
     with boa.reverts("stale config version"):
         lane.setConfig(config, 0, sender=lane_env.switchboard.address)
     with boa.reverts("invalid config"):
         lane.setConfig(
-            lane_env.make_config(downBps=0),
+            lane_env.make_config(minDownBps=0),
             1,
             sender=lane_env.switchboard.address,
         )
+
+
+def test_rate_override_validation_authorization_versions_and_cancel(lane_env, alice):
+    lane = lane_env.lane
+    config = lane_env.set_config(maxLockBonus=5_000, maxEffectiveRate=2 * 10**18)
+    ceiling = config[4] * 10_000 // (10_000 + config[14])
+
+    assert not lane.isValidRateOverride(10**18, 1, 0)
+    with boa.reverts("invalid rate override"):
+        lane.setRateOverride(
+            10**18,
+            1,
+            0,
+            sender=lane_env.switchboard.address,
+        )
+
+    lane_env.buy(lane_env.scale)
+    assert lane.isValidRateOverride(10_000, 1, 0)
+    assert lane.isValidRateOverride(ceiling, 1, 0)
+    assert not lane.isValidRateOverride(9_999, 1, 0)
+    assert not lane.isValidRateOverride(ceiling + 1, 1, 0)
+    assert not lane.isValidRateOverride(10**18, 0, 0)
+    assert not lane.isValidRateOverride(10**18, 1, 1)
+
+    with boa.reverts("no perms"):
+        lane.setRateOverride(10**18, 1, 0, sender=alice)
+    with boa.reverts("stale config version"):
+        lane.setRateOverride(
+            10**18,
+            0,
+            0,
+            sender=lane_env.switchboard.address,
+        )
+    with boa.reverts("stale override version"):
+        lane.setRateOverride(
+            10**18,
+            1,
+            1,
+            sender=lane_env.switchboard.address,
+        )
+    with boa.reverts("invalid rate override"):
+        lane.setRateOverride(
+            ceiling + 1,
+            1,
+            0,
+            sender=lane_env.switchboard.address,
+        )
+
+    assert lane_env.set_rate_override(10**18) == 1
+    installed = filter_logs(lane, "RateOverrideInstalled")[0]
+    assert installed.newVersion == 1
+    assert installed.targetRate == 10**18
+    assert installed.boundConfigVersion == 1
+    assert lane.rateOverride() == 10**18
+    assert lane.overrideVersion() == 1
+    assert lane.canCancelRateOverride(1)
+    assert not lane.canCancelRateOverride(0)
+    assert not lane.isValidRateOverride(10**18, 1, 1)
+
+    with boa.reverts("invalid rate override"):
+        lane.setRateOverride(
+            10**18,
+            1,
+            1,
+            sender=lane_env.switchboard.address,
+        )
+    with boa.reverts("no perms"):
+        lane.cancelRateOverride(1, sender=alice)
+    with boa.reverts("stale override version"):
+        lane.cancelRateOverride(0, sender=lane_env.switchboard.address)
+
+    assert lane_env.cancel_rate_override() == 2
+    cancelled = filter_logs(lane, "RateOverrideCancelled")[0]
+    assert cancelled.newVersion == 2
+    assert cancelled.targetRate == 10**18
+    assert lane.rateOverride() == 0
+    assert lane.overrideVersion() == 2
+    assert not lane.canCancelRateOverride(2)
+    with boa.reverts("no override"):
+        lane.cancelRateOverride(2, sender=lane_env.switchboard.address)
+
+
+def test_config_change_invalidates_installed_override_once(lane_env):
+    lane_env.set_config(maxLockBonus=0)
+    lane_env.buy(lane_env.scale)
+    lane_env.set_rate_override(777_777_777_777_777_777)
+
+    assert lane_env.set_config(maxLockBonus=0) is not None
+    invalidated = filter_logs(lane_env.lane, "RateOverrideInvalidated")[0]
+    assert invalidated.newVersion == 2
+    assert invalidated.targetRate == 777_777_777_777_777_777
+    assert invalidated.newConfigVersion == 2
+    assert lane_env.lane.rateOverride() == 0
+    assert lane_env.lane.overrideVersion() == 2
+
+    lane_env.set_config(maxLockBonus=0)
+    invalidation_logs = filter_logs(lane_env.lane, "RateOverrideInvalidated")
+    assert lane_env.lane.overrideVersion() == 2
+    assert invalidation_logs == []
 
 
 def test_pause_and_recovery_remain_switchboard_gated(lane_env, alice):

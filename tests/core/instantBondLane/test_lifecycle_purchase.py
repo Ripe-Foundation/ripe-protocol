@@ -200,6 +200,8 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     assert lane_env.lane.epochMaxLockBonus() == 5_000
     assert lane_env.lane.epochPricingVersion() == quote.pricingConfigVersion
     assert lane_env.lane.epochAcceptedPayment() == amount
+    assert lane_env.lane.epochWeightedLateness() == 0
+    assert lane_env.lane.epochTimingEligible()
     assert lane_env.lane.cumulativeMinted() == payout
 
     init = [log for log in logs if type(log).__name__ == "EpochInitialized"]
@@ -211,6 +213,7 @@ def test_first_quote_matches_initializing_purchase_and_events(lane_env):
     assert init[0].paymentCap == 1_000 * lane_env.scale
     assert init[0].minPaymentAmount == lane_env.scale
     assert init[0].maxLockBonus == 5_000
+    assert init[0].timingEligible
     assert init[0].pricingConfigVersion == 1
     assert purchase[0].buyer == lane_env.bob
     assert purchase[0].paymentAmount == amount
@@ -264,6 +267,8 @@ def test_public_getters_are_stale_until_next_successful_purchase(lane_env):
     stored_epoch = lane_env.lane.currentEpoch()
     stored_rate = lane_env.lane.epochRate()
     stored_accepted = lane_env.lane.epochAcceptedPayment()
+    stored_weighted_lateness = lane_env.lane.epochWeightedLateness()
+    stored_timing_eligible = lane_env.lane.epochTimingEligible()
 
     boa.env.time_travel(blocks=lane_env.epoch_length)
     projected = lane_env.quote(lane_env.scale)
@@ -274,6 +279,8 @@ def test_public_getters_are_stale_until_next_successful_purchase(lane_env):
     assert lane_env.lane.currentEpoch() == stored_epoch
     assert lane_env.lane.epochRate() == stored_rate
     assert lane_env.lane.epochAcceptedPayment() == stored_accepted
+    assert lane_env.lane.epochWeightedLateness() == stored_weighted_lateness
+    assert lane_env.lane.epochTimingEligible() == stored_timing_eligible
 
     lane_env.buy(
         lane_env.scale,
@@ -468,7 +475,70 @@ def test_prospective_pricing_config_and_live_version_separation(lane_env):
     assert event.newMaxLockBonus == 0
     assert event.previousAcceptedPayment == lane_env.scale
     assert event.previousPaymentCap == old[1]
+    assert event.previousWeightedLateness == 0
+    assert event.previousTimingEligible
     assert event.pricingConfigVersion == 2
+
+
+def test_one_shot_override_waits_for_next_successful_rollover_and_preview_is_pure(
+    lane_env,
+):
+    lane_env.set_config(
+        paymentCapPerEpoch=100 * lane_env.scale,
+        maxLockBonus=0,
+    )
+    lane_env.buy(50 * lane_env.scale)
+    stored_rate = lane_env.lane.epochRate()
+    target_rate = 777_777_777_777_777_777
+
+    assert lane_env.set_rate_override(target_rate) == 1
+    assert lane_env.lane.rateOverride() == target_rate
+    assert lane_env.lane.overrideVersion() == 1
+
+    same_epoch = lane_env.quote(lane_env.scale)
+    assert same_epoch.rate == stored_rate
+    lane_env.buy(lane_env.scale, expected_epoch=same_epoch.epoch)
+    assert lane_env.lane.rateOverride() == target_rate
+    assert lane_env.lane.overrideVersion() == 1
+
+    boa.env.time_travel(blocks=3 * lane_env.epoch_length)
+    first_preview = lane_env.quote(lane_env.scale)
+    second_preview = lane_env.quote(lane_env.scale)
+    assert first_preview.rate == second_preview.rate == target_rate
+    assert first_preview.epoch == 3
+    assert lane_env.lane.currentEpoch() == 0
+    assert lane_env.lane.rateOverride() == target_rate
+    assert lane_env.lane.overrideVersion() == 1
+
+    lane_env.lane.pause(True, sender=lane_env.switchboard.address)
+    assert not lane_env.quote(lane_env.scale).available
+    with boa.reverts("paused"):
+        lane_env.buy(lane_env.scale, expected_epoch=first_preview.epoch)
+    assert lane_env.lane.rateOverride() == target_rate
+    assert lane_env.lane.overrideVersion() == 1
+    assert lane_env.lane.currentEpoch() == 0
+    lane_env.lane.pause(False, sender=lane_env.switchboard.address)
+
+    payout = lane_env.buy(
+        lane_env.scale,
+        expected_epoch=first_preview.epoch,
+        min_ripe_out=first_preview.totalRipe,
+    )
+    applied = filter_logs(lane_env.lane, "RateOverrideApplied")[0]
+    rolled = filter_logs(lane_env.lane, "EpochRolled")[0]
+    assert payout == first_preview.totalRipe
+    assert lane_env.lane.currentEpoch() == 3
+    assert lane_env.lane.epochRate() == target_rate
+    assert lane_env.lane.rateOverride() == 0
+    assert lane_env.lane.overrideVersion() == 2
+
+    assert applied.newVersion == 2
+    assert applied.fromEpoch == 0
+    assert applied.toEpoch == 3
+    assert applied.targetRate == target_rate
+    assert applied.controllerRate == rolled.controllerRate
+    assert rolled.newRate == target_rate
+    assert rolled.controllerRate != target_rate
 
 
 def test_events_reconstruct_config_and_epoch_history_from_indexed_keys(lane_env):
@@ -569,7 +639,7 @@ def test_events_reconstruct_config_and_epoch_history_from_indexed_keys(lane_env)
     assert lane_env.lane.epochRate() == latest_roll.newRate == third_epoch.rate
     assert lane_env.lane.epochPaymentCap() == latest_roll.newPaymentCap == config_v3[1]
     assert lane_env.lane.epochMinPaymentAmount() == latest_roll.newMinPaymentAmount == config_v3[2]
-    assert lane_env.lane.epochMaxLockBonus() == latest_roll.newMaxLockBonus == config_v3[12]
+    assert lane_env.lane.epochMaxLockBonus() == latest_roll.newMaxLockBonus == config_v3[14]
     assert lane_env.lane.epochPricingVersion() == latest_roll.pricingConfigVersion == 3
     assert lane_env.lane.epochAcceptedPayment() == 3 * lane_env.scale
 

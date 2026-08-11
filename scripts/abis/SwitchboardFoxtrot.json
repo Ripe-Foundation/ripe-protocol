@@ -58,12 +58,22 @@
         "indexed": false
       },
       {
-        "name": "upBps",
+        "name": "minUpBps",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "downBps",
+        "name": "maxUpBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDownBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDownBps",
         "type": "uint256",
         "indexed": false
       },
@@ -109,6 +119,111 @@
       {
         "name": "actionId",
         "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRateOverrideSet",
+    "inputs": [
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "targetRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "expectedConfigVersion",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "expectedOverrideVersion",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRateOverrideCancellationSet",
+    "inputs": [
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "expectedOverrideVersion",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideExecuted",
+    "inputs": [
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideCancellationExecuted",
+    "inputs": [
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideActionCancelled",
+    "inputs": [
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "isCancellation",
+        "type": "bool",
         "indexed": false
       }
     ],
@@ -791,11 +906,19 @@
             "type": "uint256"
           },
           {
-            "name": "upBps",
+            "name": "minUpBps",
             "type": "uint256"
           },
           {
-            "name": "downBps",
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
             "type": "uint256"
           },
           {
@@ -814,6 +937,48 @@
       },
       {
         "name": "_expectedVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setInstantBondRateOverride",
+    "inputs": [
+      {
+        "name": "_targetRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedConfigVersion",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelInstantBondRateOverride",
+    "inputs": [
+      {
+        "name": "_expectedOverrideVersion",
         "type": "uint256"
       }
     ],
@@ -873,6 +1038,23 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "actionType",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "pendingConfig",
     "inputs": [
       {
@@ -922,11 +1104,19 @@
                 "type": "uint256"
               },
               {
-                "name": "upBps",
+                "name": "minUpBps",
                 "type": "uint256"
               },
               {
-                "name": "downBps",
+                "name": "maxUpBps",
+                "type": "uint256"
+              },
+              {
+                "name": "minDownBps",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDownBps",
                 "type": "uint256"
               },
               {
@@ -945,6 +1135,37 @@
           },
           {
             "name": "expectedVersion",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRateOverride",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "targetRate",
+            "type": "uint256"
+          },
+          {
+            "name": "expectedConfigVersion",
+            "type": "uint256"
+          },
+          {
+            "name": "expectedOverrideVersion",
             "type": "uint256"
           }
         ]

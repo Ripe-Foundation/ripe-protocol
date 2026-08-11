@@ -28,6 +28,11 @@
         "indexed": false
       },
       {
+        "name": "timingEligible",
+        "type": "bool",
+        "indexed": false
+      },
+      {
         "name": "pricingConfigVersion",
         "type": "uint256",
         "indexed": true
@@ -85,12 +90,32 @@
         "indexed": false
       },
       {
+        "name": "previousWeightedLateness",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousTimingEligible",
+        "type": "bool",
+        "indexed": false
+      },
+      {
         "name": "utilizationBps",
         "type": "uint256",
         "indexed": false
       },
       {
+        "name": "effectiveAdjustmentBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
         "name": "decaySteps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerRate",
         "type": "uint256",
         "indexed": false
       },
@@ -219,12 +244,22 @@
         "indexed": false
       },
       {
-        "name": "upBps",
+        "name": "minUpBps",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "downBps",
+        "name": "maxUpBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDownBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDownBps",
         "type": "uint256",
         "indexed": false
       },
@@ -242,6 +277,99 @@
         "name": "maxLockBonus",
         "type": "uint256",
         "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideInstalled",
+    "inputs": [
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "boundConfigVersion",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideApplied",
+    "inputs": [
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "fromEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "toEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "controllerRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideCancelled",
+    "inputs": [
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RateOverrideInvalidated",
+    "inputs": [
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "targetRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newConfigVersion",
+        "type": "uint256",
+        "indexed": true
       }
     ],
     "anonymous": false,
@@ -501,11 +629,19 @@
             "type": "uint256"
           },
           {
-            "name": "upBps",
+            "name": "minUpBps",
             "type": "uint256"
           },
           {
-            "name": "downBps",
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
             "type": "uint256"
           },
           {
@@ -572,11 +708,19 @@
             "type": "uint256"
           },
           {
-            "name": "upBps",
+            "name": "minUpBps",
             "type": "uint256"
           },
           {
-            "name": "downBps",
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
             "type": "uint256"
           },
           {
@@ -598,7 +742,96 @@
         "type": "uint256"
       }
     ],
-    "outputs": []
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidRateOverride",
+    "inputs": [
+      {
+        "name": "_targetRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedConfigVersion",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRateOverride",
+    "inputs": [
+      {
+        "name": "_targetRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedConfigVersion",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canCancelRateOverride",
+    "inputs": [
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelRateOverride",
+    "inputs": [
+      {
+        "name": "_expectedOverrideVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
   },
   {
     "stateMutability": "nonpayable",
@@ -823,11 +1056,19 @@
             "type": "uint256"
           },
           {
-            "name": "upBps",
+            "name": "minUpBps",
             "type": "uint256"
           },
           {
-            "name": "downBps",
+            "name": "maxUpBps",
+            "type": "uint256"
+          },
+          {
+            "name": "minDownBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDownBps",
             "type": "uint256"
           },
           {
@@ -946,6 +1187,54 @@
     "stateMutability": "view",
     "type": "function",
     "name": "epochAcceptedPayment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochWeightedLateness",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochTimingEligible",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "rateOverride",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "overrideVersion",
     "inputs": [],
     "outputs": [
       {

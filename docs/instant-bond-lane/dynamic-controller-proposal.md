@@ -1,0 +1,550 @@
+# Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
+
+**Status:** Owner-approved revision-20 design implemented and locally validated.
+Contract, test, model, and ABI implementation work is complete, and the owner approved
+the revision-20 project-size ceilings recorded below. Economic calibration is
+explicitly **not approved**. This document is not deployment, configuration,
+activation, merge, or pull-request authority.
+
+**Starting baseline:** branch `instant-bond-lane` at
+`ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`.
+
+The revision-20 [`implementation-spec.md`](implementation-spec.md) is authoritative.
+This document records the controller rationale and the implemented design at
+`contracts/core/InstantBondLane.vy` and
+`contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
+the final evidence block in the implementation specification.
+
+## 1. Conclusions
+
+The implemented controller preserves the utilization-based direction decision while
+making the adjustment magnitude responsive to demand strength:
+
+- high utilization moves price up by a governed value in `minUpBps..maxUpBps`;
+- low-utilization positive-payment epochs move price down by a governed value in
+  `minDownBps..maxDownBps`;
+- the dead band applies no utilization-driven step, while a newly lowered ceiling may
+  still clamp the base rate;
+- fully empty or skipped epochs retain the existing fixed `decayBps` step;
+- every committed epoch still has one fixed base payout rate; and
+- all effective adjustments remain bounded before exact inverse-rate arithmetic.
+
+"Fixed base payout rate" does not mean every buyer receives the same effective
+locked quote. MissionControl lock terms remain live, and buyer-selected lock duration
+can change the bonus within the snapshotted epoch maximum. Before the first successful
+purchase commits a lazily projected epoch, a newly executed config can also change
+that uncommitted projection.
+
+Purchase timing must be amount-weighted. Using only the final sellout block lets a
+buyer acquire almost the entire cap immediately and delay a marginal tail purchase to
+force the minimum upward adjustment.
+
+Governance can install one timelocked, one-shot exact rate for the next successful
+rollover. There is no direct or untimelocked admin setter, and an override never
+rewrites the active stored epoch. There is no target calendar epoch, execution window
+tied to an epoch boundary, or maximum lead in epochs.
+
+## 2. Implemented authority model
+
+The Lane exposes `setConfig`, `setRateOverride`, and `cancelRateOverride` to any address
+that satisfies the protocol's existing registered-switchboard check. All three
+mutators are `@nonreentrant` defense-in-depth. `SwitchboardFoxtrot` is the intended
+timelocked route and has an immutable Lane target, but the Lane does not pin authority
+to Foxtrot. Registry-wide trust is the resolved protocol boundary, not a future design
+decision.
+
+The exact manual-rate workflow is deliberately separate from ordinary configuration:
+
+- `seedRate` supplies the first initialized epoch only;
+- `setConfig` replaces persistent controller inputs but never writes the active
+  `epochRate` directly;
+- `setRateOverride` installs one exact target for the first later successful rollover;
+- `cancelRateOverride` removes an installed target through the same registered-
+  switchboard boundary;
+- `canBuyNow`, Department pause, mint authorization, and `mintBudget` can stop sales
+  but do not assign price; and
+- Foxtrot independently timelocks config replacement, override installation, and
+  installed-override cancellation as three tagged action types.
+
+## 3. Terminology and units
+
+The contract stores a base payout rate:
+
+```text
+R = RIPE-wei per whole payment token
+```
+
+`R` is the inverse of price. A lower rate is a higher RIPE price. Governance and UI
+tooling may display a human price, but every on-chain controller and override input
+must use the exact integer `rate` to avoid ambiguous decimal conversion.
+
+Let:
+
+```text
+B = 10_000
+C = snapshotted epoch payment cap
+A = total accepted payment in the epoch
+U = floor(A * B / C)
+L = immutable epoch length in blocks
+```
+
+## 4. Amount-weighted timing signal
+
+For a purchase `i` at zero-based block offset `o_i` within an epoch:
+
+```text
+if L == 1:
+    lateness_i = 0
+else:
+    lateness_i = floor(o_i * B / (L - 1))
+
+weightedLateness += paymentAmount_i * lateness_i
+```
+
+At rollover after a positive epoch:
+
+```text
+averageLateness = floor(weightedLateness / A)
+earliness = B - averageLateness
+```
+
+This maps all first-block demand to `earliness=B`, all last-block demand to zero, and
+mixed demand according to the amount arriving at each time. Splitting or merging
+purchases in the same block does not alter the signal.
+
+For `L=1`, the epoch's only block is both its first and last. The implementation
+assigns full earliness (`B`) because all observed demand necessarily arrives in the
+sole available block. For `L>1`, the first and last offsets map exactly to `B` and
+zero.
+
+The config bound `paymentCapPerEpoch <= max_value(uint256) / B` makes
+`weightedLateness <= C * B` safe. The constructor additionally enforces
+`EPOCH_LENGTH <= max_value(uint256) / B + 1`, which makes `o_i * B` safe. The
+deterministic Python model uses unbounded integers and therefore remains supporting
+mechanism evidence rather than proof of these Vyper bounds.
+
+The first initialized epoch is only partially exposed when initialization occurs after
+its deterministic start. The implemented rule sets `epochTimingEligible` only when
+initialization occurs at deterministic offset zero. Timing is still recorded, but an
+ineligible first epoch forces its upward timing multiplier to zero and therefore uses
+`minUpBps`. `EPOCH_LENGTH == 1` is offset-zero and eligible. Every later stored epoch
+is timing-eligible.
+
+## 5. Dynamic upward adjustment
+
+Final utilization still chooses the branch. For `U >= uHighBps`, normalize both the
+amount above the threshold and the timing signal:
+
+```text
+utilizationStrength = floor(
+    (U - uHighBps) * B / (B - uHighBps)
+)
+
+demandStrength = floor(utilizationStrength * earliness / B)
+
+effectiveUpBps = minUpBps + floor(
+    (maxUpBps - minUpBps) * demandStrength / B
+)
+```
+
+Consequences:
+
+- exact `uHighBps` receives `minUpBps` regardless of timing;
+- a full first-block epoch receives `maxUpBps`;
+- a full last-block epoch receives `minUpBps`;
+- a full epoch sold uniformly receives an intermediate adjustment;
+- high but partially filled epochs receive a bounded intermediate adjustment; and
+- a late tail purchase affects timing only in proportion to its amount.
+
+As the historical revision-19 controller did, first apply the latest base-rate ceiling
+before selecting any branch:
+
+```text
+boundedOldRate = min(oldRate, newBaseRateCeiling)
+```
+
+Apply the effective price increase using the current exact inverse-rate formula:
+
+```text
+newRate = max(
+    floor(boundedOldRate * B / (B + effectiveUpBps)),
+    MIN_BASE_RATE,
+)
+```
+
+Do not interpolate `rate` directly and do not replace the formula with
+`oldRate * (B - effectiveUpBps) / B`.
+
+## 6. Dynamic downward adjustment
+
+Purchase timing is not the primary weakness signal when an epoch fails to reach the
+target. For a positive-payment epoch with `U <= uLowBps`, including a utilization that
+rounds down to `U=0`, use utilization shortfall:
+
+```text
+weakness = floor((uLowBps - U) * B / uLowBps)
+
+effectiveDownBps = minDownBps + floor(
+    (maxDownBps - minDownBps) * weakness / B
+)
+
+newRate = min(
+    floor(boundedOldRate * B / (B - effectiveDownBps)),
+    newBaseRateCeiling,
+)
+```
+
+Thus utilization exactly at `uLowBps` receives `minDownBps`, and a positive-payment
+epoch whose floored utilization is zero receives `maxDownBps`.
+
+The dead band `uLowBps < U < uHighBps` applies no controller step, but a newly
+lowered ceiling still clamps the old rate to `boundedOldRate`.
+
+## 7. Empty and skipped epochs
+
+Keep `decayBps` fixed. Empty epochs have no purchase-timing observation, and skipped
+epochs already express duration by applying one decay step per epoch up to
+`maxDecayEpochs`. Giving decay another time-dependent range would count the same
+duration twice.
+
+The existing lazy rules remain:
+
+- after one positive stored epoch, apply its utilization transition once and then
+  `min(elapsed - 1, maxDecayEpochs)` fixed decay steps;
+- keep the defensive zero-accepted stored branch;
+- ignore elapsed epochs before first initialization; and
+- treat pause, disablement, budget exhaustion, and operational outages like other
+  unavailable empty time.
+
+## 8. Implemented configuration
+
+Revision 20 replaced the historical fixed fields:
+
+```text
+upBps
+downBps
+```
+
+with:
+
+```text
+minUpBps
+maxUpBps
+minDownBps
+maxDownBps
+```
+
+Retain `uLowBps`, `uHighBps`, `decayBps`, and `maxDecayEpochs`.
+
+The complete mirrored config order is:
+
+```text
+canBuyNow
+paymentCapPerEpoch
+minPaymentAmount
+mintBudget
+maxEffectiveRate
+seedRate
+uHighBps
+uLowBps
+minUpBps
+maxUpBps
+minDownBps
+maxDownBps
+decayBps
+maxDecayEpochs
+maxLockBonus
+```
+
+Controller-specific hard validation (the implementation specification contains the
+remaining payment, rate, bonus, budget, and arithmetic bounds):
+
+```text
+0 < uLowBps < uHighBps < B
+0 < minUpBps <= maxUpBps <= MAX_PRICE_STEP_BPS
+0 < minDownBps <= maxDownBps <= decayBps < B
+maxDownBps < minUpBps
+(B + minUpBps) * (B - maxDownBps) >= B * B
+0 < maxDecayEpochs <= 32
+```
+
+The round-trip inequality ensures that, away from rate bounds and integer saturation,
+the strongest configured positive low-utilization price-down factor cannot erase the
+weakest configured high-utilization price-up factor. It is not an unconditional
+state-level monotonicity guarantee: if the price-up transition saturates at
+`MIN_BASE_RATE`, a later price-down step can and should move the rate up from that
+floor. The model tests both the interior factor and this documented bound exception.
+
+Collapsing each range (`min==max`) reproduces the revision-19 positive-epoch
+transition for configs that satisfy the stricter v2 validation, including exact rate
+arithmetic, ceiling pre-clamp, floor, and bounded skipped decay. It does not preserve
+config acceptance: revision 19 permits `uLowBps=0`, `uHighBps=B`, and some asymmetric
+step pairs that the nondegenerate dynamic formulas or round-trip inequality reject.
+
+The expanded 15-field config is mirrored byte-for-byte in `InstantBondLane` and
+`SwitchboardFoxtrot`, with a source-identity guard test. Lane and Foxtrot config events
+emit every field in that same order.
+
+## 9. Implemented epoch state and observability
+
+The dynamic controller adds and publicly exposes:
+
+```text
+epochWeightedLateness
+epochTimingEligible       # false only for a late first initialized epoch
+```
+
+The timing accumulator resets on rollover, and the current purchase contribution is
+added only after projected epoch state has been selected. Failed purchases and reverted
+settlement do not persist timing.
+
+`EpochRolled` reports the implemented reconstructable inputs and results:
+
+```text
+previousWeightedLateness
+previousTimingEligible
+effectiveAdjustmentBps
+controllerRate
+```
+
+The event also carries both epoch endpoints, old/new rate, the complete new pricing
+snapshot, prior accepted payment/cap, utilization, decay steps, and pricing config
+version. Average lateness, strength intermediates, and adjustment direction are
+deterministically reconstructable and are not separate event fields.
+
+## 10. Timelocked one-shot manual rate override
+
+### 10.1 Authority
+
+There is no direct Lane admin. The intended workflow queues, confirms, executes,
+expires, and cancels override actions through `SwitchboardFoxtrot` and the existing
+`LocalGov`/`TimeLock` model.
+
+The Lane's mutators use the existing registered-switchboard authorization check.
+Registry-wide switchboard trust is accepted for revision 20; Foxtrot is the intended
+route, not a Lane-side immutable authorization pin.
+
+### 10.2 Installed state
+
+The Lane stores exactly two public scalars:
+
+```text
+rateOverride       # exact target; zero means none installed
+overrideVersion
+```
+
+`rateOverride == 0` represents no installed override because every valid rate is
+strictly positive. There is no stored bound-config-version field. Foxtrot queues the
+target plus expected config and override versions; `RateOverrideInstalled` records the
+validated config version as event data. Every full config write synchronously
+invalidates an installed target, so an additional stored binding is unnecessary.
+
+Only one installed override may exist. Replacing it requires a separately authorized
+cancel followed by a new timelocked installation. Each successful override lifecycle
+transition increments `overrideVersion` exactly once: installation, application,
+installed cancellation, or config invalidation. Preview, same-epoch purchases, failed
+execution, expired queue cleanup, and reverted settlement leave it unchanged. This
+makes two actions queued against the same version mutually exclusive.
+
+The ordinary Foxtrot TimeLock confirmation and expiration rules bound a queued action.
+There is no target epoch, target-boundary execution window, minimum pre-target window,
+or maximum lead in epochs. Once successfully installed in the Lane, the override
+persists until application, timelocked cancellation, or config invalidation.
+
+Before initialization, governance changes `seedRate` instead. Installation on an
+initialized Lane requires:
+
+```text
+MIN_BASE_RATE <= targetRate <= currentBaseRateCeiling
+expectedConfigVersion == configVersion
+expectedOverrideVersion == overrideVersion
+no installed override
+```
+
+The contract rejects an invalid rate and never silently clamps a requested manual
+target.
+
+### 10.3 Owner-selected next-successful-rollover semantics
+
+Let `S` be the Lane's stored `currentEpoch` and `E` the deterministic epoch projected
+for a purchase or preview:
+
+```text
+E == S: retain the override; use the already committed stored epoch rate
+E > S:  use targetRate exactly for the newly projected epoch
+```
+
+The `E > S` result is identical whether one or many deterministic epochs elapsed.
+The target replaces the ordinary utilization transition and every skipped-epoch decay
+effect for that rollover. The implementation still calculates the ordinary result as
+`controllerRate` and emits it as counterfactual telemetry, but does not clamp or decay
+the valid installed target. The next ordinary rollover starts from the committed
+target rate.
+
+Preview projects the override without consuming it. A successful purchase in the
+already stored epoch leaves it pending. The first successful purchase that commits any
+later epoch clears it atomically and increments `overrideVersion`. A settlement failure
+after projection reverts consumption together with the epoch, timing, cap, and mint
+accounting writes.
+
+Installation is valid even when the stored epoch is already stale relative to the
+wall-clock lane epoch. In that case the next successful purchase can apply the target
+immediately to the current uncommitted deterministic epoch. This matches the existing
+lazy rule under which governance can change an uncommitted projection while never
+rewriting an already committed epoch.
+
+### 10.4 Config changes and cancellation
+
+Installation is validated against an exact config version, which is recorded in the
+installation event rather than stored. Executing any full config while an override is
+installed clears and invalidates the override, increments its version, and emits an
+explicit event. A stale override cannot survive a successful config write and make
+ordinary purchases revert.
+
+Cancellation of a queued Foxtrot action follows existing governance cancellation.
+Cancellation of an override already installed in Lane changes a committed future
+economic rule and is itself timelocked and version-bound.
+
+### 10.5 Events and views
+
+The implemented Foxtrot events are:
+
+- `PendingRateOverrideSet(actionId, confirmationBlock, targetRate,
+  expectedConfigVersion, expectedOverrideVersion)`;
+- `PendingRateOverrideCancellationSet(actionId, confirmationBlock,
+  expectedOverrideVersion)`;
+- `RateOverrideExecuted(actionId, newVersion)`;
+- `RateOverrideCancellationExecuted(actionId, newVersion)`; and
+- `RateOverrideActionCancelled(actionId, isCancellation)` for explicit or expired
+  queued-action cleanup.
+
+The implemented Lane events are:
+
+- `RateOverrideInstalled(newVersion indexed, targetRate,
+  boundConfigVersion indexed)`;
+- `RateOverrideApplied(newVersion indexed, fromEpoch indexed, toEpoch indexed,
+  targetRate, controllerRate)`;
+- `RateOverrideCancelled(newVersion indexed, targetRate)`; and
+- `RateOverrideInvalidated(newVersion indexed, targetRate,
+  newConfigVersion indexed)`.
+
+The public override views are the scalar `rateOverride()` and `overrideVersion()`
+getters plus `isValidRateOverride(...)` and `canCancelRateOverride(...)`. There is no
+separate detailed override tuple. `previewBuyNow.rate` is authoritative for the
+projected purchase rate and does not consume an installed target.
+
+### 10.6 Emergency operator flow
+
+If pricing is wildly wrong:
+
+1. pause the Lane through the established emergency path;
+2. queue any required full config change;
+3. wait and execute it;
+4. queue the exact one-shot next-rollover rate against the resulting config version;
+5. wait and install it;
+6. verify preview, override state, ceiling, cap, and budget;
+7. unpause only when the target rate and operational checks are aligned.
+
+The global mint switch remains the broader protocol circuit breaker. Manual pricing
+does not bypass the all-in rate ceiling, epoch cap, mint budget, pause, or mint
+authorization.
+
+If the Lane remains paused across one or many deterministic epochs after installation,
+the target remains exact and pending. The first successful rollover after unpause uses
+it without calendar decay. This paused-recovery behavior is a deliberate consequence
+of the owner-selected semantics.
+
+## 11. Simulation and acceptance gates
+
+The deterministic model is
+`scripts/simulations/instant_bond_lane_controller.py`; its canonical output is
+`controller-simulation-v2.json` in this directory.
+
+Canonical artifact SHA-256:
+`f8a528bf61d1605d4f90b3a5fa8806d139b783ce2c7c22e918299073998cbde4`.
+
+The checked-in pure Python companion model demonstrates:
+
+- exact first/last timing endpoints;
+- monotone upward adjustment in both utilization strength and amount-weighted
+  earliness;
+- monotone downward adjustment in utilization weakness;
+- same-block split/merge and purchase-order invariance;
+- conditional collapsed-range positive-transition parity with revision 19, including
+  final integer rates for configs admitted by v2;
+- fixed, capped, dynamic-range-independent decay;
+- exact next-successful-rollover projection after one or many elapsed epochs, plus a
+  pure versioned install, same-epoch retention, repeat preview, failed commit,
+  successful one-shot consumption, cancellation, and config-invalidation lifecycle;
+- floor, ceiling pre-clamp, and maximum-decay preservation; and
+- byte-identical canonical JSON across repeated runs.
+
+This model is not a Lane, Foxtrot, Boa, EVM, authorization, storage, event, or
+settlement simulator. Revision-20 contract and test sources now implement the related
+paths, including stale Foxtrot actions, TimeLock boundaries, failed-settlement rollback,
+the partially exposed first initialization, pause/disable/budget intervals, config
+execution, ABI/event reconstruction, and stateful reference-model parity. Their final
+run results are recorded in §20.4 of `implementation-spec.md`; that normative evidence,
+not this design record, governs validation claims.
+
+The illustrative fixture intentionally exposes calibration risk:
+
+- full first/mid/last-block demand selects `800/500/200` bps;
+- +30% price catch-up takes `4/6/14` such epochs;
+- 2x takes `10/15/36`, and 10x takes `30/48/117`;
+- one fast-full 8% price-up epoch followed by one 2% empty decay epoch still nets a
+  `1.0584x` price multiplier per pair;
+- sixteen such alternating pairs reach a `2.4796x` price index;
+- one late-full 2% price-up epoch followed by one 2% empty decay epoch nets `0.9996x`
+  per pair, with sixteen alternating pairs reaching `0.9936x`; and
+- 32 consecutive fast-full epochs reach `11.7370x`.
+
+Those figures are mechanism evidence and a warning, not a parameter recommendation.
+
+Simulation values are illustrative. The artifact must remain marked
+`calibration_status: not_approved` until the owner pins acceptable catch-up time,
+half-life, oscillation, leakage, capacity, and override-deviation limits.
+
+## 12. Implemented revision-20 impact
+
+Revision 20 changes economics and is not behavior-preserving relative to revision 19.
+The working candidate includes:
+
+- expanded mirrored config tuples and config events;
+- changed function selectors and generated ABIs;
+- new Lane timing and override storage fields;
+- new Foxtrot pending-action storage and action/event paths;
+- revised rollover, preview, and state-commit logic;
+- new override installation/cancel/invalidation logic;
+- updated controller, property, lifecycle, Foxtrot, ABI, and stateful models;
+- a reconciled normative specification revision; and
+- regenerated canonical ABI artifacts.
+
+Historical revision 19 measured 8,669 bytes for Lane against its 9,000-byte project
+regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Final revision-20
+Boa deployments measure 10,564 bytes for Lane and 6,051 bytes for Foxtrot. The owner
+explicitly approved revision-20 local anti-creep ceilings of 11,000 and 6,500 bytes,
+leaving 436 and 449 bytes of project-gate headroom. Both deployments remain below
+EIP-170 by 14,012 and 18,525 bytes. This rebaseline is a source-size policy decision,
+not deployment or economic-calibration approval.
+
+## 13. Execution status and authority boundary
+
+Completed in the working candidate:
+
+1. owner selection of the dynamic controller and next-successful-rollover semantics;
+2. authoritative revision-20 specification reconciliation;
+3. atomic Lane and Foxtrot implementation;
+4. controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
+5. deterministic ABI regeneration;
+6. fresh revision-20 local validation; and
+7. the owner-approved 11,000-byte Lane and 6,500-byte Foxtrot project ceilings.
+
+The owner authorized the bounded branch commit and push recorded in
+`implementation-spec.md`. The resulting Git identities belong in the external handoff
+because a commit cannot include its own identity.
+
+Economic calibration remains `not_approved` and is required before any deployment or
+configuration proposal, not before completing source validation. Merge, pull-request
+publication, deployment, configuration, RIPE minting, and activation remain outside
+the current authorization.

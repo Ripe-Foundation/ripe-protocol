@@ -11,6 +11,7 @@
 #      Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 exports: gov.__interface__
 exports: timeLock.__interface__
@@ -22,9 +23,18 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
 interface InstantBondLane:
-    def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256): nonpayable
+    def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256) -> uint256: nonpayable
+    def setRateOverride(_targetRate: uint256, _expectedConfigVersion: uint256, _expectedOverrideVersion: uint256) -> uint256: nonpayable
+    def cancelRateOverride(_expectedOverrideVersion: uint256) -> uint256: nonpayable
     def isValidConfig(_config: InstantBondConfig) -> bool: view
+    def isValidRateOverride(_targetRate: uint256, _expectedConfigVersion: uint256, _expectedOverrideVersion: uint256) -> bool: view
+    def canCancelRateOverride(_expectedOverrideVersion: uint256) -> bool: view
     def configVersion() -> uint256: view
+
+flag ActionType:
+    INSTANT_BOND_CONFIG
+    RATE_OVERRIDE_SET
+    RATE_OVERRIDE_CANCEL
 
 # NOTE: Keep this struct byte-for-byte aligned with InstantBondLane.InstantBondConfig.
 # Guarded by test_instant_bond_config_struct_bodies_are_byte_for_byte_identical.
@@ -37,8 +47,10 @@ struct InstantBondConfig:
     seedRate: uint256
     uHighBps: uint256
     uLowBps: uint256
-    upBps: uint256
-    downBps: uint256
+    minUpBps: uint256
+    maxUpBps: uint256
+    minDownBps: uint256
+    maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
     maxLockBonus: uint256
@@ -46,6 +58,11 @@ struct InstantBondConfig:
 struct PendingInstantBondConfig:
     config: InstantBondConfig
     expectedVersion: uint256
+
+struct PendingRateOverride:
+    targetRate: uint256
+    expectedConfigVersion: uint256
+    expectedOverrideVersion: uint256
 
 event PendingInstantBondConfigSet:
     actionId: uint256
@@ -59,8 +76,10 @@ event PendingInstantBondConfigSet:
     seedRate: uint256
     uHighBps: uint256
     uLowBps: uint256
-    upBps: uint256
-    downBps: uint256
+    minUpBps: uint256
+    maxUpBps: uint256
+    minDownBps: uint256
+    maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
     maxLockBonus: uint256
@@ -72,10 +91,36 @@ event InstantBondConfigExecuted:
 event InstantBondConfigCancelled:
     actionId: uint256
 
+event PendingRateOverrideSet:
+    actionId: uint256
+    confirmationBlock: uint256
+    targetRate: uint256
+    expectedConfigVersion: uint256
+    expectedOverrideVersion: uint256
+
+event PendingRateOverrideCancellationSet:
+    actionId: uint256
+    confirmationBlock: uint256
+    expectedOverrideVersion: uint256
+
+event RateOverrideExecuted:
+    actionId: uint256
+    newVersion: uint256
+
+event RateOverrideCancellationExecuted:
+    actionId: uint256
+    newVersion: uint256
+
+event RateOverrideActionCancelled:
+    actionId: uint256
+    isCancellation: bool
+
 LANE: public(immutable(address))
 
-# pending config changes
+# pending actions
+actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingConfig: public(HashMap[uint256, PendingInstantBondConfig]) # aid -> config
+pendingRateOverride: public(HashMap[uint256, PendingRateOverride]) # aid -> override
 
 
 @deploy
@@ -107,6 +152,7 @@ def setInstantBondConfig(_config: InstantBondConfig, _expectedVersion: uint256) 
     assert _expectedVersion == staticcall InstantBondLane(lane).configVersion() # dev: stale config version
 
     aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.INSTANT_BOND_CONFIG
     self.pendingConfig[aid] = PendingInstantBondConfig(
         config=_config,
         expectedVersion=_expectedVersion,
@@ -125,11 +171,74 @@ def setInstantBondConfig(_config: InstantBondConfig, _expectedVersion: uint256) 
         seedRate=_config.seedRate,
         uHighBps=_config.uHighBps,
         uLowBps=_config.uLowBps,
-        upBps=_config.upBps,
-        downBps=_config.downBps,
+        minUpBps=_config.minUpBps,
+        maxUpBps=_config.maxUpBps,
+        minDownBps=_config.minDownBps,
+        maxDownBps=_config.maxDownBps,
         decayBps=_config.decayBps,
         maxDecayEpochs=_config.maxDecayEpochs,
         maxLockBonus=_config.maxLockBonus,
+    )
+    return aid
+
+
+#################
+# Rate Override #
+#################
+
+
+@external
+def setInstantBondRateOverride(
+    _targetRate: uint256,
+    _expectedConfigVersion: uint256,
+    _expectedOverrideVersion: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
+
+    lane: address = LANE
+    assert staticcall InstantBondLane(lane).isValidRateOverride(_targetRate, _expectedConfigVersion, _expectedOverrideVersion) # dev: invalid rate override
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RATE_OVERRIDE_SET
+    self.pendingRateOverride[aid] = PendingRateOverride(
+        targetRate=_targetRate,
+        expectedConfigVersion=_expectedConfigVersion,
+        expectedOverrideVersion=_expectedOverrideVersion,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRateOverrideSet(
+        actionId=aid,
+        confirmationBlock=confirmationBlock,
+        targetRate=_targetRate,
+        expectedConfigVersion=_expectedConfigVersion,
+        expectedOverrideVersion=_expectedOverrideVersion,
+    )
+    return aid
+
+
+@external
+def cancelInstantBondRateOverride(_expectedOverrideVersion: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
+
+    lane: address = LANE
+    assert staticcall InstantBondLane(lane).canCancelRateOverride(_expectedOverrideVersion) # dev: no rate override
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RATE_OVERRIDE_CANCEL
+    self.pendingRateOverride[aid] = PendingRateOverride(
+        targetRate=0,
+        expectedConfigVersion=0,
+        expectedOverrideVersion=_expectedOverrideVersion,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRateOverrideCancellationSet(
+        actionId=aid,
+        confirmationBlock=confirmationBlock,
+        expectedOverrideVersion=_expectedOverrideVersion,
     )
     return aid
 
@@ -149,13 +258,31 @@ def executePendingAction(_aid: uint256) -> bool:
             self._cancelPendingAction(_aid)
         return False
 
+    actionType: ActionType = self.actionType[_aid]
+    assert actionType != empty(ActionType) # dev: invalid action
     lane: address = LANE
-    p: PendingInstantBondConfig = self.pendingConfig[_aid]
-    extcall InstantBondLane(lane).setConfig(p.config, p.expectedVersion)
-    newVersion: uint256 = staticcall InstantBondLane(lane).configVersion()
+    newVersion: uint256 = 0
+    if actionType == ActionType.INSTANT_BOND_CONFIG:
+        p: PendingInstantBondConfig = self.pendingConfig[_aid]
+        newVersion = extcall InstantBondLane(lane).setConfig(p.config, p.expectedVersion)
+    elif actionType == ActionType.RATE_OVERRIDE_SET:
+        o: PendingRateOverride = self.pendingRateOverride[_aid]
+        newVersion = extcall InstantBondLane(lane).setRateOverride(
+            o.targetRate,
+            o.expectedConfigVersion,
+            o.expectedOverrideVersion,
+        )
+    else:
+        c: PendingRateOverride = self.pendingRateOverride[_aid]
+        newVersion = extcall InstantBondLane(lane).cancelRateOverride(c.expectedOverrideVersion)
 
-    self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
-    log InstantBondConfigExecuted(actionId=_aid, newVersion=newVersion)
+    self._clearPending(_aid)
+    if actionType == ActionType.INSTANT_BOND_CONFIG:
+        log InstantBondConfigExecuted(actionId=_aid, newVersion=newVersion)
+    elif actionType == ActionType.RATE_OVERRIDE_SET:
+        log RateOverrideExecuted(actionId=_aid, newVersion=newVersion)
+    else:
+        log RateOverrideCancellationExecuted(actionId=_aid, newVersion=newVersion)
     return True
 
 
@@ -173,6 +300,20 @@ def cancelPendingAction(_aid: uint256) -> bool:
 
 @internal
 def _cancelPendingAction(_aid: uint256):
+    actionType: ActionType = self.actionType[_aid]
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self._clearPending(_aid)
+    if actionType == ActionType.INSTANT_BOND_CONFIG:
+        log InstantBondConfigCancelled(actionId=_aid)
+    else:
+        log RateOverrideActionCancelled(
+            actionId=_aid,
+            isCancellation=actionType == ActionType.RATE_OVERRIDE_CANCEL,
+        )
+
+
+@internal
+def _clearPending(_aid: uint256):
+    self.actionType[_aid] = empty(ActionType)
     self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
-    log InstantBondConfigCancelled(actionId=_aid)
+    self.pendingRateOverride[_aid] = empty(PendingRateOverride)

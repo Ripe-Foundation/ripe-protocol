@@ -1,0 +1,1852 @@
+{
+  "arithmetic": "uint256-style floor integer model; no floats",
+  "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
+  "bound_implementation": {
+    "instant_bond_lane_source_sha256": "39cb6ac4df0870f224c84b97b93521b9f565d0a7842c0f5c500c03315c560d7b",
+    "starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+    "switchboard_foxtrot_source_sha256": "42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa"
+  },
+  "calibration_status": "not_approved",
+  "economic_metrics": {
+    "alternating_path_warning": {
+      "alternating_16_pairs_final_price_index_bps": 24796,
+      "alternating_late_16_pairs_final_price_index_bps": 9936,
+      "fast_full_then_empty_pair_price_multiplier_bps": 10584,
+      "interpretation": "With 2% empty decay, the illustrative 8% fast-up path ratchets upward while the 2% late-up path drifts slightly down; neither is calibrated or approved.",
+      "late_full_then_empty_pair_price_multiplier_bps": 9996,
+      "repeated_fast_full_32_epochs_final_price_index_bps": 117370
+    },
+    "catch_up_epochs": {
+      "fast": {
+        "+30%": 4,
+        "10x": 30,
+        "2x": 10
+      },
+      "late": {
+        "+30%": 14,
+        "10x": 117,
+        "2x": 36
+      },
+      "mid": {
+        "+30%": 6,
+        "10x": 48,
+        "2x": 15
+      }
+    },
+    "parameter_acceptance_thresholds": "owner_not_pinned",
+    "price_down_half_life_epochs": {
+      "at_uLow": 139,
+      "empty": 35,
+      "half_uLow": 69,
+      "max_configured_down_bound": 46,
+      "minimum_reachable_positive": 47
+    }
+  },
+  "fixture": {
+    "decay_bps": 200,
+    "epoch_length": 101,
+    "initial_rate": 1000000000000000000,
+    "max_decay_epochs": 4,
+    "max_down_bps": 150,
+    "max_up_bps": 800,
+    "min_down_bps": 50,
+    "min_payment_amount": 10,
+    "min_rate": 10000,
+    "min_up_bps": 200,
+    "payment_cap": 10000,
+    "rate_ceiling": 2000000000000000000,
+    "u_high_bps": 8000,
+    "u_low_bps": 2000
+  },
+  "formula": {
+    "decay": "fixed decayBps per skipped epoch, capped by maxDecayEpochs",
+    "down": "weakness=(uLow-U)*10000//uLow; step=minDown+(maxDown-minDown)*weakness//10000",
+    "override": "same stored epoch remains pending; first projected epoch greater than stored epoch uses the exact target with no skipped-epoch decay",
+    "preclamp": "boundedOldRate=min(oldRate,newBaseRateCeiling)",
+    "price_down_rate": "min(boundedOldRate*10000//(10000-effectiveDown),rateCeiling)",
+    "price_up_rate": "max(boundedOldRate*10000//(10000+effectiveUp),minRate)",
+    "up": "utilStrength=(U-uHigh)*10000//(10000-uHigh); demandStrength=utilStrength*earliness//10000; step=minUp+(maxUp-minUp)*demandStrength//10000"
+  },
+  "implementation_boundaries": [
+    "Vyper must bound or safely decompose offset*10000",
+    "first partially exposed initialized epoch is timing-ineligible",
+    "pause and disable intervals remain wall-clock time",
+    "manual next-rollover target must be timelocked, version-bound, and one-shot"
+  ],
+  "manual_override_lifecycle": {
+    "calendar_target_window_or_lead": "not_applicable",
+    "cancelled_state": {
+      "bound_config_version": 0,
+      "exists": false,
+      "target_rate": 0,
+      "version": 2
+    },
+    "config_invalidated_state": {
+      "bound_config_version": 0,
+      "exists": false,
+      "target_rate": 0,
+      "version": 2
+    },
+    "config_invalidation": "pass",
+    "consumed_state": {
+      "bound_config_version": 0,
+      "exists": false,
+      "target_rate": 0,
+      "version": 2
+    },
+    "failed_commit_preserves_state": "pass",
+    "failed_commit_state": {
+      "bound_config_version": 7,
+      "exists": true,
+      "target_rate": 925000000000000000,
+      "version": 1
+    },
+    "initial_state": {
+      "bound_config_version": 0,
+      "exists": false,
+      "target_rate": 0,
+      "version": 0
+    },
+    "installed_cancellation": "pass",
+    "installed_state": {
+      "bound_config_version": 7,
+      "exists": true,
+      "target_rate": 925000000000000000,
+      "version": 1
+    },
+    "next_rollover_projection": {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 1,
+      "final_rate": 925000000000000000,
+      "status": "apply"
+    },
+    "repeat_preview": "pass",
+    "same_epoch_projection": {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 0,
+      "final_rate": 880000000000000000,
+      "status": "pending"
+    },
+    "scope": "pure proposal lifecycle; not Lane, Foxtrot, or EVM authorization",
+    "skipped_epochs_preserve_exact_target": "pass",
+    "skipped_rollover_projection": {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 4,
+      "final_rate": 925000000000000000,
+      "status": "apply"
+    },
+    "status": "pass",
+    "successful_commit_consumes_once": "pass"
+  },
+  "manual_override_scenarios": [
+    {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 0,
+      "final_rate": 880000000000000000,
+      "name": "same_stored_epoch_pending",
+      "projected_epoch": 4,
+      "status": "pending",
+      "stored_epoch": 4,
+      "target_rate": 925000000000000000
+    },
+    {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 1,
+      "final_rate": 925000000000000000,
+      "name": "next_rollover_exact",
+      "projected_epoch": 5,
+      "status": "apply",
+      "stored_epoch": 4,
+      "target_rate": 925000000000000000
+    },
+    {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 4,
+      "final_rate": 925000000000000000,
+      "name": "skipped_rollover_exact",
+      "projected_epoch": 8,
+      "status": "apply",
+      "stored_epoch": 4,
+      "target_rate": 925000000000000000
+    },
+    {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 0,
+      "final_rate": null,
+      "name": "invalid_below_floor",
+      "projected_epoch": 5,
+      "status": "reject",
+      "stored_epoch": 4,
+      "target_rate": 9999
+    },
+    {
+      "counterfactual_controller_rate": 880000000000000000,
+      "elapsed_epochs": 0,
+      "final_rate": null,
+      "name": "invalid_above_ceiling",
+      "projected_epoch": 5,
+      "status": "reject",
+      "stored_epoch": 4,
+      "target_rate": 2000000000000000001
+    }
+  ],
+  "mechanism_checks": {
+    "conditional_collapsed_transition_mismatches": 0,
+    "conditional_collapsed_transition_rows": 449595,
+    "down_monotonic_rows": 1991,
+    "endpoint_and_epoch_length_checks": 7,
+    "floor_ceiling_and_decay_cap_checks": 3,
+    "rate_bound_exception_check": "pass",
+    "split_merge_and_order_checks": 2,
+    "status": "pass",
+    "timing_monotonic_rows": 20301,
+    "unclamped_round_trip_factor_check": "pass",
+    "utilization_monotonic_rows": 20301
+  },
+  "path_scenarios": [
+    {
+      "epochs": [
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 0,
+          "new_rate": 925925925925925925,
+          "old_rate": 1000000000000000000,
+          "price_index_bps": 10800
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 1,
+          "new_rate": 857338820301783263,
+          "old_rate": 925925925925925925,
+          "price_index_bps": 11664
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 2,
+          "new_rate": 793832241020169687,
+          "old_rate": 857338820301783263,
+          "price_index_bps": 12597
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 3,
+          "new_rate": 735029852796453413,
+          "old_rate": 793832241020169687,
+          "price_index_bps": 13604
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 4,
+          "new_rate": 680583197033753160,
+          "old_rate": 735029852796453413,
+          "price_index_bps": 14693
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 5,
+          "new_rate": 630169626883104777,
+          "old_rate": 680583197033753160,
+          "price_index_bps": 15868
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 6,
+          "new_rate": 583490395262134052,
+          "old_rate": 630169626883104777,
+          "price_index_bps": 17138
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 7,
+          "new_rate": 540268884501975974,
+          "old_rate": 583490395262134052,
+          "price_index_bps": 18509
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 8,
+          "new_rate": 500248967131459235,
+          "old_rate": 540268884501975974,
+          "price_index_bps": 19990
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 9,
+          "new_rate": 463193488084684476,
+          "old_rate": 500248967131459235,
+          "price_index_bps": 21589
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 10,
+          "new_rate": 428882859337670811,
+          "old_rate": 463193488084684476,
+          "price_index_bps": 23316
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 11,
+          "new_rate": 397113758645991491,
+          "old_rate": 428882859337670811,
+          "price_index_bps": 25181
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 12,
+          "new_rate": 367697924672214343,
+          "old_rate": 397113758645991491,
+          "price_index_bps": 27196
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 13,
+          "new_rate": 340461041363161428,
+          "old_rate": 367697924672214343,
+          "price_index_bps": 29371
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 14,
+          "new_rate": 315241704965890211,
+          "old_rate": 340461041363161428,
+          "price_index_bps": 31721
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 15,
+          "new_rate": 291890467561009454,
+          "old_rate": 315241704965890211,
+          "price_index_bps": 34259
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 16,
+          "new_rate": 270268951445379124,
+          "old_rate": 291890467561009454,
+          "price_index_bps": 37000
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 17,
+          "new_rate": 250249029116091781,
+          "old_rate": 270268951445379124,
+          "price_index_bps": 39960
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 18,
+          "new_rate": 231712063996381278,
+          "old_rate": 250249029116091781,
+          "price_index_bps": 43157
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 19,
+          "new_rate": 214548207404056738,
+          "old_rate": 231712063996381278,
+          "price_index_bps": 46609
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 20,
+          "new_rate": 198655747596348831,
+          "old_rate": 214548207404056738,
+          "price_index_bps": 50338
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 21,
+          "new_rate": 183940507033656325,
+          "old_rate": 198655747596348831,
+          "price_index_bps": 54365
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 22,
+          "new_rate": 170315284290422523,
+          "old_rate": 183940507033656325,
+          "price_index_bps": 58714
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 23,
+          "new_rate": 157699337305946780,
+          "old_rate": 170315284290422523,
+          "price_index_bps": 63411
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 24,
+          "new_rate": 146017904912913685,
+          "old_rate": 157699337305946780,
+          "price_index_bps": 68484
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 25,
+          "new_rate": 135201763808253412,
+          "old_rate": 146017904912913685,
+          "price_index_bps": 73963
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 26,
+          "new_rate": 125186818340975381,
+          "old_rate": 135201763808253412,
+          "price_index_bps": 79880
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 27,
+          "new_rate": 115913720686088315,
+          "old_rate": 125186818340975381,
+          "price_index_bps": 86271
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 28,
+          "new_rate": 107327519153785476,
+          "old_rate": 115913720686088315,
+          "price_index_bps": 93172
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 29,
+          "new_rate": 99377332549801366,
+          "old_rate": 107327519153785476,
+          "price_index_bps": 100626
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 30,
+          "new_rate": 92016048657223487,
+          "old_rate": 99377332549801366,
+          "price_index_bps": 108676
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 31,
+          "new_rate": 85200045052984710,
+          "old_rate": 92016048657223487,
+          "price_index_bps": 117370
+        }
+      ],
+      "final_price_index_bps": 117370,
+      "final_rate": 85200045052984710,
+      "max_price_index_bps": 117370,
+      "min_price_index_bps": 10800,
+      "name": "repeated_fast_full"
+    },
+    {
+      "epochs": [
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 0,
+          "new_rate": 952380952380952380,
+          "old_rate": 1000000000000000000,
+          "price_index_bps": 10500
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 1,
+          "new_rate": 907029478458049885,
+          "old_rate": 952380952380952380,
+          "price_index_bps": 11025
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 2,
+          "new_rate": 863837598531476080,
+          "old_rate": 907029478458049885,
+          "price_index_bps": 11576
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 3,
+          "new_rate": 822702474791881980,
+          "old_rate": 863837598531476080,
+          "price_index_bps": 12155
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 4,
+          "new_rate": 783526166468459028,
+          "old_rate": 822702474791881980,
+          "price_index_bps": 12762
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 5,
+          "new_rate": 746215396636627645,
+          "old_rate": 783526166468459028,
+          "price_index_bps": 13400
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 6,
+          "new_rate": 710681330130121566,
+          "old_rate": 746215396636627645,
+          "price_index_bps": 14071
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 7,
+          "new_rate": 676839362028687205,
+          "old_rate": 710681330130121566,
+          "price_index_bps": 14774
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 8,
+          "new_rate": 644608916217797338,
+          "old_rate": 676839362028687205,
+          "price_index_bps": 15513
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 9,
+          "new_rate": 613913253540759369,
+          "old_rate": 644608916217797338,
+          "price_index_bps": 16288
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 10,
+          "new_rate": 584679289086437494,
+          "old_rate": 613913253540759369,
+          "price_index_bps": 17103
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 11,
+          "new_rate": 556837418177559518,
+          "old_rate": 584679289086437494,
+          "price_index_bps": 17958
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 12,
+          "new_rate": 530321350645294779,
+          "old_rate": 556837418177559518,
+          "price_index_bps": 18856
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 13,
+          "new_rate": 505067952995518837,
+          "old_rate": 530321350645294779,
+          "price_index_bps": 19799
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 14,
+          "new_rate": 481017098090970320,
+          "old_rate": 505067952995518837,
+          "price_index_bps": 20789
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 15,
+          "new_rate": 458111521991400304,
+          "old_rate": 481017098090970320,
+          "price_index_bps": 21828
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 16,
+          "new_rate": 436296687610857432,
+          "old_rate": 458111521991400304,
+          "price_index_bps": 22920
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 17,
+          "new_rate": 415520654867483268,
+          "old_rate": 436296687610857432,
+          "price_index_bps": 24066
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 18,
+          "new_rate": 395733957016650731,
+          "old_rate": 415520654867483268,
+          "price_index_bps": 25269
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 19,
+          "new_rate": 376889482873000696,
+          "old_rate": 395733957016650731,
+          "price_index_bps": 26532
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 20,
+          "new_rate": 358942364640953043,
+          "old_rate": 376889482873000696,
+          "price_index_bps": 27859
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 21,
+          "new_rate": 341849871086621945,
+          "old_rate": 358942364640953043,
+          "price_index_bps": 29252
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 22,
+          "new_rate": 325571305796782804,
+          "old_rate": 341849871086621945,
+          "price_index_bps": 30715
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 23,
+          "new_rate": 310067910282650289,
+          "old_rate": 325571305796782804,
+          "price_index_bps": 32250
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 24,
+          "new_rate": 295302771697762180,
+          "old_rate": 310067910282650289,
+          "price_index_bps": 33863
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 25,
+          "new_rate": 281240734950249695,
+          "old_rate": 295302771697762180,
+          "price_index_bps": 35556
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 26,
+          "new_rate": 267848319000237804,
+          "old_rate": 281240734950249695,
+          "price_index_bps": 37334
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 27,
+          "new_rate": 255093637143083622,
+          "old_rate": 267848319000237804,
+          "price_index_bps": 39201
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 28,
+          "new_rate": 242946321088651068,
+          "old_rate": 255093637143083622,
+          "price_index_bps": 41161
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 29,
+          "new_rate": 231377448655858160,
+          "old_rate": 242946321088651068,
+          "price_index_bps": 43219
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 30,
+          "new_rate": 220359474910341104,
+          "old_rate": 231377448655858160,
+          "price_index_bps": 45380
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 500,
+          "epoch": 31,
+          "new_rate": 209866166581277241,
+          "old_rate": 220359474910341104,
+          "price_index_bps": 47649
+        }
+      ],
+      "final_price_index_bps": 47649,
+      "final_rate": 209866166581277241,
+      "max_price_index_bps": 47649,
+      "min_price_index_bps": 10500,
+      "name": "repeated_mid_full"
+    },
+    {
+      "epochs": [
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 0,
+          "new_rate": 980392156862745098,
+          "old_rate": 1000000000000000000,
+          "price_index_bps": 10200
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 1,
+          "new_rate": 961168781237985390,
+          "old_rate": 980392156862745098,
+          "price_index_bps": 10404
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 2,
+          "new_rate": 942322334547044500,
+          "old_rate": 961168781237985390,
+          "price_index_bps": 10612
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 3,
+          "new_rate": 923845426026514215,
+          "old_rate": 942322334547044500,
+          "price_index_bps": 10824
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 4,
+          "new_rate": 905730809829915897,
+          "old_rate": 923845426026514215,
+          "price_index_bps": 11040
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 5,
+          "new_rate": 887971382186192055,
+          "old_rate": 905730809829915897,
+          "price_index_bps": 11261
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 6,
+          "new_rate": 870560178613913779,
+          "old_rate": 887971382186192055,
+          "price_index_bps": 11486
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 7,
+          "new_rate": 853490371190111548,
+          "old_rate": 870560178613913779,
+          "price_index_bps": 11716
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 8,
+          "new_rate": 836755265872658380,
+          "old_rate": 853490371190111548,
+          "price_index_bps": 11950
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 9,
+          "new_rate": 820348299875155274,
+          "old_rate": 836755265872658380,
+          "price_index_bps": 12189
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 10,
+          "new_rate": 804263039093289484,
+          "old_rate": 820348299875155274,
+          "price_index_bps": 12433
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 11,
+          "new_rate": 788493175581656356,
+          "old_rate": 804263039093289484,
+          "price_index_bps": 12682
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 12,
+          "new_rate": 773032525080055250,
+          "old_rate": 788493175581656356,
+          "price_index_bps": 12936
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 13,
+          "new_rate": 757875024588289460,
+          "old_rate": 773032525080055250,
+          "price_index_bps": 13194
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 14,
+          "new_rate": 743014729988519078,
+          "old_rate": 757875024588289460,
+          "price_index_bps": 13458
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 15,
+          "new_rate": 728445813714234390,
+          "old_rate": 743014729988519078,
+          "price_index_bps": 13727
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 16,
+          "new_rate": 714162562464935676,
+          "old_rate": 728445813714234390,
+          "price_index_bps": 14002
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 17,
+          "new_rate": 700159374965623211,
+          "old_rate": 714162562464935676,
+          "price_index_bps": 14282
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 18,
+          "new_rate": 686430759770218834,
+          "old_rate": 700159374965623211,
+          "price_index_bps": 14568
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 19,
+          "new_rate": 672971333108057680,
+          "old_rate": 686430759770218834,
+          "price_index_bps": 14859
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 20,
+          "new_rate": 659775816772605568,
+          "old_rate": 672971333108057680,
+          "price_index_bps": 15156
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 21,
+          "new_rate": 646839036051574086,
+          "old_rate": 659775816772605568,
+          "price_index_bps": 15459
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 22,
+          "new_rate": 634155917697621652,
+          "old_rate": 646839036051574086,
+          "price_index_bps": 15768
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 23,
+          "new_rate": 621721487938844756,
+          "old_rate": 634155917697621652,
+          "price_index_bps": 16084
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 24,
+          "new_rate": 609530870528279172,
+          "old_rate": 621721487938844756,
+          "price_index_bps": 16406
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 25,
+          "new_rate": 597579284831646247,
+          "old_rate": 609530870528279172,
+          "price_index_bps": 16734
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 26,
+          "new_rate": 585862043952594359,
+          "old_rate": 597579284831646247,
+          "price_index_bps": 17068
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 27,
+          "new_rate": 574374552894700351,
+          "old_rate": 585862043952594359,
+          "price_index_bps": 17410
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 28,
+          "new_rate": 563112306759510148,
+          "old_rate": 574374552894700351,
+          "price_index_bps": 17758
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 29,
+          "new_rate": 552070888979911909,
+          "old_rate": 563112306759510148,
+          "price_index_bps": 18113
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 30,
+          "new_rate": 541245969588148930,
+          "old_rate": 552070888979911909,
+          "price_index_bps": 18475
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 31,
+          "new_rate": 530633303517793068,
+          "old_rate": 541245969588148930,
+          "price_index_bps": 18845
+        }
+      ],
+      "final_price_index_bps": 18845,
+      "final_rate": 530633303517793068,
+      "max_price_index_bps": 18845,
+      "min_price_index_bps": 10200,
+      "name": "repeated_late_full"
+    },
+    {
+      "epochs": [
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 0,
+          "new_rate": 925925925925925925,
+          "old_rate": 1000000000000000000,
+          "price_index_bps": 10800
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 1,
+          "new_rate": 944822373393801964,
+          "old_rate": 925925925925925925,
+          "price_index_bps": 10584
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 2,
+          "new_rate": 874835530920187003,
+          "old_rate": 944822373393801964,
+          "price_index_bps": 11430
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 3,
+          "new_rate": 892689317265496941,
+          "old_rate": 874835530920187003,
+          "price_index_bps": 11202
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 4,
+          "new_rate": 826564182653237908,
+          "old_rate": 892689317265496941,
+          "price_index_bps": 12098
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 5,
+          "new_rate": 843432839442079497,
+          "old_rate": 826564182653237908,
+          "price_index_bps": 11856
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 6,
+          "new_rate": 780956332816740275,
+          "old_rate": 843432839442079497,
+          "price_index_bps": 12804
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 7,
+          "new_rate": 796894217159939056,
+          "old_rate": 780956332816740275,
+          "price_index_bps": 12548
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 8,
+          "new_rate": 737865015888832459,
+          "old_rate": 796894217159939056,
+          "price_index_bps": 13552
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 9,
+          "new_rate": 752923485600849447,
+          "old_rate": 737865015888832459,
+          "price_index_bps": 13281
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 10,
+          "new_rate": 697151375556342080,
+          "old_rate": 752923485600849447,
+          "price_index_bps": 14344
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 11,
+          "new_rate": 711378954649328653,
+          "old_rate": 697151375556342080,
+          "price_index_bps": 14057
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 12,
+          "new_rate": 658684217267896900,
+          "old_rate": 711378954649328653,
+          "price_index_bps": 15181
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 13,
+          "new_rate": 672126752314180510,
+          "old_rate": 658684217267896900,
+          "price_index_bps": 14878
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 14,
+          "new_rate": 622339585476093064,
+          "old_rate": 672126752314180510,
+          "price_index_bps": 16068
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 15,
+          "new_rate": 635040393342952106,
+          "old_rate": 622339585476093064,
+          "price_index_bps": 15747
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 16,
+          "new_rate": 588000364206437135,
+          "old_rate": 635040393342952106,
+          "price_index_bps": 17006
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 17,
+          "new_rate": 600000371639221566,
+          "old_rate": 588000364206437135,
+          "price_index_bps": 16666
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 18,
+          "new_rate": 555555899665945894,
+          "old_rate": 600000371639221566,
+          "price_index_bps": 17999
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 19,
+          "new_rate": 566893775169332544,
+          "old_rate": 555555899665945894,
+          "price_index_bps": 17639
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 20,
+          "new_rate": 524901643675307911,
+          "old_rate": 566893775169332544,
+          "price_index_bps": 19051
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 21,
+          "new_rate": 535613922117661133,
+          "old_rate": 524901643675307911,
+          "price_index_bps": 18670
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 22,
+          "new_rate": 495938816775612160,
+          "old_rate": 535613922117661133,
+          "price_index_bps": 20163
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 23,
+          "new_rate": 506060017117971591,
+          "old_rate": 495938816775612160,
+          "price_index_bps": 19760
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 24,
+          "new_rate": 468574089924047769,
+          "old_rate": 506060017117971591,
+          "price_index_bps": 21341
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 25,
+          "new_rate": 478136826453109968,
+          "old_rate": 468574089924047769,
+          "price_index_bps": 20914
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 26,
+          "new_rate": 442719283752879600,
+          "old_rate": 478136826453109968,
+          "price_index_bps": 22587
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 27,
+          "new_rate": 451754371176407755,
+          "old_rate": 442719283752879600,
+          "price_index_bps": 22135
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 28,
+          "new_rate": 418291084422599773,
+          "old_rate": 451754371176407755,
+          "price_index_bps": 23906
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 29,
+          "new_rate": 426827637165918135,
+          "old_rate": 418291084422599773,
+          "price_index_bps": 23428
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 800,
+          "epoch": 30,
+          "new_rate": 395210775153627902,
+          "old_rate": 426827637165918135,
+          "price_index_bps": 25302
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 31,
+          "new_rate": 403276301177171328,
+          "old_rate": 395210775153627902,
+          "price_index_bps": 24796
+        }
+      ],
+      "final_price_index_bps": 24796,
+      "final_rate": 403276301177171328,
+      "max_price_index_bps": 25302,
+      "min_price_index_bps": 10584,
+      "name": "alternating_fast_full_and_empty"
+    },
+    {
+      "epochs": [
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 0,
+          "new_rate": 980392156862745098,
+          "old_rate": 1000000000000000000,
+          "price_index_bps": 10200
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 1,
+          "new_rate": 1000400160064025610,
+          "old_rate": 980392156862745098,
+          "price_index_bps": 9996
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 2,
+          "new_rate": 980784470651005500,
+          "old_rate": 1000400160064025610,
+          "price_index_bps": 10195
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 3,
+          "new_rate": 1000800480256128061,
+          "old_rate": 980784470651005500,
+          "price_index_bps": 9992
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 4,
+          "new_rate": 981176941427576530,
+          "old_rate": 1000800480256128061,
+          "price_index_bps": 10191
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 5,
+          "new_rate": 1001200960640384214,
+          "old_rate": 981176941427576530,
+          "price_index_bps": 9988
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 6,
+          "new_rate": 981569569255278641,
+          "old_rate": 1001200960640384214,
+          "price_index_bps": 10187
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 7,
+          "new_rate": 1001601601280896572,
+          "old_rate": 981569569255278641,
+          "price_index_bps": 9984
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 8,
+          "new_rate": 981962354196957423,
+          "old_rate": 1001601601280896572,
+          "price_index_bps": 10183
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 9,
+          "new_rate": 1002002402241793288,
+          "old_rate": 981962354196957423,
+          "price_index_bps": 9980
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 10,
+          "new_rate": 982355296315483615,
+          "old_rate": 1002002402241793288,
+          "price_index_bps": 10179
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 11,
+          "new_rate": 1002403363587228178,
+          "old_rate": 982355296315483615,
+          "price_index_bps": 9976
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 12,
+          "new_rate": 982748395673753115,
+          "old_rate": 1002403363587228178,
+          "price_index_bps": 10175
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 13,
+          "new_rate": 1002804485381380729,
+          "old_rate": 982748395673753115,
+          "price_index_bps": 9972
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 14,
+          "new_rate": 983141652334686989,
+          "old_rate": 1002804485381380729,
+          "price_index_bps": 10171
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 15,
+          "new_rate": 1003205767688456111,
+          "old_rate": 983141652334686989,
+          "price_index_bps": 9968
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 16,
+          "new_rate": 983535066361231481,
+          "old_rate": 1003205767688456111,
+          "price_index_bps": 10167
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 17,
+          "new_rate": 1003607210572685184,
+          "old_rate": 983535066361231481,
+          "price_index_bps": 9964
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 18,
+          "new_rate": 983928637816358023,
+          "old_rate": 1003607210572685184,
+          "price_index_bps": 10163
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 19,
+          "new_rate": 1004008814098324513,
+          "old_rate": 983928637816358023,
+          "price_index_bps": 9960
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 20,
+          "new_rate": 984322366763063248,
+          "old_rate": 1004008814098324513,
+          "price_index_bps": 10159
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 21,
+          "new_rate": 1004410578329656375,
+          "old_rate": 984322366763063248,
+          "price_index_bps": 9956
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 22,
+          "new_rate": 984716253264368995,
+          "old_rate": 1004410578329656375,
+          "price_index_bps": 10155
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 23,
+          "new_rate": 1004812503330988770,
+          "old_rate": 984716253264368995,
+          "price_index_bps": 9952
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 24,
+          "new_rate": 985110297383322323,
+          "old_rate": 1004812503330988770,
+          "price_index_bps": 10151
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 25,
+          "new_rate": 1005214589166655431,
+          "old_rate": 985110297383322323,
+          "price_index_bps": 9948
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 26,
+          "new_rate": 985504499182995520,
+          "old_rate": 1005214589166655431,
+          "price_index_bps": 10147
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 27,
+          "new_rate": 1005616835901015836,
+          "old_rate": 985504499182995520,
+          "price_index_bps": 9944
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 28,
+          "new_rate": 985898858726486113,
+          "old_rate": 1005616835901015836,
+          "price_index_bps": 10143
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 29,
+          "new_rate": 1006019243598455217,
+          "old_rate": 985898858726486113,
+          "price_index_bps": 9940
+        },
+        {
+          "direction": "up",
+          "effective_step_bps": 200,
+          "epoch": 30,
+          "new_rate": 986293376076916879,
+          "old_rate": 1006019243598455217,
+          "price_index_bps": 10138
+        },
+        {
+          "direction": "decay",
+          "effective_step_bps": 200,
+          "epoch": 31,
+          "new_rate": 1006421812323384570,
+          "old_rate": 986293376076916879,
+          "price_index_bps": 9936
+        }
+      ],
+      "final_price_index_bps": 9936,
+      "final_rate": 1006421812323384570,
+      "max_price_index_bps": 10200,
+      "min_price_index_bps": 9936,
+      "name": "alternating_late_full_and_empty"
+    }
+  ],
+  "schema": "ripe.instant-bond-lane.controller-simulation.v2",
+  "single_epoch_scenarios": [
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 10000,
+      "direction": "up",
+      "earliness_bps": 10000,
+      "effective_step_bps": 800,
+      "name": "full_first_block",
+      "new_rate": 925925925925925925,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10800,
+      "purchases": [
+        [
+          0,
+          10000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 5000,
+      "demand_strength_bps": 5000,
+      "direction": "up",
+      "earliness_bps": 5000,
+      "effective_step_bps": 500,
+      "name": "full_midpoint",
+      "new_rate": 952380952380952380,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10500,
+      "purchases": [
+        [
+          50,
+          10000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 10000,
+      "demand_strength_bps": 0,
+      "direction": "up",
+      "earliness_bps": 0,
+      "effective_step_bps": 200,
+      "name": "full_last_block",
+      "new_rate": 980392156862745098,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10200,
+      "purchases": [
+        [
+          100,
+          10000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 5000,
+      "demand_strength_bps": 5000,
+      "direction": "up",
+      "earliness_bps": 5000,
+      "effective_step_bps": 500,
+      "name": "full_uniform_two_tranches",
+      "new_rate": 952380952380952380,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10500,
+      "purchases": [
+        [
+          0,
+          5000
+        ],
+        [
+          100,
+          5000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 9000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 5000,
+      "direction": "up",
+      "earliness_bps": 10000,
+      "effective_step_bps": 500,
+      "name": "ninety_percent_first_block",
+      "new_rate": 952380952380952380,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10500,
+      "purchases": [
+        [
+          0,
+          9000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 9000,
+      "utilization_strength_bps": 5000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 100,
+      "demand_strength_bps": 9900,
+      "direction": "up",
+      "earliness_bps": 9900,
+      "effective_step_bps": 794,
+      "name": "ninety_nine_early_one_late",
+      "new_rate": 926440615156568463,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10794,
+      "purchases": [
+        [
+          0,
+          9900
+        ],
+        [
+          100,
+          100
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 9900,
+      "demand_strength_bps": 100,
+      "direction": "up",
+      "earliness_bps": 100,
+      "effective_step_bps": 206,
+      "name": "one_early_ninety_nine_late",
+      "new_rate": 979815794630609445,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10206,
+      "purchases": [
+        [
+          0,
+          100
+        ],
+        [
+          100,
+          9900
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 8000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "up",
+      "earliness_bps": 10000,
+      "effective_step_bps": 200,
+      "name": "exact_high_threshold_first_block",
+      "new_rate": 980392156862745098,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10200,
+      "purchases": [
+        [
+          0,
+          8000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 8000,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 10000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "up",
+      "earliness_bps": 10000,
+      "effective_step_bps": 200,
+      "name": "first_partial_epoch_timing_ineligible",
+      "new_rate": 980392156862745098,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10200,
+      "purchases": [
+        [
+          0,
+          10000
+        ]
+      ],
+      "timing_eligible": false,
+      "utilization_bps": 10000,
+      "utilization_strength_bps": 10000,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 5000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "hold",
+      "earliness_bps": 10000,
+      "effective_step_bps": 0,
+      "name": "dead_band_midpoint",
+      "new_rate": 1000000000000000000,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 10000,
+      "purchases": [
+        [
+          0,
+          5000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 5000,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 2000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "down",
+      "earliness_bps": 10000,
+      "effective_step_bps": 50,
+      "name": "exact_low_threshold",
+      "new_rate": 1005025125628140703,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 9950,
+      "purchases": [
+        [
+          0,
+          2000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 2000,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 0
+    },
+    {
+      "accepted": 1000,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "down",
+      "earliness_bps": 10000,
+      "effective_step_bps": 100,
+      "name": "half_low_threshold",
+      "new_rate": 1010101010101010101,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 9900,
+      "purchases": [
+        [
+          0,
+          1000
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 1000,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 5000
+    },
+    {
+      "accepted": 10,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "down",
+      "earliness_bps": 10000,
+      "effective_step_bps": 149,
+      "name": "minimum_reachable_positive",
+      "new_rate": 1015125367982945893,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 9851,
+      "purchases": [
+        [
+          0,
+          10
+        ]
+      ],
+      "timing_eligible": true,
+      "utilization_bps": 10,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 9950
+    },
+    {
+      "accepted": 0,
+      "average_lateness_bps": 0,
+      "demand_strength_bps": 0,
+      "direction": "decay",
+      "earliness_bps": 0,
+      "effective_step_bps": 200,
+      "name": "empty_epoch_decay",
+      "new_rate": 1020408163265306122,
+      "old_rate": 1000000000000000000,
+      "price_index_bps": 9800,
+      "purchases": [],
+      "timing_eligible": true,
+      "utilization_bps": 0,
+      "utilization_strength_bps": 0,
+      "weakness_bps": 0
+    }
+  ],
+  "status": "REVISION 20 WORKING CANDIDATE \u2014 implemented and mechanism-validated; calibration and deployment not approved"
+}

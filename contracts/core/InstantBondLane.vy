@@ -12,6 +12,7 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Department
 
@@ -56,8 +57,10 @@ struct InstantBondConfig:
     seedRate: uint256
     uHighBps: uint256
     uLowBps: uint256
-    upBps: uint256
-    downBps: uint256
+    minUpBps: uint256
+    maxUpBps: uint256
+    minDownBps: uint256
+    maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
     maxLockBonus: uint256
@@ -88,14 +91,20 @@ struct PricingState:
     maxLockBonus: uint256
     pricingConfigVersion: uint256
     acceptedPayment: uint256
+    weightedLateness: uint256
+    timingEligible: bool
     didInitialize: bool
     didRollover: bool
     fromEpoch: uint256
     oldRate: uint256
     previousAcceptedPayment: uint256
     previousPaymentCap: uint256
+    previousWeightedLateness: uint256
+    previousTimingEligible: bool
     utilizationBps: uint256
+    effectiveAdjustmentBps: uint256
     decaySteps: uint256
+    controllerRate: uint256
 
 struct PayoutData:
     baseRipe: uint256
@@ -110,6 +119,7 @@ event EpochInitialized:
     paymentCap: uint256
     minPaymentAmount: uint256
     maxLockBonus: uint256
+    timingEligible: bool
     pricingConfigVersion: indexed(uint256)
 
 event EpochRolled:
@@ -122,8 +132,12 @@ event EpochRolled:
     newMaxLockBonus: uint256
     previousAcceptedPayment: uint256
     previousPaymentCap: uint256
+    previousWeightedLateness: uint256
+    previousTimingEligible: bool
     utilizationBps: uint256
+    effectiveAdjustmentBps: uint256
     decaySteps: uint256
+    controllerRate: uint256
     pricingConfigVersion: indexed(uint256)
 
 event InstantBondPurchased:
@@ -150,11 +164,34 @@ event InstantBondConfigSet:
     seedRate: uint256
     uHighBps: uint256
     uLowBps: uint256
-    upBps: uint256
-    downBps: uint256
+    minUpBps: uint256
+    maxUpBps: uint256
+    minDownBps: uint256
+    maxDownBps: uint256
     decayBps: uint256
     maxDecayEpochs: uint256
     maxLockBonus: uint256
+
+event RateOverrideInstalled:
+    newVersion: indexed(uint256)
+    targetRate: uint256
+    boundConfigVersion: indexed(uint256)
+
+event RateOverrideApplied:
+    newVersion: indexed(uint256)
+    fromEpoch: indexed(uint256)
+    toEpoch: indexed(uint256)
+    targetRate: uint256
+    controllerRate: uint256
+
+event RateOverrideCancelled:
+    newVersion: indexed(uint256)
+    targetRate: uint256
+
+event RateOverrideInvalidated:
+    newVersion: indexed(uint256)
+    targetRate: uint256
+    newConfigVersion: indexed(uint256)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_LOCK_BONUS: constant(uint256) = 1000_00 # 1000.00%
@@ -182,6 +219,12 @@ epochMinPaymentAmount: public(uint256)
 epochMaxLockBonus: public(uint256)
 epochPricingVersion: public(uint256)
 epochAcceptedPayment: public(uint256)
+epochWeightedLateness: public(uint256)
+epochTimingEligible: public(bool)
+
+# zero means no installed target; every config replacement invalidates it
+rateOverride: public(uint256)
+overrideVersion: public(uint256)
 
 cumulativeMinted: public(uint256)
 
@@ -194,7 +237,7 @@ def __init__(
     _epochLength: uint256,
 ):
     assert _paymentToken != empty(address) and _paymentToken.is_contract # dev: invalid payment token
-    assert _epochLength != 0 # dev: invalid epoch length
+    assert _epochLength != 0 and _epochLength <= max_value(uint256) // HUNDRED_PERCENT + 1 # dev: invalid epoch length
 
     paymentDecimals: uint8 = staticcall IERC20Detailed(_paymentToken).decimals()
     assert paymentDecimals <= MAX_PAYMENT_DECIMALS # dev: invalid payment decimals
@@ -225,18 +268,22 @@ def isValidConfig(_config: InstantBondConfig) -> bool:
 @internal
 def _isValidConfig(_config: InstantBondConfig) -> bool:
     # utilization and controller bounds
-    if _config.uLowBps >= _config.uHighBps:
+    if _config.uLowBps == 0 or _config.uLowBps >= _config.uHighBps:
         return False
-    if _config.uHighBps > HUNDRED_PERCENT:
+    if _config.uHighBps >= HUNDRED_PERCENT:
         return False
 
-    if _config.downBps == 0 or _config.downBps >= _config.upBps:
+    if _config.minUpBps == 0 or _config.minUpBps > _config.maxUpBps:
         return False
-    if _config.upBps > MAX_PRICE_STEP_BPS:
+    if _config.maxUpBps > MAX_PRICE_STEP_BPS:
+        return False
+    if _config.minDownBps == 0 or _config.minDownBps > _config.maxDownBps:
         return False
     if _config.decayBps == 0 or _config.decayBps >= HUNDRED_PERCENT:
         return False
-    if _config.downBps > _config.decayBps:
+    if _config.maxDownBps > _config.decayBps or _config.maxDownBps >= _config.minUpBps:
+        return False
+    if (HUNDRED_PERCENT + _config.minUpBps) * (HUNDRED_PERCENT - _config.maxDownBps) < HUNDRED_PERCENT * HUNDRED_PERCENT:
         return False
     if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS:
         return False
@@ -272,7 +319,7 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 
 @nonreentrant
 @external
-def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256):
+def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256) -> uint256:
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _expectedVersion == self.configVersion # dev: stale config version
     assert self._isValidConfig(_newConfig) # dev: invalid config
@@ -280,6 +327,17 @@ def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256):
     newVersion: uint256 = self.configVersion + 1
     self.config = _newConfig
     self.configVersion = newVersion
+
+    overrideRate: uint256 = self.rateOverride
+    if overrideRate != 0:
+        newOverrideVersion: uint256 = self.overrideVersion + 1
+        self.rateOverride = 0
+        self.overrideVersion = newOverrideVersion
+        log RateOverrideInvalidated(
+            newVersion=newOverrideVersion,
+            targetRate=overrideRate,
+            newConfigVersion=newVersion,
+        )
 
     log InstantBondConfigSet(
         newVersion=newVersion,
@@ -291,12 +349,88 @@ def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256):
         seedRate=_newConfig.seedRate,
         uHighBps=_newConfig.uHighBps,
         uLowBps=_newConfig.uLowBps,
-        upBps=_newConfig.upBps,
-        downBps=_newConfig.downBps,
+        minUpBps=_newConfig.minUpBps,
+        maxUpBps=_newConfig.maxUpBps,
+        minDownBps=_newConfig.minDownBps,
+        maxDownBps=_newConfig.maxDownBps,
         decayBps=_newConfig.decayBps,
         maxDecayEpochs=_newConfig.maxDecayEpochs,
         maxLockBonus=_newConfig.maxLockBonus,
     )
+    return newVersion
+
+
+#################
+# Rate Override #
+#################
+
+
+@view
+@external
+def isValidRateOverride(
+    _targetRate: uint256,
+    _expectedConfigVersion: uint256,
+    _expectedOverrideVersion: uint256,
+) -> bool:
+    if _expectedConfigVersion != self.configVersion:
+        return False
+    if _expectedOverrideVersion != self.overrideVersion:
+        return False
+    return self._isValidRateOverride(_targetRate)
+
+
+@view
+@internal
+def _isValidRateOverride(_targetRate: uint256) -> bool:
+    if not self.isInitialized or self.rateOverride != 0:
+        return False
+    config: InstantBondConfig = self.config
+    ceiling: uint256 = self._baseRateCeiling(config.maxEffectiveRate, config.maxLockBonus)
+    return _targetRate >= MIN_BASE_RATE and _targetRate <= ceiling
+
+
+@nonreentrant
+@external
+def setRateOverride(
+    _targetRate: uint256,
+    _expectedConfigVersion: uint256,
+    _expectedOverrideVersion: uint256,
+) -> uint256:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _expectedConfigVersion == self.configVersion # dev: stale config version
+    assert _expectedOverrideVersion == self.overrideVersion # dev: stale override version
+    assert self._isValidRateOverride(_targetRate) # dev: invalid rate override
+
+    newVersion: uint256 = self.overrideVersion + 1
+    self.rateOverride = _targetRate
+    self.overrideVersion = newVersion
+    log RateOverrideInstalled(
+        newVersion=newVersion,
+        targetRate=_targetRate,
+        boundConfigVersion=_expectedConfigVersion,
+    )
+    return newVersion
+
+
+@view
+@external
+def canCancelRateOverride(_expectedOverrideVersion: uint256) -> bool:
+    return self.rateOverride != 0 and _expectedOverrideVersion == self.overrideVersion
+
+
+@nonreentrant
+@external
+def cancelRateOverride(_expectedOverrideVersion: uint256) -> uint256:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _expectedOverrideVersion == self.overrideVersion # dev: stale override version
+    targetRate: uint256 = self.rateOverride
+    assert targetRate != 0 # dev: no override
+
+    newVersion: uint256 = self.overrideVersion + 1
+    self.rateOverride = 0
+    self.overrideVersion = newVersion
+    log RateOverrideCancelled(newVersion=newVersion, targetRate=targetRate)
+    return newVersion
 
 
 ############
@@ -364,6 +498,7 @@ def buyNow(
     # update accounting before the state-changing external calls below
     self._storePricingState(pricing)
     self.epochAcceptedPayment = pricing.acceptedPayment + _paymentAmount
+    self.epochWeightedLateness = pricing.weightedLateness + _paymentAmount * self._getLatenessBps(block.number)
     self.cumulativeMinted += payout.totalRipe
 
     # collect exact payment amount
@@ -474,14 +609,23 @@ def _baseRateCeiling(_maxEffectiveRate: uint256, _maxLockBonus: uint256) -> uint
 
 @view
 @internal
-def _laneEpoch(_blockNumber: uint256) -> uint256:
+def _getLaneEpoch(_blockNumber: uint256) -> uint256:
     return (_blockNumber - GENESIS_BLOCK) // EPOCH_LENGTH
 
 
 @view
 @internal
+def _getLatenessBps(_blockNumber: uint256) -> uint256:
+    if EPOCH_LENGTH == 1:
+        return 0
+    offset: uint256 = (_blockNumber - GENESIS_BLOCK) % EPOCH_LENGTH
+    return offset * HUNDRED_PERCENT // (EPOCH_LENGTH - 1)
+
+
+@view
+@internal
 def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> PricingState:
-    epoch: uint256 = self._laneEpoch(block.number)
+    epoch: uint256 = self._getLaneEpoch(block.number)
 
     if not self.isInitialized:
         return PricingState(
@@ -492,14 +636,20 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
             maxLockBonus=_config.maxLockBonus,
             pricingConfigVersion=_configVersion,
             acceptedPayment=0,
+            weightedLateness=0,
+            timingEligible=(block.number - GENESIS_BLOCK) % EPOCH_LENGTH == 0,
             didInitialize=True,
             didRollover=False,
             fromEpoch=0,
             oldRate=0,
             previousAcceptedPayment=0,
             previousPaymentCap=0,
+            previousWeightedLateness=0,
+            previousTimingEligible=False,
             utilizationBps=0,
+            effectiveAdjustmentBps=0,
             decaySteps=0,
+            controllerRate=_config.seedRate,
         )
 
     pricing: PricingState = PricingState(
@@ -510,14 +660,20 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
         maxLockBonus=self.epochMaxLockBonus,
         pricingConfigVersion=self.epochPricingVersion,
         acceptedPayment=self.epochAcceptedPayment,
+        weightedLateness=self.epochWeightedLateness,
+        timingEligible=self.epochTimingEligible,
         didInitialize=False,
         didRollover=False,
         fromEpoch=0,
         oldRate=0,
         previousAcceptedPayment=0,
         previousPaymentCap=0,
+        previousWeightedLateness=0,
+        previousTimingEligible=False,
         utilizationBps=0,
+        effectiveAdjustmentBps=0,
         decaySteps=0,
+        controllerRate=self.epochRate,
     )
     if epoch <= self.currentEpoch:
         return pricing
@@ -526,6 +682,7 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
     newCeiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxLockBonus)
     rate: uint256 = min(self.epochRate, newCeiling)
     utilizationBps: uint256 = 0
+    effectiveAdjustmentBps: uint256 = 0
     decaySteps: uint256 = 0
 
     # Defensive-only under the current write sequence: a rollover is stored only
@@ -538,14 +695,29 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
         utilizationBps = self.epochAcceptedPayment * HUNDRED_PERCENT // self.epochPaymentCap
 
         if utilizationBps >= _config.uHighBps:
-            rate = max(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _config.upBps), MIN_BASE_RATE)
+            utilizationStrength: uint256 = (utilizationBps - _config.uHighBps) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.uHighBps)
+            earlinessBps: uint256 = 0
+            if self.epochTimingEligible:
+                averageLatenessBps: uint256 = self.epochWeightedLateness // self.epochAcceptedPayment
+                earlinessBps = HUNDRED_PERCENT - averageLatenessBps
+            demandStrength: uint256 = utilizationStrength * earlinessBps // HUNDRED_PERCENT
+            effectiveAdjustmentBps = _config.minUpBps + (_config.maxUpBps - _config.minUpBps) * demandStrength // HUNDRED_PERCENT
+            rate = max(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + effectiveAdjustmentBps), MIN_BASE_RATE)
         elif utilizationBps <= _config.uLowBps:
-            rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.downBps), newCeiling)
+            weaknessBps: uint256 = (_config.uLowBps - utilizationBps) * HUNDRED_PERCENT // _config.uLowBps
+            effectiveAdjustmentBps = _config.minDownBps + (_config.maxDownBps - _config.minDownBps) * weaknessBps // HUNDRED_PERCENT
+            rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - effectiveAdjustmentBps), newCeiling)
 
         decaySteps = min(elapsed - 1, _config.maxDecayEpochs)
 
     for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
         rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps), newCeiling)
+
+    # preserve the ordinary result for auditability before applying an exact target
+    controllerRate: uint256 = rate
+    overrideRate: uint256 = self.rateOverride
+    if overrideRate != 0:
+        rate = overrideRate
 
     pricing.epoch = epoch
     pricing.rate = rate
@@ -554,13 +726,19 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
     pricing.maxLockBonus = _config.maxLockBonus
     pricing.pricingConfigVersion = _configVersion
     pricing.acceptedPayment = 0
+    pricing.weightedLateness = 0
+    pricing.timingEligible = True
     pricing.didRollover = True
     pricing.fromEpoch = self.currentEpoch
     pricing.oldRate = self.epochRate
     pricing.previousAcceptedPayment = self.epochAcceptedPayment
     pricing.previousPaymentCap = self.epochPaymentCap
+    pricing.previousWeightedLateness = self.epochWeightedLateness
+    pricing.previousTimingEligible = self.epochTimingEligible
     pricing.utilizationBps = utilizationBps
+    pricing.effectiveAdjustmentBps = effectiveAdjustmentBps
     pricing.decaySteps = decaySteps
+    pricing.controllerRate = controllerRate
     return pricing
 
 
@@ -576,6 +754,22 @@ def _storePricingState(_pricing: PricingState):
     self.epochMaxLockBonus = _pricing.maxLockBonus
     self.epochPricingVersion = _pricing.pricingConfigVersion
     self.epochAcceptedPayment = _pricing.acceptedPayment
+    self.epochWeightedLateness = _pricing.weightedLateness
+    self.epochTimingEligible = _pricing.timingEligible
+
+    # preview never reaches this stateful path; downstream failure reverts consumption
+    if _pricing.didRollover and self.rateOverride != 0:
+        targetRate: uint256 = self.rateOverride
+        newOverrideVersion: uint256 = self.overrideVersion + 1
+        self.rateOverride = 0
+        self.overrideVersion = newOverrideVersion
+        log RateOverrideApplied(
+            newVersion=newOverrideVersion,
+            fromEpoch=_pricing.fromEpoch,
+            toEpoch=_pricing.epoch,
+            targetRate=targetRate,
+            controllerRate=_pricing.controllerRate,
+        )
 
     if _pricing.didInitialize:
         self.isInitialized = True
@@ -585,6 +779,7 @@ def _storePricingState(_pricing: PricingState):
             paymentCap=_pricing.paymentCap,
             minPaymentAmount=_pricing.minPaymentAmount,
             maxLockBonus=_pricing.maxLockBonus,
+            timingEligible=_pricing.timingEligible,
             pricingConfigVersion=_pricing.pricingConfigVersion,
         )
     else:
@@ -598,8 +793,12 @@ def _storePricingState(_pricing: PricingState):
             newMaxLockBonus=_pricing.maxLockBonus,
             previousAcceptedPayment=_pricing.previousAcceptedPayment,
             previousPaymentCap=_pricing.previousPaymentCap,
+            previousWeightedLateness=_pricing.previousWeightedLateness,
+            previousTimingEligible=_pricing.previousTimingEligible,
             utilizationBps=_pricing.utilizationBps,
+            effectiveAdjustmentBps=_pricing.effectiveAdjustmentBps,
             decaySteps=_pricing.decaySteps,
+            controllerRate=_pricing.controllerRate,
             pricingConfigVersion=_pricing.pricingConfigVersion,
         )
 

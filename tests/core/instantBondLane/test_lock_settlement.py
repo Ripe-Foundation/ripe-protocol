@@ -155,9 +155,19 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
 
 def settlement_snapshot(ctx):
     return (
+        ctx.lane.configVersion(),
         ctx.lane.isInitialized(),
         ctx.lane.currentEpoch(),
+        ctx.lane.epochRate(),
+        ctx.lane.epochPaymentCap(),
+        ctx.lane.epochMinPaymentAmount(),
+        ctx.lane.epochMaxLockBonus(),
+        ctx.lane.epochPricingVersion(),
         ctx.lane.epochAcceptedPayment(),
+        ctx.lane.epochWeightedLateness(),
+        ctx.lane.epochTimingEligible(),
+        ctx.lane.rateOverride(),
+        ctx.lane.overrideVersion(),
         ctx.lane.cumulativeMinted(),
         ctx.payment_token.balanceOf(ctx.bob),
         ctx.payment_token.balanceOf(ctx.endaoment_funds),
@@ -910,6 +920,41 @@ def test_payment_mint_approval_and_teller_failures_are_fully_atomic(lane_env):
                 expected_epoch=quote.epoch,
             )
         assert settlement_snapshot(lane_env) == before
+
+
+def test_failed_rollover_settlement_restores_override_and_timing_state(lane_env):
+    lane_env.set_config(maxLockBonus=0)
+    lane_env.buy(50 * lane_env.scale)
+    target_rate = 777_777_777_777_777_777
+    lane_env.set_rate_override(target_rate)
+    boa.env.time_travel(blocks=lane_env.epoch_length)
+
+    projected = lane_env.quote(lane_env.scale)
+    assert projected.rate == target_rate
+    before = settlement_snapshot(lane_env)
+
+    lane_env.ripe_token.pause(True, sender=lane_env.governance.address)
+    with boa.reverts():
+        lane_env.buy(
+            lane_env.scale,
+            expected_epoch=projected.epoch,
+            min_ripe_out=projected.totalRipe,
+        )
+    assert settlement_snapshot(lane_env) == before
+    assert lane_env.lane.rateOverride() == target_rate
+    assert lane_env.lane.overrideVersion() == 1
+
+    lane_env.ripe_token.pause(False, sender=lane_env.governance.address)
+    lane_env.buy(
+        lane_env.scale,
+        expected_epoch=projected.epoch,
+        min_ripe_out=projected.totalRipe,
+    )
+    assert lane_env.lane.epochRate() == target_rate
+    assert lane_env.lane.epochAcceptedPayment() == lane_env.scale
+    assert lane_env.lane.epochWeightedLateness() == 0
+    assert lane_env.lane.rateOverride() == 0
+    assert lane_env.lane.overrideVersion() == 2
 
 
 def test_ripe_pause_and_blacklist_asymmetry(lane_env):

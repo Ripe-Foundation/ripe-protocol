@@ -8,10 +8,12 @@ from eth_utils import keccak
 from hypothesis import HealthCheck, given, settings, strategies as st
 from vyper.compiler.output import build_abi_output
 
+from constants import ZERO_ADDRESS
+
 
 EIP170_LIMIT = 24_576
-LANE_RUNTIME_MAX = 9_000
-FOXTROT_RUNTIME_MAX = 5_500
+LANE_RUNTIME_MAX = 11_000
+FOXTROT_RUNTIME_MAX = 6_500
 MAX_UINT256 = 2**256 - 1
 
 
@@ -34,19 +36,37 @@ def event_topic(contract_path, event_name):
     return int.from_bytes(keccak(text=signature), "big")
 
 
-def reference_controller_rate(rate, accepted, cap, elapsed, config):
-    ceiling = config[4] * 10_000 // (10_000 + config[12])
+def reference_controller_rate(
+    rate,
+    accepted,
+    cap,
+    elapsed,
+    config,
+    weighted_lateness=0,
+    timing_eligible=True,
+):
+    ceiling = config[4] * 10_000 // (10_000 + config[14])
     rate = min(rate, ceiling)
     utilization = accepted * 10_000 // cap
 
     if utilization >= config[6]:
-        rate = max(rate * 10_000 // (10_000 + config[8]), 10_000)
+        utilization_strength = (
+            (utilization - config[6]) * 10_000 // (10_000 - config[6])
+        )
+        earliness = 0
+        if timing_eligible:
+            earliness = 10_000 - weighted_lateness // accepted
+        demand_strength = utilization_strength * earliness // 10_000
+        step = config[8] + (config[9] - config[8]) * demand_strength // 10_000
+        rate = max(rate * 10_000 // (10_000 + step), 10_000)
     elif utilization <= config[7]:
-        rate = min(rate * 10_000 // (10_000 - config[9]), ceiling)
+        weakness = (config[7] - utilization) * 10_000 // config[7]
+        step = config[10] + (config[11] - config[10]) * weakness // 10_000
+        rate = min(rate * 10_000 // (10_000 - step), ceiling)
 
-    decay_steps = min(elapsed - 1, config[11])
+    decay_steps = min(elapsed - 1, config[13])
     for _ in range(decay_steps):
-        rate = min(rate * 10_000 // (10_000 - config[10]), ceiling)
+        rate = min(rate * 10_000 // (10_000 - config[12]), ceiling)
     return rate, utilization, decay_steps
 
 
@@ -57,16 +77,23 @@ def extract_struct(path, name):
     return match.group("body")
 
 
-def test_runtime_sizes_have_large_eip170_headroom():
-    lane = boa.load_partial("contracts/core/InstantBondLane.vy")
-    foxtrot = boa.load_partial("contracts/config/SwitchboardFoxtrot.vy")
-    lane_size = len(lane.compiler_data.bytecode_runtime)
-    foxtrot_size = len(foxtrot.compiler_data.bytecode_runtime)
+def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
+    foxtrot = boa.load(
+        "contracts/config/SwitchboardFoxtrot.vy",
+        ripe_hq,
+        ZERO_ADDRESS,
+        2,
+        20,
+        lane_env.lane,
+    )
+    lane_size = len(boa.env.get_code(lane_env.lane.address))
+    foxtrot_size = len(boa.env.get_code(foxtrot.address))
 
     assert 0 < lane_size < EIP170_LIMIT
     assert 0 < foxtrot_size < EIP170_LIMIT
-    assert lane_size <= LANE_RUNTIME_MAX
-    assert foxtrot_size <= FOXTROT_RUNTIME_MAX
+    size_report = f"deployed runtime sizes: lane={lane_size}, foxtrot={foxtrot_size}"
+    assert lane_size <= LANE_RUNTIME_MAX, size_report
+    assert foxtrot_size <= FOXTROT_RUNTIME_MAX, size_report
 
 
 def test_event_abi_names_order_and_indexing():
@@ -81,6 +108,7 @@ def test_event_abi_names_order_and_indexing():
         "paymentCap",
         "minPaymentAmount",
         "maxLockBonus",
+        "timingEligible",
         "pricingConfigVersion",
     ]
     assert indexed_fields(initialized) == ["epoch", "pricingConfigVersion"]
@@ -95,8 +123,12 @@ def test_event_abi_names_order_and_indexing():
         "newMaxLockBonus",
         "previousAcceptedPayment",
         "previousPaymentCap",
+        "previousWeightedLateness",
+        "previousTimingEligible",
         "utilizationBps",
+        "effectiveAdjustmentBps",
         "decaySteps",
+        "controllerRate",
         "pricingConfigVersion",
     ]
     assert indexed_fields(rolled) == [
@@ -123,6 +155,51 @@ def test_event_abi_names_order_and_indexing():
         "buyer",
         "epoch",
         "pricingConfigVersion",
+    ]
+
+    override_events = {
+        name: event_abi(path, name)
+        for name in (
+            "RateOverrideInstalled",
+            "RateOverrideApplied",
+            "RateOverrideCancelled",
+            "RateOverrideInvalidated",
+        )
+    }
+    assert [item["name"] for item in override_events["RateOverrideInstalled"]["inputs"]] == [
+        "newVersion",
+        "targetRate",
+        "boundConfigVersion",
+    ]
+    assert indexed_fields(override_events["RateOverrideInstalled"]) == [
+        "newVersion",
+        "boundConfigVersion",
+    ]
+    assert [item["name"] for item in override_events["RateOverrideApplied"]["inputs"]] == [
+        "newVersion",
+        "fromEpoch",
+        "toEpoch",
+        "targetRate",
+        "controllerRate",
+    ]
+    assert indexed_fields(override_events["RateOverrideApplied"]) == [
+        "newVersion",
+        "fromEpoch",
+        "toEpoch",
+    ]
+    assert [item["name"] for item in override_events["RateOverrideCancelled"]["inputs"]] == [
+        "newVersion",
+        "targetRate",
+    ]
+    assert indexed_fields(override_events["RateOverrideCancelled"]) == ["newVersion"]
+    assert [item["name"] for item in override_events["RateOverrideInvalidated"]["inputs"]] == [
+        "newVersion",
+        "targetRate",
+        "newConfigVersion",
+    ]
+    assert indexed_fields(override_events["RateOverrideInvalidated"]) == [
+        "newVersion",
+        "newConfigVersion",
     ]
 
 
@@ -182,8 +259,8 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
     seed_rate=st.integers(min_value=10_000, max_value=10**24),
     ceiling_multiplier=st.integers(min_value=1, max_value=20),
     cap_units=st.integers(min_value=2, max_value=1_000),
-    u_low=st.integers(min_value=0, max_value=4_999),
-    up_bps=st.integers(min_value=2, max_value=10_000),
+    u_low=st.integers(min_value=1, max_value=4_999),
+    min_up_bps=st.integers(min_value=2, max_value=10_000),
     elapsed=st.integers(min_value=1, max_value=1_000_000),
     max_decay=st.integers(min_value=1, max_value=32),
 )
@@ -199,13 +276,19 @@ def test_randomized_controller_matches_contract(
     ceiling_multiplier,
     cap_units,
     u_low,
-    up_bps,
+    min_up_bps,
     elapsed,
     max_decay,
 ):
-    u_high = data.draw(st.integers(min_value=u_low + 1, max_value=10_000))
-    down_bps = data.draw(st.integers(min_value=1, max_value=up_bps - 1))
-    decay_bps = data.draw(st.integers(min_value=down_bps, max_value=9_999))
+    u_high = data.draw(st.integers(min_value=u_low + 1, max_value=9_999))
+    max_up_bps = data.draw(st.integers(min_value=min_up_bps, max_value=10_000))
+    max_down_limit = min(
+        min_up_bps - 1,
+        10_000 * min_up_bps // (10_000 + min_up_bps),
+    )
+    max_down_bps = data.draw(st.integers(min_value=1, max_value=max_down_limit))
+    min_down_bps = data.draw(st.integers(min_value=1, max_value=max_down_bps))
+    decay_bps = data.draw(st.integers(min_value=max_down_bps, max_value=9_999))
     accepted_units = data.draw(st.integers(min_value=1, max_value=cap_units))
 
     with boa.env.anchor():
@@ -219,8 +302,10 @@ def test_randomized_controller_matches_contract(
             seedRate=seed_rate,
             uHighBps=u_high,
             uLowBps=u_low,
-            upBps=up_bps,
-            downBps=down_bps,
+            minUpBps=min_up_bps,
+            maxUpBps=max_up_bps,
+            minDownBps=min_down_bps,
+            maxDownBps=max_down_bps,
             decayBps=decay_bps,
             maxDecayEpochs=max_decay,
             maxLockBonus=0,
@@ -303,6 +388,8 @@ def test_worst_case_valid_config_payout_across_decimal_counts(
                 8_000,
                 2_000,
                 1_000,
+                1_000,
+                500,
                 500,
                 1_000,
                 32,
@@ -447,6 +534,8 @@ def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
             8_000,
             2_000,
             1_000,
+            1_000,
+            500,
             500,
             1_000,
             32,
