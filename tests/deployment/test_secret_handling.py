@@ -502,16 +502,19 @@ def test_rpc_components_never_appear_in_logs_exceptions_or_repr():
 
 def test_execute_transaction_failure_never_logs_exception_text(capsys):
     failure_text = f"synthetic provider failure {_SENSITIVE_RPC}"
+    calls = []
 
     def fail():
+        calls.append("called")
         raise RuntimeError(failure_text)
 
     with pytest.raises(
         TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
     ):
-        migration_helpers.execute_transaction(fail, no_retry=True)
+        migration_helpers.execute_transaction(fail)
     rendered = capsys.readouterr().out
 
+    assert calls == ["called"]
     assert "H02_TRANSACTION_FAILED" in rendered
     assert failure_text not in rendered
     assert "synthetic provider failure" not in rendered

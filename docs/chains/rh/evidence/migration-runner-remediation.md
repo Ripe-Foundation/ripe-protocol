@@ -29,10 +29,16 @@ current index is published before the numeric completion marker so a process
 failure cannot make auto-resume skip past an older current index. An incomplete
 pending/log pair and force-replay over a pending journal both fail closed.
 
-Transaction retries must return a non-`None` result. A missing result,
-`NoneType` failure, or exhausted retry budget raises
-`MIGRATION_TRANSACTION_FAILED`; it is never appended to the log or printed as
-confirmed.
+State-changing calls make one attempt by default. A caller may supply a larger
+retry budget only after establishing that its operation is idempotent or
+receipt-reconciled; this prevents a provider exception raised after broadcast
+from silently replaying an ordinary migration action. A successful callable
+whose selected ABI entry declares no outputs is journaled with the durable
+`MIGRATION_TRANSACTION_CONFIRMED_NO_OUTPUT` marker. Any other post-call
+`None` raises `MIGRATION_TRANSACTION_RESULT_MISSING` immediately and is never
+retried, appended to the log, or printed as confirmed. An actual call exception
+raises `MIGRATION_TRANSACTION_FAILED` when its explicit attempt budget is
+exhausted.
 
 Robinhood's imperative path also fails before signer construction while any
 selected external address in `config/BluePrint.py` remains classified as an

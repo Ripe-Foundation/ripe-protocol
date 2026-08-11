@@ -215,7 +215,11 @@ def get_account(
 
 def execute_transaction(transaction, *args, **kwargs):
     attempts = 0
-    max_attempts = 20
+    # State-changing exceptions are not safely retryable by default: an RPC
+    # provider can raise after broadcast but before returning a receipt.  A
+    # caller may opt into a larger budget only for an operation it has already
+    # established is idempotent or receipt-reconciled.
+    max_attempts = 1
     if "max_attempts" in kwargs:
         max_attempts = kwargs["max_attempts"]
         kwargs.pop("max_attempts")
