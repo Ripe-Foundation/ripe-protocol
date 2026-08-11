@@ -328,8 +328,24 @@ def _require_capture_context(output: Path) -> Mapping[str, str]:
 
 def _deploy_graph():
     import boa
+    from boa.interpret import set_cache_dir
+
+    cache_dir = os.environ.get("RIPE_AUDIT_CACHE")
+    if cache_dir:
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        set_cache_dir(cache_dir)
 
     boa.env.eoa = DEPLOYER
+    # RipeHq's constructor validates that its three seed registry addresses
+    # already contain code. Their behavior is irrelevant to runtime capture;
+    # install minimal deterministic code at the exact constructor addresses.
+    seed_source = "# @version 0.4.3\n\n@deploy\ndef __init__():\n    pass\n"
+    for label, address in (("green", GREEN), ("sgreen", SGREEN), ("ripe", RIPE)):
+        boa.loads(
+            seed_source,
+            name=f"runtime_capture_{label}_seed",
+            override_address=address,
+        )
     boa.load(
         "contracts/registries/RipeHq.vy",
         GREEN,
