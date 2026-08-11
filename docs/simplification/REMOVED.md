@@ -21,7 +21,8 @@ Archived copies are also kept outside the repo at
 
 Step manifests are removed on an ongoing basis as rh produces them. Only the
 `current-manifest.json` of each chain/version is read at runtime, by
-`prepare_defaults.py`, `verify_blockscout.py`, `ccip_send.py`, and `console.py`.
+`prepare_defaults.py`, `verify_blockscout.py`, `console.py`, and
+`Migration.__init__` itself.
 
 **Every `current-manifest.json` is retained — mainnet and testnet alike.** Six
 remain: `base-mainnet/v1`, `base-sepolia/v1`, `base-sepolia/v2`,
@@ -30,14 +31,24 @@ numbered and timestamped step manifests are removed.
 
 An earlier revision of this branch deleted the four testnet current manifests as
 "disposable". **That was wrong and has been reverted.** Retained tooling reads
-them: `scripts/ccip_send.py` defaults to `--chain base-sepolia --environment v2`
-and loads that manifest directly, and `migrations/base-sepolia/0002_CcipWire.py`
-and `migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run
-the step later with `--start-timestamp`, which needs the manifest to resolve
-local and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting
-them turned a documented recovery path into a `FileNotFoundError`. The test suite
-did not catch it because nothing exercised `ccip_send`; an independent review
-did.
+them: `migrations/base-sepolia/0002_CcipWire.py` and
+`migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run the
+step later with `--start-timestamp`, which needs the manifest to resolve local
+and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting them
+turned a documented recovery path into a `FileNotFoundError`. The test suite did
+not catch it because nothing exercised the readers; an independent review did.
+
+`scripts/ccip_send.py` was a second reader — it defaulted to `--chain
+base-sepolia --environment v2` and loaded that manifest directly — and it has
+since been deleted as dead code, because its own broadcast path never executed
+(`get_account(account)` passed one argument to a three-argument signature, so
+every real invocation raised `TypeError`). **That removes a consumer, not the
+requirement.** The CcipWire recovery path above still resolves against all six
+manifests, so none of them became disposable when `ccip_send.py` went. Do not
+re-derive "nothing reads these" from its absence; that is the exact inference
+that produced the reverted deletion. `tests/test_current_manifest_consumers.py`
+now pins the set in both directions — every declared manifest must be present
+and usable, and every manifest on disk must be declared.
 
 ### Why removing step manifests does not break a deployment
 
