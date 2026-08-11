@@ -345,8 +345,6 @@ class Migration:
         contracts = self._previous_manifest.get("contracts")
         if not isinstance(contracts, dict):
             raise RuntimeError("MIGRATION_MANIFEST_CONTRACTS_MISSING")
-        if canonical_name not in contracts:
-            raise RuntimeError("MIGRATION_CANONICAL_CONTRACT_MISSING")
         if candidate_label not in contracts:
             raise RuntimeError("MIGRATION_CANDIDATE_CONTRACT_MISSING")
 
@@ -402,6 +400,12 @@ class Migration:
         if registry_address.lower() != activation_address.lower():
             raise RuntimeError("MIGRATION_CANDIDATE_REGISTRY_MISMATCH")
 
+        # A canonical label may be absent when this is the first deployment of
+        # a new component.  The candidate and its activation witness still
+        # have to be complete, nonzero manifest records and the authoritative
+        # registry readback above must prove the activation before the label is
+        # created.  Existing canonicals follow this exact same replacement
+        # path, so no stale metadata can leak into either case.
         promoted_manifest = copy.deepcopy(self._previous_manifest)
         promoted_manifest["contracts"][canonical_name] = copy.deepcopy(
             candidate

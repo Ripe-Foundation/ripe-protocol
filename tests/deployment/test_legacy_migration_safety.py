@@ -201,6 +201,38 @@ def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
     )
 
 
+def test_candidate_promotion_can_create_first_canonical_label(tmp_path):
+    candidate = {
+        "address": "0x" + "2" * 40,
+        "file": "BlueChipYieldPrices.vy",
+        "abi": [{"name": "getPrice"}],
+        "args": ["0x" + "3" * 40],
+        "future_field": {"preserve": True},
+    }
+    active = {
+        "contracts": {
+            "BlueChipYieldPricesCandidate": candidate,
+        }
+    }
+    _write_json(tmp_path / "current-manifest.json", active)
+    _write_json(tmp_path / "1-manifest.json", active)
+
+    migration = _migration(tmp_path)
+    migration.promote_candidate(
+        "BlueChipYieldPrices",
+        "BlueChipYieldPricesCandidate",
+        _Registry(candidate["address"]),
+        7,
+    )
+
+    pending = json.loads(
+        (tmp_path / "2-pending-manifest.json").read_text()
+    )
+    assert pending["contracts"]["BlueChipYieldPrices"] == candidate
+    assert pending["contracts"]["BlueChipYieldPricesCandidate"] == candidate
+    assert "BlueChipYieldPrices" not in active["contracts"]
+
+
 def test_pending_manifest_without_transaction_log_fails_closed(
     tmp_path, monkeypatch
 ):
