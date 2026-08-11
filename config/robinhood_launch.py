@@ -9,14 +9,44 @@ are therefore not importable packages -- the same reason Base's migrations
 import their values from config/ and scripts/.
 """
 
-from config.BluePrint import ROBINHOOD_ADDRESSES, ROBINHOOD_GOVERNANCE
+from config.BluePrint import (
+    ROBINHOOD_ADDRESSES,
+    ROBINHOOD_ADDRESS_STATUS,
+    ROBINHOOD_GOVERNANCE,
+    SymbolicBinding,
+)
 
 ZERO_ADDRESS = "0x" + "0" * 40
 
 
+def unresolved_external_address_keys():
+    return tuple(
+        sorted(
+            key
+            for key, status in ROBINHOOD_ADDRESS_STATUS.items()
+            if "unverified" in status
+        )
+    )
+
+
+def validate_deployment_external_facts():
+    """Fail before signer construction while any selected fact is unverified."""
+    unresolved = unresolved_external_address_keys()
+    if unresolved:
+        raise ValueError(
+            "RH_EXTERNAL_FACTS_UNVERIFIED:" + ",".join(unresolved)
+        )
+
+
 def address(key):
-    """Read a verified external address from the blueprint."""
-    return ROBINHOOD_ADDRESSES[key]
+    """Read a deployment input only after its authority marks it resolved."""
+    value = ROBINHOOD_ADDRESSES[key]
+    status = ROBINHOOD_ADDRESS_STATUS[key]
+    if isinstance(value, SymbolicBinding) or (
+        "unverified" in status or "unresolved" in status
+    ):
+        raise ValueError(f"RH_EXTERNAL_FACT_UNVERIFIED:{key}:{status}")
+    return value
 
 
 # --- block units ------------------------------------------------------------

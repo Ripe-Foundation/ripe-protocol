@@ -22,6 +22,10 @@ CONTRACTS_DIR = "./contracts"
 INTERFACES_DIR = "./interfaces"
 
 
+class TransactionExecutionError(RuntimeError):
+    """A migration transaction never produced a confirmed result."""
+
+
 def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR], excluded_dirs=("testing",)):
     """
     Load all Vyper files from the specified directories and their subdirectories.
@@ -88,7 +92,10 @@ def get_account(
             )
         account_key = private_key
     else:
-        if private_key is not None or operation is not Operation.MIGRATION_FORK:
+        if private_key is not None or operation not in (
+            Operation.MIGRATION_FORK,
+            Operation.MIGRATION_LIVE,
+        ):
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
                 profile_id=profile.identity.profile_id,
@@ -136,21 +143,32 @@ def execute_transaction(transaction, *args, **kwargs):
         max_attempts = 1
         kwargs.pop("no_retry")
 
+    if isinstance(max_attempts, bool) or not isinstance(max_attempts, int):
+        raise TransactionExecutionError("MIGRATION_ATTEMPTS_INVALID")
+    if max_attempts <= 0:
+        raise TransactionExecutionError("MIGRATION_ATTEMPTS_INVALID")
+
     while attempts < max_attempts:
         attempts += 1
         try:
-            return transaction(*args, **kwargs)
+            result = transaction(*args, **kwargs)
+            if result is None:
+                raise TransactionExecutionError(
+                    "MIGRATION_TRANSACTION_RESULT_MISSING"
+                )
+            return result
 
         except Exception as exception:
-            if "NoneType" in str(exception):
-                return None
-
             log.info(
                 "\tTransaction Failed "
                 + str(attempts)
                 + " time"
                 + ("s" if attempts > 1 else "")
-                + (" (Trying again in 3 seconds)")
+                + (
+                    " (Trying again in 3 seconds)"
+                    if attempts < max_attempts
+                    else ""
+                )
 
             )
             # Exception text is NOT logged by default: it can carry provider
@@ -167,8 +185,10 @@ def execute_transaction(transaction, *args, **kwargs):
             else:
                 log.error("\tH02_TRANSACTION_FAILED\n")
             if attempts == max_attempts:
-                log.error(f"\tMax attempts reached. Exiting.\n")
-                break
+                log.error("\tMax attempts reached. Failing closed.\n")
+                raise TransactionExecutionError(
+                    "MIGRATION_TRANSACTION_FAILED"
+                ) from None
 
             time.sleep(3)
 

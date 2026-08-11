@@ -43,6 +43,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "contracts/config/DefaultsRobinhoodLive.vy"
 MANIFEST = ROOT / "migration_history/robinhood-mainnet/v1/current-manifest.json"
+ROBINHOOD_CHAIN_ID = 4663
 
 # The ABI carries field names but not struct type names, so they are named
 # here. Keyed by getter for the top level, and by field name for nested ones.
@@ -108,6 +109,14 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 '''
+
+
+def _require_robinhood_chain_id(chain_id: int) -> None:
+    if chain_id != ROBINHOOD_CHAIN_ID:
+        raise RuntimeError(
+            "DEFAULTS_CHAIN_MISMATCH "
+            f"expected={ROBINHOOD_CHAIN_ID} observed={chain_id}"
+        )
 
 def _abi(source: str) -> list:
     out = subprocess.run(
@@ -356,7 +365,13 @@ def main() -> int:
     w3 = Web3(Web3.HTTPProvider(rpc))
     manifest = json.loads(MANIFEST.read_text())["contracts"]
     # The URL carries a provider key, so it is never printed.
-    print(f"reading chain {w3.eth.chain_id} at block {w3.eth.block_number}")
+    chain_id = w3.eth.chain_id
+    try:
+        _require_robinhood_chain_id(chain_id)
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(f"reading chain {chain_id} at block {w3.eth.block_number}")
 
     source = build(w3, manifest["MissionControl"]["address"],
                    manifest["Ledger"]["address"])

@@ -2534,7 +2534,12 @@ class MigrationRunner:
 
             if end_timestamp_int is not None and timestamp_int > end_timestamp_int:
                 break
-            if start_timestamp_int is None or timestamp_int >= start_timestamp_int:
+            starts_here = (
+                start_timestamp_int is None
+                or timestamp_int > start_timestamp_int
+                or (inclusive and timestamp_int == start_timestamp_int)
+            )
+            if starts_here:
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 
@@ -2546,16 +2551,22 @@ class MigrationRunner:
 
         latest_timestamp = None
 
-        # create the history directory if it doesn't already exist
-        os.makedirs(self.history_dir, exist_ok=True)
+        if not os.path.isdir(self.history_dir):
+            raise RuntimeError("MIGRATION_HISTORY_UNAVAILABLE")
 
-        # scan each file to get the latest timestamp
+        # Only a numeric manifest is a completed checkpoint. `current` is a
+        # state index, and `*-pending-manifest.json` is an incomplete journal;
+        # neither may silently advance resume.
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(\d+)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
-                # Convert timestamps to integers for proper numerical comparison
                 if latest_timestamp == None or int(timestamp) > int(latest_timestamp):
                     latest_timestamp = timestamp
+
+        if latest_timestamp is None and os.path.exists(
+            os.path.join(self.history_dir, "current-manifest.json")
+        ):
+            raise RuntimeError("MIGRATION_RESUME_CHECKPOINT_REQUIRED")
 
         return latest_timestamp

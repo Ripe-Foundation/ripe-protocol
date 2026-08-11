@@ -64,11 +64,28 @@ class Migration:
         except:
             self._previous_manifest = {}
 
+        pending_filename = self._pending_manifest_filename()
+        has_pending_manifest = os.path.exists(pending_filename)
+        if has_pending_manifest:
+            if self._deploy_args.ignore_logs:
+                raise RuntimeError("MIGRATION_FORCE_REPLAY_PENDING")
+            try:
+                pending_manifest = json_file.load(pending_filename)
+            except Exception:
+                raise RuntimeError("MIGRATION_PENDING_MANIFEST_INVALID") from None
+            self._previous_manifest = merge(
+                {}, self._previous_manifest, pending_manifest
+            )
+
+        loaded_log = False
         try:
             self._load_log_file()
+            loaded_log = True
             log.h3(f"Log file {self._log_filename()} loaded")
         except:
             log.h3(f"No previous log file: {self._log_filename()}")
+        if has_pending_manifest and not loaded_log:
+            raise RuntimeError("MIGRATION_RESUME_STATE_INCOMPLETE")
 
     def rpc(self):
         return self._deploy_args.rpc
@@ -261,8 +278,28 @@ class Migration:
             log.info(f"Gas spent for migration: {self.gas}")
             return self.gas
 
+        # A numbered manifest is a completed-migration checkpoint. During the
+        # migration, deployments live only in a timestamp-scoped pending file;
+        # neither a partial step nor a failed retry may become `current`.
+        pending_filename = self._pending_manifest_filename()
+        final_manifest = self._previous_manifest
+        if os.path.exists(pending_filename):
+            try:
+                final_manifest = json_file.load(pending_filename)
+            except Exception:
+                raise RuntimeError("MIGRATION_PENDING_MANIFEST_INVALID") from None
+        # Publish current first and the numeric completion marker last. If the
+        # process dies between them, auto-resume selects this same migration
+        # and its log/pending journal completes the checkpoint; it never skips
+        # ahead with an old current manifest.
+        json_file.save(self._manifest_filename("current"), final_manifest)
+        json_file.save(
+            self._manifest_filename(self._timestamp), final_manifest
+        )
+
+        if os.path.exists(pending_filename):
+            os.remove(pending_filename)
         if os.path.exists(self._log_filename()):
-            # Delete the log file
             os.remove(self._log_filename())
 
         log.info(f"Gas spent for migration: {self.gas}")
@@ -338,6 +375,8 @@ class Migration:
                 kwargs['sender'] = self._deploy_args.sender.address
 
             tx = execute_transaction(transaction, *args, **kwargs)
+            if tx is None:
+                raise RuntimeError("MIGRATION_TRANSACTION_RESULT_MISSING")
             self._transactions.append(tx)
             gas = 0
             if contract_name != '':
@@ -373,6 +412,11 @@ class Migration:
     def _manifest_filename(self, name):
         return os.path.join(self._history_path, f"{name}-manifest.json")
 
+    def _pending_manifest_filename(self):
+        return os.path.join(
+            self._history_path, f"{self._timestamp}-pending-manifest.json"
+        )
+
     def _append_manifest(self, contract_name):
         if self._manifest_v2:
             raise ManifestError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
@@ -380,26 +424,20 @@ class Migration:
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
-        try:
-            current_manifest = json_file.load(self._manifest_filename(self._timestamp))
-        except:
-            current_manifest = {}
         manifest = deployed_contracts_manifest(contracts, self._contract_files, self._args, self._files)
         merged_manifest = merge({}, self._previous_manifest, manifest)
-        current_manifest = merge({}, current_manifest, manifest)
         self._previous_manifest = merged_manifest
 
-        json_file.save(self._manifest_filename(self._timestamp), current_manifest)
-        json_file.save(self._manifest_filename("current"), merged_manifest)
+        json_file.save(self._pending_manifest_filename(), merged_manifest)
 
-        log.h3(f"{contract_name} added to manifest")
+        log.h3(f"{contract_name} added to pending manifest")
         return merged_manifest
 
     def _load_log_file(self):
         if self._manifest_v2:
             raise ManifestError("H06_LEGACY_LOG_FORBIDDEN")
         if self._deploy_args.ignore_logs:
-            raise ('no logs')
+            raise RuntimeError("MIGRATION_LOG_REPLAY_REQUESTED")
         logs = json_file.load(self._log_filename())
         self._transactions = logs["transactions"]
 
