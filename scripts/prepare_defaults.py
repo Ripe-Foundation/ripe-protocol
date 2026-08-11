@@ -7,9 +7,9 @@ since. This pulls the current values off chain and writes them into the
 contract, so what gets deployed is visible in a diff and reviewable before it
 ships -- rather than being resolved at runtime.
 
-    python scripts/prepare_defaults.py              # write the contract
-    python scripts/prepare_defaults.py --check      # exit 1 if out of date
-    python scripts/prepare_defaults.py --dry-run    # print, write nothing
+    python scripts/prepare_defaults.py --block-number N
+    python scripts/prepare_defaults.py --block-number N --check
+    python scripts/prepare_defaults.py --block-number N --dry-run
 
 Run it, read the diff, then commit -- what gets deployed is reviewable.
 
@@ -28,10 +28,12 @@ emitted instead of resetting to the launch allocation.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -43,6 +45,9 @@ except ImportError:
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "contracts/config/DefaultsRobinhoodLive.vy"
 MANIFEST = ROOT / "migration_history/robinhood-mainnet/v1/current-manifest.json"
+EXPECTED_CHAIN_ID = 4663
+REPOSITORY_ID = "ripe-foundation/ripe-protocol"
+GENERATOR_ID = "scripts/prepare_defaults.py"
 
 # The ABI carries field names but not struct type names, so they are named
 # here. Keyed by getter for the top level, and by field name for nested ones.
@@ -86,7 +91,21 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 
 # GENERATED FILE -- do not edit by hand.
 #
-# Regenerate with:  python scripts/prepare_defaults.py
+# Regenerate with:  python scripts/prepare_defaults.py --block-number {block_number}
+#
+# Snapshot provenance:
+#   repository: {repository_id}
+#   generator: {generator_id}
+#   generator sha256: {generator_sha256}
+#   manifest sha256: {manifest_sha256}
+#   chain id: {chain_id}
+#   snapshot block: {block_number}
+#   snapshot block hash: {block_hash}
+#   snapshot finality: verified against the provider finalized tag
+#   MissionControl: {mission_control_address}
+#   MissionControl code sha256: {mission_control_code_sha256}
+#   Ledger: {ledger_address}
+#   Ledger code sha256: {ledger_code_sha256}
 #
 # This is the defaults contract for REPLACING a MissionControl or Ledger that
 # already exists. DefaultsRobinhood.vy remains the launch config for a
@@ -108,6 +127,178 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 '''
+
+
+class SnapshotError(RuntimeError):
+    """The requested live snapshot cannot be proven deterministic."""
+
+
+@dataclass(frozen=True)
+class SnapshotProvenance:
+    chain_id: int
+    block_number: int
+    block_hash: str
+    manifest_sha256: str
+    generator_sha256: str
+    mission_control_address: str
+    mission_control_code_sha256: str
+    ledger_address: str
+    ledger_code_sha256: str
+
+    def header(self) -> str:
+        return HEADER.format(
+            repository_id=REPOSITORY_ID,
+            generator_id=GENERATOR_ID,
+            generator_sha256=self.generator_sha256,
+            manifest_sha256=self.manifest_sha256,
+            chain_id=self.chain_id,
+            block_number=self.block_number,
+            block_hash=self.block_hash,
+            mission_control_address=self.mission_control_address,
+            mission_control_code_sha256=self.mission_control_code_sha256,
+            ledger_address=self.ledger_address,
+            ledger_code_sha256=self.ledger_code_sha256,
+        )
+
+
+def _hex_hash(value, field: str) -> str:
+    if isinstance(value, str):
+        text = value.removeprefix("0x")
+        try:
+            raw = bytes.fromhex(text)
+        except ValueError as exc:
+            raise SnapshotError(f"{field} is not a hex hash") from exc
+    else:
+        try:
+            raw = bytes(value)
+        except (TypeError, ValueError) as exc:
+            raise SnapshotError(f"{field} is not a byte hash") from exc
+    if len(raw) != 32:
+        raise SnapshotError(f"{field} must be exactly 32 bytes")
+    return "0x" + raw.hex()
+
+
+def _block_identity(block, label: str) -> tuple[int, str]:
+    if block is None:
+        raise SnapshotError(f"provider returned no {label}")
+    try:
+        number = block["number"]
+        block_hash = block["hash"]
+    except (KeyError, TypeError) as exc:
+        raise SnapshotError(f"{label} is missing number or hash") from exc
+    if isinstance(number, bool) or not isinstance(number, int) or number < 0:
+        raise SnapshotError(f"{label} number is invalid")
+    return number, _hex_hash(block_hash, f"{label} hash")
+
+
+def _sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _code_sha256(w3, address: str, block_number: int, label: str) -> str:
+    try:
+        code = bytes(w3.eth.get_code(address, block_identifier=block_number))
+    except Exception as exc:
+        raise SnapshotError(
+            f"could not read {label} code at {address} from snapshot block "
+            f"{block_number}"
+        ) from exc
+    if not code:
+        raise SnapshotError(f"{label} has no code at snapshot block {block_number}")
+    return _sha256(code)
+
+
+def select_snapshot(
+    w3,
+    mc_addr: str,
+    ledger_addr: str,
+    *,
+    block_number: int,
+    manifest_bytes: bytes,
+    generator_bytes: bytes,
+) -> SnapshotProvenance:
+    """Bind all reads to one provider-acknowledged finalized RH block."""
+    from web3 import Web3
+
+    if (
+        isinstance(block_number, bool)
+        or not isinstance(block_number, int)
+        or block_number < 0
+    ):
+        raise SnapshotError("block number must be a non-negative integer")
+
+    chain_id = w3.eth.chain_id
+    if isinstance(chain_id, bool) or chain_id != EXPECTED_CHAIN_ID:
+        raise SnapshotError(
+            f"expected Robinhood chain id {EXPECTED_CHAIN_ID}, got {chain_id!r}"
+        )
+
+    try:
+        finalized = w3.eth.get_block("finalized")
+    except Exception as exc:
+        raise SnapshotError("provider did not return an explicit finalized block") from exc
+    finalized_number, _ = _block_identity(finalized, "finalized block")
+    if block_number > finalized_number:
+        raise SnapshotError(
+            f"requested block {block_number} is newer than finalized block "
+            f"{finalized_number}"
+        )
+    try:
+        selected = w3.eth.get_block(block_number)
+    except Exception as exc:
+        raise SnapshotError(f"requested block {block_number} is unavailable") from exc
+    selected_number, block_hash = _block_identity(selected, "snapshot block")
+    if selected_number != block_number:
+        raise SnapshotError(
+            f"provider returned block {selected_number} for requested block {block_number}"
+        )
+
+    mission_control_address = Web3.to_checksum_address(mc_addr)
+    ledger_address = Web3.to_checksum_address(ledger_addr)
+    return SnapshotProvenance(
+        chain_id=chain_id,
+        block_number=block_number,
+        block_hash=block_hash,
+        manifest_sha256=_sha256(manifest_bytes),
+        generator_sha256=_sha256(generator_bytes),
+        mission_control_address=mission_control_address,
+        mission_control_code_sha256=_code_sha256(
+            w3, mission_control_address, block_number, "MissionControl"
+        ),
+        ledger_address=ledger_address,
+        ledger_code_sha256=_code_sha256(
+            w3, ledger_address, block_number, "Ledger"
+        ),
+    )
+
+
+def verify_snapshot(w3, snapshot: SnapshotProvenance) -> None:
+    """Fail if the selected block no longer resolves to the same hash."""
+    if w3.eth.chain_id != snapshot.chain_id:
+        raise SnapshotError("provider chain id changed during collection")
+    try:
+        finalized = w3.eth.get_block("finalized")
+    except Exception as exc:
+        raise SnapshotError(
+            "provider no longer returns an explicit finalized block"
+        ) from exc
+    finalized_number, _ = _block_identity(finalized, "finalized block")
+    if finalized_number < snapshot.block_number:
+        raise SnapshotError(
+            f"selected block {snapshot.block_number} is no longer finalized"
+        )
+    try:
+        selected = w3.eth.get_block(snapshot.block_number)
+    except Exception as exc:
+        raise SnapshotError(
+            f"selected block {snapshot.block_number} is no longer available"
+        ) from exc
+    number, block_hash = _block_identity(selected, "snapshot block")
+    if number != snapshot.block_number or block_hash != snapshot.block_hash:
+        raise SnapshotError(
+            f"selected block {snapshot.block_number} changed during collection"
+        )
+
 
 def _abi(source: str) -> list:
     out = subprocess.run(
@@ -163,16 +354,34 @@ class Renderer:
         return "\n".join(lines)
 
 
-def build(w3, mc_addr: str, ledger_addr: str) -> str:
+def build(
+    w3,
+    mc_addr: str,
+    ledger_addr: str,
+    snapshot: SnapshotProvenance,
+    *,
+    manifest_bytes: bytes,
+) -> str:
     from web3 import Web3
+
+    if _sha256(manifest_bytes) != snapshot.manifest_sha256:
+        raise SnapshotError("manifest bytes do not match snapshot provenance")
+    if Web3.to_checksum_address(mc_addr) != snapshot.mission_control_address:
+        raise SnapshotError("MissionControl address does not match snapshot provenance")
+    if Web3.to_checksum_address(ledger_addr) != snapshot.ledger_address:
+        raise SnapshotError("Ledger address does not match snapshot provenance")
 
     mc_abi = _abi("contracts/data/MissionControl.vy")
     led_abi = _abi("contracts/data/Ledger.vy")
     mc = w3.eth.contract(address=Web3.to_checksum_address(mc_addr), abi=mc_abi)
     led = w3.eth.contract(address=Web3.to_checksum_address(ledger_addr), abi=led_abi)
-    call = lambda c, n, *a: getattr(c.functions, n)(*a).call()
 
-    manifest = json.loads(MANIFEST.read_text())["contracts"]
+    def call(contract, name, *args):
+        return getattr(contract.functions, name)(*args).call(
+            block_identifier=snapshot.block_number
+        )
+
+    manifest = json.loads(manifest_bytes)["contracts"]
     by_addr = {v["address"].lower(): k for k, v in manifest.items() if v.get("address")}
 
     # Assets first: their addresses decide which constants the file needs.
@@ -206,7 +415,11 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
             if manifest_name in PREFERRED_NAMES:
                 const = PREFERRED_NAMES[manifest_name]
             else:
-                label = manifest_name or _symbol(w3, addr) or "ADDRESS"
+                label = (
+                    manifest_name
+                    or _symbol(w3, addr, snapshot.block_number)
+                    or "ADDRESS"
+                )
                 # split camelCase so GreenUsdgPool reads as GREEN_USDG_POOL
                 spaced = "".join(
                     f"_{ch}" if i and ch.isupper() and not label[i - 1].isupper() else ch
@@ -223,7 +436,7 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
         addr_names[low] = const
 
     r = Renderer(addr_names)
-    out = [HEADER]
+    out = [snapshot.header()]
 
     out.append(
         "\n# addresses -- all read from the live deployment, so there is no\n"
@@ -281,7 +494,10 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
     entries = []
     for addr in assets:
         cfg = call(mc, "assetConfig", addr)
-        sym = _symbol(w3, addr) or by_addr.get(addr.lower(), "")
+        sym = (
+            _symbol(w3, addr, snapshot.block_number)
+            or by_addr.get(addr.lower(), "")
+        )
         entries.append(
             f"        # {sym}\n"
             f"        cs.AssetConfigEntry(asset={r.address(addr)}, "
@@ -324,23 +540,34 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
     return "".join(out)
 
 
-def _symbol(w3, addr) -> str | None:
+def _symbol(w3, addr, block_number: int) -> str | None:
     from web3 import Web3
     try:
-        raw = w3.eth.call({
-            "to": Web3.to_checksum_address(addr),
-            "data": Web3.keccak(text="symbol()")[:4],
-        })
+        raw = w3.eth.call(
+            {
+                "to": Web3.to_checksum_address(addr),
+                "data": Web3.keccak(text="symbol()")[:4],
+            },
+            block_identifier=block_number,
+        )
         if len(raw) > 64:
             length = int.from_bytes(raw[32:64], "big")
             return raw[64:64 + length].decode(errors="replace")
         return raw.rstrip(b"\x00").decode(errors="replace") or None
     except Exception:
+        # A symbol is presentation-only and some assets do not implement it.
+        # Never retry the read without the selected block identifier.
         return None
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--block-number",
+        required=True,
+        type=int,
+        help="Exact Robinhood snapshot block; it must already be finalized.",
+    )
     parser.add_argument("--check", action="store_true",
                         help="Exit 1 if the contract is out of date.")
     parser.add_argument("--dry-run", action="store_true")
@@ -354,12 +581,35 @@ def main() -> int:
 
     from web3 import Web3
     w3 = Web3(Web3.HTTPProvider(rpc))
-    manifest = json.loads(MANIFEST.read_text())["contracts"]
-    # The URL carries a provider key, so it is never printed.
-    print(f"reading chain {w3.eth.chain_id} at block {w3.eth.block_number}")
-
-    source = build(w3, manifest["MissionControl"]["address"],
-                   manifest["Ledger"]["address"])
+    manifest_bytes = MANIFEST.read_bytes()
+    manifest = json.loads(manifest_bytes)["contracts"]
+    mc_addr = manifest["MissionControl"]["address"]
+    ledger_addr = manifest["Ledger"]["address"]
+    try:
+        snapshot = select_snapshot(
+            w3,
+            mc_addr,
+            ledger_addr,
+            block_number=args.block_number,
+            manifest_bytes=manifest_bytes,
+            generator_bytes=Path(__file__).read_bytes(),
+        )
+        # The URL carries a provider key, so it is never printed.
+        print(
+            f"reading chain {snapshot.chain_id} at snapshot block "
+            f"{snapshot.block_number} ({snapshot.block_hash}); verified finalized"
+        )
+        source = build(
+            w3,
+            mc_addr,
+            ledger_addr,
+            snapshot,
+            manifest_bytes=manifest_bytes,
+        )
+        verify_snapshot(w3, snapshot)
+    except SnapshotError as exc:
+        print(f"snapshot failed closed: {exc}", file=sys.stderr)
+        return 2
 
     if args.dry_run:
         print(source)
