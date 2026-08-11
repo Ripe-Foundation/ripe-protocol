@@ -7,6 +7,7 @@
 - **Created:** 2026-07-28.
 - **Refreshed:** 2026-08-11 from the live remote `refs/heads/rh`; the local `rh` worktree was 80 commits behind and was not used as the refresh source.
 - **Process model amended:** 2026-08-11 to add transaction-flow cells, canonical permutation coverage, cross-agent evidence and finding controls, and capacity-safe sub-waves.
+- **Independent-review reconciliation:** 2026-08-11 to add an activation decision packet, inherited-authority and known-defect carry-forward, exact test-gate selection rules, governance-key and configured-exposure review, delta-weighted scheduling, tiered traceability, and budget/stop-loss gates.
 - **Scope of this document:** audit organization, review standards, work batches, evidence, and completion gates.
 - **Refresh performed:** repository-wide source, test, configuration, migration, manifest, ABI, CI, Solidity-build, and provenance inventory plus focused integrity validation.
 - **Not in scope:** treating this refresh as the audit itself, making or closing security findings, changing production source, attesting live-chain state, or authorizing deployment, configuration, activation, or release.
@@ -39,6 +40,114 @@ The original process remains sound: frozen baselines, assessment/remediation sep
 - The simplified migration-history model, retained current manifests, extracted-file recovery evidence, artifact identity gates, and lean/comprehensive CI lanes.
 
 Historical decision documents, parked-lane labels, and prior test reports remain inputs. They do not remove source from the audit scope, prove current behavior, or replace a fresh batch baseline and execution record.
+
+## 0. Program decision packet and activation gate
+
+This program has two distinct outputs:
+
+1. A **candidate-specific launch/activation decision packet** that can support a
+   time-bound `GO`, `CONDITIONAL GO`, `NO-GO`, or `NOT ASSESSED` recommendation
+   for one exact source, artifact, configuration, deployment, and authority
+   candidate.
+2. A **comprehensive audit completion record** under Section 9, covering all 12
+   batches, canonical flows, cross-cutting matrices, remediations, residual
+   risks, and post-freeze deltas.
+
+Neither output authorizes deployment, migration execution, configuration,
+activation, or release. Those phases still require fresh exact owner authority.
+A launch decision may be needed before the comprehensive program finishes; it
+must therefore state every incomplete batch, flow, test lane, external fact,
+and residual uncertainty rather than presenting partial review as full audit
+completion.
+
+The decision packet must bind:
+
+- Exact commit/tree, compiler inputs, source/runtime identities, manifests,
+  configuration, network, deployed addresses, active feature set, and onchain
+  observation time.
+- The current reconciled `status.yaml`, `RH-D` decisions, inherited `F-` and
+  `DV-` issues, parameter-ledger invalidation triggers, audit findings, and
+  strict-xfail register that intersect the candidate.
+- Governance Safe/authority identity, signer and quorum evidence, modules,
+  guards, recovery/rotation controls, final permission state, and irreversible
+  handoff status.
+- Required local, artifact, release, fork, Solidity, configuration, migration,
+  and runtime-identity gates, with exact selected and deselected node counts.
+- The recommendation, rationale, decision owner, timestamp, expiry/recheck
+  triggers, open conditions, monitoring/abort controls, and prohibited
+  substitutions.
+
+### 0.1 Hard activation rule
+
+Activation is `NO-GO` when any of the following is true:
+
+- A Critical finding is not `Fixed and verified` or `Not applicable`; Critical
+  risk acceptance is not an activation disposition.
+- A High finding is `Open`, `Fix planned`, `Fixed pending retest`, `Partially
+  fixed`, `Challenged`, or `Disputed`. A High `Risk accepted` disposition
+  requires explicit written activation authority naming the exact exposure,
+  configured caps, reachable cap increases, monitoring, expiry, and owner.
+- A potentially Critical/High inherited `F-`, `DV-`, `RH-D`, strict-xfail, or
+  deployment-readiness item lacks a current re-affirmed, superseded, fixed, or
+  explicitly accepted disposition against the candidate.
+- An applicable gate selects zero tests, expected collection is not asserted,
+  the fork axis or strict-xfail result is unaccounted for, or a required
+  Solidity/runtime/deployment identity is unreproduced.
+- Governance signer/quorum/key custody, an irreversible authority handoff, a
+  required external identity, or a deployment/configuration blocker remains
+  unverified.
+
+A Medium item may remain only as an explicit `Risk accepted` disposition with
+written activation authority. Low and Informational items may remain open only
+when the decision packet names their owner, bounded exposure, monitoring,
+remediation/recheck trigger, and expiry. `CONDITIONAL GO` cannot be used to
+route around a Critical/High rule.
+
+### 0.2 Budget, calendar, and stop-loss gate
+
+Before each wave, the owner must record a maximum reviewer-day budget,
+wall-clock envelope, compute/RPC budget, active-pod and active-flow cap, and the
+decision that additional spend is intended to inform. A wave may not begin
+with these fields blank. The audit lead halts fan-out and requests an owner
+decision when any of the following occurs:
+
+- The wave consumes 75% of a budget while more than 50% of its exit evidence is
+  still open.
+- Matrix reconciliation, dependency handoffs, independent challenges, or
+  retests become the throughput bottleneck for two consecutive reporting
+  intervals.
+- The candidate, authority corpus, deployment scope, or configured exposure
+  changes enough to invalidate the frozen charter.
+- A new Critical/High root cause changes the launch decision, or evidence shows
+  the current batch/flow decomposition is producing duplicate or rubber-stamped
+  work.
+
+The bounded calibration pilot runs before full Wave 1 fan-out. Its measured
+review, synthesis, reconciliation, and challenge throughput must be accepted by
+the owner before committing the larger program budget.
+
+### 0.3 Right-sized launch-decision track
+
+The comprehensive audit remains the default long-form program. When the
+immediate decision is launch readiness, the owner may authorize a narrower
+decision track without representing it as comprehensive completion:
+
+- **Lane A — Release identity first:** reproduce source-to-runtime identity for
+  every Robinhood deployment target, defaults authority, manifest, final
+  permission state, and Safe action surrounding irreversible setup.
+- **Lane B — Delta and authority spine:** review all `master…rh` changed
+  value-moving production source plus RipeHq, Ledger, MissionControl,
+  Switchboards, Teller, registries, token authority, and governance handoff.
+- **Lane C — Four launch compositions:** `LDT-01` custody ingress/egress and
+  migration; `LDT-02` borrow/repay/liquidation/deleverage; `LDT-03`
+  price/admission/configuration mutation; and `LDT-04` deployment identity,
+  final permissions, and proof that parked or disabled features remain
+  unreachable.
+
+This track may combine required content into four evidence packets rather than
+creating one file per batch artifact. It must still satisfy Section 0.1, list
+all unaudited source, and obtain a fresh-context challenge for every
+load-bearing launch claim.
 
 ## 1. Audit objective
 
@@ -111,7 +220,13 @@ Each batch must cover:
 
 Line or statement coverage is useful but not sufficient. The audit must also map behaviors, branches, state transitions, permissions, invariants, failure paths, economic boundaries, and interactions to tests.
 
-The repository's default pytest lane intentionally excludes deployment, deployment-profile, inventory, release, artifact, fuzz, gas, and fork-qualification classes. No batch may infer whole-scope coverage from the lean lane alone. The audit record must state which lane and markers ran, which paths were deselected or ignored, and whether global Boa state, Git-history dependencies, operating-system constraints, or network opt-ins affect reproducibility.
+The repository's default pytest lane intentionally excludes deployment,
+deployment-profile, inventory, release, artifact, fuzz, gas, and H-09 fork
+paths. No batch may infer whole-scope coverage from the lean lane alone. The
+audit record must state which marker and path selectors ran, which `--fork`
+mode applied, which nodes were selected/deselected/ignored/xfail, and whether
+global Boa state, Git-history dependencies, operating-system constraints, or
+network opt-ins affect reproducibility.
 
 ### 2.5 Keep conclusions reproducible
 
@@ -125,10 +240,31 @@ Audit inputs should include:
 - The [technical documentation linked from the repository README](https://ripe-finance.gitbook.io/ripe-developers), captured with its URL and access date or as a versioned snapshot when possible.
 - Intended-behavior specifications and architecture notes.
 - Prior audit reports, known-issue lists, incident reports, remediations, and accepted-risk records supplied for the batch.
-- Current `rh` source-authority documents and decision registers, read with their dates and lifecycle boundaries.
+- The canonical Robinhood authority corpus, including:
+  - `docs/chains/rh/status.yaml` for machine-readable lifecycle and blocker state;
+  - `docs/chains/rh/decision-register.md` for the canonical `RH-D` decision and accepted-risk namespace;
+  - `docs/chains/rh/rh-production-vyper-review-findings.md` for inherited `F-01` through `F-16` NO-SHIP findings;
+  - `docs/chains/rh/component-matrix.md` for component dispositions and reuse claims;
+  - `config/robinhood-parameters.json` for the 403-row parameter ledger, blocker states, provenance, and per-row invalidation triggers; and
+  - every strict `DV-` or owner-deferred xfail intersecting the batch.
 - `docs/simplification/REMOVED.md`, `docs/simplification/extracted-files.tsv`, and the associated validation evidence when an audit conclusion depends on extracted deployment history, removed test/probe infrastructure, or recovery claims.
 
 Source and deployment evidence remain authoritative for what the system actually does. Documentation establishes intent and context; any divergence between documentation, tests, source, and deployed configuration must be logged rather than silently resolved. Private findings and sensitive operational material must stay in the approved private reporting channel.
+
+These authorities must be rebound before Wave 0 closes. At the planning
+baseline, `status.yaml` names program subject `0372d486…`, 131 commits before
+the reviewed `rh` commit, with 19 contract paths changed afterward. The
+parameter ledger names baseline `a86650b…`, 212 commits before the reviewed
+commit, with 41 contract paths changed afterward. Their current bytes remain
+mandatory historical and decision inputs, but neither stale subject identity
+may be treated as current candidate proof. Rebinding must preserve existing
+identifiers, disposition history, accepted-risk rationale, and invalidation
+triggers while showing exactly what changed.
+
+New audit findings use the `AUD-###` namespace. Hypotheses use `AUD-HYP-###`,
+observations use `AUD-OBS-###`, and flow IDs use `AUD-FLOW-##`. Existing
+`RH-D###`, `F-##`, `DV-##`, component, parameter, blocker, and launch-track IDs
+are linked rather than renumbered or re-opened as apparently new findings.
 
 ## 3. Standard workflow for every batch
 
@@ -145,9 +281,21 @@ Create a short batch charter containing:
 - Target commit and environment.
 - Language/compiler and vendored-dependency scope.
 - Network, manifest, configuration-source, and deployed-state scope.
+- The exact `master…rh` production delta intersecting the batch and the
+  evidence, if any, proposed for unchanged source.
+- Every inherited `RH-D`, `F-`, `DV-`, component, parameter, blocker,
+  strict-xfail, prior-audit, and accepted-risk identifier intersecting scope,
+  with its current and proposed disposition.
+- A baseline-suite record with exact command, selected/deselected/skipped/
+  xfailed counts, known failures, fork mode, marker/path selection, and raw
+  output location.
+- The approved reviewer-day, calendar, compute/RPC, active-work, and stop-loss
+  envelope for the batch.
 - Required reviewers and completion criteria.
 
-**Gate:** scope, baseline, and dependencies are agreed before detailed review begins.
+**Gate:** scope, baseline, dependencies, inherited dispositions, baseline test
+result, authority freshness, and resource envelope are agreed before detailed
+review begins.
 
 ### Phase 1 — Architecture and threat-model mapping
 
@@ -156,6 +304,9 @@ Document:
 - Component purpose and assets at risk.
 - Users, administrators, governance, keepers, integrations, and external protocols.
 - Trust boundaries and privileged operations.
+- Governance Safe, signer/quorum, module/guard, key custody/rotation/recovery,
+  emergency authority, cross-chain key reuse, and irreversible handoff
+  assumptions, without collecting or exposing secret material.
 - State machine and critical state transitions.
 - Asset, debt, share, price, reward, and permission flows as applicable.
 - External calls, callbacks, reentrancy surfaces, and denial-of-service dependencies.
@@ -172,6 +323,9 @@ Document:
 Review every in-scope public, external, internal, and privileged path for:
 
 - Authorization and role transitions.
+- Multisig threshold and signer concentration, Safe modules/guards, key
+  compromise/rotation/recovery, transaction simulation, final ownership, and
+  the consequences of governance/Safe/guardian role concentration.
 - Initialization and configuration safety.
 - State-update ordering and reentrancy.
 - Accounting conservation and balance reconciliation.
@@ -185,6 +339,9 @@ Review every in-scope public, external, internal, and privileged path for:
 - Cross-function and cross-contract invariant preservation.
 - Source/runtime identity, generated-input authority, and immutable constructor binding.
 - Cross-chain mint/burn authority, replay/domain separation, remote-pool configuration, rate limits, RMN behavior, and ownership handoff where applicable.
+- Configured launch exposure, authorized reachable exposure after timelocked or
+  emergency changes, time-to-increase, uncapped balances, and whether severity
+  changes when a cap or admission state changes.
 
 Static tools or compiler diagnostics may supplement manual review, but tool output is evidence to triage rather than a substitute for reasoning.
 
@@ -192,15 +349,25 @@ Static tools or compiler diagnostics may supplement manual review, but tool outp
 
 ### Phase 3 — Existing test-suite assessment
 
-Build a source-to-test traceability matrix covering:
+Build a tiered source-to-test traceability matrix. On the planning baseline,
+the production Vyper surface contains 973 external functions, including 582
+state-changing externals, 59 `@nonreentrant` externals, and four `@payable`
+externals, plus 1,640 explicit `assert`/`raise` conditions and 1,521 `if`/`elif`
+branches. Treating all of these as equivalent rows would invite superficial
+sign-off.
 
-- Each externally reachable function.
-- Each privileged function.
-- Each meaningful branch and revert condition.
-- Each state transition and invariant.
-- Each event relied upon by operators or integrations.
-- Each external dependency and abnormal response.
-- Each previously reported or remediated issue relevant to the component.
+- **Tier 1 — exhaustive:** every state-changing external, privileged function,
+  `@nonreentrant` or `@payable` path, custody/debt/supply/price/reward/
+  configuration/migration transition, affected invariant, and previously
+  reported or remediated issue.
+- **Tier 2 — exhaustive for the selected risk boundary:** every meaningful
+  branch, revert, event, external abnormal response, and integration outcome
+  reachable from Tier 1 or used by a launch, monitoring, accounting, or safety
+  decision.
+- **Tier 3 — counted risk selection:** remaining view/helper behavior is sampled
+  by risk and dependency. The matrix records the total population, reviewed
+  count, selection rationale, and every untraced remainder as an explicit gap;
+  it may not silently mark the remainder covered.
 
 Assess:
 
@@ -211,7 +378,16 @@ Assess:
 - Whether tests are independent and deterministic.
 - Whether coverage comes only indirectly through another component.
 - Whether fork tests pin blocks and external dependencies reproducibly.
-- Whether the lean, comprehensive, release, artifact, fuzz, gas, fork, macOS-only, and Solidity-build lanes collectively cover the claimed scope.
+- Whether the lean and comprehensive-local lanes, release/fuzz/gas markers,
+  path-selected artifact and H-09 gates, macOS-only job, and separately executed
+  Solidity build collectively cover the claimed scope.
+- Whether marker and path selectors collect a non-zero, expected population and
+  whether a zero-test exit was incorrectly normalized as green.
+- Whether the default `--fork local` selection removed Base/mainnet nodes from
+  either lean or comprehensive results.
+- Whether strict xfails represent inherited open defects, and whether an XPASS
+  indicates a required disposition/retest update rather than a generic suite
+  regression.
 - Whether a test depends on unreachable Git objects, a dirty worktree, platform-specific filesystem behavior, shared compiler caches, or mutable global Boa state.
 
 **Output:** traceability matrix, coverage evidence, and prioritized test-gap register.
@@ -305,6 +481,18 @@ Each batch should produce the same small set of artifacts:
 10. **Source ownership manifest** — every primary production source assigned exactly once, with supporting, vendored, generated, mock, interface, migration, and cross-batch dependencies separately classified.
 11. **Transaction-flow index and flow packets** — every material end-to-end flow led by the batch or materially traversing its source, with the canonical owner, participating batches, permutation coverage, handoffs, findings, and closure state.
 
+The batch charter incorporates inherited-authority dispositions, the
+`master…rh` delta, the baseline-suite/known-failing record, and the approved
+resource envelope. The findings register links inherited identifiers and uses
+the `AUD-` namespace only for genuinely new audit conclusions. The batch report
+states its contribution to the Section 0 decision packet.
+
+This list defines required content, not eleven separate files. A pod or
+right-sized decision lane should combine compatible material into the smallest
+reviewable evidence bundle that preserves ownership, raw evidence,
+reproducibility, and independent challenge. Artifact count is never a progress
+metric.
+
 Artifacts should distinguish:
 
 - **Observed fact:** directly supported by source, test output, deployment data, or a reproduction.
@@ -342,15 +530,61 @@ For transaction-flow validation, every applicable dimension above must be explic
 
 The batch charter should pin the exact audit environment. On the refreshed `rh` baseline, the repository uses Python `3.12.0` in CI and locks Vyper `0.4.3`, Titanoboa `0.2.7`, pytest `8.4.2`, pytest-cov `7.0.0`, coverage.py `7.10.6`, and Hypothesis `6.138.15`. The Solidity subtree pins solc `0.8.26`, EVM `paris`, via-IR compilation, 80,000 optimizer runs, and no bytecode hash. The repository does not pin the Foundry executable itself, so each CCIP batch must record `forge --version` in addition to `foundry.toml`.
 
-The current test topology has two automated Python lanes plus a dedicated macOS manifest-promotion job:
+The current automated topology has two Python CI lanes plus a dedicated macOS
+manifest-promotion job. It does **not** have an automated Solidity/Foundry CI
+job.
 
-- The default lean lane applies `pytest.ini`, which excludes `tests/deployment`, `tests/deployment_profiles`, and `tests/inventory` and deselects `release`, `artifact`, `fuzz`, `gas`, and `fork_qualification` markers.
-- The comprehensive lane clears repository `addopts`; on Linux it skips the APFS-bound manifest-promotion module, which runs separately on macOS.
-- Fork qualification remains explicit and network-dependent. It must run only with a chartered provider, exact block/pin, chain identity, socket policy, and teardown/replay record.
+- The default lean lane applies `pytest.ini`, which excludes
+  `tests/deployment`, `tests/deployment_profiles`, and `tests/inventory` and
+  deselects `release`, `artifact`, `fuzz`, `gas`, and `fork_qualification`
+  markers.
+- The comprehensive lane clears repository `addopts`; on Linux it skips the
+  APFS-bound manifest-promotion module, which runs separately on macOS.
+- Both lanes still inherit `tests/conf_env.py`'s default `--fork local`
+  selection. On the planning baseline this third selection axis deselects 102
+  of 404 `tests/priceSources` nodes and 40 of 326 `tests/core/endaoment` nodes.
+  Clearing `addopts` does not make the comprehensive lane an all-fork superset.
+- With `addopts` cleared, marker-only collection selects 131 `release`, four
+  `fuzz`, and five `gas` nodes. The registered `artifact`,
+  `fork_qualification`, and `serial` markers each select zero nodes.
+- The real artifact gate is path-selected:
+  `tests/inventory/test_contract_artifacts.py` plus
+  `tests/test_vault_pointer_runtime_sizes.py` collect 50 nodes.
+- The H-09 fork framework is path- and environment-selected under
+  `tests/deployment/fork/**`; it does not use the `fork_qualification` marker.
+  In safe-default disabled mode, the bound tree collects 177 of 178 nodes and
+  deliberately deselects the one archive-required node. Archive qualification
+  requires `RIPE_RH_FORK_MODE=read-only-archive-fork`, complete accepted owner
+  envelopes and identities, the exact endpoint alias and block pin, read-only
+  RPC policy, evidence destination, and teardown/replay record.
+- The suite contains 22 strict-xfail nodes from 13 decorator sites covering
+  `DV-04`, `DV-05`, `DV-08`, `DV-09`, `DV-10`, `DV-13`, `DV-14`, `DV-15`, and
+  the owner-deferred Uniswap snapshot-manipulation case. They are an inherited
+  open-defect register, not ordinary green-suite noise. A strict XPASS requires
+  disposition reconciliation and independent retest before the baseline gate
+  is considered restored.
+
+Every gate command must first perform or retain a collection preflight and
+assert a non-zero expected selected count, the expected deselection set, fork
+mode, and strict-xfail inventory. A zero-node pytest exit or any wrapper that
+normalizes it to success is a failed gate.
+
+| Gate | Canonical selection on the planning baseline | Collection expectation |
+| --- | --- | --- |
+| Lean Python | Repository-default `python -m pytest` | 3,550 selected of 3,832; 282 deselected |
+| Comprehensive local inventory | `python -m pytest -o addopts=''` | 4,521 selected of 4,664; 143 deselected, including the fork and H-09 safe-default axes. Linux CI additionally ignores the macOS-only promotion module and must assert its correspondingly smaller exact population. |
+| Release | `python -m pytest -o addopts='' -m release` | 131 selected |
+| Artifact/runtime size | `python -m pytest -o addopts='' tests/inventory/test_contract_artifacts.py tests/test_vault_pointer_runtime_sizes.py` | 50 selected |
+| Fuzz | `python -m pytest -o addopts='' -m fuzz` | Four selected |
+| Gas | `python -m pytest -o addopts='' -m gas` | Five selected |
+| H-09 safe default | `python -m pytest -o addopts='' tests/deployment/fork` with H-09 opt-in variables absent | 177 selected of 178; one exact safe-default deselection |
+| H-09 archive qualification | Same path with the chartered opt-in envelope, identities, endpoint, and evidence controls | Non-zero exact node/classification ledger defined by the charter; no unapproved network access |
+| macOS manifest promotion | `python -m pytest -o addopts='' tests/deployment/test_current_manifest_promotion.py` on the qualified APFS runner | Non-zero exact collection recorded by the job |
+| Solidity build | `forge build --root solidity`, with `forge --version` recorded | All owned and vendored inputs compiled; currently a separately executed gate, not CI |
 
 Use the following tool classes, recording commands, configuration, version, limitations, and raw output:
 
-- **Compilation evidence:** version-pinned Vyper compilation plus relevant `annotated_ast`, deployment/runtime control-flow graph, storage `layout`, `method_identifiers`, runtime source map, integrity hash, ABI, and bytecode outputs; and Foundry/solc compilation for the Ripe CCIP wrappers and vendored dependencies. Compiler artifacts support source review and deployment comparison; they are not security findings by themselves.
+- **Compilation evidence:** version-pinned Vyper compilation plus relevant `annotated_ast`, deployment/runtime control-flow graph, storage `layout`, `method_identifiers`, runtime source map, integrity hash, ABI, and bytecode outputs; and separately executed Foundry/solc compilation for the Ripe CCIP wrappers and vendored dependencies until an explicit Solidity CI job exists. Compiler artifacts support source review and deployment comparison; they are not security findings by themselves.
 - **Execution and coverage:** pytest/Titanoboa for focused, batch, integration, and full-suite execution. Titanoboa ships a `boa.coverage` plug-in for coverage.py; configure it through pytest-cov/coverage.py and validate its Vyper line and branch reporting against a deliberately reached and unreached branch before adopting thresholds.
 - **Property and sequence testing:** Hypothesis with Titanoboa for generated values, stateful sequences, and invariant campaigns, with seeds and shrinking results retained.
 - **Optional static analysis:** evaluate [Slither](https://github.com/crytic/slither) and appropriate Solidity tooling in an isolated audit environment. Slither is not pinned by this repository; first prove compatibility with the exact Vyper/Solidity versions, imports, vendored source, and initialized-module patterns, then record which detectors and printers are applicable. A clean or incomplete run never replaces manual review.
@@ -367,24 +601,43 @@ The registry work described at kickoff is split between Batches 2 and 3: Ripe HQ
 
 ### Planning size and resourcing
 
-The table below uses physical source lines, including comments and blank lines, from the refreshed `rh` tree. Counts cover primary Ripe-owned production source only; imported dependencies, vendored Solidity, mocks, tests, deployment artifacts, remediation, reporting, and independent retest add effort. Sizes are relative planning aids, not calendar estimates. Each size combines source volume with integration breadth, accounting/economic density, adversarial surface, privilege, and expected cross-batch validation; it is not derived from line count alone.
+The table below uses physical source lines, including comments and blank lines,
+from the refreshed `rh` tree. Counts cover primary Ripe-owned production source
+only; imported dependencies, vendored Solidity, mocks, tests, deployment
+artifacts, remediation, reporting, and independent retest add effort. The delta
+columns compare `master` commit `91eda49…` with planning baseline `rh`
+`0246858…`; churn is additions plus deletions and counts a new file by all of
+its added lines. Sizes are relative planning aids, not calendar estimates. Each
+size combines source volume, delta, integration breadth, accounting/economic
+density, adversarial surface, privilege, and expected cross-batch validation;
+it is not derived from line count alone.
 
-| Batch | Primary Vyper | Owned Solidity | Raw primary lines | Size | Principal complexity flags |
-| --- | ---: | ---: | ---: | --- | --- |
-| 1 | 6 | 0 | 3,148 | L | Shared state, permissions, action-block identity, and invariants used by most downstream components |
-| 2 | 13 | 0 | 10,600 | XL | Address initialization, four defaults variants, governance, and five configuration switchboards |
-| 3 | 13 | 0 | 7,397 | XL | Heterogeneous active/candidate price sources, normalization, staleness, admission, and registry routing |
-| 4 | 5 | 2 | 1,224 | XL | Token standards, privileged and cross-chain supply, signatures, shares, CCIP ownership/rate limits, and two languages |
-| 5 | 9 | 0 | 4,171 | XL | Four vault families, exact custody, shares/rebases/losses, rewards, and unified position migration |
-| 6 | 2 | 0 | 1,488 | L | Central asset entry point, typed custody observations, action-block checks, callbacks, and broad side effects |
-| 7 | 2 | 0 | 1,690 | L | Debt, interest, zero-backing containment, Stock collateral, repayment, redemption, and oracle dependence |
-| 8 | 3 | 0 | 2,854 | L | Auctions, Stock delivery, deleveraging, bad debt, incentives, and liveness |
-| 9 | 3 | 0 | 2,255 | L | Reserve custody, privileged transfers, stabilizer, yield positions, and PSM economics |
-| 10 | 3 | 0 | 2,082 | L | Rewards, send floors, claim/migration cleanup, bonds, cadence, budgets, and multi-user fairness |
-| 11 | 3 | 0 | 1,081 | M | Governance execution, contributor templates, compensation, and authority |
-| 12 | 0 | 0 | Not comparable | XL | 151 enumerated release-identity files plus config, operational scripts, Solidity build inputs, CI, provenance, and network-specific deployment state |
+| Batch | Primary Vyper | Owned Solidity | Raw primary lines | Changed Vyper vs `master` | `+/-` churn | Size | Principal complexity flags |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| 1 | 6 | 0 | 3,148 | 3 | 116 | L | Shared state, permissions, action-block identity, and invariants used by most downstream components |
+| 2 | 13 | 0 | 10,600 | 6 | 1,589 | XL | Address initialization, four defaults variants, governance, and five configuration switchboards |
+| 3 | 13 | 0 | 7,397 | 2 | 919 | XL | Heterogeneous active/candidate price sources, normalization, staleness, admission, and registry routing |
+| 4 | 5 | 2 | 1,224 | 1 | 16 | XL | Token standards, privileged and cross-chain supply, signatures, shares, CCIP ownership/rate limits, and two languages |
+| 5 | 9 | 0 | 4,171 | 5 | 1,380 | XL | Four vault families, exact custody, shares/rebases/losses, rewards, and unified position migration |
+| 6 | 2 | 0 | 1,488 | 2 | 269 | L | Central asset entry point, typed custody observations, action-block checks, callbacks, and broad side effects |
+| 7 | 2 | 0 | 1,690 | 2 | 28 | L | Debt, interest, zero-backing containment, Stock collateral, repayment, redemption, and oracle dependence |
+| 8 | 3 | 0 | 2,854 | 1 | 33 | L | Auctions, Stock delivery, deleveraging, bad debt, incentives, and liveness |
+| 9 | 3 | 0 | 2,255 | 0 | 0 | L | Reserve custody, privileged transfers, stabilizer, yield positions, and PSM economics |
+| 10 | 3 | 0 | 2,082 | 2 | 248 | L | Rewards, send floors, claim/migration cleanup, bonds, cadence, budgets, and multi-user fairness |
+| 11 | 3 | 0 | 1,081 | 1 | 28 | M | Governance execution, contributor templates, compensation, and authority |
+| 12 | 0 | 0 | Not comparable | N/A | N/A | XL | 151 enumerated release-identity files plus config, operational scripts, Solidity build inputs, CI, provenance, and network-specific deployment state |
 
 The 62 primary non-mock Vyper files total 37,873 raw lines, and the two Ripe-owned Solidity wrappers add 117 lines. Batch 4 must also review the 18-file, 1,792-line vendored Chainlink/OpenZeppelin subtree as a pinned dependency, without misclassifying it as Ripe-owned source. Batch 12's 151 enumerated release-identity files are 85 migrations, six retained current manifests, 54 exported ABIs, and six Vyper interfaces; its scope also includes eight top-level config files, 48 non-ABI scripts, one Python CI workflow, Solidity build configuration, and relevant provenance fixtures/documents.
+
+`rh` is a strict 462-commit descendant of `master` at the planning baseline.
+Twenty-five of 62 production Vyper files differ, with 4,199 added and 427
+deleted lines. Batches 2, 5, 3, and 6 contain 4,157 of 4,626 changed lines
+(89.9% of production-source churn); Batch 9 contains none. Delta concentration
+sets reviewer priority and supports the right-sized decision track, but does
+not prove unchanged source safe. The repository supplies no current external
+audit of `master` that can be assumed as inherited assurance. Any reduced
+review of unchanged source is an explicit owner risk acceptance naming the
+evidence relied upon and the unreviewed remainder.
 
 After the pilot, replace relative sizes with reviewer-day ranges based on measured source mapping, test analysis, adversarial validation, reporting, and independent-retest throughput. Do not infer effort from line count alone.
 
@@ -452,6 +705,10 @@ A trusted foundation map for later batches, including shared invariants and priv
 
 - Department registration, replacement, enablement, and authority.
 - Address integrity and dependency rewiring.
+- Governance/Safe/guardian identity, signer set, threshold, signer
+  independence, modules, guards, transaction policy, key custody/rotation/
+  recovery, cross-chain address reuse, and concentration of emergency and
+  treasury-controlling authority.
 - Configuration ranges, defaults, and unsafe combinations.
 - Authority and non-interchangeability of Base/local, Robinhood launch, and generated Robinhood live-replacement defaults.
 - Timestamp, inherited-block, and action-block units at every configuration boundary.
@@ -500,6 +757,9 @@ A complete map of who can configure or replace protocol dependencies and how uns
 - Manipulation resistance and dependence on spot/liquidity conditions.
 - Morpho V2 factory/vault validation and fail-closed behavior in BlueChipYieldPrices.
 - Uniswap V2 pair provenance, reserve/liquidity assumptions, snapshot cadence, bootstrap/stale handling, upside throttling, and repeated snapshot poisoning.
+- The owner-deferred strict-xfail for repeated manipulated Uniswap snapshots,
+  carried as an inherited issue until re-affirmed, superseded, fixed, or
+  explicitly accepted for the exact admitted/disabled lifecycle state.
 - Cross-source disagreement, source failure, and denial of service.
 - Governance replacement and configuration safety.
 - Mock fidelity versus production oracle behavior.
@@ -584,6 +844,9 @@ A token/accounting compatibility model plus cross-chain supply, authority, depen
 - Stability Pool deposits, claims, redemptions, and liquidation effects.
 - Ripe governance vault permissions, Teller-only lock paths, point-accrual controls, and reward interactions.
 - Unified BasicVault/RipeGov migration authorization, source/target validation, exact transfer and share preservation, list/index integrity, batch atomicity, retries, Base-only legacy routing, and post-migration cleanup.
+- The strict `DV-04`, `DV-05`, `DV-08`, `DV-09`, `DV-10`, `DV-13`, `DV-14`,
+  and `DV-15` nodes touching vault, Teller, stability, price, and migration
+  behavior, with their inherited source decisions and activation effect.
 - Fee-on-transfer, rebasing, blacklisting, reentrancy, and failed-transfer behavior.
 - Registration and configuration through Vault Book.
 - Consistency between reported value, internal accounting, and actual custody.
@@ -760,6 +1023,9 @@ An incentive-accounting model proving how rewards and bond value are created, as
 - Token and fund issuance limits.
 - Template/blueprint initialization.
 - Governance handoff, timelock, and emergency behavior.
+- Safe signer/quorum composition, key lifecycle and recovery, module/guard
+  authority, contributor/operator separation, and the blast radius of a
+  compromised or unavailable signer set.
 - Cross-department privilege escalation or unintended authority.
 
 **Primary outcome**
@@ -790,6 +1056,9 @@ A role and authority matrix for governance and operational departments, includin
 - Deployment order, arguments, deterministic addresses, and initialization.
 - Department, vault, asset, and price-source registration.
 - Permission grant/revoke sequence and final authority.
+- The exact Safe readback and signer/quorum/module/guard evidence before the
+  irreversible `0007_FinishSetup.py` governance handoff, plus recovery truth
+  after the deployer loses authority.
 - Launch defaults, generated live-replacement defaults, source-of-truth inputs, and network-specific values.
 - Migration ordering, uniqueness, replay/resume behavior, current-manifest promotion, and source/history separation.
 - Consequences of extracting numeric historical manifests and probe/block-clock infrastructure, including byte-exact recovery and every retained consumer's behavior.
@@ -800,6 +1069,8 @@ A role and authority matrix for governance and operational departments, includin
 - Verification and provenance of deployed bytecode.
 - Safety of operational scripts, account selection, secret handling, resume/rollback, and failure recovery.
 - Lean/comprehensive/macOS CI lane semantics, action pinning, cache isolation, deselections, and fresh-clone reproducibility.
+- The separately executed Solidity build gate and the absence of a current
+  Solidity/Foundry CI job; no Python CI result may stand in for CCIP compilation.
 
 **Primary outcome**
 
@@ -817,11 +1088,34 @@ Maintain cross-batch matrices for:
 
 Map every privileged function to its allowed caller, how that caller is assigned, how authority changes, timelock/emergency constraints, and tests.
 
+### Governance keys and irreversible authority custody
+
+Bind each governance, Safe, guardian, treasury-controlling, deployer, CCIP
+admin, owner, and emergency role to the actual contract/account type. Review
+Safe signer identities, threshold, signer independence, modules, guards,
+fallback handlers, transaction policy/simulation, cross-chain reuse, hardware
+or organizational custody evidence, rotation, recovery, compromise response,
+and liveness. Prove the final readback before and after every irreversible
+handoff, especially `0007_FinishSetup.py`. Record only public control evidence;
+never collect seed phrases, private keys, or secret recovery material.
+
 ### Asset and accounting conservation
 
 Trace actual custody, internal balances, shares, Green/Ripe supply, debt, rewards, reserves, and liquidation proceeds across component boundaries.
 
 Require observed token balance deltas wherever nominal transfer amounts can diverge because of fees, blacklists, rebases, callbacks, deficient backing, or bridge behavior.
+
+### Configured exposure and reachable cap expansion
+
+For each value-moving finding, record current configured launch exposure,
+deployed/live exposure when applicable, uncapped balances or deposits,
+authorized maximum/reachable configuration, who can raise it, the shortest
+timelock or emergency path, monitoring, and the invalidation trigger. Severity
+must consider both current loss bounds and a realistic governance-reachable
+state. On the planning baseline, Robinhood's configured global debt limit is
+500e18 versus Base's 200,000e18, while SwitchboardAlpha can change the limit
+through governance; the smaller launch value alone cannot permanently bound
+severity.
 
 ### External-call and reentrancy surfaces
 
@@ -857,6 +1151,10 @@ Map every human-edited authority, generated contract/configuration, ABI, compile
 
 ## 8. Finding severity and disposition
 
+New findings receive stable `AUD-###` identifiers. Existing `F-`, `DV-`,
+`RH-D`, component, parameter, blocker, or prior-audit IDs remain in their
+original namespace and are linked from the audit record.
+
 Use a consistent severity model, refined during audit kickoff:
 
 - **Critical:** credible loss of most or all at-risk funds, unrestricted minting, systemic insolvency, or protocol-wide takeover.
@@ -865,7 +1163,21 @@ Use a consistent severity model, refined during audit kickoff:
 - **Low:** limited-impact correctness or security weakness with constrained exploitability.
 - **Informational:** hardening, clarity, maintainability, observability, or test-quality concern without a demonstrated security impact.
 
-Severity should account for impact, likelihood, required privilege, capital, timing, detectability, recoverability, and blast radius. Confidence should be reported separately.
+Severity should account for impact, likelihood, required privilege, capital,
+timing, detectability, recoverability, and blast radius. Confidence should be
+reported separately. Each finding records two exposure views:
+
+- **Configured exposure:** credible impact at the exact candidate's launch or
+  deployed caps, admission state, balances, and enabled features.
+- **Reachable exposure:** credible impact after realistic authorized cap,
+  admission, pause, role, or dependency changes, including the shortest
+  timelock/emergency path and any uncapped value.
+
+The final severity is not automatically the lower configured-exposure result.
+If governance can reach the higher-impact state within the decision horizon,
+the finding either carries that severity or records the exact containment,
+monitoring, expiry, and reclassification trigger. Every finding also states its
+activation effect: `blocks`, `conditional`, or `nonblocking` under Section 0.1.
 
 Allowed dispositions:
 
@@ -877,6 +1189,13 @@ Allowed dispositions:
 - Risk accepted.
 - Not applicable.
 - Duplicate.
+- Re-affirmed — an inherited decision, accepted risk, or issue disposition was
+  rechecked against the exact candidate and remains valid.
+- Challenged — current evidence may invalidate an inherited disposition; both
+  rationales remain preserved and the item blocks any dependent conclusion
+  until resolved.
+- Superseded — a named later authority or finding replaces the earlier item
+  without deleting its history.
 - Disputed, with both rationales preserved.
 
 ## 9. Program-level completion
@@ -884,11 +1203,18 @@ Allowed dispositions:
 After all batches:
 
 1. Reconcile cross-batch and cross-flow findings, duplicate root causes, linked manifestations, and preserved disagreements.
-2. Run the lean, comprehensive, release, artifact, fuzz, gas, fork-qualification, macOS-only, Solidity-build, and protocol-wide invariant/integration gates applicable to the final candidate; record every exclusion.
+2. Run the lean, comprehensive, release, path-selected artifact, fuzz, gas,
+   path/environment-selected H-09 fork, macOS-only, separately executed
+   Solidity-build, and protocol-wide invariant/integration gates applicable to
+   the final candidate. Assert each gate's non-zero collection, expected
+   deselections, fork mode, strict-xfail inventory, and exclusions.
 3. Have the program matrix owner reconcile and sign off the aggregate permission, asset-flow, debt, price, and deployment matrices plus every canonical flow packet.
 4. Reproduce generated defaults, ABIs, compiler artifacts, artifact-expectation records, current manifests, and deployed runtime identities from their declared authorities.
 5. Reconcile Base mainnet/Sepolia and Robinhood mainnet/testnet configuration, CCIP lane symmetry, active/admitted feature state, and intentional differences.
-6. Confirm every accepted risk has an owner and explicit rationale.
+6. Confirm every accepted risk has an owner, configured and reachable exposure,
+   explicit rationale, expiry/recheck trigger, and current re-affirmation; carry
+   forward every inherited `RH-D`, `F-`, `DV-`, parameter, blocker, and
+   strict-xfail disposition.
 7. Confirm every remediation is tied to a regression test and independent retest.
 8. Produce a final report that separates:
    - reviewed source and deployment scope;
@@ -899,7 +1225,12 @@ After all batches:
    - unaudited or changed code.
 9. Establish a delta-review policy for changes made after the final reviewed commit.
 
-The protocol audit is complete only for the exact reviewed source, configuration, and deployment scope. Later changes require impact triage and, where material, a targeted re-audit.
+The protocol audit evidence record may be finalized while explicitly reporting
+unresolved findings; that does not make the candidate launchable. Any open or
+otherwise unresolved Critical/High item forces the Section 0 decision packet to
+`NO-GO`. The protocol audit is complete only for the exact reviewed source,
+configuration, and deployment scope. Later changes require impact triage and,
+where material, a targeted re-audit.
 
 ## 10. Parallel execution model
 
@@ -912,7 +1243,7 @@ The default initial capacity is **five active component pods**, plus one program
 matrix owner and one deployment/integration lead. Transaction-flow cells are an
 explicit second execution dimension, not uncounted work: every active flow cell
 must have a home pod, named participating-pod liaisons, and an entry in the
-program work-in-progress register. The initial Deposit flow cell is part of the
+program work-in-progress register. The initial `AUD-FLOW-01` Deposit flow cell is part of the
 bounded Batch 5 pilot rather than a sixth source-owning pod. The audit lead
 should raise or lower the pod or flow-cell caps only after the pilot measures
 review, synthesis, cross-batch reconciliation, and independent-retest
@@ -973,20 +1304,20 @@ reviewable. Staffing convenience alone is not a reason to hide distinct flows.
 
 | Flow ID | Canonical flow | Default home batch | Principal participating batches |
 | --- | --- | --- | --- |
-| F01 | Deposit and exact custody | 6, with the bounded Batch 5 pilot first | 1–6, 10, 12 |
-| F02 | Withdrawal, actual receipt, and accounting cleanup | 6 | 1–7, 10, 12 |
-| F03 | Borrow and GREEN delivery | 7 | 1–7, 10, 12 |
-| F04 | Repayment and redemption | 7 | 1–4, 7, 12 |
-| F05 | Liquidation, auction, settlement, and bad-debt reconciliation | 8 | 1, 3–8, 10, 12 |
-| F06 | Deleverage and residual account health | 8 | 1, 3–8, 12 |
-| F07 | BasicVault and RipeGov position migration | 5 | 1, 2, 4–6, 10, 12 |
-| F08 | Stability Pool deposit, claim, and liquidation absorption | 5 | 1, 3–5, 8, 10 |
-| F09 | Reward accrual, claim, cleanup, bond creation, vesting, and redemption | 10 | 1, 2, 4–7, 10, 12 |
-| F10 | Endaoment reserve movement and PSM mint/redeem | 9 | 1–4, 7, 9, 12 |
-| F11 | Price resolution, source failure, and asset/source admission | 3 | 2, 3, 5–9, 12 |
-| F12 | Governance, timelock, department, and configuration mutation | 2 or 11, selected in the charter | 1–3, 11, 12 |
-| F13 | CCIP burn, message, remote validation, mint, and aggregate supply | 4 | 2, 4, 12 |
-| F14 | Deployment, migration, manifest, permission, and runtime-identity transition | 12 | 2–5, 12 |
+| `AUD-FLOW-01` | Deposit and exact custody | 6, with the bounded Batch 5 pilot first | 1–6, 10, 12 |
+| `AUD-FLOW-02` | Withdrawal, actual receipt, and accounting cleanup | 6 | 1–7, 10, 12 |
+| `AUD-FLOW-03` | Borrow and GREEN delivery | 7 | 1–7, 10, 12 |
+| `AUD-FLOW-04` | Repayment and redemption | 7 | 1–4, 7, 12 |
+| `AUD-FLOW-05` | Liquidation, auction, settlement, and bad-debt reconciliation | 8 | 1, 3–8, 10, 12 |
+| `AUD-FLOW-06` | Deleverage and residual account health | 8 | 1, 3–8, 12 |
+| `AUD-FLOW-07` | BasicVault and RipeGov position migration | 5 | 1, 2, 4–6, 10, 12 |
+| `AUD-FLOW-08` | Stability Pool deposit, claim, and liquidation absorption | 5 | 1, 3–5, 8, 10 |
+| `AUD-FLOW-09` | Reward accrual, claim, cleanup, bond creation, vesting, and redemption | 10 | 1, 2, 4–7, 10, 12 |
+| `AUD-FLOW-10` | Endaoment reserve movement and PSM mint/redeem | 9 | 1–4, 7, 9, 12 |
+| `AUD-FLOW-11` | Price resolution, source failure, and asset/source admission | 3 | 2, 3, 5–9, 12 |
+| `AUD-FLOW-12` | Governance, timelock, department, and configuration mutation | 2 or 11, selected in the charter | 1–3, 11, 12 |
+| `AUD-FLOW-13` | CCIP burn, message, remote validation, mint, and aggregate supply | 4 | 2, 4, 12 |
+| `AUD-FLOW-14` | Deployment, migration, manifest, permission, and runtime-identity transition | 12 | 2–5, 12 |
 
 Each flow cell follows the program's phase discipline: Phase 0 freezes the flow
 charter; Phase 1 creates its canonical end-to-end model; Phases 2 and 3 trace
@@ -1074,12 +1405,13 @@ reading code or mapping tests.
 
 | Wave | Concurrent work | Exit condition |
 | --- | --- | --- |
-| Wave 0 — Program freeze | Select the global baseline, deployments/networks, lifecycle scope, reporting channel, severity authority, evidence templates, hypothesis/finding registries, flow inventory, handoff states, and matrix owner. Draft starting batch and flow charters in parallel. | Shared operating decisions are recorded and every starting pod and flow passes Phase 0. |
-| Wave 1 — Foundation and pilot fan-out | Run Batches 1–4 concurrently. Within Batches 2–4, charter F11 Price Resolution, F12 Governance/Configuration, and F13 CCIP as named flow work where capacity permits. Use the fifth pod slot for the bounded Batch 5 F01 Deposit flow calibration slice. The deployment/integration lead begins F14/Batch 12 provenance, deployment-order, four-network, generated-defaults, and manifest mapping. | Batches 1–4 publish stable permission, state/clock, pricing/admission, token/CCIP, and dependency handoffs. F01 publishes a completed pilot packet and retrospective; F11–F14 publish the versioned packets or handoffs required for later flows. Measured reconciliation throughput sets later pod and flow-cell caps. |
+| Wave 0 — Program freeze and authority rebind | Select the global baseline, deployments/networks, lifecycle scope, decision target, reporting channel, severity authority, evidence templates, hypothesis/finding registries, flow inventory, handoff states, and matrix owner. Rebind `status.yaml`, `RH-D`, `F-`, `DV-`, component, parameter, blocker, and strict-xfail state to the candidate. Record the overall and first-wave resource envelope. | Shared operating decisions and authority freshness are recorded; the Section 0 decision packet shell exists; and the calibration charter passes Phase 0. |
+| Wave 0.5 — Calibration before fan-out | Run only the bounded Batch 5 / `AUD-FLOW-01` exact-custody slice over `BasicVault.vy`, `SimpleErc20.vy`, direct Teller/Ledger/VaultBook dependencies, and exact-custody tests. Dependency-sensitive conclusions remain provisional. Measure source review, traceability, adversarial work, synthesis, handoff, challenge, and reporting throughput. | The pilot packet, limitations, known-defect carry-forward, retrospective, reviewer-day range, wall-clock range, and stop-loss data are accepted by the owner. The owner authorizes, resizes, narrows, or stops Wave 1. |
+| Wave 1 — Delta-weighted foundation fan-out | Within the approved five-pod cap, run Batches 1–4 and continue Batch 5. Weight reviewer capacity first toward Batches 2, 5, and 3, which contain 84.0% of production-source churn, while preserving Batch 1 and 4 dependency ownership. Pre-charter Batch 6's changed Teller surface without allowing it to close before upstream handoffs. Within Batches 2–4, charter `AUD-FLOW-11` Price Resolution, `AUD-FLOW-12` Governance/Configuration, and `AUD-FLOW-13` CCIP where capacity permits. The deployment/integration lead begins `AUD-FLOW-14`/Batch 12 release-identity mapping. | Batches 1–4 publish stable permission, state/clock, pricing/admission, token/CCIP, governance-key, and dependency handoffs; Batch 5 either closes or records exact upstream blockers; `AUD-FLOW-11` through `AUD-FLOW-14` publish the versioned packets or handoffs needed by later flows. |
 | Wave 2A — Primary user-flow fan-out | Respect the five-pod cap: finalize Batch 5 and activate Batches 6, 7, 10, and 11. Run Deposit/Withdrawal, Borrow/Repay, Migration/Stability Pool, Rewards/Bonds, and Governance/Configuration flow work as their charters and handoffs permit. Batch 12 mapping continues under the central lead. | Vault/migration, Teller, debt, reward, and governance models are stable; completed pods release capacity deliberately. |
 | Wave 2B — Remaining economic and liquidation fan-out | As an active pod releases a slot, activate Batch 9. Activate Batch 8 architecture, source review, and test mapping in the next released slot. If program priorities require Batch 9 before Batch 11, record that decision without exceeding the cap. | Endaoment and preliminary liquidation/deleverage flow packets are reconciled; Batch 8 has stable pricing, vault, and debt closure dependencies identified. |
-| Wave 3 — System and liquidation closure | Close Batch 8 after pricing, vault, and debt handoffs. Finalize Batch 12 and F14, then run aggregate access-control, value-conservation, debt, pricing, external-call, timing, availability, flow-composition, and network-parity campaigns. | All batch reports, flow packets, findings, and matrix deltas are reconciled against one final reviewed candidate. |
-| Wave 4 — Remediation and independent retest | Implement approved non-overlapping fixes in parallel, serialize shared-source or deployment changes, and assign independent retesters. | Every finding has a verified, partial, accepted, disputed, or open disposition and affected program matrices are updated. |
+| Wave 3 — System and liquidation closure | Close Batch 8 after pricing, vault, and debt handoffs. Finalize Batch 12 and `AUD-FLOW-14`, then run aggregate access-control, governance-key, configured-exposure, value-conservation, debt, pricing, external-call, timing, availability, flow-composition, and network-parity campaigns. | All batch reports, flow packets, inherited dispositions, findings, and matrix deltas are reconciled against one final reviewed candidate. |
+| Wave 4 — Remediation and independent retest | Implement approved non-overlapping fixes in parallel, serialize shared-source or deployment changes, and assign independent retesters. | Every finding and inherited issue has a final recorded disposition and affected program matrices/flow packets are updated. Any unresolved Critical/High item remains an explicit audit outcome and forces the activation packet to `NO-GO`. |
 
 ### 10.5 Coordination, finding identity, and isolation rules
 
@@ -1094,9 +1426,11 @@ reading code or mapping tests.
   manifestation discovered by multiple flow cells links to one root-cause
   hypothesis or finding rather than creating competing IDs.
 - Maintain a program hypothesis registry before formal finding assignment. Each
-  record identifies reporting agent, affected source owner, affected flows,
-  invariant, evidence state, and one of `draft`, `under review`, `confirmed`,
-  `closed`, `duplicate`, or `superseded`.
+  `AUD-HYP-###` record identifies reporting agent, affected source owner,
+  affected flows, inherited identifiers, invariant, evidence state, and one of
+  `draft`, `under review`, `confirmed`, `closed`, `duplicate`, or `superseded`.
+  A confirmed new root cause receives one `AUD-###` finding; inherited issues
+  retain their existing identifier and receive a linked current disposition.
 - At the end of Phase 1, each pod publishes a versioned dependency snapshot:
   actors, state owners, invariants, assumptions, upstream requirements, and
   downstream consumers.
@@ -1131,29 +1465,74 @@ trustworthy throughput, not maximum simultaneous agent or reviewer count.
 
 ## 11. Recommended kickoff sequence
 
-1. Approve this process and adjust the batch boundaries.
-2. Decide whether `02468586d710e2cce2360c2bc07e94de6ebdab29` is the first audit freeze or only this plan's refresh baseline. If `rh` has moved, produce an exact delta inventory before rebinding.
-3. Select the exact deployed-network/configuration scope, active/admitted/candidate/legacy feature scope, evidence locations, and private reporting boundary.
-4. Establish the program matrix owner, deployment/integration lead, severity owner, hypothesis/finding registries, handoff states, evidence templates, and initial pod/flow-cell capacity.
-5. Charter Batches 1–4 and F01. Also charter F11, F12, F13, and the early F14 mapping work inside their home pods or central lead when the recorded flow-cell cap permits. Use a bounded Batch 5 calibration slice—`BasicVault.vy`, `SimpleErc20.vy`, their direct Teller/Ledger/VaultBook dependencies, and the exact-custody tests—as F01's first flow packet. It is a representative asset-moving surface without pretending the entire 4,171-line vault/migration batch can close before upstream models exist.
-6. Inventory the owned source, generated/vendored dependencies, tests, migrations, manifests, prior security reports, deployed identities, and known lifecycle decisions for every starting pod and the flow pilot.
-7. Launch Wave 1 only after those batch and flow charters pass Phase 0: run Batches 1–4 in parallel, use the fifth pod slot for the F01/Batch 5 pilot, and begin early Batch 12 provenance/configuration mapping under the deployment/integration lead.
-8. Allow F01 to map and test supporting Teller, Ledger, VaultBook, token, and reward behavior immediately, but keep source-sensitive conclusions provisional until their owning pods publish stable handoffs. Complete Batches 1–4 before formally closing Batch 5.
-9. Retrospect on the completed pilot packet, reconciliation backlog, challenged conclusions, and handoff latency. Update this operating plan if needed, convert T-shirt sizes into reviewer-day ranges, and set the Wave 2 pod and flow-cell caps from measured throughput.
-10. Expand Batch 5 to StabilityPool, RipeGov, and VaultMigrator after the Batch 1/2/4 handoffs stabilize, then start Wave 2A and 2B as slots become available. Do not wait for unrelated batches to close, and do not exceed the recorded cap.
-11. Begin any formal batch or flow's Phase 1 only after its scope-freeze gate is complete.
+1. Approve this process, the comprehensive-versus-right-sized decision scope,
+   and any batch/flow boundary changes.
+2. Decide whether `02468586d710e2cce2360c2bc07e94de6ebdab29`
+   is the first audit freeze or only this plan's refresh baseline. If `rh` has
+   moved, produce exact source, test, authority, configuration, and deployment
+   deltas before rebinding.
+3. Rebind `status.yaml`, the `RH-D` register, inherited `F-`/`DV-` issues,
+   component matrix, parameter ledger/invalidation triggers, blocker state, and
+   strict-xfail register to the exact candidate. Preserve identifiers and
+   historical rationales.
+4. Select the deployed-network/configuration scope,
+   active/admitted/candidate/legacy feature scope, decision date, evidence
+   locations, private reporting boundary, and Section 0 decision owner.
+5. Establish the program matrix owner, deployment/integration lead, severity
+   owner, `AUD-` hypothesis/finding registries, handoff states, evidence
+   templates, baseline-suite record, and overall resource/stop-loss envelope.
+6. Run Wave 0.5 before foundation fan-out. Charter only the bounded
+   Batch 5 / `AUD-FLOW-01` slice over `BasicVault.vy`, `SimpleErc20.vy`, direct
+   Teller/Ledger/VaultBook dependencies, and exact-custody tests. Keep
+   dependency-sensitive conclusions provisional.
+7. Retrospect on the pilot's reviewer-days, wall clock, reconciliation backlog,
+   challenged conclusions, handoff latency, artifact burden, and uncovered
+   surface. Obtain the owner's explicit continue/resize/narrow/stop decision
+   and Wave 1 budget.
+8. Charter Batches 1–4 and the continuation of Batch 5. Charter
+   `AUD-FLOW-11`, `AUD-FLOW-12`, `AUD-FLOW-13`, and early `AUD-FLOW-14` work
+   only within the approved capacity. Pre-charter Batch 6's changed Teller
+   surface for early mapping.
+9. Inventory owned source, `master…rh` delta, generated/vendored dependencies,
+   tests, strict xfails, migrations, manifests, authorities, prior security
+   reports, deployed identities, configured/reachable exposure, and known
+   lifecycle decisions for every starting pod and flow.
+10. Launch Wave 1 only after each batch and flow charter passes Phase 0. Weight
+    reviewer effort toward Batches 2, 5, and 3 while preserving Batches 1 and 4
+    as foundation owners; begin Batch 12 identity mapping under the central lead.
+11. Expand Batch 5 to StabilityPool, RipeGov, and VaultMigrator only after the
+    Batch 1/2/4 handoffs stabilize, then start Waves 2A and 2B as slots become
+    available. Do not wait for unrelated batches and do not exceed the approved
+    resource or work-in-progress cap.
+12. Begin any formal batch or flow's Phase 1 only after its scope-freeze gate is
+    complete. Refresh the Section 0 decision packet at every wave exit and
+    immediately after any Critical/High or authority-changing evidence.
 
 ## 12. Refreshed `rh` test-inventory observations
 
 These are filename-, collection-, and fixture-level observations from `rh` at `02468586d710e2cce2360c2bc07e94de6ebdab29`, included only to prioritize Phase 3 work. They are not findings, do not prove that a behavior lacks indirect integration coverage, and do not turn focused refresh validation into a whole-suite result.
 
 - The tree has 151 `test_*.py` modules. The default lane collected 3,550 selected tests with 282 deselections; the comprehensive collection selected 4,521 with 143 deselections.
+- The default `--fork local` hook remains active even with `addopts` cleared. It
+  deselects 102 of 404 price-source nodes and 40 of 326 Endaoment nodes; those
+  142 Base/mainnet-fork nodes are absent from both ordinary CI lanes.
+- Marker-only collection selects 131 `release`, four `fuzz`, and five `gas`
+  nodes, but zero `artifact`, `fork_qualification`, or `serial` nodes. Artifact
+  evidence is the explicit 50-node path gate, and H-09 fork evidence is the
+  `tests/deployment/fork/**` path/environment gate.
+- The suite carries 22 strict-xfail nodes from 13 sites. These name `DV-04`,
+  `DV-05`, `DV-08`, `DV-09`, `DV-10`, `DV-13`, `DV-14`, `DV-15`, and the
+  owner-deferred Uniswap manipulation item; they must be handled as inherited
+  issue state in every affected charter and decision packet.
 - `Boardroom.vy` still has no dedicated test module; the current test tree references it through shared deployment fixtures.
 - `tests/registries/` still contains dedicated Address Registry and Ripe HQ modules but no dedicated Price Desk, Vault Book, or Switchboard module. Those contracts have integration and configuration consumers that must be mapped before judging coverage.
 - `tests/modules/` contains LocalGov and TimeLock modules but no dedicated Addys or DeptBasics module.
 - `RedStone.vy` still has no dedicated price-source test module. It is deployed through shared fixtures and must receive exact behavior-to-test mapping rather than a filename-only coverage judgment.
 - Morpho V2, Uniswap V2, VaultMigrator, RipeGov migration, Stability Pool hardening, exact BasicVault custody, network profiles, current manifests, ABI/artifact identity, and fork qualification now have substantial dedicated suites. Their size is not proof that every permission, branch, invariant, external failure, or production composition is covered.
 - The Solidity CCIP subtree has no Forge unit-test directory. Current evidence is primarily compilation plus Python migration, manifest-consumer, RipeHq, artifact, and documentation checks. Batch 4 must decide which inherited TokenPool/rate-limit/ownership behavior can rely on pinned upstream evidence and which Ripe composition paths require direct local tests.
+- The Python workflow does not compile the Solidity subtree. Until a dedicated
+  job exists, `forge build --root solidity` is a separately executed recorded
+  gate and a green Python workflow is not CCIP compilation evidence.
 - The default lane excludes the deployment, deployment-profile, and inventory directories and multiple evidence markers. A green lean result cannot close Batch 12 or any batch relying on release, artifact, fuzz, gas, or fork evidence.
 - The simplification work removed the former block-clock inventory and probe packages. Retained clock evidence includes `tests/clock/test_clock_profiles.py`, deployment network-clock tests, and Ledger/Teller/composed-route tests; the audit must explicitly map what evidence was lost, retained, or replaced.
 - Numeric historical step manifests were extracted from the active tree. Tests now center on current-manifest schemas, consumers, promotion, recovery metadata, and directory/source ownership; audit replay or historical-deployment claims may require byte-exact recovery from the recorded Git objects.
@@ -1163,6 +1542,9 @@ The first charter for each affected batch must convert these observations into e
 
 ## 13. Decisions to make before the first audit batch
 
+- Whether the owner is funding the comprehensive audit, the right-sized launch
+  decision track, or a staged decision that begins narrow and expands only
+  after the calibration gate.
 - Whether the first target is the refreshed `rh` commit, a later release candidate, deployed Base or Robinhood bytecode/configuration, or an explicitly reconciled combination.
 - Which of Base mainnet, Base Sepolia, Robinhood mainnet, Robinhood testnet, local simulation, and historical deployments are in scope.
 - Which present source is active, admitted, deployed, parked, candidate-only, legacy-only, or intentionally disabled; these lifecycle labels affect threat modeling but not source ownership.
@@ -1170,10 +1552,18 @@ The first charter for each affected batch must convert these observations into e
 - Whether CCIP review includes only the Ripe wrappers and integration or also an independent review of the 18 vendored dependency files and upstream 1.5.1 equivalence.
 - How extracted numeric manifests and removed test/probe infrastructure will be recovered and used when historical deployment or regression evidence depends on them.
 - Whether prior external audits and known issues will be supplied at kickoff.
+- Whether any unchanged `master` source may receive reduced review, exactly
+  which evidence supports that reliance, and who accepts the unreviewed risk;
+  repository history alone is not an audit.
 - Whether each batch is reviewed by one reviewer plus independent retest, or by two reviewers from the start.
 - Which initial flow inventory changes are approved, which pod owns each flow, and how many flow cells may be active without exceeding reconciliation capacity.
+- The maximum reviewer-days, wall-clock period, compute/RPC spend, and stop-loss
+  thresholds for calibration and every later wave.
 - Where the program work-in-progress register, hypothesis/finding registry, versioned dependency handoffs, raw evidence, and canonical flow packets will live.
 - Which conclusions require a fresh-context challenger beyond the mandatory Critical/High candidate rule, and who may serve in that role.
+- Which Safe, signer, quorum, module, guard, guardian, key-rotation/recovery,
+  and irreversible-handoff evidence the owner will supply without exposing
+  secret key material.
 - Where private findings and public-safe reports will live.
 - Whether test-only proof work may be committed during assessment or only during remediation.
 - Which Git-history, operating-system, compiler-cache, RPC, archive-node, and secret-handling controls are required for reproducible evidence.
@@ -1194,5 +1584,38 @@ Evidence reproduced during the refresh:
 - Focused workflow, simplification-index, current-manifest consumer/promotion, schema, network-profile, and ABI-export validation: 204 passed.
 - Focused contract-artifact and EIP-170 runtime-size validation: 50 passed.
 - `forge build --root solidity`: 20 Solidity files compiled successfully with solc `0.8.26`; lint notes were emitted, but compilation succeeded.
+
+Independent-review reconciliation reproduced the following additional
+planning facts against the same source baseline:
+
+- Exact-head GitHub Actions runs
+  [31473039816](https://github.com/Ripe-Foundation/ripe-protocol/actions/runs/31473039816)
+  (push) and
+  [31473046484](https://github.com/Ripe-Foundation/ripe-protocol/actions/runs/31473046484)
+  (pull request) completed successfully for `02468586…`. They establish only
+  the configured Python workflow jobs, not marker-zero artifact/fork gates or
+  Solidity compilation.
+- Marker-only collection with `addopts` cleared: `release=131`, `fuzz=4`,
+  `gas=5`, `artifact=0`, `fork_qualification=0`, and `serial=0`; zero-node
+  marker selections exited 5.
+- Explicit artifact/runtime-size paths collected 50 nodes. The H-09 path in
+  disabled safe-default mode collected 177 of 178 nodes and deselected the one
+  archive-required node.
+- The default local-fork hook selected 302 of 404 price-source nodes and 286 of
+  326 Endaoment nodes, confirming 142 fork-axis deselections beyond marker and
+  path selection.
+- Collection identified 22 strict-xfail nodes from 13 source sites.
+- The production Vyper census contains 973 external functions, 582
+  state-changing externals, 59 `@nonreentrant` externals, four `@payable`
+  externals, 1,640 explicit `assert`/`raise` conditions, and 1,521 `if`/`elif`
+  branches.
+- `master…rh` is `0/462`; 25 production Vyper files differ with 4,626 lines of
+  churn. Per-batch changed-file/churn counts in Section 6 were independently
+  derived from the canonical ownership lists.
+- `status.yaml`'s named program subject was 131 commits behind the planning
+  baseline with 19 contract paths changed; the 403-row parameter ledger's
+  named baseline was 212 commits behind with 41 contract paths changed. All
+  403 parameter rows carry invalidation triggers, and 47 are status `blocked`.
+- The current Python workflow contains no Solidity/Foundry build step.
 
 These checks establish that the refreshed inventory and plan structure match the bound repository tree. They do not establish full-suite health, deployed-byte parity, live-chain correctness, absence of findings, or audit completion.
