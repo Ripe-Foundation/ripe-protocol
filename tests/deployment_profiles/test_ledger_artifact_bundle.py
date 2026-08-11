@@ -36,8 +36,8 @@ def test_r2_bundle_separates_baseline_builder_and_compiler_input(bundle):
     )
     assert bundle["builder_head"] == "0" * 40
     assert bundle["compiler"]["transitive_compiler_input_integrity"] == (
-        "62cc9e492ee1b1a3e84ad104507d684dc"
-        "81edecef969fc0ae0f7a1586dd0d830"
+        "9fb8e2769edfadc839c478c40859a4c89"
+        "b53ac5a4548c520b32bf5f8c8052d80"
     )
     assert len(
         {
@@ -52,28 +52,28 @@ def test_r2_bundle_records_reviewed_source_abi_and_template_artifacts(bundle):
     assert bundle["source"] == {
         "path": "contracts/data/Ledger.vy",
         "sha256": (
-            "6bd731a6ce9084de213494ebad09f8e52"
-            "c782153842708b78f90fa178c06e9e3"
+            "c98c748511a26da7a7e7cc9ae158db00"
+            "8e4c95fca18d393232081188ed1ef5a6"
         ),
     }
     assert bundle["abi"]["committed_file_sha256"] == (
-        "c6fc1c410e13f144ae9e9d1853378d4"
-        "76fa578211b08f67b23f80c2075bc415f"
+        "d5dc29b53051f37a56a1e92b6787ef28"
+        "6f97f764ca06d7d2b5ed96a8057b8f33"
     )
     assert bundle["artifacts"]["creation_bytecode"] == {
         "sha256": (
-            "a31f400f5364f8dbbd22b79bea2557f7"
-            "f3dd57538eb659c06a21e18e9d8e9127"
+            "516c111fe8d220eb79a4f3a0cc7e1915"
+            "c43510b8a0ab6651882309cef896f0aa"
         ),
-        "size": 13_730,
+        "size": 13_597,
     }
     assert bundle["artifacts"]["runtime_template"] == {
         "deployed_runtime_identity": False,
         "sha256": (
-            "8fbc85b5bac4586fdb4fc432284f9c38"
-            "d12ed3966b2de5630f9d4c80973dcce7"
+            "913b4299ce27692de499c022acd9d2dbf"
+            "361563cda0e7763607879df402eefa9"
         ),
-        "size": 13_125,
+        "size": 13_178,
     }
 
 
@@ -81,11 +81,11 @@ def test_r2_bundle_records_immutable_bound_local_runtime_separately(bundle):
     bound = bundle["artifacts"]["immutable_bound_runtime"]
     template = bundle["artifacts"]["runtime_template"]
     assert bound["action_block_source_readback"] == profile.ARB_SYS
-    assert bound["size"] == 13_253
+    assert bound["size"] == 13_306
     assert bound["size"] - template["size"] == 4 * 32
     assert bound["sha256"] == (
-        "3be45215fc469302bd0893ccf57c10a8"
-        "a274bb65ac76ad2fc88cf8958c4d0c59"
+        "55ad52673ce6e395c41c3cdff41180e2"
+        "3a9f89e6165d3809d5e59cfd7a3169c0"
     )
 
 
