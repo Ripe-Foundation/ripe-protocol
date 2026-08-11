@@ -8,21 +8,26 @@
 
 ## Current identity and exact delta
 
-This rationale is bound to current local, cached, and live `rh` commit
+The functional hook entered `rh` in commit
 `0642f086d19e3cc62faaf67da096b6511e405320`, tree
 `d869d4149380b368f9678ed03efc0b59a6c804e2`, verified on 3 August 2026.
-The one-path commit has parent
+Commit `175df7d` later added only five explanatory comment/blank lines. Current
+live `rh` `26e82703ae80e6732991cbd9702b7f61ace22ec7`, verified on 10 August 2026,
+therefore has a different source identity but unchanged runtime-template and
+ABI identities for the hook. The one-path functional commit has parent
 `27f21ccc782e45fe65634cfec3f3fb4eb9f083a0`, tree
 `1600413e0ee015aa4e68a5e4515523433a8f8a3f`.
 
 | Identity | Current value |
 | --- | --- |
 | Production source | [`contracts/tokens/modules/Erc20Token.vy`](../../../../contracts/tokens/modules/Erc20Token.vy) |
-| Git blob | `f00e5655567612e3f8c95182de75701424eeea2b` |
-| Source SHA-256 | `54ffb5d2dcdf5dd2c5990e0bcd3a67b0ebcbae32b8dc3ef6c00d2e84ea447af7` |
-| Source size | 17,435 bytes |
+| Current Git blob | `e9ec81672ed5ea973487d3ae44a633c13b06b572` |
+| Current source SHA-256 | `6593a28f791f9e6b3fdaf0ff14abd7379894833d62026a9092237de7033398c1` |
+| Current source size | 17,668 bytes |
+| Hook-introduction Git blob / SHA-256 | `f00e5655567612e3f8c95182de75701424eeea2b` / `54ffb5d2dcdf5c5990e0bcd3a67b0ebcbae32b8dc3ef6c00d2e84ea447af7` |
 | Parent Git blob / SHA-256 | `0758a13ad2537cc3d7679b80aabe27f298371664` / `dc32f4ea2a0b8128a82e206cee0c699ddf9b756d7ac51a1bace665e4192e85b1` |
-| Commit scope | 11 inserted lines in this source only; no committed ABI or test update; final line terminator removed |
+| Hook-introduction commit scope | 11 inserted lines in this source only; no committed ABI or test update; final line terminator removed |
+| Later source-only scope | `175df7d` adds three explanatory comment lines and two blank lines; no functional Vyper change |
 | Added selector | `getCCIPAdmin()` = `0x8fd6a6ac` |
 | EOF identity | Parent ends with LF (`0x0a`); current source ends with `)` (`0x29`) and has no final LF |
 
@@ -40,11 +45,12 @@ correctly initialized, the returned address follows the current RipeHq
 governance getter. The source change does not grant mint, burn, blacklist,
 pause, pool, registry, or remote-chain permissions.
 
-The Git numstat is `11` insertions / `0` deletions. That count does not expose
-the accompanying loss of the final newline. The missing LF does not alter the
-Vyper behavior described here, but it is a real source-byte and formatting
-change. Restoring it would create another production-source identity and is
-therefore not folded into this documentation-only refresh.
+The hook-introduction Git numstat is `11` insertions / `0` deletions. That
+count does not expose the accompanying loss of the final newline. The missing
+LF does not alter the Vyper behavior described here, but it is a real
+source-byte and formatting change. Restoring it would create another
+production-source identity and is therefore not folded into this
+documentation-only refresh.
 
 ## Authorization and decision status
 
@@ -64,9 +70,10 @@ hook or a Token Admin Registry path.
 The implementation is shared rather than Robinhood-only, so it complies with
 the repository's source-shape rule. It does not yet satisfy the standing
 default in [`rh-summary.md`](../../rh-summary.md), which requires an explicit
-owner decision and a **tested** shared token revision with the resulting Base
-live-version policy resolved. At this baseline there is no direct behavior
-test, four committed ABIs are stale, and the Base policy remains open.
+owner decision and a tested shared token revision with the resulting Base
+live-version policy resolved. The repository-health remediation supplied the
+direct behavior tests and current deterministic ABIs; the owner decision and
+Base policy remain open.
 
 Consequently, an owner must choose one of two separately controlled source
 dispositions: ratify the shared hook and close its evidence/ABI/Base-policy
@@ -99,7 +106,7 @@ treating every mention as the same kind of drift.
 | Document | Current disposition after `0642f086…` |
 | --- | --- |
 | `track-1-chainlink-ccip-confirmation.md` | Controlling draft condition remains unresolved: add the hook only after the stated Chainlink finding, and stop for an owner decision. The current source moved ahead of that condition. |
-| [`rh-summary.md`](../../rh-summary.md) | Controlling checklist remains open and requires a tested shared revision plus explicit Base live-version policy if the hook is unavoidable. The source has the required shared form, but the owner decision, tests, current ABIs, and Base policy are missing. |
+| [`rh-summary.md`](../../rh-summary.md) | Controlling checklist remains open and requires a tested shared revision plus explicit Base live-version policy if the hook is unavoidable. The source has the required shared form, direct tests and current ABIs now exist, but the owner decision and Base policy remain missing. |
 | [`minimal-contract-change-reassessment.md`](../minimal-contract-change-reassessment.md) | Its recommendation to keep GREEN/RIPE unchanged absent a Chainlink finding and owner decision remains the recorded policy; its unchanged-source description is stale for current `rh`. |
 | [`component-matrix.md`](../component-matrix.md) | CM-001/002's `reused unchanged` classification and the CCIP decision row's unchanged-source premise are stale for the effective compiler graph: the direct token blobs are unchanged, but their imported shared module changed. Its shared-revision requirement and rejection of a Robinhood-only hook remain current and are satisfied in form. |
 | [`block-number-inventory.md`](../block-number-inventory.md) | The CCIP row's statement that token source can remain unchanged is stale for current `rh`; the shared-source/Base-policy boundary remains applicable. |
@@ -118,7 +125,9 @@ this page is the current source-identity and drift record, not authorization.
 Three production token sources export and initialize `Erc20Token`: GREEN,
 RIPE, and sGREEN. The sGREEN artifact therefore also exposes the selector even
 though current repository policy permanently omits sGREEN from CCIP. Fresh
-Vyper `0.4.3+commit.bff19ea2` compilation produced:
+Vyper `0.4.3+commit.bff19ea2` compilation reproduced these values against live
+`rh` on 10 August 2026; the later comment-only source revision does not change
+the runtime-template or ABI identities:
 
 | Compiled source | Runtime bytes | EIP-170 headroom | Runtime SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | --- | --- |
@@ -133,10 +142,11 @@ module changed. The new function adds one ABI entry and one selector to each
 compiled artifact without changing the module's persistent storage,
 constructor, events, or existing function signatures.
 
-## Current artifact and test discrepancy
+## Integration-time artifact and test discrepancy
 
-The repository-wide deterministic ABI check is currently red. The committed
-files do not contain `getCCIPAdmin`, while fresh compiler output does:
+At the one-path source integration commit, the repository-wide deterministic
+ABI check was red. The committed files did not contain `getCCIPAdmin`, while
+fresh compiler output did:
 
 | ABI file | Committed SHA-256 | Fresh expected SHA-256 | Function count |
 | --- | --- | --- | ---: |
@@ -154,14 +164,30 @@ changed ABI output: RipeToken.json
 changed ABI output: SavingsGreen.json
 ```
 
-No checked-in test invokes `getCCIPAdmin`, and the source commit changed no
-test. The current nine-contract frozen artifact gate does not cover these token
-artifacts, so its green result does not close the ABI or behavior gap.
+No checked-in test invoked `getCCIPAdmin` at that commit, and the source commit
+changed no test. The then-current frozen artifact gate did not cover these
+token artifacts, so its green result did not close the ABI or behavior gap.
 
-The repository's only GitHub Actions workflow builds, tests, and lints the
-Robinhood handoff dashboard. It does not run the protocol ABI export test,
-contract artifact checker, or direct token tests. No current CI gate therefore
-detects this four-file discrepancy or the missing hook behavior coverage.
+The repository's only GitHub Actions workflow at that snapshot built, tested,
+and linted the Robinhood handoff dashboard. It did not run the protocol ABI
+export test, contract artifact checker, or direct token tests.
+
+## Repository-health remediation closure
+
+The health remediation closes those two repository-evidence gaps without
+changing the production source or granting CCIP authority:
+
+- all 53 deterministic production ABI outputs are byte-current, including
+  `Erc20Token.json`, `GreenToken.json`, `RipeToken.json`, and
+  `SavingsGreen.json` with `getCCIPAdmin()`;
+- direct tests cover initialized governance discovery, confirmed governance
+  changes, pre-setup failure, invalid HQ behavior, and GREEN/RIPE/sGREEN
+  transitive exports; and
+- automatic pull-request and `master`/`rh` CI now runs lean and comprehensive
+  protocol suites, so both the ABI export gate and direct token tests execute.
+
+The owner decision, Base live-version policy, exact token artifact binding,
+sGREEN exclusion, and final-LF decision remain separate open items.
 
 ## Current disposition and required follow-up
 
@@ -173,9 +199,11 @@ claim:
    reversion;
 2. if ratified, record why the Track-1 precondition is satisfied or explicitly
    superseded, and resolve the immutable Base live-version policy;
-3. regenerate and review the four deterministic ABI outputs;
-4. add direct tests for initialized admin discovery, governance changes,
-   uninitialized/invalid HQ behavior, and all three transitive token exports;
+3. **completed in repository health:** regenerate and review the four
+   deterministic ABI outputs;
+4. **completed in repository health:** add direct tests for initialized admin
+   discovery, governance changes, uninitialized/invalid HQ behavior, and all
+   three transitive token exports;
 5. bind creation/runtime, ABI, selector, layout, and compiler-input identities
    for the exact GREEN, RIPE, and sGREEN artifacts;
 6. explicitly preserve sGREEN's CCIP exclusion despite its inherited selector;
@@ -184,8 +212,9 @@ claim:
 8. keep CCIP pools, remotes, rate limits, mint/burn capabilities, registration,
    deployment, activation, and release separately gated.
 
-This audit does not implement those non-documentation corrections and does not
-authorize any onchain or external Chainlink action.
+The repository-health remediation implements items 3 and 4 only. It does not
+authorize any onchain or external Chainlink action, and it does not decide any
+of the remaining owner-controlled items.
 
 ## Reproducible checks
 

@@ -347,12 +347,21 @@ state or granting deployment authority:
 | --- | --- | --- |
 | ABI export | `DefaultsRobinhoodLive.vy` had no committed ABI and the census still expected 52 outputs. | Regenerate the committed ABI set and bind the test to all 53 current outputs. |
 | Governed contract artifacts | Source, compiler-input, creation, and runtime expectations drifted for merged contracts. | Regenerate governed expectations for Ledger, Lootbox, MissionControl, and Teller, and bind the Ledger/Lootbox profile manifests to those expectations. |
-| Migration manifest safety | The retained runner lacked the in-memory typed handoff action required by the manifest safety test. | Restore the exact reviewed H-06 manifest-safe runner implementation and retain its write-free gate. |
+| Migration manifest safety | The retained runner lacked the in-memory typed handoff action required by the manifest safety test. | Layer the reviewed H-06 typed handoff and fail-closed guards onto the current runner while retaining the CCIP helpers used by eight migration files. Add a call-graph regression gate for every retained `migration.<method>(...)` call. |
 
 The earlier red state and its baseline/candidate parity remain historical facts
 for the cleanup PR. Generated ABIs, hashes, profiles, and migration-runner code
 are repository evidence only; they do not select production constructor values,
 sign a transaction, register a contract, or authorize deployment.
+
+An initial health-remediation commit restored the historical H-06 runner blob
+verbatim. That blob predated the August 7 CCIP additions and therefore removed
+`deploy_solidity`, `get_solidity_contract`, `get_address_on_chain`, and
+`timestamp` even though retained migrations still call them. Independent review
+caught the compatibility regression before publication. This follow-up restores
+all four methods, blocks `deploy_solidity` before any Foundry side effect when
+H-06 manifest-v2 mode is active, and binds the live migration call graph in a
+root-level lean/comprehensive test.
 
 ## Validation
 
@@ -411,8 +420,11 @@ The Python workflow was **not dispatched for PR #77** because the workflow at
 that time was `workflow_dispatch` only. The post-merge remediation changes the
 workflow to run both lean and comprehensive lanes automatically for pull
 requests and for pushes to `master` or `rh`, while preserving manual
-single-lane dispatch. No remote CI result is claimed until the remediation PR
-exists and GitHub actually runs it.
+single-lane dispatch. It checks out full history for commit-bound gates, gives
+the comprehensive lane a 180-minute limit, cancels superseded PR/branch runs,
+and adds a focused macOS job for the platform-gated H-06 promotion suite. No
+remote CI result is claimed until the remediation PR exists and GitHub actually
+runs it; macOS-local and Ubuntu CI pass/skip totals are not expected to match.
 
 ### Benchmarks (process wall time from `/usr/bin/time -p`, authoritative)
 

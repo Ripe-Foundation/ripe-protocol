@@ -125,7 +125,13 @@ def _close_multiprocessing_resources(processes, queue):
         if process.is_alive():
             process.terminate()
         process.join(5)
-        process.close()
+        if process.is_alive():
+            process.kill()
+            process.join(5)
+        # ``Process.close`` raises while the child is still alive. Cleanup must
+        # not replace the assertion or publication error that led us here.
+        if not process.is_alive():
+            process.close()
     queue.close()
     queue.join_thread()
 

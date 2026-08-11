@@ -1409,7 +1409,7 @@ def test_user_in_liquidation_can_be_deleveraged(
     assert repaid_amount > 0, "Deleverage should work even for users in liquidation"
 
 
-def test_zero_collateral_value_returns_zero(
+def test_zero_collateral_value_reverts_without_price(
     switchboard_alpha,
     deleverage,
     credit_engine,
@@ -1496,7 +1496,7 @@ def test_no_deleveragable_assets_available(
         teller.deleverageUser(bob, 0, sender=alice)
 
 
-def test_price_oracle_returns_zero(
+def test_price_oracle_zero_reverts_without_price(
     switchboard_alpha,
     deleverage,
     credit_engine,

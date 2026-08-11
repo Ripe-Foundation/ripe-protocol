@@ -21,14 +21,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: python-tests-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.event_name == 'workflow_dispatch' && inputs.lane || 'automatic' }}
+  group: python-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.lane || 'automatic' }}
   cancel-in-progress: true
 
 jobs:
   test:
     name: Python 3.12.0 / ${{ matrix.lane }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ matrix.lane == 'comprehensive' && 180 || 120 }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +46,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Use Python 3.12.0
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -108,3 +110,56 @@ jobs:
         with:
           path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
+
+  manifest-promotion-macos:
+    name: Python 3.12.0 / manifest-promotion-macos
+    if: github.event_name != 'workflow_dispatch' || inputs.lane == 'comprehensive'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      ETHERSCAN_API_KEY: local-placeholder
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      PYTHONHASHSEED: "0"
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
+    steps:
+      - name: Check out full source history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Python 3.12.0
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12.0"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Create private runtime directories
+        run: |
+          mkdir -p \
+            "$HYPOTHESIS_STORAGE_DIRECTORY" \
+            "$PYTHONPYCACHEPREFIX" \
+            "$RIPE_BOA_CACHE_DIR" \
+            "$TMPDIR" \
+            "$XDG_CACHE_HOME" \
+            "$RUNNER_TEMP/pytest-cache" \
+            "$RUNNER_TEMP/pytest-basetemp"
+
+      - name: Install pinned requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+
+      - name: Run macOS manifest-promotion coverage
+        run: |
+          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
+          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          /usr/bin/time -p python -m pytest \
+            -o addopts='' \
+            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
+            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
+            --durations=20 \
+            tests/deployment/test_current_manifest_promotion.py
