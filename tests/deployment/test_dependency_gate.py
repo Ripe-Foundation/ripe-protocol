@@ -36,8 +36,8 @@ EVIDENCE = ROOT / "docs/chains/rh/evidence/dependency-security-gate.md"
 S1 = ROOT / "tests/clock/test_clock_profiles.py"
 
 APPROVED_HASHES = {
-    DIRECT_INPUT: "77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72",
-    LOCK: "3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569",
+    DIRECT_INPUT: "56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf",
+    LOCK: "781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007",
 }
 SELECTED = {
     "cbor2": "5.9.0",
@@ -162,6 +162,18 @@ CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
     Path("scripts/utils/ledger_account.py"),
     Path("scripts/utils/safe_account.py"),
 }
+DECLARED_RUNTIME_IMPORTS = {
+    "colorama": (
+        "0.4.6",
+        Path("scripts/utils/log.py"),
+        "colorama",
+    ),
+    "mergedeep": (
+        "1.3.4",
+        Path("scripts/utils/migration.py"),
+        "mergedeep",
+    ),
+}
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
 PYMDOWN_EXTENSION_NAMES = {"pymdownx.b64", "pymdownx.snippets"}
 
@@ -191,6 +203,17 @@ def _pins(path: Path) -> dict[str, str]:
 
 def _distribution_direct_url(package: str) -> str | None:
     return metadata.distribution(package).read_text("direct_url.json")
+
+
+def _direct_import_roots(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(), filename=str(path.relative_to(ROOT)))
+    roots: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.update(imported.name.partition(".")[0] for imported in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            roots.add(node.module.partition(".")[0])
+    return roots
 
 
 def _assert_web3_closure(
@@ -731,6 +754,29 @@ def test_web3_direct_dependency_and_supported_current_tree_inventory():
     assert "`web3==7.12.0` is rejected" in evidence
     assert "not whole-program Python import reachability" in normalized_evidence
     assert "code-review trigger" in evidence
+
+
+def test_migration_runtime_dependencies_are_direct_and_reachable():
+    direct_pins = _pins(DIRECT_INPUT)
+    lock_pins = _pins(LOCK)
+    for package, import_details in DECLARED_RUNTIME_IMPORTS.items():
+        version, relative_path, import_root = import_details
+        assert direct_pins.get(package) == version
+        assert lock_pins.get(package) == version
+        assert metadata.version(package) == version
+        assert _distribution_direct_url(package) is None
+        assert import_root in _direct_import_roots(ROOT / relative_path)
+
+    evidence = EVIDENCE.read_text()
+    normalized_evidence = " ".join(evidence.split())
+    assert "## Declared migration runtime dependencies — 11 August 2026" in evidence
+    assert "`colorama==0.4.6`" in evidence
+    assert "`mergedeep==1.3.4`" in evidence
+    assert (
+        "zero package additions, removals, or version changes"
+        in normalized_evidence
+    )
+    assert "does not transfer H-06" in normalized_evidence
 
 
 @pytest.mark.parametrize(

@@ -5361,3 +5361,106 @@ disposed by its owner, this candidate must pass independent review, and the
 final integrated PR87-plus-prerequisite tree must repeat the required H-06
 qualification under the new lock. No H-06 runbook or historical measurement
 was edited to imply otherwise.
+
+## Declared migration runtime dependencies — 11 August 2026
+
+**Status:** Local stacked candidate pending independent review. This section
+records dependency declarations only. It is not operative on `rh`, does not
+authorize the pending Pymdown exception, and does not transfer H-06,
+deployment, or release evidence.
+
+### Bound scope and runtime reachability
+
+The candidate began from exact Web3 prerequisite commit
+`85af5fc437367b378d437c6201ce3c31256e8a08` / tree
+`70b1707ef1566affcbafe74f65aa8595fe3f48a8` in a fresh mode-`0700`
+worktree on branch `codex/rh-declare-runtime-transitives`. Its exact file
+ceiling is:
+
+```text
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+docs/chains/rh/evidence/dependency-security-gate.md
+```
+
+Two migration runtime imports were installed only as transitive dependencies
+of Titanoboa's documentation graph:
+
+- `scripts/utils/log.py` directly imports `colorama`; the lock already selected
+  `colorama==0.4.6` through MkDocs Material.
+- `scripts/utils/migration.py` directly imports `mergedeep`; the lock already
+  selected `mergedeep==1.3.4` through MkDocs and MkDocs Get Deps.
+
+The candidate declares exact direct roots `colorama==0.4.6` and
+`mergedeep==1.3.4`. It does not change either operator module, migration merge
+semantics, logging behavior, Web3 closure, or any selected version. A narrow
+AST check reads only those two exact paths and verifies their ordinary direct
+import roots. It does not expand the Web3 directory scanner or claim dynamic,
+aliased, or whole-program import analysis.
+
+### Reproducible zero-drift lock
+
+Two independent private resolver roots used CPython `3.12.0`, pip-tools
+`7.4.1`, the exact candidate input, their own cache, and a seeded copy of the
+Web3 output lock. RPC/provider variables, keys, mnemonic, and AWS credentials
+were unset. Resolution used public PyPI only:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+pip-compile \
+  --cache-dir=PRIVATE \
+  --index-url=https://pypi.org/simple \
+  --no-emit-index-url \
+  --output-file=requirements.txt requirements.in
+```
+
+The documented `CUSTOM_COMPILE_COMMAND` preserved the exact pre-existing
+generated-header text; the display-only `--cert=None`, `--client-cert=None`,
+and `--pip-args=None` values in that header were not passed to pip. The final
+independent regenerations completed in 6.42 s and 6.39 s wall and produced
+byte-identical lock SHA-256
+`781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007`.
+
+| Artifact | Web3 prerequisite SHA-256 | Candidate SHA-256 |
+|---|---|---|
+| `requirements.in` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
+| `requirements.txt` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
+| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `2e7aabd8b2ff4aeb25c5a1b903cff33c24a1253233be8fc0522d3fb469f98bd8` |
+
+PEP 508-normalized comparison found 103 exact pin lines on each side and zero
+package additions, removals, or version changes. The generated header is
+byte-identical. The only lock changes are `-r requirements.in` annotations for
+Colorama and Mergedeep.
+
+### Focused offline validation and boundaries
+
+The existing clean Web3 CPython `3.12.0` environment already contained the
+exact unchanged candidate versions and had no direct-URL metadata for either
+package. With generated state redirected to a private external root and RPC,
+provider, key, mnemonic, and AWS variables unset:
+
+| Validation | Result |
+|---|---|
+| `python -m pip check` | pass; no broken requirements; 0.64 s wall |
+| import smoke for `scripts.utils.log` and `scripts.utils.migration` | pass from the candidate paths; 1.75 s wall |
+| exact PR87 `4b60cffbb0613efd7e628bdbaa9f644af71dd744` defaults snapshots | 30 passed, one preserved Websockets deprecation warning, in 0.43 s; 2.73 s wall; detached worktree clean before and after |
+| dependency-gate module compilation | pass; 0.09 s wall |
+| complete dependency gate with repository addopts cleared | 95 passed, one preserved Websockets deprecation warning, in 3.46 s; 6.00 s wall |
+
+An initial dependency-gate run passed 94 cases and failed only the new evidence
+assertion because the recorded zero-drift sentence wrapped across a Markdown
+line. The assertion now normalizes evidence whitespace; the dependency,
+runtime-import, and security checks were not loosened.
+
+No package version moved, so this declaration-only candidate does not alter or
+refresh the existing advisory dispositions. In particular, the Pymdown ReDoS
+finding remains a separate pending, non-operative H-01 blocker; this candidate
+does not accept, suppress, extend, or retire it. The Web3 prerequisite remains
+stacked and non-operative until its own owner/security/integration conditions
+are satisfied. No RPC, explorer query, hardware wallet, Safe service, push,
+PR, merge, deployment, settings change, or external alert mutation was
+performed.

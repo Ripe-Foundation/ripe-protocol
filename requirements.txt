@@ -43,7 +43,9 @@ click==8.3.3
     #   -r requirements.in
     #   mkdocs
 colorama==0.4.6
-    # via mkdocs-material
+    # via
+    #   -r requirements.in
+    #   mkdocs-material
 coverage[toml]==7.10.6
     # via pytest-cov
 cytoolz==1.0.1
@@ -157,6 +159,7 @@ mdurl==0.1.2
     # via markdown-it-py
 mergedeep==1.3.4
     # via
+    #   -r requirements.in
     #   mkdocs
     #   mkdocs-get-deps
 mkdocs==1.6.1
