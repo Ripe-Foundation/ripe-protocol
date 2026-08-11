@@ -5833,8 +5833,15 @@ transitive to direct-input provenance. Public-source, exact-closure,
 direct-URL, supported import-syntax, low-level network-deny, direct-runtime-
 import, and Pymdown reachability controls remain fail closed.
 
-Fresh validation of the final stacked bytes is required before publication.
-The candidate does not transfer H-06 qualification, authorize PR 87, release,
+Fresh validation used a new CPython `3.12.0` virtual environment installed
+from the exact final lock and public `https://pypi.org/simple` only. With all
+RPC/provider, private-key, mnemonic, and AWS credential variables unset, the
+complete dependency gate passed `115` tests in `3.42 s`; `python -m pip check`
+reported no broken requirements; and the offline Web3 checksum plus
+`safe_account`, `log`, and `migration` import smoke passed without constructing
+a provider. Ruff/compile/diff/scope checks remain required at publication.
+
+These results do not transfer H-06 qualification, authorize PR 87, release,
 deployment, connected-device use, RPC access, or alert dismissal. Any
 dependency, resolver, containment, or scanner change invalidates this record
 and requires a new bounded review.
