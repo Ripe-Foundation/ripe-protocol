@@ -22,8 +22,8 @@ MAX_CLAIM_ASSET_MAINTENANCE = 15
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_305
-    assert 24_576 - len(runtime) == 271
+    assert len(runtime) == 24_313
+    assert 24_576 - len(runtime) == 263
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -2460,7 +2460,7 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
 ############################################################################
 
 
-def test_preexisting_donation_masks_short_stability_receipt(
+def test_direct_stability_pool_primitive_relies_on_auctionhouse_receipt_delta(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -2473,14 +2473,21 @@ def test_preexisting_donation_masks_short_stability_receipt(
     green_token,
     savings_green,
 ):
-    """DV-08 characterization (SV-1, SP-6).
+    """DV-08 composition boundary (SV-1, SP-6).
 
     StabVault._addClaimableBalance validates a settlement receipt against the
     *aggregate* free surplus `custody - totalClaimableBalances`, not against a
     delta measured across this transaction. Donating D up front and then
     settling a liquidation that declares Q while transferring only Q - D leaves
     the free surplus at exactly Q, so the short receipt is accepted and the
-    donation is silently consumed as liquidation proceeds.
+    donation is silently consumed as liquidation proceeds when this unit test
+    impersonates AuctionHouse and calls the pool primitive directly.
+
+    Production liquidation does not expose that sequence: the authenticated
+    AuctionHouse measures the pool's claim-token balance immediately before and
+    after its collateral transfer and reverts unless the exact declared amount
+    arrived.  The cross-contract regression lives in
+    test_ah_liq_stab.py::test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault.
     """
     _seed_stability_asset(
         stability_pool,
@@ -2570,59 +2577,6 @@ def test_short_stability_receipt_without_donation_still_reverts(
     assert stability_pool.totalClaimableBalances(bravo_token) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DV-08: StabVault._addClaimableBalance still validates against the "
-    "aggregate free surplus; the Section 11.2 measured-receipt design is gated "
-    "on RH-CHANGE-01",
-)
-def test_preexisting_donation_cannot_mask_short_stability_receipt(
-    stability_pool,
-    alpha_token,
-    bravo_token,
-    alpha_token_whale,
-    bravo_token_whale,
-    bob,
-    teller,
-    auction_house,
-    mock_price_source,
-    green_token,
-    savings_green,
-):
-    """DV-08 hardening target (SV-1, SP-6, Section 11.2)."""
-    _seed_stability_asset(
-        stability_pool,
-        alpha_token,
-        alpha_token_whale,
-        bob,
-        teller,
-        mock_price_source,
-    )
-    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
-
-    declared = 10 * EIGHTEEN_DECIMALS
-    donation = 3 * EIGHTEEN_DECIMALS
-    bravo_token.transfer(stability_pool, donation, sender=bravo_token_whale)
-    bravo_token.transfer(stability_pool, declared - donation, sender=bravo_token_whale)
-    before = _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob])
-
-    with boa.reverts():
-        stability_pool.swapForLiquidatedCollateral(
-            alpha_token,
-            1,
-            bravo_token,
-            declared,
-            ZERO_ADDRESS,
-            alpha_token,
-            savings_green,
-            sender=auction_house.address,
-        )
-
-    assert _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob]) == before
-    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
-    assert stability_pool.totalClaimableBalances(bravo_token) == 0
-
-
 def test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions(
     stability_pool,
     alpha_token,
@@ -2694,6 +2648,98 @@ def test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions(
         bravo_token
     )
     assert value_before > 0
+
+
+@pytest.mark.parametrize(
+    ("reserved", "claim_state"),
+    (
+        (20 * EIGHTEEN_DECIMALS, CLAIM_ASSET_ACTIVE),
+        (ACTIVATION_THRESHOLD - 1, CLAIM_ASSET_DORMANT),
+    ),
+    ids=("active_claim", "dormant_claim"),
+)
+def test_claim_reserve_cannot_be_reclassified_as_stability_backing(
+    reserved,
+    claim_state,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """A claim token cannot later be admitted as a stability asset.
+
+    Alpha's cohort owns either an active or a sub-threshold dormant BRAVO
+    claim. A later BRAVO deposit is also the vault's attempted admission of
+    BRAVO as a stability asset; it must fail before shares can classify any of
+    the claim-reserved custody as backing. The dormant row proves admission is
+    gated by aggregate liability rather than only by the active-claim index.
+    """
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        reserved,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+    assert bravo_token.balanceOf(stability_pool) == reserved
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == claim_state
+    assert not stability_pool.isSupportedVaultAsset(bravo_token)
+
+    attempted_deposit = 10 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(
+        stability_pool,
+        attempted_deposit,
+        sender=bravo_token_whale,
+    )
+    with boa.reverts("asset reserved for claims"):
+        stability_pool.depositTokensInVault(
+            alice,
+            bravo_token,
+            attempted_deposit,
+            sender=teller.address,
+        )
+
+    assert not stability_pool.isSupportedVaultAsset(bravo_token)
+    assert stability_pool.totalBalances(bravo_token) == 0
+    assert stability_pool.userBalances(alice, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+    assert bravo_token.balanceOf(stability_pool) == reserved + attempted_deposit
+
+    # Alice never receives BRAVO shares and therefore cannot withdraw Alpha's
+    # reserved claim custody (or the unallocated attempted deposit).
+    with boa.reverts("user has no shares"):
+        stability_pool.withdrawTokensFromVault(
+            alice,
+            bravo_token,
+            MAX_UINT256,
+            alice,
+            sender=teller.address,
+        )
+    assert bravo_token.balanceOf(stability_pool) == reserved + attempted_deposit
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
 
 
 # --------------------------------------------------------------------------

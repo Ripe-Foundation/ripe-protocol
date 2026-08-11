@@ -144,6 +144,15 @@ def _getStabAddys() -> (address, address, address):
     return GREEN_TOKEN, SAVINGS_GREEN, addys._getPriceDeskAddr()
 
 
+@view
+@internal
+def _getUnreservedBalance(_asset: address) -> uint256:
+    custody: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    reserved: uint256 = self.totalClaimableBalances[_asset]
+    assert custody >= reserved # dev: claim custody deficit
+    return custody - reserved
+
+
 ########
 # Core #
 ########
@@ -161,6 +170,7 @@ def _depositTokensInVault(
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
     assert _asset != _a.greenToken # dev: green cannot be stab asset
+    assert self.totalClaimableBalances[_asset] == 0 # dev: asset reserved for claims
     totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     depositAmount: uint256 = min(_amount, totalAssetBalance)
     assert depositAmount != 0 # dev: invalid deposit amount
@@ -313,7 +323,7 @@ def _getTotalAmountForVault(_asset: address) -> uint256:
     greenToken, savingsGreen, priceDesk = self._getStabAddys()
 
     # get total value of asset
-    stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    stabAssetBalance: uint256 = self._getUnreservedBalance(_asset)
     totalStabValue: uint256 = self._getUsdValue(_asset, stabAssetBalance, greenToken, savingsGreen, priceDesk, True)
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, greenToken, savingsGreen, priceDesk)
 
@@ -371,7 +381,7 @@ def _calcWithdrawalSharesAndAmount(
     _a: addys.Addys,
 ) -> (uint256, uint256):
     totalShares: uint256 = vaultData.totalBalances[_asset]
-    totalStabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    totalStabAssetBalance: uint256 = self._getUnreservedBalance(_asset)
     assert totalStabAssetBalance != 0 # dev: no stab asset to withdraw
 
     # user shares
@@ -487,7 +497,7 @@ def swapForLiquidatedCollateral(
     self._addSwapClaimable(_stabAsset, _liqAsset, _liqAmountSent)
 
     # finalize amount
-    amount: uint256 = min(_stabAssetAmount, staticcall IERC20(_stabAsset).balanceOf(self))
+    amount: uint256 = min(_stabAssetAmount, self._getUnreservedBalance(_stabAsset))
     assert amount != 0 # dev: nothing to transfer
 
     # burn green token
@@ -585,7 +595,7 @@ def _getTotalValue(
     _priceDesk: address,
 ) -> uint256:
     totalStabValue: uint256 = 0
-    stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    stabAssetBalance: uint256 = self._getUnreservedBalance(_asset)
     if stabAssetBalance != 0:
         totalStabValue = self._getUsdValue(_asset, stabAssetBalance, _greenToken, _savingsGreen, _priceDesk, True)
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _greenToken, _savingsGreen, _priceDesk)
@@ -1235,6 +1245,7 @@ def _addClaimableBalance(
     assert _stabAsset != empty(address) # dev: invalid stab asset
     assert _claimAsset != empty(address) # dev: invalid claim asset
     assert _reportedAmount != 0 # dev: nothing received
+    assert vaultData.indexOfAsset[_claimAsset] == 0 # dev: claim asset is stability asset
 
     # validate custody
     custody: uint256 = staticcall IERC20(_claimAsset).balanceOf(self)
