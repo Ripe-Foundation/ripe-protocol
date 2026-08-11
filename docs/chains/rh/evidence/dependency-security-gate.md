@@ -4957,6 +4957,16 @@ the authoritative policy. A feature branch, working-tree change, Gate 1
 candidate, review approval, or commit that is not integrated into `rh` does
 not itself retire an exception.
 
+**New-advisory authorization boundary:** The retirement authorization above
+predates `PYSEC-2026-3654` and does not authorize a new exception for it. The
+technical containment proposed below may be tested and independently reviewed,
+but it cannot become operative without explicit adoption by Mick Hagen, H-01
+owner, followed by integration of the exact approved bytes into authoritative
+`rh`. Pending owner authorization blocks integration into authoritative `rh`.
+A green test result proves only that the pending state and bounded fail-closed
+controls are represented consistently; it is not exception, merge, release,
+deployment, or alert-state authority.
+
 The transition changes no dependency byte. Its immutable integrated inputs
 remain:
 
@@ -4981,6 +4991,7 @@ unchanged.
 | `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
 | `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
 | `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
+| `EX-H01-PYMDOWN-REDOS-01` | **Pending owner authorization—not operative.** | Exact `pymdown-extensions==10.21.3` is affected by `PYSEC-2026-3654` / `GHSA-gm37-52c6-37mw` / `CVE-2026-67422`; first patch is `11.0.1`, outside the current resolver-valid Titanoboa/docs graph. The controls below contain the currently unreachable surface but do not authorize retention. |
 
 The historical `PROPOSED_RETIREMENTS` state is superseded only when the
 effectivity boundary above is satisfied. The three retired records remain
@@ -5034,6 +5045,106 @@ acceptance.
   configuration, Markdown/docs pipeline, untrusted Markdown, advisory/exploit
   change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
   review, or hard expiry.
+
+### Pending Pymdown ReDoS exception proposal — not operative
+
+The reviewed [PyPA record](https://github.com/pypa/advisory-database/blob/main/vulns/pymdown-extensions/PYSEC-2026-3654.yaml),
+[GitHub advisory](https://github.com/advisories/GHSA-gm37-52c6-37mw),
+[upstream fix](https://github.com/facelessuser/pymdown-extensions/commit/c68498598d7b13011bb4571350b6e3612a4ce44b),
+and [PyPI release](https://pypi.org/project/pymdown-extensions/11.0.1/)
+identify one finding under `PYSEC-2026-3654`, `GHSA-gm37-52c6-37mw`, and
+`CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+`11.0.1`. GitHub rates the upstream finding High at CVSS 3.1 score `7.5`
+(`AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H`). It is distinct from the older Caption
+ReDoS fixed in `10.16.1`.
+
+The affected processors are `pymdownx.caret`, `pymdownx.tilde`,
+`pymdownx.betterem`, and `pymdownx.magiclink`; `pymdownx.extra` also exposes
+the default BetterEm processor. When an affected extension is enabled, a
+crafted sub-50-byte untrusted Markdown line can cause exponential regular-
+expression backtracking and pin the rendering thread at full CPU. This is an
+availability threat, not a confidentiality or integrity finding.
+
+The exact `origin/rh` tree at
+`02468586d710e2cce2360c2bc07e94de6ebdab29` has no MkDocs configuration or
+documentation-build command and no Pymdown import or Markdown-rendering call
+outside `tests/deployment/test_dependency_gate.py`. That explicit dependency
+test activates only `pymdownx.snippets` and `pymdownx.b64`, not an extension
+affected by this ReDoS. No repository path accepts or renders untrusted
+Markdown. Installation of the affected package alone does not activate an
+extension, so the reviewed current exploit path is absent.
+
+A clean patch upgrade is not resolver-valid. Exact `titanoboa==0.2.7`
+requires `mkdocs-material==9.5.41`, which requires
+`pymdown-extensions~=10.2` and therefore excludes version 11. Pymdown
+Extensions `11.0.1` itself requires Python `>=3.10` and Markdown `>=3.6`, so it
+is otherwise compatible with the reviewed CPython `3.12.0` / Markdown `3.9`
+profile. The Titanoboa/Material metadata constraint is the blocker. The lock
+must not be hand-edited or installed in a metadata-inconsistent state.
+
+#### `EX-H01-PYMDOWN-REDOS-01` — proposed retention of Pymdown Extensions `10.21.3`
+
+- **Status:** Pending owner authorization—not operative.
+- **Finding:** `PYSEC-2026-3654`, alias `GHSA-gm37-52c6-37mw` /
+  `CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+  `11.0.1`.
+- **Authorization required:** Explicit adoption by Mick Hagen, H-01 owner, and
+  subsequent integration of the exact independently approved bytes into
+  authoritative `rh`. Neither this branch nor a green test run grants that
+  authority.
+- **Threat model:** Activation of `pymdownx.caret`, `pymdownx.tilde`,
+  `pymdownx.betterem`, `pymdownx.magiclink`, or `pymdownx.extra` against
+  attacker-controlled Markdown permits a very short input to monopolize the
+  renderer CPU through exponential regular-expression backtracking.
+- **Scope:** Exact Pymdown Extensions `10.21.3` under the unchanged
+  `titanoboa==0.2.7` / `mkdocs-material==9.5.41` graph. The repository has no
+  affected extension activation, MkDocs configuration or build, documentation
+  renderer, or untrusted Markdown input path. The first fixed release is
+  `11.0.1`, which is not resolver-valid under the unchanged graph.
+- **Compensating controls:** Do not enable any affected extension or
+  `pymdownx.extra`; do not render untrusted Markdown; preserve the bounded
+  scanner, which rejects literal affected names in supported configuration and
+  Markdown API shapes plus direct Pymdown imports; treat any Markdown API call
+  with a runtime-computed extension value as a manual re-review trigger because
+  the AST gate cannot prove that value; do not add a MkDocs/docs-render path
+  while the affected pin remains; do not run the exponential-time proof of
+  concept in CI.
+- **Re-review/invalidation triggers:** Any affected extension, Pymdown import
+  or configuration, MkDocs/docs pipeline, Markdown-rendering API, untrusted
+  Markdown, advisory/exploit change, Titanoboa/Material/Pymdown/Markdown/Python
+  movement, scanner-boundary change, owner authorization decision, scheduled
+  review, or hard expiry.
+- **Proposed review/expiry if authorized:** The existing cadence would apply:
+  scheduled security review on **15 August 2026** and hard expiry at
+  **2026-08-31T23:59:59Z**. Those dates constrain a later authorization; they
+  do not make this proposal operative.
+- **Integration boundary:** Pending owner authorization blocks this amendment
+  and any dependent requirements-changing branch from integration into `rh`.
+  Local implementation and independent review may proceed, but publication or
+  integration must not treat this proposal as an accepted exception.
+
+### Candidate-only Pymdown ReDoS containment validation
+
+This amendment was prepared from exact `origin/rh` commit
+`02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
+`082a460d0ee190ac74a87ab29828d9c867ddff06`. With repository `addopts`
+cleared, RPC and credential variables unset, and all generated state under an
+external mode-`0700` parent, the dependency gate collected and passed all 56
+tests. The focused bounded fail-closed selection passed 13 cases: seven root
+configuration activations, five affected Markdown API activations, and the
+pending-exception evidence check. No exponential-time input was executed.
+
+The requirements inputs remained byte-identical to the base: `requirements.in`
+has Git blob `85bacd1b372b167c825497e06cf7751a432bc212` and SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`;
+`requirements.txt` has Git blob `eaf12f774a108a100696a5c77d8a9dec9617ed1e`
+and SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The amended gate SHA-256 was
+`d68dfa6cb7744ca236b6cef61ae81e8e99f71b4e204e8663b10b0690bb49bae1`.
+These green results establish internal consistency and fail-closed
+containment only. They do not authorize the pending exception or integration
+into authoritative `rh`.
 
 ### Validation inheritance and alert-state boundary
 
