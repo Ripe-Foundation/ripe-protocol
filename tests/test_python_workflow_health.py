@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -14,6 +15,11 @@ SETUP_PYTHON_ACTION = (
 CACHE_ACTION = (
     "actions/cache/{mode}@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 )
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep workflow source checks independent of protocol deployment."""
 
 
 def _workflow():
