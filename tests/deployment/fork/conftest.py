@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 
-from scripts.utils.manifest_schema import (
+from utils.canonical_json import (
     ManifestError,
     canonical_json_bytes,
     load_json_bytes,
