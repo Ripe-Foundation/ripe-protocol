@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = (
@@ -29,6 +31,11 @@ REWARD_GETTERS = {
     "getUserLootBoxShare",
 }
 CAPABILITY_GETTERS = {"isSupportedVaultAsset"}
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep source inventory checks independent of protocol deployment."""
 
 
 def _load_inventory():
