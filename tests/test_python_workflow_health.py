@@ -26,23 +26,19 @@ BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
     "'interfaces/**/*.vyi') }}"
 )
-LEAN_SHARD_TARGETS = {
+LEAN_SHARD_ARGUMENTS = {
     "core": ("tests/core",),
     "vaults-tokens": ("tests/vaults", "tests/tokens"),
     "supporting": (
-        "tests/config",
-        "tests/priceSources",
-        "tests/data",
-        "tests/clock",
-        "tests/modules",
-        "tests/registries",
-        "tests/test_current_manifest_consumers.py",
-        "tests/test_python_workflow_health.py",
-        "tests/test_removed_index_reconciles.py",
-        "tests/test_vault_pointer_runtime_sizes.py",
+        "tests",
+        "--ignore=tests/core",
+        "--ignore=tests/vaults",
+        "--ignore=tests/tokens",
     ),
 }
-LEAN_MATRIX = [{"lane": "lean", "shard": shard} for shard in LEAN_SHARD_TARGETS]
+LEAN_MATRIX = [
+    {"lane": "lean", "shard": shard} for shard in LEAN_SHARD_ARGUMENTS
+]
 COMPREHENSIVE_MATRIX = [{"lane": "comprehensive", "shard": "all"}]
 LEAN_MATRIX_JSON = json.dumps(LEAN_MATRIX, separators=(",", ":"))
 COMPREHENSIVE_MATRIX_JSON = json.dumps(COMPREHENSIVE_MATRIX, separators=(",", ":"))
@@ -77,23 +73,49 @@ def _pytest_addopts():
     return shlex.split(config["pytest"]["addopts"])
 
 
-def _workflow_lean_shard_targets():
+def _workflow_lean_shard_arguments():
     command = _step(_workflow()["jobs"]["test"], "Run lean default lane")[
         "run"
     ]
     pattern = re.compile(
         r"^  (?P<shard>[a-z][a-z-]*)\)\n"
-        r"    shard_targets=\((?P<targets>.*?)\)\n"
+        r"    shard_args=\((?P<arguments>.*?)\)\n"
         r"    ;;$",
         flags=re.MULTILINE | re.DOTALL,
     )
     branches = [
-        (match.group("shard"), tuple(shlex.split(match.group("targets"))))
+        (match.group("shard"), tuple(shlex.split(match.group("arguments"))))
         for match in pattern.finditer(command)
     ]
-    targets = dict(branches)
-    assert len(targets) == len(branches), "Lean shard names must be unique"
-    return targets
+    arguments = dict(branches)
+    assert len(arguments) == len(branches), "Lean shard names must be unique"
+    return arguments
+
+
+def _partition_shard_arguments(arguments):
+    targets = []
+    ignores = []
+    for argument in arguments:
+        if argument.startswith("--ignore="):
+            ignores.append(argument.removeprefix("--ignore="))
+        else:
+            assert not argument.startswith("-"), (
+                f"Unsupported lean shard argument: {argument}"
+            )
+            targets.append(argument)
+    assert targets, "Each lean shard must have at least one test target"
+    return tuple(targets), tuple(ignores)
+
+
+def _is_within(path, target):
+    return path == target or path.startswith(f"{target}/")
+
+
+def _shard_selects_path(path, arguments):
+    targets, ignores = _partition_shard_arguments(arguments)
+    return any(_is_within(path, target) for target in targets) and not any(
+        _is_within(path, ignored) for ignored in ignores
+    )
 
 
 def _uses_serial_pytest_marker(path):
@@ -161,7 +183,7 @@ def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
     assert step["if"] == "matrix.lane == 'lean'"
     assert step["env"] == {"TEST_SHARD": "${{ matrix.shard }}"}
 
-    assert _workflow_lean_shard_targets() == LEAN_SHARD_TARGETS
+    assert _workflow_lean_shard_arguments() == LEAN_SHARD_ARGUMENTS
 
     command = step["run"]
     assert command.count('case "$TEST_SHARD" in') == 1
@@ -170,7 +192,7 @@ def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
         '  *)\n    echo "Unknown lean test shard: $TEST_SHARD"\n'
         "    exit 2\n    ;;\nesac"
     ) in command
-    assert command.count('"${shard_targets[@]}"') == 1
+    assert command.count('"${shard_args[@]}"') == 1
 
 
 def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
@@ -195,16 +217,14 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
         )
     }
 
-    shard_targets = _workflow_lean_shard_targets()
+    shard_arguments = _workflow_lean_shard_arguments()
     unmatched = []
     multiply_matched = {}
     for path in sorted(lean_test_files):
         matches = [
             shard
-            for shard, targets in shard_targets.items()
-            if any(
-                path == target or path.startswith(f"{target}/") for target in targets
-            )
+            for shard, arguments in shard_arguments.items()
+            if _shard_selects_path(path, arguments)
         ]
         if not matches:
             unmatched.append(path)
@@ -215,6 +235,14 @@ def test_python_workflow_lean_shards_cover_each_test_file_exactly_once():
     assert multiply_matched == {}, (
         f"Lean tests belong to multiple shards: {multiply_matched}"
     )
+
+    future_root_test = "tests/test_future_lean_guard.py"
+    matches = [
+        shard
+        for shard, arguments in _workflow_lean_shard_arguments().items()
+        if _shard_selects_path(future_root_test, arguments)
+    ]
+    assert matches == ["supporting"]
 
 
 def test_python_workflow_lean_shards_reject_unisolated_serial_tests():

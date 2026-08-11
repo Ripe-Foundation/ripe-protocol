@@ -97,23 +97,17 @@ jobs:
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
           case "$TEST_SHARD" in
             core)
-              shard_targets=(tests/core)
+              shard_args=(tests/core)
               ;;
             vaults-tokens)
-              shard_targets=(tests/vaults tests/tokens)
+              shard_args=(tests/vaults tests/tokens)
               ;;
             supporting)
-              shard_targets=(
-                tests/config
-                tests/priceSources
-                tests/data
-                tests/clock
-                tests/modules
-                tests/registries
-                tests/test_current_manifest_consumers.py
-                tests/test_python_workflow_health.py
-                tests/test_removed_index_reconciles.py
-                tests/test_vault_pointer_runtime_sizes.py
+              shard_args=(
+                tests
+                --ignore=tests/core
+                --ignore=tests/vaults
+                --ignore=tests/tokens
               )
               ;;
             *)
@@ -125,7 +119,7 @@ jobs:
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             --durations=50 \
-            "${shard_targets[@]}"
+            "${shard_args[@]}"
 
       - name: Run comprehensive lane
         if: matrix.lane == 'comprehensive'
