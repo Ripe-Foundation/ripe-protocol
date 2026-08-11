@@ -50,14 +50,6 @@ interface MissionControl:
     def preferredStabVaultId() -> uint256: view
     def coreRipeGovVaultId() -> uint256: view
 
-interface RipeGovVault:
-    def totalGovPoints() -> uint256: view
-    def isPaused() -> bool: view
-
-interface StabilityPool:
-    def totalClaimableBalances(_asset: address) -> uint256: view
-    def isPaused() -> bool: view
-
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -74,6 +66,18 @@ interface CreditEngine:
     def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
+interface StabilityPool:
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def isPaused() -> bool: view
+
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_vaultId: uint256) -> address: view
+
+interface RipeGovVault:
+    def totalGovPoints() -> uint256: view
+    def isPaused() -> bool: view
+
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
 
@@ -85,10 +89,6 @@ interface TrainingWheels:
 
 interface VaultData:
     def deregisterVaultAsset(_asset: address) -> bool: nonpayable
-
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_vaultId: uint256) -> address: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -531,42 +531,7 @@ def _getLedgerAddr() -> address:
 ##########################
 
 
-@view
-@internal
-def _validateCoreRipeGovVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
-    assert _vaultId != 0 # dev: invalid vault id
-
-    vaultBook: address = self._getVaultBookAddr()
-    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
-    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
-    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
-    previousVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
-    assert _vaultId != previousVaultId # dev: already set
-
-    ripeToken: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_TOKEN_ID)
-    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, ripeToken) # dev: unsupported asset
-    na: uint256 = staticcall RipeGovVault(vaultAddr).totalGovPoints()
-    assert not staticcall RipeGovVault(vaultAddr).isPaused() # dev: vault paused
-    return vaultAddr, previousVaultId
-
-
-@view
-@internal
-def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
-    assert _vaultId != 0 # dev: invalid vault id
-
-    vaultBook: address = self._getVaultBookAddr()
-    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
-    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
-    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
-    previousVaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
-    assert _vaultId != previousVaultId # dev: already set
-
-    savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
-    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
-    na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
-    assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
-    return vaultAddr, previousVaultId
+# core ripe gov vault id
 
 
 @external
@@ -595,6 +560,28 @@ def setCoreRipeGovVaultId(
     return aid
 
 
+@view
+@internal
+def _validateCoreRipeGovVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    ripeToken: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(RIPE_TOKEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, ripeToken) # dev: unsupported asset
+    na: uint256 = staticcall RipeGovVault(vaultAddr).totalGovPoints()
+    assert not staticcall RipeGovVault(vaultAddr).isPaused() # dev: vault paused
+    return vaultAddr, previousVaultId
+
+
+# preferred stab vault id
+
+
 @external
 def setPreferredStabVaultId(
     _newVaultId: uint256,
@@ -619,6 +606,25 @@ def setPreferredStabVaultId(
         actionId=aid,
     )
     return aid
+
+
+@view
+@internal
+def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -> (address, uint256):
+    assert _vaultId != 0 # dev: invalid vault id
+
+    vaultBook: address = self._getVaultBookAddr()
+    assert staticcall VaultBook(vaultBook).isValidRegId(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(_vaultId)
+    assert vaultAddr != empty(address) and vaultAddr.is_contract # dev: invalid vault
+    previousVaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
+    assert _vaultId != previousVaultId # dev: already set
+
+    savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
+    assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
+    na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
+    assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
+    return vaultAddr, previousVaultId
 
 
 #################

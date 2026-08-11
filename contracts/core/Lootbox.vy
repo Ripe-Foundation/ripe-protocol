@@ -439,32 +439,32 @@ def _getDepositLootData(
     rewardsBudget: uint256 = staticcall Ledger(_a.ledger).ripeAvailForRewards()
     rewardsBudget -= min(globalRewards.newRipeRewards, rewardsBudget)
     rewardsCanFlow: bool = config.ripePerBlock != 0 and rewardsBudget != 0
-    stakerCanReceiveRewards: bool = rewardsCanFlow and config.stakersAlloc != 0
-    voterCanReceiveRewards: bool = rewardsCanFlow and config.votersAlloc != 0
-    genCanReceiveRewards: bool = rewardsCanFlow and config.genDepositorsAlloc != 0
 
-    # A category is terminal when its empty bucket cannot refill, or when the user has exited and
-    # its funded bucket rounded below one wei. Funded dust for a live position remains deferred.
+    # a category is terminal when
+    # 1- its empty bucket cannot refill, or
+    # 2- the user has exited and its funded bucket rounded below one wei
+    # Funded dust for a live position remains deferred.
+
+    stakerCanReceiveRewards: bool = rewardsCanFlow and config.stakersAlloc != 0
     resolveStakerTerminal: bool = (
         (globalRewards.stakers == 0 and not stakerCanReceiveRewards) or
         (globalRewards.stakers != 0 and not hasBalance)
     )
+
+    voterCanReceiveRewards: bool = rewardsCanFlow and config.votersAlloc != 0
     resolveVoterTerminal: bool = (
         (globalRewards.voters == 0 and not voterCanReceiveRewards) or
         (globalRewards.voters != 0 and not hasBalance)
     )
+
+    genCanReceiveRewards: bool = rewardsCanFlow and config.genDepositorsAlloc != 0
     resolveGenTerminal: bool = (
         (globalRewards.genDepositors == 0 and not genCanReceiveRewards) or
         (globalRewards.genDepositors != 0 and not hasBalance)
     )
 
-    # Calculate each category into LOCALS. Nothing is committed until we know the whole claim can
-    # be settled: `up.balancePoints` is a single ticket backing all three reward pools, so a
-    # partial settlement would zero the ticket while leaving one pool's entitlement unpaid.
-    #
-    # The user's cut is taken directly against `up/ap.balancePoints` rather than through a
-    # basis-point share. The old intermediate quantised to 4 decimal places, so any holder under
-    # 0.01% of the asset's points was floored to a zero payout regardless of what they were owed.
+    # nothing is committed until we know the whole claim can be settled: `up.balancePoints` is a single ticket
+    # backing all three reward pools, so a partial settlement would zero the ticket while leaving one pool's entitlement unpaid.
     apStaker: uint256 = 0
     gpStaker: uint256 = 0
     rewStaker: uint256 = 0
@@ -496,7 +496,7 @@ def _getDepositLootData(
         (ap.ripeGenPoints != 0 and gp.ripeGenPoints != 0)
     )
 
-    # A live position with no category entitlement keeps its ticket. Otherwise every category must
+    # a live position with no category entitlement keeps its ticket. Otherwise every category must
     # either pay or resolve terminally before the shared ticket can be consumed.
     if isBlocked or (hasBalance and not hasCategoryEntitlement):
         return empty(UserDepositLoot), up, ap, gp, globalRewards
