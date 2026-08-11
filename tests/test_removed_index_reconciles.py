@@ -35,6 +35,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REMOVED_MD = ROOT / "docs" / "simplification" / "REMOVED.md"
@@ -42,6 +44,11 @@ REMOVED_MD = ROOT / "docs" / "simplification" / "REMOVED.md"
 SECTION_RE = re.compile(r"^## (?P<name>.+?) \((?P<count>\d+)\)\s*$")
 BULLET_RE = re.compile(r"^- `(?P<path>[^`]+)`")
 TOTAL_RE = re.compile(r"\*\*(?P<total>[\d,]+) files removed\.\*\*")
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep pure source checks independent of protocol deployment."""
 
 
 def _sections():

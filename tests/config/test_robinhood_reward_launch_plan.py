@@ -20,6 +20,11 @@ from scripts.params.validate_robinhood_reward_launch_plan import (
 pytestmark = pytest.mark.release
 
 
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep reward-plan checks independent of protocol deployment."""
+
+
 ROOT = Path(__file__).resolve().parents[2]
 PLAN = ROOT / "config" / "robinhood-reward-launch-plan.json"
 LEDGER = ROOT / "config" / "robinhood-parameters.json"
