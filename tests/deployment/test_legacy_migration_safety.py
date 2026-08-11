@@ -88,6 +88,42 @@ def set_stored(new_value: uint256):
     assert contract.stored() == 41
 
 
+@pytest.mark.parametrize("explicit_amount", (False, True))
+def test_vyper_default_argument_zero_output_is_logged_once_and_resumable(
+    tmp_path,
+    explicit_amount,
+):
+    contract = boa.loads(
+        """
+count: public(uint256)
+
+@external
+def bump(amount: uint256 = 1):
+    self.count += amount
+"""
+    )
+    deploy_args = SimpleNamespace(
+        ignore_logs=False,
+        rpc="redacted",
+        sender=SimpleNamespace(address=boa.env.eoa),
+    )
+    call_args = (7,) if explicit_amount else ()
+    expected = 7 if explicit_amount else 1
+
+    migration = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    result = migration.execute(contract.bump, *call_args)
+
+    assert result == NO_OUTPUT_TRANSACTION_RESULT
+    assert contract.count() == expected
+    assert json.loads((tmp_path / "2-log.json").read_text()) == {
+        "transactions": [NO_OUTPUT_TRANSACTION_RESULT]
+    }
+
+    resumed = Migration(deploy_args, {}, "2", "1", str(tmp_path))
+    assert resumed.execute(contract.bump, *call_args) == NO_OUTPUT_TRANSACTION_RESULT
+    assert contract.count() == expected
+
+
 def test_abi_none_requires_explicit_zero_outputs():
     no_output_transaction = _AbiCallable([])
     assert (

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from eth_abi.abi import encode
 from eth_account import Account
+from eth_utils.abi import function_abi_to_4byte_selector
 
 from config.network_profiles import (
     get_profile,
@@ -27,18 +28,21 @@ class TransactionExecutionError(RuntimeError):
 
 
 NO_OUTPUT_TRANSACTION_RESULT = "MIGRATION_TRANSACTION_CONFIRMED_NO_OUTPUT"
+_BOA_CALL_OPTION_NAMES = frozenset(("gas", "sender", "simulate", "value"))
 
 
-def _transaction_abi_entry(transaction):
+def _transaction_abi_entry(transaction, args=(), kwargs=None):
     """Return explicit callable ABI metadata, or ``None`` if it is ambiguous."""
     direct_abi = getattr(transaction, "_abi", None)
     if isinstance(direct_abi, Mapping):
         return direct_abi
 
     # Boa's source-backed VyperFunction keeps the ABI on its contract and the
-    # function name on its AST node.  ABI-backed Boa functions take the direct
-    # path above.  Requiring exactly one match keeps unknown/overloaded shapes
-    # fail-closed instead of inferring success from a Python ``None``.
+    # function name on its AST node. ABI-backed Boa functions take the direct
+    # path above. A Vyper function with default arguments has one ABI entry for
+    # every callable arity, so resolve that expansion from the exact arguments
+    # that were accepted by the bound callable instead of treating it as an
+    # unknown overload.
     function_ast = getattr(transaction, "fn_ast", None)
     function_name = getattr(function_ast, "name", None)
     contract = getattr(transaction, "contract", None)
@@ -53,13 +57,48 @@ def _transaction_abi_entry(transaction):
         and entry.get("type") == "function"
         and entry.get("name") == function_name
     ]
-    if len(matches) != 1:
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
         return None
-    return matches[0]
+
+    func_type = getattr(transaction, "func_t", None)
+    args_abi_type = getattr(transaction, "args_abi_type", None)
+    required_args = getattr(func_type, "n_positional_args", None)
+    total_args = getattr(func_type, "n_total_args", None)
+    if (
+        not callable(args_abi_type)
+        or isinstance(required_args, bool)
+        or not isinstance(required_args, int)
+        or isinstance(total_args, bool)
+        or not isinstance(total_args, int)
+    ):
+        return None
+
+    supplied_kwargs = kwargs or {}
+    abi_kwarg_count = sum(
+        key not in _BOA_CALL_OPTION_NAMES for key in supplied_kwargs
+    )
+    supplied_args = len(args) + abi_kwarg_count
+    if not required_args <= supplied_args <= total_args:
+        return None
+
+    try:
+        selector, _ = args_abi_type(supplied_args - required_args)
+        selected = [
+            entry
+            for entry in matches
+            if function_abi_to_4byte_selector(entry) == selector
+        ]
+    except Exception:
+        return None
+    if len(selected) != 1:
+        return None
+    return selected[0]
 
 
-def _declares_zero_outputs(transaction):
-    abi_entry = _transaction_abi_entry(transaction)
+def _declares_zero_outputs(transaction, args=(), kwargs=None):
+    abi_entry = _transaction_abi_entry(transaction, args, kwargs)
     return (
         abi_entry is not None
         and abi_entry.get("type") == "function"
@@ -194,7 +233,7 @@ def execute_transaction(transaction, *args, **kwargs):
         try:
             result = transaction(*args, **kwargs)
             if result is None:
-                if _declares_zero_outputs(transaction):
+                if _declares_zero_outputs(transaction, args, kwargs):
                     return NO_OUTPUT_TRANSACTION_RESULT
                 raise TransactionExecutionError(
                     "MIGRATION_TRANSACTION_RESULT_MISSING"
