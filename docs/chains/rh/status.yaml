@@ -2,7 +2,7 @@ schema_version: 13
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-08
+  as_of: 2026-08-10
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
@@ -38,7 +38,7 @@ snapshot:
 
 counts:
   workstreams: 28
-  rh_d_decisions: 23
+  rh_d_decisions: 27
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -1128,6 +1128,7 @@ decisions:
   - { id: RH-D023, title: "LP launch admission reconsidered independently", status: "qualified_no_protocol_admission", summary: "Fresh per-LP source-path qualification preserves the selected GREEN/USDG launch-pricing pool but excludes its LP token; RIPE/WETH remains external-canary-only, both protocol admissions and all DP-14 leaves remain blocked, and no lifecycle authority is granted.", source: "docs/chains/rh/qualification/lp-launch-admission.md"}
   - { id: RH-D025, title: "Production clock usage is no longer scanned", status: "owner_accepted_coverage_loss", summary: "The block-clock inventory, its checker, and its tests are removed and nothing replaces them. Production block.number and block.timestamp usage, mixed-clock arithmetic, and unclassified Vyper paths are no longer scanned; clock-affecting changes are reviewed on their own merits. Reopen if a clock-related defect reaches a deployment candidate or a second chain with a divergent block clock is added.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D026, title: "CreditEngine carries an exact headroom waiver at 184 bytes", status: "owner_granted_waiver", summary: "Hardening plan section 11.5 requires at least 200 bytes of EIP-170 headroom for a changed deployed contract, with anything lower needing an exact owner waiver. CreditEngine sits at 184 bytes, inherited from rh and not caused by this branch. The waiver is scoped to CreditEngine; every other contract is held to 200. It waives one contract version, pinned by source sha256, immutable-free runtime-template sha256, an exact 24,392-byte deployed size, and the sha256 of the complete deployed runtime at a declared constructor input. Two reviews drove that: a size floor alone let a size-preserving semantic edit keep the waiver, and source+template hashes alone still let a changed constructor immutable through at identical length. Deployment constructor arguments are deliberately not bound. Permitted runtime growth is 0 bytes, not 184. Withdraw when CreditEngine next changes.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D027, title: "Teller carries an exact migration headroom waiver at 51 bytes", status: "owner_granted_waiver", summary: "The 200-byte EIP-170 headroom rule remains controlling. PR #83 leaves Teller at an exact 24,525-byte deployed runtime with 51 bytes of headroom after retaining only the identity-authenticated migration actions Teller must perform. The owner accepted this exact result. The waiver pins Teller source sha256, immutable-free runtime-template sha256 and size, exact deployed size, and complete deployed-runtime sha256 at declared HQ and pause constructor inputs. It permits 0 bytes of growth and reopens on any Teller or compiler-output change; reassess when the transitional legacy route is removed.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}

@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+import json
 import sys
 import types
 from pathlib import Path
@@ -15,12 +16,12 @@ from scripts.proposals import ledger_robinhood_profile as profile
 
 L3B_MANIFEST_MUTATION_SHA256 = {
     profile.ZERO_ADDRESS: (
-        "e95e1b0d898a6d896661e8daf1a6b2b0"
-        "8b6c2638b8a3a403fe50e6290b74be1f"
+        "083b2ad7cc2da3d589068abf23cf3a50"
+        "40a65566e09a0715848790a0ee060114"
     ),
     "0x0000000000000000000000000000000000000065": (
-        "155310555006fe2fc458cc2814a777d71"
-        "5891c8508332843ecd739166cf0866f"
+        "a993a9c97c018ab4faf8ccf9d611fba7"
+        "74044bd5f7efac3d8441e4d1e1927d92"
     ),
 }
 L3B_SOURCE_MUTATION_SHA256 = {
@@ -79,6 +80,20 @@ def test_r1_manifest_is_canonical_draft_with_deterministic_placeholders():
     assert b"/Users/" not in profile.MANIFEST_PATH.read_bytes()
     assert "timestamp" not in manifest
 
+    expected = json.loads(profile.EXPECTATIONS_PATH.read_text())["contracts"][
+        "Ledger"
+    ]
+    assert manifest["source"] == {
+        "compiler_settings": expected["compiler_settings"],
+        "effective_optimization": expected["effective_optimization"],
+        "path": "contracts/data/Ledger.vy",
+        "sha256": expected["source_sha256"],
+        "transitive_compiler_input_integrity": expected[
+            "transitive_compiler_input_integrity"
+        ],
+        "vyper_version": profile.PINNED_VYPER_VERSION,
+    }
+
     for name, label in profile.PLACEHOLDER_LABELS.items():
         entry = manifest["inputs"][name]
         assert entry["address"] == profile.deterministic_placeholder_address(
@@ -99,11 +114,11 @@ def test_r1_manifest_rejects_stale_source_metadata():
 
 def test_r1_compiles_reviewed_ledger_with_pinned_source_owned_settings():
     compiled = profile.compile_reviewed_ledger()
-    assert len(compiled.creation) == 13_683
-    assert len(compiled.runtime_template) == 13_264
+    assert len(compiled.creation) == 13_597
+    assert len(compiled.runtime_template) == 13_178
     assert compiled.integrity == (
-        "b381be6ad58a12908a6d494b25b5cf764"
-        "c3a8dbcef658a4f0757624e595a093d"
+        "9fb8e2769edfadc839c478c40859a4c89"
+        "b53ac5a4548c520b32bf5f8c8052d80"
     )
 
 

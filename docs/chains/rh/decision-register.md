@@ -667,6 +667,54 @@ the two tables cannot drift apart in either direction.
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
 
+### RH-D027 — Teller carries an exact migration headroom waiver at 51 bytes
+
+**Status:** Owner-granted on 10 August 2026 for the VaultMigrator integration
+candidate in PR #83.
+
+The ratified runtime-size rule remains at least 200 bytes of EIP-170 headroom.
+The integrated VaultMigrator design deliberately keeps Teller as the thin,
+identity-authenticated router for actions only Teller may perform. The owner
+reviewed that result, accepted Teller's measured size, and authorized this
+integration. This record applies the existing exact-waiver policy to that
+approval rather than lowering the shared rule.
+
+**Scope.** `Teller` only, at a measured 24,525-byte deployed runtime, leaving
+**51 bytes** of EIP-170 headroom. Every non-waived contract remains subject to
+the 200-byte floor; RipeGov separately retains its 1,000-byte migration-branch
+guard.
+
+**What exactly is waived.** One contract version and one complete deployed-byte
+identity at declared constructor inputs:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/Teller.vy` sha256 | `cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc` |
+| Runtime template sha256 (immutable-free) | `e2031902065284ce34ad4f6634672db466862696d34c12cb8d3a73b3ed77962a` |
+| Runtime template bytes | 24,429 |
+| Deployed runtime bytes (with immutables) | 24,525 |
+| Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `1948c269f1aa9752dfa04ecb30185d847d2ac11b5a0d86e7492588f0781d1dd4` |
+
+The declared HQ is not a real deployment address. Together with the explicit
+pause input it makes Teller's immutable-bearing deployed byte string
+deterministic. A deployment's actual constructor configuration remains a
+separate deployment concern.
+
+**Residual risk, accepted.** Only 51 bytes remain before EIP-170. This waiver
+permits **0 bytes** of runtime growth: the exact size and identities above are
+pinned, so a larger, smaller, or size-preserving Teller change fails the guard.
+The narrow margin makes future Teller work likely to require deletion,
+refactoring, or another explicit owner decision.
+
+**Reconsideration trigger.** Reopen on any Teller source or compiler-output
+change, and reassess when the transitional legacy-governance route is removed.
+If Teller then has at least 200 bytes of headroom, remove both the override and
+its identity record. Updating a pinned identity merely to restore a green test
+does not continue this approval.
+
+**Source:** `tests/test_vault_pointer_runtime_sizes.py`,
+`docs/chains/base/ripe-gov-vault-migration/BRANCH-STATE.md`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

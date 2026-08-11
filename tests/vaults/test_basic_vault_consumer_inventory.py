@@ -152,5 +152,7 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
         ("contracts/core/CreditRedeem.vy", 190),
         ("contracts/core/Deleverage.vy", 579),
         ("contracts/core/Deleverage.vy", 1086),
-        ("contracts/core/Teller.vy", 422),
+        ("contracts/core/Teller.vy", 407),
+        ("contracts/core/VaultMigrator.vy", 462),
+        ("contracts/core/VaultMigrator.vy", 513),
     }

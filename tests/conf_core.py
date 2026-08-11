@@ -2,7 +2,14 @@ import pytest
 import boa
 
 from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS, CORE_TOKENS
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
+from constants import (
+    ZERO_ADDRESS,
+    EIGHTEEN_DECIMALS,
+    HUNDRED_PERCENT,
+    GREEN_CCIP_POOL_HQ_ID,
+    RIPE_CCIP_POOL_HQ_ID,
+    VAULT_MIGRATOR_HQ_ID,
+)
 
 
 ###########
@@ -54,6 +61,9 @@ def ripe_hq(
     teller_utils,
     endaoment_funds,
     endaoment_psm,
+    green_ccip_pool_placeholder,
+    ripe_ccip_pool_placeholder,
+    vault_migrator,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -141,6 +151,28 @@ def ripe_hq(
     # 22
     assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_psm, "Endaoment PSM", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_psm, sender=deploy3r) == 22
+
+    # 23 and 24 are occupied by the two CCIP pools on both deployment chains.
+    # Local tests use inert departments so VaultMigrator retains its production id.
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(
+        green_ccip_pool_placeholder, "GREEN CCIP Pool Placeholder", sender=deploy3r,
+    )
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        green_ccip_pool_placeholder, sender=deploy3r,
+    ) == GREEN_CCIP_POOL_HQ_ID
+
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(
+        ripe_ccip_pool_placeholder, "RIPE CCIP Pool Placeholder", sender=deploy3r,
+    )
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        ripe_ccip_pool_placeholder, sender=deploy3r,
+    ) == RIPE_CCIP_POOL_HQ_ID
+
+    # 25
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_migrator, "Vault Migrator", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        vault_migrator, sender=deploy3r,
+    ) == VAULT_MIGRATOR_HQ_ID
 
     # special permission setup
 
@@ -476,6 +508,42 @@ def teller_utils(ripe_hq_deploy):
         "contracts/core/TellerUtils.vy",
         ripe_hq_deploy,
         name="teller_utils",
+    )
+
+
+# vault migrator
+
+
+@pytest.fixture(scope="session")
+def green_ccip_pool_placeholder(ripe_hq_deploy):
+    return boa.load(
+        "contracts/mock/MockDepartment.vy",
+        ripe_hq_deploy,
+        False,
+        False,
+        name="green_ccip_pool_placeholder",
+    )
+
+
+@pytest.fixture(scope="session")
+def ripe_ccip_pool_placeholder(ripe_hq_deploy):
+    return boa.load(
+        "contracts/mock/MockDepartment.vy",
+        ripe_hq_deploy,
+        False,
+        False,
+        name="ripe_ccip_pool_placeholder",
+    )
+
+
+@pytest.fixture(scope="session")
+def vault_migrator(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/VaultMigrator.vy",
+        ripe_hq_deploy,
+        False,
+        ZERO_ADDRESS,
+        name="vault_migrator",
     )
 
 

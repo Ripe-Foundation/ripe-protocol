@@ -136,6 +136,8 @@ def test_vault_id_pointers_initialize_to_robinhood_and_base_invariants(
     fresh_mission_control,
 ):
     assert fresh_mission_control.coreRipeGovVaultId() == 2
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert not fresh_mission_control.isRipeGovVaultId(0)
     assert fresh_mission_control.preferredStabVaultId() == 1
     assert fresh_mission_control.isStabVaultId(1)
 
@@ -212,6 +214,32 @@ def test_preferred_stab_vault_registry_is_monotonic(
     assert fresh_mission_control.preferredStabVaultId() == second_id
     assert fresh_mission_control.isStabVaultId(first_id)
     assert fresh_mission_control.isStabVaultId(second_id)
+
+
+def test_ripe_gov_vault_registry_is_monotonic(
+    fresh_mission_control,
+    switchboard_charlie,
+):
+    first_id = 41
+    second_id = 42
+
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert not fresh_mission_control.isRipeGovVaultId(first_id)
+    assert not fresh_mission_control.isRipeGovVaultId(second_id)
+
+    fresh_mission_control.setCoreRipeGovVaultId(
+        first_id,
+        sender=switchboard_charlie.address,
+    )
+    fresh_mission_control.setCoreRipeGovVaultId(
+        second_id,
+        sender=switchboard_charlie.address,
+    )
+
+    assert fresh_mission_control.coreRipeGovVaultId() == second_id
+    assert fresh_mission_control.isRipeGovVaultId(2)
+    assert fresh_mission_control.isRipeGovVaultId(first_id)
+    assert fresh_mission_control.isRipeGovVaultId(second_id)
 
 
 def test_priority_stab_vault_registry_tracks_multiple_assets_and_ignores_zero(
