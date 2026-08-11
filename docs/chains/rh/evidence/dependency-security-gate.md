@@ -4958,14 +4958,13 @@ candidate, review approval, or commit that is not integrated into `rh` does
 not itself retire an exception.
 
 **New-advisory authorization boundary:** The retirement authorization above
-predates `PYSEC-2026-3654` and does not authorize a new exception for it. The
-technical containment proposed below may be tested and independently reviewed,
-but it cannot become operative without explicit adoption by Mick Hagen, H-01
-owner, followed by integration of the exact approved bytes into authoritative
-`rh`. Pending owner authorization blocks integration into authoritative `rh`.
-A green test result proves only that the pending state and bounded fail-closed
-controls are represented consistently; it is not exception, merge, release,
-deployment, or alert-state authority.
+predates `PYSEC-2026-3654`. Mick Hagen, H-01 owner, explicitly adopted this
+exact bounded exception on 11 August 2026 after the containment candidate and
+independent review were complete. The new exception becomes operative only
+when the exact authorized bytes are integrated into authoritative `rh`; the
+authorization alone does not make a feature branch authoritative. A green test
+result proves only that the bounded fail-closed controls are represented
+consistently; it is not release, deployment, or alert-state authority.
 
 The transition changes no dependency byte. Its immutable integrated inputs
 remain:
@@ -4991,7 +4990,7 @@ unchanged.
 | `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
 | `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
 | `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
-| `EX-H01-PYMDOWN-REDOS-01` | **Pending owner authorization—not operative.** | Exact `pymdown-extensions==10.21.3` is affected by `PYSEC-2026-3654` / `GHSA-gm37-52c6-37mw` / `CVE-2026-67422`; first patch is `11.0.1`, outside the current resolver-valid Titanoboa/docs graph. The controls below contain the currently unreachable surface but do not authorize retention. |
+| `EX-H01-PYMDOWN-REDOS-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` is affected by `PYSEC-2026-3654` / `GHSA-gm37-52c6-37mw` / `CVE-2026-67422`; first patch is `11.0.1`, outside the current resolver-valid Titanoboa/docs graph. The owner-authorized controls below contain the currently unreachable surface. |
 
 The historical `PROPOSED_RETIREMENTS` state is superseded only when the
 effectivity boundary above is satisfied. The three retired records remain
@@ -5000,7 +4999,7 @@ disposal; they are not operative authorization after effective integration.
 
 ### Operative retained exception terms
 
-The retained-exception owner is **Mick Hagen, H-01 owner**. Both retained
+The retained-exception owner is **Mick Hagen, H-01 owner**. All three retained
 exceptions keep the scheduled security review on **15 August 2026** and hard
 expiry at **2026-08-31T23:59:59Z**. The earlier of a finding-specific
 invalidation trigger or hard expiry ends authorization. An expired exception
@@ -5046,7 +5045,7 @@ acceptance.
   change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
   review, or hard expiry.
 
-### Pending Pymdown ReDoS exception proposal — not operative
+### Owner-authorized Pymdown ReDoS exception
 
 The reviewed [PyPA record](https://github.com/pypa/advisory-database/blob/main/vulns/pymdown-extensions/PYSEC-2026-3654.yaml),
 [GitHub advisory](https://github.com/advisories/GHSA-gm37-52c6-37mw),
@@ -5082,16 +5081,17 @@ is otherwise compatible with the reviewed CPython `3.12.0` / Markdown `3.9`
 profile. The Titanoboa/Material metadata constraint is the blocker. The lock
 must not be hand-edited or installed in a metadata-inconsistent state.
 
-#### `EX-H01-PYMDOWN-REDOS-01` — proposed retention of Pymdown Extensions `10.21.3`
+#### `EX-H01-PYMDOWN-REDOS-01` — retain Pymdown Extensions `10.21.3`
 
-- **Status:** Pending owner authorization—not operative.
+- **Status:** Retained—operative.
 - **Finding:** `PYSEC-2026-3654`, alias `GHSA-gm37-52c6-37mw` /
   `CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
   `11.0.1`.
-- **Authorization required:** Explicit adoption by Mick Hagen, H-01 owner, and
-  subsequent integration of the exact independently approved bytes into
-  authoritative `rh`. Neither this branch nor a green test run grants that
-  authority.
+- **Authorization:** Mick Hagen, H-01 owner, explicitly adopted the exact
+  independently reviewed containment on 11 August 2026. The exception becomes
+  operative only after these exact authorized bytes are integrated into
+  authoritative `rh`; neither a feature branch nor a green test run grants
+  repository authority.
 - **Threat model:** Activation of `pymdownx.caret`, `pymdownx.tilde`,
   `pymdownx.betterem`, `pymdownx.magiclink`, or `pymdownx.extra` against
   attacker-controlled Markdown permits a very short input to monopolize the
@@ -5112,18 +5112,14 @@ must not be hand-edited or installed in a metadata-inconsistent state.
 - **Re-review/invalidation triggers:** Any affected extension, Pymdown import
   or configuration, MkDocs/docs pipeline, Markdown-rendering API, untrusted
   Markdown, advisory/exploit change, Titanoboa/Material/Pymdown/Markdown/Python
-  movement, scanner-boundary change, owner authorization decision, scheduled
-  review, or hard expiry.
-- **Proposed review/expiry if authorized:** The existing cadence would apply:
-  scheduled security review on **15 August 2026** and hard expiry at
-  **2026-08-31T23:59:59Z**. Those dates constrain a later authorization; they
-  do not make this proposal operative.
-- **Integration boundary:** Pending owner authorization blocks this amendment
-  and any dependent requirements-changing branch from integration into `rh`.
-  Local implementation and independent review may proceed, but publication or
-  integration must not treat this proposal as an accepted exception.
+  movement, scanner-boundary change, scheduled review, or hard expiry.
+- **Review/expiry:** Governed by the common retained-exception schedule above.
+- **Integration boundary:** This authorization permits publication and review
+  of this exact amendment. The exception becomes operative only when these
+  bytes are integrated into authoritative `rh`; dependent requirements changes
+  must not integrate before that boundary is satisfied.
 
-### Candidate-only Pymdown ReDoS containment validation
+### Pre-authorization Pymdown ReDoS containment validation
 
 This amendment was prepared from exact `origin/rh` commit
 `02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
@@ -5132,7 +5128,7 @@ cleared, RPC and credential variables unset, and all generated state under an
 external mode-`0700` parent, the dependency gate collected and passed all 56
 tests. The focused bounded fail-closed selection passed 13 cases: seven root
 configuration activations, five affected Markdown API activations, and the
-pending-exception evidence check. No exponential-time input was executed.
+then-pending exception evidence check. No exponential-time input was executed.
 
 The requirements inputs remained byte-identical to the base: `requirements.in`
 has Git blob `85bacd1b372b167c825497e06cf7751a432bc212` and SHA-256
@@ -5142,9 +5138,36 @@ and SHA-256
 `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
 The amended gate SHA-256 was
 `d68dfa6cb7744ca236b6cef61ae81e8e99f71b4e204e8663b10b0690bb49bae1`.
-These green results establish internal consistency and fail-closed
-containment only. They do not authorize the pending exception or integration
-into authoritative `rh`.
+These green results established internal consistency and fail-closed
+containment only. They did not authorize the exception at that checkpoint;
+the later explicit owner authorization above controls the current target
+status.
+
+### Owner authorization and current-`rh` reconciliation — 11 August 2026
+
+Mick Hagen, H-01 owner, explicitly authorized the bounded
+`EX-H01-PYMDOWN-REDOS-01` containment in the current Codex task on 11 August
+2026. The independently reviewed containment patch was replayed without scope
+expansion onto exact authoritative `rh` commit
+`3a4cac429a860ffc95bd85612d9e345108332833`, tree
+`0bc766984da112d8bde3b499e763f31b192eb591`. Integration of the exact resulting
+two-file patch remains the effectivity boundary.
+
+The authorization changes no dependency byte. `requirements.in` remains
+SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`, and
+`requirements.txt` remains SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The authorized dependency-gate source is SHA-256
+`2fcb7f1084e2e9a3d7d2e98b9da37a8a5b0372f26acf7eeb60dfc03c24ad58bd`.
+
+With repository `addopts` cleared, RPC and credential variables unset, and all
+generated state under an external mode-`0700` parent, the first full gate run
+passed 55 of 56 cases and exposed one evidence-only duplicate schedule phrase.
+The phrase was reduced to the common retained-exception schedule; the final
+complete replay passed all 56 cases. No exponential-time proof of concept,
+network request, dependency resolution, alert mutation, deployment, or live
+chain action was performed.
 
 ### Validation inheritance and alert-state boundary
 

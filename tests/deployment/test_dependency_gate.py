@@ -75,10 +75,9 @@ RETIRED_EXCEPTION_IDS = {
 RETAINED_EXCEPTION_IDS = {
     "EX-H01-PYTEST-01",
     "EX-H01-PYMDOWN-B64-01",
-}
-PENDING_EXCEPTION_IDS = {
     "EX-H01-PYMDOWN-REDOS-01",
 }
+PENDING_EXCEPTION_IDS: set[str] = set()
 OPERATIVE_EXCEPTION_IDS = RETAINED_EXCEPTION_IDS
 KNOWN_EXCEPTION_IDS = {
     *RETIRED_EXCEPTION_IDS,
@@ -710,10 +709,9 @@ def test_bounded_exceptions_are_explicit_and_workflow_gated():
     assert OPERATIVE_EXCEPTION_IDS == {
         "EX-H01-PYTEST-01",
         "EX-H01-PYMDOWN-B64-01",
-    }
-    assert PENDING_EXCEPTION_IDS == {
         "EX-H01-PYMDOWN-REDOS-01",
     }
+    assert not PENDING_EXCEPTION_IDS
     assert RETIRED_EXCEPTION_IDS.isdisjoint(OPERATIVE_EXCEPTION_IDS)
     assert RETIRED_EXCEPTION_IDS.isdisjoint(PENDING_EXCEPTION_IDS)
     assert OPERATIVE_EXCEPTION_IDS.isdisjoint(PENDING_EXCEPTION_IDS)
@@ -783,9 +781,10 @@ def test_bounded_exceptions_are_explicit_and_workflow_gated():
                 exception_id,
             )
 
+    assert PENDING_STATUS not in transition
     assert (
-        "Pending owner authorization blocks integration into authoritative "
-        "`rh`." in normalized_transition
+        "Mick Hagen, H-01 owner, explicitly adopted this exact bounded "
+        "exception on 11 August 2026" in normalized_transition
     )
 
     assert "There is no general wall-clock freshness window." in normalized
@@ -1193,7 +1192,7 @@ def test_pymdown_b64_remains_affected_and_exception_governed(tmp_path):
     assert "EX-H01-PYMDOWN-B64-01" in RETAINED_EXCEPTION_IDS
 
 
-def test_pymdown_redos_finding_is_affected_contained_and_pending():
+def test_pymdown_redos_finding_is_affected_contained_and_operative():
     evidence = EVIDENCE.read_text()
     section = _exception_section(
         evidence, "EX-H01-PYMDOWN-REDOS-01"
@@ -1209,9 +1208,9 @@ def test_pymdown_redos_finding_is_affected_contained_and_pending():
         assert finding in section
     assert "Affected versions are `<=11.0`" in normalized_section
     assert "first fixed release is `11.0.1`" in normalized_section
-    assert PENDING_STATUS in section
-    assert "EX-H01-PYMDOWN-REDOS-01" in PENDING_EXCEPTION_IDS
-    assert "EX-H01-PYMDOWN-REDOS-01" not in OPERATIVE_EXCEPTION_IDS
+    assert RETAINED_STATUS in section
+    assert "EX-H01-PYMDOWN-REDOS-01" in OPERATIVE_EXCEPTION_IDS
+    assert "EX-H01-PYMDOWN-REDOS-01" not in PENDING_EXCEPTION_IDS
 
 
 def test_s1_exact_runtime_profile_matches_the_approved_lock():
