@@ -1585,6 +1585,78 @@ def test_enabled_migration_performs_one_final_governance_point_save(
     assert target.userGovData(bob, ripe_token).govPoints == before.govPoints + pending
 
 
+def test_exporter_migration_preserves_pre_wind_down_terms_unlock_and_points(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    """A temporary one-block min-lock reduction must not become the imported
+    position's permanent terms on the exporter-capable path."""
+    target, target_id = target_ripe_gov_vault
+    _prepare_teller_migration(
+        teller=teller,
+        source=ripe_gov_vault,
+        target=target,
+        target_id=target_id,
+        token=ripe_token,
+        funder=whale,
+        user=bob,
+        mission_control=mission_control,
+        setAssetConfig=setAssetConfig,
+        setGeneralConfig=setGeneralConfig,
+        switchboard_alpha=switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=37)
+    original = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert original.unlock > boa.env.evm.patch.block_number
+    pending = ripe_gov_vault.getLatestGovPoints(
+        original.lastShares,
+        original.lastPointsUpdate,
+        original.unlock,
+        original.lastTerms,
+        ASSET_WEIGHT,
+    )
+    assert pending > 0
+
+    wind_down_terms = (
+        original.lastTerms.minLockDuration - 1,
+        original.lastTerms.maxLockDuration,
+        original.lastTerms.maxLockBoost,
+        original.lastTerms.canExit,
+        original.lastTerms.exitFee,
+    )
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        ASSET_WEIGHT,
+        False,
+        wind_down_terms,
+        sender=switchboard_alpha.address,
+    )
+    _pause_pair(ripe_gov_vault, target, switchboard_alpha)
+
+    assert _migrate_ripe_gov(
+        teller,
+        bob,
+        ripe_token,
+        SOURCE_VAULT_ID,
+        target_id,
+        sender=switchboard_echo.address,
+    ) > 0
+
+    imported = target.userGovData(bob, ripe_token)
+    assert imported.govPoints == original.govPoints + pending
+    assert imported.unlock == original.unlock
+    _assert_lock_terms_equal(imported.lastTerms, original.lastTerms)
+
+
 def test_existing_target_ledger_entry_is_not_duplicated_during_migration(
     target_ripe_gov_vault,
     ripe_gov_vault,
@@ -1833,8 +1905,11 @@ def test_migration_carries_frozen_points_without_accruing_more(
     )
     if disable_globally:
         ripe_gov_vault.disableGovPointAccrualGlobally(sender=switchboard_echo.address)
+        disabled_block = ripe_gov_vault.govPointAccrualDisabledBlock()
     else:
         ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
+        disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
+    assert disabled_block != 0
     frozen_points = source_data.govPoints
     boa.env.time_travel(blocks=100)
     _pause_pair(ripe_gov_vault, target, switchboard_alpha)
@@ -1848,6 +1923,20 @@ def test_migration_carries_frozen_points_without_accruing_more(
     )
     assert target.userGovData(bob, ripe_token).govPoints == frozen_points
     assert target.totalUserGovPoints(bob) == frozen_points
+    # A source-global disable is deliberately narrowed to the migrated user on
+    # the target; neither source policy may be silently re-enabled.
+    assert target.govPointAccrualDisabledBlock() == 0
+    target_disabled_block = target.userGovPointAccrualDisabledBlock(bob)
+    assert target_disabled_block == boa.env.evm.patch.block_number
+    assert target_disabled_block >= disabled_block
+
+    target.pause(False, sender=switchboard_alpha.address)
+    target_before = target.userGovData(bob, ripe_token)
+    boa.env.time_travel(blocks=100)
+    target.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    target_after = target.userGovData(bob, ripe_token)
+    assert target_after.govPoints == target_before.govPoints
+    assert target_after.lastPointsUpdate == boa.env.evm.patch.block_number
 
 
 def test_teller_migration_validates_authority_users_and_route_ids(
@@ -2239,7 +2328,7 @@ def test_migrated_source_position_is_permanently_tombstoned(
     assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == alice_balance
 
 
-def test_non_core_registered_ripe_gov_vault_can_be_the_migration_source(
+def test_only_historical_core_ripe_gov_vault_can_be_the_migration_source(
     ripe_hq,
     vault_book,
     governance,
@@ -2277,6 +2366,21 @@ def test_non_core_registered_ripe_gov_vault_can_be_the_migration_source(
     ledger.addVaultToUser(bob, source_id, sender=teller.address)
     _save_points(source, bob, ripe_token, switchboard_alpha)
     _pause_pair(source, target, switchboard_alpha)
+
+    # RipeGov bytecode alone is not authority to use the privileged exporter
+    # route. The source must first have been recorded as a core governance vault.
+    with boa.reverts("source is not ripe gov"):
+        _migrate_ripe_gov(
+            teller,
+            bob,
+            ripe_token,
+            source_id,
+            target_id,
+            sender=switchboard_echo.address,
+        )
+
+    mission_control.setCoreRipeGovVaultId(source_id, sender=switchboard_alpha.address)
+    assert mission_control.isRipeGovVaultId(source_id)
 
     assert _migrate_ripe_gov(teller,
         bob,

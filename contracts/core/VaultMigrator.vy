@@ -32,11 +32,15 @@ interface RipeGovVault:
     def userBalances(_user: address, _asset: address) -> uint256: view
     def totalUserGovPoints(_user: address) -> uint256: view
     def totalGovPoints() -> uint256: view
+    def govPointAccrualDisabledBlock() -> uint256: view
+    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
+    def disableGovPointAccrualForUser(_user: address): nonpayable
 
 interface MissionControl:
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
 
 interface AddressRegistry:
@@ -134,14 +138,15 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, _targetVaultId, a.vaultBook, a.missionControl)
 
+    # A core-pointer rotation must never make a former RipeGov eligible for the
+    # generic balance-only path. MissionControl's monotonic classification
+    # records every historical core id.
+    assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is ripe gov
+    assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_targetVaultId) # dev: target is ripe gov
+
     # both must NOT be paused
     assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
     assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
-
-    # source and target must not be the core ripe gov vault
-    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-    assert _sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
-    assert _targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
 
     numPositions: uint256 = 0
     for user: address in _users:
@@ -230,6 +235,12 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, targetVaultId, a.vaultBook, a.missionControl)
 
+    # Exporter-capable RipeGov migrations are the only path for a historical
+    # core vault. The immutable Base source is bound to its dedicated route.
+    assert staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is not ripe gov
+    if LEGACY_RIPE_GOV_VAULT != empty(address):
+        assert sourceVault != LEGACY_RIPE_GOV_VAULT # dev: use legacy ripe gov migration
+
     # both must be paused
     assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
     assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
@@ -296,8 +307,9 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
                 unlock=migData.unlock,
             )
 
-        # perform house keeping
+        # Preserve point-accrual disable state before final housekeeping.
         if numPositions > numPositionsBefore:
+            self._carryGovPointAccrualDisable(user, sourceVault, targetVault)
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
     return numPositions
@@ -403,8 +415,11 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
                 unlock=migData.unlock,
             )
 
-        # perform house keeping
+        # The immutable Base source predates the disable selectors, so this is
+        # normally a no-op. Keeping both RipeGov routes fail-safe also preserves
+        # the control in tests or later deployments that bind a newer source.
         if numPositions > numPositionsBefore:
+            self._carryGovPointAccrualDisable(user, sourceVault, targetVault)
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
     return numPositions
@@ -478,6 +493,71 @@ def _getPreMigrationData(
         unlock=gd.unlock,
         lastTerms=gd.lastTerms,
     )
+
+
+# governance-point accrual disable carryover
+
+
+@view
+@internal
+def _readSourceGovPointAccrualDisabledBlock(_sourceVault: address, _user: address) -> uint256:
+    # Exporter-capable RipeGov vaults expose both public controls. The immutable
+    # Base legacy vault predates them, so failed selector reads safely mean that
+    # no disable state exists on that source.
+    success: bool = False
+    response: Bytes[32] = b""
+    success, response = raw_call(
+        _sourceVault,
+        method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    globalBlock: uint256 = 0
+    if success and len(response) == 32:
+        globalBlock = abi_decode(response, uint256)
+
+    success = False
+    response = b""
+    success, response = raw_call(
+        _sourceVault,
+        abi_encode(
+            _user,
+            method_id=method_id("userGovPointAccrualDisabledBlock(address)"),
+        ),
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    userBlock: uint256 = 0
+    if success and len(response) == 32:
+        userBlock = abi_decode(response, uint256)
+
+    if globalBlock == 0:
+        return userBlock
+    if userBlock == 0:
+        return globalBlock
+    return min(globalBlock, userBlock)
+
+
+@internal
+def _carryGovPointAccrualDisable(_user: address, _sourceVault: address, _targetVault: address):
+    sourceBlock: uint256 = self._readSourceGovPointAccrualDisabledBlock(_sourceVault, _user)
+    if sourceBlock == 0:
+        return
+    assert sourceBlock <= block.number # dev: invalid source disabled block
+
+    targetGlobalBlock: uint256 = staticcall RipeGovVault(_targetVault).govPointAccrualDisabledBlock()
+    targetUserBlock: uint256 = staticcall RipeGovVault(_targetVault).userGovPointAccrualDisabledBlock(_user)
+    effectiveTargetBlock: uint256 = targetGlobalBlock
+    if effectiveTargetBlock == 0 or (targetUserBlock != 0 and targetUserBlock < effectiveTargetBlock):
+        effectiveTargetBlock = targetUserBlock
+
+    if effectiveTargetBlock == 0:
+        extcall RipeGovVault(_targetVault).disableGovPointAccrualForUser(_user)
+        effectiveTargetBlock = staticcall RipeGovVault(_targetVault).userGovPointAccrualDisabledBlock(_user)
+
+    assert effectiveTargetBlock != 0 # dev: target point accrual enabled
 
 
 # after export from source vault

@@ -479,7 +479,9 @@ def disableGovPointAccrualGlobally():
 
 @external
 def disableGovPointAccrualForUser(_user: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    # VaultMigrator may atomically carry a disabled source user's state into
+    # this target. The same irreversible one-way checks apply to both callers.
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getVaultMigratorAddr() # dev: no perms
     assert _user != empty(address) # dev: invalid user
     assert self.govPointAccrualDisabledBlock == 0 # dev: globally disabled
     assert self.userGovPointAccrualDisabledBlock[_user] == 0 # dev: already disabled
@@ -515,10 +517,11 @@ def exportPositionForMigration(_user: address, _asset: address, _targetVault: ad
     sourceShares: uint256 = vaultData.userBalances[_user][_asset]
     assert sourceShares != 0 # dev: no position
 
-    # update gov points
-    self._updateGovPointsForUserAsset(_user, _asset, a.missionControl)
+    # Accrue through this block without refreshing terms from current config.
+    # Migration must preserve the terms and unlock the position was actually
+    # carrying before a temporary wind-down configuration was installed.
+    self._updateGovPointsForUserAsset(_user, _asset, a.missionControl, False)
 
-    # check gov data
     userData: GovData = self.userGovData[_user][_asset]
     assert userData.lastShares == sourceShares # dev: inconsistent position shares
     assert self.totalUserGovPoints[_user] >= userData.govPoints # dev: inconsistent user gov points
@@ -717,7 +720,7 @@ def _updateUserGovPoints(
             asset: address = vaultData.userAssets[_user][i]
             if asset == _skipAsset or asset == empty(address):
                 continue
-            self._updateGovPointsForUserAsset(_user, asset, _missionControl)
+            self._updateGovPointsForUserAsset(_user, asset, _missionControl, True)
 
     if not shouldUpdatePoints:
         return
@@ -732,6 +735,7 @@ def _updateGovPointsForUserAsset(
     _user: address,
     _asset: address,
     _missionControl: address,
+    _shouldRefreshTerms: bool,
 ):
     config: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
 
@@ -739,11 +743,16 @@ def _updateGovPointsForUserAsset(
     shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
     newPoints: uint256 = 0
     if shouldUpdatePoints:
-        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, config.lockTerms, config.assetWeight)
+        pointTerms: cs.LockTerms = config.lockTerms
+        if not _shouldRefreshTerms:
+            pointTerms = userData.lastTerms
+        newPoints = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, pointTerms, config.assetWeight)
 
-    # refresh unlock / terms
-    userData.unlock = self._refreshUnlock(userData.unlock, config.lockTerms, userData.lastTerms)
-    userData.lastTerms = config.lockTerms
+    # Export migration accrues the position but deliberately retains its stored
+    # pre-wind-down unlock and terms for the target import.
+    if _shouldRefreshTerms:
+        userData.unlock = self._refreshUnlock(userData.unlock, config.lockTerms, userData.lastTerms)
+        userData.lastTerms = config.lockTerms
 
     # save user data
     userData.lastPointsUpdate = block.number
