@@ -126,7 +126,7 @@ def test_event_abi_names_order_and_indexing():
     ]
 
 
-def test_instant_bond_config_struct_source_order_is_identical():
+def test_instant_bond_config_struct_bodies_are_byte_for_byte_identical():
     lane = extract_struct("contracts/core/InstantBondLane.vy", "InstantBondConfig")
     foxtrot = extract_struct(
         "contracts/config/SwitchboardFoxtrot.vy", "InstantBondConfig"

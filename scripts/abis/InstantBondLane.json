@@ -1,0 +1,992 @@
+[
+  {
+    "name": "EpochInitialized",
+    "inputs": [
+      {
+        "name": "epoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "rate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "paymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pricingConfigVersion",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EpochRolled",
+    "inputs": [
+      {
+        "name": "fromEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "toEpoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "oldRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newPaymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMinPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newMaxLockBonus",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousAcceptedPayment",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "previousPaymentCap",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "utilizationBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "decaySteps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pricingConfigVersion",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondPurchased",
+    "inputs": [
+      {
+        "name": "buyer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "paymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "baseRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "bonusRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "bonusRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actualLock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "totalRipe",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epochRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "epoch",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "pricingConfigVersion",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "liveConfigVersion",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "ripeGovVaultId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "InstantBondConfigSet",
+    "inputs": [
+      {
+        "name": "newVersion",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "canBuyNow",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "paymentCapPerEpoch",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minPaymentAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "mintBudget",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxEffectiveRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "seedRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "uHighBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "uLowBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "upBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "downBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "decayBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDecayEpochs",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockBonus",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentPauseModified",
+    "inputs": [
+      {
+        "name": "isPaused",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentFundsRecovered",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAddys",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHq",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintGreen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBuyNow",
+            "type": "bool"
+          },
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "mintBudget",
+            "type": "uint256"
+          },
+          {
+            "name": "maxEffectiveRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "upBps",
+            "type": "uint256"
+          },
+          {
+            "name": "downBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockBonus",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setConfig",
+    "inputs": [
+      {
+        "name": "_newConfig",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBuyNow",
+            "type": "bool"
+          },
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "mintBudget",
+            "type": "uint256"
+          },
+          {
+            "name": "maxEffectiveRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "upBps",
+            "type": "uint256"
+          },
+          {
+            "name": "downBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockBonus",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_expectedVersion",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "buyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "previewBuyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "available",
+            "type": "bool"
+          },
+          {
+            "name": "epoch",
+            "type": "uint256"
+          },
+          {
+            "name": "pricingConfigVersion",
+            "type": "uint256"
+          },
+          {
+            "name": "liveConfigVersion",
+            "type": "uint256"
+          },
+          {
+            "name": "rate",
+            "type": "uint256"
+          },
+          {
+            "name": "remainingPayment",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "budgetRemaining",
+            "type": "uint256"
+          },
+          {
+            "name": "baseRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "bonusRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "actualLock",
+            "type": "uint256"
+          },
+          {
+            "name": "totalRipe",
+            "type": "uint256"
+          },
+          {
+            "name": "canExitEarly",
+            "type": "bool"
+          },
+          {
+            "name": "exitFee",
+            "type": "uint256"
+          },
+          {
+            "name": "isExitFrozen",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PAYMENT_TOKEN",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PAYMENT_DECIMALS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "PAYMENT_SCALE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "GENESIS_BLOCK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "EPOCH_LENGTH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "config",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBuyNow",
+            "type": "bool"
+          },
+          {
+            "name": "paymentCapPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "minPaymentAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "mintBudget",
+            "type": "uint256"
+          },
+          {
+            "name": "maxEffectiveRate",
+            "type": "uint256"
+          },
+          {
+            "name": "seedRate",
+            "type": "uint256"
+          },
+          {
+            "name": "uHighBps",
+            "type": "uint256"
+          },
+          {
+            "name": "uLowBps",
+            "type": "uint256"
+          },
+          {
+            "name": "upBps",
+            "type": "uint256"
+          },
+          {
+            "name": "downBps",
+            "type": "uint256"
+          },
+          {
+            "name": "decayBps",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDecayEpochs",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockBonus",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "configVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isInitialized",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "currentEpoch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochRate",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochPaymentCap",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochMinPaymentAmount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochMaxLockBonus",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochPricingVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochAcceptedPayment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "cumulativeMinted",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_paymentToken",
+        "type": "address"
+      },
+      {
+        "name": "_genesisBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_epochLength",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  }
+]

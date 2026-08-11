@@ -1,21 +1,21 @@
 # Instant Bond Lane — Implementation Specification
 
-**Mechanism version:** v1 · **Specification revision:** 18
+**Mechanism version:** v1 · **Specification revision:** 19
 
 **Status:** Implementation-ready specification. Economic calibration remains a
 deployment input. This document does **not** authorize deployment, production
 configuration, RIPE minting, activation, or publication.
 
-**Prepared:** 5 August 2026 · **Revised:** 7 August 2026 (RH topology alignment,
-exact-receipt hardening, independent review reconciliation, and evidence refresh)
+**Prepared:** 5 August 2026 · **Revised:** 11 August 2026 (source-style consistency,
+ABI inventory completion, reviewer reconciliation, and evidence refresh)
 
 **Companion:** pricing rationale in [`pricing-design.md`](pricing-design.md). This
 specification is authoritative wherever the documents differ.
 
 **Worktree:** `ripe-protocol-instant-bond-lane`, branch `instant-bond-lane`.
-Revision 18 began from independently reviewed commit
-`c4ae6372cb37ca83128bf95f2d56cbabf6fb3c60`, whose parent merge
-`fb43ccd79962bf33fc816775e0d9c3bb86d0af5b` incorporates RH baseline
+Revision 19 began from committed feature baseline
+`c1e971871400e25a7db1d110e691670e07c5c01f`, tree
+`554afb42fa3d50ad3843365c2ed6568908a6ff90`, which incorporates RH baseline
 `be6e4e9805e9b499b10f61cd219c555e62b43857`.
 
 ## Owner-confirmed product decisions
@@ -185,8 +185,9 @@ initializes: deptBasics[addys := addys]
 
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
-import interfaces.ConfigStructs as cs
 from interfaces import Department
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 ```
@@ -206,11 +207,11 @@ def __init__(
     assert _epochLength != 0                                # dev: invalid epoch length
 
     paymentDecimals = IERC20Detailed(_paymentToken).decimals()
-    assert paymentDecimals <= MAX_PAYMENT_DECIMALS_CONST    # dev: invalid payment decimals
+    assert paymentDecimals <= MAX_PAYMENT_DECIMALS          # dev: invalid payment decimals
 
     addys.__init__(_ripeHq)
     assert _paymentToken != addys._getRipeToken()           # dev: payment token is ripe
-    deptBasics.__init__(True, False, True)  # paused, no GREEN mint, RIPE mint
+    deptBasics.__init__(True, False, True)  # starts paused, can mint ripe only
 
     PAYMENT_TOKEN = _paymentToken
     PAYMENT_DECIMALS = paymentDecimals
@@ -315,11 +316,11 @@ they can describe the prior epoch until the next purchase. Integrations must use
 ### 3.2 Hard constants
 
 ```text
-HUNDRED_PERCENT              = 10_000
-MAX_LOCK_BONUS_CONST         = 100_000  # 1000%, aligned with existing bond ceiling
-MAX_PRICE_STEP_BPS_CONST     = 10_000   # at most a 100% price-up step
-MAX_DECAY_EPOCHS_CONST       = 32       # hard gas/velocity bound
-MAX_PAYMENT_DECIMALS_CONST   = 73       # PAYMENT_SCALE remains arithmetically usable
+HUNDRED_PERCENT              = 100_00
+MAX_LOCK_BONUS               = 1000_00  # 1000%, aligned with existing bond ceiling
+MAX_PRICE_STEP_BPS           = 100_00   # at most a 100% price-up step
+MAX_DECAY_EPOCHS             = 32       # hard gas/velocity bound
+MAX_PAYMENT_DECIMALS         = 73       # PAYMENT_SCALE remains arithmetically usable
 MIN_BASE_RATE                = 10_000   # engineering liveness floor
 ```
 
@@ -333,16 +334,16 @@ following on every config, including the first:
 
 ```text
 0 <= uLowBps < uHighBps <= 10_000
-0 < downBps < upBps <= MAX_PRICE_STEP_BPS_CONST
+0 < downBps < upBps <= MAX_PRICE_STEP_BPS
 downBps <= decayBps < 10_000
-0 < maxDecayEpochs <= MAX_DECAY_EPOCHS_CONST
+0 < maxDecayEpochs <= MAX_DECAY_EPOCHS
 
 0 < maxEffectiveRate <= max_value(uint256) / 10_000
 PAYMENT_SCALE <= minPaymentAmount <= paymentCapPerEpoch
 paymentCapPerEpoch <= max_value(uint256) / 10_000
 paymentCapPerEpoch * maxEffectiveRate <= max_value(uint256)
 
-maxLockBonus <= MAX_LOCK_BONUS_CONST
+maxLockBonus <= MAX_LOCK_BONUS
 baseRateCeiling(maxEffectiveRate, maxLockBonus) >= MIN_BASE_RATE
 maxBaseRipe = paymentCapPerEpoch * baseRateCeiling // PAYMENT_SCALE
 maxLockBonus == 0 or maxBaseRipe <= max_value(uint256) / maxLockBonus
@@ -599,7 +600,7 @@ def rollover():
         # The sold stored epoch was handled once above. Only skipped epochs decay.
         decaySteps = min(elapsed - 1, cfg.maxDecayEpochs)
 
-    for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS_CONST):
+    for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
         rate = min(
             rate * 10_000 // (10_000 - cfg.decayBps),
             newCeiling,
@@ -732,6 +733,9 @@ checks-effects-interactions. It does not partially fill an oversized request.
 
 Normative flow:
 
+The line wrapping below is illustrative; operation order, local terminology, and
+diagnostics are normative where shown.
+
 ```text
 1.  assert configVersion != 0                                  # dev: not configured
 2.  assert block.number >= GENESIS_BLOCK                       # dev: before genesis
@@ -740,8 +744,8 @@ Normative flow:
 5.  assert block.number <= deadlineBlock                       # dev: expired
 6.  a = addys._getAddys()
     assert RipeHq(a.hq).canMintRipe(self)                     # dev: mint unavailable
-7.  endaomentFunds = addys._getEndaomentFundsAddr()
-    assert endaomentFunds != empty(address)                    # dev: no destination
+7.  endaoFunds = addys._getEndaomentFundsAddr()
+    assert endaoFunds != empty(address)                        # dev: no destination
 
 8.  initialize if needed; otherwise rollover if needed
 9.  assert expectedEpoch == projected currentEpoch             # dev: epoch moved
@@ -759,12 +763,12 @@ Normative flow:
 13. budgetRemaining = cfg.mintBudget - cumulativeMinted
     assert totalRipe <= budgetRemaining                        # dev: mint budget
 
-14. ripeGovVaultId = 0
+14. coreRipeGovVaultId = 0
     if actualLock != 0:
-        ripeGovVaultId = MissionControl(a.missionControl).coreRipeGovVaultId()
-        assert ripeGovVaultId != 0                              # dev: invalid vault id
+        coreRipeGovVaultId = MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert coreRipeGovVaultId != 0                          # dev: invalid vault id
 
-15. paymentBalanceBefore = IERC20(PAYMENT_TOKEN).balanceOf(endaomentFunds)
+15. paymentBalanceBefore = IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
 
 16. store the complete pricing snapshot when initializing or rolling
     epochAcceptedPayment = pricing.acceptedPayment + paymentAmount  # effects
@@ -772,11 +776,11 @@ Normative flow:
 
 17. assert IERC20(PAYMENT_TOKEN).transferFrom(
         msg.sender,
-        endaomentFunds,
+        endaoFunds,
         paymentAmount,
         default_return_value=True,
     )                                                          # dev: payment failed
-    paymentBalanceAfter = IERC20(PAYMENT_TOKEN).balanceOf(endaomentFunds)
+    paymentBalanceAfter = IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
     assert paymentBalanceAfter >= paymentBalanceBefore
     assert paymentBalanceAfter - paymentBalanceBefore == paymentAmount
                                                                # dev: payment receipt mismatch
@@ -790,10 +794,10 @@ Normative flow:
             a.teller,
             totalRipe,
             default_return_value=True,
-        )                                                       # dev: approval failed
+        )                                                       # dev: ripe approval failed
         depositedAmount = Teller(a.teller).depositFromTrusted(
             msg.sender,
-            ripeGovVaultId,
+            coreRipeGovVaultId,
             a.ripeToken,
             totalRipe,
             actualLock,
@@ -804,9 +808,9 @@ Normative flow:
             a.teller,
             0,
             default_return_value=True,
-        )                                                       # dev: approval failed
+        )                                                       # dev: ripe approval failed
 
-19. emit InstantBondPurchased(..., ripeGovVaultId)
+19. emit InstantBondPurchased(..., ripeGovVaultId=coreRipeGovVaultId)
 20. return totalRipe
 ```
 
@@ -957,16 +961,20 @@ PendingInstantBondConfig
     config
     expectedVersion
 
-public pendingConfig[actionId] -> PendingInstantBondConfig
+public pendingConfig[aid] -> PendingInstantBondConfig
 ```
 
 Minimal external workflow:
 
 ```text
-setInstantBondConfig(config, expectedVersion) -> actionId
-executePendingAction(actionId) -> bool
-cancelPendingAction(actionId) -> bool
+setInstantBondConfig(config, expectedVersion) -> aid
+executePendingAction(aid) -> bool
+cancelPendingAction(aid) -> bool
 ```
+
+The workflow above omits source-level leading underscores for readability. The concrete
+`executePendingAction` and `cancelPendingAction` ABI input name is `_aid`; event fields
+remain the more descriptive `actionId`.
 
 Initiation requires LocalGov permission, requires the inherited `actionTimeLock` to be
 nonzero, requires `LANE.isValidConfig(config)`, requires
@@ -979,7 +987,7 @@ Execution requires LocalGov permission and a confirmable, unexpired action. It c
 `LANE.setConfig(config, expectedVersion)`. The lane repeats the version and config
 checks. If another config executed first, the stale action reverts and cannot overwrite
 state; governance may cancel it or let it expire. A successful execution deletes the
-dedicated `pendingConfig[actionId]` entry after the lane call. Before emitting the
+dedicated `pendingConfig[aid]` entry after the lane call. Before emitting the
 execution event, Foxtrot reads `LANE.configVersion()` and reports the actual resulting
 lane version rather than deriving it from the pending input.
 
@@ -1666,6 +1674,20 @@ The agreed editable scope is limited to:
 5. `tests/core/instantBondLane/conftest.py` and the feature tests in that directory;
 6. `tests/config/test_switchboard_foxtrot.py`.
 
+On 11 August 2026 the owner separately authorized the revision-19 consistency review
+and instructed that every reviewer item, including polish, be addressed. That local
+follow-up additionally permits the source-style corrections in both feature contracts,
+the paired struct-property test rename, and completion of the canonical ABI inventory
+through exactly:
+
+1. `tests/core/instantBondLane/test_properties_abi.py`;
+2. `tests/deployment/test_abi_export.py`;
+3. `scripts/abis/InstantBondLane.json`;
+4. `scripts/abis/SwitchboardFoxtrot.json`.
+
+This follow-up does not authorize staging, committing, pushing, merging, pull-request
+publication, fork or live-chain interaction, deployment, configuration, or activation.
+
 The agreed validation commands use the active or pinned Python interpreter with all
 caches, coverage data, and pytest temporary files redirected to private temporary
 paths. They comprise:
@@ -1713,6 +1735,51 @@ The reconciled local evidence through specification revision 18 on 7 August 2026
   9,000-byte and 5,500-byte regression ceilings and 15,907 and 19,507 bytes below
   the 24,576-byte EIP-170 limit; and
 - the pinned environment reported no broken Python requirements.
+
+The historical revision-18 evidence above remains bound to its prior source. Revision
+19 was validated only after the final 11 August source, specification, test, and ABI
+export edits:
+
+- Vyper `0.4.3+commit.bff19ea2` compiled both contracts. The active and pinned
+  Python 3.12 environments each reported 102 focused tests passed and the two
+  explicitly opt-in fork tests skipped. The selection includes the 50-example,
+  20-action stateful differential model;
+- the directly affected BondRoom, RipeGov, SwitchboardDelta, and TimeLock regression
+  selection reported 379 passed. A complete default-local suite was not rerun, so the
+  revision-18 full-suite limitations above remain the latest complete-suite evidence;
+- fresh cold-cache branch-aware coverage reported 86.34% combined, satisfying the
+  configured 85% gate. `InstantBondLane.vy` reported 288 statements, 19 missed, 68
+  branches, 35 partial branches, and 84.8%; `SwitchboardFoxtrot.vy` reported 50
+  statements, none missed, four branches, two partial branches, and 96.3%. The focused
+  coverage selection again reported 102 passed and two skipped;
+- the revision-18 coverage source had 313 Lane statements with the same 19 misses, 68
+  branches, and 35 partial branches. Collapsing simple calls to repository-standard
+  one-line forms removed 25 already-covered continuation locations; it did not add a
+  miss or partial branch. Rewrapping those calls would mechanically pad the metric
+  without increasing executed behavior, so revision 19 records the denominator shift
+  rather than reverting the style normalization;
+- compiled runtime-bytecode measurement reported 8,669 bytes for
+  `InstantBondLane.vy`, binary SHA-256
+  `37c046ecf03ecc046892dd0c46d40eab4d23d3243a1fb33e6019fda8d1b4c15e`,
+  exactly matching `c1e9718`. `SwitchboardFoxtrot.vy` measured 5,068 bytes, binary
+  SHA-256 `c7036ba870f0320e54aa5865515bc33aa09d83f8239be47c093be0e7b4bd262f`,
+  one byte smaller after caching its immutable lane target;
+- method identifiers and storage layout remain byte-identical to `c1e9718` for both
+  contracts. The Lane ABI remains identical. Foxtrot's only ABI metadata delta is the
+  input name `_actionId` to `_aid` on `executePendingAction` and
+  `cancelPendingAction`; selectors, types, mutability, events, and calldata are
+  unchanged;
+- the deterministic ABI exporter reported 54 outputs and its complete nine-test suite
+  passed. `InstantBondLane.json` SHA-256 is
+  `c89b70b189b99680d6454562fbba0e39b2d6a978277c50b81861c7ceb6d098d9`;
+  `SwitchboardFoxtrot.json` SHA-256 is
+  `82d212307993f7e2d78df258b7c4f90f126634ef3f372ad16f080b659d49f1a7`;
+  and
+- `git diff --check` and pinned-environment `pip check` passed. The uncommitted source
+  evidence is bound to `InstantBondLane.vy` SHA-256
+  `fea86d2c072bf06eb8bbffed6a6be5289abe778cb29a22594f527b29ce7254c3` and
+  `SwitchboardFoxtrot.vy` SHA-256
+  `25178dd5e07e04a8be7a8952b8244cbef28d0588cc027192f504b649c285c4c0`.
 
 Phase 2 does **not** authorize remote-fork tests, the deployment rehearsal in §17,
 testnet or production interaction, calibration artifacts, staging, committing,
@@ -1784,3 +1851,4 @@ actions.
 | 16 | 6 August 2026 | Rejected RIPE as the immutable payment token; made coverage cold-cache-safe; recorded owner-selected non-hard-coded issuance gates, epoch-frequency calibration, four-budget supply monitoring, and the pre-merge baseline requirement. |
 | 17 | 6 August 2026 | Recorded the owner-authorized local commit and pricing-rationale reconciliation; made the dedicated coverage gate platform-neutral, self-cleaning, fail-safe, and inert for unrelated coverage runs; added coverage-data ignores and a distinct RIPE-payment diagnostic. |
 | 18 | 7 August 2026 | Aligned locked settlement with RH's dynamic core-vault pointer; enforced exact Endaoment receipt; disclosed the actual settlement vault; reconciled migration/fork/adversarial tests; quantified the owner-accepted weighted-lock dilution; rebound RH source anchors; refreshed runbook, coverage, runtime, and authorization evidence; and incorporated the independent mutation/security review. |
+| 19 | 11 August 2026 | Normalized both feature contracts to repository Vyper conventions; reconciled constant, local, action-ID, invariant, and diagnostic notation; added canonical ABI exports; documented the Foxtrot ABI-metadata rename and Boa source-location coverage shift; and refreshed focused, coverage, runtime, ABI/layout, export, regression, and environment evidence without changing successful-path semantics or storage. |

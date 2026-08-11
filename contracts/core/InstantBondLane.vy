@@ -1,3 +1,8 @@
+#  ___ _  _ ___ _____ _   _  _ _____   ___  ___  _  _ ___    _      _   _  _ ___
+# |_ _| \| / __|_   _/_\ | \| |_   _| | _ )/ _ \| \| |   \  | |    /_\ | \| | __|
+#  | || .` \__ \ | |/ _ \| .` | | |   | _ \ (_) | .` | |) | | |__ / _ \| .` | _|
+# |___|_|\_|___/ |_/_/ \_\_|\_| |_|   |___/ \___/|_|\_|___/  |____/_/ \_\_|\_|___|
+#
 #     ╔════════════════════════════════════════╗
 #     ║  ** Instant Bond Lane **               ║
 #     ║  Fixed-epoch direct RIPE purchases     ║
@@ -18,11 +23,15 @@ initializes: deptBasics[addys := addys]
 
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
-import interfaces.ConfigStructs as cs
 from interfaces import Department
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
+interface MissionControl:
+    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
+    def coreRipeGovVaultId() -> uint256: view
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
@@ -33,15 +42,11 @@ interface RipeToken:
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface MissionControl:
-    def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
-    def coreRipeGovVaultId() -> uint256: view
-
 interface Ledger:
     def badDebt() -> uint256: view
 
-
-# ABI ORDER LOCK: keep byte-for-byte aligned with SwitchboardFoxtrot.InstantBondConfig.
+# NOTE: Keep this struct byte-for-byte aligned with SwitchboardFoxtrot.InstantBondConfig.
+# Guarded by test_instant_bond_config_struct_bodies_are_byte_for_byte_identical.
 struct InstantBondConfig:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
@@ -99,7 +104,6 @@ struct PayoutData:
     actualLock: uint256
     totalRipe: uint256
 
-
 event EpochInitialized:
     epoch: indexed(uint256)
     rate: uint256
@@ -152,12 +156,11 @@ event InstantBondConfigSet:
     maxDecayEpochs: uint256
     maxLockBonus: uint256
 
-
-HUNDRED_PERCENT: constant(uint256) = 10_000
-MAX_LOCK_BONUS_CONST: constant(uint256) = 100_000
-MAX_PRICE_STEP_BPS_CONST: constant(uint256) = 10_000
-MAX_DECAY_EPOCHS_CONST: constant(uint256) = 32
-MAX_PAYMENT_DECIMALS_CONST: constant(uint8) = 73
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+MAX_LOCK_BONUS: constant(uint256) = 1000_00 # 1000.00%
+MAX_PRICE_STEP_BPS: constant(uint256) = 100_00 # 100.00%
+MAX_DECAY_EPOCHS: constant(uint256) = 32
+MAX_PAYMENT_DECIMALS: constant(uint8) = 73
 MIN_BASE_RATE: constant(uint256) = 10_000
 
 PAYMENT_TOKEN: public(immutable(address))
@@ -190,15 +193,15 @@ def __init__(
     _genesisBlock: uint256,
     _epochLength: uint256,
 ):
-    assert _paymentToken != empty(address) and _paymentToken.is_contract  # dev: invalid payment token
-    assert _epochLength != 0  # dev: invalid epoch length
+    assert _paymentToken != empty(address) and _paymentToken.is_contract # dev: invalid payment token
+    assert _epochLength != 0 # dev: invalid epoch length
 
     paymentDecimals: uint8 = staticcall IERC20Detailed(_paymentToken).decimals()
-    assert paymentDecimals <= MAX_PAYMENT_DECIMALS_CONST  # dev: invalid payment decimals
+    assert paymentDecimals <= MAX_PAYMENT_DECIMALS # dev: invalid payment decimals
 
     addys.__init__(_ripeHq)
-    assert _paymentToken != addys._getRipeToken()  # dev: payment token is ripe
-    deptBasics.__init__(True, False, True)
+    assert _paymentToken != addys._getRipeToken() # dev: payment token is ripe
+    deptBasics.__init__(True, False, True) # starts paused, can mint ripe only
 
     PAYMENT_TOKEN = _paymentToken
     PAYMENT_DECIMALS = paymentDecimals
@@ -221,6 +224,7 @@ def isValidConfig(_config: InstantBondConfig) -> bool:
 @view
 @internal
 def _isValidConfig(_config: InstantBondConfig) -> bool:
+    # utilization and controller bounds
     if _config.uLowBps >= _config.uHighBps:
         return False
     if _config.uHighBps > HUNDRED_PERCENT:
@@ -228,15 +232,16 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 
     if _config.downBps == 0 or _config.downBps >= _config.upBps:
         return False
-    if _config.upBps > MAX_PRICE_STEP_BPS_CONST:
+    if _config.upBps > MAX_PRICE_STEP_BPS:
         return False
     if _config.decayBps == 0 or _config.decayBps >= HUNDRED_PERCENT:
         return False
     if _config.downBps > _config.decayBps:
         return False
-    if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS_CONST:
+    if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS:
         return False
 
+    # rate and payment arithmetic bounds
     if _config.maxEffectiveRate == 0 or _config.maxEffectiveRate > max_value(uint256) // HUNDRED_PERCENT:
         return False
     if _config.paymentCapPerEpoch < PAYMENT_SCALE or _config.paymentCapPerEpoch > max_value(uint256) // HUNDRED_PERCENT:
@@ -246,7 +251,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
     if _config.maxEffectiveRate > max_value(uint256) // _config.paymentCapPerEpoch:
         return False
 
-    if _config.maxLockBonus > MAX_LOCK_BONUS_CONST:
+    # lock bonus and payout arithmetic bounds
+    if _config.maxLockBonus > MAX_LOCK_BONUS:
         return False
     baseRateCeiling: uint256 = self._baseRateCeiling(_config.maxEffectiveRate, _config.maxLockBonus)
     if baseRateCeiling < MIN_BASE_RATE:
@@ -256,6 +262,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
         return False
     if _config.seedRate < MIN_BASE_RATE or _config.seedRate > baseRateCeiling:
         return False
+
+    # issuance budget cannot fall below prior minting
     if _config.mintBudget < self.cumulativeMinted:
         return False
 
@@ -265,9 +273,9 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
 @nonreentrant
 @external
 def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256):
-    assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-    assert _expectedVersion == self.configVersion  # dev: stale config version
-    assert self._isValidConfig(_newConfig)  # dev: invalid config
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _expectedVersion == self.configVersion # dev: stale config version
+    assert self._isValidConfig(_newConfig) # dev: invalid config
 
     newVersion: uint256 = self.configVersion + 1
     self.config = _newConfig
@@ -305,28 +313,31 @@ def buyNow(
     _minRipeOut: uint256,
     _deadlineBlock: uint256,
 ) -> uint256:
+    # validate availability
     configVersion: uint256 = self.configVersion
-    assert configVersion != 0  # dev: not configured
-    assert block.number >= GENESIS_BLOCK  # dev: before genesis
-    assert not deptBasics.isPaused  # dev: paused
+    assert configVersion != 0 # dev: not configured
+    assert block.number >= GENESIS_BLOCK # dev: before genesis
+    assert not deptBasics.isPaused # dev: paused
 
     config: InstantBondConfig = self.config
-    assert config.canBuyNow  # dev: disabled
-    assert block.number <= _deadlineBlock  # dev: expired
+    assert config.canBuyNow # dev: disabled
+    assert block.number <= _deadlineBlock # dev: expired
 
     a: addys.Addys = addys._getAddys()
-    assert staticcall RipeHq(a.hq).canMintRipe(self)  # dev: mint unavailable
+    assert staticcall RipeHq(a.hq).canMintRipe(self) # dev: mint unavailable
 
-    endaomentFunds: address = addys._getEndaomentFundsAddr()
-    assert endaomentFunds != empty(address)  # dev: no destination
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    assert endaoFunds != empty(address) # dev: no destination
 
+    # project current epoch and validate payment
     pricing: PricingState = self._getPricingState(config, configVersion)
-    assert _expectedEpoch == pricing.epoch  # dev: epoch moved
+    assert _expectedEpoch == pricing.epoch # dev: epoch moved
 
     remainingPayment: uint256 = pricing.paymentCap - pricing.acceptedPayment
-    assert _paymentAmount >= pricing.minPaymentAmount  # dev: below minimum payment
-    assert _paymentAmount <= remainingPayment  # dev: exceeds epoch cap
+    assert _paymentAmount >= pricing.minPaymentAmount # dev: below minimum payment
+    assert _paymentAmount <= remainingPayment # dev: exceeds epoch cap
 
+    # calculate payout and enforce mint budget
     vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
     payout: PayoutData = self._calculatePayout(
         _paymentAmount,
@@ -336,62 +347,40 @@ def buyNow(
         vaultConfig,
     )
 
-    assert payout.baseRipe != 0  # dev: zero payout
-    assert payout.totalRipe >= _minRipeOut  # dev: slippage
+    assert payout.baseRipe != 0 # dev: zero payout
+    assert payout.totalRipe >= _minRipeOut # dev: slippage
 
     budgetRemaining: uint256 = config.mintBudget - self.cumulativeMinted
-    assert payout.totalRipe <= budgetRemaining  # dev: mint budget
+    assert payout.totalRipe <= budgetRemaining # dev: mint budget
 
-    ripeGovVaultId: uint256 = 0
+    # resolve lock destination
+    coreRipeGovVaultId: uint256 = 0
     if payout.actualLock != 0:
-        ripeGovVaultId = staticcall MissionControl(
-            a.missionControl
-        ).coreRipeGovVaultId()
-        assert ripeGovVaultId != 0  # dev: invalid vault id
+        coreRipeGovVaultId = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+        assert coreRipeGovVaultId != 0 # dev: invalid vault id
 
-    paymentBalanceBefore: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(
-        endaomentFunds
-    )
+    paymentBalanceBefore: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
 
+    # update accounting before the state-changing external calls below
     self._storePricingState(pricing)
     self.epochAcceptedPayment = pricing.acceptedPayment + _paymentAmount
     self.cumulativeMinted += payout.totalRipe
 
-    assert extcall IERC20(PAYMENT_TOKEN).transferFrom(
-        msg.sender,
-        endaomentFunds,
-        _paymentAmount,
-        default_return_value=True,
-    )  # dev: payment failed
-    paymentBalanceAfter: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(
-        endaomentFunds
-    )
-    assert paymentBalanceAfter >= paymentBalanceBefore  # dev: payment receipt mismatch
-    assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount  # dev: payment receipt mismatch
+    # collect exact payment amount
+    assert extcall IERC20(PAYMENT_TOKEN).transferFrom(msg.sender, endaoFunds, _paymentAmount, default_return_value=True) # dev: payment failed
+    paymentBalanceAfter: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
+    assert paymentBalanceAfter >= paymentBalanceBefore # dev: payment receipt mismatch
+    assert paymentBalanceAfter - paymentBalanceBefore == _paymentAmount # dev: payment receipt mismatch
 
+    # mint ripe and settle lock
     if payout.actualLock == 0:
-        assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe)  # dev: mint failed
+        assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe) # dev: mint failed
     else:
-        assert extcall RipeToken(a.ripeToken).mint(self, payout.totalRipe)  # dev: mint failed
-        assert extcall IERC20(a.ripeToken).approve(
-            a.teller,
-            payout.totalRipe,
-            default_return_value=True,
-        )  # dev: approval failed
-        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(
-            msg.sender,
-            ripeGovVaultId,
-            a.ripeToken,
-            payout.totalRipe,
-            payout.actualLock,
-            a,
-        )
-        assert depositedAmount == payout.totalRipe  # dev: deposit mismatch
-        assert extcall IERC20(a.ripeToken).approve(
-            a.teller,
-            0,
-            default_return_value=True,
-        )  # dev: approval failed
+        assert extcall RipeToken(a.ripeToken).mint(self, payout.totalRipe) # dev: mint failed
+        assert extcall IERC20(a.ripeToken).approve(a.teller, payout.totalRipe, default_return_value=True) # dev: ripe approval failed
+        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(msg.sender, coreRipeGovVaultId, a.ripeToken, payout.totalRipe, payout.actualLock, a)
+        assert depositedAmount == payout.totalRipe # dev: deposit mismatch
+        assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     log InstantBondPurchased(
         buyer=msg.sender,
@@ -405,7 +394,7 @@ def buyNow(
         epoch=pricing.epoch,
         pricingConfigVersion=pricing.pricingConfigVersion,
         liveConfigVersion=configVersion,
-        ripeGovVaultId=ripeGovVaultId,
+        ripeGovVaultId=coreRipeGovVaultId,
     )
     return payout.totalRipe
 
@@ -543,29 +532,20 @@ def _getPricingState(_config: InstantBondConfig, _configVersion: uint256) -> Pri
     # inside buyNow, which atomically records a positive minimum-sized purchase.
     # Keep this safe fallback in case future storage sequencing permits a committed
     # initialized epoch with zero accepted payment.
-    if self.epochAcceptedPayment == 0:  # pragma: no branch
+    if self.epochAcceptedPayment == 0: # pragma: no branch
         decaySteps = min(elapsed, _config.maxDecayEpochs)
     else:
         utilizationBps = self.epochAcceptedPayment * HUNDRED_PERCENT // self.epochPaymentCap
 
         if utilizationBps >= _config.uHighBps:
-            rate = max(
-                rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _config.upBps),
-                MIN_BASE_RATE,
-            )
+            rate = max(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT + _config.upBps), MIN_BASE_RATE)
         elif utilizationBps <= _config.uLowBps:
-            rate = min(
-                rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.downBps),
-                newCeiling,
-            )
+            rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.downBps), newCeiling)
 
         decaySteps = min(elapsed - 1, _config.maxDecayEpochs)
 
-    for _i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS_CONST):
-        rate = min(
-            rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps),
-            newCeiling,
-        )
+    for i: uint256 in range(decaySteps, bound=MAX_DECAY_EPOCHS):
+        rate = min(rate * HUNDRED_PERCENT // (HUNDRED_PERCENT - _config.decayBps), newCeiling)
 
     pricing.epoch = epoch
     pricing.rate = rate

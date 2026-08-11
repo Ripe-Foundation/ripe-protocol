@@ -7,13 +7,8 @@
 #                                    ╠╣ │ │┌┴┬┘ │ ├┬┘│ │ │
 #                                    ╚  └─┘┴ └─ ┴ ┴└─└─┘ ┴
 #
-#     ╔════════════════════════════════════════╗
-#     ║  ** Switchboard Foxtrot **             ║
-#     ║  Instant Bond Lane configuration       ║
-#     ╚════════════════════════════════════════╝
-#
-#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-#     Ripe Foundation (C) 2025
+#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#      Ripe Foundation (C) 2025
 
 # @version 0.4.3
 
@@ -26,8 +21,13 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
+interface InstantBondLane:
+    def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256): nonpayable
+    def isValidConfig(_config: InstantBondConfig) -> bool: view
+    def configVersion() -> uint256: view
 
-# ABI ORDER LOCK: keep byte-for-byte aligned with InstantBondLane.InstantBondConfig.
+# NOTE: Keep this struct byte-for-byte aligned with InstantBondLane.InstantBondConfig.
+# Guarded by test_instant_bond_config_struct_bodies_are_byte_for_byte_identical.
 struct InstantBondConfig:
     canBuyNow: bool
     paymentCapPerEpoch: uint256
@@ -46,13 +46,6 @@ struct InstantBondConfig:
 struct PendingInstantBondConfig:
     config: InstantBondConfig
     expectedVersion: uint256
-
-
-interface InstantBondLane:
-    def isValidConfig(_config: InstantBondConfig) -> bool: view
-    def configVersion() -> uint256: view
-    def setConfig(_newConfig: InstantBondConfig, _expectedVersion: uint256): nonpayable
-
 
 event PendingInstantBondConfigSet:
     actionId: uint256
@@ -79,9 +72,10 @@ event InstantBondConfigExecuted:
 event InstantBondConfigCancelled:
     actionId: uint256
 
-
 LANE: public(immutable(address))
-pendingConfig: public(HashMap[uint256, PendingInstantBondConfig])
+
+# pending config changes
+pendingConfig: public(HashMap[uint256, PendingInstantBondConfig]) # aid -> config
 
 
 @deploy
@@ -94,33 +88,33 @@ def __init__(
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
-    assert _instantBondLane != empty(address) and _instantBondLane.is_contract  # dev: invalid lane
+    assert _instantBondLane != empty(address) and _instantBondLane.is_contract # dev: invalid lane
     LANE = _instantBondLane
 
 
-#################
-# Configuration #
-#################
+#######################
+# Instant Bond Config #
+#######################
 
 
 @external
 def setInstantBondConfig(_config: InstantBondConfig, _expectedVersion: uint256) -> uint256:
-    assert gov._canGovern(msg.sender)  # dev: no perms
-    assert timeLock.actionTimeLock != 0  # dev: action time lock not set
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert timeLock.actionTimeLock != 0 # dev: action time lock not set
 
     lane: address = LANE
-    assert staticcall InstantBondLane(lane).isValidConfig(_config)  # dev: invalid config
-    assert _expectedVersion == staticcall InstantBondLane(lane).configVersion()  # dev: stale config version
+    assert staticcall InstantBondLane(lane).isValidConfig(_config) # dev: invalid config
+    assert _expectedVersion == staticcall InstantBondLane(lane).configVersion() # dev: stale config version
 
-    actionId: uint256 = timeLock._initiateAction()
-    self.pendingConfig[actionId] = PendingInstantBondConfig(
+    aid: uint256 = timeLock._initiateAction()
+    self.pendingConfig[aid] = PendingInstantBondConfig(
         config=_config,
         expectedVersion=_expectedVersion,
     )
 
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(actionId)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingInstantBondConfigSet(
-        actionId=actionId,
+        actionId=aid,
         confirmationBlock=confirmationBlock,
         expectedVersion=_expectedVersion,
         canBuyNow=_config.canBuyNow,
@@ -137,7 +131,7 @@ def setInstantBondConfig(_config: InstantBondConfig, _expectedVersion: uint256) 
         maxDecayEpochs=_config.maxDecayEpochs,
         maxLockBonus=_config.maxLockBonus,
     )
-    return actionId
+    return aid
 
 
 #############
@@ -146,37 +140,39 @@ def setInstantBondConfig(_config: InstantBondConfig, _expectedVersion: uint256) 
 
 
 @external
-def executePendingAction(_actionId: uint256) -> bool:
-    assert gov._canGovern(msg.sender)  # dev: no perms
+def executePendingAction(_aid: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
 
-    if not timeLock._confirmAction(_actionId):
-        if timeLock._isExpired(_actionId):
-            self._cancelPendingAction(_actionId)
+    # check time lock
+    if not timeLock._confirmAction(_aid):
+        if timeLock._isExpired(_aid):
+            self._cancelPendingAction(_aid)
         return False
 
-    pending: PendingInstantBondConfig = self.pendingConfig[_actionId]
-    extcall InstantBondLane(LANE).setConfig(pending.config, pending.expectedVersion)
-    newVersion: uint256 = staticcall InstantBondLane(LANE).configVersion()
+    lane: address = LANE
+    p: PendingInstantBondConfig = self.pendingConfig[_aid]
+    extcall InstantBondLane(lane).setConfig(p.config, p.expectedVersion)
+    newVersion: uint256 = staticcall InstantBondLane(lane).configVersion()
 
-    self.pendingConfig[_actionId] = empty(PendingInstantBondConfig)
-    log InstantBondConfigExecuted(actionId=_actionId, newVersion=newVersion)
+    self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
+    log InstantBondConfigExecuted(actionId=_aid, newVersion=newVersion)
     return True
 
 
-################
-# Cancellation #
-################
+#################
+# Cancel Action #
+#################
 
 
 @external
-def cancelPendingAction(_actionId: uint256) -> bool:
-    assert gov._canGovern(msg.sender)  # dev: no perms
-    self._cancelPendingAction(_actionId)
+def cancelPendingAction(_aid: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    self._cancelPendingAction(_aid)
     return True
 
 
 @internal
-def _cancelPendingAction(_actionId: uint256):
-    assert timeLock._cancelAction(_actionId)  # dev: cannot cancel action
-    self.pendingConfig[_actionId] = empty(PendingInstantBondConfig)
-    log InstantBondConfigCancelled(actionId=_actionId)
+def _cancelPendingAction(_aid: uint256):
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
+    log InstantBondConfigCancelled(actionId=_aid)
