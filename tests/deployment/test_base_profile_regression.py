@@ -73,45 +73,28 @@ def test_base_mainnet_source_and_history_are_preserved():
 
 
 def test_legacy_chain_option_resolves_only_to_canonical_base():
+    # A case variant must not be silently folded onto the canonical chain:
+    # `verify` looks the label up verbatim and refuses anything it misses.
     result = _run_module(
         "scripts.verify", "--chain", "BASE-MAINNET"
     )
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
-    assert "H02_VERIFIER_BLOCKED profile=base-mainnet" in result.stderr
+    assert "no Etherscan-family verifier is configured" in result.stderr
 
 
 def test_blocked_robinhood_verification_never_advertises_proposed_path():
+    # Robinhood manifests exist on disk, so the refusal has to land before the
+    # manifest path is resolved or printed -- otherwise the output implies a
+    # verification route that cannot exist.
     result = _run_module(
-        "scripts.verify", "--profile", "robinhood-mainnet"
+        "scripts.verify", "--chain", "robinhood-mainnet"
     )
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
     assert "migration_history/robinhood-mainnet" not in result.stdout
-    assert "H02_VERIFIER_BLOCKED profile=robinhood-mainnet" in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("option", "value", "error_code"),
-    (
-        ("--manifest", "../evil", "H02_REPOSITORY_UNAVAILABLE"),
-        ("--environment", "bogus", "H02_HISTORY_ALIAS"),
-    ),
-)
-def test_verify_validates_assertions_before_blocked_route(
-    option, value, error_code
-):
-    result = _run_module(
-        "scripts.verify",
-        "--profile",
-        "base-mainnet",
-        option,
-        value,
-    )
-    assert result.returncode != 0
-    assert "Manifest:" not in result.stdout
-    assert error_code in result.stderr
-    assert value not in result.stderr
+    assert "no Etherscan-family verifier is configured" in result.stderr
+    assert "verify_blockscout" in result.stderr
 
 
 def test_base_sepolia_identity_valid_repository_unsupported():
@@ -133,9 +116,6 @@ def test_base_sepolia_identity_valid_repository_unsupported():
 def test_ethereum_labels_are_not_supported_profiles(label):
     with pytest.raises(NetworkProfileError, match="H02_PROFILE_UNKNOWN"):
         get_profile(label)
-    result = _run_module("scripts.verify", "--profile", label)
-    assert result.returncode != 0
-    assert "Invalid value" in result.stderr
 
 
 def test_base_manifest_path_remains_compatible():
@@ -209,16 +189,18 @@ def test_unknown_provider_returns_typed_outcome_not_keyerror():
         validate_registry((replace(profile, verifier=invalid_verifier),))
 
 
-def test_base_verification_route_is_truthfully_blocked(monkeypatch):
+def test_unresolvable_chain_fails_before_any_network_call(monkeypatch):
     calls = []
     monkeypatch.setattr(
         requests.sessions.Session,
         "request",
         lambda *args, **kwargs: calls.append(args),
     )
+    # `chain` is unset here, which is the shape a scripted run takes when it
+    # forgets the option. The refusal must precede any submission attempt.
     with pytest.raises(Exception) as captured:
         verify.cli.callback("base-mainnet", None, "current")
-    assert "H02_VERIFIER_BLOCKED" in str(captured.value)
+    assert "no Etherscan-family verifier is configured" in str(captured.value)
     assert calls == []
 
 

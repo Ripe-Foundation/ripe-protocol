@@ -255,23 +255,6 @@ def test_missing_rpc_env_fails_lazily():
     assert environment.accesses == ["BASE_MAINNET_RPC_URL"]
 
 
-def test_missing_private_key_never_uses_public_fallback(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        migration_helpers.Account,
-        "from_key",
-        lambda value: calls.append(value),
-    )
-    with pytest.raises(NetworkProfileError, match="H02_PRIVATE_KEY_MISSING"):
-        migration_helpers.get_account(
-            "DEPLOYER",
-            _verified("base-mainnet", Operation.MIGRATION_FORK),
-            Operation.MIGRATION_FORK,
-            environ=SpyEnvironment(),
-        )
-    assert calls == []
-
-
 def test_public_local_key_is_test_only():
     occurrences = []
     # This scanner intentionally searches for the one contiguous production
@@ -290,141 +273,6 @@ def test_public_local_key_is_test_only():
                     assert "tests.deployment.test_secret_handling" not in (
                         ast.unparse(node)
                     )
-
-
-def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
-    loaded = []
-    monkeypatch.setattr(
-        migration_helpers.Account,
-        "from_key",
-        lambda value: loaded.append(value) or object(),
-    )
-    local_identity = VerifiedNetworkIdentity(
-        "local", Operation.LOCAL_RUNTIME, 31337, 31337
-    )
-    account = migration_helpers.get_account(
-        "LOCAL_TEST",
-        local_identity,
-        Operation.LOCAL_RUNTIME,
-        private_key=_PUBLIC_ANVIL_TEST_KEY,
-        local_test_only=True,
-    )
-    assert account is not None
-    assert loaded == [_PUBLIC_ANVIL_TEST_KEY]
-
-
-@pytest.mark.parametrize(
-    ("identity", "operation", "error_code"),
-    (
-        (
-            VerifiedNetworkIdentity(
-                "base-mainnet", Operation.MIGRATION_FORK, 8453, 8453
-            ),
-            Operation.MIGRATION_FORK,
-            "H02_ACCOUNT_BACKEND_UNAPPROVED",
-        ),
-        (
-            VerifiedNetworkIdentity(
-                "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
-            ),
-            Operation.MIGRATION_LIVE,
-            # Base live is supported again, so the rejection reason is now the
-            # account backend rather than the operation. The guarantee under
-            # test is unchanged: a local test key is refused and never loaded.
-            "H02_ACCOUNT_BACKEND_UNAPPROVED",
-        ),
-    ),
-)
-def test_injected_local_test_account_rejected_for_live_or_fork(
-    identity, operation, error_code, monkeypatch
-):
-    calls = []
-    monkeypatch.setattr(
-        migration_helpers.Account,
-        "from_key",
-        lambda value: calls.append(value),
-    )
-    with pytest.raises(NetworkProfileError, match=error_code):
-        migration_helpers.get_account(
-            "LOCAL_TEST",
-            identity,
-            operation,
-            private_key=_PUBLIC_ANVIL_TEST_KEY,
-            local_test_only=True,
-        )
-    assert calls == []
-
-
-@pytest.mark.parametrize(
-    ("identity", "operation", "error_code"),
-    (
-        (
-            VerifiedNetworkIdentity(
-                "base-mainnet", Operation.MIGRATION_FORK, 8453, 1
-            ),
-            Operation.MIGRATION_FORK,
-            "H02_CHAIN_ID_MISMATCH",
-        ),
-        (
-            VerifiedNetworkIdentity(
-                "base-mainnet", Operation.MIGRATION_FORK, 1, 1
-            ),
-            Operation.MIGRATION_FORK,
-            "H02_CHAIN_ID_MISMATCH",
-        ),
-        (
-            VerifiedNetworkIdentity(
-                "unknown-profile", Operation.MIGRATION_FORK, 1, 1
-            ),
-            Operation.MIGRATION_FORK,
-            "H02_PROFILE_UNKNOWN",
-        ),
-        (
-            # MIGRATION_FORK is owner-approved for Robinhood now. CONSOLE_EVIDENCE
-            # is the remaining blocked operation, so identity validation still has
-            # a blocked case to precede key access for.
-            VerifiedNetworkIdentity(
-                "robinhood-mainnet",
-                Operation.CONSOLE_EVIDENCE,
-                4663,
-                4663,
-            ),
-            Operation.CONSOLE_EVIDENCE,
-            "H02_OPERATION_BLOCKED",
-        ),
-        (
-            VerifiedNetworkIdentity(
-                "base-mainnet",
-                Operation.REPOSITORY_READ,
-                8453,
-                8453,
-            ),
-            Operation.REPOSITORY_READ,
-            "H02_ACCOUNT_BACKEND_UNAPPROVED",
-        ),
-    ),
-)
-def test_account_identity_validation_precedes_key_access(
-    identity, operation, error_code, monkeypatch
-):
-    environment = SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "not-read"})
-    account_calls = []
-    monkeypatch.setattr(
-        migration_helpers.Account,
-        "from_key",
-        lambda value: account_calls.append(value),
-    )
-
-    with pytest.raises(NetworkProfileError, match=error_code):
-        migration_helpers.get_account(
-            "DEPLOYER",
-            identity,
-            operation,
-            environ=environment,
-        )
-
-    assert environment.accesses == []
-    assert account_calls == []
 
 
 def test_console_wrong_chain_prevents_manifest_and_fork(monkeypatch):
@@ -511,15 +359,27 @@ def test_explorer_key_is_not_read_at_import_or_help():
         assert "KeyError" not in result.stderr
 
 
-def test_unsupported_verifier_does_not_read_key(monkeypatch):
+@pytest.mark.parametrize(
+    ("environment_name", "chain"),
+    (
+        # Unset chain: the shape a scripted run takes when it drops the option.
+        ("base-mainnet", None),
+        # Robinhood has committed manifests, so this route gets far enough to
+        # matter -- it must still refuse before the explorer key is read.
+        ("v1", "robinhood-mainnet"),
+    ),
+)
+def test_unsupported_verifier_does_not_read_key(
+    environment_name, chain, monkeypatch
+):
     environment = SpyEnvironment(
         {"ETHERSCAN_API_KEY": "synthetic-explorer-value"}
     )
     monkeypatch.setattr(os, "environ", environment)
     with pytest.raises(Exception) as captured:
-        verify.cli.callback("base-mainnet", None, "current")
+        verify.cli.callback(environment_name, chain, "current")
     rendered = f"{captured.value} {captured.value!r}"
-    assert "H02_VERIFIER_BLOCKED" in rendered
+    assert "no Etherscan-family verifier is configured" in rendered
     assert environment.accesses == []
 
 

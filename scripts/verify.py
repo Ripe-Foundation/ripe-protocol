@@ -5,7 +5,7 @@ import time
 import click
 
 from scripts.migrate import param_prompt, CLICK_PROMPTS
-from scripts.utils.verify_etherscan import verify_from_manifest
+from scripts.utils.verify_etherscan import CHAIN_SPECS, verify_from_manifest
 
 MIGRATION_HISTORY_DIR = "./migration_history"
 
@@ -35,6 +35,19 @@ def cli(environment, chain, manifest):
     Robinhood chains have no Etherscan-family explorer -- see
     `scripts/verify_blockscout.py` for those.
     """
+    # Refuse a chain with no Etherscan-family provider before anything else.
+    # Robinhood manifests exist and are readable, so without this the run gets
+    # as far as submitting and dies inside the verifier with a traceback --
+    # after having read the explorer key. An impossible route should fail
+    # early, say so plainly, and never touch the secret.
+    spec = CHAIN_SPECS.get(chain)
+    if spec is None or spec.provider is None:
+        raise click.ClickException(
+            f"Cannot verify chain `{chain}`: no Etherscan-family verifier is "
+            "configured for it. Robinhood chains have no such explorer -- use "
+            "`python -m scripts.verify_blockscout` for those."
+        )
+
     manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/{manifest}-manifest.json"
     print(f"Verifying contracts from chain `{chain}`, manifest `{manifest_path}`")
 
