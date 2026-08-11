@@ -1,5 +1,4 @@
 import os
-from pathlib import PurePosixPath
 
 import boa.contracts
 import boa.contracts.abi
@@ -11,29 +10,6 @@ from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (deployed_contracts_manifest,
                                              execute_transaction)
-from scripts.utils.manifest_schema import (
-    ManifestError,
-    validate_execution_handoff,
-)
-from scripts.utils.migration_runner import (
-    MigrationPlanError,
-    validate_execution_plan_artifact,
-)
-
-
-_ROBINHOOD_HISTORY_SUFFIXES = (
-    PurePosixPath("migration_history/robinhood-mainnet/v1"),
-    PurePosixPath("migration_history/robinhood-testnet/v1"),
-)
-
-
-def _is_robinhood_v2_history_path(history_path):
-    normalized = PurePosixPath(str(history_path).replace("\\", "/"))
-    return any(
-        normalized == suffix
-        or normalized.parts[-len(suffix.parts):] == suffix.parts
-        for suffix in _ROBINHOOD_HISTORY_SUFFIXES
-    )
 
 
 class Migration:
@@ -49,13 +25,7 @@ class Migration:
         self._contracts = {}
         self._contract_files = {}
         self._args = {}
-        self._manifest_v2 = _is_robinhood_v2_history_path(history_path)
-        self._manifest_v2_results = {}
         self.gas = 0
-
-        if self._manifest_v2:
-            self._previous_manifest = {}
-            return
 
         try:
             filename = self._manifest_filename('current')
@@ -72,64 +42,6 @@ class Migration:
 
     def rpc(self):
         return self._deploy_args.rpc
-
-    def handoff_manifest_v2_action_result(self, semantic_plan, action_result):
-        """
-        Validate and retain one typed Robinhood result for an H-06 record.
-
-        This is an in-memory semantic handoff only. It never submits, retries,
-        writes history, or promotes current.
-        """
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        validated = validate_execution_handoff(
-            semantic_plan,
-            action_result,
-        )
-        action_id = validated["action_id"]
-        if action_id in self._manifest_v2_results:
-            raise ManifestError("H06_HANDOFF_ACTION_DUPLICATE")
-        self._manifest_v2_results[action_id] = validated
-        return validated
-
-    def manifest_v2_action_results(self):
-        """Return validated typed results in semantic action-ID order."""
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        return tuple(
-            self._manifest_v2_results[action_id]
-            for action_id in sorted(self._manifest_v2_results)
-        )
-
-    def apply_robinhood_stage(self, stage):
-        """Hand one shared literal stage to a separately authorized executor.
-
-        Static planning reads the exact same ``MIGRATION_STAGE`` literal.  The
-        Network policy remains controlling.  The CLI installs the dedicated
-        executor only after its profile, identity, account, plan, repository,
-        envelope, and history gates succeed.  Merely importing or invoking a
-        Robinhood migration can never fall through to legacy transactions.
-        """
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        execution_plan = getattr(
-            self._deploy_args, "robinhood_execution_plan", None
-        )
-        repository_root = getattr(
-            self._deploy_args, "robinhood_repository_root", None
-        )
-        if execution_plan is None or repository_root is None:
-            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED")
-        try:
-            validate_execution_plan_artifact(
-                execution_plan, repository_root=repository_root
-            )
-        except MigrationPlanError:
-            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED") from None
-        executor = getattr(self._deploy_args, "robinhood_stage_executor", None)
-        if executor is None:
-            raise ManifestError("H06_EXECUTION_HANDOFF_REQUIRED")
-        return executor(self, stage)
 
     def execute(self, transaction, *args, **kwargs):
         """
@@ -182,9 +94,6 @@ class Migration:
         with foundry) or skips if already deployed.
         Returns the deployed contract.
         """
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         label = kwargs.pop("label", name)
         source_file = kwargs.pop("source_file", None)
 
@@ -257,10 +166,6 @@ class Migration:
         """
         Ends the migration and saves the manifest file
         """
-        if self._manifest_v2:
-            log.info(f"Gas spent for migration: {self.gas}")
-            return self.gas
-
         if os.path.exists(self._log_filename()):
             # Delete the log file
             os.remove(self._log_filename())
@@ -320,9 +225,6 @@ class Migration:
         Executes a transaction or skips if already executed.
         Returns the transaction receipt as string.
         """
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
 
@@ -374,9 +276,6 @@ class Migration:
         return os.path.join(self._history_path, f"{name}-manifest.json")
 
     def _append_manifest(self, contract_name):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
-
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
@@ -396,16 +295,12 @@ class Migration:
         return merged_manifest
 
     def _load_log_file(self):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_LOG_FORBIDDEN")
         if self._deploy_args.ignore_logs:
             raise ('no logs')
         logs = json_file.load(self._log_filename())
         self._transactions = logs["transactions"]
 
     def _save_log_file(self):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_LOG_FORBIDDEN")
         json_file.save(
             self._log_filename(),
             {
