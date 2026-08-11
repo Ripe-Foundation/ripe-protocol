@@ -8,6 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from config.artifact_expectations import (
+    ArtifactExpectationsError,
+    load_artifact_expectations,
+)
 from scripts import check_contract_artifacts as artifact_checker
 
 
@@ -79,8 +83,165 @@ def _write_expectations(tmp_path: Path, values: dict) -> Path:
     return tampered
 
 
+def _load_expectations(path: Path = EXPECTATIONS, *, root: Path = ROOT) -> dict:
+    return load_artifact_expectations(path, root=root)
+
+
+def _json_bytes(value: object) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _write_v2_expectations(tmp_path: Path):
+    repository = tmp_path / "repository"
+    records_root = repository / "config" / "contract-artifacts"
+    records_root.mkdir(parents=True)
+    values = _load_expectations()
+    references = {}
+    record_paths = {}
+    for name, expectation in values["contracts"].items():
+        relative = Path("config") / "contract-artifacts" / f"{name}.json"
+        record_path = repository / relative
+        raw = _json_bytes(
+            {
+                "contract": name,
+                "expectation": expectation,
+                "schema_version": 1,
+            }
+        )
+        record_path.write_bytes(raw)
+        references[name] = {
+            "path": relative.as_posix(),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+        }
+        record_paths[name] = record_path
+
+    index = {
+        "compiler": values["compiler"],
+        "contracts": references,
+        "records_root": "config/contract-artifacts",
+        "schema_version": 2,
+    }
+    index_path = repository / "config" / "contract-artifact-expectations.json"
+    index_path.write_bytes(_json_bytes(index))
+    return repository, index_path, index, record_paths
+
+
+def _rewrite_v2_index(index_path: Path, index: dict) -> None:
+    index_path.write_bytes(_json_bytes(index))
+
+
+def test_v1_loader_preserves_the_current_in_memory_shape():
+    assert _load_expectations() == json.loads(EXPECTATIONS.read_bytes())
+
+
+def test_v2_loader_is_equivalent_to_the_frozen_v1_shape(tmp_path):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    assert _load_expectations(index_path, root=repository) == _load_expectations()
+
+
+def test_duplicate_json_keys_fail_closed(tmp_path):
+    duplicate = tmp_path / "duplicate.json"
+    duplicate.write_text(
+        '{"compiler": {}, "contracts": {}, "schema_version": 1, '
+        '"schema_version": 1}\n'
+    )
+    with pytest.raises(ArtifactExpectationsError, match="duplicate JSON key"):
+        _load_expectations(duplicate, root=tmp_path)
+
+
+def test_symlink_index_fails_closed(tmp_path):
+    target = _write_expectations(tmp_path, _load_expectations())
+    symlink = tmp_path / "expectations-symlink.json"
+    symlink.symlink_to(target)
+    result = _run_checker(
+        "--contract", "Lootbox", "--expectations", str(symlink)
+    )
+    assert result.returncode == 1
+    assert "symlink paths are forbidden" in result.stderr
+
+
+@pytest.mark.parametrize("schema_version", [3, True, 1.0])
+def test_unsupported_index_schema_fails_closed(tmp_path, schema_version):
+    values = _load_expectations()
+    values["schema_version"] = schema_version
+    unsupported = _write_expectations(tmp_path, values)
+    with pytest.raises(ArtifactExpectationsError, match="unsupported schema_version"):
+        _load_expectations(unsupported, root=tmp_path)
+
+
+def test_v2_missing_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_paths["Lootbox"].unlink()
+    with pytest.raises(ArtifactExpectationsError, match="record set mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_extra_record_fails_closed(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_paths["Lootbox"].with_name("Unindexed.json").write_text("{}\n")
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="record set mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_record_hash_mismatch_fails_closed(tmp_path):
+    repository, index_path, index, _ = _write_v2_expectations(tmp_path)
+    index["contracts"]["Lootbox"]["sha256"] = "0" * 64
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="SHA-256 mismatch"):
+        _load_expectations(index_path, root=repository)
+
+
+@pytest.mark.parametrize(
+    ("unsafe_path", "failure"),
+    [
+        ("/tmp/Lootbox.json", "absolute paths are forbidden"),
+        ("../Lootbox.json", "may not escape its root"),
+    ],
+)
+def test_v2_unsafe_record_paths_fail_closed(tmp_path, unsafe_path, failure):
+    repository, index_path, index, _ = _write_v2_expectations(tmp_path)
+    index["contracts"]["Lootbox"]["path"] = unsafe_path
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match=failure):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_non_regular_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record_path.unlink()
+    record_path.mkdir()
+    with pytest.raises(ArtifactExpectationsError, match="not a regular file"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_symlink_record_fails_closed(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    target = tmp_path / "outside-record.json"
+    target.write_bytes(record_path.read_bytes())
+    record_path.unlink()
+    record_path.symlink_to(target)
+    with pytest.raises(ArtifactExpectationsError, match="symlink paths are forbidden"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_unsupported_record_schema_fails_closed(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["schema_version"] = 2
+    raw = _json_bytes(record)
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="unsupported record schema"):
+        _load_expectations(index_path, root=repository)
+
+
 def test_frozen_required_contract_set_is_exact():
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     assert set(values["contracts"]) == REQUIRED_CONTRACTS
 
 
@@ -176,7 +337,7 @@ def test_new_contract_selection_succeeds(contract):
 
 
 def test_constructor_bound_deployed_runtime_facts_are_compiler_backed():
-    contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
+    contracts = _load_expectations()["contracts"]
 
     for name, deployed in DEPLOYED_RUNTIME_FACTS.items():
         artifacts = contracts[name]["artifacts"]
@@ -195,7 +356,7 @@ def test_constructor_bound_deployed_runtime_facts_are_compiler_backed():
 
 
 def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
-    contracts = json.loads(EXPECTATIONS.read_text())["contracts"]
+    contracts = _load_expectations()["contracts"]
     metadata_sizes = {
         record["artifacts"]["creation_metadata_size"]
         for record in contracts.values()
@@ -249,7 +410,7 @@ def test_prefix_or_metadata_byte_tampering_breaks_the_frozen_creation_binding():
         ROOT / "contracts" / "core" / "Teller.vy",
         vyper,
     )
-    expected = json.loads(EXPECTATIONS.read_text())["contracts"]["Teller"]
+    expected = _load_expectations()["contracts"]["Teller"]
     binding = artifact_checker._creation_binding(
         compiled.creation,
         integrity=compiled.integrity,
@@ -310,7 +471,7 @@ def test_new_contract_tampered_source_copy_fails_closed(
 
 @pytest.mark.parametrize("contract", NEW_CONTRACT_SOURCES)
 def test_new_contract_tampered_expectation_fails_closed(tmp_path, contract):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"][contract]["abi"]["canonical_sha256"] = "00" * 32
     tampered = _write_expectations(tmp_path, values)
 
@@ -350,7 +511,7 @@ def test_new_contract_tampered_expectation_fails_closed(tmp_path, contract):
 def test_deleverage_compiler_and_runtime_identity_drift_fails_closed(
     tmp_path, field_path, replacement, failure
 ):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     target = values["contracts"]["Deleverage"]
     for key in field_path[:-1]:
         target = target[key]
@@ -385,7 +546,7 @@ def test_tampered_source_copy_fails_closed(tmp_path):
 
 
 def test_tampered_expectation_fails_closed(tmp_path):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"]["Teller"]["abi"]["canonical_sha256"] = "00" * 32
     tampered = _write_expectations(tmp_path, values)
 
@@ -403,7 +564,7 @@ def test_tampered_expectation_fails_closed(tmp_path):
 
 
 def test_tampered_layout_expectation_fails_closed(tmp_path):
-    values = json.loads(EXPECTATIONS.read_text())
+    values = _load_expectations()
     values["contracts"]["Teller"]["storage_layout"] = {}
     tampered = _write_expectations(tmp_path, values)
 
