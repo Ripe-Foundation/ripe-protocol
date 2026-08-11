@@ -1,7 +1,7 @@
 # Robinhood Chain CCIP integration decision
 
 > **Historical planning record.** CCIP is now deployed and activated. The
-> current topology, production 1.5.1 source line, and remaining operational
+> current topology, pools reporting version 1.5.1, and remaining operational
 > gates are recorded in [ccip-live-state.md](ccip-live-state.md). Statements
 > below that deployment or registration has not happened are superseded.
 

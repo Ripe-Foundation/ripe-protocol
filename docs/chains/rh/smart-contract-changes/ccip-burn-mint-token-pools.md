@@ -1,8 +1,9 @@
 # GREEN and RIPE CCIP BurnMint pool reference subclasses
 
 > **Historical 1.6.1 reference review.** This page does not describe the
-> current live source or lifecycle. The deployed pools use the repository's
-> vendored 1.5.1 production source; see
+> current live creation source or lifecycle. The repository's vendored 1.5.1
+> implementation is the current candidate/reference, but its relationship to
+> the already-live pools is not proven; see
 > [../ccip-live-state.md](../ccip-live-state.md) for confirmed topology and
 > remaining operational gates. The exact-hash analysis below remains useful
 > only for the superseded reference artifact it names.
@@ -88,24 +89,29 @@ or explorer-verification package for these subclasses.
 
 ## Current lifecycle and authorization boundary
 
-[`RH-D008`](../decision-register.md#L129-L139) approves only a complete-or-
-disabled launch posture. The pools remain deferred and CCIP remains disabled
-unless every production, support, gas, testnet, operational, and promotion gate
-closes. Reference-source review does not satisfy those gates.
+The GREEN and RIPE topology is now live on Base and Robinhood mainnet. The
+current pool addresses, HQ rows 23/24, TokenAdminRegistry assignments,
+reciprocal remote wiring, owners, and token-specific mint capabilities are
+bound by [the dated evidence snapshot](../evidence/ccip-live-snapshot-20260811.json).
+This supersedes the historical disabled/deferred posture described by the
+older reference review. It does not prove that either repository source created
+the live pools, authorize another transaction, or close rate-policy, destination-
+gas, signer/backend, source-identity, license, or release gates.
 
 The pool reference and `Erc20Token.getCCIPAdmin()` are separate changes. The
 pools implement the direct mint/burn integration and Ripe capability views;
 the token hook affects Token Admin Registry discovery. Neither one proves or
 authorizes the other's registration or deployment.
 
-No deployment, pool ownership transfer, Token Admin Registry proposal,
-administrator acceptance, remote-pool mapping, rate-limit setting, mint
-capability, or activation is established by this file.
+The live state is established by the dated external evidence, not by this
+historical reference-source review or its exact-hash compiler results.
 
 ## Open gaps and required follow-up
 
-Before this reference can become production code, a separately authorized
-package must:
+The following is the preserved historical predeployment checklist for this
+superseded 1.6.1 reference. It is not a current claim that CCIP is absent. Any
+future replacement or mutation package must independently disposition the same
+classes of risk:
 
 1. bind an exact supported Chainlink release, Solidity dependency lock,
    compiler/EVM/optimizer/IR/metadata profile, license notices, and source tree;
@@ -122,9 +128,10 @@ package must:
 6. pass independent production-package review, testnet rehearsal, monitoring,
    activation, and release gates.
 
-The repository's only GitHub Actions workflow runs the Python/Vyper test lanes
-on manual dispatch and does not compile or test this Solidity reference. None of
-the evidence on this page is continuously enforced by repository CI.
+This historical review predated the repository's current Solidity CI lane. The
+current GitHub Actions workflow builds and tests the Solidity package alongside
+the Python/Vyper lanes. Live-pool creation provenance and external operational
+evidence remain separate gates that repository CI cannot establish.
 
 ## Reproducible source checks
 

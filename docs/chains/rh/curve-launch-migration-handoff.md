@@ -58,8 +58,10 @@ execution.
 10. Prove Curve dynamic rates, GREEN reference snapshots, Endaoment
     stabilization, Curve LP pricing, LP admission, and PSM Curve authority are
     all inactive.
-11. Register `BlueChipYieldPrices` third and assert returned PriceDesk ID 3.
-12. Apply and read back priority IDs exactly `[1, 3]`.
+11. Confirm `BlueChipYieldPrices` remains structurally selected for PriceDesk
+    ID 3 in the blueprint but has no deployment or registration action in the
+    current candidate.
+12. Apply and read back priority IDs exactly `[1, 2]`.
 13. Run H-08 source/artifact/constructor/registry/topology/omission and
     inactive-capability assertions.
 14. Run H-09 archive-fork qualification only after the endpoint, immutable
@@ -84,12 +86,13 @@ Abort before the next mutation if any of the following occurs:
   token decimals, A, fee, off-peg multiplier, or `ma_exp_time` differs;
 - any pool name, symbol, funding, custody, approving account, minimum mint,
   slippage, withdrawal, retained liquidity, or observation blocker is open;
-- any registry confirmation returns an ID other than 1, 2, or 3 in the exact
-  expected order;
+- any current-candidate registry confirmation returns an ID other than 1 or 2
+  in the exact expected order, or any action attempts to deploy/register the
+  blueprint-only BlueChipYield ID 3;
 - Curve has or is pending a USDG feed, any LP feed, or any feed other than
   GREEN;
 - Chainlink USDG is missing, zero, stale, reverting, or identity-drifted;
-- priorities differ from `[1, 3]`;
+- priorities differ from `[1, 2]`;
 - reference-pool, dynamic-rate, stabilizer, PSM Curve, LP, Stock, or Uniswap
   capability is nonzero, reachable, or pending;
 - a safe/unsafe GREEN failure produces a nonzero fallback value; or

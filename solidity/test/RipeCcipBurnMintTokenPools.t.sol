@@ -37,6 +37,25 @@ contract MockBurnMintERC20 is IBurnMintERC20 {
     function burnFrom(address, uint256) external pure override {}
 }
 
+interface IAdministeredPool {
+    function setRateLimitAdmin(address admin) external;
+    function getRateLimitAdmin() external view returns (address);
+    function setRouter(address router) external;
+    function getRouter() external view returns (address);
+}
+
+contract UntrustedPoolCaller {
+    function trySetRateLimitAdmin(address pool, address admin) external returns (bool) {
+        (bool ok,) = pool.call(abi.encodeCall(IAdministeredPool.setRateLimitAdmin, (admin)));
+        return ok;
+    }
+
+    function trySetRouter(address pool, address router) external returns (bool) {
+        (bool ok,) = pool.call(abi.encodeCall(IAdministeredPool.setRouter, (router)));
+        return ok;
+    }
+}
+
 abstract contract PoolTestBase {
     address internal constant RMN_PROXY = address(0x1111);
     address internal constant ROUTER = address(0x2222);
@@ -53,6 +72,19 @@ abstract contract PoolTestBase {
 
     function _isPinnedVersion(string memory value) internal pure returns (bool) {
         return keccak256(bytes(value)) == keccak256(bytes("BurnMintTokenPool 1.5.1"));
+    }
+
+    function _assertInheritedOwnerControls(address pool) internal {
+        UntrustedPoolCaller caller = new UntrustedPoolCaller();
+        address newAdmin = address(0x3333);
+        address newRouter = address(0x4444);
+        require(!caller.trySetRateLimitAdmin(pool, newAdmin), "non-owner changed rate admin");
+        require(!caller.trySetRouter(pool, newRouter), "non-owner changed router");
+
+        IAdministeredPool(pool).setRateLimitAdmin(newAdmin);
+        IAdministeredPool(pool).setRouter(newRouter);
+        require(IAdministeredPool(pool).getRateLimitAdmin() == newAdmin, "owner rate admin");
+        require(IAdministeredPool(pool).getRouter() == newRouter, "owner router");
     }
 }
 
@@ -76,6 +108,17 @@ contract GreenCcipBurnMintTokenPoolTest is PoolTestBase {
         require(greenPool.owner() == address(this), "GREEN owner");
         require(greenPool.getRateLimitAdmin() == address(0), "GREEN rate admin");
     }
+
+    function testGreenPoolRetainsInheritedOwnerControls() public {
+        _assertInheritedOwnerControls(address(greenPool));
+    }
+
+    function testGreenConstructorTokenBindingIsExplicit() public {
+        MockBurnMintERC20 otherToken = new MockBurnMintERC20();
+        GreenCcipBurnMintTokenPool otherPool =
+            new GreenCcipBurnMintTokenPool(otherToken, 18, _emptyAllowlist(), RMN_PROXY, ROUTER);
+        require(address(otherPool.getToken()) == address(otherToken), "explicit GREEN token");
+    }
 }
 
 contract RipeCcipBurnMintTokenPoolTest is PoolTestBase {
@@ -97,5 +140,9 @@ contract RipeCcipBurnMintTokenPoolTest is PoolTestBase {
         require(ripePool.getRouter() == ROUTER, "RIPE router");
         require(ripePool.owner() == address(this), "RIPE owner");
         require(ripePool.getRateLimitAdmin() == address(0), "RIPE rate admin");
+    }
+
+    function testRipePoolRetainsInheritedOwnerControls() public {
+        _assertInheritedOwnerControls(address(ripePool));
     }
 }

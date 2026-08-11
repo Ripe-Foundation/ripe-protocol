@@ -35,7 +35,7 @@ The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
 `DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
 two editable value authorities, and the ledger is derived and synchronized.
 The exact current result is `configuration_consistent=true`,
-`deployment_ready=false`, with 65 readiness blockers. Repository configuration
+`deployment_ready=false`, with 64 readiness blockers. Repository configuration
 is prepared and consistent; production/onchain configuration has not occurred.
 
 ## Program-level decisions
@@ -248,7 +248,7 @@ the typed JSON ledger is derived evidence, not an input surface.
 All operative decisions are approved, and the integrated manifest carries 14
 binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
-remain unresolved, so deployment readiness fails closed with 65 blockers. The
+remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
 preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
@@ -405,8 +405,10 @@ program package. The controlling disposition is:
 - keep H-10 as the separate live-rehearsal lane.
 
 CreditEngine zero-backing reassessment, every Deleverage task including
-size/headroom work, UniswapV2Prices admission and deployment, CCIP, Sites recovery, and live
-deployment are deferred or separately unauthorized. Future work is grouped
+size/headroom work, UniswapV2Prices admission and deployment, Sites recovery,
+and non-CCIP live deployment are deferred or separately unauthorized. CCIP is
+confirmed live, while further operational work, transactions, and release are
+separately gated. Future work is grouped
 into the large packages defined by
 [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),
 not eight report-specific trains.
@@ -434,7 +436,7 @@ Endaoment stabilization, use Curve in the PSM, or add Stock/Uniswap behavior.
 Five official provider and binding identities remain unverified; the pool
 address must be deployment-produced; and the slippage limit, minimum retained
 liquidity, and production observation remain open. Those nine Curve-specific
-blockers contribute to the current 65-binding fail-closed readiness result.
+blockers contribute to the current 64-binding fail-closed readiness result.
 
 Current correction source:
 [`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md).

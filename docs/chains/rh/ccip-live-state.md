@@ -4,6 +4,12 @@ Status: **LIVE TOPOLOGY CONFIRMED; OPERATIONAL DISPOSITIONS REMAIN OPEN**
 
 Evidence snapshot: [ccip-live-snapshot-20260811.json](evidence/ccip-live-snapshot-20260811.json)
 
+Evidence file SHA-256:
+`41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa`.
+The derived ledger validates this exact digest plus schema, chain/topology,
+reciprocal wiring, and token-specific capability fields before accepting the
+external fact.
+
 This document supersedes older “not deployed,” “disabled,” and “owner-parked” CCIP
 status statements. Those older documents remain historical decision and research
 records; they are not current-state authority.
@@ -26,11 +32,13 @@ configured router and RMN proxy, supports exactly the peer selector, and contain
 reciprocal remote token and pool. The exact RipeHq registration and capability-event
 transactions, snapshot blocks, runtime hashes, and addresses are in the JSON evidence.
 
-The repository production source is
+The repository candidate/reference implementation is
 `solidity/src/RipeCcipBurnMintTokenPools.sol`, which inherits the vendored 1.5.1
 source. The 1.6.1 example under `docs/chains/rh/examples/` is superseded design
-research, not live-source provenance. SPDX headers are preserved; this technical
-record makes no license or legal-sufficiency conclusion.
+research. Neither repository file is proof of exact live-pool creation provenance.
+The topology, capability, reported type/version, and runtime-hash evidence above does
+not resolve the exact live source set, compiler version/settings, constructor
+arguments, or creation bytecode/artifact identity.
 
 ## What “live” does and does not mean
 
@@ -57,10 +65,16 @@ send was performed while producing this evidence.
    amounts, manifests, profile identity, and RPC chain ID, then supports fork
    simulation only. Live mode fails with `CCIP_LIVE_SIGNER_UNBOUND`; no private-key or
    Safe backend is implied by an account label.
-4. **Historical transaction provenance.** Current TokenAdminRegistry pool assignments
+4. **Exact live creation identity.** The repository contains a candidate/reference
+   implementation, but the exact source set, compiler version/settings, constructor
+   arguments, and creation bytecode/artifact identity for the four live pools have not
+   been bound. Runtime hashes and current topology/capability reads do not establish
+   that creation provenance.
+5. **Historical transaction provenance.** Current TokenAdminRegistry pool assignments
    and remote mappings were read and match, but this snapshot does not yet bind the
-   exact historical `setPool` and `applyChainUpdates` transaction hashes. Capture
-   those if transaction-level provenance is required for the release record.
+   exact historical `setPool` and `applyChainUpdates` transaction hashes. The current
+   mutation gate requires that provenance; removing the gate instead requires a
+   separate explicit owner policy change.
 
 None of these gates should be silently converted into a default. Rate-policy changes,
 signer integration, new transactions, and release approval each require their own

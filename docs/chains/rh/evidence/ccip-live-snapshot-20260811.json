@@ -3,10 +3,12 @@
   "captured_at": "2026-08-11T20:29:21Z",
   "capture_method": "read-only public JSON-RPC and explorer API queries",
   "scope": "Base mainnet and Robinhood mainnet GREEN/RIPE CCIP current state plus RipeHq registration and capability-confirmation events",
-  "authority_boundary": "Evidence only. This snapshot does not select rate policy, authorize transactions, prove automatic execution gas, or establish legal conclusions.",
+  "authority_boundary": "Evidence only. This snapshot does not select rate policy, authorize transactions, prove automatic execution gas, establish exact live-pool creation provenance, or establish legal conclusions.",
   "repository_pool_source": {
     "path": "solidity/src/RipeCcipBurnMintTokenPools.sol",
+    "classification": "repository_candidate_reference_source",
     "inherited_type_and_version": "BurnMintTokenPool 1.5.1",
+    "live_creation_identity_status": "unresolved",
     "historical_non_live_reference": "docs/chains/rh/examples/RipeCcipBurnMintTokenPools.sol",
     "license_note": "SPDX headers are preserved as source provenance; license interpretation and legal sufficiency are outside this technical snapshot."
   },
@@ -175,6 +177,7 @@
   "unresolved_evidence": [
     "Exact historical TokenAdminRegistry setPool transaction hashes were not captured in this snapshot; current getPool values were read and matched.",
     "Exact historical applyChainUpdates transaction hashes were not captured in this snapshot; current supported selectors and reciprocal remote mappings were read and matched.",
+    "Exact live pool source set, compiler version/settings, constructor arguments, and creation bytecode/artifact identity were not established; current topology, capabilities, reported type/version, and runtime hashes do not prove the relationship to the repository candidate/reference source.",
     "No accepted full real-token OffRamp automatic-execution gas measurement is recorded.",
     "No live ccipSend signer or Safe transaction backend is authorized or implemented in scripts/ccip_send.py.",
     "This snapshot does not establish source-license legal conclusions."

@@ -52,15 +52,19 @@ typed ``MIGRATION_STAGE`` actions is required before production execution.
 """
 
 from scripts.utils import log
-from scripts.utils.migration import Migration
+from scripts.utils.migration import Migration, PromotionSpec
 
 from config.robinhood_launch import (
+    HR_MAX_TIMELOCK,
     HR_MIN_TIMELOCK,
     LEDGER_ACTION_BLOCK_SOURCE,
     LOOTBOX_DEPOSIT_REWARD,
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
     LOOTBOX_YIELD_BONUS,
+    STALE_WINDOW_MAX,
+    STALE_WINDOW_MIN,
+    SWITCHBOARD_MAX_TIMELOCK,
     SWITCHBOARD_MIN_TIMELOCK,
     TELLER_SHOULD_PAUSE,
     ZERO_ADDRESS,
@@ -88,6 +92,26 @@ ACTIVATED_0009 = (
     ("SwitchboardCharlie", "SwitchboardCharlieCandidate0009", "Switchboard", 3),
     ("SwitchboardEcho", "SwitchboardEchoCandidate0009", "Switchboard", 5),
 )
+
+CANONICAL_SOURCE_PATHS = {
+    "MissionControl": "contracts/data/MissionControl.vy",
+    "AuctionHouse": "contracts/core/AuctionHouse.vy",
+    "BondRoom": "contracts/core/BondRoom.vy",
+    "CreditEngine": "contracts/core/CreditEngine.vy",
+    "HumanResources": "contracts/core/HumanResources.vy",
+    "Lootbox": "contracts/core/Lootbox.vy",
+    "Teller": "contracts/core/Teller.vy",
+    "CreditRedeem": "contracts/core/CreditRedeem.vy",
+    "TellerUtils": "contracts/core/TellerUtils.vy",
+    "StabilityPool": "contracts/vaults/StabilityPool.vy",
+    "RipeGov": "contracts/vaults/RipeGov.vy",
+    "SimpleErc20": "contracts/vaults/SimpleErc20.vy",
+    "SwitchboardAlpha": "contracts/config/SwitchboardAlpha.vy",
+    "SwitchboardBravo": "contracts/config/SwitchboardBravo.vy",
+    "SwitchboardCharlie": "contracts/config/SwitchboardCharlie.vy",
+    "SwitchboardEcho": "contracts/config/SwitchboardEcho.vy",
+    "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
+}
 
 FINALIZED_0009 = (
     ("HumanResourcesCandidate0009", HR_MIN_TIMELOCK),
@@ -185,9 +209,7 @@ def _require_defaults_constructor_dependency(
             bytes.fromhex(encoded_args),
         )
     except (ValueError, TypeError):
-        raise RuntimeError(
-            "DEFAULTS_DEPENDENCY_CONSTRUCTOR_ARGS_INVALID"
-        ) from None
+        raise RuntimeError("DEFAULTS_DEPENDENCY_CONSTRUCTOR_ARGS_INVALID") from None
 
     expected_hq = str(hq.address).lower()
     expected_defaults = defaults_address.lower()
@@ -233,20 +255,86 @@ def migrate(migration: Migration):
         assert int(component.actionTimeLock()) == selected
         assert component.governance() == ZERO_ADDRESS
 
-    for canonical, candidate, registry_name, reg_id in ACTIVATED_0009:
-        migration.promote_candidate(
-            canonical,
-            candidate,
-            registries[registry_name],
-            reg_id,
+    defaults_candidate = migration.get_address("DefaultsRobinhoodLiveCandidate0009")
+    expected_args = {
+        "MissionControl": (hq, defaults_candidate),
+        "AuctionHouse": (hq,),
+        "BondRoom": (hq, migration.get_contract("BondBooster")),
+        "CreditEngine": (hq,),
+        "HumanResources": (hq, HR_MIN_TIMELOCK, HR_MAX_TIMELOCK),
+        "Lootbox": (
+            hq,
+            LOOTBOX_MIN_SEND_INTERVAL,
+            LOOTBOX_SEND_INTERVAL,
+            LOOTBOX_DEPOSIT_REWARD,
+            LOOTBOX_YIELD_BONUS,
+        ),
+        "Teller": (hq, TELLER_SHOULD_PAUSE),
+        "CreditRedeem": (hq,),
+        "TellerUtils": (hq,),
+        "StabilityPool": (hq,),
+        "RipeGov": (hq,),
+        "SimpleErc20": (hq,),
+        "SwitchboardAlpha": (
+            hq,
+            migration.account(),
+            STALE_WINDOW_MIN,
+            STALE_WINDOW_MAX,
+            SWITCHBOARD_MIN_TIMELOCK,
+            SWITCHBOARD_MAX_TIMELOCK,
+        ),
+        "SwitchboardBravo": (
+            hq,
+            migration.account(),
+            SWITCHBOARD_MIN_TIMELOCK,
+            SWITCHBOARD_MAX_TIMELOCK,
+        ),
+        "SwitchboardCharlie": (
+            hq,
+            migration.account(),
+            SWITCHBOARD_MIN_TIMELOCK,
+            SWITCHBOARD_MAX_TIMELOCK,
+        ),
+        "SwitchboardEcho": (
+            hq,
+            migration.account(),
+            SWITCHBOARD_MIN_TIMELOCK,
+            SWITCHBOARD_MAX_TIMELOCK,
+        ),
+    }
+    promotions = [
+        PromotionSpec(
+            canonical_name=canonical,
+            expected_source_path=CANONICAL_SOURCE_PATHS[canonical],
+            candidate_label=candidate,
+            registry_name=registry_name,
+            registry=registries[registry_name],
+            registry_id=reg_id,
+            expected_constructor_args=expected_args[canonical],
         )
-    migration.promote_candidate(
-        "DefaultsRobinhoodLive",
-        "DefaultsRobinhoodLiveCandidate0009",
-        registries[RIPE_HQ],
-        5,
-        activation_candidate_label="MissionControlCandidate0009",
+        for canonical, candidate, registry_name, reg_id in ACTIVATED_0009
+    ]
+    promotions.append(
+        PromotionSpec(
+            canonical_name="DefaultsRobinhoodLive",
+            expected_source_path=CANONICAL_SOURCE_PATHS["DefaultsRobinhoodLive"],
+            candidate_label="DefaultsRobinhoodLiveCandidate0009",
+            registry_name=RIPE_HQ,
+            registry=registries[RIPE_HQ],
+            registry_id=5,
+            expected_constructor_args=(),
+            activation_candidate_label="MissionControlCandidate0009",
+            # MissionControl's constructor is (RipeHq, Defaults). The helper
+            # independently decodes argument 1 and requires this exact
+            # candidate before accepting the sole distinct-witness policy.
+            activation_dependency_arg_index=1,
+            activation_expected_constructor_args=(hq, defaults_candidate),
+        )
     )
+    # All 17 records, compiler/source identities, dependencies, and registry
+    # readbacks pass before one pending-manifest write. A late mismatch cannot
+    # leave an earlier canonical label promoted.
+    migration.promote_candidates(promotions)
 
     # The now-promoted 0009 defaults retain the live Ledger's ripeAvailFor*
     # values, so the replacement inherits them unchanged.
@@ -272,7 +360,10 @@ def migrate(migration: Migration):
         log.h2(f"ArbSys action block: {arb_block}")
 
     redeploy(
-        "Lootbox", RIPE_HQ, 16, hq,
+        "Lootbox",
+        RIPE_HQ,
+        16,
+        hq,
         LOOTBOX_MIN_SEND_INTERVAL,
         LOOTBOX_SEND_INTERVAL,
         LOOTBOX_DEPOSIT_REWARD,

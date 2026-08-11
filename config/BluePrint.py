@@ -477,14 +477,16 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
     RobinhoodComponentSelection("CM-048", "EndaomentPSM", "required", "selected"),
     RobinhoodComponentSelection("CM-049", "DefaultsRobinhood", "required", "selected"),
     RobinhoodComponentSelection("CM-050", "AeroRipePrices", "omitted", "omitted"),
+    # Verified already-live on Base and Robinhood mainnet. These rows describe
+    # current topology, not authority for another CCIP transaction or release.
     RobinhoodComponentSelection(
-        "CM-051", "GREEN CCIP BurnMint pool", "deferred", "deferred"
+        "CM-051", "GREEN CCIP BurnMint pool", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-052", "RIPE CCIP BurnMint pool", "deferred", "deferred"
+        "CM-052", "RIPE CCIP BurnMint pool", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-053", "CCIP token-admin registration", "deferred", "deferred"
+        "CM-053", "CCIP token-admin registration", "required", "selected"
     ),
     RobinhoodComponentSelection(
         "CM-054", "GREEN/RIPE local price adapter", "deferred", "deferred"
@@ -502,7 +504,7 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
         "CM-057", "ABI export and explorer verification", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-058", "Solidity build/test/deploy toolchain", "deferred", "deferred"
+        "CM-058", "Solidity build/test/deploy toolchain", "required", "selected"
     ),
     RobinhoodComponentSelection("CM-059", "Base/RH test profiles", "required", "selected"),
     RobinhoodComponentSelection("CM-060", "DefaultsLocal", "omitted", "omitted"),
@@ -544,12 +546,12 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
                                "CM-047", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
     # Confirmed on both Base and Robinhood mainnet: RIPE was registered first
-    # at 23, then GREEN at 24. Keep these exact even while the historical
-    # blueprint lifecycle fields remain a record of the pre-activation plan.
+    # at 23, then GREEN at 24. These are active source-hard-coded identities,
+    # not empty reservations available to a future append.
     RobinhoodRegistrySelection("ripe_hq", 23, "RIPE CCIP BurnMint pool",
-                               "provisional_reservation", "CM-052", "deferred", "reserved"),
+                               "source_hard_coded", "CM-052", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 24, "GREEN CCIP BurnMint pool",
-                               "provisional_reservation", "CM-051", "deferred", "reserved"),
+                               "source_hard_coded", "CM-051", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 1, "Stability Pool",
                                "source_hard_coded", "CM-022", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault",
@@ -1014,11 +1016,13 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-15.rewards.arePointsEnabled': RobinhoodInput(SourceReference('Defaults.rewardsConfig.arePointsEnabled'), 'approved'),
     'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),
     'Deployment.DP-15.rewards.promotion': RobinhoodInput('f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234', 'approved'),
-    # DP-16
-    'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(False, 'disabled'),
-    'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(False, 'disabled'),
+    # DP-16 -- verified current live facts. This does not prove exact deployed
+    # source/compiler/constructor identity or historical transaction provenance.
+    # Operational policy and any future mutation remain gated in config/Ccip.py.
+    'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(True, 'external_fact'),
+    'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(True, 'external_fact'),
     'Deployment.DP-16.ccip.sgreenEnabled': RobinhoodInput(False, 'disabled'),
-    'Deployment.DP-16.ccip.promotion': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_16_CCIP_PROMOTION'), 'blocked'),
+    'Deployment.DP-16.ccip.promotion': RobinhoodInput(SourceReference('docs/chains/rh/evidence/ccip-live-snapshot-20260811.json'), 'external_fact'),
     # DP-17
     'Deployment.DP-17.staleWindows.alphaMinimum': RobinhoodInput(300, 'approved'),
     'Deployment.DP-17.staleWindows.alphaMaximum': RobinhoodInput(604800, 'approved'),

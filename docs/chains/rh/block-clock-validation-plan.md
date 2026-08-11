@@ -1,5 +1,10 @@
 # Block-clock validation plan
 
+> **11 August 2026 CCIP currentness note:** CCIP pending/disabled language in
+> this removed-inventory plan is historical. GREEN/RIPE topology and mint
+> capabilities are confirmed live; current operational gates are in
+> [`ccip-live-state.md`](ccip-live-state.md).
+
 > **8 August 2026 removal overlay:** This plan validated
 > `scripts/check_block_clock_inventory.py` against
 > `config/block-clock-inventory.json`. Both, and

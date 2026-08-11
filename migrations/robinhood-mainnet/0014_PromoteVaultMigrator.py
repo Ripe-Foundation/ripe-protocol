@@ -7,6 +7,11 @@ postcondition to a typed ``MIGRATION_STAGE`` action before execution.
 from scripts.utils import log
 from scripts.utils.migration import Migration
 
+from config.robinhood_launch import (
+    VAULT_MIGRATOR_SHOULD_PAUSE,
+    ZERO_ADDRESS,
+)
+
 
 VAULT_MIGRATOR_ID = 25
 VAULT_MIGRATOR_CANDIDATE = "VaultMigratorCandidate0013"
@@ -20,4 +25,11 @@ def migrate(migration: Migration):
         VAULT_MIGRATOR_CANDIDATE,
         hq,
         VAULT_MIGRATOR_ID,
+        expected_source_path="contracts/core/VaultMigrator.vy",
+        registry_name="RipeHq",
+        expected_constructor_args=(
+            hq,
+            VAULT_MIGRATOR_SHOULD_PAUSE,
+            ZERO_ADDRESS,
+        ),
     )

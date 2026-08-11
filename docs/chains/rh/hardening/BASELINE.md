@@ -1,5 +1,10 @@
 # RH hardening pass baseline, traceability, and path matrix
 
+> **11 August 2026 CCIP currentness note:** this baseline's `parked` CCIP rows
+> are historical classifications. GREEN/RIPE CCIP topology is now confirmed
+> live; current operational and release gates are in
+> [`../ccip-live-state.md`](../ccip-live-state.md).
+
 > **Path note (8 August 2026):** some paths cited below no longer exist in the
 > active tree — the block-clock inventory, the `contracts/testing/` probes, and
 > the extracted deploy manifests and review records were removed. The citations

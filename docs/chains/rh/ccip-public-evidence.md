@@ -1,7 +1,7 @@
 # Robinhood Chain CCIP public-evidence record
 
 > **Historical predeployment evidence.** For the confirmed live topology,
-> exact RipeHq event transactions, production 1.5.1 source line, and unresolved
+> exact RipeHq event transactions, pools reporting version 1.5.1, and unresolved
 > operational gates, see [ccip-live-state.md](ccip-live-state.md). Any “not
 > deployed” conclusion below is superseded by the 2026-08-11 onchain snapshot.
 

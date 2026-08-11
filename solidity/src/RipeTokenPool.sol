@@ -5,9 +5,10 @@ import {IBurnMintERC20} from "./v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {BurnMintTokenPool} from "./v0.8/ccip/pools/BurnMintTokenPool.sol";
 
 /// @notice Legacy configurable-capability pool retained for testnet migration history.
-/// @dev This is not the source of the live Base or Robinhood mainnet pools. Live
-/// production provenance is RipeCcipBurnMintTokenPools.sol, whose token-specific
-/// capability answers are compiled in as pure functions.
+/// @dev This is not selected as the repository candidate for the live Base or
+/// Robinhood mainnet topology. `RipeCcipBurnMintTokenPools.sol` is the current
+/// token-specific repository candidate/reference; neither file proves the exact
+/// source/compiler/constructor provenance of the already-live pools.
 /// @dev Identical to `BurnMintTokenPool 1.5.1` except it implements the two functions
 /// RipeHq expects on any address that holds minting privileges:
 ///

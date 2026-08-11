@@ -13,7 +13,7 @@ This plan requires a typed ``MIGRATION_STAGE`` conversion before execution.
 """
 
 from scripts.utils import log
-from scripts.utils.migration import Migration
+from scripts.utils.migration import Migration, PromotionSpec
 
 from config.robinhood_launch import (
     BLUECHIP_AAVE_PROVIDER,
@@ -22,8 +22,14 @@ from config.robinhood_launch import (
     BLUECHIP_FLUID_RESOLVER,
     BLUECHIP_MOONWELL_COMPTROLLER,
     BLUECHIP_MORPHO_FACTORIES,
+    LEDGER_ACTION_BLOCK_SOURCE,
+    LOOTBOX_DEPOSIT_REWARD,
+    LOOTBOX_MIN_SEND_INTERVAL,
+    LOOTBOX_SEND_INTERVAL,
+    LOOTBOX_YIELD_BONUS,
     PRICE_CHANGE_MAX_TIMELOCK,
     PRICE_CHANGE_MIN_TIMELOCK,
+    TELLER_SHOULD_PAUSE,
     ZERO_ADDRESS,
     address,
 )
@@ -40,19 +46,22 @@ ACTIVATED_0010 = (
     ("RipeGov", "RipeGovCandidate0010", VAULT_BOOK, 2),
 )
 
+CANONICAL_SOURCE_PATHS = {
+    "Ledger": "contracts/data/Ledger.vy",
+    "Lootbox": "contracts/core/Lootbox.vy",
+    "Teller": "contracts/core/Teller.vy",
+    "RipeGov": "contracts/vaults/RipeGov.vy",
+}
+
 
 def _add_calldata(new_addr, description):
     """The two Safe calls that append one PriceDesk registry slot."""
     from eth_abi.abi import encode
     from web3 import Web3
 
-    start = Web3.keccak(
-        text="startAddNewAddressToRegistry(address,string)"
-    )[:4]
+    start = Web3.keccak(text="startAddNewAddressToRegistry(address,string)")[:4]
     start += encode(["address", "string"], [new_addr, description])
-    confirm = Web3.keccak(
-        text="confirmNewAddressToRegistry(address)"
-    )[:4]
+    confirm = Web3.keccak(text="confirmNewAddressToRegistry(address)")[:4]
     confirm += encode(["address"], [new_addr])
     return start.hex(), confirm.hex()
 
@@ -65,13 +74,36 @@ def migrate(migration: Migration):
     }
 
     log.h1("Verifying and promoting activated 0010 candidates")
-    for canonical, candidate, registry_name, reg_id in ACTIVATED_0010:
-        migration.promote_candidate(
-            canonical,
-            candidate,
-            registries[registry_name],
-            reg_id,
-        )
+    expected_args = {
+        "Ledger": (
+            hq,
+            migration.get_address("DefaultsRobinhoodLive"),
+            LEDGER_ACTION_BLOCK_SOURCE,
+        ),
+        "Lootbox": (
+            hq,
+            LOOTBOX_MIN_SEND_INTERVAL,
+            LOOTBOX_SEND_INTERVAL,
+            LOOTBOX_DEPOSIT_REWARD,
+            LOOTBOX_YIELD_BONUS,
+        ),
+        "Teller": (hq, TELLER_SHOULD_PAUSE),
+        "RipeGov": (hq,),
+    }
+    migration.promote_candidates(
+        [
+            PromotionSpec(
+                canonical_name=canonical,
+                expected_source_path=CANONICAL_SOURCE_PATHS[canonical],
+                candidate_label=candidate,
+                registry_name=registry_name,
+                registry=registries[registry_name],
+                registry_id=reg_id,
+                expected_constructor_args=expected_args[canonical],
+            )
+            for canonical, candidate, registry_name, reg_id in ACTIVATED_0010
+        ]
+    )
 
     price_desk = migration.get_contract("PriceDesk")
     # AddressRegistry.numAddrs is the next id, not the number of populated

@@ -5,14 +5,15 @@ practical: Chainlink CCIP token pools, which have to be a `TokenPool` subclass t
 usable by CCIP, and Chainlink only publishes those in Solidity.
 
 ```
-src/RipeCcipBurnMintTokenPools.sol  # live RIPE and GREEN pool source
+src/RipeCcipBurnMintTokenPools.sol  # RIPE and GREEN pool candidate/reference
 src/RipeTokenPool.sol               # retained legacy testnet-only pool source
 src/v0.8/...                        # vendored Chainlink CCIP 1.5.1 sources
 ```
 
-## Live pool source
+## Repository candidate/reference pool source
 
-`RipeCcipBurnMintTokenPools.sol` defines one token-specific subclass of
+`RipeCcipBurnMintTokenPools.sol` defines the repository candidate/reference
+implementation: one token-specific subclass of
 `BurnMintTokenPool 1.5.1` for GREEN and one for RIPE. Each adds the two functions
 RipeHq staticcalls on any address it grants minting rights to:
 
@@ -33,8 +34,11 @@ Everything else - `lockOrBurn`, `releaseOrMint`, rate limits, allowlist, ownersh
 burn/mint pool.
 
 `RipeTokenPool.sol` is the earlier configurable-capability implementation retained for
-the existing Base Sepolia/Robinhood testnet migration history. It is not the source of
-the live Base or Robinhood mainnet pools and must not be cited as production provenance.
+the existing Base Sepolia/Robinhood testnet migration history. Neither it nor this
+candidate/reference implementation should be cited as proof of exact live-pool creation
+provenance. The live topology, capabilities, reported type/version, and runtime hashes
+are recorded separately, but the exact live source set, compiler version/settings,
+constructor arguments, and creation bytecode/artifact identity remain unresolved.
 
 ## Vendored sources
 
@@ -42,8 +46,10 @@ the live Base or Robinhood mainnet pools and must not be cited as production pro
 `BurnMintTokenPool 1.5.1` deployment on base-sepolia
 ([0x4DFd9eBB670F22b0cf53A53088E38636855CC600](https://sepolia.basescan.org/address/0x4DFd9eBB670F22b0cf53A53088E38636855CC600)),
 the pool the CCIP token manager UI deploys. `foundry.toml` mirrors the compiler settings
-Chainlink used for it (solc 0.8.26, paris, via-ir, 80000 runs), so the vendored source
-is compiled with the same settings here. Preserve every source file's SPDX header.
+Chainlink used for that Base Sepolia deployment (solc 0.8.26, paris, via-ir, 80000
+runs), so the vendored source is compiled with the same settings here. Those repository
+settings are not evidence of the settings used to create the live mainnet pools.
+Preserve every source file's SPDX header.
 This README records technical source provenance only; it makes no conclusion about
 license interpretation or legal sufficiency.
 
@@ -53,9 +59,10 @@ license interpretation or legal sufficiency.
 forge build --root solidity
 ```
 
-Mainnet migrations do this for you with the token-specific contract name and
-`source_file="RipeCcipBurnMintTokenPools.sol"`; they deploy from the Foundry artifact
-and record the address in the manifest.
+Repository mainnet migrations are configured to use the token-specific contract name
+and `source_file="RipeCcipBurnMintTokenPools.sol"`; a future/replacement deployment
+through them would use the Foundry artifact and record the address in the manifest.
+That configuration does not prove how the existing live pools were created.
 
 ## Verify
 

@@ -415,9 +415,9 @@ def test_complete_inventory_and_cardinality_reconciliation():
         f"CM-{value:03d}" for value in range(1, 61)
     )
     assert Counter(component.deployment for component in components) == {
-        Disposition.REQUIRED: 40,
+        Disposition.REQUIRED: 44,
         Disposition.OMITTED: 14,
-        Disposition.DEFERRED: 5,
+        Disposition.DEFERRED: 1,
         Disposition.BLOCKED: 1,
     }
     assert len(surfaces) == 100
@@ -431,17 +431,16 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SurfaceKind.BEHAVIORAL_INVARIANT: 9,
     }
     assert Counter(surface.disposition for surface in surfaces) == {
-        Disposition.REQUIRED: 13,
+        Disposition.REQUIRED: 19,
         Disposition.OMITTED: 20,
-        Disposition.DISABLED: 24,
-        Disposition.DEFERRED: 5,
+        Disposition.DISABLED: 22,
+        Disposition.DEFERRED: 1,
         Disposition.BLOCKED: 38,
     }
     assert Counter(surface.lifecycle_phase for surface in surfaces) == {
-        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 27,
-        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 21,
+        LifecyclePhase.DEPLOYED_INITIAL_VALUE: 32,
+        LifecyclePhase.PRE_ACTIVATION_CONFIGURATION: 22,
         LifecyclePhase.ATOMIC_STOCK_ACTIVATION: 4,
-        LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_CCIP_PROMOTION: 6,
         LifecyclePhase.POST_LAUNCH_RELEASE: 4,
         LifecyclePhase.OMITTED: 20,
         LifecyclePhase.BLOCKED: 18,
@@ -474,22 +473,21 @@ def test_complete_inventory_and_cardinality_reconciliation():
     )
     assert len(paths) == 103
     assert Counter(source.path_kind for _, source in paths) == {
-        SourcePathKind.FILE: 92,
+        SourcePathKind.FILE: 96,
         SourcePathKind.DIRECTORY: 6,
-        SourcePathKind.NONE: 5,
+        SourcePathKind.NONE: 1,
     }
     assert Counter(source.path_state for _, source in paths) == {
-        SourcePathState.EXISTING: 92,
+        SourcePathState.EXISTING: 96,
         SourcePathState.REVIEWED_PLANNED: 6,
-        SourcePathState.EXTERNAL_PENDING: 4,
         SourcePathState.ABSENT: 1,
     }
     assert Counter(source.source_class for _, source in paths) == {
         SourceClass.SHARED_CONTRACT: 53,
-        SourceClass.NON_ONCHAIN_TOOLING: 35,
+        SourceClass.NON_ONCHAIN_TOOLING: 36,
         SourceClass.EXTERNAL_INTEGRATION: 9,
         SourceClass.CHAIN_SPECIFIC_CONFIG: 3,
-        SourceClass.EXTERNAL_ARTIFACT: 3,
+        SourceClass.EXTERNAL_ARTIFACT: 2,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 50
     assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
@@ -539,7 +537,6 @@ def test_profile1_launch_selection_is_exact_and_exclusion_complete():
     assert set(selection.excluded_lanes) == {
         "PSM_PARAMETERS_OR_ACTIVATION",
         "DELEVERAGE_VALUES",
-        "CCIP",
         "CREDIT_ENGINE_ZERO_BACKING",
         "CURVE_HIGHER_POWERS_OR_LP_ACTIVATION",
         "UNISWAP",
@@ -880,18 +877,13 @@ def test_exact_registry_topology_and_authority_classes():
         "CM-045",
         "CM-047",
         "CM-048",
-        "CM-051",
         "CM-052",
+        "CM-051",
     ]
     assert all(
         topology[(RegistryDomain.RIPE_HQ, value)].authority
         is RegistryIdAuthority.SOURCE_HARD_CODED
-        for value in range(1, 23)
-    )
-    assert all(
-        topology[(RegistryDomain.RIPE_HQ, value)].authority
-        is RegistryIdAuthority.PROVISIONAL_RESERVATION
-        for value in (23, 24)
+        for value in range(1, 25)
     )
     assert {
         value: topology[(RegistryDomain.VAULT_BOOK, value)].semantic_name
@@ -1178,22 +1170,22 @@ def test_registry_shift_and_semantic_reuse_fail_closed():
             registry_expectations=(changed,),
         ),
     )
-    reserve = get_component("CM-051").registry_expectations[0]
+    live_row = get_component("CM-051").registry_expectations[0]
     assert_code(
         "H03_REGISTRY_TOPOLOGY",
         replace_component(
             "CM-051",
             registry_expectations=(
                 replace(
-                    reserve,
-                    authority=RegistryIdAuthority.REGISTRATION_ORDER,
+                    live_row,
+                    authority=RegistryIdAuthority.PROVISIONAL_RESERVATION,
                 ),
             ),
         ),
     )
 
 
-def test_ccip_is_the_only_remaining_nonautomatic_promotion():
+def test_ccip_promotion_record_matches_confirmed_live_state():
     ccip = get_promotion("P-CCIP-SEVEN-DAY")
     assert ccip.surface_ids == (
         "S-001-CCIP-CAP",
@@ -1204,7 +1196,8 @@ def test_ccip_is_the_only_remaining_nonautomatic_promotion():
         "S-058-TOOLCHAIN",
     )
     assert ROBINHOOD_BLUEPRINT.promotions == (ccip,)
-    assert ccip.disposition is Disposition.DEFERRED
+    assert ccip.disposition is Disposition.REQUIRED
+    assert ccip.promotion_phase is LifecyclePhase.DEPLOYED_INITIAL_VALUE
     assert not any(
         surface.lifecycle_phase
         is LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_REWARD_ACTIVATION

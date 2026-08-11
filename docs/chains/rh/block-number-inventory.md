@@ -18,8 +18,12 @@
 > `07fc837ee5c9c56a4cf979c64e3d678753eeb6c263e4100d7a1f0cb4704f2122`.
 > The historical ledger below remains evidence; `status.yaml` is current
 > authority. Repository configuration is prepared and consistent;
-> production/onchain configuration has not occurred. Nothing is deployed,
-> migrated, activated, or released.
+> production/onchain configuration has not occurred for the non-CCIP launch
+> candidate. **11 August 2026 CCIP currentness:** GREEN/RIPE CCIP topology is
+> separately confirmed live; historical
+> CCIP planning statements below are not current-state authority. See
+> [`ccip-live-state.md`](ccip-live-state.md). No further transaction or release
+> is authorized.
 
 **Status:** Complete analysis; BN-002 and BN-025 directions are recorded;
 remaining recommendations and owner decisions are unapproved

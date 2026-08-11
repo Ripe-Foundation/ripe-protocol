@@ -1,5 +1,18 @@
 # Robinhood Chain Technical Deployment Summary
 
+## 11 August 2026 CCIP currentness overlay
+
+GREEN and RIPE CCIP registration, routing, reciprocal wiring, governance
+ownership, and token-specific mint capabilities are confirmed live on Base and
+Robinhood mainnet. Exact live creation source/compiler/settings/constructor
+identity, rate policy, full destination-gas evidence, historical transaction
+provenance, license conclusions, a live transaction backend, any further
+transaction, and release remain separately gated. This supersedes every
+disabled, deferred, unchecked, proposed, or not-deployed CCIP statement in the
+older architecture/checklist text below; preserve those statements as dated
+planning history only. Current evidence is
+[`rh/ccip-live-state.md`](rh/ccip-live-state.md).
+
 ## 1 August 2026 current reconciliation
 
 The current configuration-source baseline is `rh` commit
@@ -11,14 +24,15 @@ Blueprint/Defaults authority are integrated.
 
 `DefaultsRobinhood.vy` exists and compiles; the derived parameter ledger is
 synchronized. The current register has 22 H-04 rows: 21 approved and
-operative, one retired and non-operative, and zero open. All 42 canonical H-03
-blockers remain open, including the 23 Curve-specific typed inputs. The source check reports
-`configuration_consistent=true`, `deployment_ready=false`, and 80 readiness
+operative, one retired and non-operative, and zero open. All 28 canonical H-03
+blockers remain open, including the nine Curve-specific typed inputs. The source check reports
+`configuration_consistent=true`, `deployment_ready=false`, and 64 readiness
 blockers. Repository configuration is prepared and consistent;
 production/onchain configuration has not occurred.
 
-No Robinhood deployment, migration execution, activation, RPC, account, key,
-signer, or release action has occurred. The sole canonical deployment-owner
+No non-CCIP Robinhood launch deployment, migration execution, activation, RPC,
+account, key, signer, or release action has occurred. The separately confirmed
+CCIP external state authorizes no further action. The sole canonical deployment-owner
 handoff is
 [`rh/deployment-owner-quickstart.md`](rh/deployment-owner-quickstart.md).
 The older checklist below is preserved as historical architecture/planning
@@ -32,8 +46,9 @@ explicitly reopened.
 
 The historical S4 zero-`deleverageCooldown` decision remains closed and was
 not reopened. CreditEngine zero-backing reassessment, Uniswap TWAP
-implementation, CCIP, Sites recovery, dashboard publication, and live
-deployment remain deferred or separately unauthorized. H-06 qualifies only a
+implementation, Sites recovery, dashboard publication, and non-CCIP live
+deployment remain deferred or separately unauthorized. CCIP is live, while
+its operational and release gates remain open. H-06 qualifies only a
 candidate operator/storage class, not a final operator, machine, volume,
 deployment, or release. Remaining work is predeployment infrastructure,
 qualification, rehearsal, and release preparation.
@@ -47,8 +62,9 @@ reports. It records one program package, not eight implementation trains.
 
 The accepted architecture preserves the current Ledger and Teller designs,
 uses protected `SimpleErc20` through the shared `BasicVault` module, selects Chainlink at PriceDesk
-ID 1, unchanged CurvePrices at ID 2 for GREEN only, and BlueChipYield at ID 3,
-with IDs 4/5 empty and priorities `[1,3]`. USDG remains Chainlink-only, so the
+ID 1 and unchanged CurvePrices at ID 2 for GREEN only, while BlueChipYield at
+ID 3 remains blueprint-selected but is not deployed or finalized by the current
+candidate. IDs 4/5 are empty and priorities are `[1,2]`. USDG remains Chainlink-only, so the
 GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG route cannot recurse.
 No LP token, additional Curve feed or consumer, dynamic rate, Teller snapshot,
 Endaoment stabilizer, PSM Curve use, or Uniswap price source is admitted.
@@ -56,9 +72,11 @@ RIPE/WETH V2 is at most an externally held launch-liquidity canary. The PSM
 posture is disabled, allowlisted, canary-first, and redemption-first.
 
 H-09 owns explicit opt-in read-only archive-fork qualification with network
-disabled by default. H-10 separately owns live rehearsal. No deployment,
-migration execution, production configuration, activation, or release has
-occurred or is authorized by the synthesis.
+disabled by default. H-10 separately owns live rehearsal. No
+launch-remediation-candidate deployment, migration execution, production
+configuration, activation, or release has occurred or is authorized by the
+synthesis. Separately observed live CCIP and monitoring-only Uniswap state
+grants no such authority.
 
 > **Document role:** This is the stable architecture and launch checklist, not
 > the live progress authority. Start with
@@ -86,12 +104,13 @@ completion percentage.
 is being re-evaluated in
 [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md)
 
-**Current owner-priority overlay:** 30 July 2026 — the
+**Historical owner-priority overlay:** 30 July 2026 — the
 [`current-owner-priorities.md`](rh/current-owner-priorities.md) overlay removes
 CCIP workflows, CreditEngine zero-backing reassessment, every Deleverage task,
 and Uniswap TWAP implementation from the active queue and also parks Sites
-recovery and dashboard deployment. These six lanes are nonblocking until
-explicitly reopened. The ordered coworker handoff is
+recovery and dashboard deployment. Its parked-CCIP status was superseded by the
+11 August live-state overlay above; no further CCIP transaction was thereby
+authorized. The ordered coworker handoff is
 [`deployment-owner-readiness.md`](rh/deployment-owner-readiness.md).
 Historical architecture and checklist material below remains preserved and
 must not be mistaken for a current assignment.

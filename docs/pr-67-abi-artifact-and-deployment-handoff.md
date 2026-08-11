@@ -135,18 +135,73 @@ The corrected Robinhood forward sequence is deliberately multi-stage:
    manifest record only after RipeHq id 25 equals the candidate.
 
 The promotion helper copies the candidate's complete record, including file,
-ABI, compiler JSON, and constructor arguments. Copying only its address would
-silently pair new code with the prior generation's metadata and is forbidden.
-Candidate labels and prior timestamp manifests remain preserved as evidence.
+ABI, compiler JSON, and canonical ABI-encoded constructor arguments. Every
+caller supplies a reviewed literal source path. The helper requires that path
+to equal the repository's canonical-name lookup and requires the filename stem
+to equal the canonical contract name; an authenticated MissionControl record
+cannot therefore be promoted as Ledger by changing the local lookup. It rejects
+absolute/traversing/non-Vyper paths, empty or malformed ABI/compiler records,
+and compiler records that do not contain the named source. The approved
+compiler settings are exactly the primary source's full output selection and a
+repository-root search path. Every compiler source is compared as exact UTF-8
+bytes to its repository file, and a Vyper `sha256sum` field is verified when
+present.
+
+The manifest's exact pinned Vyper version must equal the installed build. The
+helper recompiles the recorded standard JSON, rejects compile diagnostics or
+an integrity mismatch, and requires the recompiled ABI to equal the recorded
+ABI. Constructor bytes must decode and re-encode identically, which rejects
+trailing bytes, and must equal the independent constructor values supplied by
+the migration caller. The activated registry object must itself equal the
+canonical manifest record for the named registry. Finally, the candidate
+address must contain code whose length is exactly compiler-template length plus
+Vyper code-layout length and whose prefix equals the complete compiled runtime
+template. This is full runtime equality for contracts without code-data; for
+immutable-bearing contracts it deliberately does **not** authenticate the
+immutable suffix. The typed execution envelope must still bind the exact
+creation input, receipt/address, and full deployed runtime before production
+execution. Copying only an address would silently pair new code with the prior
+generation's metadata and is forbidden. Candidate labels and prior timestamp
+manifests remain preserved as evidence.
+
+The 17 promotions in `0010` and the four promotions in `0011` each use one
+batch helper call. Every candidate, source/compiler/runtime identity,
+constructor, dependency, registry identity, and registry readback is
+preflighted before any checkpoint write. The transaction log is then persisted
+before the pending manifest, making a pure-promotion checkpoint immediately
+resumable; the in-memory manifest advances only after the pending save
+succeeds. JSON checkpoints use a same-directory temporary file, complete write,
+file `fsync`, atomic replace, and directory `fsync`, so an interrupted partial
+write cannot replace the prior JSON target. Resume loads that complete pending
+snapshot as authoritative rather than recursively merging it with `current`, so
+removed stale fields cannot reappear. A late batch mismatch cannot leave an
+earlier canonical label promoted, while a failed pending save may retain its
+intentional log journal but cannot advance the manifest or memory.
+
+Resuming a logged `deploy` or `deploy_bp` requires the logged address to equal
+both the pending record and returned contract. It recompiles the current exact
+source/compiler/ABI record, binds the newly supplied constructor arguments, and
+validates the recorded address's deployed code before reusing the pending entry
+without regenerating it, preserving all metadata byte-for-byte. Standard
+deployments use the same runtime-template/length check described above.
+Blueprint resume is explicit: blueprint creation has empty arguments even when
+the instance ABI declares a constructor, and the deployed code must exactly
+equal the ERC-5202 `fe7100` preamble plus the recompiled creation bytecode. The
+promotion validator remains stricter than that blueprint exception.
 
 `DefaultsRobinhoodLive` has an additional dependency witness. Its activation
 witness is MissionControl at RipeHq id 5, so before either record is promoted
 the plan decodes `MissionControlCandidate0009`'s manifest constructor arguments
 and requires `(RipeHq, DefaultsRobinhoodLiveCandidate0009)` exactly. It also
 reads MissionControl's immutable RipeHq back on chain. MissionControl copies
-Defaults into storage and deliberately retains no public Defaults pointer, so
-the typed execution envelope must bind the creation input and deployment
-receipt; registry readback alone is not proof of the Defaults dependency.
+Defaults into storage and deliberately retains no public Defaults pointer. The
+generic helper therefore permits exactly this
+`DefaultsRobinhoodLive`/`MissionControl`/RipeHq-id-5 policy, requires constructor
+argument index 1, and decodes that address from the witness's recorded
+constructor bytes before promotion. Other distinct-witness combinations fail
+closed. The typed execution envelope must still bind the creation input and
+deployment receipt; registry readback alone is not proof of the Defaults
+dependency.
 
 The already-recorded Robinhood Uniswap deployment predates the corrected
 temporary-governance flow. Rewriting `0008` is not on-chain remediation. Bind
@@ -216,15 +271,65 @@ python scripts/check_contract_artifacts.py \
 The updater accepts raw deployed bytecode captured from
 `env.get_code(contract.address)`. When existing expectations are still
 unbound, the strict refresh must supply a runtime for every governed
-immutable-bearing contract, not only the example contracts below:
+immutable-bearing contract. After source freeze and one clean 18-contract Boa
+capture, the exact final regeneration sequence is:
 
-```text
+```bash
+PR67_RUNTIME_DIR=/private/tmp/pr67-final-runtime-capture
+python scripts/capture_contract_runtimes.py \
+  --output-dir "$PR67_RUNTIME_DIR"
+
+python scripts/export_abis.py
+
 python scripts/update_contract_artifact_expectations.py \
-  --deployed-runtime ContractA=/private/path/ContractA.runtime \
-  --deployed-runtime ContractB=/private/path/ContractB.runtime \
-  --require-deployed-runtime-bindings \
-  ContractA ContractB ...
+  --capture-manifest "$PR67_RUNTIME_DIR/capture-manifest.json" \
+  --deployed-runtime AuctionHouse="$PR67_RUNTIME_DIR/AuctionHouse.runtime" \
+  --deployed-runtime BlueChipYieldPrices="$PR67_RUNTIME_DIR/BlueChipYieldPrices.runtime" \
+  --deployed-runtime CreditEngine="$PR67_RUNTIME_DIR/CreditEngine.runtime" \
+  --deployed-runtime DefaultsRobinhood="$PR67_RUNTIME_DIR/DefaultsRobinhood.runtime" \
+  --deployed-runtime Deleverage="$PR67_RUNTIME_DIR/Deleverage.runtime" \
+  --deployed-runtime Ledger="$PR67_RUNTIME_DIR/Ledger.runtime" \
+  --deployed-runtime Lootbox="$PR67_RUNTIME_DIR/Lootbox.runtime" \
+  --deployed-runtime MissionControl="$PR67_RUNTIME_DIR/MissionControl.runtime" \
+  --deployed-runtime RipeGov="$PR67_RUNTIME_DIR/RipeGov.runtime" \
+  --deployed-runtime SimpleErc20="$PR67_RUNTIME_DIR/SimpleErc20.runtime" \
+  --deployed-runtime StabilityPool="$PR67_RUNTIME_DIR/StabilityPool.runtime" \
+  --deployed-runtime SwitchboardAlpha="$PR67_RUNTIME_DIR/SwitchboardAlpha.runtime" \
+  --deployed-runtime SwitchboardBravo="$PR67_RUNTIME_DIR/SwitchboardBravo.runtime" \
+  --deployed-runtime SwitchboardCharlie="$PR67_RUNTIME_DIR/SwitchboardCharlie.runtime" \
+  --deployed-runtime SwitchboardDelta="$PR67_RUNTIME_DIR/SwitchboardDelta.runtime" \
+  --deployed-runtime Teller="$PR67_RUNTIME_DIR/Teller.runtime" \
+  --deployed-runtime UniswapV2Prices="$PR67_RUNTIME_DIR/UniswapV2Prices.runtime" \
+  --deployed-runtime VaultMigrator="$PR67_RUNTIME_DIR/VaultMigrator.runtime" \
+  --require-deployed-runtime-bindings
+
+python scripts/export_abis.py --check
+python scripts/check_contract_artifacts.py \
+  --require-deployed-runtime-bindings
 ```
+
+No positional contract filter is allowed in this final sequence: strict mode
+rejects filters, requires the exact 18 runtime inputs plus their completed
+capture manifest, and rebuilds the exact 19-record governed set. The capture
+command must run from the repository root after `contracts/` and `interfaces/`
+are clean in Git, and its output path must not already exist. It writes into a
+private sibling staging directory, records the exact repository HEAD/tree,
+capture-script hash, toolchain, source hashes, constructor inputs, prospective
+state/readback obligations, and runtime hashes, writes the completion manifest
+last, then atomically publishes the directory. The updater rejects a mixed,
+stale, incomplete, foreign-worktree, or differently configured generation.
+
+The generated
+`DefaultsRobinhoodLive` has no immutable code-data suffix, so its compiler
+runtime template is already its full deployed-runtime identity and it is the
+sole governed record that does not need a capture file.
+
+ABI export compiles and preflights the complete inventory before mutation,
+atomically replaces each generated ABI, and publishes
+`scripts/abis/.abi-export-complete` only after the whole output set succeeds.
+`--check` requires that seal to match every generated ABI hash, so an interrupted
+or mixed generation cannot report current. The expectations JSON is likewise
+written through a same-directory temporary file, `fsync`, and atomic replace.
 
 For each measured runtime, the updater requires:
 
@@ -236,18 +341,27 @@ For each measured runtime, the updater requires:
 Final integration must deploy every governed immutable-bearing contract with
 the exact approved constructor arguments in one clean Boa graph, capture the
 raw `env.get_code` bytes outside the repository, refresh the final source and
-ABI records, then run the strict checker. Do not derive a deployed-runtime hash
-from the template or refresh hashes merely to make the gate pass.
+ABI records, then run the strict checker. The runtime identity proves code plus
+immutable code data. It does **not** prove storage-only constructor effects or
+post-deployment state: Teller's pause bit, MissionControl's Defaults-derived
+configuration, Deleverage's stored policy, temporary-governance relinquishment,
+and action-timelock setup still require the typed execution receipt and named
+readbacks recorded in the capture manifest. Do not derive a deployed-runtime
+hash from the template or refresh hashes merely to make the gate pass.
 
-The updater's final governed set adds `BlueChipYieldPrices`, the generated
-`DefaultsRobinhoodLive`, and the integrated `SwitchboardAlpha` to the existing
+The updater's final governed set contains 19 records and adds
+`BlueChipYieldPrices`, the generated `DefaultsRobinhoodLive`, integrated
+`SwitchboardAlpha`, and integrated `SwitchboardCharlie` to the prior 15-record
 ledger. BlueChip must replace its standalone template-only frozen facts with a
-constructor-bound runtime record; Defaults must bind the exact generated
-source used by MissionControl and Ledger; Alpha must bind the final integrated
-capability-check source and constructor. Update the inventory test's exact
-required-name set in the same final expectation refresh. The integrated
-`VaultMigrator` source also changed after the reviewed PR head and must be
-measured from those final bytes.
+constructor-bound runtime record; Defaults must bind the exact generated source
+that the typed execution envelope supplies to MissionControl and Ledger; Alpha
+and Charlie must bind their final integrated capability-check sources and
+immutable code data, while their storage/post-setup state remains a separate
+readback gate. Update the inventory
+test's exact required-name set in the same final expectation refresh. The
+integrated `VaultMigrator` source also changed after the reviewed PR head and
+must be measured from those final bytes.
 
-`config/contract-artifact-expectations.json` is intentionally not regenerated
-in this lane because the final C1/C2/C3 production bytes are not yet integrated.
+`config/contract-artifact-expectations.json`, the ABI completion seal, and the
+18-runtime capture remain deliberately ungenerated until the final production
+sources are frozen and clean. Do not commit a partial generation.
