@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import stat
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 
@@ -26,6 +27,7 @@ _COMPILER_KEYS = frozenset(
 _REFERENCE_KEYS = frozenset({"path", "sha256"})
 _RECORD_KEYS = frozenset({"contract", "expectation", "schema_version"})
 _SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+_CONTRACT_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
 class ArtifactExpectationsError(ValueError):
@@ -41,13 +43,21 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_non_finite_constant(value: str) -> None:
+    raise ArtifactExpectationsError(f"non-finite JSON constant: {value}")
+
+
 def _load_json(raw: bytes, *, label: str) -> Any:
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ArtifactExpectationsError(f"{label}: invalid UTF-8") from exc
     try:
-        return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+        return json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_non_finite_constant,
+        )
     except json.JSONDecodeError as exc:
         raise ArtifactExpectationsError(f"{label}: invalid JSON: {exc}") from exc
 
@@ -85,12 +95,129 @@ def _validate_contracts(value: Any, *, label: str) -> dict[str, Any]:
     if not contracts:
         raise ArtifactExpectationsError(f"{label}: no contract records")
     for name, record in contracts.items():
-        if not isinstance(name, str) or not name:
+        if (
+            not isinstance(name, str)
+            or _CONTRACT_IDENTIFIER_RE.fullmatch(name) is None
+        ):
             raise ArtifactExpectationsError(
-                f"{label}: contract names must be non-empty strings"
+                f"{label}: contract names must be identifier-safe"
             )
         _require_object(record, label=f"{label}.{name}")
     return contracts
+
+
+def _path_text(value: Any, *, label: str) -> str:
+    try:
+        raw = os.fspath(value)
+    except TypeError as exc:
+        raise ArtifactExpectationsError(f"{label}: path must be path-like") from exc
+    if not isinstance(raw, str) or not raw or "\x00" in raw:
+        raise ArtifactExpectationsError(
+            f"{label}: path must be a non-empty text path"
+        )
+    return raw
+
+
+def _exact_child(parent: Path, name: str, *, label: str) -> Path:
+    try:
+        names = {entry.name for entry in parent.iterdir()}
+    except OSError as exc:
+        raise ArtifactExpectationsError(
+            f"{label}: cannot inspect anchor directory: {parent}"
+        ) from exc
+    if name not in names:
+        case_matches = sorted(
+            candidate for candidate in names if candidate.casefold() == name.casefold()
+        )
+        if case_matches:
+            raise ArtifactExpectationsError(
+                f"{label}: path component casing mismatch for {name!r}; "
+                f"on disk={case_matches}"
+            )
+        raise ArtifactExpectationsError(
+            f"{label}: missing path component {name!r} under {parent}"
+        )
+    return parent / name
+
+
+def _canonical_absolute_anchor(
+    value: Any, *, label: str, final_kind: str
+) -> Path:
+    raw = _path_text(value, label=label)
+    if PureWindowsPath(raw).drive:
+        raise ArtifactExpectationsError(
+            f"{label}: Windows drive paths are forbidden"
+        )
+    path = Path(raw)
+    if not path.is_absolute():
+        raise ArtifactExpectationsError(f"{label}: anchor must be absolute")
+    raw_components = raw.split("/")
+    if any(component in {".", ".."} for component in raw_components):
+        raise ArtifactExpectationsError(
+            f"{label}: anchor may not contain . or .. spellings"
+        )
+    if raw != "/" and (raw.endswith("/") or "//" in raw):
+        raise ArtifactExpectationsError(
+            f"{label}: anchor must use canonical separators"
+        )
+    if path.as_posix() != raw:
+        raise ArtifactExpectationsError(f"{label}: anchor spelling is not canonical")
+
+    current = Path(path.anchor)
+    try:
+        mode = current.lstat().st_mode
+    except OSError as exc:
+        raise ArtifactExpectationsError(
+            f"{label}: unreadable anchor root: {current}"
+        ) from exc
+    if stat.S_ISLNK(mode) or not stat.S_ISDIR(mode):
+        raise ArtifactExpectationsError(
+            f"{label}: anchor root must be a real directory"
+        )
+
+    parts = path.parts[1:]
+    for index, part in enumerate(parts):
+        current = _exact_child(current, part, label=label)
+        try:
+            mode = current.lstat().st_mode
+        except OSError as exc:
+            raise ArtifactExpectationsError(
+                f"{label}: unreadable anchor component: {current}"
+            ) from exc
+        if stat.S_ISLNK(mode):
+            raise ArtifactExpectationsError(
+                f"{label}: symlink anchor components are forbidden: {current}"
+            )
+        is_final = index == len(parts) - 1
+        if not is_final and not stat.S_ISDIR(mode):
+            raise ArtifactExpectationsError(
+                f"{label}: non-directory anchor component: {current}"
+            )
+
+    mode = current.lstat().st_mode
+    valid = stat.S_ISDIR(mode) if final_kind == "directory" else stat.S_ISREG(mode)
+    if not valid:
+        raise ArtifactExpectationsError(
+            f"{label}: anchor is not a regular {final_kind}: {current}"
+        )
+    try:
+        resolved = current.resolve(strict=True)
+    except OSError as exc:
+        raise ArtifactExpectationsError(f"{label}: anchor cannot resolve") from exc
+    if resolved != current:
+        raise ArtifactExpectationsError(f"{label}: anchor is not canonical")
+    return current
+
+
+def _require_native_containment(
+    candidate: Path, root: Path, *, label: str
+) -> None:
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ArtifactExpectationsError(
+            f"{label}: native path escapes repository root"
+        ) from exc
 
 
 def _read_regular_file(path: Path, *, label: str) -> bytes:
@@ -111,11 +238,19 @@ def _read_regular_file(path: Path, *, label: str) -> bytes:
 def _normalized_relative_path(value: Any, *, label: str) -> PurePosixPath:
     if not isinstance(value, str) or not value:
         raise ArtifactExpectationsError(f"{label}: path must be a non-empty string")
+    if PureWindowsPath(value).drive:
+        raise ArtifactExpectationsError(
+            f"{label}: Windows drive paths are forbidden"
+        )
     if "\\" in value:
         raise ArtifactExpectationsError(f"{label}: path must use POSIX separators")
     path = PurePosixPath(value)
     if path.is_absolute():
         raise ArtifactExpectationsError(f"{label}: absolute paths are forbidden")
+    if any(component in {"", ".", ".."} for component in value.split("/")):
+        raise ArtifactExpectationsError(
+            f"{label}: path must be normalized and may not escape its root"
+        )
     if path.as_posix() != value or any(part in {"", ".", ".."} for part in path.parts):
         raise ArtifactExpectationsError(
             f"{label}: path must be normalized and may not escape its root"
@@ -130,9 +265,11 @@ def _path_under_root(
     label: str,
     final_kind: str,
 ) -> Path:
+    candidate = root.joinpath(*relative.parts)
+    _require_native_containment(candidate, root, label=label)
     current = root
     for index, part in enumerate(relative.parts):
-        current /= part
+        current = _exact_child(current, part, label=label)
         try:
             mode = current.lstat().st_mode
         except OSError as exc:
@@ -155,6 +292,13 @@ def _path_under_root(
         raise ArtifactExpectationsError(
             f"{label}: path is not a regular {final_kind}: {relative.as_posix()}"
         )
+    try:
+        resolved = current.resolve(strict=True)
+    except OSError as exc:
+        raise ArtifactExpectationsError(f"{label}: path cannot resolve") from exc
+    _require_native_containment(resolved, root, label=label)
+    if resolved != current:
+        raise ArtifactExpectationsError(f"{label}: path is not canonical")
     return current
 
 
@@ -197,6 +341,12 @@ def _load_v2(index: dict[str, Any], *, root: Path) -> dict[str, Any]:
             raise ArtifactExpectationsError(
                 f"contract references.{name}.path: record must be a direct child "
                 "of records_root"
+            )
+        expected_filename = f"{name}.json"
+        if relative.name != expected_filename:
+            raise ArtifactExpectationsError(
+                f"contract references.{name}.path: expected exact filename "
+                f"{expected_filename!r}"
             )
         if relative in seen_paths:
             raise ArtifactExpectationsError(
@@ -262,10 +412,26 @@ def _load_v2(index: dict[str, Any], *, root: Path) -> dict[str, Any]:
 
 
 def load_artifact_expectations(
-    path: Path, *, root: Path | None = None
+    path: str | Path,
+    *,
+    root: str | Path | None = None,
+    allow_v2: bool = True,
 ) -> dict[str, Any]:
     """Load v1 or v2 expectations into the established v1 in-memory shape."""
-    index_path = Path(path)
+    if root is None:
+        raise ArtifactExpectationsError(
+            "artifact expectations: canonical absolute repository root is required"
+        )
+    root_path = _canonical_absolute_anchor(
+        root,
+        label="artifact expectations repository root",
+        final_kind="directory",
+    )
+    index_path = _canonical_absolute_anchor(
+        path,
+        label="artifact expectations index",
+        final_kind="file",
+    )
     index = _require_object(
         _load_json(
             _read_regular_file(index_path, label="artifact expectations"),
@@ -283,20 +449,11 @@ def load_artifact_expectations(
         raise ArtifactExpectationsError(
             f"artifact expectations: unsupported schema_version {schema_version!r}"
         )
-
-    if root is None:
+    if not allow_v2:
         raise ArtifactExpectationsError(
-            "artifact expectations v2: repository root is required"
+            "artifact expectations v2 updates require an atomic v2 writer"
         )
-    root_path = Path(root)
-    try:
-        root_mode = root_path.lstat().st_mode
-    except OSError as exc:
-        raise ArtifactExpectationsError(
-            f"artifact expectations v2: unreadable repository root: {root_path}"
-        ) from exc
-    if stat.S_ISLNK(root_mode) or not stat.S_ISDIR(root_mode):
-        raise ArtifactExpectationsError(
-            "artifact expectations v2: repository root must be a real directory"
-        )
+    _require_native_containment(
+        index_path, root_path, label="artifact expectations index"
+    )
     return _load_v2(index, root=root_path)

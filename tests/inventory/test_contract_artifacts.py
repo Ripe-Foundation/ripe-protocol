@@ -13,6 +13,7 @@ from config.artifact_expectations import (
     load_artifact_expectations,
 )
 from scripts import check_contract_artifacts as artifact_checker
+from scripts import update_contract_artifact_expectations as artifact_updater
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -130,6 +131,14 @@ def _rewrite_v2_index(index_path: Path, index: dict) -> None:
     index_path.write_bytes(_json_bytes(index))
 
 
+def _snapshot_regular_files(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+
+
 def test_v1_loader_preserves_the_current_in_memory_shape():
     assert _load_expectations() == json.loads(EXPECTATIONS.read_bytes())
 
@@ -137,6 +146,14 @@ def test_v1_loader_preserves_the_current_in_memory_shape():
 def test_v2_loader_is_equivalent_to_the_frozen_v1_shape(tmp_path):
     repository, index_path, _, _ = _write_v2_expectations(tmp_path)
     assert _load_expectations(index_path, root=repository) == _load_expectations()
+
+
+def test_v2_index_must_be_natively_contained_by_root(tmp_path):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    outside_index = tmp_path / "outside-index.json"
+    outside_index.write_bytes(index_path.read_bytes())
+    with pytest.raises(ArtifactExpectationsError, match="native path escapes"):
+        _load_expectations(outside_index, root=repository)
 
 
 def test_duplicate_json_keys_fail_closed(tmp_path):
@@ -157,7 +174,69 @@ def test_symlink_index_fails_closed(tmp_path):
         "--contract", "Lootbox", "--expectations", str(symlink)
     )
     assert result.returncode == 1
-    assert "symlink paths are forbidden" in result.stderr
+    assert "symlink anchor components are forbidden" in result.stderr
+
+
+def test_relative_root_and_index_anchors_fail_closed(tmp_path):
+    index_path = _write_expectations(tmp_path, _load_expectations())
+    with pytest.raises(ArtifactExpectationsError, match="anchor must be absolute"):
+        _load_expectations("expectations.json", root=tmp_path)
+    with pytest.raises(ArtifactExpectationsError, match="anchor must be absolute"):
+        _load_expectations(index_path, root="repository")
+
+
+def test_dot_and_dotdot_anchor_spellings_fail_closed(tmp_path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    index_path = _write_expectations(repository, _load_expectations())
+    unsafe_indexes = (
+        f"{repository}/./{index_path.name}",
+        f"{repository}/unused/../{index_path.name}",
+    )
+    for unsafe_index in unsafe_indexes:
+        with pytest.raises(ArtifactExpectationsError, match="may not contain . or .."):
+            _load_expectations(unsafe_index, root=repository)
+
+    unsafe_roots = (
+        f"{tmp_path}/./repository",
+        f"{repository}/unused/..",
+    )
+    for unsafe_root in unsafe_roots:
+        with pytest.raises(ArtifactExpectationsError, match="may not contain . or .."):
+            _load_expectations(index_path, root=unsafe_root)
+
+
+def test_root_and_index_parent_symlinks_fail_closed(tmp_path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    index_path = _write_expectations(repository, _load_expectations())
+    linked_repository = tmp_path / "linked-repository"
+    linked_repository.symlink_to(repository, target_is_directory=True)
+
+    with pytest.raises(
+        ArtifactExpectationsError, match="symlink anchor components are forbidden"
+    ):
+        _load_expectations(
+            linked_repository / index_path.name, root=repository
+        )
+    with pytest.raises(
+        ArtifactExpectationsError, match="symlink anchor components are forbidden"
+    ):
+        _load_expectations(index_path, root=linked_repository)
+
+
+def test_root_and_index_component_casing_must_match_disk(tmp_path):
+    repository = tmp_path / "Repository"
+    repository.mkdir()
+    index_path = repository / "Expectations.json"
+    index_path.write_bytes(_json_bytes(_load_expectations()))
+
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
+        _load_expectations(
+            repository / "expectations.json", root=repository
+        )
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
+        _load_expectations(index_path, root=tmp_path / "repository")
 
 
 @pytest.mark.parametrize("schema_version", [3, True, 1.0])
@@ -167,6 +246,33 @@ def test_unsupported_index_schema_fails_closed(tmp_path, schema_version):
     unsupported = _write_expectations(tmp_path, values)
     with pytest.raises(ArtifactExpectationsError, match="unsupported schema_version"):
         _load_expectations(unsupported, root=tmp_path)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_v1_non_finite_constants_fail_closed(tmp_path, constant):
+    values = _load_expectations()
+    values["contracts"]["Lootbox"]["non_finite_counterexample"] = (
+        "__NON_FINITE__"
+    )
+    raw = _json_bytes(values).replace(b'"__NON_FINITE__"', constant.encode())
+    index_path = tmp_path / "non-finite-v1.json"
+    index_path.write_bytes(raw)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON constant"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_v2_nested_non_finite_constants_fail_closed(tmp_path, constant):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    record = json.loads(record_path.read_bytes())
+    record["expectation"]["non_finite_counterexample"] = "__NON_FINITE__"
+    raw = _json_bytes(record).replace(b'"__NON_FINITE__"', constant.encode())
+    record_path.write_bytes(raw)
+    index["contracts"]["Lootbox"]["sha256"] = hashlib.sha256(raw).hexdigest()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="non-finite JSON constant"):
+        _load_expectations(index_path, root=repository)
 
 
 def test_v2_missing_record_fails_closed(tmp_path):
@@ -197,6 +303,8 @@ def test_v2_record_hash_mismatch_fails_closed(tmp_path):
     [
         ("/tmp/Lootbox.json", "absolute paths are forbidden"),
         ("../Lootbox.json", "may not escape its root"),
+        ("C:/Lootbox.json", "Windows drive paths are forbidden"),
+        ("C:Lootbox.json", "Windows drive paths are forbidden"),
     ],
 )
 def test_v2_unsafe_record_paths_fail_closed(tmp_path, unsafe_path, failure):
@@ -204,6 +312,36 @@ def test_v2_unsafe_record_paths_fail_closed(tmp_path, unsafe_path, failure):
     index["contracts"]["Lootbox"]["path"] = unsafe_path
     _rewrite_v2_index(index_path, index)
     with pytest.raises(ArtifactExpectationsError, match=failure):
+        _load_expectations(index_path, root=repository)
+
+
+def test_contract_names_must_be_identifier_safe(tmp_path):
+    values = _load_expectations()
+    record = values["contracts"].pop("Lootbox")
+    values["contracts"]["Lootbox-unsafe"] = record
+    index_path = _write_expectations(tmp_path, values)
+    with pytest.raises(ArtifactExpectationsError, match="identifier-safe"):
+        _load_expectations(index_path, root=tmp_path)
+
+
+def test_v2_record_filename_must_match_contract_exactly(tmp_path):
+    repository, index_path, index, record_paths = _write_v2_expectations(tmp_path)
+    record_path = record_paths["Lootbox"]
+    renamed = record_path.with_name("Lootbox-record.json")
+    record_path.rename(renamed)
+    index["contracts"]["Lootbox"]["path"] = renamed.relative_to(
+        repository
+    ).as_posix()
+    _rewrite_v2_index(index_path, index)
+    with pytest.raises(ArtifactExpectationsError, match="expected exact filename"):
+        _load_expectations(index_path, root=repository)
+
+
+def test_v2_relative_component_casing_must_match_disk(tmp_path):
+    repository, index_path, _, record_paths = _write_v2_expectations(tmp_path)
+    records_root = record_paths["Lootbox"].parent
+    records_root.rename(records_root.with_name("Contract-Artifacts"))
+    with pytest.raises(ArtifactExpectationsError, match="component casing mismatch"):
         _load_expectations(index_path, root=repository)
 
 
@@ -238,6 +376,34 @@ def test_v2_unsupported_record_schema_fails_closed(tmp_path):
     _rewrite_v2_index(index_path, index)
     with pytest.raises(ArtifactExpectationsError, match="unsupported record schema"):
         _load_expectations(index_path, root=repository)
+
+
+def test_updater_refuses_v2_before_compile_or_write(tmp_path, monkeypatch):
+    repository, index_path, _, _ = _write_v2_expectations(tmp_path)
+    before = _snapshot_regular_files(repository)
+
+    def unexpected_vyper_lookup():
+        pytest.fail("updater reached compiler discovery for read-only v2")
+
+    def unexpected_write(*_args, **_kwargs):
+        pytest.fail("updater attempted to write read-only v2")
+
+    monkeypatch.setattr(artifact_updater, "ROOT", repository)
+    monkeypatch.setattr(artifact_updater, "EXPECTATIONS", index_path)
+    monkeypatch.setattr(
+        artifact_updater.checker, "_vyper_path", unexpected_vyper_lookup
+    )
+    monkeypatch.setattr(Path, "write_text", unexpected_write)
+    monkeypatch.setattr(
+        sys, "argv", ["update_contract_artifact_expectations.py"]
+    )
+
+    with pytest.raises(
+        ArtifactExpectationsError, match="updates require an atomic v2 writer"
+    ):
+        artifact_updater.main()
+
+    assert _snapshot_regular_files(repository) == before
 
 
 def test_frozen_required_contract_set_is_exact():

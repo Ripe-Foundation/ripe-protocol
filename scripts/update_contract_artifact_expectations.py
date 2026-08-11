@@ -124,7 +124,9 @@ def _record(name: str, source: Path, prior: dict, vyper: Path) -> dict:
 
 
 def main() -> int:
-    values = load_artifact_expectations(EXPECTATIONS, root=ROOT)
+    values = load_artifact_expectations(
+        EXPECTATIONS, root=ROOT, allow_v2=False
+    )
     governed_names = set(values["contracts"]) | REMEDIATION_CONTRACTS
     names = sys.argv[1:] or sorted(governed_names)
     unknown = sorted(set(names) - governed_names)
