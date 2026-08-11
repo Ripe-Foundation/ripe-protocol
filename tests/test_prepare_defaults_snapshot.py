@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -72,7 +73,28 @@ MANIFEST_BYTES = json.dumps(
     sort_keys=True,
     separators=(",", ":"),
 ).encode()
+ALTERNATE_MANIFEST_BYTES = json.dumps(
+    {
+        "contracts": json.loads(MANIFEST_BYTES)["contracts"],
+        "review_note": "same addresses, different bound manifest bytes",
+    },
+    sort_keys=True,
+    separators=(",", ":"),
+).encode()
 GENERATOR_BYTES = b"deterministic generator fixture"
+
+
+def _canonical_abi(abi: list[dict]) -> bytes:
+    return json.dumps(abi, sort_keys=True, separators=(",", ":")).encode()
+
+
+ABI_INPUTS = prepare_defaults.AbiInputs(
+    mission_control_abi_bytes=_canonical_abi(MC_ABI),
+    ledger_abi_bytes=b"[]",
+    compiler_version="v0.4.3+commit.testfixture",
+    mission_control_input_integrity="ab" * 32,
+    ledger_input_integrity="cd" * 32,
+)
 
 
 MC_VALUES = {
@@ -142,7 +164,7 @@ class FakeEth:
         selected_hashes: tuple[bytes, ...] = (BLOCK_HASH, BLOCK_HASH),
         selected_available: bool = True,
         finalized_available: bool = True,
-        symbol_error: bool = False,
+        symbol_available: bool = True,
         code_error: bool = False,
     ):
         self.chain_id = chain_id
@@ -150,7 +172,7 @@ class FakeEth:
         self.selected_hashes = selected_hashes
         self.selected_available = selected_available
         self.finalized_available = finalized_available
-        self.symbol_error = symbol_error
+        self.symbol_available = symbol_available
         self.code_error = code_error
         self.selected_reads = 0
         self.block_reads: list[str | int] = []
@@ -185,7 +207,7 @@ class FakeEth:
 
     def call(self, transaction: dict, *, block_identifier: int) -> bytes:
         self.raw_reads.append((transaction, block_identifier))
-        if self.symbol_error:
+        if not self.symbol_available:
             raise RuntimeError("symbol() unavailable")
         symbol = b"FAKE"
         return (
@@ -200,12 +222,7 @@ class FakeWeb3:
         self.eth = eth
 
 
-def _snapshot_and_source(monkeypatch, eth: FakeEth) -> tuple[object, str]:
-    monkeypatch.setattr(
-        prepare_defaults,
-        "_abi",
-        lambda source: MC_ABI if source.endswith("MissionControl.vy") else [],
-    )
+def _snapshot_and_source(eth: FakeEth) -> tuple[object, str]:
     w3 = FakeWeb3(eth)
     snapshot = prepare_defaults.select_snapshot(
         w3,
@@ -214,6 +231,7 @@ def _snapshot_and_source(monkeypatch, eth: FakeEth) -> tuple[object, str]:
         block_number=BLOCK_NUMBER,
         manifest_bytes=MANIFEST_BYTES,
         generator_bytes=GENERATOR_BYTES,
+        abi_inputs=ABI_INPUTS,
     )
     source = prepare_defaults.build(
         w3,
@@ -221,14 +239,15 @@ def _snapshot_and_source(monkeypatch, eth: FakeEth) -> tuple[object, str]:
         LEDGER,
         snapshot,
         manifest_bytes=MANIFEST_BYTES,
+        abi_inputs=ABI_INPUTS,
     )
     prepare_defaults.verify_snapshot(w3, snapshot)
     return snapshot, source
 
 
-def test_every_live_read_is_pinned_and_provenance_is_embedded(monkeypatch):
+def test_every_live_read_is_pinned_and_provenance_is_embedded():
     eth = FakeEth()
-    snapshot, source = _snapshot_and_source(monkeypatch, eth)
+    snapshot, source = _snapshot_and_source(eth)
 
     assert eth.block_reads == [
         "finalized",
@@ -240,7 +259,7 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded(monkeypatch):
     assert eth.contract_reads and all(
         read[-1] == BLOCK_NUMBER for read in eth.contract_reads
     )
-    assert eth.raw_reads and all(read[-1] == BLOCK_NUMBER for read in eth.raw_reads)
+    assert not eth.raw_reads
     assert snapshot.block_hash == "0x" + BLOCK_HASH.hex()
     assert f"#   chain id: {prepare_defaults.EXPECTED_CHAIN_ID}" in source
     assert f"#   snapshot block: {BLOCK_NUMBER}" in source
@@ -256,6 +275,27 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded(monkeypatch):
         f"#   generator sha256: {hashlib.sha256(GENERATOR_BYTES).hexdigest()}"
         in source
     )
+    assert f"#   Vyper compiler: {ABI_INPUTS.compiler_version}" in source
+    assert (
+        "#   Vyper compiler identity sha256: "
+        f"{hashlib.sha256(ABI_INPUTS.compiler_version.encode()).hexdigest()}"
+    ) in source
+    assert (
+        "#   MissionControl compiler-input integrity: "
+        f"{ABI_INPUTS.mission_control_input_integrity}"
+    ) in source
+    assert (
+        "#   MissionControl canonical ABI sha256: "
+        f"{hashlib.sha256(ABI_INPUTS.mission_control_abi_bytes).hexdigest()}"
+    ) in source
+    assert (
+        f"#   Ledger compiler-input integrity: {ABI_INPUTS.ledger_input_integrity}"
+        in source
+    )
+    assert (
+        "#   Ledger canonical ABI sha256: "
+        f"{hashlib.sha256(ABI_INPUTS.ledger_abi_bytes).hexdigest()}"
+    ) in source
     assert (
         "#   MissionControl code sha256: "
         f"{hashlib.sha256(b'mission-control-code').hexdigest()}"
@@ -266,9 +306,9 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded(monkeypatch):
     )
 
 
-def test_same_block_is_byte_identical_as_finalized_head_advances(monkeypatch):
-    _, first = _snapshot_and_source(monkeypatch, FakeEth(finalized_number=120))
-    _, second = _snapshot_and_source(monkeypatch, FakeEth(finalized_number=140))
+def test_same_block_is_byte_identical_as_finalized_head_advances():
+    _, first = _snapshot_and_source(FakeEth(finalized_number=120))
+    _, second = _snapshot_and_source(FakeEth(finalized_number=140))
 
     assert first.encode() == second.encode()
 
@@ -284,6 +324,7 @@ def test_wrong_chain_fails_before_any_block_or_code_read():
             block_number=BLOCK_NUMBER,
             manifest_bytes=MANIFEST_BYTES,
             generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
         )
 
     assert not eth.block_reads
@@ -302,6 +343,7 @@ def test_invalid_block_number_fails_before_provider_reads(block_number):
             block_number=block_number,
             manifest_bytes=MANIFEST_BYTES,
             generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
         )
 
     assert not eth.block_reads
@@ -323,6 +365,7 @@ def test_missing_block_fails_closed(missing):
             block_number=BLOCK_NUMBER,
             manifest_bytes=MANIFEST_BYTES,
             generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
         )
 
 
@@ -337,6 +380,7 @@ def test_unfinalized_requested_block_fails_before_state_reads():
             block_number=BLOCK_NUMBER,
             manifest_bytes=MANIFEST_BYTES,
             generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
         )
 
     assert eth.block_reads == ["finalized"]
@@ -357,16 +401,17 @@ def test_provider_code_read_failure_has_snapshot_context():
             block_number=BLOCK_NUMBER,
             manifest_bytes=MANIFEST_BYTES,
             generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
         )
 
     assert eth.code_reads == [(MC, BLOCK_NUMBER)]
 
 
-def test_selected_block_hash_change_fails_after_collection(monkeypatch):
+def test_selected_block_hash_change_fails_after_collection():
     eth = FakeEth(selected_hashes=(BLOCK_HASH, bytes.fromhex("bb" * 32)))
 
     with pytest.raises(prepare_defaults.SnapshotError, match="changed during collection"):
-        _snapshot_and_source(monkeypatch, eth)
+        _snapshot_and_source(eth)
 
 
 def test_provider_switch_fails_before_final_verification_reads():
@@ -379,6 +424,7 @@ def test_provider_switch_fails_before_final_verification_reads():
         block_number=BLOCK_NUMBER,
         manifest_bytes=MANIFEST_BYTES,
         generator_bytes=GENERATOR_BYTES,
+        abi_inputs=ABI_INPUTS,
     )
     eth.chain_id = 1
 
@@ -398,6 +444,7 @@ def test_finality_regression_fails_before_selected_block_reread():
         block_number=BLOCK_NUMBER,
         manifest_bytes=MANIFEST_BYTES,
         generator_bytes=GENERATOR_BYTES,
+        abi_inputs=ABI_INPUTS,
     )
     eth.finalized_number = BLOCK_NUMBER - 1
 
@@ -410,7 +457,7 @@ def test_finality_regression_fails_before_selected_block_reread():
 @pytest.mark.parametrize(
     ("mc_addr", "ledger_addr", "manifest_bytes", "error"),
     [
-        (MC, LEDGER, b"different", "manifest bytes"),
+        (MC, LEDGER, ALTERNATE_MANIFEST_BYTES, "manifest bytes"),
         ("0x" + "99" * 20, LEDGER, MANIFEST_BYTES, "MissionControl address"),
         (MC, "0x" + "99" * 20, MANIFEST_BYTES, "Ledger address"),
     ],
@@ -427,6 +474,7 @@ def test_build_rejects_inputs_that_do_not_match_provenance(
         block_number=BLOCK_NUMBER,
         manifest_bytes=MANIFEST_BYTES,
         generator_bytes=GENERATOR_BYTES,
+        abi_inputs=ABI_INPUTS,
     )
 
     with pytest.raises(prepare_defaults.SnapshotError, match=error):
@@ -436,17 +484,179 @@ def test_build_rejects_inputs_that_do_not_match_provenance(
             ledger_addr,
             snapshot,
             manifest_bytes=manifest_bytes,
+            abi_inputs=ABI_INPUTS,
         )
 
     assert not eth.contract_reads
     assert not eth.raw_reads
 
 
-def test_missing_optional_symbol_never_retries_at_latest(monkeypatch):
-    eth = FakeEth(symbol_error=True)
+def test_symbol_availability_cannot_change_generated_bytes():
+    available = FakeEth(symbol_available=True)
+    unavailable = FakeEth(symbol_available=False)
 
-    _, source = _snapshot_and_source(monkeypatch, eth)
+    _, available_source = _snapshot_and_source(available)
+    _, unavailable_source = _snapshot_and_source(unavailable)
 
-    assert "ADDRESS: constant(address)" in source
-    assert eth.raw_reads
-    assert all(read[-1] == BLOCK_NUMBER for read in eth.raw_reads)
+    assert available_source.encode() == unavailable_source.encode()
+    assert not available.raw_reads
+    assert not unavailable.raw_reads
+    deterministic_label = f"ADDRESS_{ASSET.removeprefix('0x').lower()}"
+    assert f"{deterministic_label}: constant(address)" in available_source
+    assert f"# {deterministic_label}" in available_source
+
+
+@pytest.mark.parametrize(
+    ("manifest_bytes", "mc_addr", "ledger_addr", "error"),
+    [
+        (b"{", MC, LEDGER, "not valid JSON"),
+        (b"{}", MC, LEDGER, "contracts object"),
+        (
+            json.dumps({"contracts": {"Ledger": {"address": LEDGER}}}).encode(),
+            MC,
+            LEDGER,
+            "MissionControl.address",
+        ),
+        (
+            json.dumps(
+                {"contracts": {"MissionControl": {"address": MC}}}
+            ).encode(),
+            MC,
+            LEDGER,
+            "Ledger.address",
+        ),
+        (MANIFEST_BYTES, "0x" + "99" * 20, LEDGER, "does not match manifest"),
+        (MANIFEST_BYTES, MC, "0x" + "99" * 20, "does not match manifest"),
+    ],
+)
+def test_manifest_binding_fails_before_provider_reads(
+    manifest_bytes, mc_addr, ledger_addr, error
+):
+    eth = FakeEth()
+
+    with pytest.raises(prepare_defaults.SnapshotError, match=error):
+        prepare_defaults.select_snapshot(
+            FakeWeb3(eth),
+            mc_addr,
+            ledger_addr,
+            block_number=BLOCK_NUMBER,
+            manifest_bytes=manifest_bytes,
+            generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
+        )
+
+    assert not eth.block_reads
+    assert not eth.code_reads
+
+
+def test_abi_mutation_changes_provenance_and_cannot_reuse_snapshot():
+    mutated_abi = MC_ABI + [
+        {
+            "type": "function",
+            "name": "mutated",
+            "inputs": [],
+            "outputs": [],
+            "stateMutability": "view",
+        }
+    ]
+    mutated_inputs = replace(
+        ABI_INPUTS, mission_control_abi_bytes=_canonical_abi(mutated_abi)
+    )
+    original_snapshot, _ = _snapshot_and_source(FakeEth())
+    mutated_snapshot = prepare_defaults.select_snapshot(
+        FakeWeb3(FakeEth()),
+        MC,
+        LEDGER,
+        block_number=BLOCK_NUMBER,
+        manifest_bytes=MANIFEST_BYTES,
+        generator_bytes=GENERATOR_BYTES,
+        abi_inputs=mutated_inputs,
+    )
+
+    assert (
+        original_snapshot.mission_control_abi_sha256
+        != mutated_snapshot.mission_control_abi_sha256
+    )
+    with pytest.raises(
+        prepare_defaults.SnapshotError, match="ABI/compiler inputs"
+    ):
+        prepare_defaults.build(
+            FakeWeb3(FakeEth()),
+            MC,
+            LEDGER,
+            original_snapshot,
+            manifest_bytes=MANIFEST_BYTES,
+            abi_inputs=mutated_inputs,
+        )
+
+
+def test_compiler_input_integrity_cannot_reuse_snapshot():
+    snapshot, _ = _snapshot_and_source(FakeEth())
+    mutated_inputs = replace(
+        ABI_INPUTS, mission_control_input_integrity="ef" * 32
+    )
+
+    with pytest.raises(
+        prepare_defaults.SnapshotError, match="ABI/compiler inputs"
+    ):
+        prepare_defaults.build(
+            FakeWeb3(FakeEth()),
+            MC,
+            LEDGER,
+            snapshot,
+            manifest_bytes=MANIFEST_BYTES,
+            abi_inputs=mutated_inputs,
+        )
+
+
+def test_compiler_identity_cannot_reuse_snapshot():
+    snapshot, _ = _snapshot_and_source(FakeEth())
+    mutated_inputs = replace(ABI_INPUTS, compiler_version="v0.4.4+commit.changed")
+
+    with pytest.raises(
+        prepare_defaults.SnapshotError, match="ABI/compiler inputs"
+    ):
+        prepare_defaults.build(
+            FakeWeb3(FakeEth()),
+            MC,
+            LEDGER,
+            snapshot,
+            manifest_bytes=MANIFEST_BYTES,
+            abi_inputs=mutated_inputs,
+        )
+
+
+def test_load_abi_inputs_compiles_each_canonical_abi_once(monkeypatch):
+    calls: list[tuple[str, ...]] = []
+
+    def fake_vyper(*args: str) -> bytes:
+        calls.append(args)
+        if args == ("--version",):
+            return b"v0.4.3+commit.fixture\n"
+        abi = MC_ABI if args[-1] == prepare_defaults.MISSION_CONTROL_SOURCE else []
+        integrity = b"ab" * 32 if abi else b"cd" * 32
+        return json.dumps(abi, indent=None).encode() + b"\n" + integrity + b"\n"
+
+    monkeypatch.setattr(prepare_defaults, "_run_vyper", fake_vyper)
+
+    inputs = prepare_defaults.load_abi_inputs()
+
+    assert calls == [
+        ("--version",),
+        (
+            "-p",
+            ".",
+            "-f",
+            "abi,integrity",
+            prepare_defaults.MISSION_CONTROL_SOURCE,
+        ),
+        (
+            "-p",
+            ".",
+            "-f",
+            "abi,integrity",
+            prepare_defaults.LEDGER_SOURCE,
+        ),
+    ]
+    assert inputs.mission_control_abi_bytes == _canonical_abi(MC_ABI)
+    assert inputs.ledger_abi_bytes == b"[]"

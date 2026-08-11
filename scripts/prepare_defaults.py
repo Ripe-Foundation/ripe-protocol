@@ -48,6 +48,8 @@ MANIFEST = ROOT / "migration_history/robinhood-mainnet/v1/current-manifest.json"
 EXPECTED_CHAIN_ID = 4663
 REPOSITORY_ID = "ripe-foundation/ripe-protocol"
 GENERATOR_ID = "scripts/prepare_defaults.py"
+MISSION_CONTROL_SOURCE = "contracts/data/MissionControl.vy"
+LEDGER_SOURCE = "contracts/data/Ledger.vy"
 
 # The ABI carries field names but not struct type names, so they are named
 # here. Keyed by getter for the top level, and by field name for nested ones.
@@ -67,8 +69,8 @@ NESTED_STRUCT = {
     "lockTerms": "cs.LockTerms",
 }
 
-# Preferred constant names, so the common tokens read the same way they do
-# elsewhere in the codebase instead of being named off their ERC20 symbol.
+# Preferred constant names, so common tokens read the same way they do
+# elsewhere instead of using the deterministic address-derived fallback.
 PREFERRED_NAMES = {
     "RipeToken": "RIPE_TOKEN",
     "GreenToken": "GREEN_TOKEN",
@@ -78,8 +80,8 @@ PREFERRED_NAMES = {
     "GreenUsdgPool": "GREEN_USDG_LP",
 }
 
-# The Uniswap pool reports the generic "UNI-V2" symbol and is not a manifest
-# contract, so it would otherwise generate an opaque name.
+# The Uniswap pool is not a manifest contract, so bind its known name rather
+# than using the deterministic address-derived fallback.
 NAME_OVERRIDES = {
     "0xba6f6cba1a4104000847d4fdccb676e99166cece": "RIPE_WETH_LP",
 }
@@ -98,6 +100,12 @@ HEADER = '''# Ripe Protocol License: https://github.com/ripe-foundation/ripe-pro
 #   generator: {generator_id}
 #   generator sha256: {generator_sha256}
 #   manifest sha256: {manifest_sha256}
+#   Vyper compiler: {compiler_version}
+#   Vyper compiler identity sha256: {compiler_identity_sha256}
+#   MissionControl compiler-input integrity: {mission_control_input_integrity}
+#   MissionControl canonical ABI sha256: {mission_control_abi_sha256}
+#   Ledger compiler-input integrity: {ledger_input_integrity}
+#   Ledger canonical ABI sha256: {ledger_abi_sha256}
 #   chain id: {chain_id}
 #   snapshot block: {block_number}
 #   snapshot block hash: {block_hash}
@@ -134,12 +142,58 @@ class SnapshotError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class AbiInputs:
+    mission_control_abi_bytes: bytes
+    ledger_abi_bytes: bytes
+    compiler_version: str
+    mission_control_input_integrity: str
+    ledger_input_integrity: str
+
+    def parsed_abis(self) -> tuple[list, list]:
+        try:
+            mission_control = json.loads(self.mission_control_abi_bytes)
+            ledger = json.loads(self.ledger_abi_bytes)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise SnapshotError("bound ABI bytes are not valid JSON") from exc
+        if not isinstance(mission_control, list) or not isinstance(ledger, list):
+            raise SnapshotError("bound ABI JSON must contain lists")
+        canonical_mission_control = json.dumps(
+            mission_control, sort_keys=True, separators=(",", ":")
+        ).encode()
+        canonical_ledger = json.dumps(
+            ledger, sort_keys=True, separators=(",", ":")
+        ).encode()
+        if (
+            self.mission_control_abi_bytes != canonical_mission_control
+            or self.ledger_abi_bytes != canonical_ledger
+        ):
+            raise SnapshotError("bound ABI bytes are not canonical JSON")
+        if not self.compiler_version:
+            raise SnapshotError("Vyper compiler identity is empty")
+        _require_digest(
+            self.mission_control_input_integrity,
+            "MissionControl compiler-input integrity",
+        )
+        _require_digest(
+            self.ledger_input_integrity,
+            "Ledger compiler-input integrity",
+        )
+        return mission_control, ledger
+
+
+@dataclass(frozen=True)
 class SnapshotProvenance:
     chain_id: int
     block_number: int
     block_hash: str
     manifest_sha256: str
     generator_sha256: str
+    compiler_version: str
+    compiler_identity_sha256: str
+    mission_control_input_integrity: str
+    mission_control_abi_sha256: str
+    ledger_input_integrity: str
+    ledger_abi_sha256: str
     mission_control_address: str
     mission_control_code_sha256: str
     ledger_address: str
@@ -151,6 +205,12 @@ class SnapshotProvenance:
             generator_id=GENERATOR_ID,
             generator_sha256=self.generator_sha256,
             manifest_sha256=self.manifest_sha256,
+            compiler_version=self.compiler_version,
+            compiler_identity_sha256=self.compiler_identity_sha256,
+            mission_control_input_integrity=self.mission_control_input_integrity,
+            mission_control_abi_sha256=self.mission_control_abi_sha256,
+            ledger_input_integrity=self.ledger_input_integrity,
+            ledger_abi_sha256=self.ledger_abi_sha256,
             chain_id=self.chain_id,
             block_number=self.block_number,
             block_hash=self.block_hash,
@@ -195,6 +255,136 @@ def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def _require_digest(value: str, field: str) -> None:
+    if not isinstance(value, str) or len(value) != 64 or value != value.lower():
+        raise SnapshotError(f"{field} must be 64 lowercase hex characters")
+    try:
+        raw = bytes.fromhex(value)
+    except (TypeError, ValueError) as exc:
+        raise SnapshotError(f"{field} is not a hex digest") from exc
+    if len(raw) != 32:
+        raise SnapshotError(f"{field} must be 64 lowercase hex characters")
+
+
+def _manifest_addresses(manifest_bytes: bytes) -> tuple[str, str]:
+    from web3 import Web3
+
+    try:
+        manifest = json.loads(manifest_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise SnapshotError("manifest bytes are not valid JSON") from exc
+    if not isinstance(manifest, dict) or not isinstance(
+        manifest.get("contracts"), dict
+    ):
+        raise SnapshotError("manifest is missing the contracts object")
+
+    addresses = []
+    for name in ("MissionControl", "Ledger"):
+        entry = manifest["contracts"].get(name)
+        if not isinstance(entry, dict) or not isinstance(entry.get("address"), str):
+            raise SnapshotError(f"manifest is missing {name}.address")
+        try:
+            addresses.append(Web3.to_checksum_address(entry["address"]))
+        except (TypeError, ValueError) as exc:
+            raise SnapshotError(f"manifest {name}.address is invalid") from exc
+    return addresses[0], addresses[1]
+
+
+def _validate_manifest_addresses(
+    manifest_bytes: bytes, mc_addr: str, ledger_addr: str
+) -> tuple[str, str]:
+    from web3 import Web3
+
+    manifest_mc, manifest_ledger = _manifest_addresses(manifest_bytes)
+    try:
+        supplied_mc = Web3.to_checksum_address(mc_addr)
+        supplied_ledger = Web3.to_checksum_address(ledger_addr)
+    except (TypeError, ValueError) as exc:
+        raise SnapshotError("supplied MissionControl or Ledger address is invalid") from exc
+    if supplied_mc != manifest_mc:
+        raise SnapshotError("MissionControl address does not match manifest")
+    if supplied_ledger != manifest_ledger:
+        raise SnapshotError("Ledger address does not match manifest")
+    return manifest_mc, manifest_ledger
+
+
+def _run_vyper(*args: str) -> bytes:
+    try:
+        return subprocess.run(
+            ["vyper", *args],
+            capture_output=True,
+            check=True,
+            cwd=ROOT,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SnapshotError(f"Vyper command failed: {' '.join(args)}") from exc
+
+
+def _compile_abi_inputs(source: str) -> tuple[bytes, str]:
+    output = _run_vyper("-p", ".", "-f", "abi,integrity", source)
+    lines = output.splitlines()
+    if len(lines) != 2:
+        raise SnapshotError(f"Vyper did not emit ABI and integrity for {source}")
+    try:
+        abi = json.loads(lines[0])
+        integrity = lines[1].decode().strip()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise SnapshotError(f"Vyper ABI or integrity is invalid for {source}") from exc
+    if not isinstance(abi, list):
+        raise SnapshotError(f"Vyper ABI is not a list for {source}")
+    _require_digest(integrity, f"{source} compiler-input integrity")
+    canonical_abi = json.dumps(
+        abi, sort_keys=True, separators=(",", ":")
+    ).encode()
+    return canonical_abi, integrity
+
+
+def load_abi_inputs() -> AbiInputs:
+    """Compile each ABI once and bind its complete Vyper input closure."""
+    try:
+        compiler_version = _run_vyper("--version").decode().strip()
+    except UnicodeDecodeError as exc:
+        raise SnapshotError("Vyper compiler identity is not UTF-8") from exc
+    mission_control_abi_bytes, mc_integrity = _compile_abi_inputs(
+        MISSION_CONTROL_SOURCE
+    )
+    ledger_abi_bytes, ledger_integrity = _compile_abi_inputs(LEDGER_SOURCE)
+    inputs = AbiInputs(
+        mission_control_abi_bytes=mission_control_abi_bytes,
+        ledger_abi_bytes=ledger_abi_bytes,
+        compiler_version=compiler_version,
+        mission_control_input_integrity=mc_integrity,
+        ledger_input_integrity=ledger_integrity,
+    )
+    inputs.parsed_abis()
+    return inputs
+
+
+def _validate_abi_binding(
+    abi_inputs: AbiInputs, snapshot: SnapshotProvenance
+) -> tuple[list, list]:
+    mission_control_abi, ledger_abi = abi_inputs.parsed_abis()
+    observed = (
+        abi_inputs.compiler_version,
+        _sha256(abi_inputs.compiler_version.encode()),
+        abi_inputs.mission_control_input_integrity,
+        _sha256(abi_inputs.mission_control_abi_bytes),
+        abi_inputs.ledger_input_integrity,
+        _sha256(abi_inputs.ledger_abi_bytes),
+    )
+    expected = (
+        snapshot.compiler_version,
+        snapshot.compiler_identity_sha256,
+        snapshot.mission_control_input_integrity,
+        snapshot.mission_control_abi_sha256,
+        snapshot.ledger_input_integrity,
+        snapshot.ledger_abi_sha256,
+    )
+    if observed != expected:
+        raise SnapshotError("ABI/compiler inputs do not match snapshot provenance")
+    return mission_control_abi, ledger_abi
+
+
 def _code_sha256(w3, address: str, block_number: int, label: str) -> str:
     try:
         code = bytes(w3.eth.get_code(address, block_identifier=block_number))
@@ -216,16 +406,20 @@ def select_snapshot(
     block_number: int,
     manifest_bytes: bytes,
     generator_bytes: bytes,
+    abi_inputs: AbiInputs,
 ) -> SnapshotProvenance:
     """Bind all reads to one provider-acknowledged finalized RH block."""
-    from web3 import Web3
-
     if (
         isinstance(block_number, bool)
         or not isinstance(block_number, int)
         or block_number < 0
     ):
         raise SnapshotError("block number must be a non-negative integer")
+
+    mission_control_address, ledger_address = _validate_manifest_addresses(
+        manifest_bytes, mc_addr, ledger_addr
+    )
+    abi_inputs.parsed_abis()
 
     chain_id = w3.eth.chain_id
     if isinstance(chain_id, bool) or chain_id != EXPECTED_CHAIN_ID:
@@ -253,14 +447,22 @@ def select_snapshot(
             f"provider returned block {selected_number} for requested block {block_number}"
         )
 
-    mission_control_address = Web3.to_checksum_address(mc_addr)
-    ledger_address = Web3.to_checksum_address(ledger_addr)
     return SnapshotProvenance(
         chain_id=chain_id,
         block_number=block_number,
         block_hash=block_hash,
         manifest_sha256=_sha256(manifest_bytes),
         generator_sha256=_sha256(generator_bytes),
+        compiler_version=abi_inputs.compiler_version,
+        compiler_identity_sha256=_sha256(abi_inputs.compiler_version.encode()),
+        mission_control_input_integrity=(
+            abi_inputs.mission_control_input_integrity
+        ),
+        mission_control_abi_sha256=_sha256(
+            abi_inputs.mission_control_abi_bytes
+        ),
+        ledger_input_integrity=abi_inputs.ledger_input_integrity,
+        ledger_abi_sha256=_sha256(abi_inputs.ledger_abi_bytes),
         mission_control_address=mission_control_address,
         mission_control_code_sha256=_code_sha256(
             w3, mission_control_address, block_number, "MissionControl"
@@ -298,14 +500,6 @@ def verify_snapshot(w3, snapshot: SnapshotProvenance) -> None:
         raise SnapshotError(
             f"selected block {snapshot.block_number} changed during collection"
         )
-
-
-def _abi(source: str) -> list:
-    out = subprocess.run(
-        ["vyper", "-f", "abi", source],
-        capture_output=True, text=True, check=True, cwd=ROOT,
-    ).stdout
-    return json.loads(out)
 
 
 def _outputs(abi: list, name: str) -> list:
@@ -354,6 +548,11 @@ class Renderer:
         return "\n".join(lines)
 
 
+def _address_label(address: str, manifest_name: str | None) -> str:
+    """Return a deterministic label without optional token metadata calls."""
+    return manifest_name or f"ADDRESS_{address.lower().removeprefix('0x')}"
+
+
 def build(
     w3,
     mc_addr: str,
@@ -361,18 +560,21 @@ def build(
     snapshot: SnapshotProvenance,
     *,
     manifest_bytes: bytes,
+    abi_inputs: AbiInputs,
 ) -> str:
     from web3 import Web3
 
+    manifest_mc, manifest_ledger = _validate_manifest_addresses(
+        manifest_bytes, mc_addr, ledger_addr
+    )
     if _sha256(manifest_bytes) != snapshot.manifest_sha256:
         raise SnapshotError("manifest bytes do not match snapshot provenance")
-    if Web3.to_checksum_address(mc_addr) != snapshot.mission_control_address:
+    if manifest_mc != snapshot.mission_control_address:
         raise SnapshotError("MissionControl address does not match snapshot provenance")
-    if Web3.to_checksum_address(ledger_addr) != snapshot.ledger_address:
+    if manifest_ledger != snapshot.ledger_address:
         raise SnapshotError("Ledger address does not match snapshot provenance")
 
-    mc_abi = _abi("contracts/data/MissionControl.vy")
-    led_abi = _abi("contracts/data/Ledger.vy")
+    mc_abi, led_abi = _validate_abi_binding(abi_inputs, snapshot)
     mc = w3.eth.contract(address=Web3.to_checksum_address(mc_addr), abi=mc_abi)
     led = w3.eth.contract(address=Web3.to_checksum_address(ledger_addr), abi=led_abi)
 
@@ -415,11 +617,7 @@ def build(
             if manifest_name in PREFERRED_NAMES:
                 const = PREFERRED_NAMES[manifest_name]
             else:
-                label = (
-                    manifest_name
-                    or _symbol(w3, addr, snapshot.block_number)
-                    or "ADDRESS"
-                )
+                label = _address_label(addr, manifest_name)
                 # split camelCase so GreenUsdgPool reads as GREEN_USDG_POOL
                 spaced = "".join(
                     f"_{ch}" if i and ch.isupper() and not label[i - 1].isupper() else ch
@@ -494,12 +692,9 @@ def build(
     entries = []
     for addr in assets:
         cfg = call(mc, "assetConfig", addr)
-        sym = (
-            _symbol(w3, addr, snapshot.block_number)
-            or by_addr.get(addr.lower(), "")
-        )
+        label = _address_label(addr, by_addr.get(addr.lower()))
         entries.append(
-            f"        # {sym}\n"
+            f"        # {label}\n"
             f"        cs.AssetConfigEntry(asset={r.address(addr)}, "
             f"config={r.struct(cfg, ac_comps, 'cs.AssetConfig', 8)}),"
         )
@@ -540,26 +735,6 @@ def build(
     return "".join(out)
 
 
-def _symbol(w3, addr, block_number: int) -> str | None:
-    from web3 import Web3
-    try:
-        raw = w3.eth.call(
-            {
-                "to": Web3.to_checksum_address(addr),
-                "data": Web3.keccak(text="symbol()")[:4],
-            },
-            block_identifier=block_number,
-        )
-        if len(raw) > 64:
-            length = int.from_bytes(raw[32:64], "big")
-            return raw[64:64 + length].decode(errors="replace")
-        return raw.rstrip(b"\x00").decode(errors="replace") or None
-    except Exception:
-        # A symbol is presentation-only and some assets do not implement it.
-        # Never retry the read without the selected block identifier.
-        return None
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -582,10 +757,9 @@ def main() -> int:
     from web3 import Web3
     w3 = Web3(Web3.HTTPProvider(rpc))
     manifest_bytes = MANIFEST.read_bytes()
-    manifest = json.loads(manifest_bytes)["contracts"]
-    mc_addr = manifest["MissionControl"]["address"]
-    ledger_addr = manifest["Ledger"]["address"]
     try:
+        mc_addr, ledger_addr = _manifest_addresses(manifest_bytes)
+        abi_inputs = load_abi_inputs()
         snapshot = select_snapshot(
             w3,
             mc_addr,
@@ -593,6 +767,7 @@ def main() -> int:
             block_number=args.block_number,
             manifest_bytes=manifest_bytes,
             generator_bytes=Path(__file__).read_bytes(),
+            abi_inputs=abi_inputs,
         )
         # The URL carries a provider key, so it is never printed.
         print(
@@ -605,6 +780,7 @@ def main() -> int:
             ledger_addr,
             snapshot,
             manifest_bytes=manifest_bytes,
+            abi_inputs=abi_inputs,
         )
         verify_snapshot(w3, snapshot)
     except SnapshotError as exc:
