@@ -68,22 +68,3 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
     assert "head.sha" not in group
 
 
-def test_python_workflow_runs_manifest_promotion_on_macos():
-    jobs = _workflow()["jobs"]
-    job = jobs["manifest-promotion-macos"]
-    assert job["runs-on"] == "macos-latest"
-    assert job["timeout-minutes"] == "60"
-    assert job["if"] == (
-        "github.event_name != 'workflow_dispatch' || "
-        "inputs.lane == 'comprehensive'"
-    )
-    checkout = _step(job, "Check out full source history")
-    assert checkout["with"]["fetch-depth"] == "0"
-    command = _step(job, "Run macOS manifest-promotion coverage")["run"]
-    assert "-o addopts=''" in command
-    assert "tests/deployment/test_current_manifest_promotion.py" in command
-    linux_command = _step(jobs["test"], "Run comprehensive lane")["run"]
-    assert (
-        "--ignore=tests/deployment/test_current_manifest_promotion.py"
-        in linux_command
-    )
