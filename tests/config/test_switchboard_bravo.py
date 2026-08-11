@@ -1786,6 +1786,75 @@ def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
     assert not mission_control.isStabVaultId(wrong_vault_id)
 
 
+def test_special_stab_pool_rejects_legacy_partial_interface(
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    savings_green,
+    vault_book,
+):
+    """A pool exposing the pre-canAccept read surface is not activatable."""
+    legacy_pool = boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        savings_green,
+        name="legacy_partial_special_stability_pool",
+    )
+    assert vault_book.startAddNewAddressToRegistry(
+        legacy_pool, "Legacy Partial Stability Pool", sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    legacy_id = vault_book.confirmNewAddressToRegistry(
+        legacy_pool, sender=governance.address
+    )
+
+    with boa.reverts():
+        switchboard_bravo.addAsset(
+            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False, False, True, True, True, True, True, True, True, True,
+            legacy_id,
+            sender=governance.address,
+        )
+
+
+def test_special_stab_pool_rejects_paused_pool(
+    switchboard_bravo,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    stability_pool,
+):
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.addAsset(
+            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False, False, True, True, True, True, True, True, True, True, 1,
+            sender=governance.address,
+        )
+
+
 def test_whitelist_interface_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):
     """Test whitelist interface validation"""
     # First add the asset

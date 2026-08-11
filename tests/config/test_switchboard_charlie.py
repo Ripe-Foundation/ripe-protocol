@@ -3025,6 +3025,54 @@ def test_vault_pointer_actions_reject_contracts_with_wrong_interfaces(
         switchboard_charlie.setPreferredStabVaultId(vault_id, sender=governance.address)
 
 
+def test_preferred_stability_pool_rejects_legacy_partial_interface(
+    switchboard_charlie,
+    switchboard_bravo,
+    governance,
+    vault_book,
+    mission_control,
+    savings_green,
+):
+    """The old total-liability/pause probe is no longer sufficient."""
+    legacy_pool = boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        savings_green,
+        name="legacy_partial_preferred_stability_pool",
+    )
+    vault_id = _register_vault(
+        vault_book, governance, legacy_pool, "Legacy Partial Preferred Pool"
+    )
+    _support_asset(
+        mission_control, switchboard_bravo, savings_green.address, [1, vault_id]
+    )
+
+    with boa.reverts():
+        switchboard_charlie.setPreferredStabVaultId(
+            vault_id, sender=governance.address
+        )
+
+
 def test_vault_pointer_actions_reject_malformed_probe_return_data(
     switchboard_charlie,
     switchboard_bravo,

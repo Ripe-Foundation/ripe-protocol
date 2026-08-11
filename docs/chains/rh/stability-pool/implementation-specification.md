@@ -1,5 +1,20 @@
 # Robinhood Stability Pool hardening implementation specification
 
+> **PR #67 remediation candidate (11 August 2026):** active nonzero claims now
+> fail NAV closed on unavailable price or aggregate custody deficit. Outbound
+> pool transfers require exact recipient delivery. The real
+> AuctionHouse liquidation path snapshots pool custody immediately before the
+> collateral transfer, so pre-existing donations cannot mask a short current
+> receipt. Pool designation also probes `vaultAssets`, `claimableBalances`,
+> `totalClaimableBalances`, `canAcceptLiquidationAsset`, and pause state before
+> activation/revalidation. These rules supersede historical passages below
+> that describe zero-price active claims as excluded from NAV or donation-masked
+> receipts as an accepted operating restriction.
+> The ABI-preserving implementation shares the single/many claim plumbing and
+> the AuctionHouse single/many liquidation and purchase plumbing internally.
+> Final constructor-bound measurements are `24,305` bytes for StabilityPool
+> (`271` bytes headroom) and `23,725` for AuctionHouse (`851` bytes headroom).
+
 > **Path note (8 August 2026):** some paths cited below no longer exist in the
 > active tree — the block-clock inventory, the `contracts/testing/` probes, and
 > the extracted deploy manifests and review records were removed. The citations

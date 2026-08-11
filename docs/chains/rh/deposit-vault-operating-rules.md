@@ -11,6 +11,16 @@ transaction.
 Evidence and measurements: [`deposit-vault-hardening-wp0-evidence.md`](deposit-vault-hardening-wp0-evidence.md).
 Findings are referenced by their DV identifier from that record.
 
+> **PR #67 remediation candidate (11 August 2026).** The isolated candidate now
+> enforces DV-08, DV-09, and DV-13 in contracts: AuctionHouse measures each
+> Stability Pool receipt across the collateral transfer; active-claim NAV fails
+> closed if aggregate custody is deficient or any active claim is unpriced; and
+> StabilityPool verifies exact recipient delivery before a withdrawal or claim
+> can commit. The older characterization language and size
+> table below remain historical evidence, not the behavior expected from this
+> candidate. Exact-transfer/non-rebasing admission remains defense in depth and
+> is still required for paths outside these scoped checks.
+
 > **Not covered here.** DV-01/02/03 (RipeGov privileged-caller breadth) was remediated
 > in code — `depositTokensWithLockDuration`, `adjustLock` and `releaseLock` are now
 > Teller-only. It needs no operating rule.
@@ -184,10 +194,10 @@ prune (DV-14).
 This is broader than the deposit vaults. It is a protocol-wide liveness property of
 the price layer.
 
-**Note on the accepted price policy.** SP-PRICE-01 option A says an unpriceable claim
-asset is skipped from NAV while deposits and withdrawals stay live. That holds for a
-**zero price** and for an **absent feed**. It does **not** hold for a source that
-reverts — the whole vault stops. Do not treat the three cases as equivalent.
+**Current candidate price policy.** Any nonzero active claim liability is part of its
+cohort's NAV until settled. A zero price, absent feed, or reverting source therefore
+fails NAV-dependent share movement closed. Price restoration resumes operation
+without changing claim registration, liabilities, or historical shares.
 
 **The check, before registering a price source.**
 

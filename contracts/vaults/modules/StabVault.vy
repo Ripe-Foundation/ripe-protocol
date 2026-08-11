@@ -205,7 +205,7 @@ def _withdrawTokensFromVault(
     isDepleted: bool = False
     withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
 
-    assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
+    self._transferAssetExact(_asset, withdrawalAmount, _recipient)
     return withdrawalAmount, withdrawalShares, isDepleted
 
 
@@ -611,10 +611,14 @@ def _getValueOfClaimableAssets(
         if balance == 0:
             continue
 
-        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, False)
-        if claimValue == 0:
-            continue
-
+        # A claim is part of this cohort's NAV until its liability is settled.
+        # Moving shares while its price is unavailable would transfer that
+        # future value between cohorts, so valuation must fail closed.  The
+        # aggregate custody check also covers this asset's liabilities to every
+        # stability-asset cohort, not only the pair currently being valued.
+        assert staticcall IERC20(asset).balanceOf(self) >= self.totalClaimableBalances[asset] # dev: claim custody deficit
+        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk, True)
+        assert claimValue != 0 # dev: no price for claim asset
         totalValue += claimValue
 
     return totalValue
@@ -635,14 +639,13 @@ def claimFromStabilityPool(
     _shouldAutoDeposit: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert not vaultData.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    config: StabPoolClaimsConfig = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller, a.ripeToken)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, _shouldAutoDeposit, config, a)
-    assert claimUsdValue != 0 # dev: nothing claimed
-    self._handleClaimRewards(_claimer, claimUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
-    return claimUsdValue
+    claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS] = []
+    claims.append(StabPoolClaim(
+        stabAsset=_stabAsset,
+        claimAsset=_claimAsset,
+        maxUsdValue=_maxUsdValue,
+    ))
+    return self._claimManyFromStabilityPool(_claimer, claims, _caller, _shouldAutoDeposit, _a)
 
 
 @external
@@ -652,6 +655,17 @@ def claimManyFromStabilityPool(
     _caller: address,
     _shouldAutoDeposit: bool,
     _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    return self._claimManyFromStabilityPool(_claimer, _claims, _caller, _shouldAutoDeposit, _a)
+
+
+@internal
+def _claimManyFromStabilityPool(
+    _claimer: address,
+    _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
+    _caller: address,
+    _shouldAutoDeposit: bool,
+    _a: addys.Addys,
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
@@ -1036,7 +1050,14 @@ def _handleAssetForUser(
         extcall Teller(_a.teller).depositFromTrusted(_recipient, vaultId, _asset, _amount, 0, _a)
         assert extcall IERC20(_asset).approve(_a.teller, 0, default_return_value=True) # dev: token approval failed
     else:
-        assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
+        self._transferAssetExact(_asset, _amount, _recipient)
+
+
+@internal
+def _transferAssetExact(_asset: address, _amount: uint256, _recipient: address):
+    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+    assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
+    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == _amount
 
 
 @view

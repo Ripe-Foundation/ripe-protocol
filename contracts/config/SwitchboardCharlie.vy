@@ -67,7 +67,10 @@ interface CreditEngine:
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface StabilityPool:
+    def vaultAssets(_index: uint256) -> address: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def totalClaimableBalances(_asset: address) -> uint256: view
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
     def isPaused() -> bool: view
 
 interface VaultBook:
@@ -622,6 +625,11 @@ def _validatePreferredStabVaultId(_vaultId: uint256, _missionControl: address) -
 
     savingsGreen: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SAVINGS_GREEN_ID)
     assert staticcall MissionControl(_missionControl).isSupportedAssetInVault(_vaultId, savingsGreen) # dev: unsupported asset
+    # A preferred deposit target may validly be empty before its first deposit.
+    # Probe every runtime read selector without requiring a populated first slot.
+    naStabAsset: address = staticcall StabilityPool(vaultAddr).vaultAssets(1)
+    naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(savingsGreen, savingsGreen)
+    naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(savingsGreen, savingsGreen)
     na: uint256 = staticcall StabilityPool(vaultAddr).totalClaimableBalances(savingsGreen)
     assert not staticcall StabilityPool(vaultAddr).isPaused() # dev: vault paused
     return vaultAddr, previousVaultId
