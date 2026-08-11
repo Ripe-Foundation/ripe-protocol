@@ -232,14 +232,6 @@ def execute_transaction(transaction, *args, **kwargs):
         attempts += 1
         try:
             result = transaction(*args, **kwargs)
-            if result is None:
-                if _declares_zero_outputs(transaction, args, kwargs):
-                    return NO_OUTPUT_TRANSACTION_RESULT
-                raise TransactionExecutionError(
-                    "MIGRATION_TRANSACTION_RESULT_MISSING"
-                )
-            return result
-
         except Exception as exception:
             log.info(
                 "\tTransaction Failed "
@@ -273,6 +265,19 @@ def execute_transaction(transaction, *args, **kwargs):
                 ) from None
 
             time.sleep(3)
+            continue
+
+        # A call can commit onchain and still surface Python ``None``.  That is
+        # a post-call reconciliation failure, not a transient pre-submission
+        # exception: retrying it could repeat a non-idempotent transaction.
+        if result is None:
+            if _declares_zero_outputs(transaction, args, kwargs):
+                return NO_OUTPUT_TRANSACTION_RESULT
+            log.error("\tH02_TRANSACTION_RESULT_MISSING\n")
+            raise TransactionExecutionError(
+                "MIGRATION_TRANSACTION_RESULT_MISSING"
+            )
+        return result
 
 
 def execute_vyper_json_command(file_path, command):

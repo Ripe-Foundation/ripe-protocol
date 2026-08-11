@@ -135,9 +135,9 @@ def test_abi_none_requires_explicit_zero_outputs():
     transaction = _AbiCallable([{"name": "", "type": "uint256"}])
 
     with pytest.raises(
-        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_RESULT_MISSING"
     ):
-        execute_transaction(transaction, no_retry=True)
+        execute_transaction(transaction, max_attempts=20)
 
     assert transaction.calls == 1
 

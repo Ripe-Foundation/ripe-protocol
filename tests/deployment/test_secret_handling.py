@@ -526,8 +526,7 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         assert component not in rendered
 
 
-def test_execute_transaction_none_result_fails_closed(monkeypatch):
-    monkeypatch.setattr(migration_helpers.time, "sleep", lambda value: None)
+def test_execute_transaction_none_result_fails_without_replay():
     calls = []
 
     def missing_result():
@@ -535,12 +534,12 @@ def test_execute_transaction_none_result_fails_closed(monkeypatch):
         return None
 
     with pytest.raises(
-        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_RESULT_MISSING"
     ):
         migration_helpers.execute_transaction(
-            missing_result, max_attempts=2
+            missing_result, max_attempts=20
         )
-    assert calls == ["called", "called"]
+    assert calls == ["called"]
 
 
 def test_execute_transaction_retries_then_returns_confirmed_result(monkeypatch):
