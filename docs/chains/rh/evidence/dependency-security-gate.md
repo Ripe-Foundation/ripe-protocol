@@ -5200,7 +5200,7 @@ Both candidate inputs and generated locks were byte-identical:
 |---|---|---|
 | `requirements.in` | `1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` |
 | `requirements.txt` | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` |
-| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `a497bae8881b555baa97d2bc24056a1aa0d6406030fd7ce6a59068144282ff70` |
+| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `beda706d1bb67e478295e85e849e9276aa97bfa98079ace164fb25538faf2bfa` |
 
 Normalized comparison found zero version change among the 92 existing lock
 pin lines. The candidate adds exactly eleven distributions:
@@ -5267,11 +5267,40 @@ and may conflict with the retained Titanoboa/docs graph.
 
 ### Offline regressions and focused validation
 
-The dependency gate now fails closed on the two candidate hashes, exact direct
-`web3==7.16.0` pin, runtime version, absence of `direct_url.json`, exact ten-file
-AST import set, and provider-free EIP-55 checksum and Keccak outputs. The test
-constructs no provider and exposes no HTTP, WebSocket, subprocess, audit, or
-GitHub query path.
+Reviewer hardening is based on local commit
+`202f97c11960ab1a4327dc57aefacf4877c231bc` in the fresh mode-`0700`
+worktree `/private/tmp/rh-declare-web3-dependency-hardened.5vIdYY/worktree` on
+branch `codex/rh-declare-web3-dependency-hardened`. The two requirement files
+remain byte-identical to that parent. Reviewer hardening replaces the parent
+test hash `a497bae8881b555baa97d2bc24056a1aa0d6406030fd7ce6a59068144282ff70`
+with the test hash recorded in the artifact table above.
+
+The dependency gate fails closed on the two candidate requirement hashes and
+the exact direct `web3==7.16.0` pin. It defines the complete eleven-package
+Web3 closure above as an exact name/version mapping. Every closure member must
+match the lock and installed runtime version and must have no
+`direct_url.json`; per-package mutation regressions prove that a changed lock
+version, changed runtime version, or direct-URL installation record is
+rejected.
+
+The production census covers `migrations/**/*.py` and `scripts/**/*.py`. It
+rejects a symlink anywhere in those roots and rejects a matching `.py` path
+that is not a regular file. It detects direct `import web3` / `from web3`
+forms, literal `__import__("web3")`, and literal
+`importlib.import_module("web3")`, including ordinary aliases for `importlib`
+and `import_module`. Mutation regressions exercise every listed form and the
+symlink/nonregular failures. This is a static, literal census: it does not
+claim to execute code or prove import targets assembled from runtime or
+otherwise computed values.
+
+The checksum/Keccak regression imports Web3, then replaces `socket.socket`,
+`socket.create_connection`, and the low-level DNS lookup functions with
+fail-closed hooks. The EIP-55 checksum and Keccak operations complete with an
+empty attempt log. That proves only that this executed offline regression made
+no socket or DNS attempt; it does not claim that every possible provider
+construction or arbitrary Web3 caller is statically prohibited. The gate
+still has no subprocess, audit-service, GitHub API, or direct external-query
+implementation.
 
 All validation unset RPC/provider credentials, private keys, mnemonic and AWS
 credentials; used only an explorer placeholder for collection-time guards;
@@ -5285,6 +5314,9 @@ disposable paths; and made no live query.
 | default lean collection | 3,550 selected of 3,832 total; 282 expected deselections; 7.08 s pytest / 8.93 s wall |
 | comprehensive collection with addopts cleared | 4,523 selected of 4,666 total; 143 expected safe-default deselections; 7.26 s pytest / 9.46 s wall |
 | dependency gate with addopts cleared | 47 passed in 2.91 s; 4.84 s wall |
+| reviewer-hardening Web3 selection | 47 passed, 45 deselected in 0.76 s |
+| reviewer-hardened dependency gate with addopts cleared | 92 passed in 3.70 s; 6.35 s wall |
+| reviewer-hardened PR87 snapshot recheck at exact `4b60cffbb0613efd7e628bdbaa9f644af71dd744` | 30 passed in 0.29 s; 2.23 s wall; detached worktree clean |
 
 Web3 import and the PR87 snapshot suite emit one dependency-specific warning:
 `websockets.legacy is deprecated` from Websockets `15.0.1`. It is not hidden or

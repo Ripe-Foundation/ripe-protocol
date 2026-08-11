@@ -6,6 +6,8 @@ import hashlib
 import io
 import json
 import re
+import socket
+import stat
 from importlib import metadata
 from pathlib import Path
 
@@ -48,6 +50,19 @@ SELECTED = {
     "urllib3": "2.7.0",
     "web3": "7.16.0",
     "wheel": "0.46.2",
+}
+WEB3_CLOSURE = {
+    "aiohappyeyeballs": "2.7.1",
+    "aiohttp": "3.14.3",
+    "aiosignal": "1.4.0",
+    "frozenlist": "1.8.0",
+    "multidict": "6.7.1",
+    "propcache": "0.5.2",
+    "pyunormalize": "17.0.0",
+    "types-requests": "2.33.0.20260712",
+    "web3": "7.16.0",
+    "websockets": "15.0.1",
+    "yarl": "1.24.5",
 }
 HELD = {
     "pytest": "8.4.2",
@@ -174,15 +189,96 @@ def _pins(path: Path) -> dict[str, str]:
     return pins
 
 
+def _distribution_direct_url(package: str) -> str | None:
+    return metadata.distribution(package).read_text("direct_url.json")
+
+
+def _assert_web3_closure(
+    lock: Path,
+    *,
+    version_reader=metadata.version,
+    direct_url_reader=_distribution_direct_url,
+) -> None:
+    pins = _pins(lock)
+    for package, expected_version in WEB3_CLOSURE.items():
+        assert pins.get(package) == expected_version, (
+            f"{package} lock version must be {expected_version}"
+        )
+        assert version_reader(package) == expected_version, (
+            f"{package} runtime version must be {expected_version}"
+        )
+        assert direct_url_reader(package) is None, (
+            f"{package} must not have direct URL installation metadata"
+        )
+
+
+def _literal_dynamic_import(
+    node: ast.AST,
+    importlib_aliases: set[str],
+    import_module_aliases: set[str],
+) -> str | None:
+    if not isinstance(node, ast.Call):
+        return None
+    target = (
+        node.args[0]
+        if node.args
+        else next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "name"),
+            None,
+        )
+    )
+    if not isinstance(target, ast.Constant) or not isinstance(target.value, str):
+        return None
+
+    if isinstance(node.func, ast.Name):
+        if node.func.id == "__import__" or node.func.id in import_module_aliases:
+            return target.value
+        return None
+    if (
+        isinstance(node.func, ast.Attribute)
+        and node.func.attr == "import_module"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id in importlib_aliases
+    ):
+        return target.value
+    return None
+
+
 def _web3_import_paths(root: Path) -> set[Path]:
     paths: set[Path] = set()
     for source_root in (root / "migrations", root / "scripts"):
-        for path in source_root.rglob("*.py"):
-            if path.is_symlink():
-                continue
-            tree = ast.parse(
-                path.read_text(), filename=str(path.relative_to(root))
+        try:
+            source_root_mode = source_root.lstat().st_mode
+        except FileNotFoundError:
+            continue
+        assert stat.S_ISDIR(source_root_mode), (
+            f"{source_root.relative_to(root)} must be a real directory"
+        )
+        for path in sorted(source_root.rglob("*")):
+            relative = path.relative_to(root)
+            mode = path.lstat().st_mode
+            assert not stat.S_ISLNK(mode), (
+                f"{relative}: symlink entries are not allowed in Web3 census roots"
             )
+            if path.suffix != ".py":
+                continue
+            assert stat.S_ISREG(mode), (
+                f"{relative}: Python source must be a regular file"
+            )
+            tree = ast.parse(path.read_text(), filename=str(relative))
+            importlib_aliases: set[str] = set()
+            import_module_aliases: set[str] = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for imported in node.names:
+                        if imported.name == "importlib":
+                            importlib_aliases.add(imported.asname or "importlib")
+                elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+                    for imported in node.names:
+                        if imported.name == "import_module":
+                            import_module_aliases.add(
+                                imported.asname or "import_module"
+                            )
             imports_web3 = any(
                 (
                     isinstance(node, ast.Import)
@@ -200,10 +296,21 @@ def _web3_import_paths(root: Path) -> set[Path]:
                         or node.module.startswith("web3.")
                     )
                 )
+                or (
+                    (
+                        dynamic_target := _literal_dynamic_import(
+                            node,
+                            importlib_aliases,
+                            import_module_aliases,
+                        )
+                    )
+                    is not None
+                    and (dynamic_target == "web3" or dynamic_target.startswith("web3."))
+                )
                 for node in ast.walk(tree)
             )
             if imports_web3:
-                paths.add(path.relative_to(root))
+                paths.add(relative)
     return paths
 
 
@@ -619,15 +726,125 @@ def test_web3_is_a_direct_dependency_with_exact_production_reachability():
     assert "`web3==7.12.0` is rejected" in evidence
 
 
-def test_web3_checksum_and_keccak_are_stable_without_a_provider():
+@pytest.mark.parametrize(
+    "source",
+    (
+        "import web3\n",
+        "from web3 import Web3\n",
+        "__import__('web3')\n",
+        "import importlib\nimportlib.import_module('web3')\n",
+        "import importlib as loader\nloader.import_module('web3.eth')\n",
+        "import importlib as loader\nloader.import_module(name='web3')\n",
+        "from importlib import import_module\nimport_module('web3')\n",
+        ("from importlib import import_module as load_module\nload_module('web3')\n"),
+    ),
+)
+def test_web3_census_detects_direct_and_literal_dynamic_imports(tmp_path, source):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    candidate = scripts / "candidate.py"
+    candidate.write_text(source)
+    assert _web3_import_paths(tmp_path) == {Path("scripts/candidate.py")}
+
+
+def test_web3_census_rejects_symlink_entries(tmp_path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    target = tmp_path / "target.py"
+    target.write_text("import web3\n")
+    (scripts / "candidate.py").symlink_to(target)
+
+    with pytest.raises(AssertionError, match="symlink entries are not allowed"):
+        _web3_import_paths(tmp_path)
+
+
+def test_web3_census_rejects_nonregular_python_sources(tmp_path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "candidate.py").mkdir()
+
+    with pytest.raises(AssertionError, match="Python source must be a regular"):
+        _web3_import_paths(tmp_path)
+
+
+def test_web3_census_does_not_claim_computed_dynamic_imports(tmp_path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "candidate.py").write_text(
+        "import importlib\n"
+        "module_name = ''.join(('web', '3'))\n"
+        "importlib.import_module(module_name)\n"
+    )
+    assert _web3_import_paths(tmp_path) == set()
+
+
+def test_web3_closure_matches_lock_runtime_and_install_metadata():
+    _assert_web3_closure(LOCK)
+
+
+@pytest.mark.parametrize(("package", "version"), WEB3_CLOSURE.items())
+def test_web3_closure_rejects_lock_version_mutation(tmp_path, package, version):
+    mutated = LOCK.read_text().replace(f"{package}=={version}", f"{package}==0", 1)
+    assert mutated != LOCK.read_text()
+    lock = tmp_path / "requirements.txt"
+    lock.write_text(mutated)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} lock"):
+        _assert_web3_closure(lock)
+
+
+@pytest.mark.parametrize("package", WEB3_CLOSURE)
+def test_web3_closure_rejects_runtime_version_mutation(package):
+    actual_version = metadata.version
+
+    def mutated_version(name):
+        return "0" if name == package else actual_version(name)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} runtime"):
+        _assert_web3_closure(LOCK, version_reader=mutated_version)
+
+
+@pytest.mark.parametrize("package", WEB3_CLOSURE)
+def test_web3_closure_rejects_direct_url_metadata(package):
+    def mutated_direct_url(name):
+        if name == package:
+            return '{"url": "https://example.invalid/package.whl"}'
+        return _distribution_direct_url(name)
+
+    with pytest.raises(AssertionError, match=rf"{re.escape(package)} must not"):
+        _assert_web3_closure(LOCK, direct_url_reader=mutated_direct_url)
+
+
+def test_web3_checksum_and_keccak_make_no_network_attempt(monkeypatch):
     from web3 import Web3
 
-    assert Web3.to_checksum_address(
-        "0x52908400098527886e0f7030069857d2e4169ee7"
-    ) == "0x52908400098527886E0F7030069857D2E4169EE7"
+    attempts: list[str] = []
+
+    def deny(operation):
+        def denied(*args, **kwargs):
+            attempts.append(operation)
+            raise AssertionError(f"network attempt through {operation}")
+
+        return denied
+
+    for operation in (
+        "socket",
+        "create_connection",
+        "getaddrinfo",
+        "gethostbyaddr",
+        "gethostbyname",
+        "gethostbyname_ex",
+    ):
+        monkeypatch.setattr(socket, operation, deny(f"socket.{operation}"))
+
+    assert (
+        Web3.to_checksum_address("0x52908400098527886e0f7030069857d2e4169ee7")
+        == "0x52908400098527886E0F7030069857D2E4169EE7"
+    )
     assert Web3.keccak(text="ripe-web3-offline-gate").hex() == (
         "1d17285abbb738ef53dadaa05ee534ef754ed12345f9c7c31b08c1819d611824"
     )
+    assert attempts == []
 
 
 def test_selected_and_held_versions_match_lock_and_runtime():
@@ -679,7 +896,7 @@ def test_dependency_sources_are_public_pypi_only():
     assert "--extra-index-url" not in combined
     assert "--find-links" not in combined
     assert "private-index" not in combined.lower()
-    for package in SELECTED | HELD:
+    for package in SELECTED | HELD | WEB3_CLOSURE:
         assert metadata.distribution(package).read_text("direct_url.json") is None
 
 
@@ -688,7 +905,7 @@ def test_evidence_reconciles_every_selected_package_and_residual_finding():
     normalized = " ".join(evidence.split())
     transition = _latest_transition_section(evidence)
     normalized_transition = " ".join(transition.split())
-    for package in SELECTED | HELD:
+    for package in SELECTED | HELD | WEB3_CLOSURE:
         assert package in evidence.lower()
     for finding, disposition in RESIDUAL_FINDINGS.items():
         assert finding in evidence
@@ -1276,7 +1493,7 @@ def test_cbor_and_wheel_metadata_are_stable():
     assert "Wheel-Version: 1.0" in wheel_metadata
 
 
-def test_dependency_gate_has_no_live_query_capability():
+def test_dependency_gate_has_no_external_query_or_process_runner():
     source = Path(__file__).read_text()
     tree = ast.parse(source)
     imported_roots = {
@@ -1290,10 +1507,6 @@ def test_dependency_gate_has_no_live_query_capability():
         for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert imported_roots.isdisjoint(
-        {"http", "socket", "subprocess", "urllib", "aiohttp"}
-    )
+    assert imported_roots.isdisjoint({"http", "subprocess", "urllib", "aiohttp"})
     assert "gh " + "api" not in source
     assert "pip_" + "audit" not in source
-    assert ".HTTP" + "Provider" not in source
-    assert "WebSocket" + "Provider" not in source
