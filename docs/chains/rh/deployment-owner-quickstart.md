@@ -1,5 +1,14 @@
 # Robinhood deployment-owner quick-start
 
+> **11 August 2026 removal overlay:** The unused deployment tooling this
+> quick-start drives has been removed: `scripts/check_deployment.py` and
+> `scripts/utils/deployment_assertions.py`, which step 5 invokes, and
+> `scripts/utils/manifest_schema.py` with the H-06 manifest-v2 writer and
+> promotion gate that step 6 binds. The migrations themselves are unchanged and
+> still deploy through `scripts/migrate.py`. Steps 5 and 6 no longer describe
+> anything that runs; they are retained as the record of the intended method.
+> Removed sources are recoverable from git history.
+
 This is the sole canonical human handoff for the Robinhood deployment owner and
 the deployment owner's agents. It is operational guidance, not execution
 authority. Nothing here authorizes RPC access, accounts, keys, signers,
