@@ -44,6 +44,17 @@ ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "contracts/config/DefaultsRobinhoodLive.vy"
 MANIFEST = ROOT / "migration_history/robinhood-mainnet/v1/current-manifest.json"
 ROBINHOOD_CHAIN_ID = 4663
+MAX_TOKEN_SYMBOL_BYTES = 128
+
+# Token metadata comes from external contracts and is not source-code trust.
+# Keep derived identifiers ASCII and away from Vyper language keywords.
+VYPER_RESERVED_IDENTIFIERS = {
+    "and", "assert", "break", "continue", "def", "elif", "else", "event",
+    "exports", "external", "false", "for", "from", "if", "implements",
+    "import", "in", "initializes", "interface", "internal", "is", "log",
+    "not", "or", "pass", "public", "range", "return", "self", "staticcall",
+    "struct", "true", "view",
+}
 
 # The ABI carries field names but not struct type names, so they are named
 # here. Keyed by getter for the top level, and by field name for nested ones.
@@ -109,6 +120,43 @@ implements: Defaults
 from interfaces import Defaults
 import interfaces.ConfigStructs as cs
 '''
+
+
+def _safe_constant_name(label: str) -> str:
+    """Convert an untrusted display label into one Vyper identifier."""
+    spaced = "".join(
+        f"_{ch}"
+        if (
+            i
+            and ch.isascii()
+            and ch.isupper()
+            and label[i - 1].isascii()
+            and not label[i - 1].isupper()
+        )
+        else ch
+        for i, ch in enumerate(label)
+    )
+    identifier = "".join(
+        ch if ch.isascii() and ch.isalnum() else "_"
+        for ch in spaced.upper()
+    ).strip("_")
+    if not identifier:
+        identifier = "ADDRESS"
+    if (
+        not identifier[0].isalpha()
+        or identifier.lower() in VYPER_RESERVED_IDENTIFIERS
+    ):
+        identifier = f"ASSET_{identifier}"
+    return identifier
+
+
+def _safe_asset_comment(label: str | None, fallback: str) -> str:
+    """Return bounded, printable, single-line token metadata for a comment."""
+    value = label or fallback or "unknown asset"
+    printable = "".join(
+        ch if 32 <= ord(ch) <= 126 else " " for ch in value
+    )
+    return " ".join(printable.split())[:80] or "unknown asset"
 
 
 def _require_robinhood_chain_id(chain_id: int) -> None:
@@ -217,13 +265,7 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
             else:
                 label = manifest_name or _symbol(w3, addr) or "ADDRESS"
                 # split camelCase so GreenUsdgPool reads as GREEN_USDG_POOL
-                spaced = "".join(
-                    f"_{ch}" if i and ch.isupper() and not label[i - 1].isupper() else ch
-                    for i, ch in enumerate(label)
-                )
-                const = "".join(
-                    ch if ch.isalnum() else "_" for ch in spaced.upper()
-                ).strip("_")
+                const = _safe_constant_name(label)
         base, n = const, 2
         while const in [c for c, _ in consts]:
             const = f"{base}_{n}"
@@ -290,7 +332,9 @@ def build(w3, mc_addr: str, ledger_addr: str) -> str:
     entries = []
     for addr in assets:
         cfg = call(mc, "assetConfig", addr)
-        sym = _symbol(w3, addr) or by_addr.get(addr.lower(), "")
+        sym = _safe_asset_comment(
+            _symbol(w3, addr), by_addr.get(addr.lower(), addr)
+        )
         entries.append(
             f"        # {sym}\n"
             f"        cs.AssetConfigEntry(asset={r.address(addr)}, "
@@ -340,9 +384,11 @@ def _symbol(w3, addr) -> str | None:
             "to": Web3.to_checksum_address(addr),
             "data": Web3.keccak(text="symbol()")[:4],
         })
-        if len(raw) > 64:
+        if len(raw) >= 64:
             length = int.from_bytes(raw[32:64], "big")
-            return raw[64:64 + length].decode(errors="replace")
+            if length > MAX_TOKEN_SYMBOL_BYTES or length > len(raw) - 64:
+                return None
+            return raw[64:64 + length].decode(errors="replace") or None
         return raw.rstrip(b"\x00").decode(errors="replace") or None
     except Exception:
         return None

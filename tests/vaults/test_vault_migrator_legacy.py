@@ -590,6 +590,82 @@ def test_legacy_migration_batch_gas_characterization(
         assert gas_used < 30_000_000
 
 
+@pytest.mark.gas
+def test_legacy_dual_asset_twenty_five_user_batch_fits_block_envelope(
+    ripe_hq,
+    vault_book,
+    governance,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bravo_token,
+    bravo_token_whale,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    switchboard_echo,
+    setAssetConfig,
+    setGeneralConfig,
+):
+    """Measure the settled worst-case ABI batch, not only one asset/user."""
+    boa.env.evm.patch.chain_id = 8453
+    source = ripe_gov_vault
+    target, target_id = _register_target(ripe_hq, vault_book, governance)
+    _install_legacy_migrator(ripe_hq, source, governance)
+    assets = (
+        (ripe_token, whale),
+        (bravo_token, bravo_token_whale),
+    )
+    for asset, _ in assets:
+        _set_legacy_asset_config(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            target_id,
+        )
+    setGeneralConfig()
+    mission_control.setCoreRipeGovVaultId(
+        target_id, sender=switchboard_alpha.address,
+    )
+
+    users = [boa.env.generate_address() for _ in range(25)]
+    amount = 10 * EIGHTEEN_DECIMALS
+    for user in users:
+        for asset, funder in assets:
+            _seed_locked_legacy_position(
+                source,
+                asset,
+                funder,
+                user,
+                teller,
+                ledger,
+                amount,
+            )
+    for asset, _ in assets:
+        _set_legacy_asset_config(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            target_id,
+            _one_block_min_wind_down_terms(),
+        )
+    target.pause(True, sender=switchboard_alpha.address)
+    _pause_if_needed(teller, switchboard_alpha)
+
+    assert switchboard_echo.migrateLegacyRipeGovPositions(
+        users, sender=governance.address,
+    ) == 50
+    gas_used = switchboard_echo._computation.get_gas_used()
+    print(
+        "LEGACY_MIGRATION_GAS users=25 assets=2 "
+        f"positions=50 total={gas_used} per_user={gas_used // 25}"
+    )
+    assert gas_used < 30_000_000
+
+
 def test_base_legacy_route_skips_user_without_source_positions(
     ripe_hq,
     vault_book,

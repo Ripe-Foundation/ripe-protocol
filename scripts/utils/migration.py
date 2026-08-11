@@ -1,3 +1,4 @@
+import copy
 import os
 from pathlib import PurePosixPath
 
@@ -321,6 +322,97 @@ class Migration:
     def include_contract(self, name, address):
         self._contracts[name] = address
         self._append_manifest(name)
+
+    def promote_candidate(
+        self,
+        canonical_name,
+        candidate_label,
+        registry,
+        registry_id,
+        activation_candidate_label=None,
+    ):
+        """Promote a complete candidate record after authoritative readback.
+
+        Deployment and registry activation are intentionally separate steps.
+        This helper advances the canonical manifest label only after the live
+        registry points at the candidate, and copies the candidate record as a
+        whole so stale ABI, source, compiler, or constructor metadata cannot
+        survive from the previous canonical deployment.
+        """
+        if self._manifest_v2:
+            raise ManifestError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
+
+        contracts = self._previous_manifest.get("contracts")
+        if not isinstance(contracts, dict):
+            raise RuntimeError("MIGRATION_MANIFEST_CONTRACTS_MISSING")
+        if canonical_name not in contracts:
+            raise RuntimeError("MIGRATION_CANONICAL_CONTRACT_MISSING")
+        if candidate_label not in contracts:
+            raise RuntimeError("MIGRATION_CANDIDATE_CONTRACT_MISSING")
+
+        activation_label = activation_candidate_label or candidate_label
+        if activation_label not in contracts:
+            raise RuntimeError(
+                "MIGRATION_ACTIVATION_CANDIDATE_CONTRACT_MISSING"
+            )
+
+        candidate = contracts[candidate_label]
+        if not isinstance(candidate, dict):
+            raise RuntimeError("MIGRATION_CANDIDATE_RECORD_INVALID")
+        candidate_address = candidate.get("address")
+        if (
+            not isinstance(candidate_address, str)
+            or len(candidate_address) != 42
+            or not candidate_address.startswith("0x")
+        ):
+            raise RuntimeError("MIGRATION_CANDIDATE_ADDRESS_INVALID")
+        try:
+            address_value = int(candidate_address[2:], 16)
+        except ValueError:
+            raise RuntimeError("MIGRATION_CANDIDATE_ADDRESS_INVALID") from None
+        if address_value == 0:
+            raise RuntimeError("MIGRATION_CANDIDATE_ADDRESS_INVALID")
+
+        activation_candidate = contracts[activation_label]
+        if not isinstance(activation_candidate, dict):
+            raise RuntimeError(
+                "MIGRATION_ACTIVATION_CANDIDATE_RECORD_INVALID"
+            )
+        activation_address = activation_candidate.get("address")
+        if (
+            not isinstance(activation_address, str)
+            or len(activation_address) != 42
+            or not activation_address.startswith("0x")
+        ):
+            raise RuntimeError(
+                "MIGRATION_ACTIVATION_CANDIDATE_ADDRESS_INVALID"
+            )
+        try:
+            activation_value = int(activation_address[2:], 16)
+        except ValueError:
+            raise RuntimeError(
+                "MIGRATION_ACTIVATION_CANDIDATE_ADDRESS_INVALID"
+            ) from None
+        if activation_value == 0:
+            raise RuntimeError(
+                "MIGRATION_ACTIVATION_CANDIDATE_ADDRESS_INVALID"
+            )
+
+        registry_address = str(registry.getAddr(registry_id))
+        if registry_address.lower() != activation_address.lower():
+            raise RuntimeError("MIGRATION_CANDIDATE_REGISTRY_MISMATCH")
+
+        promoted_manifest = copy.deepcopy(self._previous_manifest)
+        promoted_manifest["contracts"][canonical_name] = copy.deepcopy(
+            candidate
+        )
+        self._previous_manifest = promoted_manifest
+        json_file.save(self._pending_manifest_filename(), promoted_manifest)
+        log.h3(
+            f"{candidate_label} promoted to {canonical_name} in pending manifest "
+            f"after {activation_label} registry readback"
+        )
+        return candidate_address
 
     def include_abis(self, contracts):
         keys = self._contracts.keys()

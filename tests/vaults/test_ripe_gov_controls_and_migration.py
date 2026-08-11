@@ -165,6 +165,8 @@ def _prepare_teller_migration(
         lock_duration,
     )
     data = _save_points(source, user, token, switchboard_alpha)
+    if not teller.isPaused():
+        teller.pause(True, sender=switchboard_alpha.address)
     return amount, data
 
 
@@ -1984,7 +1986,7 @@ def test_teller_migration_validates_authority_users_and_route_ids(
         _migrate_ripe_gov(teller, bob, ripe_token, SOURCE_VAULT_ID, 999, sender=switchboard_echo.address)
 
 
-def test_teller_migration_requires_both_vaults_paused(
+def test_teller_migration_requires_teller_and_both_vaults_paused(
     target_ripe_gov_vault,
     ripe_gov_vault,
     ripe_token,
@@ -2011,6 +2013,18 @@ def test_teller_migration_requires_both_vaults_paused(
         setGeneralConfig=setGeneralConfig,
         switchboard_alpha=switchboard_alpha,
     )
+    teller.pause(False, sender=switchboard_alpha.address)
+    with boa.reverts("teller not paused"):
+        _migrate_ripe_gov(
+            teller,
+            bob,
+            ripe_token,
+            SOURCE_VAULT_ID,
+            target_id,
+            sender=switchboard_echo.address,
+        )
+    teller.pause(True, sender=switchboard_alpha.address)
+
     with boa.reverts("source vault not paused"):
         _migrate_ripe_gov(teller,
             bob,

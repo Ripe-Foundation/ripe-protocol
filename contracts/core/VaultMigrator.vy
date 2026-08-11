@@ -228,6 +228,7 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     assert len(_users) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
+    assert staticcall Department(a.teller).isPaused() # dev: teller not paused
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
     # validate migration route
@@ -326,6 +327,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     assert chain.id == BASE_CHAIN_ID and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
 
     a: addys.Addys = addys._getAddys()
+    assert staticcall Department(a.teller).isPaused() # dev: teller not paused
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
     # validate migration route
@@ -501,37 +503,42 @@ def _getPreMigrationData(
 @view
 @internal
 def _readSourceGovPointAccrualDisabledBlock(_sourceVault: address, _user: address) -> uint256:
-    # Exporter-capable RipeGov vaults expose both public controls. The immutable
-    # Base legacy vault predates them, so failed selector reads safely mean that
-    # no disable state exists on that source.
-    success: bool = False
-    response: Bytes[32] = b""
-    success, response = raw_call(
-        _sourceVault,
-        method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
-        max_outsize=32,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
     globalBlock: uint256 = 0
-    if success and len(response) == 32:
-        globalBlock = abi_decode(response, uint256)
-
-    success = False
-    response = b""
-    success, response = raw_call(
-        _sourceVault,
-        abi_encode(
-            _user,
-            method_id=method_id("userGovPointAccrualDisabledBlock(address)"),
-        ),
-        max_outsize=32,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
     userBlock: uint256 = 0
-    if success and len(response) == 32:
-        userBlock = abi_decode(response, uint256)
+
+    if LEGACY_RIPE_GOV_VAULT != empty(address) and _sourceVault == LEGACY_RIPE_GOV_VAULT:
+        # The immutable Base legacy vault predates these controls. Only that
+        # exact constructor-bound source may treat absent selectors as no
+        # disable state; exporter-capable sources must satisfy the typed ABI.
+        success: bool = False
+        response: Bytes[32] = b""
+        success, response = raw_call(
+            _sourceVault,
+            method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
+            max_outsize=32,
+            is_static_call=True,
+            revert_on_failure=False,
+        )
+        if success and len(response) == 32:
+            globalBlock = abi_decode(response, uint256)
+
+        success = False
+        response = b""
+        success, response = raw_call(
+            _sourceVault,
+            abi_encode(
+                _user,
+                method_id=method_id("userGovPointAccrualDisabledBlock(address)"),
+            ),
+            max_outsize=32,
+            is_static_call=True,
+            revert_on_failure=False,
+        )
+        if success and len(response) == 32:
+            userBlock = abi_decode(response, uint256)
+    else:
+        globalBlock = staticcall RipeGovVault(_sourceVault).govPointAccrualDisabledBlock()
+        userBlock = staticcall RipeGovVault(_sourceVault).userGovPointAccrualDisabledBlock(_user)
 
     if globalBlock == 0:
         return userBlock

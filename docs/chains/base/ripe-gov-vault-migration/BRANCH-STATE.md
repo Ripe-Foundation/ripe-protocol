@@ -44,6 +44,15 @@ that the current target supports, up to five registered source-asset slots. RIPE
 therefore use simultaneous temporary wind-down configurations. Zero-address, duplicate and
 no-position entries are harmless skips; any failure for a live position reverts the entire batch.
 
+The destination is intentionally fail-closed and must be virgin for every
+`(user, supported asset)` in the manifest. Preflight must prove zero target
+shares, zero in-vault amount, every `GovData` field and stored term zero, and no
+`positionMigratedOut` tombstone. A zero balance alone is insufficient: an
+ordinary historical full exit retains checkpoint/lock data, while a prior
+migration leaves a permanent tombstone. The planned destination is new, so
+this remains a census requirement rather than introducing ambiguous
+overwrite/merge semantics. One dirty row reverts the complete multi-user batch.
+
 `VaultMigrator` is also present in `contracts/modules/Addys.vy` with canonical id/address getters.
 The hot `Addys` struct was deliberately not widened. Teller authenticates VaultMigrator through the
 canonical Addys getter, which is rooted in Teller's immutable RipeHQ address. Lootbox has no
@@ -64,6 +73,10 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
 - Echo remains the governance surface and forwards the original governance caller for events.
 - VaultMigrator accepts only the currently registered SwitchboardEcho (Switchboard registry id 5).
 - Teller accepts migration execution calls only from the current RipeHQ VaultMigrator (id 25).
+- Both RipeGov batch routes prove the current Teller is paused before inspecting
+  any user. This includes zero-position batches; an unpaused Teller can never be
+  mistaken for an inert migration run. The ordinary vault route remains
+  fail-closed through its Teller withdrawal/deposit entrypoints.
 - Teller contains no migration validation, batching, window state or postcondition logic. Its four
   methods are thin identity steps: RipeGov source export/withdrawal, RipeGov import plus target
   Ledger registration, ordinary vault withdrawal, and ordinary vault deposit plus housekeeping.
@@ -81,8 +94,10 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
 - An exporter source's effective global/per-user governance-point accrual-disable state is carried
   into the target as an irreversible per-user disable in the migration transaction. This preserves
   the migrated user's disabled status without globally disabling unrelated target users. The target
-  records its own disable block; the immutable Base legacy source predates that feature and therefore
-  has no disable state to carry.
+  records its own disable block. Exporter-capable sources must implement both
+  disable-state selectors and malformed or missing responses revert; only the
+  exact constructor-bound immutable Base legacy source may treat those absent
+  legacy selectors as no disable state to carry.
 - After the migration batches finish and the freeze is lifted, the user's ordinary Teller/Lootbox
   claim settles those checkpointed rewards, deregisters each zero-balance asset only after its
   entitlement is gone, and removes the source Ledger entry only after no source assets remain.
@@ -141,6 +156,12 @@ resets a position's effective legacy unlock only when the new minimum is below t
 `lastTerms.minLockDuration`; changing `maxLockDuration` by one block does not generally unlock it.
 The Base census must prove the chosen RIPE and LP wind-down values cover every migrating position.
 The target stays paused so imported original terms cannot be refreshed while wind-down config is live.
+Pause Teller **before** confirming the target as `coreRipeGovVaultId`, then pause
+the still-virgin target immediately after that confirmation. Charlie's pointer
+validation requires the candidate vault to be unpaused, but RipeGov deposits and
+lock mutations are Teller-only; this ordering closes the otherwise dangerous
+pointer-flip window without weakening Charlie's validation. Complete the target
+virginity census after its pause and before the first migration batch.
 
 The generic `migrateVaultPositions` route consults MissionControl's monotonic
 `isRipeGovVaultId` classification for both endpoints. Pointer rotation never makes a former core
@@ -178,8 +199,11 @@ migration branch's independent 1,000-byte minimum.
 
 The focused local legacy benchmark measured one supported asset at 1,076,775 gas for one user,
 3,516,135 for five, 6,565,335 for ten and 15,712,935 for the 25-user ABI ceiling. These are local
-characterization values, not a Base block-envelope promise; dual-asset Base-fork measurement still
-sets the operational batch size.
+characterization values. The settled worst-case local regression then migrated 25 users with both
+supported assets (50 positions) in **28,070,872 gas**, leaving 1,929,128 gas below the repository's
+30,000,000 envelope. That proves the public ceiling is locally executable but is not a Base-fork or
+live-block promise; the preflight fork must remeasure the exact census/configuration and may select a
+smaller operational batch if the observed envelope or safety margin requires it.
 
 The independent review measured a two-asset claim at 408,507 gas versus 403,496 on `rh`: +5,011
 (about 1.2%, or roughly 2.5k per asset). The increase comes from the balance/reward-flow reads needed

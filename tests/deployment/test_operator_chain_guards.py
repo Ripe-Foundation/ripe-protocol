@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from config import robinhood_launch
@@ -26,6 +28,29 @@ def test_defaults_snapshot_rejects_every_non_robinhood_mainnet_chain(
 
 def test_defaults_snapshot_accepts_robinhood_mainnet_chain():
     prepare_defaults._require_robinhood_chain_id(4663)
+
+
+def test_defaults_snapshot_sanitizes_untrusted_token_metadata():
+    malicious = "7\n@external\ndef steal():\n    pass\N{SNOWMAN}"
+
+    identifier = prepare_defaults._safe_constant_name(malicious)
+    comment = prepare_defaults._safe_asset_comment(malicious, "fallback")
+
+    assert re.fullmatch(r"[A-Z][A-Z0-9_]*", identifier)
+    assert identifier.startswith("ASSET_7_")
+    assert "\n" not in comment and "\r" not in comment
+    assert "\N{SNOWMAN}" not in comment
+    assert len(comment) <= 80
+
+
+def test_defaults_snapshot_preserves_safe_existing_labels():
+    assert prepare_defaults._safe_constant_name("GreenUsdgPool") == (
+        "GREEN_USDG_POOL"
+    )
+    assert prepare_defaults._safe_constant_name("SPCX") == "SPCX"
+    assert prepare_defaults._safe_asset_comment("UNI-V2", "fallback") == (
+        "UNI-V2"
+    )
 
 
 @pytest.mark.parametrize(

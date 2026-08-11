@@ -23,6 +23,15 @@ def _migration(tmp_path: Path, *, timestamp: str = "2") -> Migration:
     return Migration(_args(), {}, timestamp, "1", str(tmp_path))
 
 
+class _Registry:
+    def __init__(self, address: str):
+        self.address = address
+
+    def getAddr(self, registry_id: int) -> str:
+        assert registry_id == 7
+        return self.address
+
+
 def test_deployment_stays_pending_until_migration_end(
     tmp_path, monkeypatch
 ):
@@ -61,6 +70,135 @@ def test_deployment_stays_pending_until_migration_end(
     assert not (tmp_path / "2-pending-manifest.json").exists()
     assert json.loads((tmp_path / "2-manifest.json").read_text()) == pending
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == pending
+
+
+def test_candidate_promotion_copies_complete_record_after_registry_readback(
+    tmp_path,
+):
+    old = {
+        "address": "0x" + "1" * 40,
+        "file": "old.vy",
+        "abi": [{"name": "old"}],
+        "args": ["stale"],
+        "old_only": True,
+    }
+    candidate = {
+        "address": "0x" + "2" * 40,
+        "file": "new.vy",
+        "abi": [{"name": "new"}],
+        "args": ["fresh"],
+        "solc_json": {"compiler": "exact"},
+        "future_field": {"preserve": [1, 2, 3]},
+    }
+    active = {
+        "contracts": {
+            "Service": old,
+            "ServiceCandidate": candidate,
+        }
+    }
+    _write_json(tmp_path / "current-manifest.json", active)
+    _write_json(tmp_path / "1-manifest.json", active)
+
+    migration = _migration(tmp_path)
+    promoted = migration.promote_candidate(
+        "Service", "ServiceCandidate", _Registry(candidate["address"]), 7
+    )
+
+    assert promoted == candidate["address"]
+    pending = json.loads(
+        (tmp_path / "2-pending-manifest.json").read_text()
+    )
+    assert pending["contracts"]["Service"] == candidate
+    assert pending["contracts"]["ServiceCandidate"] == candidate
+    assert "old_only" not in pending["contracts"]["Service"]
+    assert json.loads(
+        (tmp_path / "current-manifest.json").read_text()
+    ) == active
+
+    migration.end()
+    assert json.loads(
+        (tmp_path / "current-manifest.json").read_text()
+    ) == pending
+    assert json.loads((tmp_path / "2-manifest.json").read_text()) == pending
+
+
+def test_candidate_promotion_mismatch_is_write_free(tmp_path):
+    active = {
+        "contracts": {
+            "Service": {
+                "address": "0x" + "1" * 40,
+                "file": "old.vy",
+            },
+            "ServiceCandidate": {
+                "address": "0x" + "2" * 40,
+                "file": "new.vy",
+                "abi": [{"name": "new"}],
+            },
+        }
+    }
+    _write_json(tmp_path / "current-manifest.json", active)
+    _write_json(tmp_path / "1-manifest.json", active)
+    _write_json(tmp_path / "2-manifest.json", {"sentinel": True})
+    current_before = (tmp_path / "current-manifest.json").read_bytes()
+    timestamp_before = (tmp_path / "2-manifest.json").read_bytes()
+
+    migration = _migration(tmp_path)
+    with pytest.raises(
+        RuntimeError, match="MIGRATION_CANDIDATE_REGISTRY_MISMATCH"
+    ):
+        migration.promote_candidate(
+            "Service",
+            "ServiceCandidate",
+            _Registry("0x" + "3" * 40),
+            7,
+        )
+
+    assert (tmp_path / "current-manifest.json").read_bytes() == current_before
+    assert (tmp_path / "2-manifest.json").read_bytes() == timestamp_before
+    assert not (tmp_path / "2-pending-manifest.json").exists()
+
+
+def test_candidate_promotion_accepts_distinct_activation_witness(tmp_path):
+    defaults = {
+        "address": "0x" + "2" * 40,
+        "file": "DefaultsRobinhoodLive.vy",
+        "args": [],
+    }
+    mission_control = {
+        "address": "0x" + "3" * 40,
+        "file": "MissionControl.vy",
+        "args": [defaults["address"]],
+    }
+    active = {
+        "contracts": {
+            "Defaults": {
+                "address": "0x" + "1" * 40,
+                "file": "old.vy",
+            },
+            "DefaultsCandidate": defaults,
+            "MissionControlCandidate": mission_control,
+        }
+    }
+    _write_json(tmp_path / "current-manifest.json", active)
+    _write_json(tmp_path / "1-manifest.json", active)
+
+    migration = _migration(tmp_path)
+    migration.promote_candidate(
+        "Defaults",
+        "DefaultsCandidate",
+        _Registry(mission_control["address"]),
+        7,
+        activation_candidate_label="MissionControlCandidate",
+    )
+
+    pending = json.loads(
+        (tmp_path / "2-pending-manifest.json").read_text()
+    )
+    assert pending["contracts"]["Defaults"] == defaults
+    assert pending["contracts"]["DefaultsCandidate"] == defaults
+    assert (
+        pending["contracts"]["MissionControlCandidate"] == mission_control
+    )
 
 
 def test_pending_manifest_without_transaction_log_fails_closed(
