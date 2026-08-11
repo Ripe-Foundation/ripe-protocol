@@ -36,7 +36,7 @@ def charlie(env):
 
 
 @pytest.fixture(scope="session")
-def governance():
+def governance(env):
     # cannot be EOA
     return boa.load("contracts/mock/MockRando.vy", name="mock_gov")
 

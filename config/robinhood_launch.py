@@ -90,6 +90,11 @@ SGREEN_INITIAL_SUPPLY = 0
 
 # --- misc -------------------------------------------------------------------
 TELLER_SHOULD_PAUSE = True  # Teller launches paused
+# The governance-only SwitchboardEcho route is the authorization boundary for
+# migration calls. VaultMigrator must be available during the controlled
+# window while Teller remains paused, so its initial department state is
+# deliberately unpaused.
+VAULT_MIGRATOR_SHOULD_PAUSE = False
 BOND_BOOSTER_MAX_BOOST_RATIO = 200_00  # 200%
 BOND_BOOSTER_MAX_UNITS = 25_000  # a count, not a ratio
 BOND_BOOSTER_MIN_LOCK_DURATION = DAY_IN_BLOCKS * 180
@@ -189,9 +194,11 @@ PRICE_CHANGE_MIN_TIMELOCK = PRICE_MIN_TIMELOCK
 PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
 
 # --- RIPE price (Uniswap V2) ------------------------------------------------
-# The RIPE/WETH v2 pool. UniswapV2Prices reads its reserves and multiplies the
-# ratio by whatever PriceDesk says WETH is worth, so this feed inherits the
-# Chainlink ETH/USD route -- it is not an independent price.
+# The RIPE/WETH v2 pool is observed by a separately deployed monitoring
+# component. Its PriceSource entrypoints remain callable and can return a
+# manipulable observation, but UniswapV2Prices is never registered in
+# PriceDesk and is forbidden as collateral or any other protocol-valuation
+# authority.
 RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 
 # --- curve pool -------------------------------------------------------------

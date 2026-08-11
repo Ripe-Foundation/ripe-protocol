@@ -90,19 +90,23 @@ are the two human-edited value authorities. The
 [`robinhood-parameters.json`](../../../../config/robinhood-parameters.json)
 ledger is derived evidence, not a third value authority.
 
-## Non-admitted Uniswap V2 candidate
+## Monitoring-only Uniswap V2 component
 
 [`contracts/priceSources/UniswapV2Prices.vy`](../../../../contracts/priceSources/UniswapV2Prices.vy)
-replaces the deleted cumulative-price research prototype on this branch. It is
-not an admitted production price source:
+replaces the deleted cumulative-price research prototype. The owner approved
+deployment for direct monitoring, not oracle admission. The deployment
+migration uses temporary local governance only to finalize the component's
+timelock, relinquishes it, and never calls a PriceDesk registration function.
 
-| Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
-| --- | --- | --- | ---: | --- |
-| [`uniswap-v2-prices.md`](uniswap-v2-prices.md) | `866cc922d44fa44ef0fe8f3c3d8fcd745d72a1b4` | `5f783d681b919a1f42b266ac3bef881c90c0083b389b941652cdeebaaa2a5699` | 15,636 | Aero-derived candidate with the standard UndyVault/BlueChipYield configuration lifecycle; spot-reserve manipulation, approved-pair provenance, and liquidity floor remain unresolved; unregistered, unconfigured, non-admitted, undeployed, and unavailable for protocol accounting |
-
-No launch Uniswap oracle authority was approved. The source and its tests do
-not authorize a migration, PriceDesk registration, configuration, deployment,
-or activation.
+The standard PriceSource entrypoints remain callable and can return a price;
+the monitoring-only boundary comes from keeping the contract absent from
+PriceDesk and forbidding value-bearing consumers, not from an on-chain
+fail-closed interface. Those reads retain the accepted spot-reserve
+manipulation and liquidity limitations documented in
+[`uniswap-v2-prices.md`](uniswap-v2-prices.md). Deployment does not authorize
+PriceDesk registration, collateral valuation, LP admission, or any other
+value-bearing consumer. Exact source and artifact identities are generated
+from the final integrated bytes, not copied from the superseded candidate row.
 
 ## Historical/shared-source rationale inventory
 
@@ -249,8 +253,9 @@ built were extracted from the active tree; both remain recoverable from
 - [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) — changed
   GREEN/RIPE thin-Solidity reference subclasses and their production-package
   boundary;
-- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — tested, non-admitted
-  Uniswap V2 spot/snapshot candidate and its unresolved readiness boundary;
+- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — deployed monitoring-only
+  Uniswap V2 spot/snapshot component and its unresolved value-bearing
+  admission boundary;
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
   rationale;
 - [`auction-house.md`](auction-house.md) — historical/shared safe conversion,
@@ -279,9 +284,11 @@ and source-level Defaults values are not onchain configuration.
 At this exact baseline, the AAPL launch-input authority, qualified non-admission
 of launch LP tokens, owner-approved reward product packet, bounded Curve launch
 topology, deterministic Robinhood migration sources, and transaction executor
-are integrated repository facts. Their unresolved bindings keep the deployment
-plan non-executable; there is no migration history, execution, deployment,
-onchain configuration, registration, activation, or release.
+are integrated repository facts. Those facts alone do not prove any later
+lifecycle state, and unresolved bindings keep the remaining deployment plan
+non-executable. The separately owner-confirmed Uniswap monitoring deployment
+is an explicit exception; it does not establish PriceDesk registration,
+value-bearing activation, or release.
 
 The shared `Erc20Token.getCCIPAdmin()` hook is also integrated. It does not
 establish CCIP registration, pools, remotes, rate limits, or mint/burn

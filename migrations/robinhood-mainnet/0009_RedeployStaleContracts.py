@@ -1,10 +1,14 @@
-"""Redeploy the 17 contracts whose bytecode no longer matches source.
+"""Static forward plan for 16 registered replacement candidates.
 
-Deployment only. Governance moved to the Safe in 0007, so the deployer can no
-longer touch a registry: every one of these has to be pointed at through
-startAddressUpdateToRegistry + confirmAddressUpdateToRegistry, under timelock,
-by the Safe. This migration deploys and then prints that calldata. Deploying
-changes no live wiring on its own.
+Deployment and Safe-action preparation only. Governance moved to the Safe in
+0007, so the deployer cannot touch a registry. Every replacement is recorded
+under a unique ``*Candidate0009`` manifest label; the existing canonical label
+therefore continues to identify the active generation. This migration emits
+the HumanResources pre-activation timelock call plus the exact
+``startAddressUpdateToRegistry`` and ``confirmAddressUpdateToRegistry``
+calldata. A later migration must read each registry slot and each action
+timelock back and only then promote the complete candidate record to the
+canonical manifest label. Deploying changes no live wiring on its own.
 
 Ledger is bytecode-stale too and is DELIBERATELY excluded. It is the only
 contract here holding accounting nobody can rebuild -- accrued deposit and
@@ -22,9 +26,20 @@ forgetting every asset governance has registered since. That script writes
 DefaultsRobinhoodLive.vy from the live chain; review the diff before running
 this.
 
-Constructor arguments are identical to the originals in 0001/0002/0004/0005
-and 0008. The 08-05 and 08-06 changes altered internals only -- every
-signature below was re-checked against the compiled ABI and none moved.
+Constructor shapes remain compatible with the original deployment arguments,
+but external ABIs did move. In particular, Teller intentionally removed the
+single-item auction, collateral-redemption, Stability Pool claim, and
+Stability Pool redemption families; StabilityPool intentionally stopped
+exporting ``valueToShares`` and ``sharesToValue``. Safe tooling and every
+off-repository consumer must use the regenerated ABIs before activation.
+
+UniswapV2Prices is intentionally absent. Its deployed instance is a direct
+monitoring surface and must never occupy a PriceDesk registry slot.
+
+The H-06 Robinhood runner deliberately forbids this legacy deploy/send API.
+This module is therefore a reviewable action plan, not an executable
+production migration, until converted to typed ``MIGRATION_STAGE`` actions and
+the separately authorized executor/manifest lifecycle.
 """
 
 from scripts.utils import log
@@ -37,9 +52,6 @@ from config.robinhood_launch import (
     LOOTBOX_MIN_SEND_INTERVAL,
     LOOTBOX_SEND_INTERVAL,
     LOOTBOX_YIELD_BONUS,
-    PRICE_CHANGE_MAX_TIMELOCK,
-    PRICE_CHANGE_MIN_TIMELOCK,
-    RIPE_WETH_POOL,
     STALE_WINDOW_MAX,
     STALE_WINDOW_MIN,
     SWITCHBOARD_MAX_TIMELOCK,
@@ -52,7 +64,7 @@ from config.robinhood_launch import (
 RIPE_HQ = "RipeHq"
 VAULT_BOOK = "VaultBook"
 SWITCHBOARD = "Switchboard"
-PRICE_DESK = "PriceDesk"
+CANDIDATE_SUFFIX = "Candidate0009"
 
 
 def _update_calldata(reg_id, new_addr):
@@ -67,9 +79,18 @@ def _update_calldata(reg_id, new_addr):
     return start.hex(), confirm.hex()
 
 
+def _setup_action_timelock_calldata(selected):
+    """Safe call used to finish a zero-local-governance candidate."""
+    from eth_abi.abi import encode
+    from web3 import Web3
+
+    call = Web3.keccak(text="setActionTimeLockAfterSetup(uint256)")[:4]
+    call += encode(["uint256"], [selected])
+    return call.hex()
+
+
 def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
-    ripe_token = migration.get_address("RipeToken")
 
     # Unchanged since launch, so the replacement takes the address already on
     # chain rather than getting a fresh copy.
@@ -81,15 +102,35 @@ def migrate(migration: Migration):
     # MissionControl and Ledger read it at construction, so it goes first. No
     # constructor: every address it needs is already live, so the generator
     # writes them in as constants.
-    defaults = migration.deploy("DefaultsRobinhoodLive")
+    defaults = migration.deploy(
+        "DefaultsRobinhoodLive",
+        label="DefaultsRobinhoodLiveCandidate0009",
+    )
 
     updates = []
 
+    def candidate_label(name):
+        return f"{name}{CANDIDATE_SUFFIX}"
+
     def redeploy(name, registry, reg_id, *args):
         log.h2(f"Deploying {name}")
-        contract = migration.deploy(name, *args)
-        updates.append((name, registry, reg_id, contract.address))
+        label = candidate_label(name)
+        contract = migration.deploy(name, *args, label=label)
+        updates.append((name, label, registry, reg_id, contract.address))
         return contract
+
+    def finalize_local_candidate(contract, expected_minimum):
+        """Finish setup while the deployer still holds temporary local gov."""
+        assert int(contract.actionTimeLock()) == 0
+        selected = int(contract.minActionTimeLock())
+        assert selected == expected_minimum and selected != 0
+        migration.execute(
+            contract.setActionTimeLockAfterSetup,
+            selected,
+        )
+        assert int(contract.actionTimeLock()) == selected
+        migration.execute(contract.relinquishGov)
+        assert contract.governance() == ZERO_ADDRESS
 
     log.h1("Redeploying core departments")
 
@@ -97,7 +138,14 @@ def migrate(migration: Migration):
     redeploy("AuctionHouse", RIPE_HQ, 9, hq)
     redeploy("BondRoom", RIPE_HQ, 12, hq, bond_booster)
     redeploy("CreditEngine", RIPE_HQ, 13, hq)
-    redeploy("HumanResources", RIPE_HQ, 15, hq, HR_MIN_TIMELOCK, HR_MAX_TIMELOCK)
+    human_resources = redeploy(
+        "HumanResources",
+        RIPE_HQ,
+        15,
+        hq,
+        HR_MIN_TIMELOCK,
+        HR_MAX_TIMELOCK,
+    )
     redeploy(
         "Lootbox", RIPE_HQ, 16, hq,
         LOOTBOX_MIN_SEND_INTERVAL,
@@ -118,44 +166,63 @@ def migrate(migration: Migration):
     log.h1("Redeploying switchboards")
 
     # Alpha alone takes the stale-window band before its timelocks.
-    redeploy(
-        "SwitchboardAlpha", SWITCHBOARD, 1, hq, ZERO_ADDRESS,
+    switchboard_alpha = redeploy(
+        "SwitchboardAlpha", SWITCHBOARD, 1, hq, migration.account(),
         STALE_WINDOW_MIN,
         STALE_WINDOW_MAX,
         SWITCHBOARD_MIN_TIMELOCK,
         SWITCHBOARD_MAX_TIMELOCK,
     )
-    redeploy(
-        "SwitchboardBravo", SWITCHBOARD, 2, hq, ZERO_ADDRESS,
+    switchboard_bravo = redeploy(
+        "SwitchboardBravo", SWITCHBOARD, 2, hq, migration.account(),
         SWITCHBOARD_MIN_TIMELOCK, SWITCHBOARD_MAX_TIMELOCK,
     )
-    redeploy(
-        "SwitchboardCharlie", SWITCHBOARD, 3, hq, ZERO_ADDRESS,
+    switchboard_charlie = redeploy(
+        "SwitchboardCharlie", SWITCHBOARD, 3, hq, migration.account(),
         SWITCHBOARD_MIN_TIMELOCK, SWITCHBOARD_MAX_TIMELOCK,
     )
-    redeploy(
-        "SwitchboardEcho", SWITCHBOARD, 5, hq, ZERO_ADDRESS,
+    switchboard_echo = redeploy(
+        "SwitchboardEcho", SWITCHBOARD, 5, hq, migration.account(),
         SWITCHBOARD_MIN_TIMELOCK, SWITCHBOARD_MAX_TIMELOCK,
     )
 
-    log.h1("Redeploying price sources")
+    # These candidates can use temporary local governance and are finalized
+    # before any Safe registry call is prepared.
+    for component in (
+        switchboard_alpha,
+        switchboard_bravo,
+        switchboard_charlie,
+        switchboard_echo,
+    ):
+        finalize_local_candidate(component, SWITCHBOARD_MIN_TIMELOCK)
 
-    # Matches 0008. The replacement starts with an EMPTY snapshot ring, so
-    # getPrice reads zero until one is written -- see the note at the end.
-    redeploy(
-        "UniswapV2Prices", PRICE_DESK, 3, hq, ZERO_ADDRESS,
-        RIPE_WETH_POOL,
-        ripe_token,
-        PRICE_CHANGE_MIN_TIMELOCK,
-        PRICE_CHANGE_MAX_TIMELOCK,
-    )
+    # HumanResources hard-codes empty local governance in its constructor, so
+    # only RipeHq governance (the Safe) can finish setup. This call must execute
+    # and read back before the registry start below; activating a zero-timelock
+    # replacement even briefly is unsupported.
+    assert int(human_resources.actionTimeLock()) == 0
+    hr_selected = int(human_resources.minActionTimeLock())
+    assert hr_selected == HR_MIN_TIMELOCK and hr_selected != 0
+    hr_setup = _setup_action_timelock_calldata(hr_selected)
+    log.h1("HumanResources pre-activation Safe action")
+    log.info(f"\ttarget: {human_resources.address}")
+    log.info(f"\t[setup] 0x{hr_setup}")
+    log.info("\tRequire actionTimeLock readback before any registry start.")
 
     log.h1("Registry updates for the Safe")
 
-    for registry in (RIPE_HQ, VAULT_BOOK, SWITCHBOARD, PRICE_DESK):
-        rows = [u for u in updates if u[1] == registry]
+    for registry in (RIPE_HQ, VAULT_BOOK, SWITCHBOARD):
+        rows = [u for u in updates if u[2] == registry]
         if not rows:
             continue
-        log.h2(f"{registry} @ {migration.get_address(registry)}")
-        for name, _, reg_id, addr in rows:
-            log.info(f"\t{name} -> id {reg_id} -> {addr}")
+        registry_contract = migration.get_contract(registry)
+        log.h2(f"{registry} @ {registry_contract.address}")
+        for name, label, _, reg_id, addr in rows:
+            active = registry_contract.getAddr(reg_id)
+            assert active != addr, f"{name} candidate is already active"
+            start, confirm = _update_calldata(reg_id, addr)
+            log.info(f"\t{name} [{label}] -> id {reg_id}")
+            log.info(f"\t  active:    {active}")
+            log.info(f"\t  candidate: {addr}")
+            log.info(f"\t  [1] 0x{start}")
+            log.info(f"\t  [2] 0x{confirm}   (after timelock)")

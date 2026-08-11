@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import boa
 import pytest
 
 from scripts import check_contract_artifacts as artifact_checker
@@ -61,6 +62,11 @@ CURVE_LAUNCH_ARTIFACTS = {
         "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
     ),
 }
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Compiler-only inventory tests do not need the autouse protocol graph."""
 
 
 def _run_checker(*args: str) -> subprocess.CompletedProcess[str]:
@@ -160,7 +166,10 @@ def test_frozen_contract_artifacts_are_current():
     assert len(contract_lines) == len(REQUIRED_CONTRACTS)
     assert {line.split(":", 1)[0] for line in contract_lines} == REQUIRED_CONTRACTS
     assert all(
-        "not a deployed-runtime identity; constructor immutables" in line
+        (
+            "not a deployed-runtime identity; constructor immutables" in line
+            or "full deployed-runtime identity bound" in line
+        )
         for line in contract_lines
     )
 
@@ -192,6 +201,100 @@ def test_constructor_bound_deployed_runtime_facts_are_compiler_backed():
             artifacts["runtime_template_size"],
             artifacts["eip170_headroom"],
         ) != (deployed["size"], deployed["headroom"])
+
+
+def test_constructor_bound_runtime_binding_covers_exact_immutable_suffix(
+    tmp_path,
+):
+    values = json.loads(EXPECTATIONS.read_text())
+    record = values["contracts"]["Teller"]
+    compiled = artifact_checker._compile(
+        ROOT / record["source_path"],
+        artifact_checker._vyper_path(),
+    )
+    immutable_data = b"\x00" * artifact_checker._code_data_size(
+        compiled.code_layout
+    )
+    binding = artifact_checker._deployed_runtime_binding(
+        compiled,
+        immutable_data.hex(),
+    )
+    record["artifacts"].update(
+        {
+            "deployed_runtime_immutable_data_hex": immutable_data.hex(),
+            "deployed_runtime_immutable_data_sha256": (
+                artifact_checker._sha256(immutable_data)
+            ),
+            "deployed_runtime_immutable_data_size": len(immutable_data),
+            "deployed_runtime_sha256": artifact_checker._sha256(
+                binding.runtime
+            ),
+        }
+    )
+    expectations = _write_expectations(tmp_path, values)
+
+    result = _run_checker(
+        "--contract",
+        "Teller",
+        "--expectations",
+        str(expectations),
+        "--require-deployed-runtime-bindings",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "full deployed-runtime identity bound" in result.stdout
+
+    values["contracts"]["Teller"]["artifacts"][
+        "deployed_runtime_sha256"
+    ] = "00" * 32
+    tampered = _write_expectations(tmp_path, values)
+    result = _run_checker(
+        "--contract",
+        "Teller",
+        "--expectations",
+        str(tampered),
+        "--require-deployed-runtime-bindings",
+    )
+    assert result.returncode == 1
+    assert "constructor-bound deployed runtime SHA-256 mismatch" in result.stderr
+
+
+def test_constructor_bound_runtime_binding_rejects_wrong_suffix_size():
+    compiled = artifact_checker._compile(
+        ROOT / "contracts" / "core" / "Teller.vy",
+        artifact_checker._vyper_path(),
+    )
+    with pytest.raises(
+        artifact_checker.ArtifactCheckError,
+        match="constructor immutable data size mismatch",
+    ):
+        artifact_checker._deployed_runtime_binding(compiled, "")
+
+
+def test_measured_boa_runtime_is_template_plus_exact_immutable_suffix():
+    source = ROOT / "contracts" / "config" / "DefaultsRobinhood.vy"
+    constructor_args = [f"0x{value:040x}" for value in range(1, 8)]
+    compiled = artifact_checker._compile(
+        source,
+        artifact_checker._vyper_path(),
+    )
+
+    with boa.env.anchor():
+        deployed = boa.load(
+            str(source),
+            *constructor_args,
+            name="artifact_runtime_binding_probe",
+        )
+        measured_runtime = bytes(boa.env.get_code(deployed.address))
+
+    binding = artifact_checker._extract_deployed_runtime_binding(
+        compiled,
+        measured_runtime,
+    )
+    expected_immutables = b"".join(
+        value.to_bytes(32, "big") for value in range(1, 8)
+    )
+    assert binding.immutable_data == expected_immutables
+    assert binding.runtime == compiled.runtime_template + expected_immutables
 
 
 def test_creation_prefix_and_compiler_metadata_have_per_contract_boundaries():
