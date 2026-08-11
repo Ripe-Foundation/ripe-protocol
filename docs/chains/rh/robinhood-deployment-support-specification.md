@@ -1,5 +1,11 @@
 # Robinhood deployment-support specification
 
+> **CCIP supersession note (2026-08-11):** this specification's CCIP rows are
+> predeployment planning history. GREEN/RIPE CCIP is now live; current topology,
+> production 1.5.1 source provenance, and remaining operational gates are in
+> [ccip-live-state.md](ccip-live-state.md). Non-CCIP content retains its stated
+> scope and authority.
+
 > **1 August 2026 currentness overlay:** Ready to continue bounded launch
 > preparation from exact baseline `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`,
 > tree `7454b5456ebb6cd02d716a64b408629ab501629e`. PR #61, Morpho V2 and
@@ -1149,8 +1155,8 @@ shifted registration.
 | CM-048 `EndaomentPSM` | Scaffolded disabled to preserve ID 22; omission instead requires approved shared sparse-registry redesign | `contracts/core/EndaomentPSM.vy`; `ARG-HQ`; interval/fees/caps/reserve token from approved Track 4 manifest; yield `(0, zero address)` | `0600` deploy/register; `0800` proves disabled; RipeHq ID 22 `Endaoment PSM`; no GREEN capability | `canMint=false`, `canRedeem=false`, auto-deposit false, no approvals; `ASSERT-D`; `BASE-U`; `ABORT-G`; activation separately blocked |
 | CM-049 `DefaultsRobinhood` | Selected chain-specific configuration artifact; not divergent protocol logic | Proposed `contracts/config/DefaultsRobinhood.vy`; generated only from approved parameter manifest | Built before `0100`; constructor mirrors canonical defaults interface; not registered | Hash/parity/field-denominator assertions; no Base addresses; `BASE-O`; replacement approved in architecture, values open |
 | CM-050 `AeroRipePrices` | Omitted | `contracts/priceSources/AeroRipePrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
-| CM-051 GREEN CCIP BurnMint pool | Deferred thin Solidity subclass | Exact-hash Round-3 v1.6.1 inheritance-reference review passed; production source still awaits Track 1 support/version, owner-approved dependency packaging, production audit, gas and role gates | `1000_CcipPoolsAndRegistration.py`; provisional RipeHq ID 23 `GREEN CCIP Pool`; direct `canMintGreen=true` only after registration/timelock | `ROLE-G` plus external token-admin/router roles; exact dependency/compiler, no-storage/no-override, inherited lifecycle, remote/rate-limit and gas assertions; `BASE-M` new shared integration; `ABORT-G`; Track 1/owner blocked |
-| CM-052 RIPE CCIP BurnMint pool | Deferred thin Solidity subclass | Same inherited behavior as CM-051 with opposite Ripe capability; same production gates | `1000`; provisional RipeHq ID 24 `RIPE CCIP Pool`; direct `canMintRipe=true` only after registration/timelock | Same as CM-051; `ASSERT-D` until active; Track 1/owner blocked |
+| CM-051 GREEN CCIP BurnMint pool | Live token-specific 1.5.1 subclass | Pool source, ownership, routing and capability confirmed in the 2026-08-11 live snapshot; rate policy and full destination-gas evidence remain open | Confirmed RipeHq ID 24 `GREEN CCIP Pool`; `canMintGreen=true`, `canMintRipe=false` | Preserve exact topology; owner disposition for disabled rate limits/zero rate admin; accepted full OffRamp gas evidence; no inferred transaction authority |
+| CM-052 RIPE CCIP BurnMint pool | Live token-specific 1.5.1 subclass | Same live evidence boundary as CM-051 with the RIPE-only capability | Confirmed RipeHq ID 23 `RIPE CCIP Pool`; `canMintRipe=true`, `canMintGreen=false` | Same operational and authority gates as CM-051 |
 | CM-053 CCIP token-admin registration | Deferred external configuration sequence | Chainlink Token Admin Registry/Router facts pending Track 1 | `1000`, after both pools and before capability enablement | Assisted registration preferred; no secret/signature in manifest; Base and RH mappings asserted; `ABORT-G`; external-action approval required |
 | CM-054 GREEN/RIPE local price adapter | Deferred; no fabricated peg | Source/artifact and constructor do not yet exist | No migration ID until separate oracle specification; dependent features disabled | `ASSERT-O`; `BASE-M` if new shared source; owner/oracle/security blocked |
 | CM-055 deployment/migration/report tooling | Selected follow-on shared tooling, not onchain | `config/BluePrint.py`, deployment scripts and parameter scripts; profile/schema inputs from this specification | No onchain migration; implementation slices H-01–H-08 | Secret-safe, deterministic, chain-neutral assertions; `BASE-M` tooling regression; normal code revert is rollback |

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-Ripe-Protocol-License
 pragma solidity ^0.8.24;
 
+// HISTORICAL REFERENCE ONLY: this 1.6.1 import-based example is not the source
+// of the live pools. Production provenance is
+// solidity/src/RipeCcipBurnMintTokenPools.sol (vendored 1.5.1 source line).
+
 import {BurnMintTokenPool} from "@chainlink/contracts-ccip/contracts/pools/BurnMintTokenPool.sol";
 import {IBurnMintERC20} from "@chainlink/contracts/src/v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 

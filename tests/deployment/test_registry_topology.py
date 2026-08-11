@@ -114,8 +114,8 @@ def test_vault_book_ids_and_omitted_four_are_exact():
 def test_blocked_and_deferred_registry_ids_are_reserved():
     policy = blueprint_policy()
     assert policy.canonical_registries[("ripe_hq", 4)] == "CM-008"
-    assert policy.canonical_registries[("ripe_hq", 23)] == "CM-051"
-    assert policy.canonical_registries[("ripe_hq", 24)] == "CM-052"
+    assert policy.canonical_registries[("ripe_hq", 23)] == "CM-052"
+    assert policy.canonical_registries[("ripe_hq", 24)] == "CM-051"
     assert {
         ("ripe_hq", 4),
         ("ripe_hq", 23),

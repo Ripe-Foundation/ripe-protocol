@@ -1,5 +1,12 @@
 # GREEN and RIPE CCIP BurnMint pool reference subclasses
 
+> **Historical 1.6.1 reference review.** This page does not describe the
+> current live source or lifecycle. The deployed pools use the repository's
+> vendored 1.5.1 production source; see
+> [../ccip-live-state.md](../ccip-live-state.md) for confirmed topology and
+> remaining operational gates. The exact-hash analysis below remains useful
+> only for the superseded reference artifact it names.
+
 > [!IMPORTANT]
 > This page documents a changed Solidity reference source in current `rh`.
 > The file is independently reviewed example code, not an authorized production

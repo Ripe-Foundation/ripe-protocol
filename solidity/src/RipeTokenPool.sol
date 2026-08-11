@@ -4,7 +4,10 @@ pragma solidity ^0.8.24;
 import {IBurnMintERC20} from "./v0.8/shared/token/ERC20/IBurnMintERC20.sol";
 import {BurnMintTokenPool} from "./v0.8/ccip/pools/BurnMintTokenPool.sol";
 
-/// @notice Chainlink CCIP burn/mint pool for Ripe Protocol tokens (RIPE / GREEN).
+/// @notice Legacy configurable-capability pool retained for testnet migration history.
+/// @dev This is not the source of the live Base or Robinhood mainnet pools. Live
+/// production provenance is RipeCcipBurnMintTokenPools.sol, whose token-specific
+/// capability answers are compiled in as pure functions.
 /// @dev Identical to `BurnMintTokenPool 1.5.1` except it implements the two functions
 /// RipeHq expects on any address that holds minting privileges:
 ///

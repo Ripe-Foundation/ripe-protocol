@@ -4,8 +4,8 @@ This exists because of a defect that shipped and was caught in review rather
 than by a test. An earlier revision of the codebase-simplification branch deleted
 the four testnet `current-manifest.json` files as "disposable". They are not:
 
-- `scripts/ccip_send.py` defaults to `--chain base-sepolia --environment v2` and
-  loads that manifest directly through `_manifest()`;
+- `scripts/ccip_send.py` requires an explicit chain/environment pair and loads
+  that manifest directly through `_manifest()`;
 - `migrations/base-sepolia/0002_CcipWire.py` and
   `migrations/robinhood-testnet/0002_CcipWire.py` instruct the operator to re-run
   the step later with `--start-timestamp`, which resolves `RipeToken`, `RipeHq`,
@@ -23,7 +23,7 @@ manifest's `RipeToken.file` to `file_missing` left every test green even though
 default to a nonexistent chain also left every test green, because the defaults
 were retyped here as constants instead of read from the command. Both are closed
 below: the modes distinguish an address-only read from a `load_partial`, and the
-defaults come from `scripts.ccip_send.cli` itself.
+required targeting comes from `scripts.ccip_send.cli` itself.
 
 These tests are offline: they read committed JSON and touch no network, RPC, or
 private key. They live at `tests/` root rather than `tests/deployment/` because
@@ -159,16 +159,12 @@ def _migration_runner_calls(path):
     return calls
 
 
-def _ccip_send_option_default(name):
-    """The live default of a `ccip_send` command option, read from the command.
-
-    Not retyped as a constant here. The point of this guard is to fail when the
-    script's real target moves, which a copied constant cannot do.
-    """
+def _ccip_send_option(name):
+    """Return a `ccip_send` command option from the actual command."""
     cli = _ccip_send_module().cli
     for param in cli.params:
         if param.name == name:
-            return param.default
+            return param
 
     raise AssertionError(
         f"scripts/ccip_send.py has no --{name.replace('_', '-')} option; "
@@ -261,33 +257,41 @@ def test_required_current_manifest_resolves_every_field_its_consumers_read(
         _assert_record_is_usable(chain, environment, key, mode, contracts[key])
 
 
-def test_ccip_send_default_target_is_declared_and_fully_resolvable(monkeypatch):
-    """The script's own defaults, resolved the way the script resolves them."""
-    chain = _ccip_send_option_default("chain")
-    environment = _ccip_send_option_default("environment")
-    token = _ccip_send_option_default("token")
+def test_ccip_send_requires_explicit_target_and_supported_manifests_resolve(monkeypatch):
+    """The CLI must not silently select a chain or manifest environment."""
+    assert _ccip_send_option("chain").required
+    assert _ccip_send_option("environment").required
+    assert _ccip_send_option("amount").required
+    token = _ccip_send_option("token").default
 
-    assert (chain, environment) in REQUIRED_CURRENT_MANIFESTS, (
-        f"scripts/ccip_send.py defaults to {chain}/{environment}, which is not a "
-        f"declared target here. Either the default moved and this table must "
-        f"follow it, or the default now points at a manifest nothing guarantees."
-    )
-    declared = REQUIRED_CURRENT_MANIFESTS[(chain, environment)]
+    supported = {
+        target: declared
+        for target, declared in REQUIRED_CURRENT_MANIFESTS.items()
+        if declared.get(token) == LOADABLE
+    }
+    assert supported
+    for (chain, environment), declared in sorted(supported.items()):
+        contracts = _ccip_send_module()._manifest(chain, environment)
+        for key, mode in sorted(declared.items()):
+            assert key in contracts, (
+                f"ccip_send target {chain}/{environment} cannot resolve {key}"
+            )
+            _assert_record_is_usable(chain, environment, key, mode, contracts[key])
+
+    # Perform the consumer's own compilation/resolution for one representative
+    # supported target; the per-manifest bindings above ensure every other
+    # target names its own loadable compiler input.
+    chain, environment = "base-mainnet", "v1"
+    declared = supported[(chain, environment)]
     assert declared.get(token) == LOADABLE, (
         f"scripts/ccip_send.py defaults to --token {token}, which it loads with "
         f"boa.load_partial, but {chain}/{environment} declares it as "
         f"{declared.get(token)!r} here"
     )
 
-    # `_manifest` builds a path relative to the working directory, so pin it.
+    # `_manifest` is rooted at the repository; changing cwd must not redirect it.
     monkeypatch.chdir(ROOT)
     contracts = _ccip_send_module()._manifest(chain, environment)
-
-    for key, mode in sorted(declared.items()):
-        assert key in contracts, (
-            f"ccip_send default target {chain}/{environment} cannot resolve {key}"
-        )
-        _assert_record_is_usable(chain, environment, key, mode, contracts[key])
 
     # Finally, perform the consumer's own resolution rather than approximating
     # it. `ccip_send` does exactly this on the token it was told to send:

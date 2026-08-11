@@ -82,17 +82,21 @@ the eight reports into separate implementation trains.
 
 ## Parked lanes
 
-### 1. All CCIP workflows are parked
+### 1. CCIP is live; operational dispositions remain gated
 
-CCIP is disabled and outside the current work queue.
+The earlier parked instruction is superseded. RIPE and GREEN pools are registered,
+wired, owned by governance, and mint-enabled on Base and Robinhood mainnet. The
+current evidence authority is [ccip-live-state.md](ccip-live-state.md).
 
-- Do not perform CCIP research, implementation, review, external coordination,
-  production packaging, testing, testnet work, deployment, promotion, or
-  current-status investigation.
-- Do not treat historical CCIP gaps as blockers for current non-CCIP work.
-- Preserve historical CCIP documents and examples as technical records; do not
-  rewrite them to imply that their risks or gates were resolved.
-- Reopen CCIP only after an explicit owner instruction.
+- Preserve RIPE RipeHq ID 23 and GREEN RipeHq ID 24 on both chains.
+- Do not infer an approved policy from disabled inbound/outbound rate limits or
+  zero `rateLimitAdmin`; the owner disposition remains explicit and open.
+- Do not claim automatic-execution readiness until the full real-token OffRamp
+  destination-gas path has accepted evidence and margin.
+- Do not broadcast from `scripts/ccip_send.py`; it remains fork/preflight-only
+  until a signer or Safe transaction backend is separately authorized.
+- No additional CCIP transaction or release decision is authorized by the fact
+  that the topology is already live.
 
 ### 2. CreditEngine zero-backing reassessment and policy are parked
 

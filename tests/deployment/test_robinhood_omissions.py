@@ -369,10 +369,10 @@ def test_ccip_capability_withheld_until_complete():
 def test_registry_semantic_ids_cannot_shift():
     topology = registry_map()
     assert topology[(RegistryDomain.RIPE_HQ, 23)].semantic_name == (
-        "GREEN CCIP BurnMint pool"
+        "RIPE CCIP BurnMint pool"
     )
     assert topology[(RegistryDomain.RIPE_HQ, 24)].semantic_name == (
-        "RIPE CCIP BurnMint pool"
+        "GREEN CCIP BurnMint pool"
     )
     assert all(
         topology[(RegistryDomain.RIPE_HQ, value)].authority

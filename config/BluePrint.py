@@ -543,10 +543,13 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded",
                                "CM-047", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool",
-                               "provisional_reservation", "CM-051", "deferred", "reserved"),
-    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool",
+    # Confirmed on both Base and Robinhood mainnet: RIPE was registered first
+    # at 23, then GREEN at 24. Keep these exact even while the historical
+    # blueprint lifecycle fields remain a record of the pre-activation plan.
+    RobinhoodRegistrySelection("ripe_hq", 23, "RIPE CCIP BurnMint pool",
                                "provisional_reservation", "CM-052", "deferred", "reserved"),
+    RobinhoodRegistrySelection("ripe_hq", 24, "GREEN CCIP BurnMint pool",
+                               "provisional_reservation", "CM-051", "deferred", "reserved"),
     RobinhoodRegistrySelection("vault_book", 1, "Stability Pool",
                                "source_hard_coded", "CM-022", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault",

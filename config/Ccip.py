@@ -58,6 +58,55 @@ CCIP = {
 }
 
 
-# rate limits, `RateLimiter.Config(isEnabled, capacity, rate)` - disabled, which is what
-# the pools deployed by the CCIP token manager UI use today
+# Exact RipeHq registry topology confirmed on both live chains. These values
+# are duplicated in Vyper and parameter tooling because those consumers cannot
+# import this Python module; offline topology tests bind every copy together.
+CCIP_POOL_HQ_IDS = {
+    "RIPE": 23,
+    "GREEN": 24,
+}
+
+
+# Current live rate-limit state, represented as
+# `RateLimiter.Config(isEnabled, capacity, rate)`. This is evidence of the
+# deployed configuration, not an endorsement of unlimited operation. The
+# owner must explicitly choose (or explicitly accept) a production policy for
+# each token and direction before operational readiness can be claimed.
 NO_RATE_LIMIT = (False, 0, 0)
+CURRENT_RATE_LIMIT_ADMIN = "0x0000000000000000000000000000000000000000"
+
+
+# Deliberately unresolved operational dispositions. Code must not infer policy
+# from the current live state, and changing these requires an explicit owner
+# decision plus separately authorized onchain execution.
+CCIP_OWNER_DISPOSITION_GATES = {
+    "RATE_LIMIT_POLICY": None,
+    "RATE_LIMIT_ADMIN": None,
+}
+
+CCIP_EVIDENCE_GATES = {
+    "AUTOMATIC_EXECUTION_DESTINATION_GAS": None,
+}
+
+
+def require_ccip_owner_disposition(*gate_names):
+    """Block a new CCIP mutation while an owner-controlled policy is unset."""
+    unresolved = [
+        name for name in gate_names if CCIP_OWNER_DISPOSITION_GATES.get(name) is None
+    ]
+    if unresolved:
+        raise RuntimeError(
+            "CCIP_OWNER_DISPOSITION_REQUIRED: " + ", ".join(sorted(unresolved))
+        )
+
+
+def require_ccip_wiring_gates():
+    """Block a new lane until both owner choices and gas evidence are bound."""
+    require_ccip_owner_disposition(*CCIP_OWNER_DISPOSITION_GATES)
+    unresolved = [
+        name for name, value in CCIP_EVIDENCE_GATES.items() if value is None
+    ]
+    if unresolved:
+        raise RuntimeError(
+            "CCIP_EVIDENCE_REQUIRED: " + ", ".join(sorted(unresolved))
+        )

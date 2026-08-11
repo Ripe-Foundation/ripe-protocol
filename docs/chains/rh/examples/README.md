@@ -1,11 +1,17 @@
 # CCIP pool references
 
+> **Historical 1.6.1 design reference.** This directory is not live-source
+> provenance. The deployed Base and Robinhood pools use
+> `solidity/src/RipeCcipBurnMintTokenPools.sol` and report
+> `BurnMintTokenPool 1.5.1`. Current state and gates are in
+> [`../ccip-live-state.md`](../ccip-live-state.md).
+
 Status: **Independently reviewed reference — not production-ready or
 deployment-authorized**
 
 Last reviewed: 2026-07-27
 
-## Active thin-inheritance reference
+## Historical thin-inheritance reference
 
 [`RipeCcipBurnMintTokenPools.sol`](RipeCcipBurnMintTokenPools.sol) contains the
 selected GREEN and RIPE reference subclasses. It is not production-ready or

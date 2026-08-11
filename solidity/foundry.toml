@@ -2,7 +2,7 @@
 src = 'src'
 out = 'out'
 libs = []
-test = 'src'
+test = 'test'
 script = 'src'
 
 # these settings mirror the ones chainlink used for the verified

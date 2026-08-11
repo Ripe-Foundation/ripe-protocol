@@ -1,6 +1,6 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 7 August 2026
+**Snapshot date:** 11 August 2026
 **Current production-source candidate:** commit
 `e12b1abe26218acb804d84670099c41169e5f515`, tree
 `b680f0016f29f9a217054db9f80c0bbf9f0b9916`, under draft PR #73 status
@@ -19,15 +19,16 @@ deployment, configuration, or activation authority.
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
 merge `91eda49…`; its production contract changes are integrated into `rh`.
 The historical import ancestor `ad831669…` is not the present branch authority.
-No Robinhood deployment, migration execution or history, production
-configuration, activation, RPC, account, key, signer, or release action has
-occurred. The four corrected-PR controls remain zero and deferred and lack
+No launch-remediation candidate execution or release is authorized. Separately,
+the GREEN/RIPE CCIP topology is confirmed live as recorded in
+[`ccip-live-state.md`](ccip-live-state.md); that state does not authorize another
+transaction or release action. The four corrected-PR controls remain zero and deferred and lack
 Robinhood machine-facing parameter/planning representation. Every Deleverage
 task is parked, and no Deleverage implementation track is open. The current
-six parked lanes match the canonical [`status.yaml`](status.yaml) inventory
-exactly: CCIP; CreditEngine zero-backing reassessment and policy; every
-Deleverage task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
-deployment. The S4 zero-cooldown decision remains closed. All six lanes are
+five parked lanes match the canonical [`status.yaml`](status.yaml) inventory
+exactly: CreditEngine zero-backing reassessment and policy; every Deleverage
+task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
+deployment. The S4 zero-cooldown decision remains closed. All five lanes are
 nonblocking until explicitly reopened.
 
 The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
@@ -129,15 +130,17 @@ Source:
 
 ### RH-D008 — CCIP complete or disabled
 
-**Status:** Approved launch posture; external and implementation gates open.
+**Status:** Historical disabled posture superseded by confirmed live state;
+operational gates open.
 
-GREEN and RIPE CCIP are separately reviewed promotion targets within seven days
-after launch. If any identity, role, route, supply, accounting, monitoring,
-rollback, or state-independence gate is incomplete, launch and remain with CCIP
-disabled.
+GREEN and RIPE CCIP registration, routing, reciprocal wiring, governance
+ownership, and mint capabilities are live. The owner has not yet disposed the
+disabled rate-limit/zero-rate-admin posture, the full real-token OffRamp
+destination-gas evidence remains open, and no live send backend or further
+transaction/release authority is implied.
 
 Source:
-`track-8-m0-owner-decision-packet.md`.
+[`ccip-live-state.md`](ccip-live-state.md).
 
 ### RH-D009 — USDG price path
 

@@ -1,4 +1,9 @@
-from config.Ccip import CCIP, NO_RATE_LIMIT
+from config.Ccip import (
+    CCIP,
+    CURRENT_RATE_LIMIT_ADMIN,
+    NO_RATE_LIMIT,
+    require_ccip_wiring_gates,
+)
 from scripts.utils import ccip, log
 from scripts.utils.migration import Migration
 
@@ -18,6 +23,12 @@ def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
     pool = migration.get_solidity_contract("RipeTokenPool")
 
+    assert str(pool.getToken()).lower() == ripe_token.lower(), "RIPE pool has wrong token"
+    assert str(pool.getRouter()).lower() == config["ROUTER"].lower(), "RIPE pool has wrong router"
+    assert str(pool.getRmnProxy()).lower() == config["RMN_PROXY"].lower(), "RIPE pool has wrong RMN proxy"
+    assert pool.typeAndVersion() == "BurnMintTokenPool 1.5.1", "RIPE pool has wrong source version"
+    assert pool.canMintRipe() and not pool.canMintGreen(), "RIPE pool has wrong mint capability"
+
     log.h1("Wiring RipeTokenPool to the remote chains")
 
     for remote_chain in config["REMOTE_CHAINS"]:
@@ -32,18 +43,27 @@ def migrate(migration: Migration):
             )
 
         if pool.isSupportedChain(remote_selector):
-            log.info(f"{remote_chain} ({remote_selector}) already configured, skipping")
-            continue
+            log.info(f"{remote_chain} ({remote_selector}) already configured; revalidating")
+        else:
+            require_ccip_wiring_gates()
+            log.info(f"{remote_chain}: pool {remote_pool}, token {remote_token}")
+            chain_update = (
+                remote_selector,
+                [ccip.encode_address(remote_pool)],
+                ccip.encode_address(remote_token),
+                NO_RATE_LIMIT,  # outbound; unresolved owner disposition
+                NO_RATE_LIMIT,  # inbound; unresolved owner disposition
+            )
+            migration.execute(pool.applyChainUpdates, [], [chain_update])
 
-        log.info(f"{remote_chain}: pool {remote_pool}, token {remote_token}")
-        chain_update = (
+        ccip.assert_lane_configuration(
+            pool,
             remote_selector,
-            [ccip.encode_address(remote_pool)],
-            ccip.encode_address(remote_token),
-            NO_RATE_LIMIT,  # outbound
-            NO_RATE_LIMIT,  # inbound
+            remote_pool,
+            remote_token,
+            NO_RATE_LIMIT,
+            CURRENT_RATE_LIMIT_ADMIN,
         )
-        migration.execute(pool.applyChainUpdates, [], [chain_update])
 
     log.h1("Pointing CCIP at the new pool")
 

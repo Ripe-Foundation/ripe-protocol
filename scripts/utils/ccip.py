@@ -172,6 +172,91 @@ def encode_address(address):
     return encode(["address"], [str(address)])
 
 
+def _rate_limit_config(state):
+    """Return only the policy fields from a TokenBucket getter result."""
+    if all(hasattr(state, field) for field in ("isEnabled", "capacity", "rate")):
+        return (bool(state.isEnabled), int(state.capacity), int(state.rate))
+
+    values = tuple(state)
+    if len(values) != 5:
+        raise AssertionError(
+            f"unexpected CCIP TokenBucket shape: expected 5 values, got {len(values)}"
+        )
+    # RateLimiter.TokenBucket(tokens, lastUpdated, isEnabled, capacity, rate)
+    return (bool(values[2]), int(values[3]), int(values[4]))
+
+
+def _normalized_bytes(value):
+    if isinstance(value, str):
+        if not value.startswith("0x") or len(value) % 2:
+            raise AssertionError(f"unexpected CCIP bytes value {value!r}")
+        try:
+            return bytes.fromhex(value[2:])
+        except ValueError:
+            raise AssertionError(f"unexpected CCIP bytes value {value!r}") from None
+    return bytes(value)
+
+
+def assert_lane_configuration(
+    pool,
+    remote_selector,
+    remote_pool,
+    remote_token,
+    expected_rate_limit,
+    expected_rate_limit_admin,
+):
+    """Revalidate every security-relevant field of an existing CCIP lane.
+
+    `isSupportedChain()` alone is not evidence that the lane points at the
+    intended peer. A selector can be present with the wrong token, an old or
+    additional pool, or an unexpected rate policy. Migration replays call this
+    after both the add and already-present paths so neither path silently skips
+    verification.
+    """
+    expected_pool = encode_address(remote_pool)
+    expected_token = encode_address(remote_token)
+
+    assert pool.isSupportedChain(remote_selector), (
+        f"CCIP selector {remote_selector} is not configured"
+    )
+
+    actual_token = _normalized_bytes(pool.getRemoteToken(remote_selector))
+    assert actual_token == expected_token, (
+        f"CCIP selector {remote_selector} has remote token 0x{actual_token.hex()}, "
+        f"expected 0x{expected_token.hex()}"
+    )
+
+    actual_pools = tuple(
+        _normalized_bytes(value) for value in pool.getRemotePools(remote_selector)
+    )
+    assert actual_pools == (expected_pool,), (
+        f"CCIP selector {remote_selector} has remote pools "
+        f"{['0x' + value.hex() for value in actual_pools]}, expected only "
+        f"0x{expected_pool.hex()}"
+    )
+
+    outbound = _rate_limit_config(
+        pool.getCurrentOutboundRateLimiterState(remote_selector)
+    )
+    inbound = _rate_limit_config(
+        pool.getCurrentInboundRateLimiterState(remote_selector)
+    )
+    assert outbound == expected_rate_limit, (
+        f"CCIP selector {remote_selector} outbound rate policy {outbound} does "
+        f"not match expected {expected_rate_limit}"
+    )
+    assert inbound == expected_rate_limit, (
+        f"CCIP selector {remote_selector} inbound rate policy {inbound} does "
+        f"not match expected {expected_rate_limit}"
+    )
+
+    rate_limit_admin = str(pool.getRateLimitAdmin())
+    assert rate_limit_admin.lower() == expected_rate_limit_admin.lower(), (
+        f"CCIP rateLimitAdmin {rate_limit_admin} does not match expected "
+        f"{expected_rate_limit_admin}"
+    )
+
+
 # Client.GENERIC_EXTRA_ARGS_V2_TAG
 GENERIC_EXTRA_ARGS_V2_TAG = bytes.fromhex("181dcf10")
 
