@@ -16,6 +16,7 @@ from scripts.utils.deployment_assertions import (
     blueprint_policy,
     blueprint_registry_map,
     ccip_live_assertion_expectations,
+    ccip_live_component_expectations,
 )
 from scripts.utils.migration_runner import (
     ROBINHOOD_RESERVATIONS,
@@ -30,6 +31,7 @@ def expectations():
         "profile_id": "robinhood-mainnet",
         "profile_kind": "profile1",
         "chain_id": 4663,
+        "components": ccip_live_component_expectations(),
         "capabilities": ccip_capabilities,
         "external_facts": ccip_external_facts,
     }
@@ -43,6 +45,7 @@ def observations():
         "mode": "synthetic",
         "profile_id": "robinhood-mainnet",
         "chain_id": 4663,
+        "components": ccip_live_component_expectations(),
         "capabilities": ccip_capabilities,
         "external_facts": ccip_external_facts,
         "registries": [
