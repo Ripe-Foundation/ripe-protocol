@@ -1,5 +1,12 @@
 # RH Test-Speed Implementation Plan
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 ## Purpose
 
 This is the execution handoff for making the Robinhood test workflow fast enough for normal startup iteration without deleting meaningful protocol-safety coverage.

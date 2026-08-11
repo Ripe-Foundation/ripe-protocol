@@ -1,6 +1,11 @@
 name: Python tests
 
 on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - rh
   workflow_dispatch:
     inputs:
       lane:
@@ -21,16 +26,18 @@ concurrency:
 
 jobs:
   test:
-    name: Python 3.12 (${{ inputs.lane || 'lean' }})
+    name: Python 3.12
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.lane == 'comprehensive' && 120 || 30 }}
+    timeout-minutes: 120
     env:
+      # The runner context is not available in jobs.<id>.env — only inside
+      # steps — so these use github.workspace, which is.
       ETHERSCAN_API_KEY: local-placeholder
-      HYPOTHESIS_STORAGE_DIRECTORY: ${{ runner.temp }}/hypothesis
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/pycache
-      RIPE_BOA_CACHE_DIR: ${{ runner.temp }}/boa
-      TMPDIR: ${{ runner.temp }}/tmp
-      XDG_CACHE_HOME: ${{ runner.temp }}/xdg
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -46,7 +53,7 @@ jobs:
         id: boa-cache
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: ${{ runner.temp }}/boa
+          path: ${{ github.workspace }}/.ci/boa
           key: boa-${{ runner.os }}-py312-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-${{ github.run_id }}
           restore-keys: |
             boa-${{ runner.os }}-py312-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-
@@ -66,7 +73,7 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Run lean default lane
-        if: inputs.lane != 'comprehensive'
+        if: github.event.inputs.lane != 'comprehensive'
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
@@ -75,7 +82,7 @@ jobs:
             --durations=50
 
       - name: Run manual comprehensive lane
-        if: inputs.lane == 'comprehensive'
+        if: github.event.inputs.lane == 'comprehensive'
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
@@ -88,5 +95,5 @@ jobs:
         if: ${{ always() && steps.boa-cache.outcome == 'success' }}
         uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: ${{ runner.temp }}/boa
+          path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}

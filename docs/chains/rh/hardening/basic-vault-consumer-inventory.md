@@ -29,7 +29,7 @@ using the position for value or borrowing. Capability lookup and Lootbox reward
 bookkeeping are not collateral-value or borrowing consumers and are retained
 as explicit included exceptions. In particular, Lootbox's vault-total and
 loot-share reads affect reward accounting, not CreditEngine collateral value
-([Lootbox source](../../../../contracts/core/Lootbox.vy#L812),
+([Lootbox source](../../../../contracts/core/Lootbox.vy#L912),
 [CreditEngine source](../../../../contracts/core/CreditEngine.vy#L723)).
 
 ## Frozen machine inventory
@@ -48,7 +48,7 @@ source review and test update.
     "contracts/core/CreditRedeem.vy": "36daec6010821ddc5a0da31e958c692869bfdd7797fc90431e5922f9bb516937",
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
     "contracts/core/HumanResources.vy": "7422f2dee9b5898b0f163371477bbea7c4a9b03a22b393e15594bbaadb00cddb",
-    "contracts/core/Lootbox.vy": "be3060e201d8f4d850988282c3341f5c7fdaaf0d948ba7abaac07e3de5b13f67",
+    "contracts/core/Lootbox.vy": "279b859a6e5234676e091cecb8736aeadac68bc8f1b909267b7a06c69a901f43",
     "contracts/core/Teller.vy": "cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc",
     "contracts/core/VaultMigrator.vy": "34d249c01405aeda0167fdfa1650a477c3dd60a64a729b45d5e7d90b17de36a8"
   },

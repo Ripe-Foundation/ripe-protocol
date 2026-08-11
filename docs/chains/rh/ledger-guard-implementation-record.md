@@ -1,5 +1,14 @@
 # Track 6 S5 Ledger Guard Stage B Implementation Record
 
+> **8 August 2026 removal overlay:** The block-clock inventory this record
+> reconciles against has been removed, along with
+> `contracts/testing/ActionBlockIdentityProbe.vy`. The `INV-CADENCE-NEW`,
+> `INV-PATH-NEW`, and source-hash rows below therefore describe entries in a
+> ledger that no longer exists; they are kept as the historical record of the
+> Stage B/C work, not as live authority. The Ledger guard behaviour itself is
+> unaffected — no production contract changed. Removed sources are recoverable
+> from git history.
+
 **Status:** Stage B independently approved at Gate 1 artifact SHA-256
 `e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76`;
 bounded Stage C inventory reconciliation complete; mandatory Gate 2

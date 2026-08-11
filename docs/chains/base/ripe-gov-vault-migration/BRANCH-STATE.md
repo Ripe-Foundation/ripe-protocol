@@ -1,12 +1,13 @@
 # Vault Migrator / Base Legacy RipeGov Migration — Branch State & Handoff
 
 **Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
-**Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Merged base:** `rh` @ `5a664cd`
-**Status (2026-08-09):** VaultMigrator architecture implemented, committed and pushed to the draft
-PR. Post-migration cleanup now uses the ordinary Lootbox claim path, the eager settlement route has
-been removed, terminal reward dust can no longer brick an exited position, and every measured runtime
-fits EIP-170. The RipeGov pause policy and SimpleErc20 metadata rebind are owner-approved and recorded
-below; this remains a WIP and is not deployable or fork-qualified.
+**Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Merged base:** `rh` @ `26e8270`
+**Status (2026-08-10):** VaultMigrator architecture and the latest live `rh` are integrated. The
+combined migration surface is green locally, Lootbox's source/profile identities are reconciled, and
+every measured runtime fits EIP-170. Teller's owner-accepted 24,525-byte runtime is recorded as the
+exact-version waiver RH-D027 rather than weakening RH's 200-byte default floor. Post-migration cleanup
+uses the ordinary Lootbox claim path, the eager settlement route is removed, and terminal reward dust
+cannot brick an exited position. This is not deployment or fork qualification.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
 > the non-obvious facts that cost real time to discover.
@@ -126,22 +127,27 @@ there is no live Base RPC-check task for the old MissionControl.
 
 ### Current deployed runtime sizes
 
-Measured from Boa-deployed code with Vyper 0.4.3; the regression test pins these exact values:
+Measured from Boa-deployed code with Vyper 0.4.3. The regression test enforces EIP-170 and headroom
+floors; Teller and CreditEngine, the two contracts below RH's 200-byte default, are additionally pinned
+to the exact owner-waived source, compiler output, deployed size and immutable-bearing runtime identity.
 
 | Contract | Deployed runtime | EIP-170 headroom |
 |---|---:|---:|
-| VaultMigrator | 13,734 | 10,842 |
-| Teller | 23,485 | 1,091 |
+| VaultMigrator | 12,042 | 12,534 |
+| Teller | 24,525 | **51 — RH-D027 exact waiver** |
 | TellerUtils | 8,976 | 15,600 |
-| SwitchboardEcho | 23,147 | 1,429 |
-| Lootbox | 23,131 | **1,445** |
-| Ledger | 13,392 | 11,184 |
+| SwitchboardEcho | 23,053 | 1,523 |
+| Lootbox | 22,993 | 1,583 |
+| RipeGov | 23,257 | 1,319 |
+| Ledger | 13,306 | 11,270 |
+| CreditEngine | 24,392 | **184 — RH-D026 exact waiver** |
+| StabilityPool | 24,371 | 205 |
 
 AuctionHouse remains 24,556 bytes (20 free) and Deleverage remains 24,569 bytes (7 free). Adding the
 new Addys id/getters changes their transitive compiler-input identity but dead-code elimination leaves
-their runtime unchanged. Current `rh` deploys Lootbox at 22,123 bytes, so this candidate adds 1,008
-bytes. The exact-size regression pins it at 23,131 bytes and its independent 20-byte minimum-margin
-floor remains in force.
+their runtime unchanged. The pre-integration `rh` reference measured Lootbox at 22,665 bytes, so this
+candidate adds 328 bytes. Lootbox is held to RH's stronger 200-byte default; RipeGov retains the
+migration branch's independent 1,000-byte minimum.
 
 The independent review measured a two-asset claim at 408,507 gas versus 403,496 on `rh`: +5,011
 (about 1.2%, or roughly 2.5k per asset). The increase comes from the balance/reward-flow reads needed
@@ -149,39 +155,37 @@ for terminal-category liveness and is recorded here rather than treated as free.
 
 ### Local verification completed
 
-- all changed/new production contracts compile;
-- `tests/vaults/test_vault_migration.py`: 39 passed, 4 deselected, including a two-asset source that
-  survives the first claim and is removed only after the second asset migrates and is claimed;
-- new `tests/vaults/test_vault_migrator_legacy.py`: 5 passed, including consecutive migrations of
-  two assets for the same user and ordinary-claim cleanup after the legacy freeze is lifted;
-- focused RipeGov migration coverage, including atomic fee-on-transfer rejection, passes;
-- `tests/core/teller/`: 272 passed, 3 xfailed;
-- `tests/core/lootbox/`: 199 passed, including terminal-dust, structurally-unfunded live-category,
-  atomic-refill and public calculator compatibility regressions;
-- `tests/vaults/test_ripe_gov_controls_and_migration.py`: 145 passed, 10 xfailed after the approved
-  pause semantics replaced the five stale failure/strict-XPASS expectations;
-- the exact three pause-characterization nodes, two former strict-XPASS nodes and frozen
-  SimpleErc20 binding checkpoint: 6 passed;
-- `tests/inventory/test_contract_artifacts.py`: 46 passed, including the exact-three-function ABI
-  surface and absence of the removed legacy asset-window event;
-- exact deployed-size regression: passed;
-- RipeHQ id-25 checkpoint (migration, legacy, artifacts, sizes and Robinhood registry topology):
-  91 passed, 4 intentionally deselected;
-- deterministic ABIs and compiler-backed artifact expectations include VaultMigrator and the changed
-  Teller/TellerUtils/Echo/Lootbox/Ledger interfaces.
+After merging live `rh` at `26e8270`, the combined feature surface produced **965 passed, 4
+deselected, 13 xfailed**. It covers all Lootbox and Teller tests; ordinary, current-governance and
+legacy-governance migrations; RipeGov controls and vault behavior; MissionControl; the exact runtime
+waivers; all three Lootbox deployment postures; and the deterministic contract-artifact inventory.
+The xfails are the suite's recorded expectations; there were no unexpected failures or XPASSes.
 
-The exact consolidated command below produced `302 passed, 4 deselected` on the merged candidate;
-the aggregate is reproducible and is not a substitute for the separately recorded pause and frozen-
-artifact policy evidence:
+The exact command was:
 
 ```bash
 python -m pytest -q tests/core/lootbox \
+  tests/core/teller \
   tests/vaults/test_vault_migration.py \
   tests/vaults/test_vault_migrator_legacy.py \
+  tests/vaults/test_ripe_gov_controls_and_migration.py \
+  tests/vaults/test_ripe_gov_vault.py \
+  tests/data/test_mission_control.py \
   tests/test_vault_pointer_runtime_sizes.py \
   tests/deployment_profiles/test_lootbox_deployment_profiles.py \
   tests/inventory/test_contract_artifacts.py
 ```
+
+The repository's default lean lane was also run after the live-`rh` merge and
+the final consumer-inventory rebind. It produced **8 failed, 3,488 passed, 282
+deselected, 22 xfailed, 25 errors**. That lane is not globally green on the
+live RH baseline: `docs/simplification/validation-evidence.md` records 13
+failures and the same 25 errors before this integration. Normalizing test-node
+identities shows **zero new failure or error identities** here. This candidate
+removes five inherited failure identities; the remaining eight failures and all
+25 Morpho V2 constructor errors are the documented RH subset. The command was
+the repository-default `python -m pytest -q` with network and credential
+environment variables unset and Boa/pytest caches isolated under `/private/tmp`.
 
 ### Independent-review remediation and open decisions
 

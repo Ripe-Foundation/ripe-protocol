@@ -1,5 +1,12 @@
 # Track 6 S4 Deleverage Cooldown Security and Compatibility Decision
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 **Status:** Stage A implementation-necessity Decision 0 and the no-code
 initial-launch conditions are owner-approved and independently
 security-approved; checkpoint 0 is closed for this no-code disposition;

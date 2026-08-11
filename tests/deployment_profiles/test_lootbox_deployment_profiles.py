@@ -71,8 +71,8 @@ def test_r5_compiles_reviewed_lootbox_with_source_owned_codesize(compiled):
     assert len(compiled.creation) == 23_207
     assert len(compiled.runtime_template) == 22_865
     assert compiled.integrity == (
-        "8328a99cf69a6d5c8d6f9e575737057c"
-        "fbaddc3d15fe0f8d1554be1a5e37320f"
+        "935d1b79e47f91abdd1b9550c32e7c85"
+        "fe992770d3bbb7bb963b05b9c528371c"
     )
 
 

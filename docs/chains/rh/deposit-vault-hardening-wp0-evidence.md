@@ -1,5 +1,12 @@
 # RH Deposit-Vault Hardening — WP0 / WP1 evidence bundle (rev 2, rebound)
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 Produced by the implementation agent for
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md`.
 
@@ -117,6 +124,16 @@ exact owner waiver — is unchanged and still binding.
 Nothing about any deployed contract changed with this decision: Teller's measured
 headroom is 318 bytes, which cleared both floors already. The decision only
 governs what future Teller growth is admissible.
+
+#### RG-SIZE-01 VaultMigrator follow-on — owner, 2026-08-10
+
+The 200-byte rule remains controlling, but PR #83's final Teller measures 24,525
+deployed bytes and therefore needs the separate exact waiver recorded as
+RH-D027. That waiver is bound to one source, compiler output, exact deployed
+size, and complete deployed-byte identity at declared constructor inputs. It
+permits no Teller growth and does not lower the default floor. The historical
+200-byte reconciliation above remains the rule against which this exception is
+measured.
 
 #### RH-CHANGE-01 disposition — owner, 2026-08-07 and 2026-08-09 (partial)
 

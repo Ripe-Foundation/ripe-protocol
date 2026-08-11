@@ -98,7 +98,7 @@ treating every mention as the same kind of drift.
 
 | Document | Current disposition after `0642f086…` |
 | --- | --- |
-| [`track-1-chainlink-ccip-confirmation.md`](../track-1-chainlink-ccip-confirmation.md) | Controlling draft condition remains unresolved: add the hook only after the stated Chainlink finding, and stop for an owner decision. The current source moved ahead of that condition. |
+| `track-1-chainlink-ccip-confirmation.md` | Controlling draft condition remains unresolved: add the hook only after the stated Chainlink finding, and stop for an owner decision. The current source moved ahead of that condition. |
 | [`rh-summary.md`](../../rh-summary.md) | Controlling checklist remains open and requires a tested shared revision plus explicit Base live-version policy if the hook is unavoidable. The source has the required shared form, but the owner decision, tests, current ABIs, and Base policy are missing. |
 | [`minimal-contract-change-reassessment.md`](../minimal-contract-change-reassessment.md) | Its recommendation to keep GREEN/RIPE unchanged absent a Chainlink finding and owner decision remains the recorded policy; its unchanged-source description is stale for current `rh`. |
 | [`component-matrix.md`](../component-matrix.md) | CM-001/002's `reused unchanged` classification and the CCIP decision row's unchanged-source premise are stale for the effective compiler graph: the direct token blobs are unchanged, but their imported shared module changed. Its shared-revision requirement and rejection of a Robinhood-only hook remain current and are satisfied in form. |
@@ -106,7 +106,7 @@ treating every mention as the same kind of drift.
 | [`ccip-integration-decision.md`](../ccip-integration-decision.md) | The preference for no token change and the same existing Robinhood implementation is stale as a current forward-source claim. Its facts about immutable Base deployments and its rejection of a Robinhood-only hook remain current; the integrated change is shared. |
 | [`ccip-public-evidence.md`](../ccip-public-evidence.md) | The observed Base deployments' lack of `owner()`/`getCCIPAdmin()` remains true. The document's hypothetical modified-Robinhood-token case is now an integrated repository-source fact and needs decision reconciliation. |
 | [`ccip-chainlink-question-packet.md`](../ccip-chainlink-question-packet.md) | Claims about the immutable Base tokens remain accurate. The question about using assisted registration for unchanged Robinhood deployments reflects the pre-change plan, not current `rh` source identity; the packet remains unsent. |
-| [`track-3-phase-0-inventory.md`](../track-3-phase-0-inventory.md) | This is neutral inventory/question framing, not a false unchanged-source claim. Its instruction to leave the admin path pending Track 1 remains unresolved. |
+| `track-3-phase-0-inventory.md` | This is neutral inventory/question framing, not a false unchanged-source claim. Its instruction to leave the admin path pending Track 1 remains unresolved. |
 
 This documentation-only refresh does not silently rewrite those broader
 planning and decision authorities. They require a separately scoped

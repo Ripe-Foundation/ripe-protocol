@@ -495,8 +495,8 @@ Primary repository evidence:
 - [`test_stock_token_vault_comparison.py`](../../../../tests/vaults/test_stock_token_vault_comparison.py)
 - [`test_basic_vault_safety.py`](../../../../tests/vaults/test_basic_vault_safety.py)
 - [`minimal-contract-change-reassessment.md`](../minimal-contract-change-reassessment.md#L249-L305)
-- [`stock-token-vault-change-validation-plan.md`](../stock-token-vault-change-validation-plan.md#L2152-L2167)
-- [`stock-token-vault-fix-recommendations.md`](../stock-token-vault-fix-recommendations.md#L181-L225)
+- `stock-token-vault-change-validation-plan.md`
+- `stock-token-vault-fix-recommendations.md`
 
 Snapshot, ancestry, exact delta, and ABI identity:
 

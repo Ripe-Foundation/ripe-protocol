@@ -1,5 +1,12 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 **Historical post-Candidate-A status (recorded 25 July 2026 UTC):** The
 independently approved four-file H-01 Candidate A payload was
 integrated and pushed on authoritative `rh` at exact merge commit

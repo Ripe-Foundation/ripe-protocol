@@ -1258,13 +1258,24 @@ def test_robinhood_migration_handoff_is_in_memory_typed_and_write_free(
 
 
 def test_every_committed_base_json_parses_without_rewrite():
+    # The 59 numeric Base step manifests were extracted from the active tree and
+    # remain recoverable from 610b43f4508e85628a1362532a79d68d71ea902c; see
+    # docs/simplification/extracted-files.tsv.
+    #
+    # There is deliberately no assertion on the size of the corpus. What this
+    # test is for is that every committed Base manifest parses, matches the
+    # schema, and is not rewritten by being read — all of which hold for any
+    # number of files. Pinning a count only meant that adding or removing a
+    # manifest failed a test about JSON schema, which is what made the earlier
+    # 60 -> 1 edit look like a coverage decision when it was really an artifact
+    # of the pin.
     before = {
         path.relative_to(ROOT).as_posix(): hashlib.sha256(
             path.read_bytes()
         ).hexdigest()
         for path in sorted(BASE_HISTORY.glob("*.json"))
     }
-    assert len(before) == 60
+    assert before, "no Base manifests found to validate"
     for relative in before:
         parsed = json.loads((ROOT / relative).read_bytes())
         assert set(parsed) == {"contracts"}

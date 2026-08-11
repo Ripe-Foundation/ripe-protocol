@@ -1,5 +1,16 @@
 # Shared block-clock specification
 
+> **8 August 2026 removal overlay:** The block-clock inventory this
+> specification governs — `scripts/check_block_clock_inventory.py`,
+> `config/block-clock-inventory.json`, and
+> `tests/inventory/test_block_clock_inventory.py` — has been removed, together
+> with the `contracts/testing/` probes and `tests/probes/`. Path and occurrence
+> counts below are therefore historical: nothing enforces them any more. The
+> narrative record is left intact because `tests/utils/clock_profiles.py` still
+> cites this document as evidence provenance for its Base and Robinhood clock
+> profiles, which remain in force. Removed sources are recoverable from git
+> history.
+
 > **1 August 2026 currentness overlay:** Current candidate baseline is
 > `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`, tree
 > `7454b5456ebb6cd02d716a64b408629ab501629e`. `DefaultsRobinhood.vy` now exists
