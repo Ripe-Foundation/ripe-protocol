@@ -166,12 +166,12 @@ DECLARED_RUNTIME_IMPORTS = {
     "colorama": (
         "0.4.6",
         Path("scripts/utils/log.py"),
-        "colorama",
+        ("from:colorama", (("Fore", None), ("Style", None))),
     ),
     "mergedeep": (
         "1.3.4",
         Path("scripts/utils/migration.py"),
-        "mergedeep",
+        ("from:mergedeep", (("merge", None),)),
     ),
 }
 DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
@@ -205,15 +205,38 @@ def _distribution_direct_url(package: str) -> str | None:
     return metadata.distribution(package).read_text("direct_url.json")
 
 
-def _direct_import_roots(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(), filename=str(path.relative_to(ROOT)))
-    roots: set[str] = set()
-    for node in ast.walk(tree):
+def _top_level_absolute_imports(
+    path: Path,
+) -> set[tuple[str, tuple[tuple[str, str | None], ...]]]:
+    tree = ast.parse(path.read_text(), filename=str(path))
+    imports: set[tuple[str, tuple[tuple[str, str | None], ...]]] = set()
+    for node in tree.body:
         if isinstance(node, ast.Import):
-            roots.update(imported.name.partition(".")[0] for imported in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module is not None:
-            roots.add(node.module.partition(".")[0])
-    return roots
+            for imported in node.names:
+                imports.add(
+                    (
+                        f"import:{imported.name}",
+                        ((imported.name, imported.asname),),
+                    )
+                )
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module is not None
+        ):
+            imports.add(
+                (
+                    f"from:{node.module}",
+                    tuple((imported.name, imported.asname) for imported in node.names),
+                )
+            )
+    return imports
+
+
+def _import_root(
+    signature: tuple[str, tuple[tuple[str, str | None], ...]],
+) -> str:
+    return signature[0].partition(":")[2].partition(".")[0]
 
 
 def _assert_web3_closure(
@@ -760,12 +783,17 @@ def test_migration_runtime_dependencies_are_direct_and_reachable():
     direct_pins = _pins(DIRECT_INPUT)
     lock_pins = _pins(LOCK)
     for package, import_details in DECLARED_RUNTIME_IMPORTS.items():
-        version, relative_path, import_root = import_details
+        version, relative_path, expected_import = import_details
         assert direct_pins.get(package) == version
         assert lock_pins.get(package) == version
         assert metadata.version(package) == version
         assert _distribution_direct_url(package) is None
-        assert import_root in _direct_import_roots(ROOT / relative_path)
+        observed = {
+            signature
+            for signature in _top_level_absolute_imports(ROOT / relative_path)
+            if _import_root(signature) == package
+        }
+        assert observed == {expected_import}
 
     evidence = EVIDENCE.read_text()
     normalized_evidence = " ".join(evidence.split())
@@ -777,6 +805,25 @@ def test_migration_runtime_dependencies_are_direct_and_reachable():
         in normalized_evidence
     )
     assert "does not transfer H-06" in normalized_evidence
+
+
+def test_migration_runtime_import_gate_ignores_dead_code(tmp_path):
+    source = tmp_path / "dead_code.py"
+    source.write_text(
+        "if False:\n"
+        "    from colorama import Fore, Style\n"
+        "    from mergedeep import merge\n"
+    )
+    assert _top_level_absolute_imports(source) == set()
+
+
+def test_migration_runtime_import_gate_ignores_relative_imports(tmp_path):
+    source = tmp_path / "relative.py"
+    source.write_text(
+        "from .colorama import Fore, Style\n"
+        "from ..mergedeep import merge\n"
+    )
+    assert _top_level_absolute_imports(source) == set()
 
 
 @pytest.mark.parametrize(

@@ -5395,9 +5395,11 @@ of Titanoboa's documentation graph:
 The candidate declares exact direct roots `colorama==0.4.6` and
 `mergedeep==1.3.4`. It does not change either operator module, migration merge
 semantics, logging behavior, Web3 closure, or any selected version. A narrow
-AST check reads only those two exact paths and verifies their ordinary direct
-import roots. It does not expand the Web3 directory scanner or claim dynamic,
-aliased, or whole-program import analysis.
+AST check reads only those two exact paths and verifies each exact current
+unconditional, top-level, absolute import statement, including imported names
+and aliases. It ignores nested or dead-code imports and relative imports. It
+does not expand the Web3 directory scanner or claim dynamic or whole-program
+import analysis.
 
 ### Reproducible zero-drift lock
 
@@ -5429,7 +5431,7 @@ byte-identical lock SHA-256
 |---|---|---|
 | `requirements.in` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
 | `requirements.txt` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
-| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `2e7aabd8b2ff4aeb25c5a1b903cff33c24a1253233be8fc0522d3fb469f98bd8` |
+| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `d6fad04d96f19e058a5178020286e3462aada6ad65d60deb010d4a99ad5a5ca9` |
 
 PEP 508-normalized comparison found 103 exact pin lines on each side and zero
 package additions, removals, or version changes. The generated header is
@@ -5464,3 +5466,37 @@ stacked and non-operative until its own owner/security/integration conditions
 are satisfied. No RPC, explorer query, hardware wallet, Safe service, push,
 PR, merge, deployment, settings change, or external alert mutation was
 performed.
+
+### Independent-review amendment — exact import boundary
+
+Independent review found that the first candidate helper used `ast.walk()` and
+accepted any `ImportFrom` node. That proved syntax presence but also counted
+imports nested under dead code and relative imports, which are not the runtime
+dependency relationship this declaration is intended to preserve.
+
+The additive amendment changes only the dependency gate and this candidate
+evidence. It iterates only the parsed module's top-level statement list,
+accepts `ImportFrom` only when `level == 0`, records imported names and aliases,
+and requires exact equality for the current statements:
+
+```text
+scripts/utils/log.py
+  from colorama import Fore, Style
+scripts/utils/migration.py
+  from mergedeep import merge
+```
+
+Separate negative mutations prove that the same imports under `if False` and
+the corresponding one-dot/two-dot relative imports do not satisfy the gate.
+The requirement input and lock remain byte-identical at the hashes above; no
+runtime/operator file or dependency version changed.
+
+| Amendment validation | Result |
+|---|---|
+| focused exact-import and two negative-mutation cases | 3 passed, 94 deselected in 0.18 s; 2.92 s wall |
+| import smoke for both unchanged candidate modules, RPC and credential variables unset | pass; 1.74 s wall |
+| complete dependency gate with repository addopts cleared | 97 passed, one preserved Websockets deprecation warning, in 3.70 s; 6.24 s wall |
+| dependency-gate module compilation and `git diff --check` | pass |
+
+This test-boundary correction does not change the Pymdown blocker, Web3
+closure, exception status, H-06 boundary, or any deployment authority.
