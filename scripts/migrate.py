@@ -3,7 +3,7 @@ import click
 import boa
 
 from scripts.utils import log
-from scripts.utils.migration_helpers import get_account, load_vyper_files
+from scripts.utils.migration_helpers import load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
 from boa.environment import Env
@@ -56,11 +56,8 @@ def _rpc_from_env(chain):
 def _local_account(account_name):
     """Load the deployer key from {ACCOUNT}_PRIVATE_KEY, e.g. DEPLOYER.
 
-    scripts.utils.migration_helpers.get_account now requires a verified
-    network identity for the H-02 path, so this keeps the plain key route
-    without changing a helper that other callers depend on. There is no
-    fallback test key: deploying from a well-known key is never what anyone
-    wants, and a missing key should say so rather than pick one.
+    There is no fallback test key: deploying from a well-known key is never
+    what anyone wants, and a missing key should say so rather than pick one.
     """
     from eth_account import Account
 
