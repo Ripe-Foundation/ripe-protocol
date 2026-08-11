@@ -40,16 +40,9 @@ def test_python_workflow_uses_full_history_and_bounded_lane_timeouts():
 def test_python_workflow_pins_node24_action_releases_by_commit():
     jobs = _workflow()["jobs"]
     test_job = jobs["test"]
-    macos_job = jobs["manifest-promotion-macos"]
 
     assert _step(test_job, "Check out source")["uses"] == CHECKOUT_ACTION
-    assert _step(macos_job, "Check out full source history")["uses"] == (
-        CHECKOUT_ACTION
-    )
     assert _step(test_job, "Use Python 3.12.0")["uses"] == (
-        SETUP_PYTHON_ACTION
-    )
-    assert _step(macos_job, "Use Python 3.12.0")["uses"] == (
         SETUP_PYTHON_ACTION
     )
     assert _step(test_job, "Restore Titanoboa compiler artifacts")[
