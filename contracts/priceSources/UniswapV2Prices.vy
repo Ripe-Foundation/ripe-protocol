@@ -124,12 +124,22 @@ def __init__(
 ###############
 
 
-# get price
+# monitoring-only boundary
 
 
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
+    # This adapter intentionally does not expose a protocol PriceSource feed.
+    # Its reserve observations are manipulable spot data and are retained only
+    # for direct monitoring through `getMonitoringPrice` and the explicit
+    # snapshot views below.
+    return 0
+
+
+@view
+@external
+def getMonitoringPrice(_asset: address, _priceDesk: address = empty(address)) -> uint256:
     ripe: address = RIPE_TOKEN
     if _asset != ripe:
         return 0
@@ -140,11 +150,10 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return 0, False
-    config: PriceConfig = self.priceConfigs[ripe]
-    return self._getPrice(ripe, config, _priceDesk), True
+    # PriceDesk consumes this method. Returning no feed is the contract-level
+    # guard that keeps this monitoring adapter out of collateral valuation even
+    # if an operator accidentally registers it in PriceDesk.
+    return 0, False
 
 
 @view
@@ -167,7 +176,7 @@ def _getPrice(_asset: address, _config: PriceConfig, _priceDesk: address) -> uin
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    return _asset == RIPE_TOKEN
+    return False
 
 
 @view

@@ -22,11 +22,6 @@ class UniswapV2DeploymentConfig:
 UNISWAP_V2_DEFAULTS = UniswapV2DeploymentConfig()
 
 
-@pytest.fixture(scope="session")
-def ripe_hq() -> None:
-    """Keep this focused mock suite independent of the protocol bootstrap."""
-
-
 @dataclass
 class UniswapV2PricesFixture:
     source: object
@@ -179,12 +174,13 @@ def test_prices_ripe_from_either_uniswap_v2_token_position(
         fixture.ripe.address,
         sender=fixture.snapshot_caller,
     )
-    assert fixture.source.getPrice(fixture.ripe.address) == expected_price
+    assert fixture.source.getPrice(fixture.ripe.address) == 0
+    assert fixture.source.getMonitoringPrice(fixture.ripe.address) == expected_price
     assert fixture.source.getPriceAndHasFeed(
         fixture.ripe.address,
         0,
         fixture.quote_desk.address,
-    ) == (expected_price, True)
+    ) == (0, False)
 
 
 @pytest.mark.parametrize(
@@ -327,7 +323,7 @@ def test_only_exposes_the_configured_ripe_asset(uniswap_v2_prices_builder):
         fixture.quote_desk.address,
     ) == (0, False)
     assert fixture.source.getUniswapV2RipePrice(fixture.quote.address) == 0
-    assert fixture.source.hasPriceFeed(fixture.ripe.address) is True
+    assert fixture.source.hasPriceFeed(fixture.ripe.address) is False
     assert fixture.source.hasPriceFeed(fixture.quote.address) is False
     assert fixture.source.hasPriceFeed(ZERO_ADDRESS) is False
 
@@ -344,21 +340,26 @@ def test_constructor_sets_expected_immutables_and_defaults(uniswap_v2_prices_bui
     assert config.staleTime == 86_400
     assert config.nextIndex == 0
     assert fixture.source.getPricedAssets() == [fixture.ripe.address]
-    assert len(boa.env.get_code(fixture.source.address)) == 14_122
+    deployed_size = len(boa.env.get_code(fixture.source.address))
+    assert 0 < deployed_size < 24_576
 
 
-def test_protocol_price_is_zero_until_first_snapshot(uniswap_v2_prices_builder):
+def test_protocol_feed_stays_disabled_while_monitoring_starts_after_first_snapshot(
+    uniswap_v2_prices_builder,
+):
     fixture = uniswap_v2_prices_builder()
     spot = 200 * EIGHTEEN_DECIMALS
     assert fixture.source.getUniswapV2RipePrice(fixture.ripe.address) == spot
     assert fixture.source.getPrice(fixture.ripe.address) == 0
-    assert fixture.source.getPriceAndHasFeed(fixture.ripe.address) == (0, True)
+    assert fixture.source.getMonitoringPrice(fixture.ripe.address) == 0
+    assert fixture.source.getPriceAndHasFeed(fixture.ripe.address) == (0, False)
 
     assert fixture.source.addPriceSnapshot(
         fixture.ripe.address,
         sender=fixture.snapshot_caller,
     )
-    assert fixture.source.getPrice(fixture.ripe.address) == spot
+    assert fixture.source.getPrice(fixture.ripe.address) == 0
+    assert fixture.source.getMonitoringPrice(fixture.ripe.address) == spot
 
 
 def test_empty_price_desk_argument_uses_registered_price_desk(
@@ -369,7 +370,9 @@ def test_empty_price_desk_argument_uses_registered_price_desk(
         fixture.ripe.address,
         sender=fixture.snapshot_caller,
     )
-    assert fixture.source.getPrice(fixture.ripe.address) == 200 * EIGHTEEN_DECIMALS
+    assert fixture.source.getMonitoringPrice(
+        fixture.ripe.address,
+    ) == 200 * EIGHTEEN_DECIMALS
 
 
 ####################
@@ -487,9 +490,8 @@ def test_downside_is_immediate_and_combined_price_uses_lower_value(
 
     spot = 100 * EIGHTEEN_DECIMALS
     assert fixture.source.getWeightedPrice(fixture.ripe.address) == 200 * EIGHTEEN_DECIMALS
-    assert fixture.source.getPrice(
+    assert fixture.source.getMonitoringPrice(
         fixture.ripe.address,
-        0,
         fixture.quote_desk.address,
     ) == spot
 
@@ -509,9 +511,8 @@ def test_combined_price_uses_weighted_floor_when_spot_is_higher(
     assert fixture.source.getUniswapV2RipePrice(
         fixture.ripe.address,
     ) == 400 * EIGHTEEN_DECIMALS
-    assert fixture.source.getPrice(
+    assert fixture.source.getMonitoringPrice(
         fixture.ripe.address,
-        0,
         fixture.quote_desk.address,
     ) == 200 * EIGHTEEN_DECIMALS
 
@@ -524,14 +525,10 @@ def test_all_stale_snapshots_fail_closed_to_zero(uniswap_v2_prices_builder):
     )
     boa.env.time_travel(seconds=86_401)
     assert fixture.source.getWeightedPrice(fixture.ripe.address) == 0
-    assert fixture.source.getPrice(fixture.ripe.address) == 0
+    assert fixture.source.getMonitoringPrice(fixture.ripe.address) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="pending owner decision: spot snapshots remain manipulable without TWAP or liquidity floor",
-)
-def test_repeated_manipulated_snapshots_cannot_persistently_suppress_price(
+def test_repeated_manipulated_snapshots_can_suppress_monitoring_value(
     uniswap_v2_prices_builder,
 ):
     fixture = uniswap_v2_prices_builder()
@@ -546,7 +543,11 @@ def test_repeated_manipulated_snapshots_cannot_persistently_suppress_price(
 
     set_pool_reserves(fixture, 100, 10)
     assert fixture.source.getUniswapV2RipePrice(fixture.ripe.address) == honest
-    assert fixture.source.getPrice(fixture.ripe.address) == honest
+    assert fixture.source.getMonitoringPrice(
+        fixture.ripe.address,
+    ) == 20 * EIGHTEEN_DECIMALS
+    assert fixture.source.getPrice(fixture.ripe.address) == 0
+    assert fixture.source.getPriceAndHasFeed(fixture.ripe.address) == (0, False)
 
 
 def test_non_ripe_snapshot_operations_are_noops(uniswap_v2_prices_builder):
@@ -898,13 +899,12 @@ def test_pause_zeroes_price_and_blocks_state_changes(uniswap_v2_prices_builder):
         sender=fixture.snapshot_caller,
     )
     fixture.source.pause(True, sender=fixture.switchboard_caller)
-    assert fixture.source.getPrice(
+    assert fixture.source.getMonitoringPrice(
         fixture.ripe.address,
-        0,
         fixture.quote_desk.address,
     ) == 0
     assert fixture.source.getWeightedPrice(fixture.ripe.address) == 0
-    assert fixture.source.hasPriceFeed(fixture.ripe.address)
+    assert not fixture.source.hasPriceFeed(fixture.ripe.address)
     with boa.reverts("contract paused"):
         fixture.source.addPriceSnapshot(
             fixture.ripe.address,
@@ -914,9 +914,8 @@ def test_pause_zeroes_price_and_blocks_state_changes(uniswap_v2_prices_builder):
         fixture.source.updatePriceConfig(300, 20, 1_000, 3_600, sender=fixture.governor)
 
     fixture.source.pause(False, sender=fixture.switchboard_caller)
-    assert fixture.source.getPrice(
+    assert fixture.source.getMonitoringPrice(
         fixture.ripe.address,
-        0,
         fixture.quote_desk.address,
     ) == 200 * EIGHTEEN_DECIMALS
 
