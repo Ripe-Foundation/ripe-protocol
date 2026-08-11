@@ -81,12 +81,15 @@ def new_mission_control(ripe_hq, defaults, switchboard_charlie):
 @pytest.fixture(scope="function")
 def zero_pointer_mission_control(ripe_hq, defaults):
     """Deploy an unregistered MissionControl with both pointers intentionally unset."""
-    return boa.load(
+    mc = boa.load(
         "contracts/data/MissionControl.vy",
         ripe_hq,
         defaults,
         name="zero_pointer_mission_control",
     )
+    mc.eval("self.coreRipeGovVaultId = 0")
+    mc.eval("self.preferredStabVaultId = 0")
+    return mc
 
 
 ###############

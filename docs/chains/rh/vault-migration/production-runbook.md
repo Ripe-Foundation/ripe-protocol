@@ -60,10 +60,12 @@ next `claimLoot`: zero-balance assets are deregistered from the vault, and a vau
 remaining assets is dropped from the user. Expect migrated users to remain enumerated in the
 source vault until then; this is temporary and harmless.
 
-For reference, the RipeGov path removes participation immediately, and as of this change it does
-so through `Lootbox.removeVaultFromUserForMigration` — Ledger authorizes only Lootbox to remove a
-user's vault participation, so Teller routes that cleanup through Lootbox rather than calling
-Ledger directly.
+For reference, the RipeGov path removes participation immediately through
+`Ledger.removeVaultFromUserForMigration`. That narrow helper authorizes only the current Teller
+address and is unavailable while Ledger itself is paused. Teller proves that the source position
+is empty before cleanup, proves the source Ledger entry was removed afterward, and only adds the
+target Ledger entry when the user is not already participating there. Lootbox is not on this
+migration cleanup route.
 
 ### 0.2 Trusted producers bypass the Teller pause
 

@@ -34,8 +34,8 @@
     },
     "effective_optimization": "gas",
     "path": "contracts/data/Ledger.vy",
-    "sha256": "6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3",
-    "transitive_compiler_input_integrity": "62cc9e492ee1b1a3e84ad104507d684dc81edecef969fc0ae0f7a1586dd0d830",
+    "sha256": "7da1e310bad222d6cacc14aa3683ec67be6ddc76fc148efe3b174e198d645f3f",
+    "transitive_compiler_input_integrity": "b381be6ad58a12908a6d494b25b5cf764c3a8dbcef658a4f0757624e595a093d",
     "vyper_version": "0.4.3+commit.bff19ea2"
   },
   "status": "DRAFT \u2014 owner approval required before integration or use"

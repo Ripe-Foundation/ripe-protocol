@@ -932,6 +932,7 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         COMPOUND_V3,
         MOONWELL,
         AAVE_V3,
+        MORPHO_V2,
         name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

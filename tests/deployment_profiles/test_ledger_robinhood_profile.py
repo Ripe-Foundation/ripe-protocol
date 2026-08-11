@@ -15,22 +15,22 @@ from scripts.proposals import ledger_robinhood_profile as profile
 
 L3B_MANIFEST_MUTATION_SHA256 = {
     profile.ZERO_ADDRESS: (
-        "ece7fa2b42d892e7e46b199e75f9050a"
-        "397b8a89dd6d1ed2328fbb1715ca81e0"
+        "e95e1b0d898a6d896661e8daf1a6b2b0"
+        "8b6c2638b8a3a403fe50e6290b74be1f"
     ),
     "0x0000000000000000000000000000000000000065": (
-        "259a192a718e82f6866ea3c4807b7c0"
-        "add05208ef051ab1a3407cc22fe66cbb4"
+        "155310555006fe2fc458cc2814a777d71"
+        "5891c8508332843ecd739166cf0866f"
     ),
 }
 L3B_SOURCE_MUTATION_SHA256 = {
     "immutable_readback": (
-        "03c63ca6744e62024fe7ffaa573110554f"
-        "c68f08513cf505afd4dd05cea48785"
+        "6e044f13cc1111829c047a73a73f9a8f"
+        "fe4711c3dab814af3d90bc664e745bc1"
     ),
     "post_deploy_assertions": (
-        "9fd01fe6ee51b2f15162670761516e227"
-        "f6b5fcfce38b837366e6c0e87e6dd6d"
+        "477f615580e98b12a79601d0e5d5bd68"
+        "afe2b5a6e3c3bdae0167fcf3ca088beb"
     ),
 }
 
@@ -85,6 +85,16 @@ def test_r1_manifest_is_canonical_draft_with_deterministic_placeholders():
             label
         )
         assert entry["approval_status"] == "unapproved_placeholder"
+
+
+def test_r1_manifest_rejects_stale_source_metadata():
+    manifest = copy.deepcopy(profile.load_manifest())
+    manifest["source"]["sha256"] = "0" * 64
+    with pytest.raises(
+        profile.ProfileGateError,
+        match="source metadata does not match governed expectations",
+    ):
+        profile.validate_manifest(manifest)
 
 
 def test_r1_compiles_reviewed_ledger_with_pinned_source_owned_settings():

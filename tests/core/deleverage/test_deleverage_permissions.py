@@ -1444,7 +1444,7 @@ def test_zero_collateral_value_returns_zero(
     mock_price_source.setPrice(alpha_token, 0)
 
     # Should fail
-    with boa.reverts("cannot deleverage"):
+    with boa.reverts("has price config, no price"):
         teller.deleverageUser(bob, 0, sender=alice)
 
 
@@ -1531,7 +1531,7 @@ def test_price_oracle_returns_zero(
     mock_price_source.setPrice(alpha_token, 0)
 
     # Should fail gracefully
-    with boa.reverts("cannot deleverage"):
+    with boa.reverts("has price config, no price"):
         teller.deleverageUser(bob, 0, sender=alice)
 
 

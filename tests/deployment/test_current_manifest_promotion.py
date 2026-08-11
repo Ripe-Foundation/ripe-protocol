@@ -105,6 +105,8 @@ def _publish_child(root, record, queue):
         expected_prior_record_sha256=None,
     )
     queue.put((result.state.value, result.code))
+    queue.close()
+    queue.join_thread()
 
 
 def _promote_child(root, index, queue):
@@ -114,6 +116,18 @@ def _promote_child(root, index, queue):
         expected_prior_index_sha256=None,
     )
     queue.put((result.state.value, result.code))
+    queue.close()
+    queue.join_thread()
+
+
+def _close_multiprocessing_resources(processes, queue):
+    for process in processes:
+        if process.is_alive():
+            process.terminate()
+        process.join(5)
+        process.close()
+    queue.close()
+    queue.join_thread()
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-only H-06 release")
@@ -1033,17 +1047,22 @@ def test_two_concurrent_immutable_writers_have_one_durable_identity(tmp_path):
         context.Process(target=_publish_child, args=(root, record, queue))
         for _ in range(2)
     ]
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join(30)
-        assert process.exitcode == 0
-    results = [queue.get(timeout=5) for _ in processes]
-    states = sorted(item[0] for item in results)
-    assert states == ["already-present", "durable"], results
-    assert (root / immutable_basename(record)).read_bytes() == (
-        canonical_json_bytes(record)
-    )
+    started = []
+    try:
+        for process in processes:
+            process.start()
+            started.append(process)
+        for process in started:
+            process.join(30)
+            assert process.exitcode == 0
+        results = [queue.get(timeout=5) for _ in started]
+        states = sorted(item[0] for item in results)
+        assert states == ["already-present", "durable"], results
+        assert (root / immutable_basename(record)).read_bytes() == (
+            canonical_json_bytes(record)
+        )
+    finally:
+        _close_multiprocessing_resources(started, queue)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-only H-06 release")
@@ -1340,13 +1359,18 @@ def test_two_concurrent_first_promotions_have_one_winner(tmp_path):
         context.Process(target=_promote_child, args=(root, index, queue))
         for _ in range(2)
     ]
-    for process in processes:
-        process.start()
-    for process in processes:
-        process.join(30)
-        assert process.exitcode == 0
-    states = sorted(queue.get(timeout=5)[0] for _ in processes)
-    assert states == ["durable", "stale-prior"]
+    started = []
+    try:
+        for process in processes:
+            process.start()
+            started.append(process)
+        for process in started:
+            process.join(30)
+            assert process.exitcode == 0
+        states = sorted(queue.get(timeout=5)[0] for _ in started)
+        assert states == ["durable", "stale-prior"]
+    finally:
+        _close_multiprocessing_resources(started, queue)
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-only H-06 release")

@@ -350,7 +350,7 @@ def test_atomic_policy_keeps_defaults_routes_and_rewards_fail_closed():
     ]
     assert promotion.disposition == "approved"
     assert promotion.value == (
-        "7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec"
+        "f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234"
     )
 
 

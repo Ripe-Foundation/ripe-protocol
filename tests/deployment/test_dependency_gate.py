@@ -126,6 +126,7 @@ REACHABILITY_EXCLUDED_DIRS = {
     "vendor",
 }
 APPROVED_CLICK_SURFACES = {
+    Path("scripts/ccip_send.py"),
     Path("scripts/console.py"),
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),

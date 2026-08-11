@@ -202,14 +202,19 @@ dated exact-hash review evidence rather than a fresh current compilation.
 ## Automated enforcement boundary
 
 The repository currently contains one GitHub Actions workflow:
-[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). It runs the
-lean or comprehensive pytest lane on manual dispatch only; it has no push or
-pull-request trigger. It does not run the central artifact checker, block-clock
-inventory, Defaults generator, deterministic ABI export check, or any Solidity
-build/test package as a required check. The red four-file token ABI discrepancy
-and the Solidity reference gaps therefore have no repository CI enforcement.
-Every validation result in this directory is explicit audit evidence, not a
-continuously enforced gate.
+[`python-tests.yml`](../../../../.github/workflows/python-tests.yml). Pull
+requests, plus pushes to `master` or `rh`, run both lean and comprehensive
+pytest lanes on exact Python 3.12.0; manual dispatch can select either lane.
+Runs are deduplicated by head SHA and lane selection, use task-private
+pytest/cache roots, verify the resolved environment with `pip check`, and
+preserve deterministic hashing. The comprehensive lane collects the
+repository's artifact, release, fuzz, gas, and offline fork gates in addition
+to the default suite.
+
+This makes repository CI execution automatic, but GitHub branch-protection and
+required-check policy remain external controls and must be configured on the
+repository. No workflow run proves a deployment, live-chain binding, Solidity
+production package, or owner release decision.
 
 The former `rh-handoff-dashboard.yml` workflow and the dashboard application it
 built were extracted from the active tree; both remain recoverable from

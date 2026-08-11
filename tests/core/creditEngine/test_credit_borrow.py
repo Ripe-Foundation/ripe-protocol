@@ -1525,7 +1525,7 @@ def test_get_user_borrow_terms_asset_with_no_price(
 
     # Set price to zero
     mock_price_source.setPrice(alpha_token, 0)
-    terms = credit_engine.getUserBorrowTerms(bob, True)
+    terms = credit_engine.getUserBorrowTerms(bob, False)
 
     # Collateral value and max debt are 0 when price is unavailable
     assert terms.collateralVal == 0
@@ -1538,6 +1538,9 @@ def test_get_user_borrow_terms_asset_with_no_price(
     assert terms.debtTerms.liqFee == 10_00
     assert terms.debtTerms.borrowRate == 5_00
     assert terms.debtTerms.daowry == 1_00
+
+    with boa.reverts("has price config, no price"):
+        credit_engine.getUserBorrowTerms(bob, True)
 
 
 #########

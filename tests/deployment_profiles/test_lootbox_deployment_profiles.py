@@ -1,5 +1,7 @@
 """DRAFT — owner approval required before integration or use."""
 
+import copy
+
 import pytest
 
 from scripts.proposals import lootbox_deployment_profiles as profiles
@@ -23,6 +25,16 @@ def test_r5_manifest_is_canonical_draft_and_path_free(manifest):
     assert b"\r" not in raw
     assert b"/Users/" not in raw
     assert b"timestamp" not in raw.lower()
+
+
+def test_r5_manifest_rejects_stale_source_metadata():
+    manifest = copy.deepcopy(profiles.load_manifest())
+    manifest["source"]["transitive_compiler_input_integrity"] = "0" * 64
+    with pytest.raises(
+        profiles.LootboxProfileError,
+        match="source metadata does not match governed expectations",
+    ):
+        profiles.validate_manifest(manifest)
 
 
 def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
@@ -52,11 +64,11 @@ def test_r5_placeholders_are_deterministic_and_unapproved(manifest):
 
 
 def test_r5_compiles_reviewed_lootbox_with_source_owned_codesize(compiled):
-    assert len(compiled.creation) == 21_911
-    assert len(compiled.runtime_template) == 21_569
+    assert len(compiled.creation) == 22_337
+    assert len(compiled.runtime_template) == 21_995
     assert compiled.integrity == (
-        "65a3999e25cc33caf88ff839fddae3ab7"
-        "601a8e72e4eb96f84fd854eab3c9718"
+        "72f74d3dbef1d8132f18315da5e858b6"
+        "fd91cd8cc05339dfaef54206e3ba9d06"
     )
 
 
@@ -188,4 +200,5 @@ def test_x1_historical_call_site_inventory_is_complete():
         "migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py": [1],
         "migrations/base-mainnet/2025080900_Lootbox.py": [1],
         "migrations/base-mainnet/2025112500_New_Endaoment_Features.py": [4],
+        "migrations/robinhood-mainnet/0005_Departments.py": [5],
     }

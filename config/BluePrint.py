@@ -665,18 +665,18 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
     current_test_identities=(
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_ah_auctions.py",
-            "8d4c9a46c89bd8b98a135790e83d78fdbb094ce0",
-            "c3a33ecfea6a1d266bb3eab0eb8a35984c91c738c6d30519c4003ed08046f997",
+            "8b9ce1671c05e50059368879c2ad081e56ef58f8",
+            "e8ff7b4ecbfd85ab5e16794ebf0d7cb8ee167b486ed39030c0b0f624fb1892ad",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            "398789cf7ed3513df39cb87fa953cc25e9227e8c",
-            "12d161d41eda9acf8cd61697b31b2870e360125e33dbd46f8e22dff4872864cb",
+            "c04a618f48c3e3e5e8b85b3e78f558db80f527e6",
+            "adfd4961288f1b3d8dfa6e40c8dc2987f95ae8c8c8417f6d26dd7380b8632306",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            "aba36f5e004ca6a7752118cf0f02d46c28cd5a54",
-            "f9b52e3f8854f87b6b614ef673ea9630a10daea518a411cab0550e4ae5bfe10e",
+            "fc8ff200e5eef7678a9da207d5c1723f1bc4afbe",
+            "68fabc844d43d5a0f5a1f119f698837549787e458194a595a710973c07948348",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_swap_collateral.py",
@@ -688,10 +688,10 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
         RobinhoodArtifactApplicabilityIdentity(
             "AuctionHouse",
             "contracts/core/AuctionHouse.vy",
-            "d0a2d45cae0128cbb6ed5508238c817dfd963482",
-            "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3",
-            "0b58ea8c6aea0a7615315af80abcf5a06a03ba330e45e7334c4a5b168d0fe0b0",
-            "cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f",
+            "1317483e5abf1980c852efab628f1c766c45f421",
+            "d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f",
+            "06d9c2c29b70a1e71ea5c9f1e3073969292074453af064594edc387e3c8a3251",
+            "4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf",
             "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
             "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         ),
@@ -838,7 +838,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "repository_fact_integrated",
         (
             ("source", "contracts/vaults/modules/BasicVault.vy"),
-            ("gitBlob", "9c8299accd5a65cbfbc96c4cdc1849bb125523b8"),
+            ("gitBlob", "a5a51ee20c598e9bf40908fc6c38f1c0634bf665"),
             ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
         ),
         ("shared nominal vault movement remains fail-closed and external delivery stays exact",),
@@ -849,7 +849,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "repository_fact_integrated",
         (
             ("source", "contracts/core/CreditEngine.vy"),
-            ("gitBlob", "a98d2522a16708e887a5a8aad78171843d413baf"),
+            ("gitBlob", "800cc44bcb13439f5007d79143e545b4c3357014"),
             ("integrationCommit", "4c26d7d73bb02f7eae2e5df02314db77a426aced"),
         ),
         ("preserve represented zero-amount terms with zero capacity",),

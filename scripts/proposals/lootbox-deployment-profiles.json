@@ -86,8 +86,8 @@
     },
     "effective_optimization": "codesize",
     "path": "contracts/core/Lootbox.vy",
-    "sha256": "669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65",
-    "transitive_compiler_input_integrity": "65a3999e25cc33caf88ff839fddae3ab7601a8e72e4eb96f84fd854eab3c9718",
+    "sha256": "9a39a2dbf44043498908da5fb2c0c99e270417243e7608543d585f841d07b0f1",
+    "transitive_compiler_input_integrity": "72f74d3dbef1d8132f18315da5e858b6fd91cd8cc05339dfaef54206e3ba9d06",
     "vyper_version": "0.4.3+commit.bff19ea2"
   },
   "status": "DRAFT \u2014 owner approval required before integration or use"
