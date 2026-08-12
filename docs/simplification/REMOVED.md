@@ -179,6 +179,26 @@ both testnet lanes with their routers and chain selectors, and the eight
 `CcipPool`/`CcipWire` migrations deploy the token pools on each side and hand
 ownership to the Safe.
 
+**`rh` rewrote the file after we deleted it; it is still removed.** Two commits
+on `rh` -- `98155a8` "reconcile and harden live CCIP topology" and `cc01d02`
+"finalize PR67 deployment and CCIP hardening" -- grew it from 154 to 471 lines
+and fixed every defect listed above: the one-argument `get_account` call is
+gone, and so is the `.../v2/None` RPC default.
+
+That version is **not** a working bridge, and the distinction matters for anyone
+reading this later. Its own docstring: *"This tool currently supports fork
+simulation/preflight only. It deliberately has no live signer or Safe
+transaction backend and therefore cannot broadcast."* It contains zero
+references to private keys, Ledger or Safe, and `--as-address` is required in
+fork mode because "private keys are never loaded". It is a dry-run simulator for
+rehearsing a lane, not a way to move tokens.
+
+So it does not reopen the question it appears to. Owner decision stands and was
+reaffirmed against this version specifically: **remove it; it will never be
+used.** When the `rh` merge re-presents `scripts/ccip_send.py` as a
+modify/delete conflict, the resolution is delete. Those 471 lines are dropped
+deliberately, not missed -- recoverable from `origin/rh` at `cc01d02`.
+
 That closes the gap recorded above rather than leaving it outstanding. It was a
 real gap in repository terms and not an operational one: with pools wired and
 Safe-owned, moving RIPE or GREEN across a lane is a Safe transaction against the
