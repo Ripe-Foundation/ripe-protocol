@@ -2,8 +2,7 @@
   "contracts": {
     "Deleverage": {
       "address": "0x62591b3058c1428FA4b5eD2160387725be285a64",
-      "file": "contracts/core/Deleverage.vy",
-      "args": "0000000000000000000000006162df1b329e157479f8f1407e888260e0ec3d2b"
+      "file": "contracts/core/Deleverage.vy"
     }
   }
 }

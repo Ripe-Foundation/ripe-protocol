@@ -63,9 +63,9 @@ def _migration_owners(chain, environment):
     is what makes it exact: a redeployed contract appears in several steps, and
     only the one holding the live address is the current owner.
 
-    Step manifests carry no `solc_json` -- they are a record, not a payload --
-    so this reads them for attribution only. Everything submitted comes from
-    the current manifest.
+    Step manifests carry address and file only -- they are a record, not a
+    payload -- so this reads them for attribution only. Everything submitted
+    comes from the current manifest.
     """
     owners = {}
     history = _history_manifest_path(chain, environment, "current").parent
@@ -282,10 +282,10 @@ def cli(
     # once, up front, rather than listing every row as unverifiable.
     if manifest.isdigit() and not any(row["verifiable"] for row in rows):
         raise click.ClickException(
-            f"{manifest_path.name} is a step manifest: it records what "
-            f"migration {manifest} deployed, but carries no compiler output to "
-            "submit. To verify what that migration deployed, use the current "
-            f"manifest: --migration {manifest}"
+            f"{manifest_path.name} is a step manifest: it records which "
+            f"contracts migration {manifest} deployed and where, but carries "
+            "no compiler output to submit. To verify what that migration "
+            f"deployed, use the current manifest: --migration {manifest}"
         )
 
     if sum(bool(flag) for flag in (contracts, migration, verify_all)) > 1:

@@ -2,93 +2,75 @@
   "contracts": {
     "DefaultsRobinhoodLive": {
       "address": "0xAb7527f779B9C6F473054f9D03fF39BC2123A95C",
-      "file": "contracts/config/DefaultsRobinhoodLive.vy",
-      "args": ""
+      "file": "contracts/config/DefaultsRobinhoodLive.vy"
     },
     "MissionControl": {
       "address": "0x5B8b85cD2f56D1a99691de784FB50c0bf2FA3baC",
-      "file": "contracts/data/MissionControl.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940000000000000000000000000ab7527f779b9c6f473054f9d03ff39bc2123a95c"
+      "file": "contracts/data/MissionControl.vy"
     },
     "AuctionHouse": {
       "address": "0x29EB2bE10AE6dA82d93aa160C75669C915Bb1d9D",
-      "file": "contracts/core/AuctionHouse.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/core/AuctionHouse.vy"
     },
     "BondRoom": {
       "address": "0x319b6Cdedf500055f2AF36b820A7600ec77F4E4f",
-      "file": "contracts/core/BondRoom.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000002d0c3e6bba5dab67103a6ca24b674ec4ad6ea919"
+      "file": "contracts/core/BondRoom.vy"
     },
     "CreditEngine": {
       "address": "0x71e21d0E3F8db4B465B7f84e1E69D5f9953Fc747",
-      "file": "contracts/core/CreditEngine.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/core/CreditEngine.vy"
     },
     "HumanResources": {
       "address": "0xF17eF9744882cF9c00dC89Cfe6DB8E0b2D16bB4a",
-      "file": "contracts/core/HumanResources.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000001c20000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/core/HumanResources.vy"
     },
     "Lootbox": {
       "address": "0xB428AC4DDD322AC9a339B8E0c252423BA518b82a",
-      "file": "contracts/core/Lootbox.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "file": "contracts/core/Lootbox.vy"
     },
     "Teller": {
       "address": "0x68Aa3a6D6d322D814Eb268aC5E63bD86B37A70D3",
-      "file": "contracts/core/Teller.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000001"
+      "file": "contracts/core/Teller.vy"
     },
     "CreditRedeem": {
       "address": "0x4f9DE044CE91458487Ab9f28B5c83DA9078CCb53",
-      "file": "contracts/core/CreditRedeem.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/core/CreditRedeem.vy"
     },
     "TellerUtils": {
       "address": "0xFaDad2b7599a7d11d7Dc3b838A7b404983cA448A",
-      "file": "contracts/core/TellerUtils.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/core/TellerUtils.vy"
     },
     "StabilityPool": {
       "address": "0xBb18Cc60aFCa88272EdAdb86fc28D56B05e7D46E",
-      "file": "contracts/vaults/StabilityPool.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/StabilityPool.vy"
     },
     "RipeGov": {
       "address": "0x0cF85820136CeB7138439790784b2AD2CDEa8D62",
-      "file": "contracts/vaults/RipeGov.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/RipeGov.vy"
     },
     "SimpleErc20": {
       "address": "0x1D10c882D7f420f9F27B0a22ac1c6e90b1F3EbD0",
-      "file": "contracts/vaults/SimpleErc20.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/SimpleErc20.vy"
     },
     "SwitchboardAlpha": {
       "address": "0xd02ff7F8202fae6890Fbf089B75A846743197E62",
-      "file": "contracts/config/SwitchboardAlpha.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012c0000000000000000000000000000000000000000000000000000000000093a800000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/config/SwitchboardAlpha.vy"
     },
     "SwitchboardBravo": {
       "address": "0xacFcC76e4F40d56B52e51418B31e2091091520dE",
-      "file": "contracts/config/SwitchboardBravo.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/config/SwitchboardBravo.vy"
     },
     "SwitchboardCharlie": {
       "address": "0xf9e3F5E80e7b23eE754727509FA82Ee8626ddB04",
-      "file": "contracts/config/SwitchboardCharlie.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/config/SwitchboardCharlie.vy"
     },
     "SwitchboardEcho": {
       "address": "0xC11b8Cf74607A5e4bA55Ff7806Ac29229f2481f3",
-      "file": "contracts/config/SwitchboardEcho.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/config/SwitchboardEcho.vy"
     },
     "UniswapV2Prices": {
       "address": "0xfB2d96242769fCE0a3Cf75204B0553cE0E516545",
-      "file": "contracts/priceSources/UniswapV2Prices.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ba6f6cba1a4104000847d4fdccb676e99166cece0000000000000000000000004d3f37a965b21ab4122e92dd41d2693e742c883b0000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/priceSources/UniswapV2Prices.vy"
     }
   }
 }

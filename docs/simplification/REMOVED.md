@@ -30,13 +30,11 @@ worth keeping, and its absence is also what left
 from git (`origin/master` and the commits that removed them: `51616b9`,
 `cc7a0a7`, `075c146`) and are committed again.
 
-**Step manifests keep the record, not the compiler output.** Restored at full
-fidelity they were 133.6 MB, because `abi` and `solc_json` are ~99.5% of the
-bytes. Both were stripped from the numbered manifests, leaving `address`,
-`file` and `args` -- which contract, from which source, with which constructor
-arguments, at which step. That is 0.6 MB, and it is the part that is actually
-history: `abi` and `solc_json` are reproducible by compiling `file` at that
-commit.
+**Step manifests keep the record, not the payload.** Restored at full fidelity
+they were 133.6 MB. The numbered manifests now keep `address` and `file` only
+-- which contract, deployed where, from which source, at which step -- which is
+227 KB. `abi`, `solc_json` and `args` are dropped: they are the verification
+payload, and verification runs against `current-manifest.json`.
 
 **The reason is that nothing reads a step manifest**, not that the fields are
 unusable. `Migration._append_manifest` reads only a step's own file, during that

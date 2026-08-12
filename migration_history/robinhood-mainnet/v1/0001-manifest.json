@@ -2,13 +2,11 @@
   "contracts": {
     "Ledger": {
       "address": "0xBc66693E2De8d8483D68d96161eF6f46B0606881",
-      "file": "contracts/data/Ledger.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000005b385644e8ade9d5135ae5edb43c62b92726f83b0000000000000000000000000000000000000000000000000000000000000064"
+      "file": "contracts/data/Ledger.vy"
     },
     "MissionControl": {
       "address": "0xf2551065293E1C884232186A324c3b6E3B18ef9C",
-      "file": "contracts/data/MissionControl.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000005b385644e8ade9d5135ae5edb43c62b92726f83b"
+      "file": "contracts/data/MissionControl.vy"
     }
   }
 }

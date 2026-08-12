@@ -2,23 +2,19 @@
   "contracts": {
     "VaultBook": {
       "address": "0x8DBd00caA2e13dC1A32aA2F726711b97A046e964",
-      "file": "contracts/registries/VaultBook.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0"
+      "file": "contracts/registries/VaultBook.vy"
     },
     "StabilityPool": {
       "address": "0x3E194C470f8B045743EFF0a7a3A804fEc8475201",
-      "file": "contracts/vaults/StabilityPool.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/StabilityPool.vy"
     },
     "RipeGov": {
       "address": "0xF3cde399a598ed200759982658F84a0D4202d6A7",
-      "file": "contracts/vaults/RipeGov.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/RipeGov.vy"
     },
     "SimpleErc20": {
       "address": "0xc2af4F8A81eA246630DBbe9f9e34d062d68ee2c8",
-      "file": "contracts/vaults/SimpleErc20.vy",
-      "args": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940"
+      "file": "contracts/vaults/SimpleErc20.vy"
     }
   }
 }
