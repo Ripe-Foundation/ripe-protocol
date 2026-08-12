@@ -1,4 +1,5 @@
 import os
+from pathlib import PurePosixPath
 
 import boa.contracts
 import boa.contracts.abi
@@ -10,6 +11,35 @@ from scripts.utils import solidity
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import (deployed_contracts_manifest,
                                              execute_transaction)
+
+
+# Histories whose deployment has already happened. `scripts/migrate.py`
+# defaults to `--environment v1`, so `--chain robinhood-mainnet` lands here;
+# without this boundary a re-run re-broadcasts every transaction and rewrites
+# the committed manifest and logs of a live deployment.
+#
+# This is deliberately just a path check. On the pre-cleanup tree the same
+# boundary rode along on a flag named `_manifest_v2`, which made it look like
+# part of the unused H06 manifest-v2 planner; it never was. The planner is
+# gone and the boundary stays, with its original codes so anything matching on
+# them keeps working.
+_EXECUTION_BLOCKED_HISTORIES = (
+    PurePosixPath("migration_history/robinhood-mainnet/v1"),
+    PurePosixPath("migration_history/robinhood-testnet/v1"),
+)
+
+
+class MigrationHistoryError(Exception):
+    """Raised when a migration would execute against a deployed history."""
+
+
+def _is_execution_blocked_history(history_path):
+    normalized = PurePosixPath(str(history_path).replace("\\", "/"))
+    return any(
+        normalized == suffix
+        or normalized.parts[-len(suffix.parts):] == suffix.parts
+        for suffix in _EXECUTION_BLOCKED_HISTORIES
+    )
 
 
 class Migration:
@@ -26,6 +56,11 @@ class Migration:
         self._contract_files = {}
         self._args = {}
         self.gas = 0
+        self._execution_blocked = _is_execution_blocked_history(history_path)
+
+        if self._execution_blocked:
+            self._previous_manifest = {}
+            return
 
         try:
             filename = self._manifest_filename('current')
@@ -94,6 +129,11 @@ class Migration:
         with foundry) or skips if already deployed.
         Returns the deployed contract.
         """
+        # Solidity deploys do not go through `_run`, so they need the boundary
+        # applied here as well.
+        if self._execution_blocked:
+            raise MigrationHistoryError("H06_LEGACY_EXECUTION_FORBIDDEN")
+
         label = kwargs.pop("label", name)
         source_file = kwargs.pop("source_file", None)
 
@@ -166,6 +206,10 @@ class Migration:
         """
         Ends the migration and saves the manifest file
         """
+        if self._execution_blocked:
+            log.info(f"Gas spent for migration: {self.gas}")
+            return self.gas
+
         if os.path.exists(self._log_filename()):
             # Delete the log file
             os.remove(self._log_filename())
@@ -225,6 +269,9 @@ class Migration:
         Executes a transaction or skips if already executed.
         Returns the transaction receipt as string.
         """
+        if self._execution_blocked:
+            raise MigrationHistoryError("H06_LEGACY_EXECUTION_FORBIDDEN")
+
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
 
@@ -276,6 +323,9 @@ class Migration:
         return os.path.join(self._history_path, f"{name}-manifest.json")
 
     def _append_manifest(self, contract_name):
+        if self._execution_blocked:
+            raise MigrationHistoryError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
+
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
@@ -295,6 +345,8 @@ class Migration:
         return merged_manifest
 
     def _load_log_file(self):
+        if self._execution_blocked:
+            raise MigrationHistoryError("H06_LEGACY_LOG_FORBIDDEN")
         if self._deploy_args.ignore_logs:
             raise ('no logs')
         logs = json_file.load(self._log_filename())
