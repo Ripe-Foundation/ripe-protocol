@@ -252,3 +252,51 @@ def test_auto_resume_does_not_rerun_the_last_completed_migration(chain):
 
     assert resume not in selected
     assert all(int(t) > int(resume) for t in selected)
+
+
+# --- step manifests carry the record, not the bulk -------------------------
+
+
+def test_step_manifests_keep_the_record_and_drop_the_bulk():
+    """Step manifests record what was deployed; they do not carry compiler output.
+
+    `deployed_contracts_manifest` emits address/abi/solc_json/args/file. For the
+    per-step history, address+file+args is the record worth keeping -- which
+    contract, from which source, with which constructor arguments. `abi` and
+    `solc_json` are ~99.5% of the bytes and are reconstructible by compiling
+    `file` at that commit. Nothing reads either from a step manifest: `abi` has
+    no manifest reader at all, and the verifier path needs `compiler_version`,
+    which `deployed_contracts_manifest` has never emitted.
+    """
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    steps = list(root.glob("*/*/[0-9]*-manifest.json"))
+    assert steps, "expected committed step manifests"
+
+    for path in steps:
+        for name, record in json.loads(path.read_text())["contracts"].items():
+            where = f"{path.name}:{name}"
+            assert "address" in record, where
+            assert "abi" not in record, where
+            assert "solc_json" not in record, where
+
+
+def test_current_manifests_keep_everything():
+    # current-manifest.json is the runtime authority -- prepare_defaults,
+    # verify, verify_blockscout, console and Migration.__init__ all read it.
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    currents = list(root.glob("*/*/current-manifest.json"))
+    assert currents
+
+    vyper_fields = {"abi", "solc_json", "args", "file"}
+    kept = 0
+    for path in currents:
+        for name, record in json.loads(path.read_text())["contracts"].items():
+            where = f"{path.parent.parent.name}/{path.parent.name}:{name}"
+            assert "address" in record, where
+            # Solidity deploys are recorded by address alone -- Foundry
+            # artifacts have no Vyper compiler-output equivalent
+            # (see Migration.deploy_solidity). Everything else keeps the lot.
+            if vyper_fields & set(record):
+                assert vyper_fields <= set(record), where
+                kept += 1
+    assert kept, "expected current manifests to retain Vyper compiler output"

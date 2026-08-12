@@ -28,7 +28,28 @@ worth keeping, and its absence is also what left
 
 60 `base-mainnet/v1` and 11 `robinhood-mainnet/v1` step manifests were recovered
 from git (`origin/master` and the commits that removed them: `51616b9`,
-`cc7a0a7`, `075c146`) and are committed again. The base-sepolia and
+`cc7a0a7`, `075c146`) and are committed again.
+
+**Step manifests keep the record, not the compiler output.** Restored at full
+fidelity they were 133.6 MB, because `abi` and `solc_json` are ~99.5% of the
+bytes. Both were stripped from the numbered manifests, leaving `address`,
+`file` and `args` -- which contract, from which source, with which constructor
+arguments, at which step. That is 0.6 MB, and it is the part that is actually
+history: `abi` and `solc_json` are reproducible by compiling `file` at that
+commit.
+
+Nothing read either field from a step manifest. `abi` has no manifest reader
+anywhere -- `export_abis.py` compiles from source. `solc_json` is only consumed
+by the Etherscan verifier, which also requires an explicit
+`compiler_version` string; `deployed_contracts_manifest` has never emitted one,
+on this branch or on `master`, so `verify_manifest` raises
+`VerifierConfigurationError` against every manifest in the repository,
+including the current ones. Stripping `solc_json` removes bytes no working path
+could use.
+
+`current-manifest.json` is untouched and keeps all five fields. It is the
+runtime authority, and it is what a future `compiler_version` fix would make
+verifiable. The base-sepolia and
 robinhood-testnet step manifests are not retained; 31 of them are unreadable
 from any commit reachable here, and the rest are testnet churn.
 
