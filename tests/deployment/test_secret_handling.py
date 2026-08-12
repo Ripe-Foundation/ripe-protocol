@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
+import click
+import eth_account
 import pytest
 import requests
 
@@ -135,57 +137,6 @@ def test_spy_environment_records_common_read_paths():
         "OTHER",
         "<copy>",
     ]
-
-
-def _call_migrate(**overrides):
-    values = {
-        "ask": False,
-        "safe": "",
-        "fork": True,
-        "is_retry": False,
-        "rpc": "https://rpc.invalid.example",
-        "single": False,
-        "environment": "v1",
-        "start_timestamp": "0",
-        "end_timestamp": "0",
-        "profile_id": "base-mainnet",
-        "blueprint": None,
-        "account": "DEPLOYER",
-        "ledger": -1,
-    }
-    values.update(overrides)
-    return migrate.cli.callback(**values)
-
-
-def _prepare_migration_execution(monkeypatch, run):
-    sender = SimpleNamespace(
-        address="0x0000000000000000000000000000000000000001"
-    )
-    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
-    monkeypatch.setattr(migrate, "get_account", lambda *args: sender)
-    monkeypatch.setattr(migrate, "load_vyper_files", lambda: {})
-    monkeypatch.setattr(
-        migrate,
-        "MigrationRunner",
-        lambda *args: SimpleNamespace(run=run),
-    )
-    monkeypatch.setattr(
-        migrate.boa.deployments,
-        "DeploymentsDB",
-        lambda *args: object(),
-    )
-    monkeypatch.setattr(
-        migrate.boa.deployments,
-        "set_deployments_db",
-        lambda *args: None,
-    )
-
-    @contextmanager
-    def fake_fork(rpc_url, **kwargs):
-        assert rpc_url == _SENSITIVE_RPC
-        yield SimpleNamespace(set_balance=lambda *args: None)
-
-    monkeypatch.setattr(migrate.boa, "fork", fake_fork)
 
 
 @pytest.mark.parametrize(
@@ -448,3 +399,88 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
 # rejected in isolation any more. Requesting BOTH is still unapproved, and it is
 # rejected on the same path with the same code -- which is what this test is
 # actually about: an unapproved backend never reaches a chain read or a secret.
+
+
+# --- _local_account -------------------------------------------------------
+#
+# ab3100d removed the H-02 `migration_helpers.get_account`, which had the only
+# direct missing-key coverage. `scripts.migrate._local_account` is now the
+# normal private-key loader on the live deploy path and had none of its own.
+
+# Well formed (any in-range 32 bytes is a real key), used with a faked loader.
+_WELL_FORMED_TEST_KEY = "0x" + "ab" * 31 + "cd"
+# Genuinely malformed: wrong length and non-hex, so eth_account rejects it.
+_MALFORMED_TEST_KEY = "0xnot-a-real-private-key-value"
+
+
+def test_local_account_missing_key_raises_before_reading_the_key(monkeypatch):
+    loaded = []
+    monkeypatch.setattr(
+        eth_account.Account, "from_key", lambda value: loaded.append(value)
+    )
+    monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
+
+    with pytest.raises(click.ClickException) as captured:
+        migrate._local_account("DEPLOYER")
+
+    assert "DEPLOYER_PRIVATE_KEY is not set" in str(captured.value)
+    # The loader must not be reached at all when the key is absent.
+    assert loaded == []
+
+
+def test_local_account_has_no_well_known_key_fallback(monkeypatch):
+    monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
+
+    with pytest.raises(click.ClickException) as captured:
+        migrate._local_account("DEPLOYER")
+
+    rendered = f"{captured.value} {captured.value!r}"
+    assert _PUBLIC_ANVIL_TEST_KEY not in rendered
+    assert "0x" not in rendered.replace("0x0", "")
+
+
+def test_local_account_invalid_key_never_appears_in_the_failure(monkeypatch):
+    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _MALFORMED_TEST_KEY)
+
+    with pytest.raises(Exception) as captured:
+        migrate._local_account("DEPLOYER")
+
+    rendered = f"{captured.value} {captured.value!r} {captured.traceback}"
+    assert _MALFORMED_TEST_KEY not in rendered
+    assert _MALFORMED_TEST_KEY[2:] not in rendered
+
+
+def test_local_account_loads_a_valid_key(monkeypatch):
+    seen = []
+
+    def fake_from_key(value):
+        seen.append(value)
+        return SimpleNamespace(address="0x" + "5" * 40)
+
+    monkeypatch.setattr(eth_account.Account, "from_key", fake_from_key)
+    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _WELL_FORMED_TEST_KEY)
+
+    account = migrate._local_account("DEPLOYER")
+
+    assert account.address == "0x" + "5" * 40
+    assert seen == [_WELL_FORMED_TEST_KEY]
+
+
+def test_local_account_reads_only_the_named_account_variable(monkeypatch):
+    monkeypatch.delenv("TREASURY_PRIVATE_KEY", raising=False)
+    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _WELL_FORMED_TEST_KEY)
+
+    with pytest.raises(click.ClickException) as captured:
+        migrate._local_account("TREASURY")
+
+    assert "TREASURY_PRIVATE_KEY is not set" in str(captured.value)
+    assert _WELL_FORMED_TEST_KEY not in str(captured.value)
+
+
+def test_ledger_branch_bypasses_local_account_entirely():
+    # `--ledger` must sign with the device, never fall back to an env key.
+    source = (ROOT / "scripts/migrate.py").read_text()
+    ledger_branch = source.split("elif ledger != -1:")[1].split("else:")[0]
+
+    assert "LedgerAccount(final_rpc, ledger)" in ledger_branch
+    assert "_local_account" not in ledger_branch
