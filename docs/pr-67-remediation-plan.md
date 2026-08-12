@@ -57,7 +57,7 @@ Required closure:
 - prevent custody deficits from remaining fully valued;
 - make liquidation receipt accounting call-local so prior donations cannot mask a short receipt;
 - prevent fee-on-transfer or short outbound receipts from burning liabilities/shares as if the user received the full nominal amount;
-- prevent `inLiquidation` from remaining latched when direct settlement consumes healthy collateral and no auction can clear the deficient remainder;
+- keep `inLiquidation` as an account-wide unhealthy freeze while using actual auction existence, rather than the flag alone, to permit a repaired no-auction remainder to be retried;
 - require proposed/confirmed preferred Stability Pools to support every selector that downstream liquidation now calls, including `canAcceptLiquidationAsset`;
 - preserve storage and enforce deployed-runtime size limits after the complete lane is implemented.
 

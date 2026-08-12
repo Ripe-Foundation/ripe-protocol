@@ -15,7 +15,7 @@ def test_auction_house_source_abi_and_vault_interface_are_frozen():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/AuctionHouse.vy": (
-            "d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f"
+            "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951"
         ),
         "scripts/abis/AuctionHouse.json": (
             "97b39517f9b527e4bcdf9dc50b4f418d4036367e5f3f4d62a0ffdd68d29ee276"
@@ -41,6 +41,7 @@ def test_ah_liquidation_auction_creation(
     mock_price_source,
     createDebtTerms,
     credit_engine,
+    ledger,
     sally,
 ):
     """Test auction creation when liquidation doesn't restore debt health
@@ -105,6 +106,8 @@ def test_ah_liquidation_auction_creation(
     # Verify user is still in liquidation
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     assert user_debt.inLiquidation
+    assert ledger.hasFungibleAuctions(bob)
+    assert not credit_engine.canLiquidateUser(bob)
 
 
 def test_ah_liquidation_auction_discount_calculation(
@@ -319,6 +322,8 @@ def test_ah_liquidation_auction_position_depletion(
     performDeposit,
     alpha_token,
     alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
     bob,
     alice,
     teller,
@@ -328,6 +333,7 @@ def test_ah_liquidation_auction_position_depletion(
     green_token,
     whale,
     ledger,
+    credit_engine,
 ):
     """Test auction behavior when user's position is depleted
     
@@ -350,20 +356,31 @@ def test_ah_liquidation_auction_position_depletion(
         _shouldSwapInStabPools=False,
         _shouldAuctionInstantly=True,
     )
+    setAssetConfig(
+        bravo_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
 
     # Setup
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
     
     # Small position for easy depletion
     deposit_amount = 50 * EIGHTEEN_DECIMALS
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
-    debt_amount = 30 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+    debt_amount = 40 * EIGHTEEN_DECIMALS
     teller.borrow(debt_amount, bob, False, sender=bob)
 
     # Set liquidatable price
     new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
     mock_price_source.setPrice(alpha_token, new_price)
+    mock_price_source.setPrice(bravo_token, new_price)
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
@@ -385,6 +402,34 @@ def test_ah_liquidation_auction_position_depletion(
 
     # auction no longer exists
     assert not ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
+    assert not ledger.hasFungibleAuctions(bob)
+
+    # Buying all auctionable collateral does not necessarily restore health.
+    # With no auction left, the account stays frozen but a later permissionless
+    # liquidation pass is allowed once the remaining position is again beyond
+    # its liquidation threshold.
+    residual_debt, residual_terms, _ = credit_engine.getLatestUserDebtAndTerms(
+        bob,
+        False,
+    )
+    assert residual_debt.inLiquidation
+    assert residual_debt.amount > residual_terms.totalMaxDebt
+    assert not credit_engine.canLiquidateUser(bob)
+
+    mock_price_source.setPrice(bravo_token, 10 * EIGHTEEN_DECIMALS // 100)
+    assert credit_engine.canLiquidateUser(bob)
+    boa.env.evm.vm.state.clear_transient_storage()
+    debt_after_purchase = ledger.userDebt(bob).amount
+    keeper_before = green_token.balanceOf(sally)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+    assert ledger.userDebt(bob).amount == debt_after_purchase
+    assert ledger.userDebt(bob).inLiquidation
+    assert green_token.balanceOf(sally) == keeper_before
+    retry_log = filter_logs(teller, "LiquidateUser")[0]
+    assert retry_log.totalLiqFees == 0
+    assert retry_log.keeperFee == 0
+    assert retry_log.repayAmount == 0
+    assert retry_log.numAuctionsStarted == 0
     
     # Verify alice received the collateral
     alice_alpha_balance = alpha_token.balanceOf(alice)

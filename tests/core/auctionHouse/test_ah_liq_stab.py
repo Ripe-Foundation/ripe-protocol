@@ -175,7 +175,7 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     assert ledger.userDebt(bob).inLiquidation
 
 
-def test_direct_settlement_does_not_latch_deficient_remainder_without_auction(
+def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_without_auction(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -199,7 +199,7 @@ def test_direct_settlement_does_not_latch_deficient_remainder_without_auction(
     bob,
     sally,
 ):
-    """A skipped deficient position remains retryable when no auction exists."""
+    """An unhealthy remainder stays frozen but retryable when no auction exists."""
     setGeneralConfig()
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
     terms = createDebtTerms(
@@ -276,10 +276,13 @@ def test_direct_settlement_does_not_latch_deficient_remainder_without_auction(
 
     assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
     assert not ledger.hasFungibleAuction(bob, simple_id, bravo_token)
-    assert not ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
+    assert ledger.userDebt(bob).inLiquidation
+    assert credit_engine.canLiquidateUser(bob)
 
     # Repairing bravo custody restores the same position. A second liquidation
-    # must now run and create its auction instead of hitting a stale latch.
+    # must now run and create its auction instead of treating the account-wide
+    # freeze as proof that an auction is already handling the user.
     bravo_token.transfer(simple_erc20_vault, 1, sender=bravo_token_whale)
     assert credit_engine.canLiquidateUser(bob)
     # Titanoboa retains EIP-1153 values between simulated top-level calls;

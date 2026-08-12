@@ -586,8 +586,17 @@ context. A replacement should be a narrower maintained scanner over
 
 ### RH-D026 — CreditEngine carries an exact headroom waiver at 184 bytes
 
-**Status:** Owner-granted on 8 August 2026, against the RH codebase
-simplification branch `codex/rh-codebase-simplification`.
+**Status:** Retired on 11 August 2026. The owner-granted 8 August waiver remains
+historical evidence for the exact prior version on
+`codex/rh-codebase-simplification`.
+
+**Retirement.** The liquidation-state change produced a new CreditEngine
+version and therefore reopened this exact-version decision as required. A
+behavior-preserving size consolidation leaves the new constructor-bound runtime
+at 24,367 bytes, with 209 bytes of EIP-170 headroom. CreditEngine is again
+governed by the default 200-byte floor; its override and pinned waiver identity
+have been removed from `tests/test_vault_pointer_runtime_sizes.py`. No new
+below-floor waiver was granted.
 
 The deposit-vault hardening plan section 11.5 sets at least 200 bytes of
 EIP-170 headroom as the acceptance threshold for a changed deployed contract,

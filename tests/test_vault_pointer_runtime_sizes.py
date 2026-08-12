@@ -25,7 +25,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Ledger": 13_306,
     "Lootbox": 22_993,
     "RipeGov": 23_257,
-    "CreditEngine": 24_392,
+    "CreditEngine": 24_367,
     "StabilityPool": 24_371,
 }
 
@@ -47,20 +47,18 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # passed. The default is now the ratified value.
 DEFAULT_MIN_HEADROOM = 200
 
-# Measured headroom against the 24,576 limit after the VaultMigrator merge:
-#   Teller 51, CreditEngine 184, StabilityPool 205, SwitchboardCharlie 1,091,
+# Measured headroom against the 24,576 limit after the liquidation-state change:
+#   Teller 51, CreditEngine 209, StabilityPool 205, SwitchboardCharlie 1,091,
 #   SwitchboardAlpha 1,142, Lootbox 1,583, RipeGov 1,319, SwitchboardBravo
 #   1,494, SwitchboardEcho 1,523, and the rest far larger.
 #
-# CreditEngine's inherited 184-byte position is carried by RH-D026. Teller's
-# migration implementation leaves 51 bytes and is carried by RH-D027 after the
-# owner explicitly accepted that exact size. Both are exact, dated waivers rather
-# than reasons to weaken the rule for every contract. See the decision register
-# for their scope and reconsideration triggers.
+# CreditEngine has self-retired RH-D026 by returning above the 200-byte floor.
+# Teller's migration implementation leaves 51 bytes and is carried by RH-D027
+# after the owner explicitly accepted that exact size. See the decision register
+# for its scope and reconsideration triggers.
 #
 MIN_HEADROOM_OVERRIDES = {
     "Teller": 51,  # RH-D027 waiver; do not change without a new decision
-    "CreditEngine": 184,  # RH-D026 waiver; do not lower without a new decision
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -121,32 +119,10 @@ MIN_RIPE_GOV_MARGIN = 1_000
 # a hash to make this green is the exact move it exists to prevent.
 #
 # This binding is exceptional and self-retiring: it applies only while a contract
-# sits below the ratified floor. When either contract returns to 200+ bytes of
+# sits below the ratified floor. When a waived contract returns to 200+ bytes of
 # headroom, its override and identity entry are both removed, and it goes back to
 # being governed by the floor like everything else.
 WAIVED_CONTRACT_IDENTITIES = {
-    "CreditEngine": {
-        "decision": "RH-D026",
-        "fixture": "credit_engine",
-        "source": "contracts/core/CreditEngine.vy",
-        "source_sha256": (
-            "d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43"
-        ),
-        "runtime_sha256": (
-            "e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943"
-        ),
-        "runtime_template_bytes": 24_296,
-        "deployed_runtime_bytes": 24_392,
-        # Declared constructor input, so the deployed bytes below are fixed.
-        # Not a real HQ and not required to be one.
-        "pinned_hq": "0x00000000000000000000000000000000000000A1",
-        "constructor_args": (
-            "0x00000000000000000000000000000000000000A1",
-        ),
-        "deployed_sha256": (
-            "12a781ca7793d79a866c3285f67f80fce65342dffc86239054a00653e94f7ac5"
-        ),
-    },
     "Teller": {
         "decision": "RH-D027",
         "fixture": "teller",

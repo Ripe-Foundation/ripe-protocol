@@ -74,7 +74,8 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 23_761, "headroom": 815},
+    "AuctionHouse": {"size": 23_863, "headroom": 713},
+    "CreditEngine": {"size": 24_367, "headroom": 209},
     "Deleverage": {"size": 24_569, "headroom": 7},
 }
 CURVE_LAUNCH_ARTIFACTS = {

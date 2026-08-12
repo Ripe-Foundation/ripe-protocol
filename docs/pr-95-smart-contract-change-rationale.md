@@ -16,7 +16,7 @@ The source inventory below was taken from the three-dot diff between:
 - target branch: `rh` at `3a4cac429a860ffc95bd85612d9e345108332833`;
 - remediated source head before this document: `304019c4be7b7fad8da4b355c28e9e0c56dd1c45`.
 
-There are 12 changed production contract files:
+There are 13 changed production contract files:
 
 | Contract source | Nature of change | Primary reason |
 | --- | --- | --- |
@@ -24,6 +24,7 @@ There are 12 changed production contract files:
 | `contracts/config/SwitchboardBravo.vy` | Executable validation | Validate a special Stability Pool against its real populated/empty state, downstream selectors, and paused state. |
 | `contracts/config/SwitchboardCharlie.vy` | Executable validation | Prevent the preferred Stability Pool pointer from accepting a partial or incompatible implementation. |
 | `contracts/core/AuctionHouse.vy` | Liquidation accounting and code-size refactor | Make liquidation retries safe, prevent no-progress fees, and prove exact collateral receipt by the pool. |
+| `contracts/core/CreditEngine.vy` | Liquidation eligibility and code-size refactor | Keep an unhealthy account frozen while allowing another liquidation pass only after its auctions are gone. |
 | `contracts/core/Teller.vy` | Reentrancy/composition guard | Prevent housekeeping callbacks from corrupting an in-progress token receipt measurement. |
 | `contracts/core/VaultMigrator.vy` | Migration route and state preservation | Keep historical RipeGov vaults out of generic migration and preserve disabled governance-point state. |
 | `contracts/modules/Addys.vy` | Registry constants | Match the immutable live RipeHq order: RIPE CCIP pool ID 23 and GREEN CCIP pool ID 24. |
@@ -200,11 +201,19 @@ shape, not preexisting liquidity.
 
 ### What changed
 
-#### A. Liquidation latch now reflects actual queued work
+#### A. Liquidation state is an account-wide unhealthy freeze
 
-`userDebt.inLiquidation` is now set only when at least one asset was actually
-queued for auction. It is no longer inferred from the user's pre-liquidation
-collateral value.
+Once a user reaches the liquidation threshold, `userDebt.inLiquidation` stays
+set until debt health is restored. The freeze applies to the whole account,
+including protocol-held RIPE/GREEN-like zero-LTV assets and positive-LTV
+collateral that policy does not permit AuctionHouse to sell, such as a
+tokenized security awaiting a governance-controlled recovery route.
+
+Auction existence now has a separate job: an outstanding auction blocks a
+competing liquidation pass, while a frozen unhealthy user with no auction may
+be retried permissionlessly. `CreditEngine.canLiquidateUser` mirrors this
+distinction. Health restoration still clears the flag through the existing
+CreditEngine/Ledger path, which also removes outstanding auctions.
 
 #### B. No-progress liquidation calls are economically inert
 
@@ -229,15 +238,20 @@ expressions were also shortened without changing their formulas.
 
 ### Why these changes are required
 
-The old latch used collateral value calculated before direct liquidation
-phases. A healthy asset could be completely consumed by direct Stability Pool
-settlement while a deficient asset remained. If no auction was created, the
-stale pre-phase value still latched the user as "in liquidation." Future public
-liquidation attempts exited early even after backing was repaired.
+The old code used one boolean for two different concerns: freezing an unhealthy
+account and proving that an auction already owned the liquidation workflow.
+Clearing the flag when no auction was queued made deficient collateral
+retryable, but it also removed the explicit account-wide freeze requested for
+zero-LTV and non-auctionable collateral. Keeping the flag while continuing to
+reject every retry had the opposite failure: a healthy asset could be consumed
+by direct Stability Pool settlement, leave a deficient remainder with no
+auction, and permanently block a later retry after backing was repaired.
 
-Simply removing that latch introduced a second risk: a no-progress call could
-be retried and charge fees each time. Retryability and fee-bearing progress
-therefore have to be handled together.
+Separating the two concerns preserves both invariants. The debt flag freezes
+the account; `Ledger.hasFungibleAuctions(user)` determines whether another
+liquidation pass may run. A no-progress retry must also be economically inert,
+or repeated calls could charge fees without repaying debt or creating an
+auction.
 
 The old aggregate pool receipt check could be satisfied by tokens already in
 the pool. Measuring the caller-local balance delta is what proves that this
@@ -252,22 +266,76 @@ an intentional change to caller-facing single-vs-batch semantics.
 - Public AuctionHouse selectors are preserved.
 - No persistent storage variable is added; existing transient liquidation
   bookkeeping remains transaction-scoped on the EVM.
-- No-progress calls emit a liquidation result but charge no fee and leave the
-  user retryable.
+- No-progress calls emit a liquidation result but charge no fee. The account
+  remains frozen while unhealthy and is retryable only when no auction exists.
+- Positive-LTV collateral that is not burnable, transferable, Stability-Pool
+  eligible, or auctionable remains frozen but requires an explicit recovery
+  route; the flag by itself does not repay the debt.
 - The pool balance-delta assertion means fee-on-transfer or otherwise short
   incoming liquidation assets are unsupported and revert atomically.
-- Final measured deployed runtime: 23,761 bytes, leaving 815 bytes below the
+- Final measured deployed runtime: 23,863 bytes, leaving 713 bytes below the
   EIP-170 limit.
 
 ### Representative validation
 
-- `test_direct_settlement_does_not_latch_deficient_remainder_without_auction`
+- `test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_without_auction`
 - nonzero-fee no-progress retry coverage in
   `tests/core/auctionHouse/test_ah_liquidation.py`
+- non-auctionable positive-LTV collateral plus zero-LTV account-freeze coverage
+  in `tests/core/auctionHouse/test_ah_liquidation.py`
+- final-auction depletion with unhealthy residual debt remains frozen and
+  retryable in `tests/core/auctionHouse/test_ah_auctions.py`
 - `test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault`
 - existing single/many liquidation and single/many auction-purchase behavior
 
-## 5. `Teller.vy`
+## 5. `CreditEngine.vy`
+
+### What changed
+
+Debt-health checks now distinguish an account-wide liquidation freeze from an
+outstanding auction. `hasGoodDebtHealth` and redemption remain false while the
+flag is set. `canLiquidateUser` may become true for a frozen user only when no
+auction exists and the live collateral/debt values are at the liquidation
+threshold.
+
+Equivalent liquidation/redemption threshold calculations now share one helper.
+Two existing arithmetic paths were also expressed more compactly: repayment
+refund is `available - repaid` after `repaid = min(available, debt)`, and dynamic
+rate boost arithmetic is inlined. The subtraction uses `unsafe_sub` only after
+the preceding `min` proves `repaid <= available`.
+
+### Why these changes are required
+
+Without the auction-aware view, the public eligibility check would say a frozen
+no-auction account cannot be liquidated even though AuctionHouse intentionally
+allows that retry. Keepers and operational tooling would receive the opposite
+answer from the action they are meant to evaluate.
+
+The first correct implementation fell below the repository's ratified 200-byte
+EIP-170 headroom floor. Consolidating equivalent arithmetic brought the final
+deployed runtime back above the floor without removing selectors or weakening
+the liquidation policy. This self-retires the prior RH-D026 exact waiver rather
+than extending it to a new contract version.
+
+### Interface, storage, and risk impact
+
+- Public selectors and persistent storage are unchanged.
+- A frozen account with an outstanding auction still reports non-liquidatable.
+- A frozen account without an auction reports liquidatable only after the live
+  position reaches its liquidation threshold; being above ordinary LTV alone
+  is not enough.
+- Final measured deployed runtime: 24,367 bytes, leaving 209 bytes of EIP-170
+  headroom.
+
+### Representative validation
+
+- active-auction rejection in `test_ah_liquidation_auction_creation`
+- no-auction direct-settlement retry coverage
+- non-auctionable collateral and final-auction-depletion retry coverage
+- repayment/refund and dynamic-borrow-rate focused CreditEngine regressions
+- exact constructor-bound runtime and default headroom-floor checks
+
+## 6. `Teller.vy`
 
 ### What changed
 
@@ -302,7 +370,7 @@ route under the same mutex already used by direct deposits.
   `test_receipt_window_blocks_every_custody_changing_nested_route` and
   `test_after_credit_callback_cannot_corrupt_the_measured_receipt`
 
-## 6. `VaultMigrator.vy`
+## 7. `VaultMigrator.vy`
 
 ### What changed
 
@@ -388,7 +456,7 @@ maximum duration does not provide the same unlock behavior.
 - late-user rollback, same-action-block rollback, 25-user limit, and gas
   characterization in `tests/vaults/test_vault_migrator_legacy.py`
 
-## 7. `Addys.vy`
+## 8. `Addys.vy`
 
 ### What changed
 
@@ -418,7 +486,7 @@ the opposite pool.
 - This is still important preventive correctness: future code must not compile
   the opposite live topology into a contract.
 
-## 8. `UniswapV2Prices.vy`
+## 9. `UniswapV2Prices.vy`
 
 ### What changed
 
@@ -457,7 +525,7 @@ turn the adapter into protocol pricing authority.
 - reserve, decimal, stale-snapshot, timelock, malformed-response, and pause
   coverage in `tests/priceSources/uniswap/test_minimal_prices.py`
 
-## 9. `RipeGov.vy`
+## 10. `RipeGov.vy`
 
 ### What changed
 
@@ -529,7 +597,7 @@ than the user's original terms—the opposite of the migration objective.
 - exporter term preservation and frozen-point carryover tests
 - paused/unpaused point and lock mutation matrix
 
-## 10. `StabVault.vy`
+## 11. `StabVault.vy`
 
 `StabVault` is the shared module compiled into StabilityPool. These changes are
 the largest accounting portion of the smart-contract remediation.
@@ -639,7 +707,7 @@ for that path. PR #95 does not claim general fee-on-transfer token support.
   and EIP-170/gas-bound coverage in
   `tests/vaults/modules/test_stab_vault_hardening.py`
 
-## 11. `RipeCcipBurnMintTokenPools.sol`
+## 12. `RipeCcipBurnMintTokenPools.sol`
 
 ### What changed
 
@@ -683,7 +751,7 @@ Foundry tests prove the candidate's compiled capability answers, token binding,
 inherited owner controls, and pinned `BurnMintTokenPool 1.5.1` type/version.
 They do not claim to prove historical live deployment provenance.
 
-## 12. `RipeTokenPool.sol`
+## 13. `RipeTokenPool.sol`
 
 ### What changed
 

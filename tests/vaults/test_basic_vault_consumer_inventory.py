@@ -149,17 +149,17 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
         if row["classification"] == "value_backing_required"
     }
     assert required_paths == {
-        ("contracts/core/AuctionHouse.vy", 419),
-        ("contracts/core/AuctionHouse.vy", 515),
-        ("contracts/core/AuctionHouse.vy", 891),
-        ("contracts/core/AuctionHouse.vy", 1199),
-        ("contracts/core/AuctionHouse.vy", 1227),
-        ("contracts/core/CreditEngine.vy", 733),
-        ("contracts/core/CreditEngine.vy", 1260),
+        ("contracts/core/AuctionHouse.vy", 431),
+        ("contracts/core/AuctionHouse.vy", 527),
+        ("contracts/core/AuctionHouse.vy", 902),
+        ("contracts/core/AuctionHouse.vy", 1215),
+        ("contracts/core/AuctionHouse.vy", 1243),
+        ("contracts/core/CreditEngine.vy", 729),
+        ("contracts/core/CreditEngine.vy", 1249),
         ("contracts/core/CreditRedeem.vy", 190),
         ("contracts/core/Deleverage.vy", 579),
         ("contracts/core/Deleverage.vy", 1086),
         ("contracts/core/Teller.vy", 407),
-        ("contracts/core/VaultMigrator.vy", 462),
-        ("contracts/core/VaultMigrator.vy", 513),
+        ("contracts/core/VaultMigrator.vy", 479),
+        ("contracts/core/VaultMigrator.vy", 600),
     }

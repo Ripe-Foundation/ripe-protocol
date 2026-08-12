@@ -41,6 +41,7 @@ interface Ledger:
     def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
+    def hasFungibleAuctions(_liqUser: address) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
@@ -303,8 +304,11 @@ def _liquidateUser(
     if userDebt.amount == 0:
         return 0
 
-    # already in liquidation
-    if userDebt.inLiquidation:
+    # An outstanding auction owns the current liquidation pass. A user that is
+    # still unhealthy but has no auction must remain globally frozen while
+    # allowing a later pass to retry non-auction settlement or queue newly
+    # eligible collateral.
+    if staticcall Ledger(_a.ledger).hasFungibleAuctions(_liqUser):
         return 0
 
     # user has debt but no liquidation threshold - cannot liquidate
@@ -355,16 +359,19 @@ def _liquidateUser(
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
 
-    # Only an asset actually queued for auction needs the re-entry latch.
-    # Pre-liquidation collateral value can be stale after direct settlement and
-    # would permanently latch a deficient remainder that created no auction.
-    userDebt.inLiquidation = self.numUserAssetsForAuction[_liqUser] != 0
+    hasQueuedAuction: bool = self.numUserAssetsForAuction[_liqUser] != 0
+
+    # Reaching the liquidation threshold freezes the whole account until debt
+    # health is restored. This also locks protocol-held zero-LTV assets and
+    # positive-LTV assets that policy does not permit the AuctionHouse to sell.
+    # repayFromDept clears the flag below if this pass restores debt health.
+    userDebt.inLiquidation = True
 
     # Retryable no-progress calls must also be economically inert. Charging
     # liquidation fees or minting a keeper reward when no debt was repaid and
     # no asset was queued lets repeated calls increase debt without advancing
     # liquidation.
-    if repayValueIn == 0 and not userDebt.inLiquidation:
+    if repayValueIn == 0 and not hasQueuedAuction:
         totalLiqFees = 0
         keeperFee = 0
 

@@ -9,7 +9,7 @@ from conf_utils import filter_logs
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "6f2da0e344c5cbb3e45aae72c289282e6ea7a635aab53d01d166780b3558caac"
+    "f8a6e21d742fab14010f165f8a44dd69f88e4d076395185680c05c18b7194f09"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -2030,7 +2030,8 @@ def test_ah_liquidation_edge_cases(
     keeper_rewards1 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards1 == 0
     assert ledger.userDebt(bob).amount == debt_before
-    assert not ledger.userDebt(bob).inLiquidation
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
     assert green_token.balanceOf(sally) == keeper_green_before
     first_log = filter_logs(teller, "LiquidateUser")[0]
     assert first_log.totalLiqFees == 0
@@ -2045,13 +2046,121 @@ def test_ah_liquidation_edge_cases(
     keeper_rewards2 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards2 == 0
     assert ledger.userDebt(bob).amount == debt_before
-    assert not ledger.userDebt(bob).inLiquidation
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
     assert green_token.balanceOf(sally) == keeper_green_before
     second_log = filter_logs(teller, "LiquidateUser")[0]
     assert second_log.totalLiqFees == 0
     assert second_log.keeperFee == 0
     assert second_log.repayAmount == 0
     assert second_log.numAuctionsStarted == 0
+
+
+def test_non_auctionable_collateral_freezes_zero_ltv_assets_while_remaining_retryable(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    teller,
+    simple_erc20_vault,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    green_token,
+    ledger,
+    sally,
+):
+    """A frozen security position locks unrelated zero-LTV protocol assets."""
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,
+    )
+
+    # Alpha models positive-LTV collateral that policy does not permit the
+    # AuctionHouse to burn, transfer, swap, or auction (for example, a
+    # tokenized security awaiting a governance-controlled recovery route).
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=alpha_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Bravo models RIPE/GREEN-like protocol collateral with no borrowing or
+    # liquidation value. It still must remain locked with the rest of the
+    # account after Alpha crosses its liquidation threshold.
+    zero_ltv_terms = createDebtTerms(
+        _ltv=0,
+        _redemptionThreshold=0,
+        _liqThreshold=0,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    setAssetConfig(
+        bravo_token,
+        _debtTerms=zero_ltv_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    performDeposit(bob, 10 * EIGHTEEN_DECIMALS, bravo_token, bravo_token_whale)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    assert credit_engine.canLiquidateUser(bob)
+
+    debt_before = ledger.userDebt(bob).amount
+    keeper_before = green_token.balanceOf(sally)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
+    assert credit_engine.canLiquidateUser(bob)
+    assert ledger.userDebt(bob).amount == debt_before
+    assert green_token.balanceOf(sally) == keeper_before
+
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+    assert liq_log.totalLiqFees == 0
+    assert liq_log.keeperFee == 0
+    assert liq_log.repayAmount == 0
+    assert liq_log.numAuctionsStarted == 0
+
+    assert credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        0,
+        bravo_token,
+        simple_erc20_vault,
+    ) == 0
+    with boa.reverts("cannot withdraw anything"):
+        teller.withdraw(
+            bravo_token,
+            EIGHTEEN_DECIMALS,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
 
 
 def test_ah_liquidation_special_stab_pool(
