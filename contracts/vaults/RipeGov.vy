@@ -500,9 +500,7 @@ def disableGovPointAccrualGlobally():
 
 @external
 def disableGovPointAccrualForUser(_user: address):
-    # VaultMigrator may atomically carry a disabled source user's state into
-    # this target. The same irreversible one-way checks apply to both callers.
-    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getVaultMigratorAddr() # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _user != empty(address) # dev: invalid user
     assert self.govPointAccrualDisabledBlock == 0 # dev: globally disabled
     assert self.userGovPointAccrualDisabledBlock[_user] == 0 # dev: already disabled

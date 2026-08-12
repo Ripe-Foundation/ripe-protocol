@@ -3,8 +3,8 @@
 **Canonical worktree:** `/Users/wigglez/dev/ripe-protocol-base-gov-migration-phase1`
 **Branch:** `codex/base-gov-migration-on-rh` · **PR:** #83 (draft) · **Merged base:** `rh` @ `26e8270`
 **Status (2026-08-11):** VaultMigrator architecture and the latest live `rh` are integrated. The
-core-remediation candidate preserves pre-wind-down lock records on both governance routes, carries
-irreversible accrual-disable state, and excludes every historically classified RipeGov from the
+core-remediation candidate preserves pre-wind-down lock records on both governance routes, leaves
+emergency accrual-disable policy local to its source vault, and excludes every historically classified RipeGov from the
 generic balance-only migration. Teller's owner-accepted 24,525-byte runtime remains unchanged under
 RH-D027. This is not deployment or fork qualification; the verification evidence below predates this
 remediation unless a later paragraph explicitly says otherwise.
@@ -91,13 +91,10 @@ freeze lifted -> ordinary Teller claim -> Lootbox reward settlement / asset + Le
   `unlock`/`lastTerms` without refreshing them from current MissionControl config. Legacy migration
   snapshots the same record for every supported user asset before the first withdrawal. Both routes
   import and verify the original lock record.
-- An exporter source's effective global/per-user governance-point accrual-disable state is carried
-  into the target as an irreversible per-user disable in the migration transaction. This preserves
-  the migrated user's disabled status without globally disabling unrelated target users. The target
-  records its own disable block. Exporter-capable sources must implement both
-  disable-state selectors and malformed or missing responses revert; only the
-  exact constructor-bound immutable Base legacy source may treat those absent
-  legacy selectors as no disable state to carry.
+- Global and per-user governance-point accrual-disable settings are emergency,
+  vault-local controls and are deliberately not migration data. Migration
+  preserves the points already recorded by the source, but the target begins
+  with its own independently administered accrual policy.
 - After the migration batches finish and the freeze is lifted, the user's ordinary Teller/Lootbox
   claim settles those checkpointed rewards, deregisters each zero-balance asset only after its
   entitlement is gone, and removes the source Ledger entry only after no source assets remain.

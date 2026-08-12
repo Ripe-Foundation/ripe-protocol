@@ -32,9 +32,6 @@ interface RipeGovVault:
     def userBalances(_user: address, _asset: address) -> uint256: view
     def totalUserGovPoints(_user: address) -> uint256: view
     def totalGovPoints() -> uint256: view
-    def govPointAccrualDisabledBlock() -> uint256: view
-    def userGovPointAccrualDisabledBlock(_user: address) -> uint256: view
-    def disableGovPointAccrualForUser(_user: address): nonpayable
 
 interface MissionControl:
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
@@ -308,9 +305,8 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
                 unlock=migData.unlock,
             )
 
-        # Preserve point-accrual disable state before final housekeeping.
+        # perform housekeeping
         if numPositions > numPositionsBefore:
-            self._carryGovPointAccrualDisable(user, sourceVault, targetVault)
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
     return numPositions
@@ -417,11 +413,8 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
                 unlock=migData.unlock,
             )
 
-        # The immutable Base source predates the disable selectors, so this is
-        # normally a no-op. Keeping both RipeGov routes fail-safe also preserves
-        # the control in tests or later deployments that bind a newer source.
+        # perform housekeeping
         if numPositions > numPositionsBefore:
-            self._carryGovPointAccrualDisable(user, sourceVault, targetVault)
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
     return numPositions
@@ -495,76 +488,6 @@ def _getPreMigrationData(
         unlock=gd.unlock,
         lastTerms=gd.lastTerms,
     )
-
-
-# governance-point accrual disable carryover
-
-
-@view
-@internal
-def _readSourceGovPointAccrualDisabledBlock(_sourceVault: address, _user: address) -> uint256:
-    globalBlock: uint256 = 0
-    userBlock: uint256 = 0
-
-    if LEGACY_RIPE_GOV_VAULT != empty(address) and _sourceVault == LEGACY_RIPE_GOV_VAULT:
-        # The immutable Base legacy vault predates these controls. Only that
-        # exact constructor-bound source may treat absent selectors as no
-        # disable state; exporter-capable sources must satisfy the typed ABI.
-        success: bool = False
-        response: Bytes[32] = b""
-        success, response = raw_call(
-            _sourceVault,
-            method_id("govPointAccrualDisabledBlock()", output_type=Bytes[4]),
-            max_outsize=32,
-            is_static_call=True,
-            revert_on_failure=False,
-        )
-        if success and len(response) == 32:
-            globalBlock = abi_decode(response, uint256)
-
-        success = False
-        response = b""
-        success, response = raw_call(
-            _sourceVault,
-            abi_encode(
-                _user,
-                method_id=method_id("userGovPointAccrualDisabledBlock(address)"),
-            ),
-            max_outsize=32,
-            is_static_call=True,
-            revert_on_failure=False,
-        )
-        if success and len(response) == 32:
-            userBlock = abi_decode(response, uint256)
-    else:
-        globalBlock = staticcall RipeGovVault(_sourceVault).govPointAccrualDisabledBlock()
-        userBlock = staticcall RipeGovVault(_sourceVault).userGovPointAccrualDisabledBlock(_user)
-
-    if globalBlock == 0:
-        return userBlock
-    if userBlock == 0:
-        return globalBlock
-    return min(globalBlock, userBlock)
-
-
-@internal
-def _carryGovPointAccrualDisable(_user: address, _sourceVault: address, _targetVault: address):
-    sourceBlock: uint256 = self._readSourceGovPointAccrualDisabledBlock(_sourceVault, _user)
-    if sourceBlock == 0:
-        return
-    assert sourceBlock <= block.number # dev: invalid source disabled block
-
-    targetGlobalBlock: uint256 = staticcall RipeGovVault(_targetVault).govPointAccrualDisabledBlock()
-    targetUserBlock: uint256 = staticcall RipeGovVault(_targetVault).userGovPointAccrualDisabledBlock(_user)
-    effectiveTargetBlock: uint256 = targetGlobalBlock
-    if effectiveTargetBlock == 0 or (targetUserBlock != 0 and targetUserBlock < effectiveTargetBlock):
-        effectiveTargetBlock = targetUserBlock
-
-    if effectiveTargetBlock == 0:
-        extcall RipeGovVault(_targetVault).disableGovPointAccrualForUser(_user)
-        effectiveTargetBlock = staticcall RipeGovVault(_targetVault).userGovPointAccrualDisabledBlock(_user)
-
-    assert effectiveTargetBlock != 0 # dev: target point accrual enabled
 
 
 # after export from source vault

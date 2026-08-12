@@ -26,7 +26,7 @@ There are 13 changed production contract files:
 | `contracts/core/AuctionHouse.vy` | Liquidation accounting and code-size refactor | Make liquidation retries safe, prevent no-progress fees, and prove exact collateral receipt by the pool. |
 | `contracts/core/CreditEngine.vy` | Liquidation eligibility and code-size refactor | Keep an unhealthy account frozen while allowing another liquidation pass only after its auctions are gone. |
 | `contracts/core/Teller.vy` | Reentrancy/composition guard | Prevent housekeeping callbacks from corrupting an in-progress token receipt measurement. |
-| `contracts/core/VaultMigrator.vy` | Migration route and state preservation | Keep historical RipeGov vaults out of generic migration and preserve disabled governance-point state. |
+| `contracts/core/VaultMigrator.vy` | Migration route and state preservation | Keep historical RipeGov vaults out of generic migration while preserving balances, points, and lock terms. |
 | `contracts/modules/Addys.vy` | Registry constants | Match the immutable live RipeHq order: RIPE CCIP pool ID 23 and GREEN CCIP pool ID 24. |
 | `contracts/priceSources/UniswapV2Prices.vy` | Price-authority boundary | Keep manipulable Uniswap V2 observations available for monitoring but impossible to consume as a protocol price feed. |
 | `contracts/vaults/RipeGov.vy` | Lock, points, transfer, and migration behavior | Preserve original migration terms, stop same-user accounting corruption, and constrain privileged contributor locks. |
@@ -394,17 +394,6 @@ The exporter-capable route also requires the source ID to be classified as a
 historical RipeGov and rejects the constructor-bound immutable Base legacy
 source, which must use its dedicated legacy route.
 
-#### C. Governance-point disable state is carried to the target
-
-After a user's positions migrate, VaultMigrator determines whether global or
-user-specific point accrual was disabled on the source. If so, it ensures the
-target user is also disabled before final housekeeping.
-
-For normal exporter-capable sources the selectors are called through the typed
-interface and must succeed. Only the exact immutable Base legacy source may use
-nonreverting raw calls, because that deployed contract predates the selectors.
-An absent selector on any other source is not silently treated as enabled.
-
 ### Why these changes are required
 
 A former core RipeGov vault does not become a basic shares vault when the core
@@ -412,14 +401,14 @@ pointer rotates. Sending it through generic migration would discard lock,
 governance-point, and tombstone semantics. Historical classification must be
 monotonic.
 
-Likewise, migration previously copied balances, points, and locks but did not
-carry the emergency accrual-disable condition. A user frozen on the source
-could begin accruing again on a fresh target after migration. The exact
-historical disable block is not recreated; the security property being
-preserved is that accrual remains disabled.
-
 Requiring Teller to be paused prevents ordinary user activity and most
 Teller-routed mutation during the administrator-controlled migration window.
+
+Governance-point disable settings are intentionally not migration state. They
+are emergency, vault-local controls used when a particular vault approaches a
+points-overflow risk. Migration preserves the points recorded by the source,
+while the target starts under its own independently administered disable
+policy and may resume accrual.
 
 ### Approved batch and lock-term design retained
 
@@ -456,7 +445,7 @@ maximum duration does not provide the same unlock behavior.
 ### Representative validation
 
 - `test_core_pointer_rotation_preserves_the_historical_exclusion_boundary`
-- `test_migration_carries_frozen_points_without_accruing_more`
+- `test_migration_does_not_carry_source_point_disable_policy`
 - `test_exporter_migration_preserves_pre_wind_down_terms_unlock_and_points`
 - `test_teller_migration_requires_teller_and_both_vaults_paused`
 - `test_active_legacy_locks_migrate_for_many_users_and_all_assets_after_one_block_min_reduction`
@@ -549,19 +538,14 @@ The HumanResources contributor transfer duration is clamped to the current
 governance-configured minimum and maximum. If the recipient already has a later
 lock after normal terms refresh, the transfer cannot shorten it.
 
-#### C. VaultMigrator can carry a point-accrual disable
-
-`disableGovPointAccrualForUser` retains its one-way and nonzero-user checks but
-also accepts the registered VaultMigrator as an authorized caller.
-
-#### D. Migration export accrues without rewriting stored terms
+#### C. Migration export accrues without rewriting stored terms
 
 `_updateGovPointsForUserAsset` now takes an internal refresh flag. Normal point
 updates still refresh to current MissionControl terms. Migration export uses
 the stored `lastTerms` to accrue through the current block and deliberately
 does not replace `unlock` or `lastTerms` with the temporary wind-down config.
 
-#### E. Public point refresh is closed while the vault is paused
+#### D. Public point refresh is closed while the vault is paused
 
 `updateUserGovPoints` now rejects calls while paused. This prevents an unrelated
 registered protocol caller from rewriting imported or not-yet-exported lock
@@ -587,8 +571,8 @@ than the user's original terms—the opposite of the migration objective.
 
 - No public selector is removed or added by these changes.
 - No persistent storage variable is added.
-- Authorization of an existing irreversible function is broadened narrowly to
-  the registry-bound VaultMigrator.
+- Governance-point disable setters remain Switchboard-only; VaultMigrator has
+  no authority to apply them.
 - Same-user calls report zero moved rather than manufacturing a transfer.
 - Paused migration state becomes intentionally more restrictive.
 - Measured deployed runtime: 23,789 bytes, leaving 787 bytes of EIP-170
@@ -601,7 +585,7 @@ than the user's original terms—the opposite of the migration objective.
 - `test_contributor_transfer_cannot_shorten_existing_lock`
 - contributor min/max clamp and existing-lock coverage in
   `tests/vaults/test_ripe_gov_controls_and_migration.py`
-- exporter term preservation and frozen-point carryover tests
+- exporter term preservation and source-disable non-carryover tests
 - paused/unpaused point and lock mutation matrix
 
 ## 11. `StabVault.vy`

@@ -39,7 +39,7 @@ Exclusive production ownership: `VaultMigrator.vy`, migration-specific `Teller.v
 Required closure:
 
 - exclude all historical RipeGov IDs from generic migration;
-- preserve global and per-user governance-point accrual-disable state, or implement an explicitly equivalent fail-closed target state;
+- preserve recorded and pending governance points, but do not carry source-vault global or per-user accrual-disable policy to the target;
 - preserve pre-refresh unlock, terms, stored points, and pending points in both legacy and exporter-capable RipeGov migration;
 - retain fail-closed target-virginity and replay/tombstone behavior;
 - keep the settled multi-user, all-assets-per-user ABI and behavior;

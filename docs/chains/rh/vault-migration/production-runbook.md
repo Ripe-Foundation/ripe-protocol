@@ -143,7 +143,9 @@ success log.
 
 The generic route is never a substitute for RipeGov migration. Dedicated
 RipeGov migration must preserve the original unlock, stored lock terms,
-governance points, pending points, and accrual-disable state.
+governance points, and pending points. Global and per-user accrual-disable
+settings are emergency policy local to the source vault and are not carried to
+the destination.
 
 The pause matrix differs by dedicated route. A registered same-chain
 `migrateRipeGovPositions` move requires both source and target RipeGov vaults

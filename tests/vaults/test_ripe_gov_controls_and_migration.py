@@ -540,10 +540,16 @@ def test_disabled_user_point_update_skips_boardroom_and_point_mutation(
 def test_point_disable_setters_are_authorized_and_irreversible(
     ripe_gov_vault,
     switchboard_echo,
+    vault_migrator,
     bob,
 ):
     with boa.reverts("no perms"):
         ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=bob)
+    with boa.reverts("no perms"):
+        ripe_gov_vault.disableGovPointAccrualForUser(
+            bob,
+            sender=vault_migrator.address,
+        )
     with boa.reverts("no perms"):
         ripe_gov_vault.disableGovPointAccrualGlobally(sender=bob)
     with boa.reverts("invalid user"):
@@ -1877,7 +1883,7 @@ def test_migration_accepts_exact_stale_zero_target_asset_registration(
 
 
 @pytest.mark.parametrize("disable_globally", [False, True])
-def test_migration_carries_frozen_points_without_accruing_more(
+def test_migration_does_not_carry_source_point_disable_policy(
     disable_globally,
     target_ripe_gov_vault,
     ripe_gov_vault,
@@ -1925,19 +1931,15 @@ def test_migration_carries_frozen_points_without_accruing_more(
     )
     assert target.userGovData(bob, ripe_token).govPoints == frozen_points
     assert target.totalUserGovPoints(bob) == frozen_points
-    # A source-global disable is deliberately narrowed to the migrated user on
-    # the target; neither source policy may be silently re-enabled.
     assert target.govPointAccrualDisabledBlock() == 0
-    target_disabled_block = target.userGovPointAccrualDisabledBlock(bob)
-    assert target_disabled_block == boa.env.evm.patch.block_number
-    assert target_disabled_block >= disabled_block
+    assert target.userGovPointAccrualDisabledBlock(bob) == 0
 
     target.pause(False, sender=switchboard_alpha.address)
     target_before = target.userGovData(bob, ripe_token)
     boa.env.time_travel(blocks=100)
     target.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     target_after = target.userGovData(bob, ripe_token)
-    assert target_after.govPoints == target_before.govPoints
+    assert target_after.govPoints > target_before.govPoints
     assert target_after.lastPointsUpdate == boa.env.evm.patch.block_number
 
 
