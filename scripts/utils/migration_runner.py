@@ -4,7 +4,7 @@ import re
 
 from scripts.utils import log
 from scripts.utils.migration import (Migration, MigrationHistoryError,
-                                     is_deployed_history)
+                                     history_has_deployment)
 from scripts.utils.deploy_args import DeployArgs
 
 
@@ -37,28 +37,34 @@ class MigrationRunner:
         self.files = files
         self.gas = 0
 
-    def _require_start_point(self, start_timestamp):
-        # A history that has already been deployed may be extended, but never
-        # from the default start point. `--start-timestamp` defaults to "0",
-        # which selects every migration from the first one, and the resume
-        # logic that would otherwise skip ahead does not work here: the history
-        # holds only current-manifest.json, so _latest_manifest_timestamp()
-        # yields "current" and int("current") raises. Nothing records which
-        # migration ran last, so the caller has to say where to resume.
-        if not is_deployed_history(self.history_dir):
+    def _require_start_point(self, deploy_args, start_timestamp):
+        # A history that already has a current-manifest.json has been deployed.
+        # Extending it is fine; redoing it by accident is not, and those are the
+        # same command: `--start-timestamp` defaults to "0", which selects every
+        # migration from the first one. Nothing here corrects for that -- the
+        # numbered step manifests are pruned by policy, `end()` deletes the
+        # transaction log on success, and current-manifest.json records no step
+        # attribution, so nothing says which migration ran last.
+        #
+        # Two ways to proceed deliberately: name the first migration to run, or
+        # pass --is-retry to resume a run that failed partway (which is also
+        # what makes the per-step skip read the log at all).
+        if not history_has_deployment(self.history_dir):
+            return
+        if not getattr(deploy_args, "ignore_logs", True):  # --is-retry
             return
         try:
-            explicit = int(str(start_timestamp).strip()) > 0
+            if int(str(start_timestamp).strip()) > 0:
+                return
         except (TypeError, ValueError):
-            explicit = False
-        if not explicit:
-            raise MigrationHistoryError(
-                "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
-                f"{self.history_dir} has already been deployed. Re-running "
-                "from the default start point would execute every migration "
-                "from the first one against it. Pass an explicit "
-                "--start-timestamp naming the first migration to run."
-            )
+            pass
+        raise MigrationHistoryError(
+            "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
+            f"{self.history_dir} already holds a deployed current-manifest.json. "
+            "Running from the default start point would execute every migration "
+            "from the first one against it. Pass --start-timestamp naming the "
+            "first migration to run, or --is-retry to resume a failed run."
+        )
 
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
         """
@@ -75,7 +81,7 @@ class MigrationRunner:
         named `current-manifest.json` will be also be saved in the history directory,
         duplicating the manifest of the latest migration.
         """
-        self._require_start_point(start_timestamp)
+        self._require_start_point(deploy_args, start_timestamp)
 
         for migrate, timestamp, prev_timestamp in self._migrations(start_timestamp, end_timestamp):
             log.h1(f"Running migration with timestamp {timestamp}...")

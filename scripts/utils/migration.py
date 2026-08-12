@@ -1,5 +1,4 @@
 import os
-from pathlib import PurePosixPath
 
 import boa.contracts
 import boa.contracts.abi
@@ -13,39 +12,27 @@ from scripts.utils.migration_helpers import (deployed_contracts_manifest,
                                              execute_transaction)
 
 
-# Histories whose deployment has already happened. `scripts/migrate.py`
-# defaults to `--environment v1`, so `--chain robinhood-mainnet` lands here.
+# A history that already holds a current-manifest.json has been deployed.
+# `_append_manifest` writes it on the first successful step, so its presence is
+# the surviving evidence that migrations have run here -- the numbered step
+# manifests are pruned as a matter of policy (see docs/simplification), and the
+# transaction log is deleted by `end()` on success, so neither can be used.
 #
-# Running against one of these is allowed, but only deliberately: the caller
-# must have established a start point, which MigrationRunner does before it
-# constructs anything. Anything constructing a Migration directly fails closed,
-# because the dangerous default is silent -- `--start-timestamp` defaults to 0,
-# which selects every migration from the first, and the resume logic that would
-# skip ahead is broken (see MigrationRunner._latest_manifest_timestamp).
-#
-# This is deliberately just a path check. On the pre-cleanup tree the same
-# boundary rode along on a flag named `_manifest_v2`, which made it look like
-# part of the unused H06 manifest-v2 planner; it never was. The planner is
-# gone and the boundary stays, with its original codes so anything matching on
-# them keeps working.
-DEPLOYED_HISTORIES = (
-    PurePosixPath("migration_history/robinhood-mainnet/v1"),
-    PurePosixPath("migration_history/robinhood-testnet/v1"),
-)
+# Running against such a history is allowed, but not by accident:
+# `--start-timestamp` defaults to "0", which selects every migration from the
+# first one, so a bare run is a full redeploy rather than a resume.
+# MigrationRunner decides; anything constructing a Migration directly fails
+# closed.
+CURRENT_MANIFEST = "current-manifest.json"
 
 
 class MigrationHistoryError(Exception):
     """Raised when a migration would execute against a deployed history."""
 
 
-def is_deployed_history(history_path):
-    """True if `history_path` names a history whose deployment already ran."""
-    normalized = PurePosixPath(str(history_path).replace("\\", "/"))
-    return any(
-        normalized == suffix
-        or normalized.parts[-len(suffix.parts):] == suffix.parts
-        for suffix in DEPLOYED_HISTORIES
-    )
+def history_has_deployment(history_path):
+    """True if `history_path` already holds a deployed current manifest."""
+    return os.path.exists(os.path.join(str(history_path), CURRENT_MANIFEST))
 
 
 class Migration:
@@ -64,7 +51,7 @@ class Migration:
         self._args = {}
         self.gas = 0
         self._execution_blocked = (
-            is_deployed_history(history_path) and not allow_deployed_history
+            history_has_deployment(history_path) and not allow_deployed_history
         )
 
         if self._execution_blocked:
