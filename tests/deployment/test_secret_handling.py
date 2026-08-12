@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
-import click
 import eth_account
 import pytest
 import requests
@@ -420,7 +419,7 @@ def test_local_account_missing_key_raises_before_reading_the_key(monkeypatch):
     )
     monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
 
-    with pytest.raises(click.ClickException) as captured:
+    with pytest.raises(migrate.click.ClickException) as captured:
         migrate._local_account("DEPLOYER")
 
     assert "DEPLOYER_PRIVATE_KEY is not set" in str(captured.value)
@@ -431,7 +430,7 @@ def test_local_account_missing_key_raises_before_reading_the_key(monkeypatch):
 def test_local_account_has_no_well_known_key_fallback(monkeypatch):
     monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
 
-    with pytest.raises(click.ClickException) as captured:
+    with pytest.raises(migrate.click.ClickException) as captured:
         migrate._local_account("DEPLOYER")
 
     rendered = f"{captured.value} {captured.value!r}"
@@ -470,7 +469,7 @@ def test_local_account_reads_only_the_named_account_variable(monkeypatch):
     monkeypatch.delenv("TREASURY_PRIVATE_KEY", raising=False)
     monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _WELL_FORMED_TEST_KEY)
 
-    with pytest.raises(click.ClickException) as captured:
+    with pytest.raises(migrate.click.ClickException) as captured:
         migrate._local_account("TREASURY")
 
     assert "TREASURY_PRIVATE_KEY is not set" in str(captured.value)

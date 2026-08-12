@@ -134,7 +134,7 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**191 files removed.**
+**190 files removed.**
 
 The two `Deployment tooling` sections below are this PR's removals — the unused
 H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
@@ -231,7 +231,7 @@ commit each is retrievable from) is in `extracted-files.tsv` under the
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`
 
-## Deployment tooling (12)
+## Deployment tooling (11)
 
 - `scripts/ccip_send.py`
 - `scripts/check_deployment.py`
@@ -242,7 +242,6 @@ commit each is retrievable from) is in `extracted-files.tsv` under the
 - `scripts/proposals/ledger_robinhood_profile.py`
 - `scripts/proposals/lootbox-deployment-profiles.json`
 - `scripts/proposals/lootbox_deployment_profiles.py`
-- `scripts/update_contract_artifact_expectations.py`
 - `scripts/utils/deployment_assertions.py`
 - `scripts/utils/manifest_schema.py`
 
