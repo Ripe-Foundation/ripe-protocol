@@ -324,9 +324,11 @@ _BASE_MAINNET_OPERATIONS = _operations(
     # tests/deployment/test_base_profile_regression.py pins the contradiction
     # so that closing it has to be a decision, not a drive-by edit.
     #
-    # Reconciling means routing verify.py through operation_decision() and
-    # flipping this to _SUPPORTED for the profiles that really can verify. That
-    # is integration work, not cleanup, so it is not done here.
+    # Owner decision (2026-08-12): verify.py stays as simple as it is on
+    # master and is NOT routed through this registry. So the gap is permanent
+    # by choice, not pending work. This policy therefore governs the other
+    # consumers of the registry (console.py, resolve_rpc_reference) and does
+    # not describe what `python -m scripts.verify` will do.
     _policy(Operation.VERIFICATION, _BLOCKED, verifier=True),
 )
 

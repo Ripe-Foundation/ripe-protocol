@@ -326,10 +326,10 @@ def test_verification_policy_and_verify_cli_disagree_by_design():
     `verify_etherscan.CHAIN_SPECS` and never calls `operation_decision`. The
     profile registry still records VERIFICATION as blocked.
 
-    This test exists so the contradiction is explicit and tracked. Wiring the
-    CLI through the registry should flip the policy to SUPPORTED and delete
-    this test in the same change; until then, the mismatch must not be
-    mistaken for enforcement.
+    Owner decision (2026-08-12): verify.py stays as simple as it is on master
+    and is not routed through the registry, so this divergence is permanent by
+    choice rather than pending work. The test stays to keep it explicit -- the
+    policy must not be read as enforcement of what the CLI does.
     """
     profile = get_profile("base-mainnet")
     decision = operation_decision(profile, Operation.VERIFICATION)
