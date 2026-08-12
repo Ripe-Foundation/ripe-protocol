@@ -124,8 +124,18 @@ CLICK_PROMPTS = {
         "help": "Account name for deployment. Defaults to `DEPLOYER`"
     },
     "is_retry": {
-        "prompt": "Ignore current logs (always run transactions)?",
-        "help": "Ignore previous log files",
+        # This said "Ignore current logs (always run transactions)?" / "Ignore
+        # previous log files", which is the opposite of what the flag does:
+        # `ignore_logs=not is_retry`, so --is-retry READS the log and skips what
+        # it records. An operator wanting a clean re-run and passing --is-retry
+        # on that description would have had transactions silently skipped.
+        "prompt": "Retry: skip transactions already recorded in this migration's log?",
+        "help": (
+            "Retry a migration that failed partway: read its log file and skip "
+            "the transactions already recorded there, resuming at the first "
+            "one that did not complete. Without this the log is ignored and "
+            "every transaction in the migration runs again."
+        ),
         "default": False,
     },
     "manifest": {

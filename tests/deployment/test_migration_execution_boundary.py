@@ -300,3 +300,66 @@ def test_current_manifests_keep_everything():
                 assert vyper_fields <= set(record), where
                 kept += 1
     assert kept, "expected current manifests to retain Vyper compiler output"
+
+
+# --- retrying a migration that failed partway ------------------------------
+
+
+def _with_log(tmp_path: Path, recorded, *, is_retry: bool):
+    history = _history(tmp_path, deployed=True)
+    (history / "9999-log.json").write_text(json.dumps({"transactions": recorded}))
+    args = SimpleNamespace(
+        sender=SimpleNamespace(address="0x" + "1" * 40),
+        # scripts/migrate.py passes ignore_logs=not is_retry.
+        ignore_logs=not is_retry,
+        rpc=None,
+        chain="robinhood-mainnet",
+        blueprint=None,
+    )
+    return Migration(
+        args, {}, "9999", None, str(history), allow_deployed_history=True
+    )
+
+
+def test_retry_skips_transactions_already_in_the_log(tmp_path):
+    broadcast = []
+    migration = _with_log(tmp_path, ["0xRECORDED"], is_retry=True)
+
+    result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
+
+    # The recorded receipt is returned and nothing is re-broadcast.
+    assert result == "0xRECORDED"
+    assert broadcast == []
+
+
+def test_without_retry_the_log_is_ignored_and_everything_runs(tmp_path):
+    broadcast = []
+    migration = _with_log(tmp_path, ["0xRECORDED"], is_retry=False)
+
+    result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
+
+    assert result == "0xNEW"
+    assert broadcast == ["sent"]
+
+
+def test_retry_resumes_at_the_first_incomplete_transaction(tmp_path):
+    broadcast = []
+    migration = _with_log(tmp_path, ["0xONE", "0xTWO"], is_retry=True)
+
+    first = migration.execute(lambda **_: broadcast.append(1) or "new")
+    second = migration.execute(lambda **_: broadcast.append(2) or "new")
+    third = migration.execute(lambda **_: broadcast.append(3) or "0xTHREE")
+
+    assert [first, second, third] == ["0xONE", "0xTWO", "0xTHREE"]
+    assert broadcast == [3], "only the transaction past the log should run"
+
+
+def test_retry_help_describes_what_the_flag_actually_does():
+    # The help said "Ignore previous log files", which is the inverse:
+    # --is-retry reads the log. Passing it for a clean re-run would have
+    # skipped transactions instead of running them.
+    from scripts.migrate import CLICK_PROMPTS
+
+    text = f"{CLICK_PROMPTS['is_retry']['help']} {CLICK_PROMPTS['is_retry']['prompt']}"
+    assert "skip" in text.lower()
+    assert "ignore previous log files" not in text.lower()
