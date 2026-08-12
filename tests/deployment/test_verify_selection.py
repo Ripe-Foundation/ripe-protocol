@@ -220,3 +220,31 @@ def test_failed_submission_exits_nonzero(monkeypatch):
         _invoke(contracts="GreenToken")
 
     assert "Verification failed for: GreenToken" in str(captured.value)
+
+
+def test_step_manifest_redirects_to_the_migration_selector(monkeypatch):
+    """A numbered manifest is a record, not a payload.
+
+    Owner decision: `solc_json` lives in `current-manifest.json` alone. So
+    pointing --manifest at a step manifest can never verify anything, and
+    should say why once rather than listing every contract as unverifiable.
+    The redirect names the flag that does what the caller wanted.
+    """
+    monkeypatch.setenv("ETHERSCAN_API_KEY", "probe")
+    monkeypatch.setattr(
+        verify, "verify_from_manifest", lambda **_: pytest.fail("submitted")
+    )
+
+    with pytest.raises(verify.click.ClickException) as captured:
+        verify.cli.callback("v1", "base-mainnet", "2026072800")
+
+    message = str(captured.value)
+    assert "is a step manifest" in message
+    assert "--migration 2026072800" in message
+
+
+def test_the_redirect_names_a_selector_that_works(submissions):
+    # Whatever the redirect suggests has to actually be selectable.
+    _invoke(migration="2026072800")
+
+    assert submissions == ["AuctionHouse", "Deleverage"]

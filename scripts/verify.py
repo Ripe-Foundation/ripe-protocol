@@ -276,6 +276,18 @@ def cli(
     if not rows:
         raise click.ClickException(f"No contracts in {manifest_path}.")
 
+    # A numbered step manifest is a record of what a migration deployed --
+    # address, file, args -- and deliberately carries no solc_json, which is
+    # what verification submits. Only current-manifest.json has it. Say so
+    # once, up front, rather than listing every row as unverifiable.
+    if manifest.isdigit() and not any(row["verifiable"] for row in rows):
+        raise click.ClickException(
+            f"{manifest_path.name} is a step manifest: it records what "
+            f"migration {manifest} deployed, but carries no compiler output to "
+            "submit. To verify what that migration deployed, use the current "
+            f"manifest: --migration {manifest}"
+        )
+
     if sum(bool(flag) for flag in (contracts, migration, verify_all)) > 1:
         raise click.ClickException(
             "Use only one of --contracts, --migration, --all."
