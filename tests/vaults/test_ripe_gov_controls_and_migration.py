@@ -3229,129 +3229,26 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
 
 
 # --------------------------------------------------------------------------
-# DV-05: contributor lock duration is clamped without shortening a later lock
+# Contributor transfers retain their separately governed lock term
 # --------------------------------------------------------------------------
 
 
-def test_contributor_transfer_cannot_shorten_existing_lock(
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    bob,
-    sally,
-    teller,
-    human_resources,
-    switchboard_bravo,
-    mission_control,
-    setAssetConfig,
-    switchboard_alpha,
-):
-    """DV-05: a short contributor duration cannot reduce a later current lock."""
-    _configure_ripe_gov_asset(
-        mission_control,
-        setAssetConfig,
-        switchboard_alpha,
-        ripe_token,
-        [SOURCE_VAULT_ID],
-    )
-    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
-
-    # Recipient holds a small position at the maximum lock.
-    _direct_deposit(
-        ripe_gov_vault,
-        ripe_token,
-        whale,
-        bob,
-        10 * EIGHTEEN_DECIMALS,
-        teller,
-        lock_duration=max_lock,
-        switchboard=switchboard_bravo,
-    )
-    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    assert unlock_before == boa.env.evm.patch.block_number + max_lock
-
-    # Contributor holds a much larger position.
-    _direct_deposit(
-        ripe_gov_vault, ripe_token, whale, sally, 1_000 * EIGHTEEN_DECIMALS, teller
-    )
-
-    # Contributor payout carries a 1-block lock duration -- far below min_lock.
-    ripe_gov_vault.transferContributorRipeTokens(
-        sally, bob, 1, sender=human_resources.address
-    )
-
-    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    assert unlock_after >= unlock_before
-    assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
-
-
-def test_contributor_transfer_preserves_existing_lock_with_short_duration(
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    bob,
-    sally,
-    teller,
-    human_resources,
-    switchboard_bravo,
-    mission_control,
-    setAssetConfig,
-    switchboard_alpha,
-):
-    """DV-05 hardening target (RG-4, Section 9.3)."""
-    _configure_ripe_gov_asset(
-        mission_control,
-        setAssetConfig,
-        switchboard_alpha,
-        ripe_token,
-        [SOURCE_VAULT_ID],
-    )
-    max_lock = LOCK_TERMS[1]
-    _direct_deposit(
-        ripe_gov_vault,
-        ripe_token,
-        whale,
-        bob,
-        10 * EIGHTEEN_DECIMALS,
-        teller,
-        lock_duration=max_lock,
-        switchboard=switchboard_bravo,
-    )
-    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
-    _direct_deposit(
-        ripe_gov_vault, ripe_token, whale, sally, 1_000 * EIGHTEEN_DECIMALS, teller
-    )
-
-    ripe_gov_vault.transferContributorRipeTokens(
-        sally, bob, 1, sender=human_resources.address
-    )
-
-    assert ripe_gov_vault.userGovData(bob, ripe_token).unlock >= unlock_before
-
-
-# Section 8.2 boundary set, split by whether the clamp invariant already holds.
-# A raw duration that happens to sit inside [minLockDuration, maxLockDuration]
-# trivially satisfies the clamp, so only the out-of-bounds boundaries are
-# checkpoints. Keeping them in one loop would have hidden that distinction.
-CONTRIBUTOR_DURATIONS_IN_BOUNDS = (
+CONTRIBUTOR_DURATIONS = (
+    ("zero", 0),
+    ("one", 1),
+    ("below_general_min", LOCK_TERMS[0] - 1),
     ("at_min", LOCK_TERMS[0]),
     ("ordinary", (LOCK_TERMS[0] + LOCK_TERMS[1]) // 2),
     ("at_max", LOCK_TERMS[1]),
-)
-CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS = (
-    ("zero", 0),
-    ("one", 1),
-    ("below_min", LOCK_TERMS[0] - 1),
-    ("above_max", LOCK_TERMS[1] + 1),
+    ("above_general_max", LOCK_TERMS[1] + 1),
     ("far_above_max", LOCK_TERMS[1] * 10),
 )
-CONTRIBUTOR_DURATIONS = CONTRIBUTOR_DURATIONS_IN_BOUNDS + CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS
 
 
 @pytest.mark.parametrize(
     "duration", [d for _label, d in CONTRIBUTOR_DURATIONS], ids=[l for l, _d in CONTRIBUTOR_DURATIONS]
 )
-def test_contributor_duration_lands_clamped_on_a_fresh_recipient(
+def test_contributor_transfer_honors_configured_duration_on_fresh_recipient(
     duration,
     ripe_gov_vault,
     ripe_token,
@@ -3364,7 +3261,7 @@ def test_contributor_duration_lands_clamped_on_a_fresh_recipient(
     setAssetConfig,
     switchboard_alpha,
 ):
-    """DV-05: every fresh-recipient duration is clamped to current bounds."""
+    """The contributor's block-based term is distinct from general deposit bounds."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3381,19 +3278,12 @@ def test_contributor_duration_lands_clamped_on_a_fresh_recipient(
         sally, bob, duration, sender=human_resources.address
     )
 
-    expected_duration = min(max(duration, LOCK_TERMS[0]), LOCK_TERMS[1])
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == (
-        boa.env.evm.patch.block_number + expected_duration
+        boa.env.evm.patch.block_number + duration
     )
 
 
-@pytest.mark.parametrize(
-    "duration",
-    [d for _label, d in CONTRIBUTOR_DURATIONS_IN_BOUNDS],
-    ids=[l for l, _d in CONTRIBUTOR_DURATIONS_IN_BOUNDS],
-)
-def test_contributor_duration_inside_bounds_already_satisfies_the_clamp(
-    duration,
+def test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock(
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -3404,13 +3294,9 @@ def test_contributor_duration_inside_bounds_already_satisfies_the_clamp(
     mission_control,
     setAssetConfig,
     switchboard_alpha,
+    switchboard_bravo,
 ):
-    """DV-05 control half: an in-bounds duration trivially lands in bounds.
-
-    These three boundaries pass on the bound baseline, so they are plain
-    regressions. They exist so a Section 9.3 clamp cannot silently change the
-    in-bounds behavior while fixing the out-of-bounds cases.
-    """
+    """An existing recipient lock is blended, not substituted for the HR term."""
     _configure_ripe_gov_asset(
         mission_control,
         setAssetConfig,
@@ -3418,65 +3304,46 @@ def test_contributor_duration_inside_bounds_already_satisfies_the_clamp(
         ripe_token,
         [SOURCE_VAULT_ID],
     )
-    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
+
+    max_lock = LOCK_TERMS[1]
+    contributor_duration = 1
     _direct_deposit(
-        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
-    )
-
-    ripe_gov_vault.transferContributorRipeTokens(
-        sally, bob, duration, sender=human_resources.address
-    )
-
-    remaining = (
-        ripe_gov_vault.userGovData(bob, ripe_token).unlock - boa.env.evm.patch.block_number
-    )
-    assert min_lock <= remaining <= max_lock
-    assert remaining == duration
-
-
-@pytest.mark.parametrize(
-    "duration",
-    [d for _label, d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
-    ids=[l for l, _d in CONTRIBUTOR_DURATIONS_OUT_OF_BOUNDS],
-)
-def test_contributor_duration_is_clamped_to_current_governance_bounds(
-    duration,
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    bob,
-    sally,
-    teller,
-    human_resources,
-    mission_control,
-    setAssetConfig,
-    switchboard_alpha,
-):
-    """DV-05 hardening target, bounds half (RG-4, Section 9.3).
-
-    A fresh recipient with no prior lock must end up inside
-    [minLockDuration, maxLockDuration] for any contributor duration.
-    """
-    _configure_ripe_gov_asset(
-        mission_control,
-        setAssetConfig,
-        switchboard_alpha,
+        ripe_gov_vault,
         ripe_token,
-        [SOURCE_VAULT_ID],
+        whale,
+        bob,
+        10 * EIGHTEEN_DECIMALS,
+        teller,
+        lock_duration=max_lock,
+        switchboard=switchboard_bravo,
     )
-    min_lock, max_lock = LOCK_TERMS[0], LOCK_TERMS[1]
     _direct_deposit(
-        ripe_gov_vault, ripe_token, whale, sally, 100 * EIGHTEEN_DECIMALS, teller
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        sally,
+        1_000 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+
+    recipient_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    contributor_shares = ripe_gov_vault.userBalances(sally, ripe_token)
+    unlock_before = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    expected_unlock = ripe_gov_vault.getWeightedLockOnTokenDeposit(
+        contributor_shares,
+        contributor_duration,
+        LOCK_TERMS,
+        recipient_shares,
+        unlock_before,
     )
 
     ripe_gov_vault.transferContributorRipeTokens(
-        sally, bob, duration, sender=human_resources.address
+        sally, bob, contributor_duration, sender=human_resources.address
     )
-
-    remaining = (
-        ripe_gov_vault.userGovData(bob, ripe_token).unlock - boa.env.evm.patch.block_number
-    )
-    assert min_lock <= remaining <= max_lock
+    unlock_after = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    assert unlock_after == expected_unlock
+    assert unlock_after < unlock_before
+    assert ripe_gov_vault.userBalances(sally, ripe_token) == 0
 
 
 # --------------------------------------------------------------------------

@@ -12,10 +12,9 @@ Evidence and measurements: [`deposit-vault-hardening-wp0-evidence.md`](deposit-v
 Findings are referenced by their DV identifier from that record.
 
 > **PR #67 remediation candidate (11 August 2026).** The isolated candidate now
-> enforces DV-04, DV-05, DV-07, DV-08, DV-09, DV-10, and DV-13 in contracts:
+> enforces DV-04, DV-07, DV-08, DV-09, DV-10, and DV-13 in contracts:
 > AuctionHouse and CreditRedeem reject same-user collateral movement before a
-> vault transfer is attempted; contributor
-> durations are clamped without shortening a later refreshed lock; Teller
+> vault transfer is attempted; Teller
 > blocks every housekeeping route during custody receipt measurement; zero asset weight now
 > earns zero governance points; AuctionHouse measures each
 > Stability Pool receipt across the collateral transfer; active-claim NAV fails
@@ -25,6 +24,9 @@ Findings are referenced by their DV identifier from that record.
 > Exact-transfer/non-rebasing admission remains defense in depth, while the Teller
 > callback-free token admission remains defense in depth. Dormant claim dust
 > retains the explicit pre-exit operating disposition stated below.
+> DV-05 is reclassified as intentional contributor policy: the separately
+> governed `depositLockDuration` is honored on the final owner transfer rather
+> than being rebound to general RipeGov deposit bounds.
 
 > **Not covered here.** DV-01/02/03 (RipeGov privileged-caller breadth) was remediated
 > in code — `depositTokensWithLockDuration`, `adjustLock` and `releaseLock` are now
@@ -37,7 +39,7 @@ Findings are referenced by their DV identifier from that record.
 | # | Decision point | Rule | Status | Mitigates |
 |---|---|---|---|---|
 | 1 | Admitting any asset that can reach the Stability Pool | exact-transfer, non-rebasing, callback-free only | operational defense in depth | DV-08, DV-09, DV-10, DV-13 |
-| 2 | Deploying a `Contributor` | contract clamps `depositLockDuration` to current bounds without shortening a later refreshed lock | enforced; configuration review remains defense in depth | DV-05 |
+| 2 | Deploying a `Contributor` | select and record the contributor-specific `depositLockDuration`; the final transfer honors it exactly | governed HR policy; contract-enforced | DV-05 reclassified |
 | 3 | Configuring a RipeGov vault asset | zero weight earns zero points | enforced | DV-07 |
 | 4 | Pausing RipeGov | pause Teller in the same operation | operational | DV-06 |
 | 5 | Registering a price source | it must never revert | operational | DV-14 |
@@ -114,23 +116,36 @@ upgrades, balance semantics, and any path outside the exact checks above.
 
 ---
 
-## 2. Contributor deployment — keep `depositLockDuration` in bounds
+## 2. Contributor deployment — preserve the contributor-specific lock term
 
-**The rule.** Every deployed `Contributor` must carry a `depositLockDuration` inside
-the RipeGov asset's `[minLockDuration, maxLockDuration]`.
+**The rule.** Treat `depositLockDuration` as an explicit term of the Contributor
+agreement, denominated in blocks. Do not derive or silently rewrite it from the
+general RipeGov asset bounds.
 
-**Enforced behavior.** `RipeGov.transferContributorRipeTokens` clamps the configured
-duration into the current `[minLockDuration, maxLockDuration]`. It first refreshes the
-recipient's existing unlock under the current terms; when that refreshed unlock is
-later than the clamped duration, the later unlock is preserved. A contributor payout
-therefore cannot shorten a still-effective recipient lock (DV-05).
+**Enforced behavior.** During vesting, `cashRipeCheck` deposits RIPE into the
+Contributor's RipeGov position through Teller, so that ordinary deposit is still
+clamped to current general RipeGov bounds. The position cannot be transferred to the
+owner until the Contributor's separately configured timestamp `unlockTime` and the
+block-based transfer confirmation delay have elapsed. At final transfer,
+`RipeGov.transferContributorRipeTokens` passes the stored `depositLockDuration`
+unchanged into the normal weighted-lock calculation. It does not substitute the
+recipient's existing lock or rebind the Contributor agreement to current general
+deposit terms.
+
+This means a configured Contributor duration may be below or above the current
+general min/max, and a large short-duration contributor transfer may reduce an
+existing recipient position's weighted unlock. That is the intended consequence of
+combining positions under the repository's weighted-lock model, not a bypass of the
+Contributor's vesting contract. DV-05 is therefore closed as a design clarification,
+not as a hardening invariant.
 
 **The check, at Contributor deployment.**
 
-- [ ] Read the current terms: `MissionControl.ripeGovVaultConfig(ripeToken).lockTerms`.
-- [ ] Assert `minLockDuration <= depositLockDuration <= maxLockDuration`.
-- [ ] Re-check every existing Contributor whenever those governance bounds change —
-      a bounds change can put an already-deployed Contributor out of range.
+- [ ] Record the exact `depositLockDuration` and that its unit is blocks, while
+      vesting/cliff/unlock terms are timestamp seconds.
+- [ ] Confirm the agreement intentionally accepts the resulting final-owner lock and
+      weighted merge with any existing owner position.
+- [ ] Do not treat later RipeGov min/max changes as amendments to this stored term.
 
 ---
 
@@ -283,7 +298,7 @@ free.
 | 1 (rebase / burn) | `test_stab_vault_hardening.py::test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions`, `::test_claim_reserve_cannot_be_reclassified_as_stability_backing` | passing enforcement regression |
 | 1 (outbound fee) | `::test_outbound_fee_on_transfer_short_delivery_reverts_atomically`, `::test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares` | passing enforcement regression for the named paths |
 | 1 (callbacks) | `test_teller_deposit.py::test_predeployment_undecorated_route_reentrancy_cross_product`, `::test_receipt_window_blocks_every_custody_changing_nested_route`, `::test_after_credit_callback_cannot_corrupt_the_measured_receipt` | passing central-guard regressions |
-| 2 | `test_ripe_gov_controls_and_migration.py::test_contributor_duration_lands_clamped_on_a_fresh_recipient`, `::test_contributor_transfer_cannot_shorten_existing_lock` | passing enforcement regressions |
+| 2 | `test_hr_contributor.py::test_contributor_final_transfer_honors_its_separate_deposit_lock_term`, `test_ripe_gov_controls_and_migration.py::test_contributor_transfer_honors_configured_duration_on_fresh_recipient`, `::test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock` | passing contributor-policy regressions |
 | 3 | `test_ripe_gov_vault.py::test_zero_asset_weight_means_zero_points`, `::test_nonzero_asset_weight_boundaries_are_exact` | passing policy regression |
 | 4 | `test_ripe_gov_controls_and_migration.py::test_ripe_gov_pause_matrix_while_paused` | passing enforcement regression |
 | 5 | `test_stab_vault_hardening.py::test_reverting_price_source_takes_down_every_nav_dependent_action` | passing enforcement regression |
@@ -291,5 +306,6 @@ free.
 | Dormant dust | `test_stab_vault_hardening.py::test_dormant_dust_is_claimable_before_exit_but_stranded_after`, `::test_dormant_dust_remains_recoverable_after_full_exit` | first is passing characterization; post-exit recovery remains `xfail(strict=True)` by accepted product disposition |
 
 The remaining `xfail(strict=True)` checkpoint records only the accepted dormant-dust
-post-exit limitation. Completed DV-04/05/07/08/09/10/13 changes are ordinary passing
-tests, not expected failures.
+post-exit limitation. Completed DV-04/07/08/09/10/13 changes are ordinary passing
+tests, not expected failures. DV-05 is covered by passing tests of the owner-confirmed
+contributor-specific behavior rather than by a clamp.

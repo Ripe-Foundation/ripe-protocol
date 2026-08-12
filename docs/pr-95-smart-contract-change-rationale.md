@@ -572,30 +572,36 @@ failure-tolerant.
 
 ### What changed
 
-#### A. Contributor lock duration is constrained
-
-The HumanResources contributor transfer duration is clamped to the current
-governance-configured minimum and maximum. If the recipient already has a later
-lock after normal terms refresh, the transfer cannot shorten it.
-
-#### B. Migration export accrues without rewriting stored terms
+#### A. Migration export accrues without rewriting stored terms
 
 `_updateGovPointsForUserAsset` now takes an internal refresh flag. Normal point
 updates still refresh to current MissionControl terms. Migration export uses
 the stored `lastTerms` to accrue through the current block and deliberately
 does not replace `unlock` or `lastTerms` with the temporary wind-down config.
 
-#### C. Public point refresh is closed while the vault is paused
+#### B. Public point refresh is closed while the vault is paused
 
 `updateUserGovPoints` now rejects calls while paused. This prevents an unrelated
 registered protocol caller from rewriting imported or not-yet-exported lock
 metadata during the migration window.
 
-### Why these changes are required
+### Deliberately preserved contributor behavior
 
-HumanResources is privileged to move contributor RIPE, but the supplied lock
-duration should not bypass the same current min/max policy imposed on normal
-governance deposits or shorten a recipient's stronger existing lock.
+`transferContributorRipeTokens` continues to pass the Contributor contract's
+stored `depositLockDuration` unchanged into the existing weighted-lock helper.
+That duration is a separately governed HumanResources agreement term, not an
+ordinary user-deposit choice. The Contributor contract independently enforces
+its timestamp vesting/unlock schedule and block-based transfer confirmation
+delay before the final owner transfer is possible.
+
+Ordinary paycheck deposits made while RIPE remains owned by the Contributor
+still pass through Teller and the normal RipeGov deposit clamp. The final owner
+transfer does not re-clamp the agreement term or substitute the recipient's
+unrelated existing lock. If the recipient already has shares, the existing
+weighted-lock calculation may therefore produce an earlier aggregate unlock;
+that is the intended result of combining the two positions.
+
+### Why these changes are required
 
 For migration, the administrator intentionally lowers minimum lock terms to
 make the legacy withdrawal possible. If export first refreshed the stored row
@@ -614,9 +620,9 @@ than the user's original terms—the opposite of the migration objective.
 
 ### Representative validation
 
-- `test_contributor_transfer_cannot_shorten_existing_lock`
-- contributor min/max clamp and existing-lock coverage in
-  `tests/vaults/test_ripe_gov_controls_and_migration.py`
+- `test_contributor_final_transfer_honors_its_separate_deposit_lock_term`
+- `test_contributor_transfer_honors_configured_duration_on_fresh_recipient`
+- `test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock`
 - exporter term preservation and source-disable non-carryover tests
 - paused/unpaused point and lock mutation matrix
 

@@ -13,6 +13,15 @@ This plan does not authorize a deployment, merge, push, configuration change, or
 
 It also does not, by itself, authorize production-contract edits. The owner’s standing RH rule is to make the fewest possible production smart-contract changes. Section 5.4 is therefore a mandatory owner gate before Work Packages 2 through 6 may change production source.
 
+> **Owner supersession — 2026-08-11 (DV-05).** The proposed contributor clamp in
+> the original plan was rejected after tracing the full HumanResources/Contributor
+> lifecycle. `depositLockDuration` is an explicit, separately governed Contributor
+> term. Ordinary paycheck deposits still use normal RipeGov bounds while held by the
+> Contributor, but the final owner transfer—after timestamp unlock and the transfer
+> confirmation delay—must honor that stored term and the normal weighted-lock
+> calculation. Sections 8.2, 9.3, and the completion criteria below incorporate this
+> controlling decision; older expected-red/evidence descriptions are historical.
+
 ## 2. Bound baseline and startup gate
 
 The analysis behind this plan was performed against the local RH branch at:
@@ -423,7 +432,7 @@ Expected test names, subject to the WP0 caller inventory confirming Teller-only 
 - test_registered_non_teller_cannot_release_another_users_lock
 - test_rejected_gov_privileged_call_is_fully_atomic
 
-### 8.2 Same-address and contributor lock matrix
+### 8.2 Same-address and contributor-term matrix
 
 Exercise:
 
@@ -438,16 +447,21 @@ Exercise:
 - maximum lock;
 - configured duration above maximum;
 - configured duration below minimum;
-- prior unlock later than newly computed unlock.
+- prior unlock later than the contributor-weighted result.
 
-Assert that both caller routes stop before vault movement and that contributor transfer never shortens an existing lock.
+Assert that both collateral-routing callers stop before vault movement. Separately
+assert that contributor transfer honors its configured duration on a fresh recipient
+and feeds that exact duration into the normal weighted-lock calculation for an
+existing recipient. Do not require preservation of the recipient's earlier unlock;
+weighted shortening is an intended consequence of combining positions.
 
 Suggested test names:
 
 - test_auction_buyer_cannot_be_liquidated_user
 - test_credit_redemption_recipient_equals_user
-- test_contributor_transfer_cannot_shorten_existing_lock
-- test_contributor_duration_is_clamped_to_current_governance_bounds
+- test_contributor_transfer_honors_configured_duration_on_fresh_recipient
+- test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock
+- test_contributor_final_transfer_honors_its_separate_deposit_lock_term
 
 ### 8.3 Stability zero-price economics
 
@@ -520,15 +534,18 @@ recipient equals the source user. RipeGov and SharesVault do not duplicate
 that routing policy. A new caller must add and test the same guard before it
 may reach `transferBalanceWithinVault`.
 
-### 9.3 Prevent contributor lock shortening
+### 9.3 Preserve the contributor-specific final-transfer term
 
-When contributor shares move into RipeGov:
+When contributor shares move into the owner's RipeGov position:
 
-- resolve the current minimum and maximum governance lock bounds;
-- clamp the contributor duration to those bounds;
-- preserve the recipient’s later existing unlock;
-- reject or safely handle a contradictory configuration;
-- calculate points from the final effective lock, not the nominal requested duration.
+- pass the Contributor contract's stored `depositLockDuration` unchanged;
+- do not clamp it to the current general RipeGov min/max;
+- do not replace it with the recipient's remaining lock;
+- use the existing weighted-lock calculation when the recipient already has shares;
+- retain the Contributor's independent timestamp vesting/unlock and block-based
+  transfer confirmation gates; and
+- keep ordinary paycheck deposits through Teller subject to normal RipeGov deposit
+  bounds while the position remains owned by the Contributor contract.
 
 ### 9.4 Pause semantics
 
@@ -548,7 +565,9 @@ Also retain exact-once migration, source tombstone, destination shares, locks, p
 
 - Only the intended caller can create locked governance shares or mutate a user lock.
 - Same-user transfer changes no state.
-- Contributor movement cannot shorten a lock.
+- Contributor movement honors the separately configured duration and normal
+  weighted-lock semantics, including a shorter aggregate unlock where the weights
+  produce one.
 - Pause behavior is explicit for every public mutation.
 - Existing legitimate Teller, HumanResources, reward, withdrawal, and migration flows remain green.
 

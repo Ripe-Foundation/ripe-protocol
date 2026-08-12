@@ -452,15 +452,6 @@ def transferContributorRipeTokens(
     # config
     config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
 
-    # Contributor configuration cannot bypass current governance bounds or
-    # shorten an existing lock that remains later after the normal terms
-    # refresh. The weighted-deposit helper receives this effective duration.
-    lockDuration: uint256 = min(max(_lockDuration, config.lockTerms.minLockDuration), config.lockTerms.maxLockDuration)
-    recipientData: GovData = self.userGovData[_toUser][a.ripeToken]
-    refreshedUnlock: uint256 = self._refreshUnlock(recipientData.unlock, config.lockTerms, recipientData.lastTerms)
-    if refreshedUnlock > block.number:
-        lockDuration = max(lockDuration, refreshedUnlock - block.number)
-
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
     transferShares: uint256 = 0
@@ -468,7 +459,7 @@ def transferContributorRipeTokens(
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
     # handle gov data/points
-    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount
