@@ -4957,6 +4957,15 @@ the authoritative policy. A feature branch, working-tree change, Gate 1
 candidate, review approval, or commit that is not integrated into `rh` does
 not itself retire an exception.
 
+**New-advisory authorization boundary:** The retirement authorization above
+predates `PYSEC-2026-3654`. Mick Hagen, H-01 owner, explicitly adopted this
+exact bounded exception on 11 August 2026 after the containment candidate and
+independent review were complete. The new exception becomes operative only
+when the exact authorized bytes are integrated into authoritative `rh`; the
+authorization alone does not make a feature branch authoritative. A green test
+result proves only that the bounded fail-closed controls are represented
+consistently; it is not release, deployment, or alert-state authority.
+
 The transition changes no dependency byte. Its immutable integrated inputs
 remain:
 
@@ -4981,6 +4990,7 @@ unchanged.
 | `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
 | `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
 | `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
+| `EX-H01-PYMDOWN-REDOS-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` is affected by `PYSEC-2026-3654` / `GHSA-gm37-52c6-37mw` / `CVE-2026-67422`; first patch is `11.0.1`, outside the current resolver-valid Titanoboa/docs graph. The owner-authorized controls below contain the currently unreachable surface. |
 
 The historical `PROPOSED_RETIREMENTS` state is superseded only when the
 effectivity boundary above is satisfied. The three retired records remain
@@ -4989,7 +4999,7 @@ disposal; they are not operative authorization after effective integration.
 
 ### Operative retained exception terms
 
-The retained-exception owner is **Mick Hagen, H-01 owner**. Both retained
+The retained-exception owner is **Mick Hagen, H-01 owner**. All three retained
 exceptions keep the scheduled security review on **15 August 2026** and hard
 expiry at **2026-08-31T23:59:59Z**. The earlier of a finding-specific
 invalidation trigger or hard expiry ends authorization. An expired exception
@@ -5034,6 +5044,130 @@ acceptance.
   configuration, Markdown/docs pipeline, untrusted Markdown, advisory/exploit
   change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
   review, or hard expiry.
+
+### Owner-authorized Pymdown ReDoS exception
+
+The reviewed [PyPA record](https://github.com/pypa/advisory-database/blob/main/vulns/pymdown-extensions/PYSEC-2026-3654.yaml),
+[GitHub advisory](https://github.com/advisories/GHSA-gm37-52c6-37mw),
+[upstream fix](https://github.com/facelessuser/pymdown-extensions/commit/c68498598d7b13011bb4571350b6e3612a4ce44b),
+and [PyPI release](https://pypi.org/project/pymdown-extensions/11.0.1/)
+identify one finding under `PYSEC-2026-3654`, `GHSA-gm37-52c6-37mw`, and
+`CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+`11.0.1`. GitHub rates the upstream finding High at CVSS 3.1 score `7.5`
+(`AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H`). It is distinct from the older Caption
+ReDoS fixed in `10.16.1`.
+
+The affected processors are `pymdownx.caret`, `pymdownx.tilde`,
+`pymdownx.betterem`, and `pymdownx.magiclink`; `pymdownx.extra` also exposes
+the default BetterEm processor. When an affected extension is enabled, a
+crafted sub-50-byte untrusted Markdown line can cause exponential regular-
+expression backtracking and pin the rendering thread at full CPU. This is an
+availability threat, not a confidentiality or integrity finding.
+
+The exact `origin/rh` tree at
+`02468586d710e2cce2360c2bc07e94de6ebdab29` has no MkDocs configuration or
+documentation-build command and no Pymdown import or Markdown-rendering call
+outside `tests/deployment/test_dependency_gate.py`. That explicit dependency
+test activates only `pymdownx.snippets` and `pymdownx.b64`, not an extension
+affected by this ReDoS. No repository path accepts or renders untrusted
+Markdown. Installation of the affected package alone does not activate an
+extension, so the reviewed current exploit path is absent.
+
+A clean patch upgrade is not resolver-valid. Exact `titanoboa==0.2.7`
+requires `mkdocs-material==9.5.41`, which requires
+`pymdown-extensions~=10.2` and therefore excludes version 11. Pymdown
+Extensions `11.0.1` itself requires Python `>=3.10` and Markdown `>=3.6`, so it
+is otherwise compatible with the reviewed CPython `3.12.0` / Markdown `3.9`
+profile. The Titanoboa/Material metadata constraint is the blocker. The lock
+must not be hand-edited or installed in a metadata-inconsistent state.
+
+#### `EX-H01-PYMDOWN-REDOS-01` — retain Pymdown Extensions `10.21.3`
+
+- **Status:** Retained—operative.
+- **Finding:** `PYSEC-2026-3654`, alias `GHSA-gm37-52c6-37mw` /
+  `CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+  `11.0.1`.
+- **Authorization:** Mick Hagen, H-01 owner, explicitly adopted the exact
+  independently reviewed containment on 11 August 2026. The exception becomes
+  operative only after these exact authorized bytes are integrated into
+  authoritative `rh`; neither a feature branch nor a green test run grants
+  repository authority.
+- **Threat model:** Activation of `pymdownx.caret`, `pymdownx.tilde`,
+  `pymdownx.betterem`, `pymdownx.magiclink`, or `pymdownx.extra` against
+  attacker-controlled Markdown permits a very short input to monopolize the
+  renderer CPU through exponential regular-expression backtracking.
+- **Scope:** Exact Pymdown Extensions `10.21.3` under the unchanged
+  `titanoboa==0.2.7` / `mkdocs-material==9.5.41` graph. The repository has no
+  affected extension activation, MkDocs configuration or build, documentation
+  renderer, or untrusted Markdown input path. The first fixed release is
+  `11.0.1`, which is not resolver-valid under the unchanged graph.
+- **Compensating controls:** Do not enable any affected extension or
+  `pymdownx.extra`; do not render untrusted Markdown; preserve the bounded
+  scanner, which rejects literal affected names in supported configuration and
+  Markdown API shapes plus direct Pymdown imports; treat any Markdown API call
+  with a runtime-computed extension value as a manual re-review trigger because
+  the AST gate cannot prove that value; do not add a MkDocs/docs-render path
+  while the affected pin remains; do not run the exponential-time proof of
+  concept in CI.
+- **Re-review/invalidation triggers:** Any affected extension, Pymdown import
+  or configuration, MkDocs/docs pipeline, Markdown-rendering API, untrusted
+  Markdown, advisory/exploit change, Titanoboa/Material/Pymdown/Markdown/Python
+  movement, scanner-boundary change, scheduled review, or hard expiry.
+- **Review/expiry:** Governed by the common retained-exception schedule above.
+- **Integration boundary:** This authorization permits publication and review
+  of this exact amendment. The exception becomes operative only when these
+  bytes are integrated into authoritative `rh`; dependent requirements changes
+  must not integrate before that boundary is satisfied.
+
+### Pre-authorization Pymdown ReDoS containment validation
+
+This amendment was prepared from exact `origin/rh` commit
+`02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
+`082a460d0ee190ac74a87ab29828d9c867ddff06`. With repository `addopts`
+cleared, RPC and credential variables unset, and all generated state under an
+external mode-`0700` parent, the dependency gate collected and passed all 56
+tests. The focused bounded fail-closed selection passed 13 cases: seven root
+configuration activations, five affected Markdown API activations, and the
+then-pending exception evidence check. No exponential-time input was executed.
+
+The requirements inputs remained byte-identical to the base: `requirements.in`
+has Git blob `85bacd1b372b167c825497e06cf7751a432bc212` and SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`;
+`requirements.txt` has Git blob `eaf12f774a108a100696a5c77d8a9dec9617ed1e`
+and SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The amended gate SHA-256 was
+`d68dfa6cb7744ca236b6cef61ae81e8e99f71b4e204e8663b10b0690bb49bae1`.
+These green results established internal consistency and fail-closed
+containment only. They did not authorize the exception at that checkpoint;
+the later explicit owner authorization above controls the current target
+status.
+
+### Owner authorization and current-`rh` reconciliation — 11 August 2026
+
+Mick Hagen, H-01 owner, explicitly authorized the bounded
+`EX-H01-PYMDOWN-REDOS-01` containment in the current Codex task on 11 August
+2026. The independently reviewed containment patch was replayed without scope
+expansion onto exact authoritative `rh` commit
+`3a4cac429a860ffc95bd85612d9e345108332833`, tree
+`0bc766984da112d8bde3b499e763f31b192eb591`. Integration of the exact resulting
+two-file patch remains the effectivity boundary.
+
+The authorization changes no dependency byte. `requirements.in` remains
+SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`, and
+`requirements.txt` remains SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The authorized dependency-gate source is SHA-256
+`2fcb7f1084e2e9a3d7d2e98b9da37a8a5b0372f26acf7eeb60dfc03c24ad58bd`.
+
+With repository `addopts` cleared, RPC and credential variables unset, and all
+generated state under an external mode-`0700` parent, the first full gate run
+passed 55 of 56 cases and exposed one evidence-only duplicate schedule phrase.
+The phrase was reduced to the common retained-exception schedule; the final
+complete replay passed all 56 cases. No exponential-time proof of concept,
+network request, dependency resolution, alert mutation, deployment, or live
+chain action was performed.
 
 ### Validation inheritance and alert-state boundary
 
@@ -5539,3 +5673,201 @@ control flow. Requirement and operator/migration bytes remain unchanged.
 
 The amendment does not change dependency selection, Web3 closure, the pending
 Pymdown disposition, exception authority, H-06, deployment, or release state.
+
+## Non-operative dependency-train integration rehearsal — 11 August 2026
+
+**Status:** Local integration candidate only. This record is not an H-01 owner
+decision, accepted exception, merge proposal, release approval, H-06
+qualification, deployment artifact, or alert-state update. The rehearsal is
+bound to exact local `origin/rh` commit
+`02468586d710e2cce2360c2bc07e94de6ebdab29`; it changes no authoritative ref.
+
+This candidate rehearses the required semantic order without replacing the
+three short landing units:
+
+1. pending Pymdown ReDoS containment at
+   `de0d46728b9341d3f0e36554a765d841ef1b0aa7`;
+2. reviewed Web3 `7.16.0` closure at
+   `85af5fc437367b378d437c6201ce3c31256e8a08`; and
+3. reviewed direct Colorama/Mergedeep declarations and final import guards at
+   `f6686caa3a79dd44afe4dd23ff703853dc4c325a`.
+
+The last input already descends from the Web3 input. The rehearsal merged its
+content with the independent Pymdown input against exact `origin/rh` base
+`02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
+`082a460d0ee190ac74a87ab29828d9c867ddff06`. The resulting reconciled
+pre-record tree was `820f951fb03b9b42f48d5066d754cd6eab3579c3` and changed exactly
+`requirements.in`, `requirements.txt`,
+`tests/deployment/test_dependency_gate.py`, and this evidence path.
+
+### Intentional shared-surface reconciliation
+
+The Pymdown aliases and `EX-H01-PYMDOWN-REDOS-01` remain in the pending set,
+which is disjoint from the operative and retired sets. The Web3 prerequisite's
+separate review-blocker assertion also remains: it prevents that prerequisite
+from treating the pending H-01 proposal as disposed. The two controls are
+complementary. Neither converts the proposal into an operative exception or
+represents owner adoption.
+
+All inherited candidate records and their standalone artifact hashes above
+remain historical descriptions of those exact candidates. They were not
+silently rebound to this composite. The reconciled inherited evidence prefix
+immediately before this section has SHA-256
+`36bf25ec26f55a3b8e311daf9920e42b471bea9a7b9e402c3150d954fd3f42fa`.
+That digest excludes the single Markdown separator line before this heading.
+This section alone records the composite identities and results.
+
+### Final lock reproduction and delta
+
+Two isolated mode-`0700` resolver roots used CPython `3.12.0`, pip `23.2.1`,
+pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`, packaging `26.3`,
+pyproject-hooks `1.2.0`, setuptools `84.0.0`, and wheel `0.47.0`. Each began
+with its own copy of the exact candidate input and seeded output, used its own
+private cache, and resolved from public `https://pypi.org/simple` only:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+CUSTOM_COMPILE_COMMAND='pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in'
+pip-compile --quiet --cache-dir=PRIVATE --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt requirements.in
+```
+
+The two authoritative public-PyPI resolutions completed in `19.13 s` and
+`19.15 s` wall and reproduced byte-identical output. An earlier sandboxed
+attempt could not resolve public-PyPI DNS, stopped at Titanoboa before
+producing a resolved output, and is not counted as either authoritative
+regeneration.
+
+| Composite artifact | SHA-256 |
+|---|---|
+| `requirements.in` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
+| `requirements.txt` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
+| `tests/deployment/test_dependency_gate.py` | `1b017ed881dc2468af20fe7181aaccafb5ac64ac4cf484939fa31261ab875d7f` |
+
+Normalized lock comparison against the exact base found 92 prior pin lines
+and 103 final pin lines. Every prior pin is unchanged; there are no removals
+or version changes. The eleven additions are exactly the reviewed Web3
+closure. Colorama `0.4.6` and Mergedeep `1.3.4` were already transitive lock
+members, so making them direct roots changes only their `via` annotations.
+The direct input and lock contain no direct, VCS, editable, file, private-index,
+extra-index, or find-links source.
+
+### Offline rehearsal results
+
+All validation used the exact final lock, unset RPC/provider, private-key,
+mnemonic, and AWS credential variables, redirected generated state to
+mode-`0700` disposable roots, and made no live query.
+
+| Validation | Result |
+|---|---|
+| initial composite dependency gate before this record | 115 passed, one preserved Websockets deprecation warning, in 3.59 s |
+| final evidence-bound dependency gate and module compilation | 115 passed, one preserved warning, in 3.52 s; 6.07 s wall; compile pass |
+| pending Pymdown control, seven root-configuration cases, and five affected Markdown activation cases | 14 passed, 101 deselected in 0.20 s |
+| final Web3 selection, including exact closure and network-deny regressions | 49 passed, 66 deselected, one preserved warning, in 0.81 s |
+| final runtime-import guard selection | 10 passed, 105 deselected in 0.18 s |
+| `python -m pip check` and offline Web3/operator import smoke | pass; no broken requirements and no provider construction |
+| exact PR87 head `4b60cffbb0613efd7e628bdbaa9f644af71dd744`, `tests/test_prepare_defaults_snapshot.py` | 30 passed, one preserved warning, in 0.35 s; detached worktree clean before and after |
+| default lean collection | 3,550 selected of 3,832 total; 282 expected deselections; 8.17 s |
+| addopts-cleared collection with only `fork_qualification` deselected | 4,591 selected of 4,734 total; 143 expected safe-default deselections; 8.72 s |
+
+The first collection attempt did not call Boa's cache setter and failed closed
+on two attempts to use the inaccessible default user cache. The recorded
+collections explicitly called `boa.interpret.set_cache_dir` before invoking
+pytest and completed cleanly. This execution correction changed no repository
+byte.
+
+### Landing, qualification, and rollback boundary
+
+This composite is an integration rehearsal, not a request to publish a single
+large pull request. Preserve the three short units and their review history.
+Pymdown containment remains pending owner authorization; downstream Web3 and
+runtime-declaration candidates cannot treat it as accepted or bypass that
+landing gate. If any input changes, discard this rehearsal result and rebuild
+the train from the newly reviewed exact commits.
+
+The lock identity differs from authoritative `rh`, so every H-06 result tied
+to the old lock requires prescribed requalification after an authorized final
+integration. PR87 snapshots and collection prove bounded compatibility only;
+they do not establish downstream remediation, fork qualification, deployment
+readiness, or release authority. No push, PR, merge, settings change, RPC,
+deployment, device action, or owner acceptance occurred.
+
+## Authorized Web3 and runtime dependency candidate — 11 August 2026
+
+This latest section supersedes only the publication disposition of the
+non-operative rehearsal immediately above. Mick Hagen's explicit H-01 owner
+authorization is recorded in the controlling transition section, and the
+containment branch remains the required integration parent. The historical
+standalone and rehearsal records remain exact descriptions of their named
+candidate bytes and checkpoints.
+
+The bounded follow-on candidate combines two already independent-reviewed
+dependency units because they share the same four files and exact lock:
+
+1. declare `web3==7.16.0` and its reviewed eleven-distribution public-PyPI
+   closure; and
+2. declare already-locked `colorama==0.4.6` and `mergedeep==1.3.4` as honest
+   direct runtime inputs without changing either installed version.
+
+The exact scope remains `requirements.in`, `requirements.txt`,
+`tests/deployment/test_dependency_gate.py`, and this evidence record. No
+contract, migration, operator implementation, workflow, generated file,
+manifest, deployment, or alert state changes. The branch may be published and
+reviewed in parallel, but it must not integrate before the exact owner-
+authorized containment bytes are authoritative in `rh`.
+
+The resulting input and lock identities remain:
+
+```text
+requirements.in
+  56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf
+requirements.txt
+  781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007
+```
+
+The normalized lock retains every prior version, adds exactly the reviewed
+eleven-package Web3 closure, and changes Colorama/Mergedeep only from
+transitive to direct-input provenance. Public-source, exact-closure,
+direct-URL, supported import-syntax, low-level network-deny, direct-runtime-
+import, and Pymdown reachability controls remain fail closed.
+
+Fresh validation used a new CPython `3.12.0` virtual environment installed
+from the exact final lock and public `https://pypi.org/simple` only. With all
+RPC/provider, private-key, mnemonic, and AWS credential variables unset, the
+complete dependency gate passed `115` tests in `3.42 s`; `python -m pip check`
+reported no broken requirements; and the offline Web3 checksum plus
+`safe_account`, `log`, and `migration` import smoke passed without constructing
+a provider. Ruff/compile/diff/scope checks remain required at publication.
+
+These results do not transfer H-06 qualification, authorize PR 87, release,
+deployment, connected-device use, RPC access, or alert dismissal. Any
+dependency, resolver, containment, or scanner change invalidates this record
+and requires a new bounded review.
+
+## PR #95 dependency-reachability reconciliation — 12 August 2026
+
+Merging current `rh` into PR #95 retained the authoritative dependency input,
+lock, Pymdown containment, and hardened `prepare_defaults.py` bytes. The merge
+also exposed two current-tree reachability additions that the exact dependency
+inventory needed to classify explicitly:
+
+- `migrations/robinhood-mainnet/0011_BlueChipYieldPricesCandidate.py` and
+  `migrations/robinhood-mainnet/0013_VaultMigratorCandidate.py` are additional
+  production/operator files with direct Web3 imports. They extend the
+  syntax-limited exact inventory from ten to twelve files without changing the
+  selected `web3==7.16.0` dependency or its locked closure.
+- `tests/deployment/test_secret_handling.py` and
+  `tests/test_ccip_hardening.py` are test-only Click consumers. They exercise
+  the already-approved command surfaces through `ClickException` and
+  `CliRunner`; neither references Click's editor API. They are explicit
+  reviewed allowlist entries, while the scanner continues to reject
+  `click.edit`, wildcard/editor imports, and every unreviewed Click import
+  surface.
+
+This reconciliation changes no dependency version, package source, production
+CLI implementation, migration behavior, contract, ABI, storage layout,
+deployment, or live state. It does not transfer H-06 qualification or authorize
+deployment/release. The exact test-source SHA-256 and focused validation result
+are recorded by the merge-resolution commit.

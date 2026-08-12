@@ -19,10 +19,11 @@ and routed through Lootbox instead), and every Ledger call site in the new
 contracts was checked to resolve against the deployed selectors. Redeploy it
 only when something actually needs it, and before real deposits accumulate.
 
-Run `python scripts/prepare_defaults.py` first. MissionControl copies its
-defaults into storage at construction, so building it against
-DefaultsRobinhood -- the LAUNCH config -- would make the replacement come up
-forgetting every asset governance has registered since. That script writes
+Run `python scripts/prepare_defaults.py --block-number <FINALIZED_BLOCK>`
+first. MissionControl copies its defaults into storage at construction, so
+building it against DefaultsRobinhood -- the LAUNCH config -- would make the
+replacement come up forgetting every asset governance has registered since.
+That script writes
 DefaultsRobinhoodLive.vy from the live chain; review the diff before running
 this.
 
