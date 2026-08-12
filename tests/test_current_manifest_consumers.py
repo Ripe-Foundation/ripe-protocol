@@ -43,6 +43,11 @@ import pytest
 from eth_utils import is_address
 from scripts.utils.migration import Migration
 
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep offline manifest tests independent of protocol deployment."""
+
 ROOT = Path(__file__).resolve().parents[1]
 HISTORY = ROOT / "migration_history"
 MIGRATIONS = ROOT / "migrations"
