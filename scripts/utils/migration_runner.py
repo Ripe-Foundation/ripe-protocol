@@ -160,7 +160,17 @@ class MigrationRunner:
 
             if end_timestamp_int is not None and timestamp_int > end_timestamp_int:
                 break
-            if start_timestamp_int is None or timestamp_int >= start_timestamp_int:
+            # `inclusive` was declared, documented and passed by the auto-resume
+            # call above, but never read here -- both modes compared with `>=`.
+            # That made resuming re-run the migration that produced the latest
+            # manifest. On both mainnets the resume point is 2026080700, whose
+            # migration deploys the CCIP token pools, so a resume would have
+            # deployed a second set against a live chain.
+            if start_timestamp_int is None or (
+                timestamp_int >= start_timestamp_int
+                if inclusive
+                else timestamp_int > start_timestamp_int
+            ):
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 

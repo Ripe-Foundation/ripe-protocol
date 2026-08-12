@@ -203,3 +203,52 @@ def test_first_deployment_is_never_blocked(tmp_path):
 
     assert migration._execution_blocked is False
     assert migration.execute(lambda **_: "RECEIPT") == "RECEIPT"
+
+
+# --- resuming must not re-run the completed migration ----------------------
+
+
+def _mainnet_runner(chain: str) -> MigrationRunner:
+    root = Path(__file__).resolve().parents[2]
+    return MigrationRunner(
+        str(root / f"migrations/{chain}"),
+        str(root / f"migration_history/{chain}/v1"),
+        {},
+    )
+
+
+@pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))
+def test_inclusive_flag_actually_changes_selection(chain):
+    """`inclusive=False` must exclude the start timestamp.
+
+    It was declared, documented and passed by the auto-resume call, but never
+    read: both modes compared with `>=`, so they returned identical lists. No
+    test asserted they differ, and none could while the step manifests were
+    pruned -- with no numbered manifest on disk the resume point was None,
+    which selects everything regardless of the flag.
+    """
+    runner = _mainnet_runner(chain)
+    resume = runner._latest_manifest_timestamp()
+    assert resume is not None, "needs committed step manifests"
+
+    inclusive = [t for _, t, _ in runner._filtered_migration_filenames(
+        resume, "0", inclusive=True)]
+    exclusive = [t for _, t, _ in runner._filtered_migration_filenames(
+        resume, "0", inclusive=False)]
+
+    assert resume in inclusive
+    assert resume not in exclusive
+    assert exclusive == [t for t in inclusive if t != resume]
+
+
+@pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))
+def test_auto_resume_does_not_rerun_the_last_completed_migration(chain):
+    # The concrete hazard: 2026080700 deploys the CCIP token pools, so
+    # re-running it would deploy a second set against a live chain.
+    runner = _mainnet_runner(chain)
+    resume = runner._latest_manifest_timestamp()
+
+    selected = [timestamp for _, timestamp, _ in runner._migrations(None, "0")]
+
+    assert resume not in selected
+    assert all(int(t) > int(resume) for t in selected)
