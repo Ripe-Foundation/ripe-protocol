@@ -18,9 +18,10 @@ Uniswap state grants no such authority.
 **11 August 2026 owner amendment:** the original no-deployment Uniswap
 disposition is superseded only as follows: the owner confirms
 `UniswapV2Prices` is already deployed as a direct monitoring component. It
-remains permanently absent from PriceDesk, and its callable price-source output
-is never a collateral or other value-bearing authority. All LP-admission and
-manipulation limitations remain.
+remains permanently absent from PriceDesk. The replacement source preserves
+the PriceSource ABI only as inert stubs and exposes spot data solely through
+explicit RIPE monitoring views. Neither generation is collateral or other
+value-bearing authority. All LP-admission and manipulation limitations remain.
 
 **11 August 2026 CCIP supersession:** the synthesis's earlier instruction to
 keep CCIP disabled is historical and no longer current-state authority. GREEN
@@ -301,10 +302,10 @@ owner explicitly reopens it:
    representation, configuration, tests, fork scenarios, documentation
    refreshes, bytecode size or EIP-170 headroom work, deployment planning, and
    operational work. Preserve current zero values and historical evidence.
-3. **Uniswap V2 candidate admission.** The old cumulative-price design and
-   implementation are deleted. The smaller `UniswapV2Prices` spot/snapshot
-   candidate may be deployed under the 11 August monitoring-only amendment,
-   but no PriceDesk row or security-relevant DEX price belongs in launch.
+3. **Uniswap V2 candidate admission.** The old cumulative-price and snapshot
+   designs are deleted. The stripped stateless `UniswapV2Prices` monitor may
+   be deployed under the 11 August monitoring-only amendment, but no PriceDesk
+   row or security-relevant DEX price belongs in launch.
 4. **CCIP (historical disposition, superseded 11 August 2026).** This was the
    original keep-disabled instruction. Current authority is the confirmed live
    topology plus the still-open operational and release gates in

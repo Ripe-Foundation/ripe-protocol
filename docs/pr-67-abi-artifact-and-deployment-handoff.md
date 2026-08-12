@@ -108,9 +108,10 @@ the wrappers without a demonstrated need.
 
 The corrected Robinhood forward sequence is deliberately multi-stage:
 
-1. `0008_UniswapV2Prices.py` deploys Uniswap for direct monitoring, finalizes
-   its timelock, relinquishes temporary local governance, and never registers
-   it in PriceDesk.
+1. `0008_UniswapV2Prices.py` deploys the stateless RIPE/WETH monitor, verifies
+   its immutable identities and permanent no-feed interface, and never
+   registers it in PriceDesk. It has no local governance or timelock to
+   finalize.
 2. `0009_RedeployStaleContracts.py` deploys 16 replacements under unique
    `*Candidate0009` labels, finalizes the four Switchboards under temporary
    local governance, and emits the HumanResources pre-activation setup call
@@ -203,13 +204,12 @@ closed. The typed execution envelope must still bind the creation input and
 deployment receipt; registry readback alone is not proof of the Defaults
 dependency.
 
-The already-recorded Robinhood Uniswap deployment predates the corrected
-temporary-governance flow. Rewriting `0008` is not on-chain remediation. Bind
-the current address and full deployed runtime, read `governance()` and
-`actionTimeLock()`, and if the timelock is still zero use the separately
-authorized RipeHq governance path to finalize that existing monitoring
-instance. A tempGov-zero instance is already locally relinquished and cannot
-execute `relinquishGov()` because the stored local governor is zero.
+The already-recorded Robinhood Uniswap deployment predates the stripped
+stateless monitor. Rewriting `0008` is not on-chain remediation. Bind and
+classify the current address and runtime independently. Replacing it requires
+a separately authorized deployment, exact constructor/runtime binding,
+consumer update, and manifest transition; the old instance cannot be converted
+in place by governance or a timelock action.
 
 PriceDesk's `numAddrs()` is the next registry id. With Chainlink and Curve in
 slots 1 and 2, the BlueChip precondition is `numAddrs() == 3` and

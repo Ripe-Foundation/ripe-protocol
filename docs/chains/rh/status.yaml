@@ -416,11 +416,12 @@ owner_priority_overlay:
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >
-        The smaller UniswapV2Prices candidate replaces the deleted cumulative-
-        price prototype. Its spot-reserve input, pair provenance, minimum-
-        liquidity requirement, and repeatable snapshot poisoning remain
-        unresolved. Bootstrap and fully stale snapshot states fail closed. It
-        remains unregistered, unconfigured, non-admitted,
+        The stripped UniswapV2Prices replacement is a stateless RIPE/WETH
+        monitor. Its PriceSource interface is permanently inert, while its
+        explicitly named monitoring views expose a manipulable spot-reserve
+        observation. Pair provenance and minimum-liquidity policy remain
+        operational monitoring concerns. It remains unregistered,
+        unconfigured, non-admitted,
         undeployed, unactivated, and unavailable for protocol accounting. Do
         not add a checkpoint service, PriceDesk
         registration, Chainlink fallback, pool address, liquidity amount,

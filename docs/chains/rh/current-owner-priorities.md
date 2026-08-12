@@ -132,14 +132,14 @@ the four zero-valued controls.
 
 ### 4. Uniswap V2 price-source admission and activation are parked
 
-The smaller `UniswapV2Prices` candidate replaces the deleted cumulative-price
-prototype. Its tests are strong, but its spot-reserve input, unbound pair
-provenance, absent minimum-liquidity requirement, and repeatable snapshot
-poisoning remain unresolved. Bootstrap and fully stale snapshot states now fail
-closed to zero. It is not registered, configured, admitted, deployed, or
-activated and is unavailable for protocol accounting. No Uniswap launch
-price source is required; bounded launch behavior and PriceDesk priority source
-IDs `[1, 2]` remain unchanged.
+The stripped `UniswapV2Prices` replacement is a stateless RIPE/WETH monitor.
+Its PriceSource interface is permanently inert, while its explicitly named
+monitoring views expose a manipulable spot-reserve observation. Pair
+provenance and minimum-liquidity policy remain operational monitoring concerns,
+not oracle-admission work. The replacement is not registered, configured,
+admitted, deployed, or activated and is unavailable for protocol accounting.
+No Uniswap launch price source is required; bounded launch behavior and
+PriceDesk priority source IDs `[1, 2]` remain unchanged.
 
 - Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
   pool address, liquidity amount, funding or custody authority, migration,

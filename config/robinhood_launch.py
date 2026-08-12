@@ -195,10 +195,11 @@ PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
 
 # --- RIPE price (Uniswap V2) ------------------------------------------------
 # The RIPE/WETH v2 pool is observed by a separately deployed monitoring
-# component. Its PriceSource entrypoints remain callable and can return a
-# manipulable observation, but UniswapV2Prices is never registered in
-# PriceDesk and is forbidden as collateral or any other protocol-valuation
-# authority.
+# component. It implements PriceSource only as an inert compatibility shell:
+# every protocol-pricing entrypoint reports no feed, while explicitly named
+# RIPE monitoring views expose the manipulable spot observation. It is never
+# registered in PriceDesk and is forbidden as collateral or any other
+# protocol-valuation authority.
 RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 
 # --- curve pool -------------------------------------------------------------

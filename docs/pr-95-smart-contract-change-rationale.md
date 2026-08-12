@@ -486,19 +486,22 @@ the opposite pool.
 
 ### What changed
 
-- Standard PriceSource `getPrice` now returns zero.
-- `getPriceAndHasFeed` now returns `(0, false)`.
-- `hasPriceFeed` now returns false.
-- Added `getMonitoringPrice`, which exposes the existing weighted/spot
-  monitoring calculation to direct callers.
-- Direct reserve-price and snapshot/configuration views remain available.
+- The contract still implements every required PriceSource selector, but the
+  entire standard interface is permanently inert: it reports no feed, no
+  priced assets, no pending actions, and no successful mutations.
+- Removed snapshots, averaging, throttling, staleness policy, pending config,
+  governance, timelocks, pause state, and generic asset handling.
+- Added only explicit RIPE/WETH pool-state, WETH-ratio, and USD monitoring
+  views plus an `isMonitoringOnly` marker.
+- The constructor now binds exactly RipeHq, RIPE/WETH pair, RIPE, and WETH and
+  validates the canonical pair and 18-decimal token identities.
 
 ### Why this is required
 
-Uniswap V2 reserve ratios are manipulable spot observations. Repeated
-manipulated snapshots can also suppress the weighted monitoring result for an
-extended period. The owner decision was to retain this data for monitoring,
-not to promote it into a collateral-grade or value-bearing oracle.
+Uniswap V2 reserve ratios are manipulable spot observations. Snapshot,
+staleness, throttling, and governance machinery made this component resemble a
+collateral-grade oracle without making it one. The owner decision is to retain
+only a transparent current RIPE liquidity observation.
 
 The boundary must be enforced in the contract, not only in a runbook. Returning
 `hasFeed = false` means an accidental PriceDesk registration cannot silently
@@ -506,20 +509,21 @@ turn the adapter into protocol pricing authority.
 
 ### Interface, storage, and risk impact
 
-- The new direct monitoring getter is an intentional ABI addition.
-- Standard PriceSource calls are intentionally disabled even though direct
-  monitoring calls can return a value.
-- Snapshot storage/configuration is retained.
+- The PriceSource ABI remains structurally compatible, but the previous
+  module-exported governance/configuration ABI and generic monitoring getters
+  are intentionally removed.
+- The replacement has no persistent storage; its identities are immutables.
+- Standard PriceSource calls remain disabled even while explicit monitoring
+  calls can return a manipulable spot value.
 - Monitoring values remain manipulable and may return zero; no caller should
   treat them as liquidation, borrowing, collateral, or accounting authority.
-- Measured deployed runtime: 14,028 bytes.
 
 ### Representative validation
 
-- `test_protocol_feed_stays_disabled_while_monitoring_starts_after_first_snapshot`
-- `test_repeated_manipulated_snapshots_can_suppress_monitoring_value`
-- reserve, decimal, stale-snapshot, timelock, malformed-response, and pause
-  coverage in `tests/priceSources/uniswap/test_minimal_prices.py`
+- `test_every_protocol_price_source_entrypoint_is_permanently_inert`
+- `test_monitor_reports_only_the_ripe_weth_pool_state_and_spot_prices`
+- constructor identity, malformed dependency, overflow, and immediate spot
+  manipulation coverage in `tests/priceSources/uniswap/test_minimal_prices.py`
 
 ## 10. `RipeGov.vy`
 
@@ -759,8 +763,9 @@ the repository no longer presents both as interchangeable mainnet choices.
 
 The remediation intentionally avoids broad ABI/storage churn:
 
-- Uniswap adds `getMonitoringPrice` and changes the standard PriceSource views
-  to report no protocol feed.
+- Uniswap retains the required PriceSource interface as inert stubs, removes
+  the broader module-exported ABI, and exposes only explicitly named RIPE
+  monitoring views.
 - AuctionHouse and StabVault retain their single-item public wrappers by
   routing them through shared batch internals.
 - RipeGov, VaultMigrator, Teller, Alpha, Bravo, and Charlie add no new public

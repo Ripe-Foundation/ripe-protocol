@@ -133,11 +133,9 @@ CONSTRUCTOR_INPUTS: Mapping[str, Sequence[Mapping[str, Any]]] = {
     ],
     "UniswapV2Prices": [
         _input("_ripeHq", "address", HQ),
-        _input("_tempGov", "address", DEPLOYER),
         _input("_ripeWethPool", "address", RIPE_WETH_POOL),
         _input("_ripeToken", "address", RIPE),
-        _input("_minPriceChangeTimeLock", "uint256", 600),
-        _input("_maxPriceChangeTimeLock", "uint256", 50_400),
+        _input("_wethToken", "address", WETH),
     ],
     "VaultMigrator": [
         _input("_ripeHq", "address", HQ),
@@ -241,12 +239,11 @@ PROSPECTIVE_STATE: Mapping[str, Mapping[str, Any]] = {
         required_readbacks=("isPaused()==True",),
     ),
     "UniswapV2Prices": _prospective(
-        initial={"governance": DEPLOYER, "actionTimeLock": 0},
-        post_deploy_actions=_FINALIZE_LOCAL_GOV,
+        initial={"isMonitoringOnly": True, "actionTimeLock": 0},
         required_readbacks=(
-            "governance()==0x0",
-            "actionTimeLock()==600",
-            "monitoring-only interface behavior",
+            "isMonitoringOnly()==True",
+            "RIPE/WETH immutable identities match constructor inputs",
+            "getPriceAndHasFeed(RIPE)==(0,False)",
         ),
     ),
     "VaultMigrator": _prospective(

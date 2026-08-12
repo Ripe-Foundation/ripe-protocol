@@ -94,15 +94,13 @@ ledger is derived evidence, not a third value authority.
 
 [`contracts/priceSources/UniswapV2Prices.vy`](../../../../contracts/priceSources/UniswapV2Prices.vy)
 replaces the deleted cumulative-price research prototype. The owner approved
-deployment for direct monitoring, not oracle admission. The deployment
-migration uses temporary local governance only to finalize the component's
-timelock, relinquishes it, and never calls a PriceDesk registration function.
+deployment for direct monitoring, not oracle admission. The replacement has
+no local governance, timelock, configuration, or snapshot state.
 
-The standard PriceSource entrypoints remain callable and can return a price;
-the monitoring-only boundary comes from keeping the contract absent from
-PriceDesk and forbidding value-bearing consumers, not from an on-chain
-fail-closed interface. Those reads retain the accepted spot-reserve
-manipulation and liquidity limitations documented in
+The standard PriceSource entrypoints remain callable but are permanently
+inert. They return no price or feed, even if the component is accidentally
+registered. Only explicitly named RIPE/WETH monitoring views expose the
+accepted spot-reserve manipulation and liquidity limitations documented in
 [`uniswap-v2-prices.md`](uniswap-v2-prices.md). Deployment does not authorize
 PriceDesk registration, collateral valuation, LP admission, or any other
 value-bearing consumer. Exact source and artifact identities are generated

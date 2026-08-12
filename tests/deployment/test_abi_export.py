@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -183,3 +184,32 @@ def test_uniswap_v2_abi_is_independently_byte_current_and_old_abi_is_absent():
     assert not (
         ROOT / "scripts" / "abis" / "RobinhoodUniswapV2RipePrices.json"
     ).exists()
+
+    entries = json.loads(abi.read_text())
+    function_names = {
+        entry["name"]
+        for entry in entries
+        if entry.get("type") == "function"
+    }
+    assert {
+        "isMonitoringOnly",
+        "getRipePoolState",
+        "getRipeWethMonitoringPrice",
+        "getRipeUsdMonitoringPrice",
+    } <= function_names
+    assert {
+        "governance",
+        "pendingGov",
+        "startGovernanceChange",
+        "getAddys",
+        "getRipeHq",
+        "priceConfigs",
+        "snapShots",
+        "pendingPriceConfigs",
+        "getMonitoringPrice",
+        "getUniswapV2RipePrice",
+        "getWeightedPrice",
+        "getLatestSnapshot",
+        "updatePriceConfig",
+        "isValidPriceConfig",
+    }.isdisjoint(function_names)

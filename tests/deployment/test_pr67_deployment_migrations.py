@@ -110,6 +110,33 @@ class _VaultMigratorCandidate(_Contract):
         return self._should_pause
 
 
+class _UniswapMonitorCandidate(_Contract):
+    def __init__(self, address, ripe_hq, pool, ripe, weth):
+        super().__init__(address)
+        self._ripe_hq = ripe_hq.address
+        self._pool = pool
+        self._ripe = ripe.address
+        self._weth = weth
+
+    def isMonitoringOnly(self):
+        return True
+
+    def RIPE_HQ(self):
+        return self._ripe_hq
+
+    def RIPE_WETH_POOL(self):
+        return self._pool
+
+    def RIPE_TOKEN(self):
+        return self._ripe
+
+    def WETH_TOKEN(self):
+        return self._weth
+
+    def getPriceAndHasFeed(self, _asset):
+        return 0, False
+
+
 class _MissionControlCandidate(_Contract):
     def __init__(self, address, ripe_hq):
         super().__init__(address)
@@ -158,6 +185,8 @@ class _FakeMigration:
         self._next_address += 1
         if name == "VaultMigrator":
             contract = _VaultMigratorCandidate(address, args[1])
+        elif name == "UniswapV2Prices":
+            contract = _UniswapMonitorCandidate(address, *args)
         elif name in {
             "BlueChipYieldPrices",
             "HumanResources",
@@ -165,12 +194,11 @@ class _FakeMigration:
             "SwitchboardBravo",
             "SwitchboardCharlie",
             "SwitchboardEcho",
-            "UniswapV2Prices",
         }:
             minimum = (
                 REDEPLOY.HR_MIN_TIMELOCK
                 if name == "HumanResources"
-                else UNISWAP.PRICE_CHANGE_MIN_TIMELOCK
+                else BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
             )
             contract = _GovernedCandidate(
                 address,
@@ -360,24 +388,26 @@ def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
     } <= stability_events
 
 
-def test_uniswap_deploys_monitor_only_then_finalizes_and_relinquishes():
+def test_uniswap_deploys_stateless_monitor_with_inert_price_source_interface(
+    monkeypatch,
+):
     hq = _Contract(_addr(1))
+    ripe = _Contract(_addr(2))
+    weth = _addr(3)
+    monkeypatch.setattr(UNISWAP, "address", lambda key: weth)
     migration = _FakeMigration(
-        contracts={"RipeHq": hq, "RipeToken": _Contract(_addr(2))}
+        contracts={"RipeHq": hq, "RipeToken": ripe}
     )
 
     UNISWAP.migrate(migration)
 
     assert [row[0] for row in migration.deployments] == ["UniswapV2Prices"]
     args = migration.deployments[0][2]
-    assert args[1] == migration.account()
-    assert [name for name, _ in migration.executions] == [
-        "setActionTimeLockAfterSetup",
-        "relinquishGov",
-    ]
+    assert args == (hq, UNISWAP.RIPE_WETH_POOL, ripe, weth)
+    assert migration.executions == []
     candidate = migration.deployments[0][3]
-    assert candidate.actionTimeLock() == UNISWAP.PRICE_CHANGE_MIN_TIMELOCK
-    assert candidate.governance() == ZERO_ADDRESS
+    assert candidate.isMonitoringOnly()
+    assert candidate.getPriceAndHasFeed(ripe.address) == (0, False)
     assert "PriceDesk" not in migration.contracts
 
 
