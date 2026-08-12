@@ -44,7 +44,11 @@ interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
 interface StabilityPool:
+    def getNumVaultAssets() -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def totalClaimableBalances(_asset: address) -> uint256: view
+    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
     def isPaused() -> bool: view
 
 interface RipeHq:
@@ -500,8 +504,21 @@ def _isValidAssetLiqConfig(
         stabPool: address = staticcall VaultBook(vaultBook).getAddr(_specialStabPoolId)
         if stabPool == empty(address) or not stabPool.is_contract:
             return False
+        numStabAssets: uint256 = staticcall StabilityPool(stabPool).getNumVaultAssets()
+        hasStabAsset: bool = numStabAssets != 0
+        stabAsset: address = savingsGreen
+        if hasStabAsset:
+            stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
+            if stabAsset == empty(address):
+                return False
+        canAccept: bool = staticcall StabilityPool(stabPool).canAcceptLiquidationAsset(stabAsset, _asset)
+        if hasStabAsset and not canAccept:
+            return False
+        naPair: uint256 = staticcall StabilityPool(stabPool).claimableBalances(stabAsset, _asset)
         na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)
         naPaused: bool = staticcall StabilityPool(stabPool).isPaused()
+        if naPaused:
+            return False
 
     return True
 

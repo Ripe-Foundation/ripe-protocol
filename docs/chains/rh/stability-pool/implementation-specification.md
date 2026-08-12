@@ -1,5 +1,20 @@
 # Robinhood Stability Pool hardening implementation specification
 
+> **PR #67 remediation candidate (11 August 2026):** active nonzero claims now
+> fail NAV closed on unavailable price or aggregate custody deficit. Outbound
+> pool transfers require exact recipient delivery. The real
+> AuctionHouse liquidation path snapshots pool custody immediately before the
+> collateral transfer, so pre-existing donations cannot mask a short current
+> receipt. Pool designation also probes `vaultAssets`, `claimableBalances`,
+> `totalClaimableBalances`, `canAcceptLiquidationAsset`, and pause state before
+> activation/revalidation. These rules supersede historical passages below
+> that describe zero-price active claims as excluded from NAV or donation-masked
+> receipts as an accepted operating restriction.
+> The ABI-preserving implementation shares the single/many claim plumbing and
+> the AuctionHouse single/many liquidation and purchase plumbing internally.
+> Final constructor-bound measurements are `24,313` bytes for StabilityPool
+> (`263` bytes headroom) and `23,863` for AuctionHouse (`713` bytes headroom).
+
 > **Path note (8 August 2026):** some paths cited below no longer exist in the
 > active tree — the block-clock inventory, the `contracts/testing/` probes, and
 > the extracted deploy manifests and review records were removed. The citations
@@ -9,9 +24,9 @@
 
 > [!WARNING]
 > **Superseded design snapshot below.** The current owner correction retains
-> the `$0.10/$0.05` dormant thresholds, values unavailable active claim
-> collateral at zero, and removes the later paused zero-price
-> quarantine/reactivation state machine.
+> the `$0.10/$0.05` dormant thresholds, but active claims now fail valuation
+> closed when their price is unavailable; it does not value them at zero. The
+> later paused zero-price quarantine/reactivation state machine remains removed.
 > The current behavior, residual risk, and
 > non-borrowing/phase-2-liquidatable invariant are recorded in
 > [`../rh-production-vyper-remediation.md`](../rh-production-vyper-remediation.md).

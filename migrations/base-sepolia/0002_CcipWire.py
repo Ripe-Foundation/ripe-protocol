@@ -1,4 +1,4 @@
-from config.Ccip import CCIP, NO_RATE_LIMIT
+from config.Ccip import CCIP
 from scripts.utils import ccip, log
 from scripts.utils.migration import Migration
 
@@ -18,6 +18,56 @@ def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
     pool = migration.get_solidity_contract("RipeTokenPool")
 
+    assert str(pool.getToken()).lower() == ripe_token.lower(), (
+        "RIPE pool has wrong token"
+    )
+    assert str(pool.getRouter()).lower() == config["ROUTER"].lower(), (
+        "RIPE pool has wrong router"
+    )
+    assert str(pool.getRmnProxy()).lower() == config["RMN_PROXY"].lower(), (
+        "RIPE pool has wrong RMN proxy"
+    )
+    assert pool.typeAndVersion() == "BurnMintTokenPool 1.5.1", (
+        "RIPE pool has wrong source version"
+    )
+    assert pool.canMintRipe() and not pool.canMintGreen(), (
+        "RIPE pool has wrong mint capability"
+    )
+
+    governance = str(hq.governance())
+    blueprint_governance = str(migration.blueprint().ADDYS["GOVERNANCE"])
+    assert governance.lower() == blueprint_governance.lower(), (
+        "RipeHq governance and blueprint governance must match before CCIP activation"
+    )
+    owner = str(pool.owner())
+    configured_pool = str(ccip.token_admin_registry(chain).getPool(ripe_token))
+    already_active = bool(hq.canMintRipe(pool.address)) or (
+        configured_pool.lower() == str(pool.address).lower()
+    )
+    if owner.lower() != governance.lower() and already_active:
+        raise RuntimeError(
+            "CCIP_ACTIVE_POOL_NOT_GOVERNANCE_OWNED: disable routing/mint authority "
+            "before recovering this legacy testnet state"
+        )
+    if owner.lower() != governance.lower():
+        ccip.execute_activation_mutation(
+            migration, "RIPE", pool.transferOwnership, governance
+        )
+        if governance.lower() == str(migration.account().address).lower():
+            ccip.execute_activation_mutation(migration, "RIPE", pool.acceptOwnership)
+        else:
+            log.error(
+                f"ACTION REQUIRED: governance {governance} must accept pool ownership; "
+                "rerun as governance before any wiring, routing, or mint grant"
+            )
+            return
+    assert str(pool.owner()).lower() == governance.lower(), (
+        "governance must own the pool before wiring"
+    )
+    assert str(migration.account().address).lower() == governance.lower(), (
+        "the governance owner must execute testnet wiring"
+    )
+
     log.h1("Wiring RipeTokenPool to the remote chains")
 
     for remote_chain in config["REMOTE_CHAINS"]:
@@ -31,23 +81,69 @@ def migrate(migration: Migration):
                 f"migration on {remote_chain} before wiring {chain} to it"
             )
 
-        if pool.isSupportedChain(remote_selector):
-            log.info(f"{remote_chain} ({remote_selector}) already configured, skipping")
-            continue
+        lane_is_configured = pool.isSupportedChain(remote_selector)
+        if lane_is_configured:
+            log.info(
+                f"{remote_chain} ({remote_selector}) already configured; revalidating"
+            )
+            policy = ccip.lane_policy_for_revalidation(chain, remote_chain, "RIPE")
+        else:
+            policy = ccip.require_activation_policy(migration, "RIPE", remote_chain)
+            log.info(f"{remote_chain}: pool {remote_pool}, token {remote_token}")
+            chain_update = (
+                remote_selector,
+                [ccip.encode_address(remote_pool)],
+                ccip.encode_address(remote_token),
+                policy.outbound.as_tuple(),
+                policy.inbound.as_tuple(),
+            )
+            ccip.execute_activation_mutation(
+                migration,
+                "RIPE",
+                pool.applyChainUpdates,
+                [],
+                [chain_update],
+                remote_chain=remote_chain,
+            )
 
-        log.info(f"{remote_chain}: pool {remote_pool}, token {remote_token}")
-        chain_update = (
-            remote_selector,
-            [ccip.encode_address(remote_pool)],
-            ccip.encode_address(remote_token),
-            NO_RATE_LIMIT,  # outbound
-            NO_RATE_LIMIT,  # inbound
+        outbound, inbound, rate_limit_admin = ccip.current_lane_policy_fields(
+            pool, remote_selector
         )
-        migration.execute(pool.applyChainUpdates, [], [chain_update])
+        if (outbound, inbound) != (
+            policy.outbound.as_tuple(),
+            policy.inbound.as_tuple(),
+        ):
+            ccip.execute_activation_mutation(
+                migration,
+                "RIPE",
+                pool.setChainRateLimiterConfig,
+                remote_selector,
+                policy.outbound.as_tuple(),
+                policy.inbound.as_tuple(),
+                remote_chain=remote_chain,
+            )
+        if rate_limit_admin.lower() != policy.rate_limit_admin.lower():
+            ccip.execute_activation_mutation(
+                migration,
+                "RIPE",
+                pool.setRateLimitAdmin,
+                policy.rate_limit_admin,
+                remote_chain=remote_chain,
+            )
+
+        ccip.assert_lane_configuration(
+            pool,
+            remote_selector,
+            remote_pool,
+            remote_token,
+            policy.outbound.as_tuple(),
+            policy.inbound.as_tuple(),
+            policy.rate_limit_admin,
+        )
 
     log.h1("Pointing CCIP at the new pool")
 
-    if not ccip.set_pool(migration, ripe_token, pool.address):
+    if not ccip.set_pool(migration, ripe_token, pool.address, "RIPE"):
         log.error(
             "Stopping here: the pool this one replaces keeps its ripe minting rights "
             "until CCIP actually routes through the new pool. Re-run this migration "
@@ -63,48 +159,45 @@ def migrate(migration: Migration):
     if previous_reg_id == 0:
         log.info(f"{previous_pool} is not in RipeHq, nothing to retire")
     else:
-        migration.execute(hq.initiateHqConfigChange, previous_reg_id, False, False, False)
-        migration.execute(hq.confirmHqConfigChange, previous_reg_id)
+        ccip.execute_activation_mutation(
+            migration,
+            "RIPE",
+            hq.initiateHqConfigChange,
+            previous_reg_id,
+            False,
+            False,
+            False,
+        )
+        ccip.execute_activation_mutation(
+            migration, "RIPE", hq.confirmHqConfigChange, previous_reg_id
+        )
         assert not hq.canMintRipe(previous_pool), "previous pool can still mint RIPE"
 
-    # last, since the pool owner is who sets rate limits, remote pools and the router
-    hand_pool_to_governance(migration, pool, hq)
-
-
-def hand_pool_to_governance(migration: Migration, pool, hq):
-    """
-    Moves pool ownership from the deployer to the blueprint's governance address.
-    Ownership is two step: the deployer offers it, governance has to accept. When
-    governance is the deployer itself, both happen here.
-    """
-    log.h1("Handing the pool over to governance")
-
-    governance = str(migration.blueprint().ADDYS["GOVERNANCE"])
-    owner = str(pool.owner())
-
-    hq_governance = str(hq.governance())
-    if hq_governance.lower() != governance.lower():
-        log.info(
-            f"note: the pool will be owned by the blueprint's governance ({governance}), "
-            f"while its minting rights are governed by RipeHq's ({hq_governance})"
+    log.h1("Granting the governance-owned, routed pool mint authority LAST")
+    reg_id = int(hq.getRegId(pool.address))
+    if reg_id == 0:
+        ccip.execute_activation_mutation(
+            migration,
+            "RIPE",
+            hq.startAddNewAddressToRegistry,
+            pool.address,
+            "CCIP Ripe Pool",
         )
-
-    if owner.lower() == governance.lower():
-        log.info(f"pool is already owned by governance ({governance})")
-        return
-
-    migration.execute(pool.transferOwnership, governance)
-
-    if governance.lower() == str(migration.account().address).lower():
-        migration.execute(pool.acceptOwnership)
-        log.info(f"pool ownership moved to governance ({governance})")
-        return
-
-    log.error(
-        f"ACTION REQUIRED: pool ownership was offered to governance ({governance}), which "
-        f"has to accept it before it can change rate limits, remote pools or the router. "
-        f"From governance run:\n"
-        f"    cast send {pool.address} 'acceptOwnership()' \\\n"
-        f"        --rpc-url $RPC_URL --account $GOVERNANCE_ACCOUNT\n"
-        f"Until then the deployer ({migration.account().address}) stays the owner."
+        reg_id = int(
+            ccip.execute_activation_mutation(
+                migration, "RIPE", hq.confirmNewAddressToRegistry, pool.address
+            )
+        )
+    hq_config = tuple(hq.hqConfig(reg_id))
+    actual_capabilities = (bool(hq_config[1]), bool(hq_config[2]), bool(hq_config[3]))
+    assert actual_capabilities in ((False, False, False), (False, True, False)), (
+        f"RIPE pool has unexpected RipeHq capabilities {actual_capabilities}"
     )
+    if actual_capabilities != (False, True, False):
+        ccip.execute_activation_mutation(
+            migration, "RIPE", hq.initiateHqConfigChange, reg_id, False, True, False
+        )
+        ccip.execute_activation_mutation(
+            migration, "RIPE", hq.confirmHqConfigChange, reg_id
+        )
+    assert hq.canMintRipe(pool.address), "RipeHq did not grant RIPE mint authority"

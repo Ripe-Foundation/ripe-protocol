@@ -1188,6 +1188,13 @@
     ]
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "resetVvvPrice",
+    "inputs": [],
+    "outputs": []
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "SUPER_OETH",
@@ -1224,6 +1231,30 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "VVV",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "vvvPrice",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
@@ -1241,6 +1272,10 @@
       },
       {
         "name": "_wrappedSuperOETH",
+        "type": "address"
+      },
+      {
+        "name": "_vvv",
         "type": "address"
       },
       {

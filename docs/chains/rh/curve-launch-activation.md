@@ -16,8 +16,8 @@ remain preserved as evidence.
 
 | Surface | Current authority |
 | --- | --- |
-| PriceDesk registry | ID 1 `ChainlinkPrices`; ID 2 `CurvePrices`; ID 3 `BlueChipYieldPrices`; IDs 4 and 5 empty |
-| PriceDesk priorities | Exactly `[1, 3]` |
+| PriceDesk registry | ID 1 `ChainlinkPrices`; ID 2 `CurvePrices`; ID 3 `BlueChipYieldPrices` remains blueprint-selected but is not deployed/finalized by the current candidate; IDs 4 and 5 empty |
+| PriceDesk priorities | Exactly `[1, 2]` |
 | Curve-configured asset | GREEN only |
 | GREEN route | GREEN → Curve GREEN/USDG pool → PriceDesk USDG lookup → Chainlink USDG/USD feed |
 | USDG | Chainlink-only; no Curve USDG feed |
@@ -37,7 +37,7 @@ canonical rows are `ROBINHOOD_CURVE_LAUNCH_INPUTS` and the derived profile
 view is `CURVE_PARAMS["robinhood"]`.
 
 `contracts/config/DefaultsRobinhood.vy` remains the source for readable
-protocol defaults, including priority IDs `[1, 3]`.
+protocol defaults, including priority IDs `[1, 2]`.
 `config/robinhood-parameters.json` remains mechanically derived evidence; the
 Curve launch rows are not copied into JSON as another value surface.
 
@@ -75,8 +75,8 @@ following remain typed blockers:
   minimum minted LP, slippage limit, withdrawal authority, and minimum
   retained liquidity.
 
-The canonical readiness result is `deployment_ready=false` with 80 blockers:
-the remaining 57 non-Curve blockers plus 23 Curve-specific typed blockers.
+The canonical readiness result is `deployment_ready=false` with 64 blockers:
+the remaining 55 non-Curve blockers plus nine Curve-specific typed blockers.
 Missing blockers do not
 prevent deterministic source, validation, H-09 safe-default, or migration
 interface work; they do prevent executable deployment use.
@@ -131,7 +131,7 @@ When Curve pricing authority must be removed:
 4. Repair the pool/feed dependency while ID 2 remains disabled.
 5. Verify pool identity, registered handler/factory, exact coins and decimals,
    nonzero oracle response, Chainlink USDG freshness, no Curve USDG feed, empty
-   reference-pool configuration, and priorities `[1, 3]`.
+   reference-pool configuration, and priorities `[1, 2]`.
 6. Unpause only after those checks pass.
 7. Start and confirm the governed ID 2 address update, then repeat GREEN/USDG,
    safe/unsafe, topology, and inactive-capability checks.

@@ -16,17 +16,19 @@ import {BurnMintTokenPool} from "./v0.8/ccip/pools/BurnMintTokenPool.sol";
 //   - RipeHq.canMintGreen(addr) / canMintRipe(addr) read them on every mint,
 //     so GreenToken.mint() / RipeToken.mint() revert unless the pool agrees.
 //
-// One contract per token, with the answers compiled in as `pure` rather than
-// taken as constructor arguments. A pool cannot then be deployed claiming to
-// be for a token it is not: the capability is a property of the bytecode, so
-// it is visible in the verified source and cannot be got wrong by passing
-// arguments in the wrong order.
+// One contract per capability, with the answers compiled in as `pure` rather
+// than taken as constructor flags. This prevents GREEN/RIPE capability flags
+// from being passed in the wrong order. The inherited constructor still accepts
+// an arbitrary token, so deployment tooling must bind and revalidate getToken().
 //
-// Ripe uses the vendored `BurnMintTokenPool 1.5.1` here rather than the 1.6.1
-// package the reference in docs/ imports, because foundry.toml mirrors the
-// settings Chainlink used for their verified 1.5.1 deployments -- so these
-// build byte-identically to the upstream pool they extend. Both versions are
-// in active use on Base and Robinhood mainnet.
+// This is the repository candidate/reference implementation for token-specific
+// pools that inherit the vendored `BurnMintTokenPool 1.5.1`. Onchain topology,
+// capability, type/version, and runtime-hash evidence does not by itself prove
+// that the live Base or Robinhood pools were created from this source. The exact
+// live source set, compiler version/settings, constructor arguments, and
+// creation-artifact identity remain unresolved. The 1.6.1 example under docs/
+// is retained only as superseded design research. foundry.toml pins settings
+// for compiling this repository candidate; it is not live-creation provenance.
 
 /// @notice CCIP burn/mint pool for GREEN.
 contract GreenCcipBurnMintTokenPool is BurnMintTokenPool {

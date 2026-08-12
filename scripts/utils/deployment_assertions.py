@@ -13,8 +13,10 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from config.Ccip import CCIP_LIVE_POOL_CAPABILITIES, CCIP_POOL_HQ_IDS
 from config.robinhood_blueprint import (
     ROBINHOOD_BLUEPRINT,
     Disposition,
@@ -26,6 +28,14 @@ from config.robinhood_blueprint import (
 
 SCHEMA_VERSION = 1
 ZERO_ADDRESS = "0x" + "0" * 40
+CCIP_LIVE_EVIDENCE_PATH = (
+    "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json"
+)
+CCIP_LIVE_EVIDENCE_SHA256 = (
+    "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa"
+)
+ROOT = Path(__file__).resolve().parents[2]
+CCIP_LIVE_COMPONENT_IDS = {"RIPE": "CM-052", "GREEN": "CM-051"}
 REQUIRED_DISPOSITIONS = frozenset({Disposition.REQUIRED})
 UNAVAILABLE_DISPOSITIONS = frozenset(
     {
@@ -89,6 +99,7 @@ class BlueprintPolicy:
     canonical_registries: Mapping[tuple[str, int], str]
     required_registries: frozenset[tuple[str, int]]
     reserved_registries: frozenset[tuple[str, int]]
+    required_components: frozenset[str]
     unavailable_components: Mapping[str, Disposition]
 
 
@@ -122,9 +133,11 @@ def blueprint_policy(
     canonical: dict[tuple[str, int], str] = {}
     required: set[tuple[str, int]] = set()
     reserved: set[tuple[str, int]] = set()
+    required_components: set[str] = set()
     unavailable_components: dict[str, Disposition] = {}
     for component in blueprint.components:
         if component.deployment in REQUIRED_DISPOSITIONS:
+            required_components.add(component.component_id)
             continue
         if component.deployment in UNAVAILABLE_DISPOSITIONS:
             unavailable_components[component.component_id] = component.deployment
@@ -151,6 +164,7 @@ def blueprint_policy(
         canonical_registries=canonical,
         required_registries=frozenset(required),
         reserved_registries=frozenset(reserved),
+        required_components=frozenset(required_components),
         unavailable_components=unavailable_components,
     )
 
@@ -200,7 +214,12 @@ def _require_identity_fields(
     rows: Sequence[Mapping[str, Any]], *, path: str
 ) -> None:
     for index, row in enumerate(rows):
-        missing = [field for field in IDENTITY_FIELDS if field not in row]
+        fields = (
+            CCIP_EXTERNAL_IDENTITY_FIELDS
+            if row.get("component_id") in set(CCIP_LIVE_COMPONENT_IDS.values())
+            else IDENTITY_FIELDS
+        )
+        missing = [field for field in fields if field not in row]
         if missing:
             raise DeploymentAssertionInputError(
                 f"{path}[{index}] is missing deployed identity field(s): "
@@ -279,6 +298,17 @@ IDENTITY_FIELDS = (
     "runtime_sha256",
     "constructor_sha256",
     "artifact_sha256",
+)
+CCIP_EXTERNAL_IDENTITY_FIELDS = (
+    "address",
+    "proxy_type",
+    "implementation",
+    "runtime_keccak256",
+    "runtime_bytes",
+    "constructor_identity_status",
+    "artifact_identity_status",
+    "evidence_path",
+    "evidence_sha256",
 )
 PLAN_COMPONENT_FIELDS = (
     "artifact",
@@ -542,7 +572,14 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
             ),
         },
         "psm_posture": list(psm_assertion.get("postconditions", [])),
-        "ccip_present": False,
+        "ccip_assertion_boundary": {
+            "live_components": ["CM-051", "CM-052", "CM-053"],
+            "repository_toolchain_component": "CM-058",
+            "live_state_observation_required": True,
+            "live_source_identity_proven": False,
+            "additional_mutation_authorized": False,
+            "operational_readiness": False,
+        },
         "uniswap_present": False,
         "final_authority": {
             "action_id": handoff.get("action_id"),
@@ -550,6 +587,16 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
             "is_final_action": True,
         },
     }
+    for row in ccip_live_component_expectations():
+        component_id = row["component_id"]
+        existing = components.get(component_id)
+        if existing is not None and existing != row:
+            raise DeploymentAssertionInputError(
+                f"plan component conflicts with authenticated live CCIP identity: {component_id}"
+            )
+        components[component_id] = row
+
+    ccip_capabilities, ccip_external_facts = ccip_live_assertion_expectations()
     expectations = {
         "schema_version": SCHEMA_VERSION,
         "profile_id": _require_string(profile.get("profile_id"), "plan.profile.profile_id"),
@@ -557,7 +604,8 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
         "chain_id": _require_int(profile.get("expected_chain_id"), "plan.profile.expected_chain_id"),
         "registries": sorted(registries, key=lambda row: (row["domain"], row["registry_id"])),
         "components": [components[key] for key in sorted(components)],
-        "capabilities": [],
+        "capabilities": ccip_capabilities,
+        "external_facts": ccip_external_facts,
         "forbidden_edges": [],
         "profile2_components": [],
         "configuration_sources": {
@@ -578,8 +626,115 @@ def expectations_from_plan(plan_value: Mapping[str, Any]) -> Mapping[str, Any]:
     return expectations
 
 
+def _authenticated_ccip_live_evidence() -> Mapping[str, Any]:
+    evidence_path = ROOT / CCIP_LIVE_EVIDENCE_PATH
+    try:
+        payload = evidence_path.read_bytes()
+    except OSError as exc:
+        raise DeploymentAssertionInputError(
+            f"CCIP live evidence is unreadable: {CCIP_LIVE_EVIDENCE_PATH}"
+        ) from exc
+    if hashlib.sha256(payload).hexdigest() != CCIP_LIVE_EVIDENCE_SHA256:
+        raise DeploymentAssertionInputError("CCIP live evidence digest mismatch")
+    try:
+        evidence = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DeploymentAssertionInputError("CCIP live evidence is invalid JSON") from exc
+    if not isinstance(evidence, dict) or evidence.get("schema_version") != 1:
+        raise DeploymentAssertionInputError("CCIP live evidence has an invalid schema")
+    try:
+        pools = evidence["chains"]["robinhood-mainnet"]["pools"]
+    except (KeyError, TypeError) as exc:
+        raise DeploymentAssertionInputError(
+            "CCIP live evidence lacks Robinhood pool identities"
+        ) from exc
+    if set(pools) != set(CCIP_LIVE_COMPONENT_IDS):
+        raise DeploymentAssertionInputError("CCIP live evidence pool census mismatch")
+    return evidence
+
+
+def ccip_live_component_expectations() -> list[Mapping[str, Any]]:
+    """Return exact live pool address/runtime identities from authenticated evidence."""
+
+    evidence = _authenticated_ccip_live_evidence()
+    pools = evidence["chains"]["robinhood-mainnet"]["pools"]
+    rows = []
+    for label, component_id in CCIP_LIVE_COMPONENT_IDS.items():
+        pool = pools[label]
+        runtime_keccak256 = pool.get("runtime_keccak256")
+        runtime_bytes = pool.get("runtime_bytes")
+        if (
+            not isinstance(runtime_keccak256, str)
+            or not runtime_keccak256.startswith("0x")
+            or len(runtime_keccak256) != 66
+            or not isinstance(runtime_bytes, int)
+            or runtime_bytes <= 0
+        ):
+            raise DeploymentAssertionInputError(
+                f"CCIP live evidence has invalid runtime identity for {label}"
+            )
+        rows.append(
+            {
+                "component_id": component_id,
+                "address": pool["pool"],
+                "proxy_type": "none",
+                "implementation": None,
+                "runtime_keccak256": runtime_keccak256,
+                "runtime_bytes": runtime_bytes,
+                "constructor_identity_status": "unresolved",
+                "artifact_identity_status": "unresolved",
+                "evidence_path": CCIP_LIVE_EVIDENCE_PATH,
+                "evidence_sha256": CCIP_LIVE_EVIDENCE_SHA256,
+            }
+        )
+    return rows
+
+
+def ccip_live_assertion_expectations() -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+    """Return the exact CCIP facts a pre-collected observation must prove.
+
+    Registry rows 23 and 24 are independently enforced by blueprint policy.
+    These rows close the remaining gap: token-specific mint membership,
+    token-admin/reciprocal wiring (CM-053), and the repository toolchain
+    boundary (CM-058) may not be inferred merely from a plan posture label.
+    """
+
+    _authenticated_ccip_live_evidence()
+    capabilities = [
+        {
+            "component_id": CCIP_LIVE_COMPONENT_IDS[label],
+            "capability": capability,
+            "enabled": enabled,
+        }
+        for label in ("RIPE", "GREEN")
+        for capability, enabled in sorted(
+            CCIP_LIVE_POOL_CAPABILITIES[label].items()
+        )
+    ]
+    external_facts = [
+        {
+            "fact_id": "ccip-mainnet-live-registration-and-wiring",
+            "component_ids": ["CM-051", "CM-052", "CM-053"],
+            "evidence_path": CCIP_LIVE_EVIDENCE_PATH,
+            "evidence_sha256": CCIP_LIVE_EVIDENCE_SHA256,
+            "registry_ids": dict(CCIP_POOL_HQ_IDS),
+            "token_admin_registry_pool_matches": True,
+            "remote_token_and_pool_mappings_are_reciprocal": True,
+        },
+        {
+            "fact_id": "ccip-repository-toolchain-boundary",
+            "component_ids": ["CM-058"],
+            "repository_source": "solidity/src/RipeCcipBurnMintTokenPools.sol",
+            "repository_build": "solidity/foundry.toml",
+            "live_creation_identity_status": "unresolved",
+        },
+    ]
+    return capabilities, external_facts
+
+
 def expectations_template() -> Mapping[str, Any]:
     """Return a versioned owner-expectations envelope shape for CLI users."""
+    ccip_capabilities, ccip_external_facts = ccip_live_assertion_expectations()
     return {
         "schema_version": SCHEMA_VERSION,
         "profile_id": "<profile-id>",
@@ -587,6 +742,7 @@ def expectations_template() -> Mapping[str, Any]:
         "chain_id": 1,
         "registries": [],
         "components": [
+            *ccip_live_component_expectations(),
             {
                 "component_id": "<component-id>",
                 "address": "<address>",
@@ -597,13 +753,8 @@ def expectations_template() -> Mapping[str, Any]:
                 "artifact_sha256": "<sha256>",
             }
         ],
-        "capabilities": [
-            {
-                "component_id": "<component-id>",
-                "capability": "<capability>",
-                "enabled": False,
-            }
-        ],
+        "capabilities": ccip_capabilities,
+        "external_facts": ccip_external_facts,
         "forbidden_edges": [
             {
                 "source": "<component-id>",
@@ -627,6 +778,7 @@ def observations_template(mode: ObservationMode) -> Mapping[str, Any]:
         "registries": expected["registries"],
         "components": expected["components"],
         "capabilities": expected["capabilities"],
+        "external_facts": expected["external_facts"],
         "edges": [],
         "configuration_sources": expected["configuration_sources"],
     }
@@ -710,6 +862,12 @@ def assert_deployment(
         )
 
     policy = blueprint_policy(blueprint)
+    ccip_required_components = {"CM-051", "CM-052", "CM-053", "CM-058"}
+    if not ccip_required_components.issubset(policy.required_components):
+        raise DeploymentAssertionInputError(
+            "blueprint must classify every observed CCIP component and "
+            "repository boundary as required"
+        )
     registry_rows = _require_rows(
         observations.get("registries", []), "observations.registries"
     )
@@ -865,6 +1023,14 @@ def assert_deployment(
         failures=failures,
     )
 
+    for row in ccip_live_component_expectations():
+        key = (row["component_id"],)
+        if expected_components.get(key) != row:
+            raise DeploymentAssertionInputError(
+                "expectations.components must include exact authenticated live CCIP "
+                f"identity: {row['component_id']}"
+            )
+
     for (component_id,) in expected_components:
         disposition = policy.unavailable_components.get(component_id)
         if disposition is not None:
@@ -912,7 +1078,12 @@ def assert_deployment(
                 "missing",
             )
             continue
-        for field in IDENTITY_FIELDS:
+        identity_fields = (
+            CCIP_EXTERNAL_IDENTITY_FIELDS
+            if component_id in set(CCIP_LIVE_COMPONENT_IDS.values())
+            else IDENTITY_FIELDS
+        )
+        for field in identity_fields:
             if field not in expected:
                 continue
             if observed.get(field) != expected.get(field):
@@ -965,6 +1136,16 @@ def assert_deployment(
         duplicate_code="DUPLICATE_EXPECTED_CAPABILITY",
         failures=failures,
     )
+    required_ccip_capabilities, required_ccip_external_facts = (
+        ccip_live_assertion_expectations()
+    )
+    for row in required_ccip_capabilities:
+        key = (row["component_id"], row["capability"])
+        if expected_capabilities.get(key) != row:
+            raise DeploymentAssertionInputError(
+                "expectations.capabilities must include exact live CCIP "
+                f"membership: {key[0]}/{key[1]}"
+            )
     observed_capabilities = _index_rows(
         observed_capability_rows,
         ("component_id", "capability"),
@@ -999,6 +1180,72 @@ def assert_deployment(
                 path,
                 expected.get("enabled"),
                 observed.get("enabled"),
+            )
+
+    expected_external_fact_rows = _require_rows(
+        expectations.get("external_facts", []), "expectations.external_facts"
+    )
+    observed_external_fact_rows = _require_rows(
+        observations.get("external_facts", []), "observations.external_facts"
+    )
+    _require_string_fields(
+        expected_external_fact_rows,
+        ("fact_id",),
+        path="expectations.external_facts",
+    )
+    _require_string_fields(
+        observed_external_fact_rows,
+        ("fact_id",),
+        path="observations.external_facts",
+    )
+    expected_external_facts = _index_rows(
+        expected_external_fact_rows,
+        ("fact_id",),
+        path="expected_external_facts",
+        duplicate_code="DUPLICATE_EXPECTED_EXTERNAL_FACT",
+        failures=failures,
+    )
+    for row in required_ccip_external_facts:
+        key = (row["fact_id"],)
+        if expected_external_facts.get(key) != row:
+            raise DeploymentAssertionInputError(
+                "expectations.external_facts must include exact live CCIP fact: "
+                f"{key[0]}"
+            )
+    observed_external_facts = _index_rows(
+        observed_external_fact_rows,
+        ("fact_id",),
+        path="external_facts",
+        duplicate_code="DUPLICATE_OBSERVED_EXTERNAL_FACT",
+        failures=failures,
+    )
+    for key in sorted(set(expected_external_facts) | set(observed_external_facts)):
+        expected = expected_external_facts.get(key)
+        observed = observed_external_facts.get(key)
+        path = f"external_facts.{key[0]}"
+        if expected is None:
+            _failure(
+                failures,
+                "UNEXPECTED_EXTERNAL_FACT",
+                path,
+                "absent",
+                "present",
+            )
+        elif observed is None:
+            _failure(
+                failures,
+                "MISSING_EXTERNAL_FACT",
+                path,
+                json.dumps(expected, sort_keys=True),
+                "missing",
+            )
+        elif observed != expected:
+            _failure(
+                failures,
+                "EXTERNAL_FACT_MISMATCH",
+                path,
+                json.dumps(expected, sort_keys=True),
+                json.dumps(observed, sort_keys=True),
             )
 
     observed_edges = _require_rows(observations.get("edges", []), "observations.edges")

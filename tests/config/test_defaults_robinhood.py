@@ -17,6 +17,7 @@ import pytest
 
 from config import BluePrint as blueprint_source
 from scripts.params import generate_robinhood_defaults as sync
+from scripts.utils import deployment_assertions
 
 
 pytestmark = pytest.mark.release
@@ -528,6 +529,132 @@ def test_sensitive_and_placeholder_rejection_remains_fail_closed():
         sync.extract_deployment_values(defaults, blueprint=proxy)
 
 
+def test_source_reference_is_limited_to_defaults_and_allowlisted_live_evidence():
+    defaults = sync.extract_defaults_values()
+    values = sync.extract_deployment_values(defaults)
+    assert values["Deployment.DP-16.ccip.promotion"] == {
+        "kind": "external_fact",
+        "raw": sync.CCIP_LIVE_EVIDENCE_PATH,
+    }
+
+    proxy = _blueprint_proxy()
+    path = "Deployment.DP-16.ccip.promotion"
+    proxy.ROBINHOOD_DEPLOYMENT_INPUTS[path] = blueprint_source.RobinhoodInput(
+        blueprint_source.SourceReference("docs/chains/rh/evidence/not-allowlisted.json"),
+        "external_fact",
+    )
+    with pytest.raises(sync.ManifestError, match="H04_SOURCE_REFERENCE"):
+        sync.extract_deployment_values(defaults, blueprint=proxy)
+
+
+def test_ccip_source_reference_rejects_same_path_byte_replacement(
+    tmp_path, monkeypatch
+):
+    evidence_path = tmp_path / sync.CCIP_LIVE_EVIDENCE_PATH
+    evidence_path.parent.mkdir(parents=True)
+    payload = (ROOT / sync.CCIP_LIVE_EVIDENCE_PATH).read_bytes()
+    evidence_path.write_bytes(payload + b"\n")
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    with pytest.raises(sync.ManifestError, match="H04_CCIP_EVIDENCE_DIGEST"):
+        sync._validated_ccip_live_evidence()
+
+
+def test_ccip_evidence_identity_is_shared_by_ledger_and_deployment_assertions():
+    assert deployment_assertions.CCIP_LIVE_EVIDENCE_PATH == (
+        sync.CCIP_LIVE_EVIDENCE_PATH
+    )
+    assert deployment_assertions.CCIP_LIVE_EVIDENCE_SHA256 == (
+        sync.CCIP_LIVE_EVIDENCE_SHA256
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "code"),
+    [
+        (lambda value: value.__setitem__("schema_version", 2), "SCHEMA"),
+        (
+            lambda value: value["chains"]["robinhood-mainnet"].__setitem__(
+                "chain_id", 999
+            ),
+            "TOPOLOGY",
+        ),
+        (
+            lambda value: value["chains"]["robinhood-mainnet"]["pools"][
+                "RIPE"
+            ].__setitem__("can_mint_ripe", False),
+            "CAPABILITY",
+        ),
+    ],
+)
+def test_ccip_source_reference_validates_schema_topology_and_capabilities(
+    tmp_path, monkeypatch, mutation, code
+):
+    evidence_path = tmp_path / sync.CCIP_LIVE_EVIDENCE_PATH
+    evidence_path.parent.mkdir(parents=True)
+    value = json.loads((ROOT / sync.CCIP_LIVE_EVIDENCE_PATH).read_bytes())
+    mutation(value)
+    payload = json.dumps(value, sort_keys=True).encode()
+    evidence_path.write_bytes(payload)
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        sync, "CCIP_LIVE_EVIDENCE_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    with pytest.raises(sync.ManifestError, match=f"H04_CCIP_EVIDENCE_{code}"):
+        sync._validated_ccip_live_evidence()
+
+
+def test_dp16_ledger_records_current_live_fact_and_preserves_no_action_boundary():
+    ledger = sync.derive_ledger(_ledger())
+    records = _records(ledger)
+    expected = {
+        "Deployment.DP-16.ccip.greenEnabled": ("CM-051", True),
+        "Deployment.DP-16.ccip.ripeEnabled": ("CM-052", True),
+    }
+    for path, (h03_ref, value) in expected.items():
+        record = records[path]
+        assert record["h03_ref"] == h03_ref
+        assert record["status"] == "external_fact"
+        assert record["value"] == {"kind": "external_fact", "raw": value}
+        assert record["source"] == {
+            "citation": sync.CCIP_LIVE_EVIDENCE_PATH,
+            "capture_commit": sync.CCIP_LIVE_EVIDENCE_CAPTURE_COMMIT,
+            "sha256": sync.CCIP_LIVE_EVIDENCE_SHA256,
+        }
+        assert record["approval"]["status"] == "confirmed_existing_state"
+        assert record["blockers"] == ["B-T1-CCIP", "B-T1-TOOLCHAIN"]
+        assert "no mutation authorized" in record["approval"]["provenance"]
+
+    sgreen = records["Deployment.DP-16.ccip.sgreenEnabled"]
+    assert sgreen["status"] == "disabled"
+    assert sgreen["value"] == {"kind": "concrete", "raw": False}
+    assert sgreen["source"]["citation"] == (
+        "review-archives/h04/h04-group2-proposal-R2.md"
+    )
+
+    promotion = records["Deployment.DP-16.ccip.promotion"]
+    assert promotion["h03_ref"] == "CM-053"
+    assert promotion["status"] == "external_fact"
+    assert promotion["value"] == {
+        "kind": "external_fact",
+        "raw": sync.CCIP_LIVE_EVIDENCE_PATH,
+    }
+    assert promotion["approval"]["schedule_id"] == "BS-H04-CCIP-PARKED"
+    assert "no further transaction" in promotion["launch_phase"]
+
+    schedule = next(
+        item
+        for item in ledger["binding_schedules"]
+        if item["id"] == "BS-H04-CCIP-PARKED"
+    )
+    assert schedule["records"] == ["P-H04-403"]
+    assert schedule["classification"] == (
+        "confirmed_existing_state_with_operational_gates"
+    )
+    assert "separate transaction and release authority" in schedule[
+        "closure_artifacts"
+    ]
+
+
 def test_sync_is_deterministic_and_writes_only_the_ledger(tmp_path):
     path = _write_ledger(tmp_path, _ledger())
     first_identity = sync.sync_ledger(path)
@@ -594,8 +721,9 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False
-    assert len(blockers) == 65
+    assert len(blockers) == 64
     assert not any("Deployment.DP-15.rewards.promotion" in item for item in blockers)
+    assert not any("Deployment.DP-16.ccip.promotion" in item for item in blockers)
     assert any(item.endswith(":unresolved") for item in blockers)
     assert any(item.endswith(":unverified") for item in blockers)
     assert any(item.startswith("curve:owner_selected:") for item in blockers)
@@ -663,10 +791,22 @@ def test_launch_authority_semantics_preserve_stable_ids_and_selected_reconciliat
     reconciled_ids = set(reconciled)
     assert len(reconciled_ids) == baseline["reconciled_record_count"]
     stable_ids = sorted(set(new_by_id) - reconciled_ids)
-    stable_projection = [
-        _record_projection(new_by_id[record_id])
-        for record_id in stable_ids
-    ]
+    # Preserve the immutable launch-baseline proof while explicitly normalizing
+    # the later dated CCIP live-state reconciliation back to its historical
+    # projection. The generated ledger tests below assert the current facts.
+    pre_live_ccip_projection = {
+        "P-H04-400": ("disabled", False),
+        "P-H04-401": ("disabled", False),
+        "P-H04-403": ("blocked", None),
+    }
+    stable_projection = []
+    for record_id in stable_ids:
+        projection = _record_projection(new_by_id[record_id])
+        if record_id in pre_live_ccip_projection:
+            projection["status"], projection["value"] = (
+                pre_live_ccip_projection[record_id]
+            )
+        stable_projection.append(projection)
     assert len(stable_projection) == baseline["stable_record_count"]
     assert _projection_sha256(stable_projection) == (
         baseline["stable_projection_sha256"]

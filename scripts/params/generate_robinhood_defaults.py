@@ -26,6 +26,17 @@ SCHEMA_VERSION = "h04-robinhood-parameters-v4-derived-ledger"
 LEGACY_SCHEMA_VERSION = "h04-robinhood-parameters-v3-profile1-pr66"
 LAUNCH_INPUT_COMMIT = "74c4120fbfa1ade859dc32f61acdf567c139fe02"
 MORPHO_AUTHORITY_COMMIT = "33ad0f3c08bf6dc88f6569c622886d264d6e2868"
+CCIP_LIVE_EVIDENCE_PATH = (
+    "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json"
+)
+# This is the original read-only capture commit, not a claim that the current
+# annotated evidence bytes can be retrieved from that commit. Exact current
+# bytes are authenticated by CCIP_LIVE_EVIDENCE_SHA256 below.
+CCIP_LIVE_EVIDENCE_CAPTURE_COMMIT = "98155a8402d3602318409454f3577325036569e2"
+CCIP_LIVE_EVIDENCE_SHA256 = (
+    "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa"
+)
+EXTERNAL_FACT_SOURCE_REFERENCES = frozenset({CCIP_LIVE_EVIDENCE_PATH})
 
 ROOT = Path(__file__).resolve().parents[2]
 LEDGER_PATH = ROOT / "config" / "robinhood-parameters.json"
@@ -430,7 +441,20 @@ def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
         unit = record["unit"]
         if set(unit) not in ({"kind"}, {"kind", "denominator"}):
             raise ManifestError("H04_UNIT_KEYS")
-        _expect_keys(record["source"], {"citation", "commit"}, "H04_SOURCE_KEYS")
+        source_keys = set(record["source"])
+        if source_keys in (
+            {"citation", "capture_commit", "sha256"},
+            # Input-only compatibility for the immediately preceding derived
+            # ledger; reconciliation rewrites this ambiguous key below.
+            {"citation", "commit", "sha256"},
+        ):
+            if (
+                record["source"]["citation"] != CCIP_LIVE_EVIDENCE_PATH
+                or record["source"]["sha256"] != CCIP_LIVE_EVIDENCE_SHA256
+            ):
+                raise ManifestError("H04_SOURCE_DIGEST")
+        elif source_keys != {"citation", "commit"}:
+            raise ManifestError("H04_SOURCE_KEYS")
         _expect_keys(record["owner"], {"kind", "id"}, "H04_OWNER_KEYS")
         approval_keys = set(record["approval"])
         if approval_keys not in (
@@ -802,11 +826,19 @@ def extract_deployment_values(
         value = record.value
         kind = type(value).__name__
         if kind == "SourceReference":
-            if value.path not in defaults_values:
+            if value.path in defaults_values:
+                normalized = copy.deepcopy(defaults_values[value.path])
+            elif value.path in EXTERNAL_FACT_SOURCE_REFERENCES:
+                _validated_ccip_live_evidence()
+                normalized = {"kind": "external_fact", "raw": value.path}
+            else:
                 raise ManifestError(f"H04_SOURCE_REFERENCE:{path}:{value.path}")
-            normalized = copy.deepcopy(defaults_values[value.path])
         elif kind == "SymbolicBinding":
             normalized = {"kind": "symbolic_binding", "name": value.semantic_name}
+        elif record.disposition == "external_fact" and (
+            type(value) in (bool, int, str) or isinstance(value, list)
+        ):
+            normalized = {"kind": "external_fact", "raw": copy.deepcopy(value)}
         elif value == selected.ZERO_ADDRESS:
             normalized = {"kind": "concrete", "raw": "empty(address)"}
         elif isinstance(value, str) and re.fullmatch(r"0x[0-9A-Fa-f]{40}", value):
@@ -820,6 +852,309 @@ def extract_deployment_values(
     if len(values) != 119:
         raise ManifestError("H04_DEPLOYMENT_SOURCE_CENSUS")
     return values
+
+
+def _validated_ccip_live_evidence() -> Mapping[str, Any]:
+    """Authenticate and structurally bind the dated external CCIP fact.
+
+    The exact byte digest prevents a same-path replacement, while the explicit
+    projection prevents a future digest update from silently changing the
+    chain, registry, pool, reciprocal-wiring, or mint-capability semantics that
+    the generated ledger consumes.
+    """
+
+    evidence_path = ROOT / CCIP_LIVE_EVIDENCE_PATH
+    try:
+        payload = evidence_path.read_bytes()
+    except FileNotFoundError as exc:
+        raise ManifestError(
+            f"H04_SOURCE_REFERENCE_MISSING:{CCIP_LIVE_EVIDENCE_PATH}"
+        ) from exc
+    except OSError as exc:
+        raise ManifestError("H04_CCIP_EVIDENCE_UNREADABLE") from exc
+    if hashlib.sha256(payload).hexdigest() != CCIP_LIVE_EVIDENCE_SHA256:
+        raise ManifestError("H04_CCIP_EVIDENCE_DIGEST")
+    try:
+        evidence = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ManifestError("H04_CCIP_EVIDENCE_JSON") from exc
+    if not isinstance(evidence, dict) or evidence.get("schema_version") != 1:
+        raise ManifestError("H04_CCIP_EVIDENCE_SCHEMA")
+
+    expected_chains = {
+        "base-mainnet": {
+            "chain_id": 8453,
+            "chain_selector": 15971525489660198786,
+            "ripe_hq": "0x6162df1b329e157479f8f1407e888260e0ec3d2b",
+            "remote_chain": "robinhood-mainnet",
+            "remote_chain_selector": 6180753054346818345,
+            "pools": {
+                "RIPE": {
+                    "registry_id": 23,
+                    "token": "0x2a0a59d6b975828e781ecac125dba40d7ee5ddc0",
+                    "pool": "0x6e3f8465af365a2c400c361783ea51ad44b3c836",
+                    "can_mint_green": False,
+                    "can_mint_ripe": True,
+                },
+                "GREEN": {
+                    "registry_id": 24,
+                    "token": "0xd1eac76497d06cf15475a5e3984d5bc03de7c707",
+                    "pool": "0xef56e5036728718baa577257ff4fa9259e9e895f",
+                    "can_mint_green": True,
+                    "can_mint_ripe": False,
+                },
+            },
+        },
+        "robinhood-mainnet": {
+            "chain_id": 4663,
+            "chain_selector": 6180753054346818345,
+            "ripe_hq": "0xd4e82ae1de673bba3b53386a2d2c630ae6630940",
+            "remote_chain": "base-mainnet",
+            "remote_chain_selector": 15971525489660198786,
+            "pools": {
+                "RIPE": {
+                    "registry_id": 23,
+                    "token": "0x4d3f37a965b21ab4122e92dd41d2693e742c883b",
+                    "pool": "0xe51af1311832818a6d366081fc535ca56357a6ee",
+                    "can_mint_green": False,
+                    "can_mint_ripe": True,
+                },
+                "GREEN": {
+                    "registry_id": 24,
+                    "token": "0x355bb7f0f6c730e4460d620420a300fa08ff82f3",
+                    "pool": "0x4b19f165bb1ce3f19bbe828d150706b9deeeec95",
+                    "can_mint_green": True,
+                    "can_mint_ripe": False,
+                },
+            },
+        },
+    }
+    try:
+        chains = evidence["chains"]
+        if set(chains) != set(expected_chains):
+            raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+        if evidence["ripe_hq_registry_ids"] != {"RIPE": 23, "GREEN": 24}:
+            raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+        source = evidence["repository_pool_source"]
+        if (
+            source["path"] != "solidity/src/RipeCcipBurnMintTokenPools.sol"
+            or source["classification"]
+            != "repository_candidate_reference_source"
+            or source["live_creation_identity_status"] != "unresolved"
+        ):
+            raise ManifestError("H04_CCIP_EVIDENCE_PROVENANCE")
+
+        for chain_name, expected_chain in expected_chains.items():
+            actual_chain = chains[chain_name]
+            for field in (
+                "chain_id",
+                "chain_selector",
+                "remote_chain",
+                "remote_chain_selector",
+            ):
+                if actual_chain[field] != expected_chain[field]:
+                    raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+            if actual_chain["ripe_hq"].lower() != expected_chain["ripe_hq"]:
+                raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+            if set(actual_chain["pools"]) != {"RIPE", "GREEN"}:
+                raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+            remote = chains[actual_chain["remote_chain"]]
+            for label, expected_pool in expected_chain["pools"].items():
+                actual_pool = actual_chain["pools"][label]
+                for field in (
+                    "registry_id",
+                    "can_mint_green",
+                    "can_mint_ripe",
+                ):
+                    if actual_pool[field] != expected_pool[field]:
+                        raise ManifestError("H04_CCIP_EVIDENCE_CAPABILITY")
+                for field in ("token", "pool"):
+                    if actual_pool[field].lower() != expected_pool[field]:
+                        raise ManifestError("H04_CCIP_EVIDENCE_TOPOLOGY")
+                if actual_pool["remote_token"].lower() != remote["pools"][label][
+                    "token"
+                ].lower() or [value.lower() for value in actual_pool["remote_pools"]] != [
+                    remote["pools"][label]["pool"].lower()
+                ]:
+                    raise ManifestError("H04_CCIP_EVIDENCE_RECIPROCITY")
+
+        expected_assertions = {
+            "token_admin_registry_pool_matches",
+            "each_pool_supports_exactly_the_peer_selector",
+            "remote_token_and_pool_mappings_are_reciprocal",
+            "router_and_rmn_match_repository_config",
+            "pool_owners_match_governance_safe",
+            "token_administrators_match_governance_safe",
+            "all_pending_token_administrators_are_zero",
+            "all_rate_limit_admins_are_zero",
+            "all_inbound_and_outbound_rate_limits_are_disabled",
+        }
+        assertions = evidence["current_state_assertions"]
+        if set(assertions) != expected_assertions or not all(
+            value is True for value in assertions.values()
+        ):
+            raise ManifestError("H04_CCIP_EVIDENCE_ASSERTIONS")
+    except ManifestError:
+        raise
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise ManifestError("H04_CCIP_EVIDENCE_SCHEMA") from exc
+    return evidence
+
+
+def _reconcile_ccip_live_metadata(ledger: dict[str, Any]) -> None:
+    """Reconcile the one dated live CCIP fact without granting new authority."""
+
+    _validated_ccip_live_evidence()
+
+    schedules = {
+        schedule["id"]: schedule for schedule in ledger["binding_schedules"]
+    }
+    try:
+        schedule = schedules["BS-H04-CCIP-PARKED"]
+    except KeyError as exc:
+        raise ManifestError("H04_CCIP_SCHEDULE_MISSING") from exc
+    schedule.update(
+        {
+            "classification": "confirmed_existing_state_with_operational_gates",
+            "lifecycle_phase": (
+                "externally completed live package; further transactions and "
+                "release remain gated"
+            ),
+            "prerequisite": (
+                "existing state requires no action; any further CCIP transaction "
+                "or release requires separate authority and all open gates"
+            ),
+            "closure_artifacts": [
+                "2026-08-11 read-only live topology snapshot",
+                "owner disposition for inbound and outbound rate limits and rateLimitAdmin",
+                "accepted full real-token OffRamp automatic-execution gas evidence",
+                "exact live pool source, compiler, and constructor-bound identity",
+                "license conclusions and historical transaction provenance",
+                "reviewed live signer or Safe transaction backend",
+                "separate transaction and release authority",
+            ],
+            "invalidation": [
+                "live topology or capability drift",
+                "CCIP release or toolchain change",
+                "router, peer, role, or limit change",
+                "new transaction or release directive",
+            ],
+        }
+    )
+
+    records = {
+        record["destination"]["path"]: record for record in ledger["parameters"]
+    }
+    live_rows = {
+        "Deployment.DP-16.ccip.greenEnabled": ("CM-051", "GREEN"),
+        "Deployment.DP-16.ccip.ripeEnabled": ("CM-052", "RIPE"),
+    }
+    historical_provenance = (
+        "Read-only 2026-08-11 live snapshot; historical D-H04-02 decision "
+        "evidence remains review-archives/h04/h04-group2-proposal-R2.md at "
+        "a86650b187c523f27c92f05bfe959d06840025a6; no mutation authorized"
+    )
+    common_invalidation = [
+        "live topology or capability drift",
+        "evidence snapshot superseded",
+        "controlling owner or release decision change",
+    ]
+    for path, (h03_ref, token) in live_rows.items():
+        try:
+            record = records[path]
+        except KeyError as exc:
+            raise ManifestError(f"H04_CCIP_RECORD_MISSING:{path}") from exc
+        record.update(
+            {
+                "h03_ref": h03_ref,
+                "description": (
+                    f"Verified current live external state for Robinhood {token} "
+                    "CCIP enablement."
+                ),
+                "status": "external_fact",
+                "source": {
+                    "citation": CCIP_LIVE_EVIDENCE_PATH,
+                    "capture_commit": CCIP_LIVE_EVIDENCE_CAPTURE_COMMIT,
+                    "sha256": CCIP_LIVE_EVIDENCE_SHA256,
+                },
+                "reviewer_class": "protocol and security",
+                "approval": {
+                    "status": "confirmed_existing_state",
+                    "date": "2026-08-11",
+                    "provenance": historical_provenance,
+                },
+                "launch_phase": (
+                    "confirmed existing live state; further transactions and "
+                    "release gated"
+                ),
+                "blockers": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
+                "zero_semantics": {
+                    "kind": "not_zero",
+                    "explanation": (
+                        "Observed enabled state is true; this records current "
+                        "state and authorizes no new action."
+                    ),
+                },
+                "base_comparison": {
+                    "kind": "current_existing_state",
+                    "detail": (
+                        "The dated snapshot confirms reciprocal live Base and "
+                        "Robinhood topology; it is not an inheritance decision."
+                    ),
+                },
+                "invalidation": copy.deepcopy(common_invalidation),
+            }
+        )
+
+    promotion_path = "Deployment.DP-16.ccip.promotion"
+    try:
+        promotion = records[promotion_path]
+    except KeyError as exc:
+        raise ManifestError(f"H04_CCIP_RECORD_MISSING:{promotion_path}") from exc
+    promotion.update(
+        {
+            "h03_ref": "CM-053",
+            "description": (
+                "Evidence reference for the externally completed GREEN and RIPE "
+                "CCIP live package."
+            ),
+            "status": "external_fact",
+            "source": {
+                "citation": CCIP_LIVE_EVIDENCE_PATH,
+                "capture_commit": CCIP_LIVE_EVIDENCE_CAPTURE_COMMIT,
+                "sha256": CCIP_LIVE_EVIDENCE_SHA256,
+            },
+            "reviewer_class": "protocol and security",
+            "approval": {
+                "status": "confirmed_existing_state",
+                "date": "2026-08-11",
+                "provenance": historical_provenance,
+                "schedule_id": "BS-H04-CCIP-PARKED",
+            },
+            "launch_phase": (
+                "confirmed existing live package; no further transaction or "
+                "release authorized"
+            ),
+            "blockers": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
+            "unit": {"kind": "evidence_reference"},
+            "zero_semantics": {
+                "kind": "not_applicable",
+                "explanation": (
+                    "The value is a dated evidence reference, not a zeroable "
+                    "deployment parameter."
+                ),
+            },
+            "base_comparison": {
+                "kind": "current_existing_state",
+                "detail": (
+                    "The evidence binds the reciprocal Base and Robinhood live "
+                    "package without authorizing another action."
+                ),
+            },
+            "conversion": {"kind": "not_applicable"},
+            "invalidation": copy.deepcopy(common_invalidation),
+        }
+    )
 
 
 def derive_assertion_values(
@@ -991,6 +1326,8 @@ def derive_ledger(
 
     for record in expected["parameters"]:
         record.pop("generated_repr", None)
+
+    _reconcile_ccip_live_metadata(expected)
 
     deployment_paths = {
         record["destination"]["path"]

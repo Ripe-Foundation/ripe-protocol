@@ -9,7 +9,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -19,6 +21,8 @@ from vyper.compiler.input_bundle import FilesystemInputBundle
 
 
 ROOT = Path(__file__).resolve().parents[1]
+ABI_EXPORT_COMPLETION = ".abi-export-complete"
+ABI_EXPORT_SCHEMA_VERSION = 1
 
 # Test-only sources are excluded by directory. Importable modules are classified
 # individually so the four standalone module ABIs already checked into the
@@ -45,37 +49,65 @@ REPOSITORY_LEGACY_OUTPUT_SHA256: Mapping[str, str] = {
     "DefaultsBaseSepolia.json": (
         "bcb820120926cc98370a05a54653179df55aa15d0e956bc19533ebb37b822fa0"
     ),
-    "Deleverage.json": (
-        "d0480bf6b0d7d05c461b33b31dd0e85b48135fa66d850a4c8526e0d9fefaea8d"
-    ),
-    "EndaomentPSM.json": (
-        "d6bab0783a4f1b98432d45b47d527f29599194c77bc90e772eb5f9f56ce214c0"
-    ),
-    "SwitchboardAlpha.json": (
-        "73cf0c3180d4fe27049b11e27eca717995af0fe778ab05daed6275c4f85fb49b"
-    ),
-    "wsuperOETHbPrices.json": (
-        "dbdcb0be1bd0bdc163643a57571efbb141caa167739f2471c514611585134beb"
-    ),
 }
-REPOSITORY_LEGACY_COMPILED_SHA256: Mapping[str, str] = {
-    "Deleverage.json": (
-        "7de1944637565f5640169b879a13705706332cd171ae41579c45dfe5da72cb43"
-    ),
-    "EndaomentPSM.json": (
-        "683e36ca7bf48f002afcb80d06dcb6a9540323cadc0647650c7ff3ddb9d7bec0"
-    ),
-    "SwitchboardAlpha.json": (
-        "e5e33b9fd69ca649b3a7035f6f9f9afb3da88b80b57724907af388dce6edc747"
-    ),
-    "wsuperOETHbPrices.json": (
-        "9fa66465471bfe016db2baec84a7caab1b7b4e49ab59e7aece531319d1956147"
-    ),
-}
+REPOSITORY_LEGACY_COMPILED_SHA256: Mapping[str, str] = {}
 
 
 class AbiExportError(RuntimeError):
     """Raised when a deterministic ABI inventory cannot be produced."""
+
+
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _completion_bytes(expected: Mapping[str, bytes], status: str) -> bytes:
+    value = {
+        "schema_version": ABI_EXPORT_SCHEMA_VERSION,
+        "status": status,
+        "outputs": {
+            name: hashlib.sha256(data).hexdigest()
+            for name, data in sorted(expected.items())
+        },
+    }
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _completion_drift(
+    output_dir: Path,
+    expected: Mapping[str, bytes],
+) -> tuple[str, ...]:
+    path = output_dir / ABI_EXPORT_COMPLETION
+    if not path.is_file() or path.is_symlink():
+        return ("missing ABI export completion seal",)
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return ("invalid ABI export completion seal",)
+    expected_value = json.loads(_completion_bytes(expected, "complete"))
+    if value != expected_value:
+        return ("stale or incomplete ABI export completion seal",)
+    return ()
 
 
 @dataclass(frozen=True)
@@ -270,11 +302,13 @@ def check_abis(
     legacy = _legacy_output_hashes(
         contracts_dir, output_dir, legacy_output_sha256
     )
+    generated = {name: data for name, data in expected.items() if name not in legacy}
     failures = (
         *_output_drift(output_dir, expected, legacy),
         *_legacy_compilation_drift(
             expected, _legacy_compiled_hashes(contracts_dir, output_dir)
         ),
+        *_completion_drift(output_dir, generated),
     )
     if failures:
         raise AbiExportError("; ".join(failures))
@@ -298,6 +332,7 @@ def export_abis(
     legacy = _legacy_output_hashes(
         contracts_dir, output_dir, legacy_output_sha256
     )
+    generated = {name: data for name, data in expected.items() if name not in legacy}
     compiled_legacy_failures = _legacy_compilation_drift(
         expected, _legacy_compiled_hashes(contracts_dir, output_dir)
     )
@@ -326,12 +361,13 @@ def export_abis(
     if legacy_failures:
         raise AbiExportError("; ".join(legacy_failures))
 
-    if expected:
+    if expected or legacy:
         output_dir.mkdir(parents=True, exist_ok=True)
-    for name in sorted(expected):
-        if name in legacy:
-            continue
-        (output_dir / name).write_bytes(expected[name])
+    completion = output_dir / ABI_EXPORT_COMPLETION
+    _atomic_write_bytes(completion, _completion_bytes(generated, "in_progress"))
+    for name, data in sorted(generated.items()):
+        _atomic_write_bytes(output_dir / name, data)
+    _atomic_write_bytes(completion, _completion_bytes(generated, "complete"))
 
     return AbiExportReport(
         exported=tuple(
@@ -373,7 +409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.check
             else export_abis(args.contracts_dir, args.output_dir)
         )
-    except AbiExportError as exc:
+    except (AbiExportError, OSError) as exc:
         print(f"ABI_EXPORT_FAILED: {exc}", file=sys.stderr)
         return 1
 

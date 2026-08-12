@@ -30,8 +30,8 @@ numbered and timestamped step manifests are removed.
 
 An earlier revision of this branch deleted the four testnet current manifests as
 "disposable". **That was wrong and has been reverted.** Retained tooling reads
-them: `scripts/ccip_send.py` defaults to `--chain base-sepolia --environment v2`
-and loads that manifest directly, and `migrations/base-sepolia/0002_CcipWire.py`
+them: `scripts/ccip_send.py` requires an explicit chain/environment and loads
+the selected current manifest directly, and `migrations/base-sepolia/0002_CcipWire.py`
 and `migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run
 the step later with `--start-timestamp`, which needs the manifest to resolve
 local and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting

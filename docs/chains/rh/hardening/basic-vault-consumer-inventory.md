@@ -44,14 +44,14 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "d0414b5b3d8248c65dd16a722b4333767c386170f76dfe69913e4c1de1abed8f",
-    "contracts/core/CreditEngine.vy": "d8fae4e9cffff0d95adbe48a59e57c622585f021017b94089f8a70e615c36e43",
+    "contracts/core/AuctionHouse.vy": "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
+    "contracts/core/CreditEngine.vy": "96e7deef17d5fe094c964090850cae9eb9293350eff94567519444631701deb6",
     "contracts/core/CreditRedeem.vy": "36daec6010821ddc5a0da31e958c692869bfdd7797fc90431e5922f9bb516937",
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
     "contracts/core/HumanResources.vy": "7422f2dee9b5898b0f163371477bbea7c4a9b03a22b393e15594bbaadb00cddb",
     "contracts/core/Lootbox.vy": "279b859a6e5234676e091cecb8736aeadac68bc8f1b909267b7a06c69a901f43",
-    "contracts/core/Teller.vy": "cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc",
-    "contracts/core/VaultMigrator.vy": "34d249c01405aeda0167fdfa1650a477c3dd60a64a729b45d5e7d90b17de36a8"
+    "contracts/core/Teller.vy": "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476",
+    "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
   },
   "getter_scope": [
     "doesUserHaveBalance",
@@ -66,9 +66,9 @@ source review and test update.
   ],
   "rows": [
     {
-      "id": "AH-419",
+      "id": "AH-431",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 419,
+      "line": 431,
       "function": "_performLiquidationPhases",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -76,9 +76,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-501",
+      "id": "AH-513",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 501,
+      "line": 513,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -86,9 +86,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-515",
+      "id": "AH-527",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 515,
+      "line": 527,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -96,9 +96,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-891",
+      "id": "AH-902",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 891,
+      "line": 902,
       "function": "_canStartAuction",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -106,9 +106,9 @@ source review and test update.
       "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
     },
     {
-      "id": "AH-1199",
+      "id": "AH-1215",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1199,
+      "line": 1215,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -116,9 +116,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-1227",
+      "id": "AH-1243",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1227,
+      "line": 1243,
       "function": "_transferCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -126,9 +126,9 @@ source review and test update.
       "evidence_test": "test_safe_nominal_volatile_deleverage_skips_deficit_and_continues"
     },
     {
-      "id": "CE-727",
+      "id": "CE-723",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 727,
+      "line": 723,
       "function": "_getUserBorrowTerms",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -136,9 +136,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "CE-733",
+      "id": "CE-729",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 733,
+      "line": 729,
       "function": "_getUserBorrowTerms",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -146,9 +146,9 @@ source review and test update.
       "evidence_test": "test_unsafe_backing_failures_keep_terms_with_zero_capacity"
     },
     {
-      "id": "CE-1260",
+      "id": "CE-1249",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 1260,
+      "line": 1249,
       "function": "getMaxWithdrawableForAsset",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -326,9 +326,9 @@ source review and test update.
       "evidence_test": "test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal"
     },
     {
-      "id": "VM-152",
+      "id": "VM-157",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 152,
+      "line": 154,
       "function": "migrateVaultPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -336,9 +336,9 @@ source review and test update.
       "evidence_test": "test_normal_migration_rejects_more_than_twenty_source_asset_slots"
     },
     {
-      "id": "VM-160",
+      "id": "VM-165",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 160,
+      "line": 162,
       "function": "migrateVaultPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -346,9 +346,9 @@ source review and test update.
       "evidence_test": "test_all_user_assets_migrate_with_one_housekeeping_call"
     },
     {
-      "id": "VM-184",
+      "id": "VM-189",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 184,
+      "line": 186,
       "function": "migrateVaultPositions",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -356,9 +356,9 @@ source review and test update.
       "evidence_test": "test_all_user_assets_migrate_with_one_housekeeping_call"
     },
     {
-      "id": "VM-244",
+      "id": "VM-256",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 244,
+      "line": 253,
       "function": "migrateRipeGovPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -366,9 +366,9 @@ source review and test update.
       "evidence_test": "test_governance_migration_rejects_more_than_five_source_asset_slots"
     },
     {
-      "id": "VM-252",
+      "id": "VM-264",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 252,
+      "line": 261,
       "function": "migrateRipeGovPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -376,9 +376,9 @@ source review and test update.
       "evidence_test": "test_one_user_migrates_all_governance_assets_with_one_housekeeping_call"
     },
     {
-      "id": "VM-338",
+      "id": "VM-352",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 338,
+      "line": 348,
       "function": "migrateLegacyRipeGovPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -386,9 +386,9 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-346",
+      "id": "VM-360",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 346,
+      "line": 356,
       "function": "migrateLegacyRipeGovPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -396,9 +396,9 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-462",
+      "id": "VM-479",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 462,
+      "line": 472,
       "function": "_getPreMigrationData",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -406,9 +406,9 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-513",
+      "id": "VM-600",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 513,
+      "line": 523,
       "function": "_verifyRipeGovExport",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -416,9 +416,9 @@ source review and test update.
       "evidence_test": "test_teller_migration_preserves_position_and_updates_ledger_and_deposit_points"
     },
     {
-      "id": "VM-514",
+      "id": "VM-601",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 514,
+      "line": 524,
       "function": "_verifyRipeGovExport",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -426,9 +426,9 @@ source review and test update.
       "evidence_test": "test_teller_migration_preserves_position_and_updates_ledger_and_deposit_points"
     },
     {
-      "id": "VM-539",
+      "id": "VM-626",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 539,
+      "line": 549,
       "function": "_verifyRipeGovImport",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",

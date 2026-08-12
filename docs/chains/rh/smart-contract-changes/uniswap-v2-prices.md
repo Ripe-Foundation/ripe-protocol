@@ -1,83 +1,79 @@
-# UniswapV2Prices: non-admitted price-source candidate
+# UniswapV2Prices: RIPE/WETH monitoring-only adapter
 
 ## Scope
 
 [`UniswapV2Prices.vy`](../../../../contracts/priceSources/UniswapV2Prices.vy)
-is a small Uniswap V2-style RIPE price-source candidate. It replaces the
-deleted `RobinhoodUniswapV2RipePrices` research prototype; the two designs must
-not coexist or be treated as alternative deployment choices.
+is deliberately not an oracle. It is a stateless observer for exactly one
+canonical 18-decimal RIPE/WETH Uniswap V2 pair.
 
-The contract starts from Ripe's existing `AeroRipePrices` price-source shape
-and changes only the venue-specific read path. Its pair interface and reserve
-ratio follow Underscore Protocol's `UniswapV2.vy` Lego at commit
-`78532a77ebddc176fb2a73899dcc79ba25a8001f`:
+The contract continues to implement the repository `PriceSource` interface so
+registry and generic tooling can call it safely. That interface is an inert
+compatibility shell:
 
-- read `token0`, `token1`, and `getReserves` from one immutable pair;
-- require the immutable RIPE token to be one of those pair tokens;
-- price the other token through PriceDesk;
-- normalize both token decimal domains to an 18-decimal RIPE price; and
-- retain Aero-style snapshots, downside immediacy, upside throttling, pause,
-  governance, and timelocked configuration.
+- `getPrice` always returns zero;
+- `getPriceAndHasFeed` always returns `(0, false)`;
+- `hasPriceFeed` and every pending-action view return false;
+- `getPricedAssets` returns an empty list;
+- every feed, snapshot, disable, and timelock mutation returns false; and
+- unsupported no-return pause and recovery mutations revert `monitoring only`.
 
-The configuration lifecycle is the one explicit non-venue departure from
-`AeroRipePrices`: the otherwise incomplete Aero confirmation and cancellation
-stubs are replaced with the existing snapshot-price-source flow copied from
-`UndyVaultPrices` and `BlueChipYieldPrices`. A proposal stores the complete
-configuration behind a timelock; confirmation revalidates it, confirms the
-action, installs it, clears pending state, and attempts a fresh snapshot;
-cancellation is governance-only, pause-gated, cancels the action, and clears
-pending state. The pending, updated, and cancelled events use the same field
-placement as those snapshot price sources.
+An accidental PriceDesk registration therefore neither supplies a protocol
+price nor creates a missing-selector denial of service.
 
-The adapter supports RIPE in either pair position, rejects zero reserves and
-unsupported token decimals above 18, returns zero for an unavailable quote
-price or arithmetic overflow, and exposes no feed for assets other than the
-configured RIPE token. Construction rejects zero pool/RIPE addresses and a
-pair that does not contain RIPE. Protocol-facing price reads fail closed before
-the first snapshot and after all snapshots become stale.
+## Functional monitoring surface
+
+Only four non-interface behaviors remain:
+
+- `isMonitoringOnly()` identifies the contract's permanent role;
+- `getRipePoolState()` returns RIPE reserve, WETH reserve, and pair timestamp;
+- `getRipeWethMonitoringPrice()` returns the current spot WETH-per-RIPE ratio;
+- `getRipeUsdMonitoringPrice()` combines that ratio with PriceDesk's current
+  WETH/USD observation for direct monitoring.
+
+The constructor binds RipeHq, the pair, RIPE, and WETH as immutables. It
+requires the pair to contain exactly RIPE and WETH, in either order, and
+requires both tokens to use 18 decimals. PriceDesk is resolved dynamically
+through RipeHq ID 7 so a registry rotation does not stale the USD monitoring
+view.
+
+Pool, RipeHq, and PriceDesk reads fail closed to zero on a revert or malformed
+response. Arithmetic overflow in the WETH/USD multiplication also returns
+zero. These checks improve monitoring robustness; they do not make the spot
+ratio safe for protocol valuation.
+
+## Removed oracle-like machinery
+
+The monitoring revision removes all snapshot storage, ring-buffer averaging,
+staleness policy, upside throttling, pending configuration, local governance,
+action timelocks, pause state, priced-asset state, and generic asset handling.
+Historical sampling, aggregation, alerting, and manipulation detection belong
+in the off-chain monitoring system.
+
+This removal is intentional. Snapshot and throttling machinery made a
+manipulable spot observer resemble a collateral-grade oracle without providing
+the security properties of one.
 
 ## Verification
 
 [`test_minimal_prices.py`](../../../../tests/priceSources/uniswap/test_minimal_prices.py)
-contains 75 collected regression cases covering token order, decimal combinations, reserve
-and quote ratios, zero and malformed inputs, arithmetic overflow, bootstrap,
-snapshots, staleness, ring-buffer rollover and shrinkage, upside throttling,
-downside behavior, governance, events, standard snapshot-source configuration
-confirmation and cancellation, superseded and expired timelocks, permissions,
-recursive quote calls, and pause behavior. The unresolved repeated
-spot-manipulation case is retained as a
-strict expected failure pending the owner architecture decision. The repository
-ABI is exported as
-[`UniswapV2Prices.json`](../../../../scripts/abis/UniswapV2Prices.json).
+covers both token orderings, immutable identity, exact pair and decimal
+validation, all PriceSource stubs, reserve and USD observations, zero reserves,
+malformed and reverting dependencies, missing WETH/USD data, overflow, and the
+immediate/non-persistent effect of reserve manipulation.
 
-Current compiler facts with Vyper `0.4.3+commit.bff19ea2`:
-
-| Property | Value |
-| --- | --- |
-| Source SHA-256 | `5f783d681b919a1f42b266ac3bef881c90c0083b389b941652cdeebaaa2a5699` |
-| Source bytes | 15,636 |
-| Runtime-template bytes | 13,669 |
-| Runtime-template EIP-170 headroom | 10,907 bytes |
-| Runtime-template SHA-256 | `2dc8fa0469958bc4d829be6b10ede1210152dacfa3e2c95a847250cb286677d8` |
-| Constructor-bound immutable bytes | 256 |
-| Deployed-runtime bytes | 13,925 |
-| Deployed-runtime EIP-170 headroom | 10,651 bytes |
-| Canonical ABI SHA-256 | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
-| Committed ABI file SHA-256 | `1171f61c3eeed8930165c6851e64985da75e1352d31bc1862dceffa5813afe23` |
+The deployment migration binds the new four-argument constructor and performs
+readbacks of the monitoring marker, immutables, and permanent no-feed result.
+The repository ABI and constructor-bound deployed-runtime identity are
+regenerated from the integrated source. The measured deployed runtime is 3,781
+bytes, with 20,795 bytes of EIP-170 headroom.
 
 ## Readiness boundary
 
-This is not a production-readiness or deployment record. The current price is
-a spot reserve ratio, not a time-weighted oracle. The contract does not prove
-that the immutable pair came from an approved factory, enforce minimum
-liquidity, or bind a Robinhood pair address. Repeated permissioned protocol
-snapshot triggers can still persist a manipulated spot price; the regression
-suite records that unresolved behavior as a strict expected failure.
+The existing deployed instance cannot be changed in place. Source changes
+describe a replacement deployment, which requires separate authorization,
+runtime/constructor binding, manifest handling, and operational consumer
+updates. This PR does not deploy, register, activate, or replace anything.
 
-Before PriceDesk admission, security review must resolve those behaviors and
-bind the pair, quote asset/feed, liquidity and manipulation limits, oracle
-architecture, parameters, ownership, deployment, and monitoring. Deployment
-must also call `setActionTimeLockAfterSetup()` before any configuration or
-admission step. No migration,
-PriceDesk registration, configuration, deployment, or activation is included
-in this change.
+Neither monitoring getter may be used for borrowing, liquidation, collateral,
+accounting, or any other value-bearing decision. Any proposal to make this
+component value-bearing requires a new oracle architecture and security review.

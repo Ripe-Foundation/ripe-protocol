@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
+import click
 import pytest
 import requests
 
@@ -22,6 +23,7 @@ from config.network_profiles import (
 )
 from scripts import console, migrate, verify
 from scripts.utils import migration_helpers
+from scripts.utils.migration_helpers import TransactionExecutionError
 from scripts.utils.migration_runner import MigrationError
 
 
@@ -272,6 +274,24 @@ def test_missing_private_key_never_uses_public_fallback(monkeypatch):
     assert calls == []
 
 
+def test_verified_live_private_key_backend_is_profile_gated(monkeypatch):
+    expected = object()
+    loaded = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: loaded.append(value) or expected,
+    )
+    result = migration_helpers.get_account(
+        "DEPLOYER",
+        _verified("base-mainnet", Operation.MIGRATION_LIVE),
+        Operation.MIGRATION_LIVE,
+        environ=SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "synthetic-key"}),
+    )
+    assert result is expected
+    assert loaded == ["synthetic-key"]
+
+
 def test_public_local_key_is_test_only():
     occurrences = []
     # This scanner intentionally searches for the one contiguous production
@@ -482,14 +502,19 @@ def test_rpc_components_never_appear_in_logs_exceptions_or_repr():
 
 def test_execute_transaction_failure_never_logs_exception_text(capsys):
     failure_text = f"synthetic provider failure {_SENSITIVE_RPC}"
+    calls = []
 
     def fail():
+        calls.append("called")
         raise RuntimeError(failure_text)
 
-    result = migration_helpers.execute_transaction(fail, no_retry=True)
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        migration_helpers.execute_transaction(fail)
     rendered = capsys.readouterr().out
 
-    assert result is None
+    assert calls == ["called"]
     assert "H02_TRANSACTION_FAILED" in rendered
     assert failure_text not in rendered
     assert "synthetic provider failure" not in rendered
@@ -502,6 +527,39 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         "fragment-token",
     ):
         assert component not in rendered
+
+
+def test_execute_transaction_none_result_fails_without_replay():
+    calls = []
+
+    def missing_result():
+        calls.append("called")
+        return None
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_RESULT_MISSING"
+    ):
+        migration_helpers.execute_transaction(
+            missing_result, max_attempts=20
+        )
+    assert calls == ["called"]
+
+
+def test_execute_transaction_retries_then_returns_confirmed_result(monkeypatch):
+    monkeypatch.setattr(migration_helpers.time, "sleep", lambda value: None)
+    calls = []
+    expected = object()
+
+    def eventually_succeeds():
+        calls.append("called")
+        if len(calls) == 1:
+            raise RuntimeError("transient")
+        return expected
+
+    assert migration_helpers.execute_transaction(
+        eventually_succeeds, max_attempts=2
+    ) is expected
+    assert calls == ["called", "called"]
 
 
 def test_explorer_key_is_not_read_at_import_or_help():
@@ -578,7 +636,105 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
     assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
 
 
-# Safe and Ledger are approved backends for Base on their own, so neither is
-# rejected in isolation any more. Requesting BOTH is still unapproved, and it is
-# rejected on the same path with the same code -- which is what this test is
-# actually about: an unapproved backend never reaches a chain read or a secret.
+# Live Safe proposal submission is deliberately unadvertised until a qualified
+# backend exists. Fork-only Safe impersonation and live Ledger signing remain
+# separate paths.
+
+
+def test_migrate_wrong_chain_stops_before_account_history_or_fork(monkeypatch):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(
+        migrate, "read_chain_id", lambda value: events.append("chain") or 1
+    )
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: events.append("history"),
+    )
+    monkeypatch.setattr(
+        migrate.boa, "fork", lambda *args, **kwargs: events.append("fork")
+    )
+
+    with pytest.raises(click.ClickException, match="H02_CHAIN_ID_MISMATCH"):
+        _call_migrate()
+    assert events == ["chain"]
+
+
+@pytest.mark.parametrize(
+    ("force_replay", "expected_ignore_logs"),
+    ((False, False), (True, True)),
+)
+def test_migrate_resume_and_force_replay_semantics(
+    monkeypatch, force_replay, expected_ignore_logs
+):
+    observed = {}
+
+    def run(deploy_args, start, end, continue_running):
+        observed.update(
+            ignore_logs=deploy_args.ignore_logs,
+            start=start,
+            end=end,
+            continue_running=continue_running,
+            chain=deploy_args.chain,
+            blueprint=deploy_args.blueprint.blueprint,
+        )
+        return 0
+
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    _prepare_migration_execution(monkeypatch, run)
+    _call_migrate(
+        rpc=_SENSITIVE_RPC,
+        start_timestamp=None,
+        end_timestamp=None,
+        is_retry=force_replay,
+    )
+
+    assert observed == {
+        "ignore_logs": expected_ignore_logs,
+        "start": None,
+        "end": None,
+        "continue_running": True,
+        "chain": "base-mainnet",
+        "blueprint": "base",
+    }
+
+
+def test_live_safe_backend_fails_before_signer_construction(monkeypatch):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: events.append("history"),
+    )
+
+    with pytest.raises(
+        click.ClickException, match="H02_ACCOUNT_BACKEND_UNAPPROVED"
+    ):
+        _call_migrate(fork=False, safe="0x" + "1" * 40)
+    assert events == []
+
+
+def test_migrate_rejects_history_and_blueprint_aliases_before_account(
+    monkeypatch,
+):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+
+    with pytest.raises(click.ClickException, match="H02_HISTORY_ALIAS"):
+        _call_migrate(environment="v2")
+    with pytest.raises(click.ClickException, match="H02_PROFILE_INVALID"):
+        _call_migrate(blueprint="robinhood")
+    assert events == []

@@ -16,7 +16,7 @@ def test_m4_deleverage_source_abi_and_vault_interface_are_frozen():
             "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138"
         ),
         "scripts/abis/Deleverage.json": (
-            "d0480bf6b0d7d05c461b33b31dd0e85b48135fa66d850a4c8526e0d9fefaea8d"
+            "7de1944637565f5640169b879a13705706332cd171ae41579c45dfe5da72cb43"
         ),
         "interfaces/Vault.vyi": (
             "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"

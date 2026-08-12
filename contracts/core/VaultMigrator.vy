@@ -37,6 +37,7 @@ interface MissionControl:
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def isStabVaultId(_vaultId: uint256) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def coreRipeGovVaultId() -> uint256: view
 
 interface AddressRegistry:
@@ -134,14 +135,15 @@ def migrateVaultPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sourc
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, _targetVaultId, a.vaultBook, a.missionControl)
 
+    # A core-pointer rotation must never make a former RipeGov eligible for the
+    # generic balance-only path. MissionControl's monotonic classification
+    # records every historical core id.
+    assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is ripe gov
+    assert not staticcall MissionControl(a.missionControl).isRipeGovVaultId(_targetVaultId) # dev: target is ripe gov
+
     # both must NOT be paused
     assert not staticcall Vault(sourceVault).isPaused() # dev: source vault paused
     assert not staticcall Vault(targetVault).isPaused() # dev: target vault paused
-
-    # source and target must not be the core ripe gov vault
-    coreRipeGovVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
-    assert _sourceVaultId != coreRipeGovVaultId # dev: source is core ripe gov
-    assert _targetVaultId != coreRipeGovVaultId # dev: target is core ripe gov
 
     numPositions: uint256 = 0
     for user: address in _users:
@@ -223,12 +225,19 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
     assert len(_users) != 0 # dev: no migrations
 
     a: addys.Addys = addys._getAddys()
+    assert staticcall Department(a.teller).isPaused() # dev: teller not paused
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
     # validate migration route
     sourceVault: address = empty(address)
     targetVault: address = empty(address)
     sourceVault, targetVault = self._validateMigrationRoute(_sourceVaultId, targetVaultId, a.vaultBook, a.missionControl)
+
+    # Exporter-capable RipeGov migrations are the only path for a historical
+    # core vault. The immutable Base source is bound to its dedicated route.
+    assert staticcall MissionControl(a.missionControl).isRipeGovVaultId(_sourceVaultId) # dev: source is not ripe gov
+    if LEGACY_RIPE_GOV_VAULT != empty(address):
+        assert sourceVault != LEGACY_RIPE_GOV_VAULT # dev: use legacy ripe gov migration
 
     # both must be paused
     assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
@@ -296,7 +305,7 @@ def migrateRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS], _sou
                 unlock=migData.unlock,
             )
 
-        # perform house keeping
+        # perform housekeeping
         if numPositions > numPositionsBefore:
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 
@@ -314,6 +323,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
     assert chain.id == BASE_CHAIN_ID and LEGACY_RIPE_GOV_VAULT != empty(address) # dev: legacy migration disabled
 
     a: addys.Addys = addys._getAddys()
+    assert staticcall Department(a.teller).isPaused() # dev: teller not paused
     targetVaultId: uint256 = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
 
     # validate migration route
@@ -403,7 +413,7 @@ def migrateLegacyRipeGovPositions(_users: DynArray[address, MAX_MIGRATION_USERS]
                 unlock=migData.unlock,
             )
 
-        # perform house keeping
+        # perform housekeeping
         if numPositions > numPositionsBefore:
             extcall Teller(a.teller).performHousekeeping(True, user, True, a)
 

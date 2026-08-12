@@ -189,12 +189,12 @@ ROBINHOOD_RESERVATIONS: tuple[MigrationReservation, ...] = (
         "1000",
         "1000_CcipPoolsAndRegistration.py",
         "ccip-pools-and-registration",
-        "deferred",
+        "confirmed_external_state_gated",
         ("B-T1-CCIP", "B-T1-TOOLCHAIN"),
     ),
 )
 
-_REPORT_SCHEMA = "ripe.robinhood.migration-plan.v3"
+_REPORT_SCHEMA = "ripe.robinhood.migration-plan.v4"
 _PRODUCTION_ARTIFACT_DOMAIN = b"ripe-robinhood-production-artifact-v1"
 _PRODUCTION_PLAN_DOMAIN = b"ripe-robinhood-production-plan-v1"
 _PREVIEW_ARTIFACT_DOMAIN = b"ripe-robinhood-preview-artifact-v1"
@@ -265,11 +265,16 @@ _FIXED_PLANNING_INPUTS = (
     "scripts/utils/manifest_schema.py",
     "scripts/utils/migration.py",
     "scripts/utils/migration_runner.py",
+    "solidity/README.md",
+    "solidity/foundry.toml",
+    "solidity/src/RipeCcipBurnMintTokenPools.sol",
+    "solidity/src/RipeTokenPool.sol",
+    "solidity/test/RipeCcipBurnMintTokenPools.t.sol",
 )
 
 
 def robinhood_source_expectations() -> tuple[SourceExpectation, ...]:
-    """Return the executable shared-source set; deferred 1000 has no file."""
+    """Return launch sources; live CCIP is observed, not redeployed here."""
 
     return tuple(
         SourceExpectation(
@@ -279,6 +284,23 @@ def robinhood_source_expectations() -> tuple[SourceExpectation, ...]:
         )
         for reservation in _SOURCE_RESERVATIONS
     )
+
+
+def ccip_external_existing_stages() -> list[Mapping[str, Any]]:
+    """Represent observed live CCIP without adding a launch mutation stage."""
+
+    return [
+        {
+            "migration_id": "1000",
+            "semantic_id": "ccip-pools-and-registration",
+            "state": "confirmed_existing_live_state",
+            "reason": (
+                "ccip-live-state-observed-outside-launch-mutation-graph; "
+                "any further transaction remains separately gated"
+            ),
+            "blockers": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
+        }
+    ]
 
 
 def _plain(value: Any) -> Any:
@@ -1631,13 +1653,10 @@ def build_robinhood_plan(
         "source": source,
         "execution_envelope": envelope,
         "stages": planned_stages,
-        "deferred_stages": [
-            {
-                "migration_id": "1000",
-                "semantic_id": "ccip-pools-and-registration",
-                "reason": "ccip-deferred-outside-launch-graph",
-            }
-        ],
+        # Retained as an empty compatibility surface for v3 report consumers;
+        # the already-live CCIP package is not a deferred launch stage.
+        "deferred_stages": [],
+        "external_existing_stages": ccip_external_existing_stages(),
         "component_coverage": {
             "selected": sorted(target_selected),
             "blocked": sorted(target_blocked),
@@ -2398,6 +2417,7 @@ def build_blocked_migration_report(
         "source_members": plan["source"]["members"],
         "steps": plan["stages"],
         "deferred_steps": plan["deferred_stages"],
+        "external_existing_steps": plan["external_existing_stages"],
         "component_coverage": plan["component_coverage"],
         "registry_coverage": plan["registry_coverage"],
         "action_census": plan["action_census"],
@@ -2534,7 +2554,12 @@ class MigrationRunner:
 
             if end_timestamp_int is not None and timestamp_int > end_timestamp_int:
                 break
-            if start_timestamp_int is None or timestamp_int >= start_timestamp_int:
+            starts_here = (
+                start_timestamp_int is None
+                or timestamp_int > start_timestamp_int
+                or (inclusive and timestamp_int == start_timestamp_int)
+            )
+            if starts_here:
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 
@@ -2546,16 +2571,22 @@ class MigrationRunner:
 
         latest_timestamp = None
 
-        # create the history directory if it doesn't already exist
-        os.makedirs(self.history_dir, exist_ok=True)
+        if not os.path.isdir(self.history_dir):
+            raise RuntimeError("MIGRATION_HISTORY_UNAVAILABLE")
 
-        # scan each file to get the latest timestamp
+        # Only a numeric manifest is a completed checkpoint. `current` is a
+        # state index, and `*-pending-manifest.json` is an incomplete journal;
+        # neither may silently advance resume.
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(\d+)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
-                # Convert timestamps to integers for proper numerical comparison
                 if latest_timestamp == None or int(timestamp) > int(latest_timestamp):
                     latest_timestamp = timestamp
+
+        if latest_timestamp is None and os.path.exists(
+            os.path.join(self.history_dir, "current-manifest.json")
+        ):
+            raise RuntimeError("MIGRATION_RESUME_CHECKPOINT_REQUIRED")
 
         return latest_timestamp

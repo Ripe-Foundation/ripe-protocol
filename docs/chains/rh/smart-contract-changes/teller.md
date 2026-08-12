@@ -1,5 +1,11 @@
 # Teller: exact deposit receipt
 
+> **11 August 2026 CCIP currentness note:** “owner-parked” CCIP statements below
+> preserve the reviewed snapshot's historical scope boundary. GREEN/RIPE CCIP
+> topology is now confirmed live; see
+> [`../ccip-live-state.md`](../ccip-live-state.md). No further transaction or
+> release is implied.
+
 > **Draft explanatory synthesis — not controlling approval evidence.** This
 > document explains a reviewed implementation snapshot. It does not authorize
 > a source change, deployment, activation, migration, release, or parked work.

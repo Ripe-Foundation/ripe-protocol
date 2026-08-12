@@ -1,5 +1,11 @@
 # Chainlink technical question packet: GREEN/RIPE on Base <-> Robinhood Chain
 
+> **Historical unsent draft; do not send as current state.** The pools are now
+> live, but the exact live source/compiler/settings/constructor identity and
+> relationship to the repository's 1.5.1 candidate are unresolved. See
+> [ccip-live-state.md](ccip-live-state.md) for confirmed topology and the
+> destination-gas evidence question that remains unresolved.
+
 Status: **REVISED DRAFT — NOT SENT — FRESH OWNER APPROVAL REQUIRED**
 
 Revised: 2026-07-27

@@ -41,6 +41,7 @@ interface Ledger:
     def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
+    def hasFungibleAuctions(_liqUser: address) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
@@ -239,22 +240,8 @@ def liquidateUser(
     _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    vaultRegistry: address = self._getUnderscoreVaultRegistry(a.missionControl)
-
-    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    assert config.canLiquidate # dev: cannot liquidate
-
-    # liquidate user
-    keeperRewards: uint256 = self._liquidateUser(_liqUser, config, vaultRegistry, a)
-
-    # handle keeper rewards
-    if keeperRewards != 0:
-        self._handleGreenForUser(_keeper, keeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
-
-    return keeperRewards
+    users: DynArray[address, MAX_LIQ_USERS] = [_liqUser]
+    return self._liquidateManyUsers(users, _keeper, _wantsSavingsGreen, _a)
 
 
 @external
@@ -263,6 +250,16 @@ def liquidateManyUsers(
     _keeper: address,
     _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    return self._liquidateManyUsers(_liqUsers, _keeper, _wantsSavingsGreen, _a)
+
+
+@internal
+def _liquidateManyUsers(
+    _liqUsers: DynArray[address, MAX_LIQ_USERS],
+    _keeper: address,
+    _wantsSavingsGreen: bool,
+    _a: addys.Addys,
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
@@ -307,8 +304,11 @@ def _liquidateUser(
     if userDebt.amount == 0:
         return 0
 
-    # already in liquidation
-    if userDebt.inLiquidation:
+    # An outstanding auction owns the current liquidation pass. A user that is
+    # still unhealthy but has no auction must remain globally frozen while
+    # allowing a later pass to retry non-auction settlement or queue newly
+    # eligible collateral.
+    if staticcall Ledger(_a.ledger).hasFungibleAuctions(_liqUser):
         return 0
 
     # user has debt but no liquidation threshold - cannot liquidate
@@ -359,9 +359,21 @@ def _liquidateUser(
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
 
-    # Latch for usable borrowing collateral or a queued auction asset, including
-    # Stability Pool positions; fully deficient positions remain retryable.
-    userDebt.inLiquidation = (bt.collateralVal | self.numUserAssetsForAuction[_liqUser]) != 0
+    hasQueuedAuction: bool = self.numUserAssetsForAuction[_liqUser] != 0
+
+    # Reaching the liquidation threshold freezes the whole account until debt
+    # health is restored. This also locks protocol-held zero-LTV assets and
+    # positive-LTV assets that policy does not permit the AuctionHouse to sell.
+    # repayFromDept clears the flag below if this pass restores debt health.
+    userDebt.inLiquidation = True
+
+    # Retryable no-progress calls must also be economically inert. Charging
+    # liquidation fees or minting a keeper reward when no debt was repaid and
+    # no asset was queued lets repeated calls increase debt without advancing
+    # liquidation.
+    if repayValueIn == 0 and not hasQueuedAuction:
+        totalLiqFees = 0
+        keeperFee = 0
 
     # check if liq fees were already covered (stability pool swaps)
     liqFeesUnpaid: uint256 = totalLiqFees
@@ -685,14 +697,11 @@ def _getUsdValue(
     _savingsGreen: address,
     _priceDesk: address,
 ) -> uint256:
-    usdValue: uint256 = 0
     if _asset == _greenToken:
-        usdValue = _amount
-    elif _asset == _savingsGreen:
-        usdValue = staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
-    else:
-        usdValue = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
-    return usdValue
+        return _amount
+    if _asset == _savingsGreen:
+        return staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
+    return staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
 
 
 @internal
@@ -742,9 +751,11 @@ def _swapAssetsWithStabPool(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
+    poolBalanceBefore: uint256 = staticcall IERC20(_liqAsset).balanceOf(_stabPool.vaultAddr)
     collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _stabPool.vaultAddr, _liqVaultId, _liqVaultAddr, _liqAsset, False, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0 or collateralAmountSent == 0:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
+    assert staticcall IERC20(_liqAsset).balanceOf(_stabPool.vaultAddr) == poolBalanceBefore + collateralAmountSent
 
     # calc target stab pool values
     targetStabPoolUsdValue: uint256 = collateralUsdValueSent * (HUNDRED_PERCENT - _liqFeeRatio) // HUNDRED_PERCENT
@@ -1027,20 +1038,14 @@ def buyFungibleAuction(
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert greenAmount != 0 # dev: no green to spend
-    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _recipient, _caller, _shouldTransferBalance, a)
-    assert greenSpent != 0 # dev: no green spent
-
-    # handle leftover green
-    if greenAmount > greenSpent:
-        self._handleGreenForUser(_caller, greenAmount - greenSpent, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
-
-    return greenSpent
+    purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS] = []
+    purchases.append(FungAuctionPurchase(
+        liqUser=_liqUser,
+        vaultId=_vaultId,
+        asset=_asset,
+        maxGreenAmount=max_value(uint256),
+    ))
+    return self._buyManyFungibleAuctions(purchases, _greenAmount, _recipient, _caller, _shouldTransferBalance, _shouldRefundSavingsGreen, _a)
 
 
 @external
@@ -1052,6 +1057,19 @@ def buyManyFungibleAuctions(
     _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    return self._buyManyFungibleAuctions(_purchases, _greenAmount, _recipient, _caller, _shouldTransferBalance, _shouldRefundSavingsGreen, _a)
+
+
+@internal
+def _buyManyFungibleAuctions(
+    _purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS],
+    _greenAmount: uint256,
+    _recipient: address,
+    _caller: address,
+    _shouldTransferBalance: bool,
+    _shouldRefundSavingsGreen: bool,
+    _a: addys.Addys,
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
@@ -1172,9 +1190,7 @@ def _buyFungibleAuction(
 def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxDiscount: uint256) -> uint256:
     if _progress == 0 or _startDiscount == _maxDiscount:
         return _startDiscount
-    discountRange: uint256 = _maxDiscount - _startDiscount
-    adjustment: uint256 =  _progress * discountRange // HUNDRED_PERCENT
-    return _startDiscount + adjustment
+    return _startDiscount + _progress * (_maxDiscount - _startDiscount) // HUNDRED_PERCENT
 
 
 #############
@@ -1257,14 +1273,11 @@ def _getAssetAmount(
     _savingsGreen: address,
     _priceDesk: address,
 ) -> uint256:
-    amount: uint256 = 0
     if _asset == _greenToken:
-        amount = _targetUsdValue
-    elif _asset == _savingsGreen:
-        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    else:
-        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
-    return amount
+        return _targetUsdValue
+    if _asset == _savingsGreen:
+        return staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    return staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
 
 
 # green handling
@@ -1308,9 +1321,7 @@ def _handleGreenForUser(
 def _isPaymentCloseEnough(_requestedAmount: uint256, _actualAmount: uint256) -> bool:
     # An extra safety check to make sure what was paid was actually close-ish to what was requested
     buffer: uint256 = _requestedAmount * ONE_PERCENT // HUNDRED_PERCENT
-    upperBound: uint256 = _requestedAmount + buffer
-    lowerBound: uint256 = _requestedAmount - buffer
-    return upperBound >= _actualAmount and _actualAmount >= lowerBound
+    return _requestedAmount + buffer >= _actualAmount and _actualAmount >= _requestedAmount - buffer
 
 
 # calc amount of debt to repay

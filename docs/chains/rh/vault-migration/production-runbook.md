@@ -1,188 +1,185 @@
-# Deposit-Vault Position Migration — RH Production Runbook
+# Deposit-vault position migration runbook
 
-**Scope:** governance-operated migration of one user's entire balance of one ERC-20 asset from one
-compatible registered deposit vault to another, via
-`SwitchboardEcho.migrateVaultPositions` → `Teller.migrateVaultPosition`.
+Scope: governance-operated, bounded migration of many users. For each user,
+the migrator enumerates and moves every supported source asset in the same
+transaction. The production call path is:
 
-**Primary use:** replacing a Stability Pool. The same path supports compatible SimpleErc20 and
-RebaseErc20 pairs. The core RipeGov vault is excluded by design and keeps its own separate
-migration path (`Teller.migrateRipeGovPosition`).
+```text
+governance
+  -> SwitchboardEcho.migrateVaultPositions(users, sourceVaultId, targetVaultId)
+  -> VaultMigrator.migrateVaultPositions(...)
+  -> Teller withdrawal/deposit helpers
+```
 
-This runbook documents operational procedure only. It authorizes no production transaction.
-Execution, commit, push and deployment all remain separately owner-gated.
+RipeGov uses the separate
+`SwitchboardEcho.migrateRipeGovPositions(users, sourceVaultId)` route. The Base
+legacy vault uses `SwitchboardEcho.migrateLegacyRipeGovPositions(users)`.
+Operators do not call a `Teller.migrate*` function; no such public Teller
+entrypoint exists.
 
----
+This document describes procedure only. It authorizes no transaction,
+deployment, registry update, or release.
 
-## 0. Hard operational constraints
+## On-chain constraints
 
-These are properties of the deployed code, not preferences. Each is enforced on-chain and each has
-a corresponding test in `tests/vaults/test_vault_migration.py`.
+| Constraint | Operational consequence |
+| --- | --- |
+| Echo is governance-only | Submit the batch through the approved governance/Safe path. |
+| VaultMigrator accepts only a registered switchboard | Calling VaultMigrator directly from an EOA reverts. |
+| VaultMigrator is RipeHq id 25 | Read back the exact candidate at id 25; a deployment or manifest label without registry activation has no Teller authority. |
+| VaultMigrator must be unpaused | Confirm its department state before the window. |
+| Teller must be paused | Ordinary user actions are closed while its migration-only helpers remain available to VaultMigrator. |
+| Generic source and target vaults must be unpaused | Their normal withdrawal/deposit accounting is reused. |
+| Ledger and CreditEngine must remain unpaused | Per-user housekeeping and debt reconciliation run after a migrated user. |
+| Source and target must be distinct valid VaultBook entries | Bind both registry IDs and addresses immediately before execution. |
+| Historical RipeGov vaults are excluded from the generic route | Use only a dedicated RipeGov migration function; changing the current core pointer does not turn an old RipeGov into a generic vault. |
+| Source and target must agree on Stability Pool classification | A generic move cannot cross the Stability/non-Stability boundary. |
+| Every migrated asset must fully deplete at the source | A partial withdrawal reverts the entire batch. |
+| The batch is atomic | A failure for a late user rolls back every earlier user in the transaction. |
 
-| constraint | why | consequence if ignored |
-|---|---|---|
-| Caller must be a registered switchboard | `Teller.migrateVaultPosition` asserts `addys._isSwitchboardAddr(msg.sender)` | call reverts `only switchboard allowed` |
-| Echo wrapper is governance-only | `gov._canGovern` | call reverts `no perms` |
-| **Teller must be paused** | migration is unavailable during ordinary operation | reverts `teller not paused` |
-| **Both endpoint vaults must be UNPAUSED** | the ordinary deposit/withdraw internals assert `not vaultData.isPaused` | reverts `source vault paused` / `target vault paused` |
-| Neither endpoint may be the current `coreRipeGovVaultId` | current-pointer exclusion rule | reverts `source is core ripe gov` / `target is core ripe gov` |
-| Both endpoints must share `isStabVaultId` | prevents collateral ↔ non-collateral stability moves | reverts `stab vault mismatch` |
-| Source must have Ledger participation | proves a real position exists | reverts `source vault missing from Ledger` |
-| Source must fully deplete | partial migration is not supported | reverts `source position not depleted` |
-| **At most one migration per user per action block** | see §0.1 | reverts `one action per block`, rolling back the entire batch |
+The ABI ceiling is 25 users, not an instruction to submit 25. Select a batch
+size from a fork rehearsal of the actual users, asset counts, vault types, and
+chain gas limit.
 
-### 0.1 One migration per user per action block — binding manifest rule
+## User and asset semantics
 
-Every migration ends with `_performHousekeeping(_isHigherRisk=True, ...)`, which calls
-`Ledger.checkAndUpdateLastTouch(user, shouldCheck=True)` whenever
-`MissionControl.shouldCheckLastTouch()` is enabled. **RH enables it**
-(`DefaultsRobinhood.shouldCheckLastTouch()` returns `True`).
+Deduplicate by user. One user appears at most once in a transaction, and one
+call handles all supported source assets for that user. Do not split RIPE and
+RIPE-LP into separate calls merely because they are distinct assets.
 
-That guard asserts `lastTouch[user] != actionBlock`. Therefore:
+The migrator snapshots or reads the user's source positions before mutation,
+skips unsupported target assets, and migrates supported positions atomically.
+The returned count and events count positions, not users. A zero address or a
+user with no eligible balance does not establish that the user census is
+complete; reconcile every manifest row against live state.
 
-- A user may appear **at most once per action block**, across *all* batches in that block — not
-  merely once per `(user, asset, source)` tuple.
-- A user holding **N** assets in the source vault requires **N separate blocks**.
-- Splitting a batch into several transactions within the same block does **not** help.
-- Any prior Teller action for that user in the same block (including a trusted deposit) also
-  stamps `lastTouch` and will block the migration.
+`Ledger.checkAndUpdateLastTouch` still applies through housekeeping. Pause
+Teller, then execute after a later action block and preflight `lastTouch` for
+every user. A user action earlier in the same action block can revert the whole
+batch even if the manifest itself contains no duplicate.
 
-**Manifest rule: deduplicate by USER, not by (user, asset, source).** Build one batch per block
-containing each user at most once.
+## Bind the environment
 
-The existing RipeGov migration has no such constraint, because `migrateRipeGovPosition` does not
-call `_performHousekeeping`. Do not carry RipeGov batching habits over to this path.
+Record and independently verify:
 
-### 0.1a The generic path does not remove source Ledger participation
+1. chain ID, RPC identity, snapshot block number/hash, and Safe;
+2. RipeHq, Switchboard, SwitchboardEcho, VaultMigrator, Teller, TellerUtils,
+   Ledger, CreditEngine, Lootbox, MissionControl, VaultBook, source, and target
+   addresses;
+3. registry IDs, deployed runtime hashes, constructor immutables, pause states,
+   and governance owners;
+4. the complete historical-RipeGov ID set and the current
+   `coreRipeGovVaultId`;
+5. target asset support and source/target Stability classification; and
+6. every trusted producer or alternate deposit route that can change a source
+   position during the window.
 
-Unlike `migrateRipeGovPosition`, this path deliberately leaves the user's source-vault
-participation in place with a zero balance. Ordinary `Lootbox` cleanup removes it on the user's
-next `claimLoot`: zero-balance assets are deregistered from the vault, and a vault with no
-remaining assets is dropped from the user. Expect migrated users to remain enumerated in the
-source vault until then; this is temporary and harmless.
+Abort if any readback differs from the approved manifest. A source-code or
+template hash is not a deployed-runtime identity when constructor immutables
+exist.
 
-For reference, the RipeGov path removes participation immediately through
-`Ledger.removeVaultFromUserForMigration`. That narrow helper authorizes only the current Teller
-address and is unavailable while Ledger itself is paused. Teller proves that the source position
-is empty before cleanup, proves the source Ledger entry was removed afterward, and only adds the
-target Ledger entry when the user is not already participating there. Lootbox is not on this
-migration cleanup route.
+For first activation, prove RipeHq ids 23 and 24 are the approved CCIP pools,
+`numAddrs()` is 25 before the append, the confirmation returns 25, and
+`getAddr(25)` equals the VaultMigrator candidate afterwards. Robinhood's
+candidate must bind `(RipeHq, false, zero-address)` as its constructor inputs:
+unpaused for the controlled window and with no Base legacy-vault address.
 
-### 0.2 Trusted producers bypass the Teller pause
+## Prepare the route
 
-`Teller.depositFromTrusted` is intentionally **not** pause-gated. Pausing Teller therefore does not
-freeze the endpoint vaults the way the RipeGov path's vault-pause does. Trusted producers must be
-rerouted away from the source **before** the migration window opens, and re-checked after the
-pause. This is a procedural control, not an on-chain one.
+1. Register and fully configure the target through its normal timelocked
+   governance path.
+2. For a Stability Pool replacement, prove the target supports every selector
+   used by liquidation, including `canAcceptLiquidationAsset`, and prove its
+   claim-asset state is compatible with the move.
+3. Remove or reroute trusted producers from the source.
+4. Build the holder census from events and reconcile it to live source
+   balances and Ledger participation.
+5. Sort and deduplicate users. Record every eligible asset and every skipped
+   asset with the exact reason.
 
----
+For a Stability Pool, a nonempty claimable basket or custody deficit can make
+full depletion impossible. Clear and reconcile the economic state through an
+approved route; never remove the `isDepleted` assertion to force migration.
 
-## 1. Bind the environment
+## Open and rehearse the window
 
-1. Bind chain ID and snapshot block/hash.
-2. Record current addresses for Teller, TellerUtils, SwitchboardEcho, VaultBook, MissionControl,
-   Ledger, Lootbox and both endpoint vaults.
-3. Record endpoint code hashes.
-4. **Prove Teller and TellerUtils share the same RipeHq.** `Teller.migrateVaultPosition` delegates
-   endpoint resolution to TellerUtils, which resolves its own address bundle from its own immutable
-   RipeHq. Verify:
-   - `Teller.getRipeHq() == TellerUtils.getRipeHq() == <expected RipeHq>`
-   - both resolve the same Switchboard, VaultBook, MissionControl, Ledger and Teller addresses
-   - both are the exact implementations the live registry pointers select
+1. Pause Teller.
+2. Keep VaultMigrator, Ledger, CreditEngine, and the endpoint states required
+   by the selected migration route available.
+3. Wait for a later action block, then re-read every bound address, pause
+   state, route, user `lastTouch`, balance, debt, and lock record.
+4. Fork-rehearse the exact Safe calldata at the bound block. Include a canary,
+   the maximum intended batch, a late-user failure, and a same-action-block
+   failure.
+5. Prove a late failure leaves all source/target balances, shares, locks,
+   points, Ledger entries, Lootbox records, debt state, and events unchanged.
 
----
+Do not extrapolate old single-asset gas measurements to the all-assets-per-user
+implementation.
 
-## 2. Prepare the target
+## Execute and reconcile
 
-5. Register and configure the target vault and asset through the normal governed path.
-6. For a Stability Pool replacement: remove the source from liquidation/priority routes, set the
-   target as preferred, and prove the target is absent from every liquidation route with an empty
-   claimable basket.
-7. For any vault type: identify every trusted producer and prove it no longer selects the source.
-8. Verify neither endpoint is the current `coreRipeGovVaultId`, and that both endpoints have equal
-   `isStabVaultId` values.
+Execute a canary batch first. For every position, reconcile:
 
----
+- exact source debit and target credit;
+- Teller and VaultMigrator residual token balances;
+- source depletion and target shares;
+- Ledger participation and `lastTouch`;
+- Lootbox point updates;
+- debt and liquidation health; and
+- emitted user/asset migration events.
 
-## 3. Open the window
+Only then execute the remaining measured batches. After each batch, repeat the
+live holder census. A late trusted deposit changes the live position and must
+be included or explicitly blocked before source retirement.
 
-9. **Pause Teller.** Keep both vaults **unpaused** — their deposit/withdraw internals require it.
-10. Re-read all bound addresses and code hashes after the pause.
+A replay of a fully depleted user is normally a zero-position no-op, but that
+does not make an unchecked batch idempotent: skipped, residual, newly added, or
+partially eligible positions can produce a different result, and any late
+failure remains atomic. Resume from reconciled chain state, not from a local
+success log.
 
----
+## RipeGov-specific rules
 
-## 4. Build and prove the manifest
+The generic route is never a substitute for RipeGov migration. Dedicated
+RipeGov migration must preserve the original unlock, stored lock terms,
+governance points, and pending points. Global and per-user accrual-disable
+settings are emergency policy local to the source vault and are not carried to
+the destination.
 
-11. Discover holders from logs and reconcile against live source balances.
-12. Sort and deduplicate the manifest **by user** (§0.1). Split into gas-safe batches.
-    Twenty-five is an ABI ceiling, not a required batch size.
-13. Fork-simulate every final Safe calldata batch against the bound snapshot. Reconcile source
-    withdrawal, target deposit, Echo migration event, Ledger, Lootbox and debt health.
+The pause matrix differs by dedicated route. A registered same-chain
+`migrateRipeGovPositions` move requires both source and target RipeGov vaults
+paused. The Base legacy route requires the legacy source unpaused and the new
+target paused. Teller remains paused and VaultMigrator remains unpaused in
+both cases. Bind the selected function and prove its exact matrix; do not carry
+the generic unpaused-endpoint rule into a RipeGov batch.
 
-### Measured gas (local Boa, SimpleErc20 → SimpleErc20)
+For the Base legacy wind-down, governance may reduce the RIPE and RIPE-LP
+minimum lock durations together by one block only after the census proves the
+new minimum is below every migrating position's stored historical minimum.
+The controlled sequence is:
 
-| users | total gas | per user |
-|---:|---:|---:|
-| 1 | 582,820 | 582,820 |
-| 5 | 2,124,740 | 424,948 |
-| 10 | 4,052,140 | 405,214 |
-| 25 | 9,834,340 | 393,373 |
+1. pause Teller;
+2. apply and confirm the approved lock-configuration change;
+3. wait for the required action-block boundary;
+4. call `migrateLegacyRipeGovPositions(users)` in gas-qualified multi-user
+   batches; and
+5. restore or advance configuration exactly as the approved migration plan
+   specifies.
 
-A 25-user batch fits comfortably inside a standard block envelope. Re-measure on the target chain
-before signing; these are local-EVM figures, not chain-calibrated. Other pairings (Rebase,
-Stability) cost more per user; size batches from a fork simulation of the actual pairing.
+Changing the configuration does not authorize loss of the user's stored lock.
+The target import must restore that original lock and terms.
 
----
+## Closeout
 
-## 5. Execute
+Retire a source only after a second independent census proves no economic
+position, claim, reward, debt dependency, or trusted producer remains.
+Pause VaultMigrator to close the privileged migration window unless a separate
+owner-approved operating policy keeps it available. Unpause Teller only after
+that decision and all registry, route, accounting, and residual-token
+readbacks match the approved post-migration manifest.
 
-14. Execute a canary batch, reconcile it fully, then execute the remaining batches.
-15. Repeat holder discovery and live reconciliation to catch late trusted deposits; migrate any
-    residual positions before retiring the source.
-
-The function moves the user's **entire live position at execution time**. A late trusted deposit is
-therefore included in the migration, not treated as stale-manifest corruption.
-
----
-
-## 6. Close out
-
-16. Remove source support, then pause/retire the source, only after its economic positions are
-    empty.
-17. Do **not** call `Lootbox.resetAssetPoints` until all source rewards are claimed or a separate
-    forfeiture policy is approved.
-18. Unpause Teller only after independent pointer, route, supported-vault and residual checks.
-
----
-
-## 7. Stability Pool specifics
-
-A nonempty source claimable basket normally prevents full depletion: the withdrawal computes value
-including claimables but can transfer only the stability asset, so `isDepleted` stays false and
-Teller reverts.
-
-**Clear and re-prove the basket before migrating. Never remove the `isDepleted` assertion to work
-around it.**
-
----
-
-## 8. Failure and recovery
-
-Atomicity is the recovery mechanism. Any failure after the withdrawal reverts the withdrawal and
-every metadata update, for the **whole Echo batch** — no partial batch can land, and no migration
-event survives a reverted batch.
-
-Successful calls are **not idempotent**: a replay finds no source balance and reverts. Re-running a
-partially-successful plan is safe only because the successful entries now fail closed.
-
----
-
-## 9. Trust boundaries
-
-- Governance controls SwitchboardEcho calls; any registered switchboard can reach
-  `Teller.migrateVaultPosition`. Keeping migration wrappers confined to Echo is a governance
-  convention, not an on-chain guarantee.
-- RipeHq and VaultBook registry changes follow their own governance/timelock processes.
-- The current core pointer is the on-chain RipeGov exclusion boundary. Governance must not register
-  and support an unpaused, non-core RipeGov as an ordinary deposit-vault endpoint. The rule is a
-  current-pointer rule; it does not claim to identify every RipeGov bytecode.
-- Operators must reroute trusted producers before pausing Teller (§0.2).
+Keep the candidate deployment records, Safe transaction IDs, timelock action
+IDs, fork evidence, per-batch receipts, and final reconciliation together. A
+green aggregate test count or a local manifest update is not proof that a
+registry activation occurred.

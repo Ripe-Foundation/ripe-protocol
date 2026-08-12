@@ -54,13 +54,14 @@ auction becomes deficient, its purchase returns zero without mutating auction,
 debt, GREEN, or collateral state, allowing a batch to preserve earlier healthy
 purchases.
 
-An all-deficient liquidation now leaves `inLiquidation` false when it seizes
-nothing and creates no auction, so backing restoration can be followed by a
-permissionless retry. Stability Pool's truthful indexed getter also restores
-phase-2 visibility for eligible positions; CreditEngine separately excludes
-stability vault ID `1` from borrowing power. If ordinary borrowing collateral
-is fully deficient but phase 2 queues a healthy Stability Pool asset for
-auction, `inLiquidation` remains true so that auction can start.
+An all-deficient liquidation now leaves `inLiquidation` true as an account-wide
+freeze while the user remains unhealthy. Auction existence is checked
+separately: with no outstanding auction, backing restoration can be followed by
+a permissionless retry; with an auction, a competing pass is blocked. This
+also freezes zero-LTV assets and positive-LTV collateral that policy does not
+permit AuctionHouse to sell. Stability Pool's truthful indexed getter restores
+phase-2 visibility for eligible positions, while CreditEngine separately
+excludes stability vault ID `1` from borrowing power.
 
 The Deleverage withdrawal wrapper and collateral-transfer helper also return a
 soft-zero/skip result for deficient collateral. Deleverage can therefore

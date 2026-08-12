@@ -5845,3 +5845,29 @@ These results do not transfer H-06 qualification, authorize PR 87, release,
 deployment, connected-device use, RPC access, or alert dismissal. Any
 dependency, resolver, containment, or scanner change invalidates this record
 and requires a new bounded review.
+
+## PR #95 dependency-reachability reconciliation — 12 August 2026
+
+Merging current `rh` into PR #95 retained the authoritative dependency input,
+lock, Pymdown containment, and hardened `prepare_defaults.py` bytes. The merge
+also exposed two current-tree reachability additions that the exact dependency
+inventory needed to classify explicitly:
+
+- `migrations/robinhood-mainnet/0011_BlueChipYieldPricesCandidate.py` and
+  `migrations/robinhood-mainnet/0013_VaultMigratorCandidate.py` are additional
+  production/operator files with direct Web3 imports. They extend the
+  syntax-limited exact inventory from ten to twelve files without changing the
+  selected `web3==7.16.0` dependency or its locked closure.
+- `tests/deployment/test_secret_handling.py` and
+  `tests/test_ccip_hardening.py` are test-only Click consumers. They exercise
+  the already-approved command surfaces through `ClickException` and
+  `CliRunner`; neither references Click's editor API. They are explicit
+  reviewed allowlist entries, while the scanner continues to reject
+  `click.edit`, wildcard/editor imports, and every unreviewed Click import
+  surface.
+
+This reconciliation changes no dependency version, package source, production
+CLI implementation, migration behavior, contract, ABI, storage layout,
+deployment, or live state. It does not transfer H-06 qualification or authorize
+deployment/release. The exact test-source SHA-256 and focused validation result
+are recorded by the merge-resolution commit.

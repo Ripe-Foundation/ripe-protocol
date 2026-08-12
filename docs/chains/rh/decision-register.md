@@ -1,6 +1,6 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 7 August 2026
+**Snapshot date:** 11 August 2026
 **Current production-source candidate:** commit
 `e12b1abe26218acb804d84670099c41169e5f515`, tree
 `b680f0016f29f9a217054db9f80c0bbf9f0b9916`, under draft PR #73 status
@@ -19,22 +19,23 @@ deployment, configuration, or activation authority.
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
 merge `91eda49…`; its production contract changes are integrated into `rh`.
 The historical import ancestor `ad831669…` is not the present branch authority.
-No Robinhood deployment, migration execution or history, production
-configuration, activation, RPC, account, key, signer, or release action has
-occurred. The four corrected-PR controls remain zero and deferred and lack
+No launch-remediation candidate execution or release is authorized. Separately,
+the GREEN/RIPE CCIP topology is confirmed live as recorded in
+[`ccip-live-state.md`](ccip-live-state.md); that state does not authorize another
+transaction or release action. The four corrected-PR controls remain zero and deferred and lack
 Robinhood machine-facing parameter/planning representation. Every Deleverage
 task is parked, and no Deleverage implementation track is open. The current
-six parked lanes match the canonical [`status.yaml`](status.yaml) inventory
-exactly: CCIP; CreditEngine zero-backing reassessment and policy; every
-Deleverage task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
-deployment. The S4 zero-cooldown decision remains closed. All six lanes are
+five parked lanes match the canonical [`status.yaml`](status.yaml) inventory
+exactly: CreditEngine zero-backing reassessment and policy; every Deleverage
+task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
+deployment. The S4 zero-cooldown decision remains closed. All five lanes are
 nonblocking until explicitly reopened.
 
 The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
 `DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
 two editable value authorities, and the ledger is derived and synchronized.
 The exact current result is `configuration_consistent=true`,
-`deployment_ready=false`, with 65 readiness blockers. Repository configuration
+`deployment_ready=false`, with 64 readiness blockers. Repository configuration
 is prepared and consistent; production/onchain configuration has not occurred.
 
 ## Program-level decisions
@@ -129,15 +130,17 @@ Source:
 
 ### RH-D008 — CCIP complete or disabled
 
-**Status:** Approved launch posture; external and implementation gates open.
+**Status:** Historical disabled posture superseded by confirmed live state;
+operational gates open.
 
-GREEN and RIPE CCIP are separately reviewed promotion targets within seven days
-after launch. If any identity, role, route, supply, accounting, monitoring,
-rollback, or state-independence gate is incomplete, launch and remain with CCIP
-disabled.
+GREEN and RIPE CCIP registration, routing, reciprocal wiring, governance
+ownership, and mint capabilities are live. The owner has not yet disposed the
+disabled rate-limit/zero-rate-admin posture, the full real-token OffRamp
+destination-gas evidence remains open, and no live send backend or further
+transaction/release authority is implied.
 
 Source:
-`track-8-m0-owner-decision-packet.md`.
+[`ccip-live-state.md`](ccip-live-state.md).
 
 ### RH-D009 — USDG price path
 
@@ -245,7 +248,7 @@ the typed JSON ledger is derived evidence, not an input surface.
 All operative decisions are approved, and the integrated manifest carries 14
 binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
-remain unresolved, so deployment readiness fails closed with 65 blockers. The
+remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
 preserved, but every Deleverage task is parked and no implementation track is
 open until explicit owner reopening.
@@ -402,8 +405,10 @@ program package. The controlling disposition is:
 - keep H-10 as the separate live-rehearsal lane.
 
 CreditEngine zero-backing reassessment, every Deleverage task including
-size/headroom work, UniswapV2Prices admission and deployment, CCIP, Sites recovery, and live
-deployment are deferred or separately unauthorized. Future work is grouped
+size/headroom work, UniswapV2Prices admission and deployment, Sites recovery,
+and non-CCIP live deployment are deferred or separately unauthorized. CCIP is
+confirmed live, while further operational work, transactions, and release are
+separately gated. Future work is grouped
 into the large packages defined by
 [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md),
 not eight report-specific trains.
@@ -431,7 +436,7 @@ Endaoment stabilization, use Curve in the PSM, or add Stock/Uniswap behavior.
 Five official provider and binding identities remain unverified; the pool
 address must be deployment-produced; and the slippage limit, minimum retained
 liquidity, and production observation remain open. Those nine Curve-specific
-blockers contribute to the current 65-binding fail-closed readiness result.
+blockers contribute to the current 64-binding fail-closed readiness result.
 
 Current correction source:
 [`rh-production-vyper-remediation.md`](rh-production-vyper-remediation.md).
@@ -581,8 +586,17 @@ context. A replacement should be a narrower maintained scanner over
 
 ### RH-D026 — CreditEngine carries an exact headroom waiver at 184 bytes
 
-**Status:** Owner-granted on 8 August 2026, against the RH codebase
-simplification branch `codex/rh-codebase-simplification`.
+**Status:** Retired on 11 August 2026. The owner-granted 8 August waiver remains
+historical evidence for the exact prior version on
+`codex/rh-codebase-simplification`.
+
+**Retirement.** The liquidation-state change produced a new CreditEngine
+version and therefore reopened this exact-version decision as required. A
+behavior-preserving size consolidation leaves the new constructor-bound runtime
+at 24,367 bytes, with 209 bytes of EIP-170 headroom. CreditEngine is again
+governed by the default 200-byte floor; its override and pinned waiver identity
+have been removed from `tests/test_vault_pointer_runtime_sizes.py`. No new
+below-floor waiver was granted.
 
 The deposit-vault hardening plan section 11.5 sets at least 200 bytes of
 EIP-170 headroom as the acceptance threshold for a changed deployed contract,
@@ -667,10 +681,11 @@ the two tables cannot drift apart in either direction.
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
 
-### RH-D027 — Teller carries an exact migration headroom waiver at 51 bytes
+### RH-D027 — Teller carries an exact migration and receipt-guard waiver at 71 bytes
 
 **Status:** Owner-granted on 10 August 2026 for the VaultMigrator integration
-candidate in PR #83.
+candidate in PR #83; exact artifact replaced by owner decision on 11 August
+2026 for PR #95.
 
 The ratified runtime-size rule remains at least 200 bytes of EIP-170 headroom.
 The integrated VaultMigrator design deliberately keeps Teller as the thin,
@@ -679,8 +694,14 @@ reviewed that result, accepted Teller's measured size, and authorized this
 integration. This record applies the existing exact-waiver policy to that
 approval rather than lowering the shared rule.
 
-**Scope.** `Teller` only, at a measured 24,525-byte deployed runtime, leaving
-**51 bytes** of EIP-170 headroom. Every non-waived contract remains subject to
+The replacement retains the housekeeping guard that prevents an external
+receipt-measurement callback from entering Teller housekeeping. To recover
+headroom without changing behavior, the one-use preferred-StabilityPool helper
+was inlined at its sole caller. The same MissionControl view call and nonzero-ID
+check remain, and no public ABI or storage item changed.
+
+**Scope.** `Teller` only, at a measured 24,505-byte deployed runtime, leaving
+**71 bytes** of EIP-170 headroom. Every non-waived contract remains subject to
 the 200-byte floor; RipeGov separately retains its 1,000-byte migration-branch
 guard.
 
@@ -689,18 +710,23 @@ identity at declared constructor inputs:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/Teller.vy` sha256 | `cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc` |
-| Runtime template sha256 (immutable-free) | `e2031902065284ce34ad4f6634672db466862696d34c12cb8d3a73b3ed77962a` |
-| Runtime template bytes | 24,429 |
-| Deployed runtime bytes (with immutables) | 24,525 |
-| Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `1948c269f1aa9752dfa04ecb30185d847d2ac11b5a0d86e7492588f0781d1dd4` |
+| `contracts/core/Teller.vy` sha256 | `fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476` |
+| Runtime template sha256 (immutable-free) | `3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8` |
+| Runtime template bytes | 24,409 |
+| Deployed runtime bytes (with immutables) | 24,505 |
+| Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `8980ea1cae7a32927d120e3fc333d3a1039d778cf09c1b7293a57cd755d67ea9` |
+
+The governed artifact ledger additionally binds the production capture input
+declared by `scripts/capture_contract_runtimes.py` (RH HQ
+`0xD4e8…0940`, `_shouldPause = true`), whose full deployed-runtime SHA-256 is
+`a07176c5878268b4b704c79d08440e4dacdb5d484b913a842992a69d09998b3c`.
 
 The declared HQ is not a real deployment address. Together with the explicit
 pause input it makes Teller's immutable-bearing deployed byte string
 deterministic. A deployment's actual constructor configuration remains a
 separate deployment concern.
 
-**Residual risk, accepted.** Only 51 bytes remain before EIP-170. This waiver
+**Residual risk, accepted.** Only 71 bytes remain before EIP-170. This waiver
 permits **0 bytes** of runtime growth: the exact size and identities above are
 pinned, so a larger, smaller, or size-preserving Teller change fails the guard.
 The narrow margin makes future Teller work likely to require deletion,

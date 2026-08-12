@@ -29,6 +29,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  solidity:
+    name: Solidity / build and focused tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Foundry 1.3.5
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+        with:
+          version: v1.3.5
+
+      - name: Build and test CCIP pool source
+        run: |
+          forge build --root solidity
+          forge test --root solidity --offline -vv
+
   test:
     name: Python 3.12.0 / ${{ matrix.lane }} / ${{ matrix.shard }}
     runs-on: ubuntu-latest

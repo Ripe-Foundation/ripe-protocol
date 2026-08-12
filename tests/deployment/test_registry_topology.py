@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -14,25 +15,39 @@ from scripts.utils.deployment_assertions import (
     assert_deployment,
     blueprint_policy,
     blueprint_registry_map,
+    ccip_live_assertion_expectations,
+    ccip_live_component_expectations,
+)
+from scripts.utils.migration_runner import (
+    ROBINHOOD_RESERVATIONS,
+    ccip_external_existing_stages,
 )
 
 
 def expectations():
+    ccip_capabilities, ccip_external_facts = ccip_live_assertion_expectations()
     return {
         "schema_version": 1,
         "profile_id": "robinhood-mainnet",
         "profile_kind": "profile1",
         "chain_id": 4663,
+        "components": ccip_live_component_expectations(),
+        "capabilities": ccip_capabilities,
+        "external_facts": ccip_external_facts,
     }
 
 
 def observations():
     policy = blueprint_policy()
+    ccip_capabilities, ccip_external_facts = ccip_live_assertion_expectations()
     return {
         "schema_version": 1,
         "mode": "synthetic",
         "profile_id": "robinhood-mainnet",
         "chain_id": 4663,
+        "components": ccip_live_component_expectations(),
+        "capabilities": ccip_capabilities,
+        "external_facts": ccip_external_facts,
         "registries": [
             {
                 "domain": domain,
@@ -59,10 +74,12 @@ def test_blueprint_policy_handles_every_disposition_explicitly():
     assert SUPPORTED_DISPOSITIONS == frozenset(Disposition)
 
     policy = blueprint_policy()
-    assert len(policy.required_registries) == 32
-    assert len(policy.reserved_registries) == 6
+    assert len(policy.required_registries) == 34
+    assert len(policy.reserved_registries) == 4
     assert policy.unavailable_components["CM-008"] is Disposition.BLOCKED
-    assert policy.unavailable_components["CM-051"] is Disposition.DEFERRED
+    assert {"CM-051", "CM-052", "CM-053", "CM-058"} <= (
+        policy.required_components
+    )
 
 
 def test_price_desk_selected_one_two_three_and_unavailable_others_are_exact():
@@ -111,16 +128,105 @@ def test_vault_book_ids_and_omitted_four_are_exact():
     assert ("vault_book", 4) in policy.reserved_registries
 
 
-def test_blocked_and_deferred_registry_ids_are_reserved():
+def test_blocked_registry_is_reserved_and_live_ccip_ids_are_required():
     policy = blueprint_policy()
     assert policy.canonical_registries[("ripe_hq", 4)] == "CM-008"
-    assert policy.canonical_registries[("ripe_hq", 23)] == "CM-051"
-    assert policy.canonical_registries[("ripe_hq", 24)] == "CM-052"
-    assert {
-        ("ripe_hq", 4),
-        ("ripe_hq", 23),
-        ("ripe_hq", 24),
-    } <= policy.reserved_registries
+    assert policy.canonical_registries[("ripe_hq", 23)] == "CM-052"
+    assert policy.canonical_registries[("ripe_hq", 24)] == "CM-051"
+    assert ("ripe_hq", 4) in policy.reserved_registries
+    assert {("ripe_hq", 23), ("ripe_hq", 24)} <= policy.required_registries
+    assert not {("ripe_hq", 23), ("ripe_hq", 24)} & policy.reserved_registries
+
+
+def test_migration_planner_represents_live_ccip_as_external_state_not_deferred():
+    reservation = next(
+        row for row in ROBINHOOD_RESERVATIONS if row.migration_id == "1000"
+    )
+    assert reservation.disposition == "confirmed_external_state_gated"
+    assert ccip_external_existing_stages() == [
+        {
+            "migration_id": "1000",
+            "semantic_id": "ccip-pools-and-registration",
+            "state": "confirmed_existing_live_state",
+            "reason": (
+                "ccip-live-state-observed-outside-launch-mutation-graph; "
+                "any further transaction remains separately gated"
+            ),
+            "blockers": ["B-T1-CCIP", "B-T1-TOOLCHAIN"],
+        }
+    ]
+
+
+def test_historical_ccip_status_surfaces_carry_currentness_overlays():
+    root = Path(__file__).resolve().parents[2]
+    historical_surfaces = (
+        "docs/chains/rh-summary.md",
+        "docs/chains/rh/block-clock-validation-plan.md",
+        "docs/chains/rh/block-number-inventory.md",
+        "docs/chains/rh/component-matrix.md",
+        "docs/chains/rh/reassessment-and-qualification-synthesis.md",
+        "docs/chains/rh/robinhood-deployment-support-specification.md",
+        "docs/chains/rh/robinhood-deployment-validation-plan.md",
+        "docs/chains/rh/smart-contract-changes/defaults-robinhood.md",
+        "docs/chains/rh/smart-contract-changes/guarded-erc20.md",
+        "docs/chains/rh/smart-contract-changes/lootbox.md",
+        "docs/chains/rh/smart-contract-changes/teller.md",
+        "docs/chains/rh/hardening/BASELINE.md",
+        "docs/chains/rh/hardening/hardening-pass-report.md",
+    )
+    for relative in historical_surfaces:
+        prefix = (root / relative).read_text()[:4_000]
+        assert (
+            "11 August 2026 CCIP" in prefix
+            or "CCIP supersession note (2026-08-11)" in prefix
+        ), relative
+        assert "ccip-live-state.md" in prefix, relative
+
+    current = (root / "docs/chains/rh/ccip-live-state.md").read_text()
+    assert "LIVE TOPOLOGY CONFIRMED" in current
+    assert "exact live source set" in current
+    assert "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa" in current
+
+    question_packet = (
+        root / "docs/chains/rh/ccip-chainlink-question-packet.md"
+    ).read_text()
+    assert "relationship to the repository's 1.5.1 candidate are unresolved" in (
+        question_packet
+    )
+    assert "deployed and activated from the repository's 1.5.1" not in (
+        question_packet
+    )
+
+    status = (root / "docs/chains/rh/status.yaml").read_text()
+    assert "64 unresolved or unverified bindings" in status
+    assert "deployment_readiness_blockers: 64" in status
+    assert "deployment_readiness_blocker_count: 64" in status
+    assert "Sixty-four unresolved or unverified bindings" in status
+
+    current_topology_surfaces = (
+        "docs/chains/rh-summary.md",
+        "docs/chains/rh/current-owner-priorities.md",
+        "docs/chains/rh/curve-launch-activation.md",
+        "docs/chains/rh/curve-launch-migration-handoff.md",
+        "docs/chains/rh/decision-register.md",
+        "docs/chains/rh/reassessment-and-qualification-synthesis.md",
+    )
+    for relative in current_topology_surfaces:
+        content = (root / relative).read_text()
+        assert "[1, 2]" in content or "[1,2]" in content, relative
+        assert "[1, 3]" not in content, relative
+        assert "[1,3]" not in content, relative
+
+    for relative in (
+        "docs/chains/rh/robinhood-deployment-support-specification.md",
+        "docs/chains/rh/robinhood-deployment-validation-plan.md",
+    ):
+        current_overlay = (root / relative).read_text()[:4_000]
+        assert "[1,2]" in current_overlay, relative
+        assert "[1,3]" not in current_overlay, relative
+
+    runner = (root / "scripts/utils/migration_runner.py").read_text()
+    assert "ccip-deferred-outside-launch-graph" not in runner
 
 
 def test_shift_duplicate_and_reserved_reuse_fail_closed():

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 import sys
@@ -11,6 +12,8 @@ from scripts.utils.deployment_assertions import (
     ObservationMode,
     assert_deployment,
     blueprint_policy,
+    ccip_live_assertion_expectations,
+    ccip_live_component_expectations,
 )
 
 
@@ -28,6 +31,8 @@ CAPABILITY = {
     "capability": "price_source",
     "enabled": True,
 }
+CCIP_CAPABILITIES, CCIP_EXTERNAL_FACTS = ccip_live_assertion_expectations()
+CCIP_COMPONENTS = ccip_live_component_expectations()
 
 
 def required_registries():
@@ -48,8 +53,9 @@ def expectations():
         "profile_id": "robinhood-mainnet",
         "profile_kind": "profile1",
         "chain_id": 4663,
-        "components": [COMPONENT],
-        "capabilities": [CAPABILITY],
+        "components": [COMPONENT, *copy.deepcopy(CCIP_COMPONENTS)],
+        "capabilities": [CAPABILITY, *copy.deepcopy(CCIP_CAPABILITIES)],
+        "external_facts": copy.deepcopy(CCIP_EXTERNAL_FACTS),
         "forbidden_edges": [
             {"source": "CM-016", "target": "CM-017", "kind": "pricing"}
         ],
@@ -67,8 +73,9 @@ def observations(mode="synthetic"):
         "profile_id": "robinhood-mainnet",
         "chain_id": 4663,
         "registries": required_registries(),
-        "components": [COMPONENT],
-        "capabilities": [CAPABILITY],
+        "components": [COMPONENT, *copy.deepcopy(CCIP_COMPONENTS)],
+        "capabilities": [CAPABILITY, *copy.deepcopy(CCIP_CAPABILITIES)],
+        "external_facts": copy.deepcopy(CCIP_EXTERNAL_FACTS),
         "configuration_sources": {
             "Deleverage.fullPayoffBuffer": "robinhood-mainnet"
         },
@@ -105,7 +112,10 @@ def test_wrong_proxy_implementation_runtime_constructor_or_artifact_fails(
     field, replacement, code
 ):
     value = observations()
-    value["components"] = [{**COMPONENT, field: replacement}]
+    value["components"] = [
+        {**COMPONENT, field: replacement},
+        *copy.deepcopy(CCIP_COMPONENTS),
+    ]
     assert code in codes(assert_deployment(expectations(), value))
 
 
@@ -134,12 +144,84 @@ def test_role_and_capability_membership_is_exact():
         assert_deployment(expectations(), invalid)
 
 
+def test_ccip_components_capabilities_and_external_facts_are_observation_bound():
+    expected = expectations()
+    observed = observations()
+    assert assert_deployment(expected, observed).ok
+
+    missing_component = copy.deepcopy(observed)
+    missing_component["components"] = [
+        row for row in missing_component["components"] if row["component_id"] != "CM-051"
+    ]
+    assert "MISSING_COMPONENT" in codes(
+        assert_deployment(expected, missing_component)
+    )
+
+    missing_expected_component = expectations()
+    missing_expected_component["components"] = [
+        row
+        for row in missing_expected_component["components"]
+        if row["component_id"] != "CM-052"
+    ]
+    with pytest.raises(
+        DeploymentAssertionInputError,
+        match="exact authenticated live CCIP identity",
+    ):
+        assert_deployment(missing_expected_component, observed)
+
+    missing_capability = copy.deepcopy(observed)
+    missing_capability["capabilities"] = [
+        row
+        for row in missing_capability["capabilities"]
+        if not (
+            row["component_id"] == "CM-051"
+            and row["capability"] == "canMintGreen"
+        )
+    ]
+    assert "MISSING_CAPABILITY" in codes(
+        assert_deployment(expected, missing_capability)
+    )
+
+    missing_registration = copy.deepcopy(observed)
+    missing_registration["external_facts"] = missing_registration[
+        "external_facts"
+    ][1:]
+    assert "MISSING_EXTERNAL_FACT" in codes(
+        assert_deployment(expected, missing_registration)
+    )
+
+    wrong_toolchain = copy.deepcopy(observed)
+    wrong_toolchain["external_facts"][1]["live_creation_identity_status"] = (
+        "proven"
+    )
+    assert "EXTERNAL_FACT_MISMATCH" in codes(
+        assert_deployment(expected, wrong_toolchain)
+    )
+
+    understated_expectations = expectations()
+    understated_expectations["capabilities"] = [CAPABILITY]
+    with pytest.raises(
+        DeploymentAssertionInputError,
+        match="must include exact live CCIP membership",
+    ):
+        assert_deployment(understated_expectations, observations())
+
+    missing_fact_expectations = expectations()
+    missing_fact_expectations["external_facts"] = missing_fact_expectations[
+        "external_facts"
+    ][1:]
+    with pytest.raises(
+        DeploymentAssertionInputError,
+        match="must include exact live CCIP fact",
+    ):
+        assert_deployment(missing_fact_expectations, observations())
+
+
 @pytest.mark.parametrize(
     ("component_id", "code"),
     [
         ("CM-005", "OMITTED_COMPONENT_PRESENT"),
         ("CM-008", "BLOCKED_COMPONENT_PRESENT"),
-        ("CM-051", "DEFERRED_COMPONENT_PRESENT"),
     ],
 )
 def test_unavailable_component_presence_fails_closed(component_id, code):
@@ -183,7 +265,6 @@ def test_disabled_and_profile2_reachability_fail_closed():
     ("component_id", "code"),
     [
         ("CM-008", "BLOCKED_COMPONENT_REACHABLE"),
-        ("CM-051", "DEFERRED_COMPONENT_REACHABLE"),
     ],
 )
 def test_blocked_and_deferred_edges_fail_closed(component_id, code):
@@ -230,7 +311,8 @@ def test_required_chain_identity_and_mandatory_blueprint_enforcement(envelope):
 def test_deployed_modes_require_complete_component_identity():
     value = observations("deployed_observation")
     value["components"] = [
-        {key: item for key, item in COMPONENT.items() if key != "runtime_sha256"}
+        {key: item for key, item in COMPONENT.items() if key != "runtime_sha256"},
+        *copy.deepcopy(CCIP_COMPONENTS),
     ]
     with pytest.raises(
         DeploymentAssertionInputError,

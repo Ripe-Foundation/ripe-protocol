@@ -1,5 +1,9 @@
 # GuardedErc20: custody and delivery containment
 
+> **11 August 2026 CCIP currentness note:** the “owner-parked” CCIP label below
+> is historical. GREEN/RIPE CCIP topology is now confirmed live; current gates
+> are in [`../ccip-live-state.md`](../ccip-live-state.md).
+
 > **Path note (8 August 2026):** some paths cited below no longer exist in the
 > active tree — the block-clock inventory, the `contracts/testing/` probes, and
 > the extracted deploy manifests and review records were removed. The citations
