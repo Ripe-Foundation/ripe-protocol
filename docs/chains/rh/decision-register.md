@@ -716,6 +716,11 @@ identity at declared constructor inputs:
 | Deployed runtime bytes (with immutables) | 24,505 |
 | Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `8980ea1cae7a32927d120e3fc333d3a1039d778cf09c1b7293a57cd755d67ea9` |
 
+The governed artifact ledger additionally binds the production capture input
+declared by `scripts/capture_contract_runtimes.py` (RH HQ
+`0xD4e8…0940`, `_shouldPause = true`), whose full deployed-runtime SHA-256 is
+`a07176c5878268b4b704c79d08440e4dacdb5d484b913a842992a69d09998b3c`.
+
 The declared HQ is not a real deployment address. Together with the explicit
 pause input it makes Teller's immutable-bearing deployed byte string
 deterministic. A deployment's actual constructor configuration remains a

@@ -328,7 +328,7 @@ source review and test update.
     {
       "id": "VM-157",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 157,
+      "line": 154,
       "function": "migrateVaultPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -338,7 +338,7 @@ source review and test update.
     {
       "id": "VM-165",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 165,
+      "line": 162,
       "function": "migrateVaultPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -348,7 +348,7 @@ source review and test update.
     {
       "id": "VM-189",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 189,
+      "line": 186,
       "function": "migrateVaultPositions",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -358,7 +358,7 @@ source review and test update.
     {
       "id": "VM-256",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 256,
+      "line": 253,
       "function": "migrateRipeGovPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -368,7 +368,7 @@ source review and test update.
     {
       "id": "VM-264",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 264,
+      "line": 261,
       "function": "migrateRipeGovPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -378,7 +378,7 @@ source review and test update.
     {
       "id": "VM-352",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 352,
+      "line": 348,
       "function": "migrateLegacyRipeGovPositions",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -388,7 +388,7 @@ source review and test update.
     {
       "id": "VM-360",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 360,
+      "line": 356,
       "function": "migrateLegacyRipeGovPositions",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -398,7 +398,7 @@ source review and test update.
     {
       "id": "VM-479",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 479,
+      "line": 472,
       "function": "_getPreMigrationData",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -408,7 +408,7 @@ source review and test update.
     {
       "id": "VM-600",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 600,
+      "line": 523,
       "function": "_verifyRipeGovExport",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -418,7 +418,7 @@ source review and test update.
     {
       "id": "VM-601",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 601,
+      "line": 524,
       "function": "_verifyRipeGovExport",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -428,7 +428,7 @@ source review and test update.
     {
       "id": "VM-626",
       "path": "contracts/core/VaultMigrator.vy",
-      "line": 626,
+      "line": 549,
       "function": "_verifyRipeGovImport",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",

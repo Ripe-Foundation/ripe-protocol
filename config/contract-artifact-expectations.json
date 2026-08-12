@@ -2786,21 +2786,21 @@
       },
       "artifacts": {
         "accepted_runtime_ceiling": 24436,
-        "creation_executable_prefix_sha256": "22724ca6730afd4bb1917847b03f2725daf6c775f03d649112482cb05e85da49",
-        "creation_executable_prefix_size": 24579,
-        "creation_metadata_sha256": "e3132098417b7c61bd64faba6085aec15fa39736a63ea669690e6e440404771b",
+        "creation_executable_prefix_sha256": "9dd2825a4bb946d534e316117dcb501a6c54a818569e507dd83b80e4fde387b8",
+        "creation_executable_prefix_size": 24552,
+        "creation_metadata_sha256": "55a28f98da230052aff5b2ec29d8e0193839fbcaaa6efd629df2967e98c636c2",
         "creation_metadata_size": 83,
-        "creation_sha256": "7e33685bdc6498f303727826129f4558593d0404a10cf471107ec8288c9e331b",
-        "creation_size": 24662,
-        "deployed_eip170_headroom": 44,
+        "creation_sha256": "62151e3501668b0c0f1aa11a2ed7723c061c6f5579fdaeb8897ed5fe66b9ad43",
+        "creation_size": 24635,
+        "deployed_eip170_headroom": 71,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "539ed34b79afa14b8a8819660a4132ce60237644b6c26631179318d106ab9d56",
-        "deployed_runtime_size": 24532,
-        "eip170_headroom": 140,
-        "runtime_template_sha256": "8db66d7613328d35f96733f04b63e78048f6281bb8608806e4997d79d502ba79",
-        "runtime_template_size": 24436
+        "deployed_runtime_sha256": "a07176c5878268b4b704c79d08440e4dacdb5d484b913a842992a69d09998b3c",
+        "deployed_runtime_size": 24505,
+        "eip170_headroom": 167,
+        "runtime_template_sha256": "3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8",
+        "runtime_template_size": 24409
       },
       "code_layout": {
         "addys": {
@@ -2854,9 +2854,9 @@
         "canonical_sha256": "ca59ea101febde31384c85ac9711488501aba09ba55269f56c7dac42861ab0d3",
         "count": 110
       },
-      "source_git_blob": "53434a048518a830724b0807e17b81db828364a9",
+      "source_git_blob": "e1260cc1fcb328d221d408f584c82010ec7557a2",
       "source_path": "contracts/core/Teller.vy",
-      "source_sha256": "941b1d37282a53bf9f6ce33627d6d9333a87cb84cf718445e460a461ee384716",
+      "source_sha256": "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -2878,7 +2878,7 @@
           "type": "bool"
         }
       },
-      "transitive_compiler_input_integrity": "2285e87d6a4afab4319f321c9ee94fa28bb1917bcd70427c5cc34f3c64d48997"
+      "transitive_compiler_input_integrity": "0f30eae6ed773a465ba46d87d27e2c909442e375bcd3b01a14653910fb531ffd"
     },
     "UniswapV2Prices": {
       "abi": {
