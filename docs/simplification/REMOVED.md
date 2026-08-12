@@ -58,16 +58,28 @@ and stopped being true when that was fixed by deriving the version from
 
 `current-manifest.json` is untouched and keeps all five fields for every chain.
 
-**Owner decision (2026-08-12): `solc_json` lives in the current manifest alone.**
-Restoring it to the numbered manifests was costed at ~3 MB for
-`robinhood-mainnet` and ~66 MB for `base-mainnet`, and would have made their
-superseded contract generations verifiable through
-`verify --manifest <timestamp>` -- 21 and 94 addresses respectively. Declined:
-a step manifest is a record of what a migration deployed, and verification
-targets live addresses. `scripts/verify.py` therefore refuses a numbered
-manifest outright and points at `--migration <timestamp>`, which verifies what
-that migration deployed using the current manifest. Superseded generations
-remain reachable by compiling `file` at the commit that deployed them. The base-sepolia and
+**Owner decision (2026-08-12): verification is current-manifest-only; step
+manifests are attribution-only.** Three things follow, and they are one
+decision rather than three:
+
+- `current-manifest.json` keeps all five fields and is the only thing
+  verification reads.
+- Numbered manifests keep `address` and `file`. That is what
+  `verify --migration` and the checklist attribute against, and it is all
+  anything reads from one. `scripts/verify.py` refuses a numbered manifest
+  outright and redirects to `--migration <timestamp>`.
+- Superseded contract generations -- 94 addresses on `base-mainnet`, 21 on
+  `robinhood-mainnet` -- are out of scope, deliberately.
+
+Restoring `solc_json` to the numbered manifests was considered and declined at
+~3 MB for `robinhood-mainnet` and ~66 MB for `base-mainnet`. Note that the
+price quoted while it was open is now understated: since `args` was stripped
+too, verifying from a step manifest would need `solc_json` *and* `args` *and*
+reopening the numbered-manifest path in `verify` -- which is code, and
+contradicts the first bullet. It is not a 3 MB data question any more.
+
+If it is ever revisited, `extracted-files.tsv` records the blob id, byte length
+and sha256 of every full-fidelity manifest, and they are reachable in git. The base-sepolia and
 robinhood-testnet step manifests are not retained; 31 of them are unreadable
 from any commit reachable here, and the rest are testnet churn.
 
