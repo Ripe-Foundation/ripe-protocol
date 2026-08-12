@@ -1,14 +1,23 @@
-"""The already-deployed Robinhood histories refuse legacy execution.
+"""Deployed Robinhood histories may only be extended deliberately.
 
 `scripts/migrate.py` defaults to `--environment v1`, so
 `--chain robinhood-mainnet` resolves to `migration_history/robinhood-mainnet/v1`
 -- a history whose deployment has already happened. Executing against it would
 re-broadcast every transaction and rewrite the committed manifest and logs.
 
+Running against one of these is allowed -- new migrations have to be able to
+land -- but never from the default start point. `--start-timestamp` defaults to
+"0", which selects every migration from the first, and the resume logic that
+would skip ahead does not work here: the history holds only
+current-manifest.json, so `_latest_manifest_timestamp()` yields "current" and
+`int("current")` raises. Nothing records which migration ran last. So the
+runner requires an explicit start point, and anything constructing a Migration
+directly fails closed.
+
 The pre-cleanup tree carried this boundary on a flag named `_manifest_v2`,
 which made it look like part of the unused H06 manifest-v2 planner. It was not,
-and these tests pin the boundary independently of that planner so it cannot be
-removed again as scaffolding.
+and these tests pin it independently of that planner so it cannot be removed
+again as scaffolding.
 """
 
 from __future__ import annotations
@@ -19,6 +28,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.utils.migration import Migration, MigrationHistoryError
+from scripts.utils.migration_runner import MigrationRunner
 
 
 BLOCKED = (
@@ -119,3 +129,59 @@ def test_boundary_matches_on_path_suffix_not_absolute_prefix(tmp_path):
     # so the check has to hold on a suffix rather than an absolute location.
     nested = _migration(tmp_path / "deeply" / "nested", BLOCKED[0])
     assert nested._execution_blocked is True
+
+
+# --- extending a deployed history -----------------------------------------
+
+
+def _runner(tmp_path: Path, history: str) -> MigrationRunner:
+    resolved = tmp_path / history
+    resolved.mkdir(parents=True, exist_ok=True)
+    return MigrationRunner("migrations/robinhood-mainnet", str(resolved), {})
+
+
+@pytest.mark.parametrize("history", BLOCKED)
+@pytest.mark.parametrize("start", (None, "", "0", 0, "not-a-timestamp"))
+def test_deployed_history_refuses_a_default_start_point(tmp_path, history, start):
+    # "0" is the CLI default and means "every migration from the first one".
+    # Against a live deployment that is a full redeploy, not a resume.
+    with pytest.raises(
+        MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
+    ):
+        _runner(tmp_path, history)._require_start_point(start)
+
+
+@pytest.mark.parametrize("history", BLOCKED)
+def test_deployed_history_accepts_an_explicit_start_point(tmp_path, history):
+    # This is the case that has to work: landing a new migration.
+    _runner(tmp_path, history)._require_start_point("2026081200")
+
+
+@pytest.mark.parametrize("history", ALLOWED)
+@pytest.mark.parametrize("start", (None, "0", "2026081200"))
+def test_other_histories_need_no_start_point(tmp_path, history, start):
+    # Base must keep working exactly as before, including the bare default.
+    _runner(tmp_path, history)._require_start_point(start)
+
+
+@pytest.mark.parametrize("history", BLOCKED)
+def test_authorized_construction_executes_against_a_deployed_history(
+    tmp_path, history
+):
+    # The runner passes this once it has established a start point; without it
+    # a Migration built by any other caller still fails closed.
+    resolved = tmp_path / history
+    resolved.mkdir(parents=True, exist_ok=True)
+    args = SimpleNamespace(
+        sender=SimpleNamespace(address="0x" + "1" * 40),
+        ignore_logs=True,
+        rpc=None,
+        chain=history.split("/")[1],
+        blueprint=None,
+    )
+    migration = Migration(
+        args, {}, "9999", None, str(resolved), allow_deployed_history=True
+    )
+
+    assert migration._execution_blocked is False
+    assert migration.execute(lambda **_: "RECEIPT") == "RECEIPT"

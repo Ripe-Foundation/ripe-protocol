@@ -14,16 +14,21 @@ from scripts.utils.migration_helpers import (deployed_contracts_manifest,
 
 
 # Histories whose deployment has already happened. `scripts/migrate.py`
-# defaults to `--environment v1`, so `--chain robinhood-mainnet` lands here;
-# without this boundary a re-run re-broadcasts every transaction and rewrites
-# the committed manifest and logs of a live deployment.
+# defaults to `--environment v1`, so `--chain robinhood-mainnet` lands here.
+#
+# Running against one of these is allowed, but only deliberately: the caller
+# must have established a start point, which MigrationRunner does before it
+# constructs anything. Anything constructing a Migration directly fails closed,
+# because the dangerous default is silent -- `--start-timestamp` defaults to 0,
+# which selects every migration from the first, and the resume logic that would
+# skip ahead is broken (see MigrationRunner._latest_manifest_timestamp).
 #
 # This is deliberately just a path check. On the pre-cleanup tree the same
 # boundary rode along on a flag named `_manifest_v2`, which made it look like
 # part of the unused H06 manifest-v2 planner; it never was. The planner is
 # gone and the boundary stays, with its original codes so anything matching on
 # them keeps working.
-_EXECUTION_BLOCKED_HISTORIES = (
+DEPLOYED_HISTORIES = (
     PurePosixPath("migration_history/robinhood-mainnet/v1"),
     PurePosixPath("migration_history/robinhood-testnet/v1"),
 )
@@ -33,17 +38,19 @@ class MigrationHistoryError(Exception):
     """Raised when a migration would execute against a deployed history."""
 
 
-def _is_execution_blocked_history(history_path):
+def is_deployed_history(history_path):
+    """True if `history_path` names a history whose deployment already ran."""
     normalized = PurePosixPath(str(history_path).replace("\\", "/"))
     return any(
         normalized == suffix
         or normalized.parts[-len(suffix.parts):] == suffix.parts
-        for suffix in _EXECUTION_BLOCKED_HISTORIES
+        for suffix in DEPLOYED_HISTORIES
     )
 
 
 class Migration:
-    def __init__(self, deploy_args: DeployArgs, files, timestamp, previous_timestamp, history_path):
+    def __init__(self, deploy_args: DeployArgs, files, timestamp, previous_timestamp, history_path,
+                 allow_deployed_history=False):
         self._hq = None
         self._files = files
         self._timestamp = timestamp
@@ -56,7 +63,9 @@ class Migration:
         self._contract_files = {}
         self._args = {}
         self.gas = 0
-        self._execution_blocked = _is_execution_blocked_history(history_path)
+        self._execution_blocked = (
+            is_deployed_history(history_path) and not allow_deployed_history
+        )
 
         if self._execution_blocked:
             self._previous_manifest = {}

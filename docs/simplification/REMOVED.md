@@ -91,6 +91,29 @@ point is recorded in `extracted-files.tsv`. If bridging is wanted, it is a
 separate change that fixes account loading, requires an explicit RPC rather than
 synthesising one, defaults to dry-run, and confirms before broadcast. That is
 new work with a real blast radius, which is why it does not belong in a cleanup.
+### Robinhood deployment posture — owner decision (2026-08-12)
+
+Extending the deployed Robinhood histories is **allowed**. Re-running them from
+the default start point is **not**, because those are the same command.
+
+`--start-timestamp` defaults to `0`, which selects every migration from the
+first, and nothing corrects for that here: `migration_history/robinhood-mainnet/v1`
+holds only `current-manifest.json`, so `_latest_manifest_timestamp()` yields
+`"current"` and `int("current")` raises; the per-step skip only replays from a
+transaction log, and normal runs pass `ignore_logs=True`; and the manifest
+records 42 contracts with no step attribution, so nothing says where to resume.
+A bare `migrate --chain robinhood-mainnet` would therefore have redeployed all
+13 migrations against live mainnet.
+
+So `MigrationRunner.run()` refuses a deployed history unless the caller names an
+explicit `--start-timestamp`, and `Migration` still fails closed for any other
+caller. Landing a new migration works:
+
+    python -m scripts.migrate --chain robinhood-mainnet --start-timestamp 2026081200
+
+Base is unaffected — it is not a deployed-history target and its bare default
+still runs.
+
 **Owner decision (2026-08-12): deprecated, not to be rebuilt.** The script was
 scaffolding for exercising a lane before it was live, not an operator tool. The
 lanes are now deployed and wired — `config/Ccip.py` declares both mainnet and

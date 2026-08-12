@@ -3,7 +3,8 @@ import os
 import re
 
 from scripts.utils import log
-from scripts.utils.migration import Migration
+from scripts.utils.migration import (Migration, MigrationHistoryError,
+                                     is_deployed_history)
 from scripts.utils.deploy_args import DeployArgs
 
 
@@ -36,6 +37,29 @@ class MigrationRunner:
         self.files = files
         self.gas = 0
 
+    def _require_start_point(self, start_timestamp):
+        # A history that has already been deployed may be extended, but never
+        # from the default start point. `--start-timestamp` defaults to "0",
+        # which selects every migration from the first one, and the resume
+        # logic that would otherwise skip ahead does not work here: the history
+        # holds only current-manifest.json, so _latest_manifest_timestamp()
+        # yields "current" and int("current") raises. Nothing records which
+        # migration ran last, so the caller has to say where to resume.
+        if not is_deployed_history(self.history_dir):
+            return
+        try:
+            explicit = int(str(start_timestamp).strip()) > 0
+        except (TypeError, ValueError):
+            explicit = False
+        if not explicit:
+            raise MigrationHistoryError(
+                "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
+                f"{self.history_dir} has already been deployed. Re-running "
+                "from the default start point would execute every migration "
+                "from the first one against it. Pass an explicit "
+                "--start-timestamp naming the first migration to run."
+            )
+
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
         """
         Run migrations starting at `start_timestamp`. If no start timestamp is provided,
@@ -51,11 +75,15 @@ class MigrationRunner:
         named `current-manifest.json` will be also be saved in the history directory,
         duplicating the manifest of the latest migration.
         """
+        self._require_start_point(start_timestamp)
+
         for migrate, timestamp, prev_timestamp in self._migrations(start_timestamp, end_timestamp):
             log.h1(f"Running migration with timestamp {timestamp}...")
             try:
                 migration = Migration(
-                    deploy_args, self.files, timestamp, prev_timestamp, self.history_dir
+                    deploy_args, self.files, timestamp, prev_timestamp, self.history_dir,
+                    # _require_start_point has established a deliberate start.
+                    allow_deployed_history=True,
                 )
                 migrate(migration)
                 self.gas += migration.end()
