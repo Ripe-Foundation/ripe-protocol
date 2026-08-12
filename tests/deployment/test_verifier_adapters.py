@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 from collections import deque
+from pathlib import Path
+from typing import Mapping
 
 import pytest
 import requests
 
 from scripts.utils.verify_etherscan import (
+    _compiler_version,
     CHAIN_SPECS,
     PROVIDER_POLICIES,
     EtherscanVerifier,
@@ -219,3 +223,59 @@ def test_unsupported_language_or_format_fails_before_http(updates, message):
     with pytest.raises(VerifierConfigurationError, match=message):
         adapter.verify_manifest("Example", manifest(**updates))
     assert session.calls == []
+
+
+# --- the committed manifests must actually verify --------------------------
+#
+# Every test above builds a synthetic manifest carrying a record-level
+# "compiler_version". No manifest in this repository has one:
+# deployed_contracts_manifest emits address/abi/solc_json/args/file, here and on
+# master. So the adapter rejected every real manifest while its suite passed.
+# These tests use the committed manifests instead of a fixture.
+
+
+def _committed_manifest_records():
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    for path in sorted(root.glob("*/*/current-manifest.json")):
+        contracts = json.loads(path.read_text()).get("contracts", {})
+        for name, record in sorted(contracts.items()):
+            if isinstance(record.get("solc_json"), Mapping):
+                yield f"{path.parent.parent.name}/{path.parent.name}", name, record
+
+
+def test_no_committed_manifest_carries_a_record_level_compiler_version():
+    # Pins the premise: if this ever becomes false, the fallback is dead code.
+    records = list(_committed_manifest_records())
+    assert records, "expected committed manifests with solc_json"
+    assert all("compiler_version" not in rec for _, _, rec in records)
+
+
+def test_committed_manifests_resolve_a_compiler_version():
+    for where, name, record in _committed_manifest_records():
+        resolved = _compiler_version(record, record["solc_json"])
+        assert resolved == "vyper:0.4.3", f"{where}:{name} -> {resolved}"
+
+
+def test_a_committed_manifest_submits_successfully():
+    where, name, record = next(_committed_manifest_records())
+    session = FakeSession(
+        FakeResponse({"status": "0", "message": "NOTOK", "result": "not verified"}),
+        FakeResponse({"status": "1", "message": "OK", "result": "GUID"}),
+        FakeResponse({"status": "1", "message": "OK", "result": "Pass - Verified"}),
+    )
+    verifier = create_verifier(
+        chain="base-mainnet",
+        api_key="probe",
+        session=session,
+        sleep=lambda *_: None,
+    )
+
+    result = verifier.verify_manifest(name, record)
+
+    assert result.ok, f"{where}:{name} -> {result}"
+    submission = next(
+        kwargs for _method, _url, kwargs in session.calls
+        if (kwargs.get("data") or {}).get("action") == "verifysourcecode"
+    )
+    assert submission["data"]["compilerversion"] == "vyper:0.4.3"
+    assert submission["data"]["codeformat"] == "vyper-json"

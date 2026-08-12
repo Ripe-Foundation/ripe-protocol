@@ -166,11 +166,17 @@ class MigrationRunner:
             # manifest. On both mainnets the resume point is 2026080700, whose
             # migration deploys the CCIP token pools, so a resume would have
             # deployed a second set against a live chain.
-            if start_timestamp_int is None or (
-                timestamp_int >= start_timestamp_int
-                if inclusive
-                else timestamp_int > start_timestamp_int
-            ):
+            #
+            # This is origin/rh's implementation verbatim. rh fixed the same bug
+            # after c70f14e slimmed this file from the pre-rh baseline, so the
+            # slim carried the inert version forward. Keeping rh's exact form
+            # means the merge is a no-op here rather than a competing rewrite.
+            starts_here = (
+                start_timestamp_int is None
+                or timestamp_int > start_timestamp_int
+                or (inclusive and timestamp_int == start_timestamp_int)
+            )
+            if starts_here:
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 
