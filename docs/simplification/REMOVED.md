@@ -53,7 +53,7 @@ that produced the reverted deletion. `tests/test_current_manifest_consumers.py`
 now pins the set in both directions — every declared manifest must be present
 and usable, and every manifest on disk must be declared.
 
-### Disposition of `scripts/ccip_send.py` — capability gap, owner decision open
+### Disposition of `scripts/ccip_send.py` — deprecated, owner decision closed
 
 "It was broken" is why it was safe to delete this week. It is not a finding that
 the capability is unwanted, and those are different claims. Recording the
@@ -91,7 +91,19 @@ point is recorded in `extracted-files.tsv`. If bridging is wanted, it is a
 separate change that fixes account loading, requires an explicit RPC rather than
 synthesising one, defaults to dry-run, and confirms before broadcast. That is
 new work with a real blast radius, which is why it does not belong in a cleanup.
-**The keep-versus-rebuild call is the owner's and is still open.**
+**Owner decision (2026-08-12): deprecated, not to be rebuilt.** The script was
+scaffolding for exercising a lane before it was live, not an operator tool. The
+lanes are now deployed and wired — `config/Ccip.py` declares both mainnet and
+both testnet lanes with their routers and chain selectors, and the eight
+`CcipPool`/`CcipWire` migrations deploy the token pools on each side and hand
+ownership to the Safe.
+
+That closes the gap recorded above rather than leaving it outstanding. It was a
+real gap in repository terms and not an operational one: with pools wired and
+Safe-owned, moving RIPE or GREEN across a lane is a Safe transaction against the
+live router, not a laptop script holding a raw `<NAME>_PRIVATE_KEY` and
+broadcasting by default. The three defects listed above are moot; the recovery
+point stays in `extracted-files.tsv` for reference only.
 
 ### Why removing step manifests does not break a deployment
 
