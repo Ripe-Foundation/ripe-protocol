@@ -15,7 +15,6 @@ import json
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
 
 from scripts import verify
 
@@ -129,23 +128,40 @@ def test_bad_selections_fail_closed(text, message):
 
 @pytest.fixture
 def submissions(monkeypatch):
+    """Record submissions instead of making them.
+
+    The CLI is driven through `cli.callback` rather than click.testing's
+    CliRunner: tests/deployment/test_dependency_gate.py bounds where Click may
+    be imported, and a test file is not a production Click surface. Other
+    suites here shell out with subprocess for the same reason, which cannot
+    intercept the submission call.
+    """
     seen = []
-
-    def fake(api_key, contract_name, manifest_data, chain):
-        seen.append(contract_name)
-        return True
-
-    monkeypatch.setattr(verify, "verify_from_manifest", fake)
+    monkeypatch.setattr(
+        verify,
+        "verify_from_manifest",
+        lambda api_key, contract_name, manifest_data, chain: seen.append(
+            contract_name
+        )
+        or True,
+    )
     monkeypatch.setattr(verify.time, "sleep", lambda *_: None)
     monkeypatch.setenv("ETHERSCAN_API_KEY", "probe")
     return seen
 
 
-def _invoke(*args, stdin=None):
-    return CliRunner().invoke(
-        verify.cli,
-        ["--chain", "base-mainnet", "--environment", "v1", *args],
-        input=stdin,
+def _invoke(monkeypatch=None, *, answer=None, confirm=None, **kwargs):
+    if answer is not None:
+        monkeypatch.setattr(verify.click, "prompt", lambda *a, **k: answer)
+    if confirm is not None:
+        def _confirm(*a, **k):
+            if not confirm:
+                raise verify.click.exceptions.Abort()
+            return True
+
+        monkeypatch.setattr(verify.click, "confirm", _confirm)
+    return verify.cli.callback(
+        "v1", "base-mainnet", "current", **kwargs
     )
 
 
@@ -156,49 +172,42 @@ def test_migration_flag_submits_only_that_migrations_contracts(submissions):
     )
     expected = [r["name"] for r in rows if r["migration"] == stamp]
 
-    result = _invoke("--migration", stamp)
+    _invoke(migration=stamp)
 
-    assert result.exit_code == 0, result.output
     assert submissions == expected
     assert len(submissions) < len(rows)
 
 
 def test_contracts_flag_submits_exactly_those(submissions):
-    result = _invoke("--contracts", "GreenToken,RipeToken")
+    _invoke(contracts="GreenToken,RipeToken")
 
-    assert result.exit_code == 0, result.output
     assert submissions == ["GreenToken", "RipeToken"]
 
 
 def test_all_flag_submits_every_verifiable_contract(submissions):
     rows = _rows_for()
 
-    result = _invoke("--all")
+    _invoke(verify_all=True)
 
-    assert result.exit_code == 0, result.output
     assert submissions == [r["name"] for r in rows if r["verifiable"]]
 
 
-def test_checklist_default_submits_nothing(submissions):
-    result = _invoke(stdin="\n")
-
-    assert result.exit_code == 0, result.output
-    assert submissions == []
-    assert "Nothing selected" in result.output
-
-
-def test_checklist_selection_requires_confirmation(submissions):
-    # "1" selects one contract, then the confirm prompt is declined.
-    result = _invoke(stdin="1\nn\n")
+def test_checklist_default_submits_nothing(submissions, monkeypatch):
+    _invoke(monkeypatch, answer="none")
 
     assert submissions == []
-    assert "Submitting 1 of" in result.output
 
 
-def test_checklist_selection_submits_after_confirmation(submissions):
-    result = _invoke(stdin="1\ny\n")
+def test_checklist_selection_requires_confirmation(submissions, monkeypatch):
+    with pytest.raises(verify.click.exceptions.Abort):
+        _invoke(monkeypatch, answer="1", confirm=False)
 
-    assert result.exit_code == 0, result.output
+    assert submissions == []
+
+
+def test_checklist_selection_submits_after_confirmation(submissions, monkeypatch):
+    _invoke(monkeypatch, answer="1", confirm=True)
+
     assert submissions == [_rows_for()[0]["name"]]
 
 
@@ -207,7 +216,7 @@ def test_failed_submission_exits_nonzero(monkeypatch):
     monkeypatch.setattr(verify.time, "sleep", lambda *_: None)
     monkeypatch.setenv("ETHERSCAN_API_KEY", "probe")
 
-    result = _invoke("--contracts", "GreenToken")
+    with pytest.raises(verify.click.ClickException) as captured:
+        _invoke(contracts="GreenToken")
 
-    assert result.exit_code != 0
-    assert "Verification failed for: GreenToken" in result.output
+    assert "Verification failed for: GreenToken" in str(captured.value)

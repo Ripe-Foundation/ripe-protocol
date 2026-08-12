@@ -206,7 +206,17 @@ def _parse_selection(text, rows):
     default=False,
     help="Verify every verifiable contract in the manifest. Skips the checklist.",
 )
-def cli(environment, chain, manifest, contracts, migration, verify_all):
+def cli(
+    environment,
+    chain,
+    manifest,
+    # Defaulted so `cli.callback(environment, chain, manifest)` keeps working:
+    # the secret-handling and profile-regression suites call it that way to
+    # assert the chain guard runs before the explorer key is read.
+    contracts="",
+    migration="",
+    verify_all=False,
+):
     """Verify contracts on Etherscan/Basescan.
 
     Reads the manifest (`current` by default) and offers a checklist so a run
