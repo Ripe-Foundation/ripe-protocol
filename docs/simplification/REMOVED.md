@@ -38,18 +38,27 @@ arguments, at which step. That is 0.6 MB, and it is the part that is actually
 history: `abi` and `solc_json` are reproducible by compiling `file` at that
 commit.
 
-Nothing read either field from a step manifest. `abi` has no manifest reader
-anywhere -- `export_abis.py` compiles from source. `solc_json` is only consumed
-by the Etherscan verifier, which also requires an explicit
-`compiler_version` string; `deployed_contracts_manifest` has never emitted one,
-on this branch or on `master`, so `verify_manifest` raises
-`VerifierConfigurationError` against every manifest in the repository,
-including the current ones. Stripping `solc_json` removes bytes no working path
-could use.
+**The reason is that nothing reads a step manifest**, not that the fields are
+unusable. `Migration._append_manifest` reads only a step's own file, during that
+step, to accumulate within it; `current-manifest.json` is the cumulative
+authority every other reader uses. So a numbered manifest is a record, and
+address/file/args is the whole record.
 
-`current-manifest.json` is untouched and keeps all five fields. It is the
-runtime authority, and it is what a future `compiler_version` fix would make
-verifiable. The base-sepolia and
+Do not extend this to `current-manifest.json`. `solc_json` is exactly what makes
+a contract verifiable -- it carries the standard-JSON input and the compiler
+version -- and 45 of the 50 contracts in `base-mainnet/v1/current-manifest.json`
+submit successfully through `verify_from_manifest`. The other 5 have no
+`solc_json` at all, because they were deployed with `deploy_solidity`, which
+records an address only. Stripping `solc_json` from the current manifests would
+make those 45 unverifiable on a live mainnet.
+
+(An earlier revision of this note claimed verification failed for every manifest
+and that `solc_json` was therefore unusable bytes. That was true when written --
+the adapter required a record-level `compiler_version` that no manifest emits --
+and stopped being true when that was fixed by deriving the version from
+`solc_json.compiler_version`. The conclusion held; the premise did not.)
+
+`current-manifest.json` is untouched and keeps all five fields for every chain. The base-sepolia and
 robinhood-testnet step manifests are not retained; 31 of them are unreadable
 from any commit reachable here, and the rest are testnet churn.
 

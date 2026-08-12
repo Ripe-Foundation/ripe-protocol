@@ -279,3 +279,33 @@ def test_a_committed_manifest_submits_successfully():
     )
     assert submission["data"]["compilerversion"] == "vyper:0.4.3"
     assert submission["data"]["codeformat"] == "vyper-json"
+
+
+def test_current_manifests_remain_verifiable_in_bulk():
+    """Guards the premise that `solc_json` must stay in current manifests.
+
+    A step manifest carries address/file/args only, because nothing reads one.
+    That reasoning must not be extended to `current-manifest.json`: `solc_json`
+    is what makes a contract verifiable. Contracts deployed with
+    `deploy_solidity` have no `solc_json` by design -- Foundry artifacts have no
+    Vyper compiler-output equivalent -- so they are counted, not required.
+    """
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    manifest = json.loads(
+        (root / "base-mainnet/v1/current-manifest.json").read_text()
+    )
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+
+    validated = unsupported = 0
+    for name, record in manifest["contracts"].items():
+        try:
+            verifier._validate_manifest(name, record)
+            validated += 1
+        except VerifierConfigurationError:
+            assert "solc_json" not in record, name
+            unsupported += 1
+
+    assert validated >= 45, f"only {validated} contracts would submit"
+    assert unsupported == sum(
+        1 for r in manifest["contracts"].values() if "solc_json" not in r
+    )
