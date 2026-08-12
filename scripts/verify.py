@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import time
+from pathlib import Path
 
 import click
 
@@ -8,6 +10,48 @@ from scripts.migrate import param_prompt, CLICK_PROMPTS
 from scripts.utils.verify_etherscan import CHAIN_SPECS, verify_from_manifest
 
 MIGRATION_HISTORY_DIR = "./migration_history"
+
+# scripts/verify_blockscout.py targets Robinhood mainnet only, so that is the
+# one chain we can honestly redirect to it. Pointing anything else there --
+# a typo, `local`, a retired network -- would be false advice.
+BLOCKSCOUT_CHAINS = frozenset({"robinhood-mainnet"})
+
+# One path segment: must start alphanumeric, and may then carry only
+# alphanumerics, dot, dash or underscore. That admits `v1`, `v2` and
+# `current`, and excludes separators, `.`, `..`, absolute paths and empties.
+_SEGMENT_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+
+
+def _canonical_segment(value, option):
+    """Return `value` if it is a single safe path segment, else refuse.
+
+    The rejected value is deliberately not echoed. It is caller-controlled,
+    and repeating it back writes the attempted path into terminal scrollback
+    and CI logs.
+    """
+    if not isinstance(value, str) or not _SEGMENT_RE.match(value):
+        raise click.ClickException(
+            f"--{option} must be a single path segment matching "
+            "[A-Za-z0-9][A-Za-z0-9._-]* -- no separators, no '.' or '..', "
+            "not absolute. The rejected value is not echoed."
+        )
+    return value
+
+
+def _history_manifest_path(chain, environment, manifest):
+    """Resolve the manifest path and prove it stays inside the history tree."""
+    root = Path(MIGRATION_HISTORY_DIR).resolve()
+    candidate = (
+        root / chain / environment / f"{manifest}-manifest.json"
+    ).resolve()
+    # The segment rules already forbid traversal. Re-checking the *resolved*
+    # path is what stops a symlink planted inside the tree from widening it,
+    # and it is cheap next to submitting contract records with a live key.
+    if not candidate.is_relative_to(root):
+        raise click.ClickException(
+            "Resolved manifest path escapes the migration history directory."
+        )
+    return candidate
 
 
 @click.command()
@@ -35,23 +79,36 @@ def cli(environment, chain, manifest):
     Robinhood chains have no Etherscan-family explorer -- see
     `scripts/verify_blockscout.py` for those.
     """
-    # Refuse a chain with no Etherscan-family provider before anything else.
-    # Robinhood manifests exist and are readable, so without this the run gets
-    # as far as submitting and dies inside the verifier with a traceback --
-    # after having read the explorer key. An impossible route should fail
-    # early, say so plainly, and never touch the secret.
-    spec = CHAIN_SPECS.get(chain)
-    if spec is None or spec.provider is None:
+    # Validate every input before constructing -- let alone printing -- a path.
+    # An unknown chain and a known chain without a verifier are different
+    # failures and get different advice; conflating them tells someone with a
+    # typo to go use the Robinhood Blockscout script.
+    spec = CHAIN_SPECS.get(chain) if isinstance(chain, str) else None
+    if spec is None:
         raise click.ClickException(
-            f"Cannot verify chain `{chain}`: no Etherscan-family verifier is "
-            "configured for it. Robinhood chains have no such explorer -- use "
-            "`python -m scripts.verify_blockscout` for those."
+            "Unknown chain. Supported chains: "
+            + ", ".join(sorted(CHAIN_SPECS))
+            + "."
+        )
+    if spec.provider is None:
+        # Safe to echo now: `chain` is a canonical key, not free text.
+        hint = (
+            " Use `python -m scripts.verify_blockscout` for that chain."
+            if chain in BLOCKSCOUT_CHAINS
+            else ""
+        )
+        raise click.ClickException(
+            f"Chain `{chain}` has no Etherscan-family verifier configured."
+            + hint
         )
 
-    manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/{manifest}-manifest.json"
+    environment = _canonical_segment(environment, "environment")
+    manifest = _canonical_segment(manifest, "manifest")
+    manifest_path = _history_manifest_path(chain, environment, manifest)
+
     print(f"Verifying contracts from chain `{chain}`, manifest `{manifest_path}`")
 
-    if not os.path.exists(manifest_path):
+    if not manifest_path.exists():
         raise click.ClickException(f"No manifest found at {manifest_path}")
 
     # Either spelling is accepted: `migrate` reads BASESCAN_API_KEY for the

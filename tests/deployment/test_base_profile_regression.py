@@ -80,7 +80,7 @@ def test_legacy_chain_option_resolves_only_to_canonical_base():
     )
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
-    assert "no Etherscan-family verifier is configured" in result.stderr
+    assert "Unknown chain" in result.stderr
 
 
 def test_blocked_robinhood_verification_never_advertises_proposed_path():
@@ -93,7 +93,7 @@ def test_blocked_robinhood_verification_never_advertises_proposed_path():
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
     assert "migration_history/robinhood-mainnet" not in result.stdout
-    assert "no Etherscan-family verifier is configured" in result.stderr
+    assert "has no Etherscan-family verifier configured" in result.stderr
     assert "verify_blockscout" in result.stderr
 
 
@@ -200,7 +200,7 @@ def test_unresolvable_chain_fails_before_any_network_call(monkeypatch):
     # forgets the option. The refusal must precede any submission attempt.
     with pytest.raises(Exception) as captured:
         verify.cli.callback("base-mainnet", None, "current")
-    assert "no Etherscan-family verifier is configured" in str(captured.value)
+    assert "Unknown chain" in str(captured.value)
     assert calls == []
 
 
@@ -231,3 +231,88 @@ def test_committed_base_history_inventory_is_unchanged():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
+
+
+# --- verify.py input containment -------------------------------------------
+#
+# `verify` submits contract records with a live explorer credential, so the
+# manifest it reads must come from inside the selected history directory. The
+# path was previously built by interpolating the three options straight into a
+# format string, which let `--environment`/`--manifest` walk out of the tree.
+
+
+@pytest.mark.parametrize(
+    ("option", "value", "label"),
+    (
+        ("--environment", "../../..", "parent traversal"),
+        ("--manifest", "../../../../etc/passwd", "deep traversal"),
+        ("--environment", "/etc", "absolute path"),
+        ("--manifest", "/etc/passwd", "absolute manifest"),
+        ("--environment", "a/b", "forward separator"),
+        ("--manifest", "a\\b", "backslash separator"),
+        ("--environment", ".", "single dot"),
+        ("--environment", "..", "double dot"),
+        ("--environment", "", "empty segment"),
+    ),
+)
+def test_verify_rejects_noncanonical_path_segments(option, value, label):
+    result = _run_module("scripts.verify", option, value)
+
+    assert result.returncode != 0, label
+    # It must fail before a path is built, so nothing path-shaped is printed.
+    assert "migration_history" not in result.stdout, label
+    assert "migration_history" not in result.stderr, label
+    # And the rejected value is not echoed back into logs.
+    if value not in ("", ".", ".."):
+        assert value not in result.stderr, label
+        assert value not in result.stdout, label
+
+
+def test_verify_resolved_manifest_stays_inside_history_directory():
+    root = (ROOT / "migration_history").resolve()
+    resolved = verify._history_manifest_path("base-mainnet", "v1", "current")
+
+    assert resolved.is_relative_to(root)
+    assert resolved == root / "base-mainnet/v1/current-manifest.json"
+
+
+@pytest.mark.parametrize("label", ("BASE-MAINNET", "Base-Mainnet", "bogus-chain", "local"))
+def test_verify_rejects_unknown_chain_without_blockscout_advice(label):
+    result = _run_module("scripts.verify", "--chain", label)
+
+    assert result.returncode != 0
+    assert "Unknown chain" in result.stderr
+    # A typo or a case variant is not a Robinhood problem; sending it to the
+    # Blockscout script would be false advice.
+    assert "verify_blockscout" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("chain", "expect_blockscout"),
+    (
+        ("robinhood-mainnet", True),
+        # verify_blockscout targets Robinhood mainnet only, so testnet and the
+        # retired goerli networks must not be pointed at it.
+        ("robinhood-testnet", False),
+        ("base-goerli", False),
+        ("eth-goerli", False),
+    ),
+)
+def test_verify_separates_unsupported_provider_from_unknown_chain(
+    chain, expect_blockscout
+):
+    result = _run_module("scripts.verify", "--chain", chain)
+
+    assert result.returncode != 0
+    assert "no Etherscan-family verifier configured" in result.stderr
+    assert "Unknown chain" not in result.stderr
+    assert ("verify_blockscout" in result.stderr) is expect_blockscout
+
+
+def test_verify_reports_missing_manifest_for_canonical_segments():
+    result = _run_module(
+        "scripts.verify", "--chain", "base-mainnet", "--environment", "v999"
+    )
+
+    assert result.returncode != 0
+    assert "No manifest found" in result.stderr
