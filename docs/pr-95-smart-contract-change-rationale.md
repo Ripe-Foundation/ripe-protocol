@@ -329,10 +329,17 @@ than extending it to a new contract version.
 
 ### Representative validation
 
+- the direct CreditEngine state matrix in
+  `tests/core/creditEngine/test_credit_liquidation_state.py`, covering healthy,
+  redemption-only, and liquidatable positions across frozen/unfrozen and
+  auction/no-auction states;
+- exact inclusive redemption/liquidation boundaries, zero thresholds, zero
+  debt, and last-auction removal in the same CreditEngine-owned suite;
 - active-auction rejection in `test_ah_liquidation_auction_creation`
 - no-auction direct-settlement retry coverage
 - non-auctionable collateral and final-auction-depletion retry coverage
-- repayment/refund and dynamic-borrow-rate focused CreditEngine regressions
+- repayment/refund caps against both declared input and actual CreditEngine
+  balance, plus the existing dynamic-borrow-rate CreditEngine regressions
 - exact constructor-bound runtime and default headroom-floor checks
 
 ## 6. `Teller.vy`
