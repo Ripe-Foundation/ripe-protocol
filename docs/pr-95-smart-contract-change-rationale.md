@@ -440,7 +440,7 @@ maximum duration does not provide the same unlock behavior.
   explicitly allowed stale-zero preconditions; a dirty target makes the batch
   revert atomically.
 - A late user failure still rolls back earlier users in the same transaction.
-- Measured deployed runtime: 13,476 bytes.
+- Measured deployed runtime: 12,464 bytes.
 
 ### Representative validation
 
@@ -575,7 +575,7 @@ than the user's original terms—the opposite of the migration objective.
   no authority to apply them.
 - Same-user calls report zero moved rather than manufacturing a transfer.
 - Paused migration state becomes intentionally more restrictive.
-- Measured deployed runtime: 23,789 bytes, leaving 787 bytes of EIP-170
+- Measured deployed runtime: 23,667 bytes, leaving 909 bytes of EIP-170
   headroom.
 
 ### Representative validation
