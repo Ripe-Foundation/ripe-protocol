@@ -670,8 +670,8 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
     current_test_identities=(
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_ah_auctions.py",
-            "8b9ce1671c05e50059368879c2ad081e56ef58f8",
-            "e8ff7b4ecbfd85ab5e16794ebf0d7cb8ee167b486ed39030c0b0f624fb1892ad",
+            "77f1222861917511bf5bd7adae7a1ff215b9afbc",
+            "f869490832929bf6d206d5a888831bad3f1fe32e98a5d9e009458a8ba9648f83",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
@@ -705,7 +705,7 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/core/Deleverage.vy",
             "b43d373039b352d6eab240be714134764901b947",
             "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
-            "434f2475eb7a20ae27c1ae4dd80948706b3d7078bf0f736fa0d7fae8a01b376b",
+            "aab99ede7492d5f7f4769493c55ba04f28478caccbe9f32075dd9ef9b8c2acc7",
             "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
             "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
             "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
@@ -715,7 +715,7 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/vaults/SimpleErc20.vy",
             "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
             "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
+            "ec9daa8c14f70bacf1e83f0061e6865d27641a151090917f2d1f82ba2503ffe5",
             "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
             "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
             "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
