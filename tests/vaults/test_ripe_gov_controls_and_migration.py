@@ -81,7 +81,8 @@ def _save_points(vault, user, asset, switchboard_alpha, blocks=25):
 def _pause_pair(source, target, switchboard_alpha):
     hq = boa.load_partial("contracts/registries/RipeHq.vy").at(source.getRipeHq())
     teller = boa.load_partial("contracts/core/Teller.vy").at(hq.getAddr(17))
-    teller.pause(True, sender=switchboard_alpha.address)
+    if not teller.isPaused():
+        teller.pause(True, sender=switchboard_alpha.address)
     source.pause(True, sender=switchboard_alpha.address)
     target.pause(True, sender=switchboard_alpha.address)
 
