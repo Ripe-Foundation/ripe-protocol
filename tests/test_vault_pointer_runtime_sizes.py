@@ -48,17 +48,17 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit after the liquidation-state change:
-#   Teller 51, CreditEngine 209, StabilityPool 205, SwitchboardCharlie 1,091,
+#   Teller 71, CreditEngine 209, StabilityPool 205, SwitchboardCharlie 1,091,
 #   SwitchboardAlpha 1,142, Lootbox 1,583, RipeGov 1,319, SwitchboardBravo
 #   1,494, SwitchboardEcho 1,523, and the rest far larger.
 #
 # CreditEngine has self-retired RH-D026 by returning above the 200-byte floor.
-# Teller's migration implementation leaves 51 bytes and is carried by RH-D027
-# after the owner explicitly accepted that exact size. See the decision register
-# for its scope and reconsideration triggers.
+# Teller leaves 71 bytes after retaining the receipt-window guard and inlining a
+# one-use preferred-pool lookup. The owner replaced RH-D027 with this exact
+# artifact identity. See the decision register for its scope and triggers.
 #
 MIN_HEADROOM_OVERRIDES = {
-    "Teller": 51,  # RH-D027 waiver; do not change without a new decision
+    "Teller": 71,  # RH-D027 replacement; do not change without a new decision
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -128,13 +128,13 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "teller",
         "source": "contracts/core/Teller.vy",
         "source_sha256": (
-            "cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc"
+            "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476"
         ),
         "runtime_sha256": (
-            "e2031902065284ce34ad4f6634672db466862696d34c12cb8d3a73b3ed77962a"
+            "3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8"
         ),
-        "runtime_template_bytes": 24_429,
-        "deployed_runtime_bytes": 24_525,
+        "runtime_template_bytes": 24_409,
+        "deployed_runtime_bytes": 24_505,
         # The paused-state constructor input is pinned together with HQ because
         # both are immutable parts of the complete deployed byte string.
         "pinned_hq": "0x00000000000000000000000000000000000000A2",
@@ -143,7 +143,7 @@ WAIVED_CONTRACT_IDENTITIES = {
             False,
         ),
         "deployed_sha256": (
-            "1948c269f1aa9752dfa04ecb30185d847d2ac11b5a0d86e7492588f0781d1dd4"
+            "8980ea1cae7a32927d120e3fc333d3a1039d778cf09c1b7293a57cd755d67ea9"
         ),
     },
 }

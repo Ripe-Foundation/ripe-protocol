@@ -5,8 +5,8 @@
 **Status (2026-08-11):** VaultMigrator architecture and the latest live `rh` are integrated. The
 core-remediation candidate preserves pre-wind-down lock records on both governance routes, leaves
 emergency accrual-disable policy local to its source vault, and excludes every historically classified RipeGov from the
-generic balance-only migration. Teller's owner-accepted 24,525-byte runtime remains unchanged under
-RH-D027. This is not deployment or fork qualification; the verification evidence below predates this
+generic balance-only migration. Teller's owner-accepted RH-D027 artifact is now 24,505 bytes after
+retaining the receipt-window guard and inlining a one-use lookup. This is not deployment or fork qualification; the verification evidence below predates this
 remediation unless a later paragraph explicitly says otherwise.
 
 > Read this before touching the branch. It records what changed, *why*, what is still broken, and
@@ -179,7 +179,7 @@ owner-waived source, compiler output, deployed size and immutable-bearing runtim
 | Contract | Deployed runtime | EIP-170 headroom |
 |---|---:|---:|
 | VaultMigrator | 13,144 | 11,432 |
-| Teller | 24,525 | **51 — RH-D027 exact waiver** |
+| Teller | 24,505 | **71 — RH-D027 exact waiver** |
 | TellerUtils | 8,976 | 15,600 |
 | SwitchboardEcho | 23,053 | 1,523 |
 | Lootbox | 22,993 | 1,583 |

@@ -348,6 +348,9 @@ than extending it to a new contract version.
 ### What changed
 
 `_performHousekeeping` now reverts while `receiptMeasurementActive` is true.
+The one-use `_getPreferredStabVaultId` wrapper was also inlined at
+`convertToSavingsGreenAndDepositIntoStabPool`; the same MissionControl getter
+and nonzero-ID assertion remain at the call site.
 
 ### Why this is required
 
@@ -368,8 +371,11 @@ route under the same mutex already used by direct deposits.
 - A nested protocol callback that attempts housekeeping during an active
   receipt measurement now fails atomically by design.
 - Teller is close to EIP-170 after all changes: measured deployed runtime is
-  24,532 bytes, leaving 44 bytes of headroom. The shared artifact ledger binds
-  the full deployed runtime, including immutable data.
+  24,505 bytes, leaving 71 bytes of headroom. This is the exact owner-approved
+  RH-D027 replacement artifact. Inlining the one-use helper is behavior
+  preserving and recovered 27 bytes relative to the unoptimized guarded
+  version; the shared artifact ledger binds the full deployed runtime,
+  including immutable data.
 
 ### Representative validation
 

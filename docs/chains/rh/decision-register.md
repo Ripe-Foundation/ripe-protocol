@@ -681,10 +681,11 @@ the two tables cannot drift apart in either direction.
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
 
-### RH-D027 — Teller carries an exact migration headroom waiver at 51 bytes
+### RH-D027 — Teller carries an exact migration and receipt-guard waiver at 71 bytes
 
 **Status:** Owner-granted on 10 August 2026 for the VaultMigrator integration
-candidate in PR #83.
+candidate in PR #83; exact artifact replaced by owner decision on 11 August
+2026 for PR #95.
 
 The ratified runtime-size rule remains at least 200 bytes of EIP-170 headroom.
 The integrated VaultMigrator design deliberately keeps Teller as the thin,
@@ -693,8 +694,14 @@ reviewed that result, accepted Teller's measured size, and authorized this
 integration. This record applies the existing exact-waiver policy to that
 approval rather than lowering the shared rule.
 
-**Scope.** `Teller` only, at a measured 24,525-byte deployed runtime, leaving
-**51 bytes** of EIP-170 headroom. Every non-waived contract remains subject to
+The replacement retains the housekeeping guard that prevents an external
+receipt-measurement callback from entering Teller housekeeping. To recover
+headroom without changing behavior, the one-use preferred-StabilityPool helper
+was inlined at its sole caller. The same MissionControl view call and nonzero-ID
+check remain, and no public ABI or storage item changed.
+
+**Scope.** `Teller` only, at a measured 24,505-byte deployed runtime, leaving
+**71 bytes** of EIP-170 headroom. Every non-waived contract remains subject to
 the 200-byte floor; RipeGov separately retains its 1,000-byte migration-branch
 guard.
 
@@ -703,18 +710,18 @@ identity at declared constructor inputs:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/Teller.vy` sha256 | `cbc9ab37a3f14ab45be9a18e1008114478c2b69e36867056bd8e5517a0fd67bc` |
-| Runtime template sha256 (immutable-free) | `e2031902065284ce34ad4f6634672db466862696d34c12cb8d3a73b3ed77962a` |
-| Runtime template bytes | 24,429 |
-| Deployed runtime bytes (with immutables) | 24,525 |
-| Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `1948c269f1aa9752dfa04ecb30185d847d2ac11b5a0d86e7492588f0781d1dd4` |
+| `contracts/core/Teller.vy` sha256 | `fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476` |
+| Runtime template sha256 (immutable-free) | `3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8` |
+| Runtime template bytes | 24,409 |
+| Deployed runtime bytes (with immutables) | 24,505 |
+| Deployed runtime sha256 at declared HQ `0x…00A2`, `_shouldPause = false` | `8980ea1cae7a32927d120e3fc333d3a1039d778cf09c1b7293a57cd755d67ea9` |
 
 The declared HQ is not a real deployment address. Together with the explicit
 pause input it makes Teller's immutable-bearing deployed byte string
 deterministic. A deployment's actual constructor configuration remains a
 separate deployment concern.
 
-**Residual risk, accepted.** Only 51 bytes remain before EIP-170. This waiver
+**Residual risk, accepted.** Only 71 bytes remain before EIP-170. This waiver
 permits **0 bytes** of runtime growth: the exact size and identities above are
 pinned, so a larger, smaller, or size-preserving Teller change fails the guard.
 The narrow margin makes future Teller work likely to require deletion,

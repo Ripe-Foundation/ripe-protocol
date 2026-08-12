@@ -12,8 +12,8 @@
 > receipts as an accepted operating restriction.
 > The ABI-preserving implementation shares the single/many claim plumbing and
 > the AuctionHouse single/many liquidation and purchase plumbing internally.
-> Final constructor-bound measurements are `24,305` bytes for StabilityPool
-> (`271` bytes headroom) and `23,725` for AuctionHouse (`851` bytes headroom).
+> Final constructor-bound measurements are `24,313` bytes for StabilityPool
+> (`263` bytes headroom) and `23,863` for AuctionHouse (`713` bytes headroom).
 
 > **Path note (8 August 2026):** some paths cited below no longer exist in the
 > active tree — the block-clock inventory, the `contracts/testing/` probes, and
@@ -24,9 +24,9 @@
 
 > [!WARNING]
 > **Superseded design snapshot below.** The current owner correction retains
-> the `$0.10/$0.05` dormant thresholds, values unavailable active claim
-> collateral at zero, and removes the later paused zero-price
-> quarantine/reactivation state machine.
+> the `$0.10/$0.05` dormant thresholds, but active claims now fail valuation
+> closed when their price is unavailable; it does not value them at zero. The
+> later paused zero-price quarantine/reactivation state machine remains removed.
 > The current behavior, residual risk, and
 > non-borrowing/phase-2-liquidatable invariant are recorded in
 > [`../rh-production-vyper-remediation.md`](../rh-production-vyper-remediation.md).

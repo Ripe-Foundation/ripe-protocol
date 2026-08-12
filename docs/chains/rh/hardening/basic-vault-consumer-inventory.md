@@ -50,8 +50,8 @@ source review and test update.
     "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
     "contracts/core/HumanResources.vy": "7422f2dee9b5898b0f163371477bbea7c4a9b03a22b393e15594bbaadb00cddb",
     "contracts/core/Lootbox.vy": "279b859a6e5234676e091cecb8736aeadac68bc8f1b909267b7a06c69a901f43",
-    "contracts/core/Teller.vy": "941b1d37282a53bf9f6ce33627d6d9333a87cb84cf718445e460a461ee384716",
-    "contracts/core/VaultMigrator.vy": "aedf6fe73b67fb26e1c012d4cbf78fd272e06c658632e88ac60dc0cc145d9f25"
+    "contracts/core/Teller.vy": "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476",
+    "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
   },
   "getter_scope": [
     "doesUserHaveBalance",

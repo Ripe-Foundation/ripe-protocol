@@ -737,36 +737,37 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     assert active_index != 0
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
-    # A configured feed reporting zero excludes the claim collateral from NAV
-    # without removing it from the active claim-asset set.
+    # An active claim liability cannot silently disappear from NAV. A zero
+    # price therefore blocks valuation and share-changing operations while the
+    # active registration and all accounting remain intact.
     mock_price_source.setPrice(bravo_token, 0)
-    known_value = total_value_before - ACTIVATION_THRESHOLD
-    assert stability_pool.getTotalValue(alpha_token) == known_value
-    assert stability_pool.getTotalUserValue(bob, alpha_token) == known_value
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
+    with boa.reverts():
+        stability_pool.getTotalUserValue(bob, alpha_token)
 
-    # Deposits and withdrawals remain live while the unavailable claim asset is
-    # temporarily valued at zero.
     with boa.env.anchor():
         alpha_token.transfer(
             stability_pool,
             EIGHTEEN_DECIMALS,
             sender=alpha_token_whale,
         )
-        assert stability_pool.depositTokensInVault(
-            alice,
-            alpha_token,
-            EIGHTEEN_DECIMALS,
-            sender=teller.address,
-        ) == EIGHTEEN_DECIMALS
-        withdrawn, is_user_depleted = stability_pool.withdrawTokensFromVault(
-            alice,
-            alpha_token,
-            EIGHTEEN_DECIMALS,
-            alice,
-            sender=teller.address,
-        )
-        assert EIGHTEEN_DECIMALS - 1 <= withdrawn <= EIGHTEEN_DECIMALS
-        assert is_user_depleted
+        with boa.reverts():
+            stability_pool.depositTokensInVault(
+                alice,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            )
+        with boa.reverts():
+            stability_pool.withdrawTokensFromVault(
+                bob,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                bob,
+                sender=teller.address,
+            )
+        assert stability_pool.userBalances(bob, alpha_token) == shares_before
 
     # Maintenance never removes or reclassifies an unpriced active pair,
     # whether the pool is paused or unpaused.
@@ -786,11 +787,12 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     assert stability_pool.userBalances(bob, alpha_token) == shares_before
 
     # Unpause has no oracle-specific state machine. Removing the feed entirely
-    # has the same zero-NAV treatment as a configured feed reporting zero.
+    # retains the same fail-closed valuation behavior.
     stability_pool.pause(False, sender=switchboard_alpha.address)
     assert not stability_pool.isPaused()
     mock_price_source.disablePriceFeed(bravo_token)
-    assert stability_pool.getTotalValue(alpha_token) == known_value
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
 
     # Restoring the feed puts the collateral back into NAV immediately; no
     # activation call or persistent recovery bookkeeping is required.
@@ -3692,12 +3694,18 @@ def test_redemption_fails_closed_during_outage_and_resumes_after_restoration(
 
     # During the outage the redemption fails closed and changes nothing.
     mock_price_source.setPrice(bravo_token, 0)
-    before = _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob])
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], include_values=False
+    )
     with boa.reverts():
         redeem_from_stability_pool(
             teller, vault_id, bravo_token, redeem_amount, bob, sender=bob
         )
-    assert _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob]) == before
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], include_values=False
+    ) == before
 
     # After restoration it succeeds and reduces the recorded liability exactly.
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)

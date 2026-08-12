@@ -1889,14 +1889,12 @@ def test_ah_liquidation_savings_green_keeper_rewards(
     sally,
     green_token,
     savings_green,
-    _test,
 ):
-    """Test keeper rewards paid in savings GREEN tokens
-    
-    This tests:
-    - Keeper can choose to receive rewards in savings GREEN
-    - _shouldStakeRewards parameter works correctly
-    - Savings GREEN deposit happens correctly
+    """A no-progress liquidation cannot mint a savings-GREEN keeper reward.
+
+    This collateral is routed only to Deleverage, so AuctionHouse neither
+    repays debt nor starts an auction. The keeper's reward preference must not
+    turn that retryable no-progress call into a fee-bearing action.
     """
     
     setGeneralConfig()
@@ -1933,22 +1931,13 @@ def test_ah_liquidation_savings_green_keeper_rewards(
     keeper_savings_before = savings_green.balanceOf(sally)
 
     # Perform liquidation with _wantsSavingsGreen=True
-    expected_keeper_fee = debt_amount * 2_00 // HUNDRED_PERCENT
     keeper_rewards = teller.liquidateUser(bob, True, sender=sally)  # True = should stake rewards (savings GREEN)
 
-    # Verify keeper rewards
-    _test(expected_keeper_fee, keeper_rewards)
-
-    # Verify keeper received savings GREEN, not regular GREEN
+    assert keeper_rewards == 0
     keeper_green_after = green_token.balanceOf(sally)
     keeper_savings_after = savings_green.balanceOf(sally)
-    
-    assert keeper_green_after == keeper_green_before  # No regular GREEN received
-    assert keeper_savings_after > keeper_savings_before  # Savings GREEN received
-    
-    # Verify the amount of savings GREEN received
-    savings_green_received = keeper_savings_after - keeper_savings_before
-    _test(expected_keeper_fee, savings_green.convertToAssets(savings_green_received))
+    assert keeper_green_after == keeper_green_before
+    assert keeper_savings_after == keeper_savings_before
 
 
 def test_ah_liquidation_edge_cases(

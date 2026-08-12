@@ -127,9 +127,10 @@ governs what future Teller growth is admissible.
 
 #### RG-SIZE-01 VaultMigrator follow-on — owner, 2026-08-10
 
-The 200-byte rule remains controlling, but PR #83's final Teller measures 24,525
-deployed bytes and therefore needs the separate exact waiver recorded as
-RH-D027. That waiver is bound to one source, compiler output, exact deployed
+The 200-byte rule remains controlling. RH-D027's PR #83 artifact was replaced
+by the owner on 11 August 2026: Teller now measures 24,505 deployed bytes with
+71 bytes of headroom after retaining the receipt-window housekeeping guard and
+inlining one behavior-equivalent helper. The waiver is bound to one source, compiler output, exact deployed
 size, and complete deployed-byte identity at declared constructor inputs. It
 permits no Teller growth and does not lower the default floor. The historical
 200-byte reconciliation above remains the rule against which this exception is

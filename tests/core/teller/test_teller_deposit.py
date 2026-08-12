@@ -3399,13 +3399,13 @@ def test_predeployment_withdrawal_responsibility_matrix(
             True,
         )
 
-    protected_simple_rejects_shape_or_delivery = (
-        vault_kind == "simple"
+    exact_delivery_vault_rejects_short_delivery = (
+        vault_kind in ("simple", "stability")
         and transfer_mode in (1, 3, 4)
     )
     universally_rejected = transfer_mode in (6, 7, 10)
     should_revert = (
-        protected_simple_rejects_shape_or_delivery or universally_rejected
+        exact_delivery_vault_rejects_short_delivery or universally_rejected
     )
 
     if should_revert:
