@@ -8,7 +8,6 @@ from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
 from boa.environment import Env
 # from scripts.utils.safe_account import SafeAccount
-# from scripts.utils.ledger_account import LedgerAccount
 from scripts.utils.mock_account import MockAccount
 import os
 
