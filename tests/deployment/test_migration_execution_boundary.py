@@ -2,9 +2,10 @@
 
 `_append_manifest` writes `current-manifest.json` on the first successful step,
 so its presence is the evidence that migrations have already run against a
-history. Nothing else survives to say so: the numbered step manifests are pruned
-as a matter of policy, `end()` deletes the transaction log on success, and the
-current manifest records contracts with no step attribution.
+history, and the one signal every history has: the mainnet step manifests were
+recovered from git, but the testnet ones were not, `end()` deletes the
+transaction log on success, and the current manifest records contracts with no
+step attribution.
 
 That matters because extending and redoing are the same command.
 `--start-timestamp` defaults to `"0"`, and the runner selects every migration
@@ -75,14 +76,31 @@ def test_current_manifest_is_what_marks_a_history_deployed(tmp_path):
 
 
 def test_every_committed_history_is_recognised_as_deployed():
-    # All six retain a current manifest; the step manifests were pruned, which
-    # is why the check cannot key on those.
     root = Path(__file__).resolve().parents[2] / "migration_history"
     histories = [p for p in root.glob("*/*") if p.is_dir()]
     assert histories, "expected committed histories"
     for history in histories:
         assert history_has_deployment(history), history
-        assert not list(history.glob("[0-9]*-manifest.json")), history
+
+
+def test_mainnet_step_manifests_are_retained():
+    """Per-step history is kept for the mainnets.
+
+    An earlier revision pruned every numbered manifest, leaving only
+    `current-manifest.json`. That discarded per-step attribution — which
+    migration deployed which contract, and each generation of a redeployed one
+    — and it is the reason `_latest_manifest_timestamp()` had nothing to
+    resume from. The mainnet manifests were recovered from git; the testnet
+    ones were not retained.
+    """
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    steps = {
+        f"{p.parent.name}/{p.name}": len(list(p.glob("[0-9]*-manifest.json")))
+        for p in root.glob("*/*")
+        if p.is_dir()
+    }
+    assert steps["base-mainnet/v1"] >= 60
+    assert steps["robinhood-mainnet/v1"] >= 11
 
 
 # --- the runner decides ----------------------------------------------------

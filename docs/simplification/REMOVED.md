@@ -19,8 +19,20 @@ Archived copies are also kept outside the repo at
 
 ## Deployment manifests: what is kept and why
 
-Step manifests are removed on an ongoing basis as rh produces them. Only the
-`current-manifest.json` of each chain/version is read at runtime, by
+**Step manifests are retained for the mainnets.** An earlier revision of this
+branch pruned every numbered manifest, keeping only `current-manifest.json`.
+That was reversed on owner instruction: per-step attribution -- which migration
+deployed which contract, and each generation of a redeployed one -- is history
+worth keeping, and its absence is also what left
+`MigrationRunner._latest_manifest_timestamp()` with nothing to resume from.
+
+60 `base-mainnet/v1` and 11 `robinhood-mainnet/v1` step manifests were recovered
+from git (`origin/master` and the commits that removed them: `51616b9`,
+`cc7a0a7`, `075c146`) and are committed again. The base-sepolia and
+robinhood-testnet step manifests are not retained; 31 of them are unreadable
+from any commit reachable here, and the rest are testnet churn.
+
+Only the `current-manifest.json` of each chain/version is read at runtime, by
 `prepare_defaults.py`, `verify.py`, `verify_blockscout.py`, `console.py`, and
 `Migration.__init__` itself. `verify.py` belongs on that list because its
 `--manifest` option defaults to `current` (`scripts/migrate.py:131-135`), so an
@@ -176,7 +188,7 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**190 files removed.**
+**119 files removed.**
 
 The two `Deployment tooling` sections below are this PR's removals — the unused
 H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
@@ -191,84 +203,13 @@ commit each is retrievable from) is in `extracted-files.tsv` under the
 - `scripts/check_block_clock_inventory.py`
 - `tests/inventory/test_block_clock_inventory.py`
 
-## Deployment manifests (79)
+## Deployment manifests (8)
 
-- `migration_history/base-mainnet/v1/0000-manifest.json`
-- `migration_history/base-mainnet/v1/1004-manifest.json`
-- `migration_history/base-mainnet/v1/1005-manifest.json`
-- `migration_history/base-mainnet/v1/1006-manifest.json`
-- `migration_history/base-mainnet/v1/1007-manifest.json`
-- `migration_history/base-mainnet/v1/1008-manifest.json`
-- `migration_history/base-mainnet/v1/1009-manifest.json`
-- `migration_history/base-mainnet/v1/1010-manifest.json`
-- `migration_history/base-mainnet/v1/1011-manifest.json`
-- `migration_history/base-mainnet/v1/1012-manifest.json`
-- `migration_history/base-mainnet/v1/1013-manifest.json`
-- `migration_history/base-mainnet/v1/1014-manifest.json`
-- `migration_history/base-mainnet/v1/1015-manifest.json`
-- `migration_history/base-mainnet/v1/1016-manifest.json`
-- `migration_history/base-mainnet/v1/1017-manifest.json`
-- `migration_history/base-mainnet/v1/2001-manifest.json`
-- `migration_history/base-mainnet/v1/2025071501-manifest.json`
-- `migration_history/base-mainnet/v1/2025071502-manifest.json`
-- `migration_history/base-mainnet/v1/2025071503-manifest.json`
-- `migration_history/base-mainnet/v1/2025071504-manifest.json`
-- `migration_history/base-mainnet/v1/2025071505-manifest.json`
-- `migration_history/base-mainnet/v1/2025071506-manifest.json`
-- `migration_history/base-mainnet/v1/2025071601-manifest.json`
-- `migration_history/base-mainnet/v1/2025071602-manifest.json`
-- `migration_history/base-mainnet/v1/2025071801-manifest.json`
-- `migration_history/base-mainnet/v1/2025072001-manifest.json`
-- `migration_history/base-mainnet/v1/2025072201-manifest.json`
-- `migration_history/base-mainnet/v1/2025072301-manifest.json`
-- `migration_history/base-mainnet/v1/2025072701-manifest.json`
-- `migration_history/base-mainnet/v1/2025072901-manifest.json`
-- `migration_history/base-mainnet/v1/2025080401-manifest.json`
-- `migration_history/base-mainnet/v1/2025080800-manifest.json`
-- `migration_history/base-mainnet/v1/2025080900-manifest.json`
-- `migration_history/base-mainnet/v1/2025080901-manifest.json`
-- `migration_history/base-mainnet/v1/2025081200-manifest.json`
-- `migration_history/base-mainnet/v1/2025081800-manifest.json`
-- `migration_history/base-mainnet/v1/2025082000-manifest.json`
-- `migration_history/base-mainnet/v1/2025090300-manifest.json`
-- `migration_history/base-mainnet/v1/2025090400-manifest.json`
-- `migration_history/base-mainnet/v1/2025102000-manifest.json`
-- `migration_history/base-mainnet/v1/2025102200-manifest.json`
-- `migration_history/base-mainnet/v1/2025111100-manifest.json`
-- `migration_history/base-mainnet/v1/2025112400-manifest.json`
-- `migration_history/base-mainnet/v1/2025112500-manifest.json`
-- `migration_history/base-mainnet/v1/2025120200-manifest.json`
-- `migration_history/base-mainnet/v1/2025120400-manifest.json`
-- `migration_history/base-mainnet/v1/2025120700-manifest.json`
-- `migration_history/base-mainnet/v1/2025120900-manifest.json`
-- `migration_history/base-mainnet/v1/2026010900-manifest.json`
-- `migration_history/base-mainnet/v1/2026011400-manifest.json`
-- `migration_history/base-mainnet/v1/2026021300-manifest.json`
-- `migration_history/base-mainnet/v1/2026021900-manifest.json`
-- `migration_history/base-mainnet/v1/2026022000-manifest.json`
-- `migration_history/base-mainnet/v1/2026030500-manifest.json`
-- `migration_history/base-mainnet/v1/2026043000-manifest.json`
-- `migration_history/base-mainnet/v1/2026072800-manifest.json`
-- `migration_history/base-mainnet/v1/2026072801-manifest.json`
-- `migration_history/base-mainnet/v1/2026080700-manifest.json`
-- `migration_history/base-mainnet/v1/3001-manifest.json`
-- `migration_history/base-mainnet/v1/3002-manifest.json`
 - `migration_history/base-sepolia/v1/0000-manifest.json`
 - `migration_history/base-sepolia/v1/0002-manifest.json`
 - `migration_history/base-sepolia/v1/0003-manifest.json`
 - `migration_history/base-sepolia/v2/0000-manifest.json`
 - `migration_history/base-sepolia/v2/0001-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0000-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0001-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0002-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0003-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0004-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0005-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0006-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0008-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0009-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0010-manifest.json`
-- `migration_history/robinhood-mainnet/v1/2026080700-manifest.json`
 - `migration_history/robinhood-testnet/v1/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`

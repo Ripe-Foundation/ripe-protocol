@@ -175,9 +175,14 @@ class MigrationRunner:
         # create the history directory if it doesn't already exist
         os.makedirs(self.history_dir, exist_ok=True)
 
-        # scan each file to get the latest timestamp
+        # Scan each file to get the latest timestamp. The pattern is anchored to
+        # digits on purpose: `current-manifest.json` sits in the same directory
+        # and a `(.*)` group matched it too, so this walked into
+        # int("current") -- a ValueError -- as soon as a history held both a
+        # numbered manifest and the current one. That is every history with
+        # step manifests, which is to say every real deployment.
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(\d+)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
                 # Convert timestamps to integers for proper numerical comparison
