@@ -77,6 +77,7 @@ def extract_struct(path, name):
     return match.group("body")
 
 
+@pytest.mark.artifact
 def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
     foxtrot = boa.load(
         "contracts/config/SwitchboardFoxtrot.vy",
@@ -96,11 +97,13 @@ def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
     assert foxtrot_size <= FOXTROT_RUNTIME_MAX, size_report
 
 
+@pytest.mark.artifact
 def test_event_abi_names_order_and_indexing():
     path = "contracts/core/InstantBondLane.vy"
     initialized = event_abi(path, "EpochInitialized")
     rolled = event_abi(path, "EpochRolled")
     purchased = event_abi(path, "InstantBondPurchased")
+    config_set = event_abi(path, "InstantBondConfigSet")
 
     assert [item["name"] for item in initialized["inputs"]] == [
         "epoch",
@@ -156,6 +159,7 @@ def test_event_abi_names_order_and_indexing():
         "epoch",
         "pricingConfigVersion",
     ]
+    assert indexed_fields(config_set) == ["newVersion"]
 
     override_events = {
         name: event_abi(path, name)
@@ -203,6 +207,7 @@ def test_event_abi_names_order_and_indexing():
     ]
 
 
+@pytest.mark.artifact
 def test_instant_bond_config_struct_bodies_are_byte_for_byte_identical():
     lane = extract_struct("contracts/core/InstantBondLane.vy", "InstantBondConfig")
     foxtrot = extract_struct(
@@ -211,14 +216,22 @@ def test_instant_bond_config_struct_bodies_are_byte_for_byte_identical():
     assert lane == foxtrot
 
 
+@pytest.mark.artifact
 def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
     path = "contracts/core/InstantBondLane.vy"
     initialized_topic = event_topic(path, "EpochInitialized")
     rolled_topic = event_topic(path, "EpochRolled")
     purchased_topic = event_topic(path, "InstantBondPurchased")
+    config_topic = event_topic(path, "InstantBondConfigSet")
     buyer_topic = int(str(lane_env.bob), 16)
 
     lane_env.set_config(maxLockBonus=0)
+    raw_logs = [
+        RawLogEntry(*entry)
+        for entry in lane_env.lane._computation.get_raw_log_entries()
+    ]
+    assert any(list(log.topics) == [config_topic, 1] for log in raw_logs)
+
     first = lane_env.quote(lane_env.scale)
     lane_env.buy(
         lane_env.scale,
@@ -236,6 +249,12 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
     )
 
     lane_env.set_config(maxLockBonus=0)
+    raw_logs = [
+        RawLogEntry(*entry)
+        for entry in lane_env.lane._computation.get_raw_log_entries()
+    ]
+    assert any(list(log.topics) == [config_topic, 2] for log in raw_logs)
+
     boa.env.time_travel(blocks=lane_env.epoch_length)
     second = lane_env.quote(lane_env.scale)
     lane_env.buy(
@@ -269,6 +288,7 @@ def test_indexed_epoch_and_pricing_topics_filter_raw_runtime_logs(lane_env):
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
+@pytest.mark.fuzz
 def test_randomized_controller_matches_contract(
     lane_env,
     data,
@@ -474,6 +494,7 @@ def test_worst_case_valid_config_executes_purchase(
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
+@pytest.mark.fuzz
 def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
     ripe_hq,
     governance,

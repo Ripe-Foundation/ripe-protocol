@@ -614,7 +614,7 @@ def test_existing_position_uses_weighted_unlock_while_quote_discloses_increment(
         lane_env.ripe_token,
         prior_amount,
         100,
-        sender=lane_env.switchboard.address,
+        sender=lane_env.teller.address,
     )
     prior_data = lane_env.ripe_gov_vault.userGovData(
         lane_env.bob, lane_env.ripe_token
@@ -663,7 +663,7 @@ def test_repeated_max_lock_purchases_measure_rounding_bonus_and_share_blocks(lan
         lane_env.ripe_token,
         prior_amount,
         100,
-        sender=lane_env.switchboard.address,
+        sender=lane_env.teller.address,
     )
     lane_env.ripe_token.transfer(
         lane_env.ripe_gov_vault,
@@ -758,7 +758,7 @@ def test_accepted_expired_position_max_bonus_dilution_is_pinned(lane_env):
         lane_env.ripe_token,
         prior_amount,
         100,
-        sender=lane_env.switchboard.address,
+        sender=lane_env.teller.address,
     )
     boa.env.time_travel(blocks=101)
 
@@ -1016,11 +1016,35 @@ def test_teller_deposit_mismatch_reverts_every_effect(lane_env):
     assert settlement_snapshot(lane_env) == before
 
 
-def test_teller_allowance_reset_clears_partial_pull_safety_net(lane_env):
+def test_teller_partial_pull_reverts_every_effect(lane_env):
     lane_env.set_config()
     lane_env.setup_lock_terms()
     partial_teller = boa.loads(PARTIAL_PULL_TELLER)
     replace_teller(lane_env, partial_teller)
+
+    amount = lane_env.scale
+    quote = lane_env.quote(amount, 500)
+    before = settlement_snapshot(lane_env)
+    with boa.reverts("ripe settlement mismatch"):
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+            min_ripe_out=quote.totalRipe,
+        )
+
+    assert settlement_snapshot(lane_env) == before
+
+
+def test_locked_settlement_preserves_preexisting_ripe_dust(lane_env):
+    lane_env.set_config()
+    lane_env.setup_lock_terms()
+    dust = 1
+    lane_env.ripe_token.transfer(
+        lane_env.lane,
+        dust,
+        sender=lane_env.ripe_whale,
+    )
 
     amount = lane_env.scale
     quote = lane_env.quote(amount, 500)
@@ -1031,6 +1055,6 @@ def test_teller_allowance_reset_clears_partial_pull_safety_net(lane_env):
         min_ripe_out=quote.totalRipe,
     )
 
-    assert lane_env.ripe_token.balanceOf(partial_teller) == payout - 1
-    assert lane_env.ripe_token.balanceOf(lane_env.lane) == 1
-    assert lane_env.ripe_token.allowance(lane_env.lane, partial_teller) == 0
+    assert payout == quote.totalRipe
+    assert lane_env.ripe_token.balanceOf(lane_env.lane) == dust
+    assert lane_env.ripe_token.allowance(lane_env.lane, lane_env.teller) == 0

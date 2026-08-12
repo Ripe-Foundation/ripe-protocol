@@ -155,7 +155,7 @@ event InstantBondPurchased:
     ripeGovVaultId: uint256
 
 event InstantBondConfigSet:
-    newVersion: uint256
+    newVersion: indexed(uint256)
     canBuyNow: bool
     paymentCapPerEpoch: uint256
     minPaymentAmount: uint256
@@ -511,10 +511,12 @@ def buyNow(
     if payout.actualLock == 0:
         assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe) # dev: mint failed
     else:
+        ripeBalanceBefore: uint256 = staticcall IERC20(a.ripeToken).balanceOf(self)
         assert extcall RipeToken(a.ripeToken).mint(self, payout.totalRipe) # dev: mint failed
         assert extcall IERC20(a.ripeToken).approve(a.teller, payout.totalRipe, default_return_value=True) # dev: ripe approval failed
         depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(msg.sender, coreRipeGovVaultId, a.ripeToken, payout.totalRipe, payout.actualLock, a)
         assert depositedAmount == payout.totalRipe # dev: deposit mismatch
+        assert staticcall IERC20(a.ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
         assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     log InstantBondPurchased(

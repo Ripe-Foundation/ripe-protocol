@@ -56,6 +56,40 @@ def test_constructor_derives_payment_scale(ripe_hq, governance, decimals):
         assert lane.cumulativeMinted() == 0
 
 
+def test_constructor_uses_genesis_relative_boundaries_without_absolute_alignment(
+    ripe_hq, governance
+):
+    with boa.env.anchor():
+        token = deploy_token(governance.address, 6)
+        if boa.env.evm.patch.block_number < 3:
+            boa.env.time_travel(blocks=3 - boa.env.evm.patch.block_number)
+        current_block = boa.env.evm.patch.block_number
+        genesis = current_block - 1
+        if genesis % 100 == 0:
+            genesis -= 1
+
+        lane = boa.load(
+            "contracts/core/InstantBondLane.vy",
+            ripe_hq,
+            token,
+            genesis,
+            100,
+        )
+
+        assert genesis > 0
+        assert genesis % lane.EPOCH_LENGTH() != 0
+        assert lane.GENESIS_BLOCK() == genesis
+
+        zero_genesis_lane = boa.load(
+            "contracts/core/InstantBondLane.vy",
+            ripe_hq,
+            token,
+            0,
+            100,
+        )
+        assert zero_genesis_lane.GENESIS_BLOCK() == 0
+
+
 def test_constructor_rejects_invalid_payment_token_and_epoch_length(
     ripe_hq, governance, alice, mock_rando_contract
 ):

@@ -1,4 +1,5 @@
 import boa
+import pytest
 from hypothesis import settings, strategies as st
 from hypothesis.stateful import (
     RuleBasedStateMachine,
@@ -62,6 +63,7 @@ def settlement_snapshot(ctx):
     )
 
 
+@pytest.mark.fuzz
 def test_stateful_lifecycle_differential_fuzz(lane_env):
     class InstantBondLaneStateMachine(RuleBasedStateMachine):
         def __init__(self):

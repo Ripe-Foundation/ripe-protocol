@@ -494,6 +494,7 @@ def test_read_only_fork_transport_rejects_broadcast_before_network(monkeypatch):
         )
 
 
+@pytest.mark.fork_qualification
 def test_robinhood_mainnet_fork_binds_topology_token_and_evm_clock(rh_fork):
     live = _live_contracts(rh_fork)
     assert live.hq.address == rh_fork.ripe_hq
@@ -520,6 +521,7 @@ def test_robinhood_mainnet_fork_binds_topology_token_and_evm_clock(rh_fork):
     assert observed_number != rh_fork.block_number
 
 
+@pytest.mark.fork_qualification
 def test_robinhood_mainnet_fork_executes_and_rolls_back_full_purchase_paths(rh_fork):
     live = _live_contracts(rh_fork)
     baseline = {

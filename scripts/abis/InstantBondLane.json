@@ -201,7 +201,7 @@
       {
         "name": "newVersion",
         "type": "uint256",
-        "indexed": false
+        "indexed": true
       },
       {
         "name": "canBuyNow",

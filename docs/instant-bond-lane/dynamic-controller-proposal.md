@@ -1,15 +1,18 @@
 # Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
 
-**Status:** Owner-approved revision-20 design implemented and locally validated.
-Contract, test, model, and ABI implementation work is complete, and the owner approved
-the revision-20 project-size ceilings recorded below. Economic calibration is
-explicitly **not approved**. This document is not deployment, configuration,
-activation, merge, or pull-request authority.
+**Status:** Owner-approved revision-20 design with revision-21 reviewer remediation
+implemented and locally validated. Contract, test, model, ABI, and branch-only feature
+gate work is complete, and the owner approved the revision-20 project-size ceilings
+recorded below. Economic calibration is explicitly **not approved**. This document is
+not merge, rebase, push, pull-request, deployment, configuration, or activation
+authority.
 
-**Starting baseline:** branch `instant-bond-lane` at
-`ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`.
+**Starting baselines:** revision 20 began at
+`ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`; revision 21 begins from the
+committed and pushed `instant-bond-lane` checkpoint
+`79917dd8ca1abc5fc915777fd80e95d4005b4747` without merging or rebasing RH.
 
-The revision-20 [`implementation-spec.md`](implementation-spec.md) is authoritative.
+The revision-21 [`implementation-spec.md`](implementation-spec.md) is authoritative.
 This document records the controller rationale and the implemented design at
 `contracts/core/InstantBondLane.vy` and
 `contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
@@ -215,6 +218,11 @@ The existing lazy rules remain:
 - ignore elapsed epochs before first initialization; and
 - treat pause, disablement, budget exhaustion, and operational outages like other
   unavailable empty time.
+
+Availability does not pause or rebaseline the lateness clock. Demand released after a
+mid-epoch unpause is therefore measured at its wall-clock offset and can select a
+weaker upward step than equal demand available from the epoch start. Calibration must
+include that deliberately accepted distortion.
 
 ## 8. Implemented configuration
 
@@ -480,11 +488,11 @@ The checked-in pure Python companion model demonstrates:
 - byte-identical canonical JSON across repeated runs.
 
 This model is not a Lane, Foxtrot, Boa, EVM, authorization, storage, event, or
-settlement simulator. Revision-20 contract and test sources now implement the related
+settlement simulator. Revision-21 contract and test sources now implement the related
 paths, including stale Foxtrot actions, TimeLock boundaries, failed-settlement rollback,
 the partially exposed first initialization, pause/disable/budget intervals, config
 execution, ABI/event reconstruction, and stateful reference-model parity. Their final
-run results are recorded in §20.4 of `implementation-spec.md`; that normative evidence,
+run results are recorded in §20.5 of `implementation-spec.md`; that normative evidence,
 not this design record, governs validation claims.
 
 The illustrative fixture intentionally exposes calibration risk:
@@ -521,30 +529,32 @@ The working candidate includes:
 - regenerated canonical ABI artifacts.
 
 Historical revision 19 measured 8,669 bytes for Lane against its 9,000-byte project
-regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Final revision-20
-Boa deployments measure 10,564 bytes for Lane and 6,051 bytes for Foxtrot. The owner
-explicitly approved revision-20 local anti-creep ceilings of 11,000 and 6,500 bytes,
-leaving 436 and 449 bytes of project-gate headroom. Both deployments remain below
-EIP-170 by 14,012 and 18,525 bytes. This rebaseline is a source-size policy decision,
-not deployment or economic-calibration approval.
+regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Revision 20
+measured 10,564 bytes for Lane and 6,051 bytes for Foxtrot. Revision-21 Boa
+deployments measure 10,679 and 6,051 bytes. The owner-approved revision-20 local
+anti-creep ceilings remain 11,000 and 6,500 bytes, leaving current headroom of 321 and
+449 bytes. Both deployments remain below EIP-170 by 13,897 and 18,525 bytes. This
+rebaseline is a source-size policy decision, not deployment or economic-calibration
+approval.
 
 ## 13. Execution status and authority boundary
 
 Completed in the working candidate:
 
 1. owner selection of the dynamic controller and next-successful-rollover semantics;
-2. authoritative revision-20 specification reconciliation;
+2. authoritative revision-21 specification reconciliation;
 3. atomic Lane and Foxtrot implementation;
 4. controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 5. deterministic ABI regeneration;
-6. fresh revision-20 local validation; and
+6. fresh revision-21 local validation and a branch-only automatic feature gate; and
 7. the owner-approved 11,000-byte Lane and 6,500-byte Foxtrot project ceilings.
 
-The owner authorized the bounded branch commit and push recorded in
-`implementation-spec.md`. The resulting Git identities belong in the external handoff
-because a commit cannot include its own identity.
+Revision 20's bounded branch commit and push completed at `79917dd`. For revision 21,
+the owner authorized one local commit in the dedicated branch and worktree. Its Git
+identity belongs in the external handoff because a commit cannot include its own
+identity; branch push remains separately unauthorized.
 
 Economic calibration remains `not_approved` and is required before any deployment or
-configuration proposal, not before completing source validation. Merge, pull-request
-publication, deployment, configuration, RIPE minting, and activation remain outside
-the current authorization.
+configuration proposal, not before completing source validation. Merge, rebase,
+branch push, pull-request publication, deployment, configuration, RIPE minting, and
+activation remain outside the current authorization.

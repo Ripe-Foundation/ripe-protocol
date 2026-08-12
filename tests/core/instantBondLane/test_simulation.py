@@ -4,8 +4,10 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import boa
 import pytest
 
+from conf_utils import filter_logs
 from scripts.simulations.instant_bond_lane_controller import (
     BPS,
     BOUND_IMPLEMENTATION,
@@ -21,6 +23,7 @@ from scripts.simulations.instant_bond_lane_controller import (
     commit_override,
     install_override,
     invalidate_override_for_config_change,
+    lateness_bps,
     project_installed_override,
     project_next_rollover_override,
     signal_for,
@@ -32,6 +35,26 @@ ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT = ROOT / "docs" / "instant-bond-lane" / "controller-simulation-v2.json"
 
 
+def contract_params(ctx, config, initial_rate):
+    return Params(
+        epoch_length=ctx.epoch_length,
+        payment_cap=config[1],
+        min_payment_amount=config[2],
+        u_low_bps=config[7],
+        u_high_bps=config[6],
+        min_up_bps=config[8],
+        max_up_bps=config[9],
+        min_down_bps=config[10],
+        max_down_bps=config[11],
+        decay_bps=config[12],
+        max_decay_epochs=config[13],
+        min_rate=BPS,
+        rate_ceiling=config[4] * BPS // (BPS + config[14]),
+        initial_rate=initial_rate,
+    )
+
+
+@pytest.mark.artifact
 def test_canonical_simulation_artifact_is_current():
     expected = canonical_bytes(build_artifact())
     assert ARTIFACT.read_bytes() == expected
@@ -372,3 +395,176 @@ def test_override_install_rejects_stale_or_impossible_inputs_without_clamping():
     )
     assert stale_config.status == "invalidated"
     assert stale_config.final_rate == stale_config.counterfactual_controller_rate
+
+
+@pytest.mark.parametrize(
+    "accepted_units, offset, expected_direction",
+    [
+        (100, 0, "up"),
+        (100, 49, "up"),
+        (100, 99, "up"),
+        (10, 50, "down"),
+        (50, 50, "hold"),
+    ],
+)
+def test_published_controller_model_matches_lane_rollover(
+    lane_factory,
+    accepted_units,
+    offset,
+    expected_direction,
+):
+    ctx = lane_factory()
+    cap = 100 * ctx.scale
+    config = ctx.set_config(
+        paymentCapPerEpoch=cap,
+        minPaymentAmount=ctx.scale,
+        maxEffectiveRate=2 * 10**18,
+        seedRate=10**18,
+        uHighBps=8_000,
+        uLowBps=2_000,
+        minUpBps=200,
+        maxUpBps=800,
+        minDownBps=50,
+        maxDownBps=100,
+        decayBps=100,
+        maxDecayEpochs=4,
+        maxLockBonus=0,
+    )
+
+    ctx.buy(50 * ctx.scale)
+    boa.env.time_travel(blocks=ctx.epoch_length + offset)
+
+    accepted = accepted_units * ctx.scale
+    ctx.buy(accepted)
+    old_rate = ctx.lane.epochRate()
+    p = contract_params(ctx, config, old_rate)
+    signal = signal_for(((offset, accepted),), p)
+    expected_rate = apply_signal(old_rate, signal, p)
+
+    boa.env.time_travel(blocks=ctx.epoch_length - offset)
+    quote = ctx.quote(ctx.scale)
+    ctx.buy(ctx.scale, expected_epoch=quote.epoch)
+    event = filter_logs(ctx.lane, "EpochRolled")[-1]
+
+    assert signal.direction == expected_direction
+    assert event.previousAcceptedPayment == signal.accepted
+    assert event.previousWeightedLateness == accepted * lateness_bps(
+        offset, ctx.epoch_length
+    )
+    assert event.utilizationBps == signal.utilization_bps
+    assert event.effectiveAdjustmentBps == signal.effective_step_bps
+    assert event.decaySteps == 0
+    assert event.controllerRate == expected_rate
+    assert event.newRate == quote.rate == expected_rate
+
+
+def test_published_decay_model_matches_lane_skipped_epochs(lane_factory):
+    ctx = lane_factory()
+    cap = 100 * ctx.scale
+    config = ctx.set_config(
+        paymentCapPerEpoch=cap,
+        minPaymentAmount=ctx.scale,
+        minUpBps=200,
+        maxUpBps=800,
+        minDownBps=50,
+        maxDownBps=100,
+        decayBps=100,
+        maxDecayEpochs=4,
+        maxLockBonus=0,
+    )
+    accepted = 50 * ctx.scale
+    ctx.buy(accepted)
+    old_rate = ctx.lane.epochRate()
+    p = contract_params(ctx, config, old_rate)
+    signal = signal_for(((0, accepted),), p)
+    expected_rate = apply_decay(apply_signal(old_rate, signal, p), 4, p)
+
+    boa.env.time_travel(blocks=5 * ctx.epoch_length)
+    quote = ctx.quote(ctx.scale)
+    ctx.buy(ctx.scale, expected_epoch=quote.epoch)
+    event = filter_logs(ctx.lane, "EpochRolled")[-1]
+
+    assert signal.direction == "hold"
+    assert event.effectiveAdjustmentBps == 0
+    assert event.decaySteps == 4
+    assert event.controllerRate == expected_rate
+    assert event.newRate == quote.rate == expected_rate
+
+
+def test_published_override_model_matches_lane_lifecycle(lane_factory):
+    ctx = lane_factory()
+    cap = 100 * ctx.scale
+    config = ctx.set_config(
+        paymentCapPerEpoch=cap,
+        minPaymentAmount=ctx.scale,
+        minUpBps=200,
+        maxUpBps=800,
+        minDownBps=50,
+        maxDownBps=100,
+        decayBps=100,
+        maxDecayEpochs=4,
+        maxLockBonus=0,
+    )
+    accepted = ctx.scale
+    ctx.buy(accepted)
+    old_rate = ctx.lane.epochRate()
+    p = contract_params(ctx, config, old_rate)
+    controller_rate = apply_signal(
+        old_rate,
+        signal_for(((0, accepted),), p),
+        p,
+    )
+    target_rate = 9 * 10**17
+
+    model_state = install_override(
+        OverrideState(),
+        initialized=True,
+        target_rate=target_rate,
+        config_version=1,
+        expected_config_version=1,
+        expected_override_version=0,
+        p=p,
+    )
+    assert ctx.set_rate_override(target_rate) == model_state.version
+    assert ctx.lane.rateOverride() == model_state.target_rate
+
+    same_epoch = project_installed_override(
+        model_state,
+        stored_epoch=0,
+        projected_epoch=0,
+        controller_rate=old_rate,
+        config_version=1,
+        p=p,
+    )
+    assert same_epoch.status == "pending"
+    assert ctx.quote(ctx.scale).rate == same_epoch.final_rate
+
+    boa.env.time_travel(blocks=ctx.epoch_length)
+    projected = project_installed_override(
+        model_state,
+        stored_epoch=0,
+        projected_epoch=1,
+        controller_rate=controller_rate,
+        config_version=1,
+        p=p,
+    )
+    quote = ctx.quote(ctx.scale)
+    assert projected.status == "apply"
+    assert quote.rate == projected.final_rate == target_rate
+
+    projection, committed_state = commit_override(
+        model_state,
+        stored_epoch=0,
+        projected_epoch=1,
+        controller_rate=controller_rate,
+        config_version=1,
+        successful=True,
+        p=p,
+    )
+    ctx.buy(ctx.scale, expected_epoch=quote.epoch)
+    applied = filter_logs(ctx.lane, "RateOverrideApplied")[-1]
+
+    assert applied.controllerRate == projection.counterfactual_controller_rate
+    assert applied.targetRate == projection.final_rate
+    assert ctx.lane.rateOverride() == committed_state.target_rate == 0
+    assert ctx.lane.overrideVersion() == committed_state.version

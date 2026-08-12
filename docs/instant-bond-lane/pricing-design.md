@@ -1,20 +1,21 @@
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Economic rationale for the owner-approved revision-20 mechanism now
-implemented in the working candidate. Contract, test, model, and ABI implementation
-work and local validation are complete; the owner approved the revision-20 project-size
-ceilings recorded in the normative specification. Economic calibration is explicitly
-**not approved**.
+**Status:** Economic rationale for the owner-approved revision-20 mechanism and its
+revision-21 reviewer remediation, now implemented in the working candidate. Contract,
+test, model, ABI, branch-only feature-gate work, and local validation are complete; the
+owner approved the revision-20 project-size ceilings recorded in the normative
+specification. Economic calibration is explicitly **not approved**.
 
 > **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
 > source and supersedes this document wherever they differ. The companion
 > [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
 > controller and override derivation in more detail. This rationale does not authorize
-> deployment, configuration, RIPE minting, activation, merge, or pull-request
-> publication.
+> deployment, configuration, RIPE minting, activation, merge, rebase, branch push, or
+> pull-request publication.
 
-**Prepared:** 5 August 2026 · **Revised:** 11 August 2026 for the implemented
-revision-20 controller and next-successful-rollover override.
+**Prepared:** 5 August 2026 · **Revised:** 12 August 2026 for the implemented
+revision-20 controller, next-successful-rollover override, and revision-21 reviewer
+remediation.
 
 **Purpose:** Explain how the Instant Bond Lane sets its Buy Now rate, why the mechanism
 uses these signals, and which economic risks remain for calibration and operations.
@@ -163,7 +164,9 @@ a stored epoch. Epochs before first initialization are ignored.
 Pause, `canBuyNow=false`, exhausted budget, frontend failure, and other unavailable
 time are not separately clocked. They decay like other empty time. This gives patient
 buyers a waiting option, bounded by the rate ceiling, decay cap, per-epoch capacity,
-and lifetime mint budget.
+and lifetime mint budget. Demand released after a mid-epoch unpause is measured at its
+wall-clock lateness, so it may select a weaker upward step than equal volume available
+from the epoch start.
 
 ---
 
@@ -242,6 +245,11 @@ replenishment. Live `canBuyNow` and `mintBudget` changes apply immediately; rate
 minimum-payment, and maximum-bonus fields are snapshotted only at initialization or the
 next successful rollover and never rewrite the running epoch.
 
+`cumulativeMinted` is local to one Lane deployment. A replacement therefore needs an
+external program ledger of retired Lane issuance and must configure its new
+`mintBudget` to no more than the previously approved program remainder. Reusing the
+retired deployment's nominal budget would double-count issuance authority.
+
 ---
 
 ## 5. What the controller does and does not provide
@@ -315,7 +323,11 @@ the actual current core RipeGov vault ID used for locked settlement.
 
 RipeGov combines deposits into an account-level weighted unlock. The requested deposit
 duration is not necessarily the final position unlock; this inherited behavior and its
-accepted economic exposure are detailed in the implementation specification.
+accepted economic exposure are detailed in the implementation specification. For an
+expired prior position, normalized prior shares `P`, normalized new shares `N`, and
+requested lock `L` produce `floor((P + N * L) / (P + N))`; the result stays at one
+block while `N * (L - 2) < P`. Calibration must therefore model chunked purchases
+through the whole epoch cap, not only one deposit.
 
 ### 6.3 Buyer is the recipient
 
@@ -469,8 +481,9 @@ Before deployment or any configuration proposal, the owner must approve limits f
 - weak-demand decline and empty-epoch half-life;
 - alternating-demand oscillation;
 - per-epoch and rolling-day issuance;
-- lifetime Lane budget;
-- lock-bonus exposure; and
+- lifetime Lane budget across active and retired deployments;
+- lock-bonus exposure across the full epoch cap and representative dormant RipeGov
+  positions; and
 - acceptable manual-target deviation from the ordinary controller.
 
 Calibration must use the configured token's actual decimal scale and target-chain
@@ -488,21 +501,23 @@ Completed in the working candidate:
 - normative specification reconciliation;
 - controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 - deterministic ABI regeneration;
-- fresh revision-20 validation evidence; and
+- fresh revision-21 validation evidence and a branch-only automatic feature gate; and
 - the owner-approved Lane/Foxtrot project-size rebaseline.
 
-The owner authorized the bounded branch commit and push. Its Git identities belong in
-the external handoff because a commit cannot include its own identity. Economic
-calibration remains pending before any deployment or configuration proposal.
+Revision 20's bounded branch commit and push completed at `79917dd`. For revision 21,
+the owner authorized one local commit in the dedicated branch and worktree. Its Git
+identity belongs in the external handoff because a commit cannot include its own
+identity; branch push remains separately unauthorized. Economic calibration remains
+pending before any deployment or configuration proposal.
 
-Historical revision-18/19 measurements are preserved only in
+Historical revision-18/19/20 measurements are preserved only in
 `implementation-spec.md` and must not be presented as current evidence. The exact
-revision-20 runtime sizes, hashes, selectors, layouts, coverage, and test results are
-recorded in that specification's final-evidence block.
+revision-21 runtime sizes, hashes, selectors, layouts, coverage, and test results are
+recorded in that specification's current-evidence block.
 
-The completed local checks satisfy the bounded commit-and-push prerequisite. Merge,
-pull-request publication, deployment, configuration, RIPE minting, and activation
-remain separately unauthorized.
+The completed local checks satisfy the bounded local-commit prerequisite. Merge,
+rebase, branch push, pull-request publication, deployment, configuration, RIPE
+minting, and activation remain separately unauthorized.
 
 ---
 
