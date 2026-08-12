@@ -13,8 +13,9 @@ the important limitations that remain.
 
 The source inventory below was taken from the three-dot diff between:
 
-- target branch: `rh` at `3a4cac429a860ffc95bd85612d9e345108332833`;
-- remediated source head before this document: `304019c4be7b7fad8da4b355c28e9e0c56dd1c45`.
+- target branch: `rh` at `3c4b06b893d550303e8ff95e2e39e6ec920c411d`;
+- contract/source head audited by this revision:
+  `b3308599e3cac7252dfe919b408df6a98cc26615`.
 
 There are 13 changed production contract files:
 
@@ -507,6 +508,42 @@ The boundary must be enforced in the contract, not only in a runbook. Returning
 `hasFeed = false` means an accidental PriceDesk registration cannot silently
 turn the adapter into protocol pricing authority.
 
+### Why the monitoring reads use `raw_call`
+
+There are exactly three `raw_call` sites, and all three are fallible monitoring
+reads rather than protocol pricing or mutation paths:
+
+1. read `getReserves()` from the constructor-bound RIPE/WETH pair;
+2. resolve the current PriceDesk with `RipeHq.getAddr(7)`; and
+3. read the WETH/USD observation with `PriceDesk.getPrice(WETH, false)`.
+
+The monitoring API is intentionally best effort. If the pair, registry, or
+PriceDesk reverts, returns an empty/malformed payload, or is temporarily
+unavailable, the explicit monitoring getter should return zero instead of
+making an observer transaction revert. A normal typed `staticcall` would
+bubble a dependency revert and would not provide that behavior.
+
+These are bounded calls, not arbitrary low-level execution:
+
+- every call is static, so it cannot mutate the target;
+- the pair and RipeHq are constructor-bound immutables, while PriceDesk is
+  resolved from the fixed RipeHq registry ID;
+- calldata is built from fixed method signatures and fixed arguments;
+- output buffers are one byte larger than the only valid ABI result
+  (97 bytes for a 96-byte reserve tuple and 33 bytes for a 32-byte word), and
+  the code then requires the exact valid length. This rejects empty, short, and
+  overlong responses;
+- decoded reserves/timestamp/address are range checked before conversion or
+  use; and
+- any failed validation returns zero from the monitoring surface.
+
+The constructor deliberately uses typed `staticcall` instead. Deployment must
+fail—not degrade to a zero observation—if the supplied pair does not expose the
+expected token identities, is not exactly RIPE/WETH, or either token does not
+report 18 decimals. In short: typed calls enforce immutable deployment
+identity; bounded `raw_call` keeps non-authoritative monitoring reads
+failure-tolerant.
+
 ### Interface, storage, and risk impact
 
 - The PriceSource ABI remains structurally compatible, but the previous
@@ -524,7 +561,11 @@ turn the adapter into protocol pricing authority.
 
 - `test_every_protocol_price_source_entrypoint_is_permanently_inert`
 - `test_monitor_reports_only_the_ripe_weth_pool_state_and_spot_prices`
-- constructor identity, malformed dependency, overflow, and immediate spot
+- `test_malformed_pool_response_fails_closed`
+- `test_reverting_pool_read_fails_closed`
+- `test_unavailable_or_malformed_weth_usd_price_only_zeroes_usd_monitoring`
+- `test_reverting_weth_usd_price_only_zeroes_usd_monitoring`
+- constructor identity, missing PriceDesk, overflow, and immediate spot
   manipulation coverage in `tests/priceSources/uniswap/test_minimal_prices.py`
 
 ## 10. `RipeGov.vy`
