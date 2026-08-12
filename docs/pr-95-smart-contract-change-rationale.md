@@ -15,7 +15,7 @@ The source inventory below was taken from the three-dot diff between:
 
 - target branch: `rh` at `3c4b06b893d550303e8ff95e2e39e6ec920c411d`;
 - contract/source head audited by this revision:
-  `b3308599e3cac7252dfe919b408df6a98cc26615`.
+  `2abd65c48279a5a0dcdbcaae286fe735a142d9a1`.
 
 There are 13 changed production contract files:
 
@@ -30,7 +30,7 @@ There are 13 changed production contract files:
 | `contracts/core/VaultMigrator.vy` | Migration route and state preservation | Keep historical RipeGov vaults out of generic migration while preserving balances, points, and lock terms. |
 | `contracts/modules/Addys.vy` | Registry constants | Match the immutable live RipeHq order: RIPE CCIP pool ID 23 and GREEN CCIP pool ID 24. |
 | `contracts/priceSources/UniswapV2Prices.vy` | Price-authority boundary | Keep manipulable Uniswap V2 observations available for monitoring but impossible to consume as a protocol price feed. |
-| `contracts/vaults/RipeGov.vy` | Lock, points, and migration behavior | Preserve original migration terms and constrain privileged contributor locks. |
+| `contracts/vaults/RipeGov.vy` | Lock, points, and migration behavior | Preserve original migration terms while retaining contributor-specific agreement terms. |
 | `contracts/vaults/modules/StabVault.vy` | NAV, custody, claims, and delivery accounting | Keep claim liabilities reserved, fail closed on missing prices/custody, and reject short user deliveries. |
 | `solidity/src/RipeCcipBurnMintTokenPools.sol` | Comments/provenance clarification only | Remove false claims that the repository candidate proves the source used for already-live pools. |
 | `solidity/src/RipeTokenPool.sol` | Comments/provenance clarification only | Classify this configurable-capability pool as retained legacy/testnet history, not the selected mainnet candidate. |
@@ -615,7 +615,7 @@ than the user's original terms—the opposite of the migration objective.
 - Governance-point disable setters remain Switchboard-only; VaultMigrator has
   no authority to apply them.
 - Paused migration state becomes intentionally more restrictive.
-- Measured deployed runtime: 23,506 bytes, leaving 1,070 bytes of EIP-170
+- Measured deployed runtime: 23,305 bytes, leaving 1,271 bytes of EIP-170
   headroom.
 
 ### Representative validation
