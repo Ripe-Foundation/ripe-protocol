@@ -64,7 +64,8 @@ immediate/non-persistent effect of reserve manipulation.
 The deployment migration binds the new four-argument constructor and performs
 readbacks of the monitoring marker, immutables, and permanent no-feed result.
 The repository ABI and constructor-bound deployed-runtime identity are
-regenerated from the integrated source.
+regenerated from the integrated source. The measured deployed runtime is 3,781
+bytes, with 20,795 bytes of EIP-170 headroom.
 
 ## Readiness boundary
 

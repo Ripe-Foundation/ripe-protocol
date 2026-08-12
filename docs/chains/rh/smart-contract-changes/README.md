@@ -142,7 +142,7 @@ These are the authoritative values in
 | SwitchboardBravo | 22,922 | 1,654 | 23,082 | 1,494 | `d7af2f3f3adf8ddc1088f19bc7295e07b058eee18420eb6f227ce4912c1da65f` | `8a30c7b4483192513051c1162f235d02549e708aab4173d79597609ffab39202` |
 | SwitchboardDelta | 23,102 | 1,474 | 23,262 | 1,314 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
 | Teller | 24,151 | 425 | 24,247 | 329 | `21d15c2b77d9f513cb8a0957daa42910150ba5661883913ea8bbf4a9ec6343d1` | `9cca03351cd8ead87160401be263732376fb4ab7d4913b0d59ce6ad271e4dabb` |
-| UniswapV2Prices | 13,866 | 10,710 | 14,122 | 10,454 | `8a54a6b8ac9c746a43e59a06d10dcf4a7454996a0adaa1b8be3021c31a207a88` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
+| UniswapV2Prices | 3,621 | 20,955 | 3,781 | 20,795 | `88cbf9a963bf38bfcf83ea95317356bf44e50052973748968e1f8bf34574910f` | `787994c73fa92e072833734f3c079215eace4bc7159305bcd059989b62deef6f` |
 
 Runtime templates with constructor-bound immutables are compiler artifacts,
 not final deployed-runtime identities.
@@ -251,8 +251,8 @@ built were extracted from the active tree; both remain recoverable from
 - [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) — changed
   GREEN/RIPE thin-Solidity reference subclasses and their production-package
   boundary;
-- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — deployed monitoring-only
-  Uniswap V2 spot/snapshot component and its unresolved value-bearing
+- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — RIPE/WETH-only stateless
+  monitoring component and its prohibited value-bearing
   admission boundary;
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
   rationale;

@@ -337,12 +337,24 @@ def _deploy_graph():
     # already contain code. Their behavior is irrelevant to runtime capture;
     # install minimal deterministic code at the exact constructor addresses.
     seed_source = "# @version 0.4.3\n\n@deploy\ndef __init__():\n    pass\n"
-    for label, address in (("green", GREEN), ("sgreen", SGREEN), ("ripe", RIPE)):
+    for label, address in (("green", GREEN), ("sgreen", SGREEN)):
         boa.loads(
             seed_source,
             name=f"runtime_capture_{label}_seed",
             override_address=address,
         )
+    boa.load(
+        "contracts/mock/MockUniswapV2Token.vy",
+        18,
+        name="runtime_capture_ripe_token",
+        override_address=RIPE,
+    )
+    boa.load(
+        "contracts/mock/MockUniswapV2Token.vy",
+        18,
+        name="runtime_capture_weth_token",
+        override_address=WETH,
+    )
     boa.load(
         "contracts/registries/RipeHq.vy",
         GREEN,

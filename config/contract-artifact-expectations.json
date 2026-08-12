@@ -2882,73 +2882,52 @@
     },
     "UniswapV2Prices": {
       "abi": {
-        "canonical_sha256": "05c8da1674ed7b17da62a9956cc778b956309f41e50492b448a75128ea841640",
-        "committed_file_sha256": "7815609b30dc0c2102ee2d5671f9e3175773d9c913606ea60451e50ecadfcc48",
+        "canonical_sha256": "787994c73fa92e072833734f3c079215eace4bc7159305bcd059989b62deef6f",
+        "committed_file_sha256": "a261e469c5b7118a6e3c44ef371b4815af9c7380fb46a13326a444c0b52fe0c3",
         "committed_path": "scripts/abis/UniswapV2Prices.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "6a0ae8f79296b8b51691cbdb61f66035e5a0405c16981511f5bea59212bb393b",
-        "creation_executable_prefix_size": 15482,
-        "creation_metadata_sha256": "3479473d7b2ac58b2e0124db623160784fd5c4818c837b08d018d992f22053e2",
-        "creation_metadata_size": 57,
-        "creation_sha256": "5f2bbec15679ae45faac496d96871e3cdcf8b2419b02fef86801a3c3822b962c",
-        "creation_size": 15539,
-        "deployed_eip170_headroom": 10548,
-        "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000ba6f6cba1a4104000847d4fdccb676e99166cece0000000000000000000000004d3f37a965b21ab4122e92dd41d2693e742c883b",
-        "deployed_runtime_immutable_data_sha256": "8eb845a8ffa6ee3a47e6240cfb996716f1be1fc55fed369d7d1f3132bb8b4a5c",
-        "deployed_runtime_immutable_data_size": 256,
-        "deployed_runtime_sha256": "cbb3ebe7f7c9050532ceb4b480a13521bc74a8b8f820e389165b954e5bfa55aa",
-        "deployed_runtime_size": 14028,
-        "eip170_headroom": 10804,
-        "runtime_template_sha256": "7ab9563a7010a45b144b0029811696a6cf8ac0d885fe3b3398decc889e1fbd5f",
-        "runtime_template_size": 13772
+        "creation_executable_prefix_sha256": "0a624d4cdb069ec8a42144b0e7bb032bb163f077575f1b5d5b4150ef9c886083",
+        "creation_executable_prefix_size": 4202,
+        "creation_metadata_sha256": "e30ec6ef00a4e20bb03b6abb21a85b58a1007ab2bd4d6eb51a253221ea5b989e",
+        "creation_metadata_size": 56,
+        "creation_sha256": "e187f30c6321f346429c855c514599407ab328e125ec80b1564091d0586ac581",
+        "creation_size": 4258,
+        "deployed_eip170_headroom": 20795,
+        "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940000000000000000000000000ba6f6cba1a4104000847d4fdccb676e99166cece0000000000000000000000004d3f37a965b21ab4122e92dd41d2693e742c883b0000000000000000000000000bd7d308f8e1639fab988df18a8011f41eacad730000000000000000000000000000000000000000000000000000000000000000",
+        "deployed_runtime_immutable_data_sha256": "fae6b07bf3a2ec13d001a02a061adacf0272e1267f5bfa75b1a74ee03340ce6d",
+        "deployed_runtime_immutable_data_size": 160,
+        "deployed_runtime_sha256": "bb9be0cb54c710ebc7cc27ddbd8f42527265cc0fd2a1355cc24b69d76f156bef",
+        "deployed_runtime_size": 3781,
+        "eip170_headroom": 20955,
+        "runtime_template_sha256": "88cbf9a963bf38bfcf83ea95317356bf44e50052973748968e1f8bf34574910f",
+        "runtime_template_size": 3621
       },
       "code_layout": {
+        "RIPE_HQ": {
+          "length": 32,
+          "offset": 0,
+          "type": "address"
+        },
+        "RIPE_IS_TOKEN0": {
+          "length": 32,
+          "offset": 128,
+          "type": "bool"
+        },
         "RIPE_TOKEN": {
           "length": 32,
-          "offset": 224,
+          "offset": 64,
           "type": "address"
         },
         "RIPE_WETH_POOL": {
           "length": 32,
-          "offset": 192,
+          "offset": 32,
           "type": "address"
         },
-        "addys": {
-          "RIPE_HQ_FOR_ADDYS": {
-            "length": 32,
-            "offset": 96,
-            "type": "address"
-          }
-        },
-        "gov": {
-          "MAX_GOV_TIME_LOCK": {
-            "length": 32,
-            "offset": 64,
-            "type": "uint256"
-          },
-          "MIN_GOV_TIME_LOCK": {
-            "length": 32,
-            "offset": 32,
-            "type": "uint256"
-          },
-          "RIPE_HQ_FOR_GOV": {
-            "length": 32,
-            "offset": 0,
-            "type": "address"
-          }
-        },
-        "timeLock": {
-          "MAX_ACTION_TIMELOCK": {
-            "length": 32,
-            "offset": 160,
-            "type": "uint256"
-          },
-          "MIN_ACTION_TIMELOCK": {
-            "length": 32,
-            "offset": 128,
-            "type": "uint256"
-          }
+        "WETH_TOKEN": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
         }
       },
       "compiler_settings": {
@@ -2963,10 +2942,6 @@
               "type": "address"
             },
             {
-              "name": "_tempGov",
-              "type": "address"
-            },
-            {
               "name": "_ripeWethPool",
               "type": "address"
             },
@@ -2975,12 +2950,8 @@
               "type": "address"
             },
             {
-              "name": "_minPriceChangeTimeLock",
-              "type": "uint256"
-            },
-            {
-              "name": "_maxPriceChangeTimeLock",
-              "type": "uint256"
+              "name": "_wethToken",
+              "type": "address"
             }
           ],
           "outputs": [],
@@ -2991,101 +2962,19 @@
       "constructor_bound_runtime_template": true,
       "effective_optimization": "gas",
       "events": {
-        "canonical_sha256": "d7e26b475d553e99be3796a7ba71fc8776984097ce69dbac1408c0fbf39121e0",
-        "count": 14
+        "canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "count": 0
       },
       "selectors": {
-        "canonical_sha256": "ee043962b536e981d9ce3d889acafcc8d02ebaeffb97f618f31f2d62b342f4aa",
-        "count": 71
+        "canonical_sha256": "6434df9e57e52f7b40871b08521654ff6889941190aaf5d33b2a8883d16ee74e",
+        "count": 36
       },
-      "source_git_blob": "b9658cb6c28bffdbdaf26302e402bb0b95f35811",
+      "source_git_blob": "d36d5bdafa58f2697c6fd3ca841c389f5d0c93b1",
       "source_path": "contracts/priceSources/UniswapV2Prices.vy",
-      "source_sha256": "289232a2e072b44e6dcbc0c3ec3a71d68aa9611acf06257d42ad7fa1e00e082a",
-      "storage_layout": {
-        "gov": {
-          "govChangeTimeLock": {
-            "n_slots": 1,
-            "slot": 5,
-            "type": "uint256"
-          },
-          "governance": {
-            "n_slots": 1,
-            "slot": 0,
-            "type": "address"
-          },
-          "numGovChanges": {
-            "n_slots": 1,
-            "slot": 4,
-            "type": "uint256"
-          },
-          "pendingGov": {
-            "n_slots": 3,
-            "slot": 1,
-            "type": "PendingGovernance"
-          }
-        },
-        "pendingPriceConfigs": {
-          "n_slots": 1,
-          "slot": 16,
-          "type": "HashMap[address, PendingPriceConfig]"
-        },
-        "priceConfigs": {
-          "n_slots": 1,
-          "slot": 14,
-          "type": "HashMap[address, PriceConfig]"
-        },
-        "priceData": {
-          "assets": {
-            "n_slots": 1,
-            "slot": 7,
-            "type": "HashMap[uint256, address]"
-          },
-          "indexOfAsset": {
-            "n_slots": 1,
-            "slot": 8,
-            "type": "HashMap[address, uint256]"
-          },
-          "isPaused": {
-            "n_slots": 1,
-            "slot": 6,
-            "type": "bool"
-          },
-          "numAssets": {
-            "n_slots": 1,
-            "slot": 9,
-            "type": "uint256"
-          }
-        },
-        "snapShots": {
-          "n_slots": 1,
-          "slot": 15,
-          "type": "HashMap[address, HashMap[uint256, PriceSnapshot]]"
-        },
-        "timeLock": {
-          "actionId": {
-            "n_slots": 1,
-            "slot": 11,
-            "type": "uint256"
-          },
-          "actionTimeLock": {
-            "n_slots": 1,
-            "slot": 12,
-            "type": "uint256"
-          },
-          "expiration": {
-            "n_slots": 1,
-            "slot": 13,
-            "type": "uint256"
-          },
-          "pendingActions": {
-            "n_slots": 1,
-            "slot": 10,
-            "type": "HashMap[uint256, PendingAction]"
-          }
-        }
-      },
+      "source_sha256": "ffaeffe177e7c56efb18288628447e3c27aad26e3abb18c1a181a34069cd25fb",
+      "storage_layout": {},
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "0ea53fb76c3d390c9accfbb006e32932be15720b45657ed3c456cf8e64a248c6"
+      "transitive_compiler_input_integrity": "ce485f270d7c1db248f3b9b43e5dc1904ef7d4fdca6cb6592bc79d5c3d1a52d5"
     },
     "VaultMigrator": {
       "abi": {

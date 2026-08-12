@@ -517,6 +517,8 @@ turn the adapter into protocol pricing authority.
   calls can return a manipulable spot value.
 - Monitoring values remain manipulable and may return zero; no caller should
   treat them as liquidation, borrowing, collateral, or accounting authority.
+- Measured deployed runtime: 3,781 bytes, leaving 20,795 bytes of EIP-170
+  headroom (down from 14,028 bytes before this focused rewrite).
 
 ### Representative validation
 
