@@ -53,6 +53,46 @@ that produced the reverted deletion. `tests/test_current_manifest_consumers.py`
 now pins the set in both directions — every declared manifest must be present
 and usable, and every manifest on disk must be declared.
 
+### Disposition of `scripts/ccip_send.py` — capability gap, owner decision open
+
+"It was broken" is why it was safe to delete this week. It is not a finding that
+the capability is unwanted, and those are different claims. Recording the
+difference, because the deletion rationale was doing duty for a disposition it
+never established.
+
+**The gap is real and specific.** The tool's own opening line states it:
+Chainlink's Transporter UI only lists tokens Chainlink has onboarded, so a
+self-served token like RIPE has to call `Router.ccipSend()` itself. RIPE and
+GREEN are not onboarded. With the script gone there is no in-repo path to move
+them across a lane — the remaining CCIP surface is the `CcipWire` migrations,
+which wire pools and hand ownership to the Safe, and pool wiring is not a token
+send. Anyone needing one now hand-builds the router call. No runbook ever
+documented the script, so nothing operator-facing broke, but that absence is
+also why the gap is easy to miss.
+
+**The deleted implementation should not come back unchanged.** Three defects,
+each independently disqualifying for a tool that moves value:
+
+1. The broadcast path never executed. `get_account(account)` passed one argument
+   to a three-argument signature, so every real send raised `TypeError`. The
+   `--fork --as-address` simulation path skipped that call and did work, so the
+   accurate statement is that it could dry-run and could never send.
+2. `rpc` defaulted to
+   `f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}"`,
+   which becomes `.../v2/None` when the key is unset. It fails open on RPC
+   configuration rather than refusing.
+3. It read a raw `<NAME>_PRIVATE_KEY` hot key and broadcast by default —
+   `--fork` was opt-in, so the bare invocation was a live send with no
+   confirmation step.
+
+**Recommendation: deprecate the implementation, keep the gap on the books.**
+Restoring 154 lines that have never moved a token buys nothing; the recovery
+point is recorded in `extracted-files.tsv`. If bridging is wanted, it is a
+separate change that fixes account loading, requires an explicit RPC rather than
+synthesising one, defaults to dry-run, and confirms before broadcast. That is
+new work with a real blast radius, which is why it does not belong in a cleanup.
+**The keep-versus-rebuild call is the owner's and is still open.**
+
 ### Why removing step manifests does not break a deployment
 
 The migration machinery never reads a *previous* step's numbered manifest.
