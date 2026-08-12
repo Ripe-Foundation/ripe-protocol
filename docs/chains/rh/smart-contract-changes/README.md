@@ -131,8 +131,8 @@ These are the authoritative values in
 
 | Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
-| AuctionHouse | 24,460 | 116 | 24,556 | 20 | `4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
-| CreditEngine | 24,296 | 280 | 24,392 | 184 | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| AuctionHouse | 23,767 | 809 | 23,863 | 713 | `6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,271 | 305 | 24,367 | 209 | `ad40bde63aee7e41933c2cbe6012de9940791a4f28a85328b8accdf3dabf635e` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
 | DefaultsRobinhood | 2,474 | 22,102 | 2,698 | 21,878 | `b424af2dc57a90b7332aab302df9acfbb716f91e6a11f31446ea109f3ac075c9` | `6878e6b5bd5b34906a96ac60e03df7db322dc01d546de6385ec6a70fc9fae1a2` |
 | Deleverage | 24,473 | 103 | 24,569 | 7 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
 | Ledger | 13,264 | 11,312 | 13,392 | 11,184 | `fe65aaa826003b14518824bf6219b33cde311db63687a9b9c23baf7fb4708380` | `0a10ba343608af86094ef62417285e32e3abe6a976bdf63590706310e9771f34` |
