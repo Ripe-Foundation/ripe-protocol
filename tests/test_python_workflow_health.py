@@ -315,7 +315,7 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test"]
+    assert job["needs"] == ["test", "deployment-controls"]
     assert job["runs-on"] == "ubuntu-latest"
     assert job["timeout-minutes"] == "5"
     assert job["if"] == (
@@ -327,3 +327,35 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert step["env"]["TEST_RESULT"] == "${{ needs.test.result }}"
     assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
+
+    controls = _step(job, "Require successful deployment controls")
+    assert controls["env"]["CONTROLS_RESULT"] == (
+        "${{ needs.deployment-controls.result }}"
+    )
+    assert 'if [ "$CONTROLS_RESULT" != "success" ]' in controls["run"]
+    assert "exit 1" in controls["run"]
+
+
+def test_python_workflow_runs_ignored_deployment_controls_credential_free():
+    """The lean lane cannot see tests/deployment, so a required job must.
+
+    pytest.ini ignores that tree, which is exactly where this branch's
+    deploy-path controls live. The job has to run it with addopts cleared and
+    with every credential unset, or it proves nothing about an offline gate.
+    """
+    job = _workflow()["jobs"]["deployment-controls"]
+    assert job["runs-on"] == "ubuntu-latest"
+
+    command = _step(job, "Run deployment control suites")["run"]
+    assert "-o addopts=''" in command
+    assert "tests/deployment" in command
+    for secret in (
+        "ETHERSCAN_API_KEY",
+        "BASESCAN_API_KEY",
+        "PRIVATE_KEY",
+        "WEB3_ALCHEMY_API_KEY",
+    ):
+        assert f"unset " in command and secret in command
+
+    # The ignored directories must stay in sync with what this job covers.
+    assert "tests/deployment" in PYTEST_IGNORED_DIRECTORIES

@@ -139,11 +139,74 @@ jobs:
           path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
 
+  # pytest.ini's addopts ignores tests/deployment, so the lean lane never
+  # exercises the deploy-path controls: the Robinhood execution boundary,
+  # verifier input handling, _local_account, canonical JSON, the reward packet,
+  # artifact expectations, and blueprint policy. Those are exactly the surfaces
+  # this branch changed, so they get their own required job rather than
+  # relying on a manual comprehensive run.
+  #
+  # It is credential-free: every RPC/key variable is unset, and the suite is
+  # offline by construction (its fixtures block sockets and fake submission).
+  deployment-controls:
+    name: Python 3.12.0 / deployment-controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ETHERSCAN_API_KEY: local-placeholder
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      PYTHONHASHSEED: "0"
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
+    steps:
+      - name: Check out full source history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Use Python 3.12.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.0"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Create private runtime directories
+        run: |
+          mkdir -p \
+            "$HYPOTHESIS_STORAGE_DIRECTORY" \
+            "$PYTHONPYCACHEPREFIX" \
+            "$RIPE_BOA_CACHE_DIR" \
+            "$TMPDIR" \
+            "$XDG_CACHE_HOME" \
+            "$RUNNER_TEMP/pytest-cache" \
+            "$RUNNER_TEMP/pytest-basetemp"
+
+      - name: Install pinned requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+
+      - name: Run deployment control suites
+        run: |
+          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
+          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          unset ETHERSCAN_API_KEY BASESCAN_API_KEY
+          /usr/bin/time -p python -m pytest \
+            -o addopts='' \
+            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
+            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
+            --durations=25 \
+            tests/deployment
+
   rh-pr-gate:
     name: rh-pr-gate
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     needs:
       - test
+      - deployment-controls
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -153,5 +216,14 @@ jobs:
         run: |
           if [ "$TEST_RESULT" != "success" ]; then
             echo "Lean test lane did not succeed: $TEST_RESULT"
+            exit 1
+          fi
+
+      - name: Require successful deployment controls
+        env:
+          CONTROLS_RESULT: ${{ needs.deployment-controls.result }}
+        run: |
+          if [ "$CONTROLS_RESULT" != "success" ]; then
+            echo "Deployment control suites did not succeed: $CONTROLS_RESULT"
             exit 1
           fi
