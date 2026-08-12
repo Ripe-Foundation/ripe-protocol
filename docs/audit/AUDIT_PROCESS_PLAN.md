@@ -605,7 +605,7 @@ Critical/High candidates and other load-bearing conclusions require a fresh-cont
 
 ### Capacity and waves
 
-Start with at most five active component pods. Flow agents count against the real work-in-progress limit; they are not free extra capacity.
+The methodological ceiling is five active component pods when the execution environment has that capacity. The default Codex kickoff uses one audit lead plus three worker agents, for four concurrent participants total. Flow agents count against the real work-in-progress limit; they are not free extra capacity. Never exceed the runtime's available agent slots.
 
 | Wave | Contract work | Exit condition |
 | --- | --- | --- |
@@ -710,17 +710,37 @@ Allowed dispositions:
 
 A challenged or disputed inherited issue blocks any dependent conclusion until the disagreement is resolved or explicitly carried as unresolved risk.
 
-## 10. Kickoff decisions
+## 10. Fresh-orchestrator kickoff
 
-Only the following owner decisions are required before audit execution:
+A fresh top-level audit task may begin from this document without inheriting the planning conversation. Use the following defaults unless the owner explicitly overrides them. An unavailable optional input does not block source review, test mapping, flow modeling, or unrelated audit work; record the assumption or gap and continue.
 
-1. Exact starting contract commit/tree and the final-report snapshot/reconciliation rule.
-2. Which network/configuration values and admitted contract features should be used when assessing realistic exposure.
-3. Whether vendored CCIP dependencies receive independent source review or pinned-upstream reliance plus Ripe integration review.
-4. Which prior audits, known issues, and accepted risks are supplied.
-5. Maximum concurrent component and flow agents.
-6. Where private findings, raw proof output, and the canonical findings register live.
-7. Whether assessment-only proof tests may be committed before remediation authorization.
+### Default operating decisions
+
+1. **Candidate:** before assigning work, resolve the current live `rh` ref and record the exact starting commit/tree. Distinguish local docs-only plan commits from the production-contract snapshot. Do not pull, reset, switch, clean, or otherwise mutate an existing user worktree to obtain the candidate; use clean isolated worktrees or detached copies.
+2. **Exposure:** assess both the current `rh` contract configuration and every realistically contract-reachable configuration or limit. Configuration and deployment artifacts are supporting evidence only, not separate audit workstreams.
+3. **CCIP:** deeply review the Ripe-owned pool contracts and every inherited behavior reachable through their integration. Treat unchanged, pinned upstream CCIP code as a declared dependency boundary rather than duplicating a full upstream audit; expand review when Ripe changes it, relies on a subtle inherited behavior, or a finding path crosses it.
+4. **Inherited evidence:** bind all repository-available prior findings, accepted risks, strict xfails, and relevant contract audit material at kickoff. Missing external reports do not stop the audit; list them as unavailable inputs and incorporate them if supplied later.
+5. **Capacity:** use one fresh audit-lead/orchestrator plus three worker agents. The lead owns scope, the branch-change ledger, finding identity, cross-agent reconciliation, and final synthesis. Do not consume the lead slot with a full primary batch while coordination or reconciliation remains pending.
+6. **Artifacts:** create one isolated audit workspace, record its absolute path, and give each worker a separate evidence subdirectory or worktree. Keep one canonical findings register, contract-ownership map, flow register, invariant matrices, and `rh` branch-change ledger under lead ownership. Raw outputs and security-sensitive findings remain local. Do not stage, commit, push, publish, or delete audit artifacts without owner authorization.
+7. **Proof work:** agents may run existing tests and create assessment-only proof tests in their isolated audit worktrees. They must not edit production contracts. Proof tests remain uncommitted until the owner authorizes a commit; production fixes require a separately authorized remediation branch and independent retest.
+8. **External actions:** no push, pull request, deployment, activation, release, external message, or repository cleanup is part of audit authorization. Preserve all pre-existing dirty, staged, untracked, and worktree state.
+
+### Startup sequence
+
+1. Read this plan completely before delegating.
+2. Inspect repository and worktree state read-only, resolve the live `rh` candidate, and create a kickoff packet with the exact commit/tree, contract-source inventory, changed-source intake, inherited-issue inputs, audit workspace paths, agent roster, and unresolved assumptions.
+3. Start Wave 0.5 before broad fan-out. Assign the three workers to the same calibration slice with non-competing responsibilities:
+   - **Component/source worker:** manually model and review `contracts/vaults/modules/BasicVault.vy` and `contracts/vaults/SimpleErc20.vy`; own their source-level conclusions and candidate findings.
+   - **Test/adversarial worker:** independently map existing evidence for the same contracts, identify semantic gaps, and design or run focused custody/receipt proofs without changing production source.
+   - **Flow/permutation worker:** own `AUD-FLOW-01`, the deposit and exact-custody journey, including the applicable caller, amount, state, asset/dependency, ordering, failure-point, and economic permutations.
+4. The audit lead reconciles the three packets into one accepted contract model, custody invariant, source-to-test record, flow model, and findings disposition. Preserve disagreements until resolved; do not average conflicting conclusions.
+5. If calibration quality is acceptable, fan out through the waves in Section 7, prioritizing Batches 2, 5, 3, and 6 while retaining complete coverage of all batches and flows. Rotate workers between component, evidence, and flow responsibilities only with explicit ownership handoffs.
+6. Apply the live-`rh` protocol in Section 2 throughout. Minor or localized `rh` changes reopen only affected evidence and never block unrelated agents. Notify the owner promptly of a credible Critical/High candidate, but continue safe unrelated audit work.
+7. At every handoff, record exact source references, commands and outputs, assumptions, unchecked surface, affected flows/invariants, and the newest commit against which the conclusion remains valid.
+
+### Authority and escalation boundary
+
+The orchestrator should make ordinary audit-method decisions and keep work moving. Ask the owner only when progress requires production-contract edits, artifact commits/publication, external actions, a scope expansion beyond the contracts, or a business/risk-acceptance judgment. A branch advance, missing optional document, test failure, disputed hypothesis, or localized code change is an audit input to investigate, not by itself a reason to stop the program.
 
 Everything else is subordinate to the contract audit. If a requested artifact or activity does not help answer a contract behavior, security, or economic-risk question, it should not consume audit time.
 
