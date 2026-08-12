@@ -313,14 +313,20 @@ _BASE_MAINNET_OPERATIONS = _operations(
         identity=True,
         repository=True,
     ),
-    # VERIFICATION stays blocked deliberately. scripts/verify.py has no
-    # submission path -- it selects a route, echoes the manifest, then raises
-    # H02_OPERATION_INVALID unconditionally. The real implementation lives in
-    # scripts/utils/verify_etherscan.py (verify_from_manifest) and is tested by
-    # tests/deployment/test_verifier_adapters.py, but nothing calls it.
-    # Marking this SUPPORTED would advertise a capability the CLI lacks and
-    # disclose the manifest path before dead-ending. Flip it only together with
-    # wiring verify.py to verify_from_manifest.
+    # VERIFICATION is BLOCKED here and that is currently NOT what happens.
+    #
+    # This used to read "scripts/verify.py has no submission path ... flip it
+    # only together with wiring verify.py to verify_from_manifest". verify.py
+    # has since been wired to verify_from_manifest and does submit, but it
+    # resolves chains from verify_etherscan.CHAIN_SPECS and never consults this
+    # registry -- so this policy does not gate it. The two authorities
+    # disagree, deliberately and visibly, rather than silently:
+    # tests/deployment/test_base_profile_regression.py pins the contradiction
+    # so that closing it has to be a decision, not a drive-by edit.
+    #
+    # Reconciling means routing verify.py through operation_decision() and
+    # flipping this to _SUPPORTED for the profiles that really can verify. That
+    # is integration work, not cleanup, so it is not done here.
     _policy(Operation.VERIFICATION, _BLOCKED, verifier=True),
 )
 

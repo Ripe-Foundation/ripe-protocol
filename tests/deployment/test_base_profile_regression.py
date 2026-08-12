@@ -316,3 +316,33 @@ def test_verify_reports_missing_manifest_for_canonical_segments():
 
     assert result.returncode != 0
     assert "No manifest found" in result.stderr
+
+
+def test_verification_policy_and_verify_cli_disagree_by_design():
+    """Characterization: the registry blocks VERIFICATION, the CLI ignores it.
+
+    `verify.py` was wired to `verify_from_manifest` in this cleanup, so it now
+    has a real submission path -- but it resolves chains from
+    `verify_etherscan.CHAIN_SPECS` and never calls `operation_decision`. The
+    profile registry still records VERIFICATION as blocked.
+
+    This test exists so the contradiction is explicit and tracked. Wiring the
+    CLI through the registry should flip the policy to SUPPORTED and delete
+    this test in the same change; until then, the mismatch must not be
+    mistaken for enforcement.
+    """
+    profile = get_profile("base-mainnet")
+    decision = operation_decision(profile, Operation.VERIFICATION)
+    assert decision.outcome is OperationOutcome.BLOCKED_PENDING_POLICY
+
+    # The CLI does not consult that decision: base-mainnet resolves and gets
+    # as far as the manifest/key checks rather than being refused as blocked.
+    source = (ROOT / "scripts/verify.py").read_text()
+    assert "operation_decision" not in source
+    assert "network_profiles" not in source
+
+    result = _run_module(
+        "scripts.verify", "--chain", "base-mainnet", "--environment", "v999"
+    )
+    assert "No manifest found" in result.stderr
+    assert "BLOCKED_PENDING_POLICY" not in result.stderr
