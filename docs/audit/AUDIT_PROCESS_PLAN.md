@@ -5,6 +5,7 @@
 - **Purpose:** define a contract-first security audit of the Ripe Protocol code on `rh`.
 - **Planning baseline:** live `rh` / `origin/rh` contract tree at commit `6ce9c6a8813e9ba9bcf5f9a810af1e8bc86b05e8`, tree `6a0aa2a24b4d89e0d1106045423c766a58936410`.
 - **Contract-focused revision:** 2026-08-12.
+- **Execution model:** rolling `rh` intake with exact per-workstream evidence snapshots and impact-scoped revalidation; ordinary branch movement does not stop the audit.
 - **Primary scope:** 62 production Vyper contract files, two Ripe-owned Solidity source files defining three pool contracts, their imported modules and interfaces, the 18 vendored Solidity dependencies they compile against, and tests that provide evidence about those contracts.
 - **Primary question:** can an untrusted or privileged actor cause incorrect authorization, accounting, custody, pricing, debt, supply, reward, liquidation, migration, cross-chain, or availability behavior in the contracts?
 - **Not an audit result:** this plan organizes the work. It does not itself establish that any contract is safe.
@@ -62,7 +63,7 @@ The comprehensive contract audit is complete only when:
 - Remediated findings receive regression evidence and independent retest.
 - Unreviewed contracts, functions, branches, flows, or assumptions are listed explicitly rather than hidden behind a green test suite.
 
-An audit report may accurately finish while reporting unresolved findings. It may not describe contracts as ready or safe when a Critical or High issue remains unresolved.
+An audit report may accurately finish while reporting unresolved findings. It may not describe contracts as ready or safe when a Critical or High issue remains unresolved. Its conclusions apply to the exact final report commit/tree; later `rh` changes require impact-scoped delta review before inheriting those conclusions.
 
 ## 2. Standard workflow for every contract batch
 
@@ -81,6 +82,32 @@ Record:
 - Explicit exclusions.
 
 The charter must link every intersecting `F-`, `DV-`, strict-xfail, accepted-risk, and contract-relevant `RH-D` identifier.
+
+### Live `rh` change and non-blocking reconciliation
+
+Freezing scope means that each conclusion and proof remains reproducible against an exact commit and tree. It does **not** require the `rh` branch to stop moving, and ordinary `rh` changes do not pause the audit program.
+
+The audit lead maintains a branch-change ledger. Intake checkpoints occur before a batch or flow begins, before it closes, and before the final report snapshot is frozen. Additional checks may run whenever `rh` advances; intake triage should be quick and must not hold unrelated work. At each checkpoint, record:
+
+- Previous and new `rh` commit/tree.
+- Changed production contracts, imported modules, interfaces, and contract-relevant test evidence.
+- The affected batch owners, flow owners, shared invariants, findings, and proofs.
+- Semantic-impact classification, required revalidation, reviewer, and completion state.
+- The newest exact commit against which each batch and flow conclusion is valid.
+
+Classify each change by contract impact rather than commit size or line count:
+
+1. **No contract-semantic impact:** documentation, deployment/release material, repository maintenance, or other changes that do not alter compiled contract behavior. Test-only changes may strengthen or weaken evidence but do not by themselves invalidate a source conclusion. Continue every contract and flow workstream; update only the affected evidence mapping when relevant.
+2. **Localized contract impact:** a production-contract change with effects confined to identified contracts, entry points, or invariants and no credible propagation into unrelated flows. Continue all unrelated workstreams. Reopen only the affected source paths, test claims, findings, and transaction-flow permutations.
+3. **Cross-cutting or material contract impact:** a change to authorization, initialization, accounting, custody, price resolution, debt, supply, liquidation, migration, external-call behavior, shared interfaces/registries, or another load-bearing assumption. Pause closure only for the affected batches, flows, and invariant families while their owners revalidate. Unaffected work continues.
+
+A change is not material merely because it touches many lines, and a small diff is not minor merely because it touches few. Review semantic reach, value and authority at risk, interface/storage effects, downstream callers, and changed adversarial behavior.
+
+Agents continue from their recorded snapshots and must not silently relabel old evidence as current. When a newer change intersects their work, they retain completed analysis that remains valid, mark only affected conclusions stale, and publish the delta handoff to the relevant component and flow owners. Do not restart a whole batch when path-level or invariant-level revalidation is sufficient.
+
+A full-program pause is exceptional and requires the audit lead to show that the candidate can no longer be reproduced or that a change invalidates shared assumptions across most of the contract system. Normal fixes, additions, merges, and localized refactors do not meet that threshold.
+
+Before final reporting, freeze one final report commit/tree and reconcile the cumulative contract delta from the starting snapshot through that final snapshot. Closure requires zero untriaged production-contract changes, refreshed evidence for every affected conclusion, and an explicit list of any post-baseline changes not reviewed. Later `rh` movement does not retroactively change what was audited; it creates a new delta-review obligation before the later commit can inherit the report's conclusions.
 
 ### Step 2 — Build the contract model
 
@@ -582,11 +609,11 @@ Start with at most five active component pods. Flow agents count against the rea
 
 | Wave | Contract work | Exit condition |
 | --- | --- | --- |
-| 0 | Freeze the contract candidate; assign all 65 Ripe-owned production contracts across 64 source files; bind inherited contract issues; establish shared invariant and finding registers. | Zero unowned or double-owned contracts; starting charters accepted. |
+| 0 | Record the starting contract snapshot; assign all 65 Ripe-owned production contracts across 64 source files; bind inherited contract issues; establish the branch-change ledger plus shared invariant and finding registers. | Zero unowned or double-owned contracts; starting charters accepted; rolling `rh` intake owner and checkpoints established. |
 | 0.5 | Calibrate on the Batch 5 `BasicVault.vy` / `SimpleErc20.vy` exact-custody slice and `AUD-FLOW-01`. | Source review, test mapping, adversarial proof, flow handoff, and synthesis quality are accepted before broad fan-out. |
 | 1 | Run Batches 1–4 and continue Batch 5, weighting capacity toward Batches 2, 5, and 3. Start `AUD-FLOW-11`, `AUD-FLOW-12`, and `AUD-FLOW-13` when their component models stabilize. | Shared state, authority, price, token, vault, and migration models are stable. |
 | 2 | As foundation slots release, run Batches 6, 7, 8, 10, and 11, pairing CreditEngine and AuctionHouse review early because the current candidate changes their shared freeze/retry state machine. Activate deposit/withdraw, borrow/repay, liquidation/deleverage, reward, migration, and governance flows. Start Batch 9 in the next available slot. | User-entry, debt, liquidation, reward, governance, and Endaoment contract models are stable. |
-| 3 | Close Batch 9 and every remaining composed flow; execute protocol-wide invariant and adversarial campaigns, with independent replay of Stability Pool, liquidation, migration, monitoring-isolation, and CCIP capability/token-binding claims. | All 11 batches, 13 flows, shared matrices, inherited issues, and findings reconcile against one exact candidate. |
+| 3 | Close Batch 9 and every remaining composed flow; execute protocol-wide invariant and adversarial campaigns, with independent replay of Stability Pool, liquidation, migration, monitoring-isolation, and CCIP capability/token-binding claims. Freeze the final report snapshot and reconcile all contract changes since the starting snapshot. | All 11 batches, 13 flows, shared matrices, inherited issues, findings, and `rh` change-ledger entries reconcile against the exact final report commit/tree. |
 | 4 | Independently retest authorized contract remediations and all affected flows. | Every remediation has regression proof; every finding has a final disposition; remaining risk and unchecked contract surface are explicit. |
 
 Agents may begin reading a dependent contract early. They may not close a dependency-sensitive conclusion before the relevant owner publishes a stable handoff.
@@ -687,7 +714,7 @@ A challenged or disputed inherited issue blocks any dependent conclusion until t
 
 Only the following owner decisions are required before audit execution:
 
-1. Exact contract commit/tree to audit.
+1. Exact starting contract commit/tree and the final-report snapshot/reconciliation rule.
 2. Which network/configuration values and admitted contract features should be used when assessing realistic exposure.
 3. Whether vendored CCIP dependencies receive independent source review or pinned-upstream reliance plus Ripe integration review.
 4. Which prior audits, known issues, and accepted risks are supplied.
