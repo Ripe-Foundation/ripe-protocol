@@ -1462,21 +1462,21 @@
         "committed_path": "scripts/abis/RipeGov.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "67aa58893dc384c1bc19c3ecf229fc55adc6be8ee94c6d6ee8f8b1537c36d451",
-        "creation_executable_prefix_size": 23746,
-        "creation_metadata_sha256": "650ec7153d912deec64c27e42d6356fee3646e3f98a10f117cbeecca0f6d8d5c",
+        "creation_executable_prefix_sha256": "6488e7c1ac4094277bc381a69e74ad1bd4891a3c7e83a224d1876982cf03b9ac",
+        "creation_executable_prefix_size": 23585,
+        "creation_metadata_sha256": "43265b333d154837b6173bfbe314559be93fead236b55c4f920b410c34a3fca4",
         "creation_metadata_size": 70,
-        "creation_sha256": "f0c4ca8a720b19a5297dc3cd584a5dff1829534dff644c5069ba22932156fd21",
-        "creation_size": 23816,
-        "deployed_eip170_headroom": 909,
+        "creation_sha256": "952705426c84c72810baa378c80064209597b379935ca097631736bd3209a475",
+        "creation_size": 23655,
+        "deployed_eip170_headroom": 1070,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
         "deployed_runtime_immutable_data_sha256": "ed83a2128f485fcbc1398a96a19ee7ca74d961970458483ec5d3c6457210d7c1",
         "deployed_runtime_immutable_data_size": 32,
-        "deployed_runtime_sha256": "15d8781165f812aafd253ad93192c73ef0b036dde109fb4dea01f486e3c98428",
-        "deployed_runtime_size": 23667,
-        "eip170_headroom": 941,
-        "runtime_template_sha256": "4e33c1c9376ddedde355fba544c2288d66edbb23a626f00e7f3221c1e7e576cd",
-        "runtime_template_size": 23635
+        "deployed_runtime_sha256": "22f741ce761469ca4364a8263d2c22ee65bbe2cdcc60a0576e992a85ea6982e6",
+        "deployed_runtime_size": 23506,
+        "eip170_headroom": 1102,
+        "runtime_template_sha256": "b813c425654035ac7fc2fd013319b2d4b517d645b5beca9c998338b3c906b3ae",
+        "runtime_template_size": 23474
       },
       "code_layout": {
         "addys": {
@@ -1514,9 +1514,9 @@
         "canonical_sha256": "23c4d5f465b9913b6d55f4ad7d6d60b301ef3a51a66af988eba984fbe00b4b46",
         "count": 64
       },
-      "source_git_blob": "569faf1bb3224d86b14fa4d37277537213a18d26",
+      "source_git_blob": "f8ef69357e8eeb37d991bad094afa0ea9a4810ea",
       "source_path": "contracts/vaults/RipeGov.vy",
-      "source_sha256": "357e9b434f67ed10d49a3287fbe41df24091875a487774ef75e586a87290c7b2",
+      "source_sha256": "8550988d9ec00efe207d6a62e2a790cc5e8f6fac12958c562f86522454720f3b",
       "storage_layout": {
         "govPointAccrualDisabledBlock": {
           "n_slots": 1,
@@ -1603,7 +1603,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "28c3fb5b2a90bb4b9bce592e421f4d29c7789ef9dfca03729de03bc2028e0fe9"
+      "transitive_compiler_input_integrity": "22079d9244c71594de7c16912d42356be323a3d24fd16a0cef68e1ba89ebd664"
     },
     "SimpleErc20": {
       "abi": {

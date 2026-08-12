@@ -562,7 +562,7 @@ than the user's original terms—the opposite of the migration objective.
 - Governance-point disable setters remain Switchboard-only; VaultMigrator has
   no authority to apply them.
 - Paused migration state becomes intentionally more restrictive.
-- Measured deployed runtime: 23,667 bytes, leaving 909 bytes of EIP-170
+- Measured deployed runtime: 23,506 bytes, leaving 1,070 bytes of EIP-170
   headroom.
 
 ### Representative validation
