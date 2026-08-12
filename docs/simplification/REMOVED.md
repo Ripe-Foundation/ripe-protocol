@@ -21,8 +21,11 @@ Archived copies are also kept outside the repo at
 
 Step manifests are removed on an ongoing basis as rh produces them. Only the
 `current-manifest.json` of each chain/version is read at runtime, by
-`prepare_defaults.py`, `verify_blockscout.py`, `console.py`, and
-`Migration.__init__` itself.
+`prepare_defaults.py`, `verify.py`, `verify_blockscout.py`, `console.py`, and
+`Migration.__init__` itself. `verify.py` belongs on that list because its
+`--manifest` option defaults to `current` (`scripts/migrate.py:131-135`), so an
+operator verifying a deployment reads the current manifest unless they name
+another one.
 
 **Every `current-manifest.json` is retained — mainnet and testnet alike.** Six
 remain: `base-mainnet/v1`, `base-sepolia/v1`, `base-sepolia/v2`,
@@ -91,7 +94,13 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**171 files removed.**
+**195 files removed.**
+
+The two `Deployment tooling` sections below are this PR's removals — the unused
+H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
+Recovery metadata for the 24 (git mode, blob id, byte length, sha256, and a
+commit each is retrievable from) is in `extracted-files.tsv` under the
+`deployment-tooling` and `deployment-tooling-test` categories.
 
 ## Block-clock inventory (4)
 
@@ -181,6 +190,36 @@ top pointing here.
 - `migration_history/robinhood-testnet/v1/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`
+
+## Deployment tooling (13)
+
+- `scripts/ccip_send.py`
+- `scripts/check_contract_artifacts.py`
+- `scripts/check_deployment.py`
+- `scripts/params/validate_robinhood_reward_launch_plan.py`
+- `scripts/proposals/__init__.py`
+- `scripts/proposals/build_ledger_artifact_bundle.py`
+- `scripts/proposals/ledger-robinhood-profile.json`
+- `scripts/proposals/ledger_robinhood_profile.py`
+- `scripts/proposals/lootbox-deployment-profiles.json`
+- `scripts/proposals/lootbox_deployment_profiles.py`
+- `scripts/update_contract_artifact_expectations.py`
+- `scripts/utils/deployment_assertions.py`
+- `scripts/utils/manifest_schema.py`
+
+## Deployment tooling tests (11)
+
+- `tests/deployment/test_current_manifest_promotion.py`
+- `tests/deployment/test_manifest_schema.py`
+- `tests/deployment/test_post_deployment_assertions.py`
+- `tests/deployment/test_registry_topology.py`
+- `tests/deployment_profiles/conftest.py`
+- `tests/deployment_profiles/test_ledger_artifact_bundle.py`
+- `tests/deployment_profiles/test_ledger_robinhood_profile.py`
+- `tests/deployment_profiles/test_lootbox_deployment_profiles.py`
+- `tests/inventory/conftest.py`
+- `tests/inventory/test_bluechip_yield_prices_artifacts.py`
+- `tests/inventory/test_contract_artifacts.py`
 
 ## Evidence records (13)
 
