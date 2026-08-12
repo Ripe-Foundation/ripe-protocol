@@ -26,12 +26,12 @@ L3B_MANIFEST_MUTATION_SHA256 = {
 }
 L3B_SOURCE_MUTATION_SHA256 = {
     "immutable_readback": (
-        "6e044f13cc1111829c047a73a73f9a8f"
-        "fe4711c3dab814af3d90bc664e745bc1"
+        "03b44a8f833f8957f35ea3764b848335"
+        "def211433d3b00de68ac2d5bc63aa327"
     ),
     "post_deploy_assertions": (
-        "477f615580e98b12a79601d0e5d5bd68"
-        "afe2b5a6e3c3bdae0167fcf3ca088beb"
+        "65d201968d665b5794ae80fc146707e5"
+        "a5811cb68ca95ad90c4ec753e461ddac"
     ),
 }
 

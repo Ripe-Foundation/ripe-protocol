@@ -4957,6 +4957,15 @@ the authoritative policy. A feature branch, working-tree change, Gate 1
 candidate, review approval, or commit that is not integrated into `rh` does
 not itself retire an exception.
 
+**New-advisory authorization boundary:** The retirement authorization above
+predates `PYSEC-2026-3654`. Mick Hagen, H-01 owner, explicitly adopted this
+exact bounded exception on 11 August 2026 after the containment candidate and
+independent review were complete. The new exception becomes operative only
+when the exact authorized bytes are integrated into authoritative `rh`; the
+authorization alone does not make a feature branch authoritative. A green test
+result proves only that the bounded fail-closed controls are represented
+consistently; it is not release, deployment, or alert-state authority.
+
 The transition changes no dependency byte. Its immutable integrated inputs
 remain:
 
@@ -4981,6 +4990,7 @@ unchanged.
 | `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
 | `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
 | `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
+| `EX-H01-PYMDOWN-REDOS-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` is affected by `PYSEC-2026-3654` / `GHSA-gm37-52c6-37mw` / `CVE-2026-67422`; first patch is `11.0.1`, outside the current resolver-valid Titanoboa/docs graph. The owner-authorized controls below contain the currently unreachable surface. |
 
 The historical `PROPOSED_RETIREMENTS` state is superseded only when the
 effectivity boundary above is satisfied. The three retired records remain
@@ -4989,7 +4999,7 @@ disposal; they are not operative authorization after effective integration.
 
 ### Operative retained exception terms
 
-The retained-exception owner is **Mick Hagen, H-01 owner**. Both retained
+The retained-exception owner is **Mick Hagen, H-01 owner**. All three retained
 exceptions keep the scheduled security review on **15 August 2026** and hard
 expiry at **2026-08-31T23:59:59Z**. The earlier of a finding-specific
 invalidation trigger or hard expiry ends authorization. An expired exception
@@ -5035,6 +5045,130 @@ acceptance.
   change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
   review, or hard expiry.
 
+### Owner-authorized Pymdown ReDoS exception
+
+The reviewed [PyPA record](https://github.com/pypa/advisory-database/blob/main/vulns/pymdown-extensions/PYSEC-2026-3654.yaml),
+[GitHub advisory](https://github.com/advisories/GHSA-gm37-52c6-37mw),
+[upstream fix](https://github.com/facelessuser/pymdown-extensions/commit/c68498598d7b13011bb4571350b6e3612a4ce44b),
+and [PyPI release](https://pypi.org/project/pymdown-extensions/11.0.1/)
+identify one finding under `PYSEC-2026-3654`, `GHSA-gm37-52c6-37mw`, and
+`CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+`11.0.1`. GitHub rates the upstream finding High at CVSS 3.1 score `7.5`
+(`AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H`). It is distinct from the older Caption
+ReDoS fixed in `10.16.1`.
+
+The affected processors are `pymdownx.caret`, `pymdownx.tilde`,
+`pymdownx.betterem`, and `pymdownx.magiclink`; `pymdownx.extra` also exposes
+the default BetterEm processor. When an affected extension is enabled, a
+crafted sub-50-byte untrusted Markdown line can cause exponential regular-
+expression backtracking and pin the rendering thread at full CPU. This is an
+availability threat, not a confidentiality or integrity finding.
+
+The exact `origin/rh` tree at
+`02468586d710e2cce2360c2bc07e94de6ebdab29` has no MkDocs configuration or
+documentation-build command and no Pymdown import or Markdown-rendering call
+outside `tests/deployment/test_dependency_gate.py`. That explicit dependency
+test activates only `pymdownx.snippets` and `pymdownx.b64`, not an extension
+affected by this ReDoS. No repository path accepts or renders untrusted
+Markdown. Installation of the affected package alone does not activate an
+extension, so the reviewed current exploit path is absent.
+
+A clean patch upgrade is not resolver-valid. Exact `titanoboa==0.2.7`
+requires `mkdocs-material==9.5.41`, which requires
+`pymdown-extensions~=10.2` and therefore excludes version 11. Pymdown
+Extensions `11.0.1` itself requires Python `>=3.10` and Markdown `>=3.6`, so it
+is otherwise compatible with the reviewed CPython `3.12.0` / Markdown `3.9`
+profile. The Titanoboa/Material metadata constraint is the blocker. The lock
+must not be hand-edited or installed in a metadata-inconsistent state.
+
+#### `EX-H01-PYMDOWN-REDOS-01` — retain Pymdown Extensions `10.21.3`
+
+- **Status:** Retained—operative.
+- **Finding:** `PYSEC-2026-3654`, alias `GHSA-gm37-52c6-37mw` /
+  `CVE-2026-67422`. Affected versions are `<=11.0`; the first fixed release is
+  `11.0.1`.
+- **Authorization:** Mick Hagen, H-01 owner, explicitly adopted the exact
+  independently reviewed containment on 11 August 2026. The exception becomes
+  operative only after these exact authorized bytes are integrated into
+  authoritative `rh`; neither a feature branch nor a green test run grants
+  repository authority.
+- **Threat model:** Activation of `pymdownx.caret`, `pymdownx.tilde`,
+  `pymdownx.betterem`, `pymdownx.magiclink`, or `pymdownx.extra` against
+  attacker-controlled Markdown permits a very short input to monopolize the
+  renderer CPU through exponential regular-expression backtracking.
+- **Scope:** Exact Pymdown Extensions `10.21.3` under the unchanged
+  `titanoboa==0.2.7` / `mkdocs-material==9.5.41` graph. The repository has no
+  affected extension activation, MkDocs configuration or build, documentation
+  renderer, or untrusted Markdown input path. The first fixed release is
+  `11.0.1`, which is not resolver-valid under the unchanged graph.
+- **Compensating controls:** Do not enable any affected extension or
+  `pymdownx.extra`; do not render untrusted Markdown; preserve the bounded
+  scanner, which rejects literal affected names in supported configuration and
+  Markdown API shapes plus direct Pymdown imports; treat any Markdown API call
+  with a runtime-computed extension value as a manual re-review trigger because
+  the AST gate cannot prove that value; do not add a MkDocs/docs-render path
+  while the affected pin remains; do not run the exponential-time proof of
+  concept in CI.
+- **Re-review/invalidation triggers:** Any affected extension, Pymdown import
+  or configuration, MkDocs/docs pipeline, Markdown-rendering API, untrusted
+  Markdown, advisory/exploit change, Titanoboa/Material/Pymdown/Markdown/Python
+  movement, scanner-boundary change, scheduled review, or hard expiry.
+- **Review/expiry:** Governed by the common retained-exception schedule above.
+- **Integration boundary:** This authorization permits publication and review
+  of this exact amendment. The exception becomes operative only when these
+  bytes are integrated into authoritative `rh`; dependent requirements changes
+  must not integrate before that boundary is satisfied.
+
+### Pre-authorization Pymdown ReDoS containment validation
+
+This amendment was prepared from exact `origin/rh` commit
+`02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
+`082a460d0ee190ac74a87ab29828d9c867ddff06`. With repository `addopts`
+cleared, RPC and credential variables unset, and all generated state under an
+external mode-`0700` parent, the dependency gate collected and passed all 56
+tests. The focused bounded fail-closed selection passed 13 cases: seven root
+configuration activations, five affected Markdown API activations, and the
+then-pending exception evidence check. No exponential-time input was executed.
+
+The requirements inputs remained byte-identical to the base: `requirements.in`
+has Git blob `85bacd1b372b167c825497e06cf7751a432bc212` and SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`;
+`requirements.txt` has Git blob `eaf12f774a108a100696a5c77d8a9dec9617ed1e`
+and SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The amended gate SHA-256 was
+`d68dfa6cb7744ca236b6cef61ae81e8e99f71b4e204e8663b10b0690bb49bae1`.
+These green results established internal consistency and fail-closed
+containment only. They did not authorize the exception at that checkpoint;
+the later explicit owner authorization above controls the current target
+status.
+
+### Owner authorization and current-`rh` reconciliation — 11 August 2026
+
+Mick Hagen, H-01 owner, explicitly authorized the bounded
+`EX-H01-PYMDOWN-REDOS-01` containment in the current Codex task on 11 August
+2026. The independently reviewed containment patch was replayed without scope
+expansion onto exact authoritative `rh` commit
+`3a4cac429a860ffc95bd85612d9e345108332833`, tree
+`0bc766984da112d8bde3b499e763f31b192eb591`. Integration of the exact resulting
+two-file patch remains the effectivity boundary.
+
+The authorization changes no dependency byte. `requirements.in` remains
+SHA-256
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`, and
+`requirements.txt` remains SHA-256
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The authorized dependency-gate source is SHA-256
+`2fcb7f1084e2e9a3d7d2e98b9da37a8a5b0372f26acf7eeb60dfc03c24ad58bd`.
+
+With repository `addopts` cleared, RPC and credential variables unset, and all
+generated state under an external mode-`0700` parent, the first full gate run
+passed 55 of 56 cases and exposed one evidence-only duplicate schedule phrase.
+The phrase was reduced to the common retained-exception schedule; the final
+complete replay passed all 56 cases. No exponential-time proof of concept,
+network request, dependency resolution, alert mutation, deployment, or live
+chain action was performed.
+
 ### Validation inheritance and alert-state boundary
 
 The retirement basis is the exact integrated lock, raw no-ignore package
@@ -5067,3 +5201,647 @@ wildcard Click imports, or shell execution. The reachability gate therefore
 includes it in the reviewed CLI allowlist while continuing to reject the
 editor surface. This defense-in-depth update does not reopen the retired Click
 exception.
+
+## Declared Web3 operator dependency prerequisite — 11 August 2026
+
+**Status:** Local candidate pending independent review. This section records a
+four-file prerequisite only; it is not operative on `rh`, merge approval, H-06
+requalification, deployment authorization, or evidence that any external alert
+was closed.
+
+### Immutable candidate boundary
+
+The isolated implementation worktree was created mode `0700` from the exact
+cached `origin/rh` commit requested by the owner:
+
+```text
+base commit:
+  02468586d710e2cce2360c2bc07e94de6ebdab29
+base tree:
+  082a460d0ee190ac74a87ab29828d9c867ddff06
+branch:
+  codex/rh-declare-web3-dependency
+worktree:
+  /private/tmp/rh-declare-web3-dependency.ch0yCQ/worktree
+```
+
+The exact file ceiling is:
+
+```text
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+docs/chains/rh/evidence/dependency-security-gate.md
+```
+
+No workflow, operator script, migration, H-06 runbook, historical measurement,
+PR87 byte, contract, interface, RPC setting, branch setting, or secret was
+changed. No RPC, explorer, chain, hardware wallet, Safe service, push, PR,
+merge, deployment, or external alert-state mutation was performed.
+
+### Why Web3 is a required direct dependency
+
+The exact base and PR87 head
+`4b60cffbb0613efd7e628bdbaa9f644af71dd744` had byte-identical requirement
+files and did not declare Web3. The clean pinned RH Python 3.12 validation
+environment therefore failed at `from web3 import Web3` while exercising
+PR87's defaults snapshot path. The syntax-limited AST inventory described
+below measured these ten current-tree production/operator files using its
+supported import forms:
+
+```text
+migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py
+migrations/base-mainnet/2026080701_CcipWire.py
+migrations/robinhood-mainnet/0001_Registries.py
+migrations/robinhood-mainnet/0009_RedeployStaleContracts.py
+migrations/robinhood-mainnet/0010_RedeployLedger.py
+migrations/robinhood-mainnet/2026080701_CcipWire.py
+scripts/ledger_signing_smoke.py
+scripts/prepare_defaults.py
+scripts/utils/ledger_account.py
+scripts/utils/safe_account.py
+```
+
+These are known production/operator callers, not one optional test extra. The
+list is a bounded current-tree measurement, not whole-program Python import
+reachability. An exact main-lock pin gives local developers, CI, migrations,
+and operator scripts one reproducible environment. A separate ops lock would
+duplicate and drift the same Vyper/Boa/eth graph, while replacing Web3 in ten
+historical and current callers would be a larger behavioral change. The
+smallest reviewed fix is therefore an exact direct main-lock dependency.
+
+### Pin selection and primary-source security review
+
+The review was refreshed at `2026-08-11T18:42:39Z` using primary official
+package and upstream security sources only:
+
+- [PyPI release metadata for Web3 7.16.0](https://pypi.org/pypi/web3/7.16.0/json)
+  reported exact version `7.16.0`, `yanked: false`, Python `>=3.8,<4`, and an
+  empty release vulnerability list.
+- [PyPI's Web3 project page](https://pypi.org/project/web3/) reported `7.16.0`
+  as the latest stable release; the newer `8.0.0b3` is a prerelease and was
+  not selected.
+- [The upstream v7.16.0 release](https://github.com/ApeWorX/web3.py/releases/tag/v7.16.0)
+  is a verified release for commit `efbc6eb`.
+- The upstream security page and the official GitHub global-advisory API
+  returned one Web3 advisory,
+  [GHSA-5hr4-253g-cpx2 / CVE-2026-40072](https://github.com/advisories/GHSA-5hr4-253g-cpx2).
+  Its stable affected range is `>=6.0.0b3,<7.15.0`, and `7.15.0` is the first
+  stable patched version. The issue is default-on CCIP Read SSRF.
+
+Consequently, `web3==7.12.0` is rejected even though it passed an earlier
+local compatibility probe. Exact `web3==7.16.0` is the latest non-yanked
+stable Python 3.12-compatible release, is beyond the advisory's stable patch
+boundary, and passed the repository compatibility checks below. This review
+does not claim future advisories cannot appear.
+
+### Deterministic seeded resolution
+
+Two independent mode-`0700` disposable resolver environments used exact
+CPython `3.12.0`, interpreter SHA-256
+`d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`,
+pip `23.2.1`, pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`, packaging
+`26.3`, pyproject-hooks `1.2.0`, setuptools `84.0.0`, and wheel `0.47.0`.
+Each resolver had its own private cache and its own copy of the exact old
+output lock. Both used public `https://pypi.org/simple` only, with no extra or
+private index:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+pip-compile \
+  --cache-dir=PRIVATE_DISPOSABLE_CACHE \
+  --index-url=https://pypi.org/simple \
+  --no-emit-index-url \
+  --output-file=requirements.txt requirements.in
+```
+
+The truthful generated header remains:
+
+```text
+#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+```
+
+One non-authoritative preflight mistakenly passed the display-only header
+value `--cert=None` back to pip-tools. It stopped before resolution with
+`OSError: Could not find a suitable TLS CA certificate bundle, invalid path:
+None` and did not change the seeded output. The two authoritative runs used
+the documented invocation above and completed in 19.29 s and 11.49 s wall.
+
+Both candidate inputs and generated locks were byte-identical:
+
+| Artifact | Old RH SHA-256 | Candidate SHA-256 |
+|---|---|---|
+| `requirements.in` | `1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` |
+| `requirements.txt` | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` |
+| `tests/deployment/test_dependency_gate.py` | not an input to resolution | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` |
+
+Normalized comparison found zero version change among the 92 existing lock
+pin lines. The candidate adds exactly eleven distributions:
+
+```text
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+frozenlist==1.8.0
+multidict==6.7.1
+propcache==0.5.2
+pyunormalize==17.0.0
+types-requests==2.33.0.20260712
+web3==7.16.0
+websockets==15.0.1
+yarl==1.24.5
+```
+
+Every remaining literal lock change is a resolver annotation adding Web3 or
+one of those eleven packages to an existing package's `via` list. Neither
+input nor lock contains a direct URL, VCS URL, editable path, find-links,
+extra index, or private index.
+
+### Fresh installation, size, and advisory evidence
+
+Separate fresh mode-`0700` CPython `3.12.0` environments installed the exact
+old and candidate locks from public PyPI with `--no-cache-dir`. These are
+single cold-install samples, not performance benchmarks:
+
+| Measurement | Old RH lock | Candidate lock | Delta |
+|---|---:|---:|---:|
+| installation wall time | 20.87 s | 26.26 s | +5.39 s |
+| installed distributions, including environment tooling | 93 | 104 | +11 |
+| site-packages disk allocation | 219,772 KiB | 234,144 KiB | +14,372 KiB (14.04 MiB) |
+
+Both installations passed `python -m pip check`. The candidate inventory
+differed only by the exact eleven-package closure above. No installed
+distribution contained `direct_url.json`; install logs resolved artifacts from
+public `files.pythonhosted.org` under the explicit public PyPI index.
+
+A separate CPython `3.12.0` / pip `23.2.1` environment installed exact
+`pip-audit==2.10.1`. A fresh raw no-ignore audit used `--no-deps`,
+`--disable-pip`, no fix, no suppression, and no `--ignore-vuln` flags. Its raw
+JSON SHA-256 is
+`5581a4c9316cc50901b83dbb31b2af092a22d53d5432c2220492c52ea2942cde`.
+All eleven new closure packages, including Web3, had zero findings.
+
+The full unchanged-plus-new lock currently reports five rows in three
+pre-existing packages:
+
+| Package | Finding | Current disposition |
+|---|---|---|
+| Pymdown Extensions `10.21.3` | `PYSEC-2026-3609`, aliases `CVE-2026-61632` and `GHSA-9xwg-3r6f-jcx2`; fixed `11.0.0` | existing `EX-H01-PYMDOWN-B64-01` record |
+| Pymdown Extensions `10.21.3` | `PYSEC-2026-3654`, aliases `CVE-2026-67422` and `GHSA-gm37-52c6-37mw`; fixed `11.0.1` | **separate H-01 review blocker**; newly observed and not accepted by this prerequisite |
+| pytest `8.4.2` | `PYSEC-2026-1845`; fixed `9.0.3` | existing `EX-H01-PYTEST-01` record |
+| Vyper `0.4.3` | `PYSEC-2023-142` | existing authoritative range exclusion; not an exception |
+| Vyper `0.4.3` | `PYSEC-2025-33` | existing authoritative range exclusion; not an exception |
+
+The newly published Pymdown ReDoS row is outside the Web3 dependency closure
+and exact four-file remediation authority. This candidate does not suppress,
+accept, retire, reclassify, or fix it. Its owner must review it separately
+before integration; floating Pymdown would violate the zero-drift lock scope
+and may conflict with the retained Titanoboa/docs graph.
+
+### Offline regressions and focused validation
+
+Reviewer hardening began from local commit
+`202f97c11960ab1a4327dc57aefacf4877c231bc`; this final simplicity amendment
+began from local commit `9f37272f3d438a8d4afee880c5f43308beb7c870` in the same fresh
+mode-`0700` worktree
+`/private/tmp/rh-declare-web3-dependency-hardened.5vIdYY/worktree` on branch
+`codex/rh-declare-web3-dependency-hardened`. The two requirement files remain
+byte-identical across both amendments. The final test hash is recorded in the
+artifact table above; the immediate parent test hash was
+`beda706d1bb67e478295e85e849e9276aa97bfa98079ace164fb25538faf2bfa`.
+
+The dependency gate asserts the two candidate requirement hashes and the exact
+direct `web3==7.16.0` pin. It defines the complete eleven-package Web3 closure
+above as an exact name/version mapping. Every closure member must match the
+lock and installed runtime version and must have no `direct_url.json`;
+per-package mutation regressions prove that a changed lock version, changed
+runtime version, or direct-URL installation record is rejected.
+
+The syntax-limited inventory scans `migrations/**/*.py` and `scripts/**/*.py`.
+It rejects a symlink anywhere in those roots and rejects a matching `.py` path
+that is not a regular file. Its supported syntax is direct `import web3` /
+`from web3`, literal `__import__("web3")`, and literal
+`importlib.import_module("web3")`, including ordinary aliases introduced by
+the `import importlib as ...` and `from importlib import import_module as ...`
+statements themselves. Regressions exercise every supported form and the
+symlink/nonregular failures. Equality with the ten-file list is only a drift
+check over that supported syntax and is not whole-program Python import
+reachability.
+
+Callable assignment such as `loader = importlib.import_module`, builtins
+aliases such as `import builtins as python_builtins` followed by
+`python_builtins.__import__`, and module-name aliases or other dataflow-derived
+call targets are deliberately outside the static inventory. Regression cases
+make that boundary visible. Any such construct in operator or migration code
+is a code-review trigger for an explicit dependency/inventory update; this
+gate does not implement callable assignment, builtins, scope, or dataflow
+alias analysis.
+
+The checksum/Keccak regression imports Web3, then replaces `socket.socket`,
+`socket.create_connection`, and the low-level DNS lookup functions with
+denial hooks. The EIP-55 checksum and Keccak operations complete with an empty
+attempt log. That proves only that this executed offline regression made no
+socket or DNS attempt; it does not claim that every possible provider
+construction or arbitrary Web3 caller is statically prohibited. The gate
+still has no subprocess, audit-service, GitHub API, or direct external-query
+implementation.
+
+All validation unset RPC/provider credentials, private keys, mnemonic and AWS
+credentials; used only an explorer placeholder for collection-time guards;
+redirected bytecode, Boa, pytest, XDG, and Hypothesis state to private
+disposable paths; and made no live query.
+
+| Validation | Result |
+|---|---|
+| Web3 `7.16.0` import, `scripts.utils.safe_account` import, EIP-55 checksum, and Keccak smoke | pass; no provider constructed |
+| exact PR87 head `4b60cffbb0613efd7e628bdbaa9f644af71dd744`, `tests/test_prepare_defaults_snapshot.py`, addopts cleared | 30 passed in 0.27 s; 2.06 s wall; PR87 worktree clean before and after |
+| default lean collection | 3,550 selected of 3,832 total; 282 expected deselections; 7.08 s pytest / 8.93 s wall |
+| comprehensive collection with addopts cleared | 4,523 selected of 4,666 total; 143 expected safe-default deselections; 7.26 s pytest / 9.46 s wall |
+| dependency gate with addopts cleared | 47 passed in 2.91 s; 4.84 s wall |
+| reviewer-hardening Web3 selection | 47 passed, 45 deselected in 0.76 s |
+| reviewer-hardened dependency gate with addopts cleared | 92 passed in 3.70 s; 6.35 s wall |
+| reviewer-hardened PR87 snapshot recheck at exact `4b60cffbb0613efd7e628bdbaa9f644af71dd744` | 30 passed in 0.29 s; 2.23 s wall; detached worktree clean |
+| final simplicity-amendment Web3 selection | 49 passed, 45 deselected in 0.74 s |
+| final simplicity-amendment dependency gate with addopts cleared | 94 passed in 3.32 s; 5.51 s wall |
+| final simplicity-amendment PR87 snapshot recheck at exact `4b60cffbb0613efd7e628bdbaa9f644af71dd744` | 30 passed in 0.31 s; 2.35 s wall; detached worktree clean |
+
+Web3 import and the PR87 snapshot suite emit one dependency-specific warning:
+`websockets.legacy is deprecated` from Websockets `15.0.1`. It is not hidden or
+suppressed. It does not affect the synchronous checksum, Keccak, or HTTPProvider
+callers under review, but it remains an upstream compatibility/deprecation
+signal for a future Web3/Websockets update.
+
+An attempted broad operator-helper import progressed past Web3 and then failed
+at `scripts/utils/ledger_account.py:4` because `hid` is also undeclared;
+`ledgerblue` and `ledgereth` are further module-level imports in that helper.
+Those hardware-wallet dependencies predate this candidate and are not needed
+by PR87's snapshot path. They require a separate operator-dependency decision;
+this prerequisite does not claim every optional Ledger helper is importable
+from the main lock.
+
+### Effectivity and H-06 boundary
+
+This candidate changes the dependency input and lock identities. Therefore no
+historical H-06, fork, deployment, or full-suite result recorded against old
+lock `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`
+transfers to the candidate. The focused offline PR87 result proves only that
+the missing Web3 dependency is resolved and its 30 snapshots remain stable.
+
+Before merge or deployment reliance, the separate Pymdown H-01 blocker must be
+disposed by its owner, this candidate must pass independent review, and the
+final integrated PR87-plus-prerequisite tree must repeat the required H-06
+qualification under the new lock. No H-06 runbook or historical measurement
+was edited to imply otherwise.
+
+## Declared migration runtime dependencies — 11 August 2026
+
+**Status:** Local stacked candidate pending independent review. This section
+records dependency declarations only. It is not operative on `rh`, does not
+authorize the pending Pymdown exception, and does not transfer H-06,
+deployment, or release evidence.
+
+### Bound scope and runtime reachability
+
+The candidate began from exact Web3 prerequisite commit
+`85af5fc437367b378d437c6201ce3c31256e8a08` / tree
+`70b1707ef1566affcbafe74f65aa8595fe3f48a8` in a fresh mode-`0700`
+worktree on branch `codex/rh-declare-runtime-transitives`. Its exact file
+ceiling is:
+
+```text
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+docs/chains/rh/evidence/dependency-security-gate.md
+```
+
+Two migration runtime imports were installed only as transitive dependencies
+of Titanoboa's documentation graph:
+
+- `scripts/utils/log.py` directly imports `colorama`; the lock already selected
+  `colorama==0.4.6` through MkDocs Material.
+- `scripts/utils/migration.py` directly imports `mergedeep`; the lock already
+  selected `mergedeep==1.3.4` through MkDocs and MkDocs Get Deps.
+
+The candidate declares exact direct roots `colorama==0.4.6` and
+`mergedeep==1.3.4`. It does not change either operator module, migration merge
+semantics, logging behavior, Web3 closure, or any selected version. A narrow
+AST check reads only those two exact paths and verifies each exact current
+absolute import statement in the module's leading import-only block after an
+optional module docstring and any `from __future__` imports. It preserves
+statement order, imported names, aliases, and repeated occurrences. It ignores
+nested or dead-code imports and relative imports. It does not expand the Web3
+directory scanner or claim dynamic or whole-program import analysis.
+
+### Reproducible zero-drift lock
+
+Two independent private resolver roots used CPython `3.12.0`, pip-tools
+`7.4.1`, the exact candidate input, their own cache, and a seeded copy of the
+Web3 output lock. RPC/provider variables, keys, mnemonic, and AWS credentials
+were unset. Resolution used public PyPI only:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+pip-compile \
+  --cache-dir=PRIVATE \
+  --index-url=https://pypi.org/simple \
+  --no-emit-index-url \
+  --output-file=requirements.txt requirements.in
+```
+
+The documented `CUSTOM_COMPILE_COMMAND` preserved the exact pre-existing
+generated-header text; the display-only `--cert=None`, `--client-cert=None`,
+and `--pip-args=None` values in that header were not passed to pip. The final
+independent regenerations completed in 6.42 s and 6.39 s wall and produced
+byte-identical lock SHA-256
+`781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007`.
+
+| Artifact | Web3 prerequisite SHA-256 | Candidate SHA-256 |
+|---|---|---|
+| `requirements.in` | `77768a6e25a4eac86afa88492c5e21d8609c3c5aee469846067e5c8c2b896e72` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
+| `requirements.txt` | `3a75970898ff917f508c8ac40046d41eee91646bc83af8bb87d0fd7217e3e569` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
+| `tests/deployment/test_dependency_gate.py` | `06433cf502c3cb46f82757f2f6c8f137b0e350bdecc6d79426000033d24320e3` | `fa1d9269bdbf4d85de0189a9a3d417b56f25ff0a5abfd49114480541477af29d` |
+
+PEP 508-normalized comparison found 103 exact pin lines on each side and zero
+package additions, removals, or version changes. The generated header is
+byte-identical. The only lock changes are `-r requirements.in` annotations for
+Colorama and Mergedeep.
+
+### Focused offline validation and boundaries
+
+The existing clean Web3 CPython `3.12.0` environment already contained the
+exact unchanged candidate versions and had no direct-URL metadata for either
+package. With generated state redirected to a private external root and RPC,
+provider, key, mnemonic, and AWS variables unset:
+
+| Validation | Result |
+|---|---|
+| `python -m pip check` | pass; no broken requirements; 0.64 s wall |
+| import smoke for `scripts.utils.log` and `scripts.utils.migration` | pass from the candidate paths; 1.75 s wall |
+| exact PR87 `4b60cffbb0613efd7e628bdbaa9f644af71dd744` defaults snapshots | 30 passed, one preserved Websockets deprecation warning, in 0.43 s; 2.73 s wall; detached worktree clean before and after |
+| dependency-gate module compilation | pass; 0.09 s wall |
+| complete dependency gate with repository addopts cleared | 95 passed, one preserved Websockets deprecation warning, in 3.46 s; 6.00 s wall |
+
+An initial dependency-gate run passed 94 cases and failed only the new evidence
+assertion because the recorded zero-drift sentence wrapped across a Markdown
+line. The assertion now normalizes evidence whitespace; the dependency,
+runtime-import, and security checks were not loosened.
+
+No package version moved, so this declaration-only candidate does not alter or
+refresh the existing advisory dispositions. In particular, the Pymdown ReDoS
+finding remains a separate pending, non-operative H-01 blocker; this candidate
+does not accept, suppress, extend, or retire it. The Web3 prerequisite remains
+stacked and non-operative until its own owner/security/integration conditions
+are satisfied. No RPC, explorer query, hardware wallet, Safe service, push,
+PR, merge, deployment, settings change, or external alert mutation was
+performed.
+
+### Independent-review amendment — exact import boundary
+
+Independent review found that the first candidate helper used `ast.walk()` and
+accepted any `ImportFrom` node. That proved syntax presence but also counted
+imports nested under dead code and relative imports, which are not the runtime
+dependency relationship this declaration is intended to preserve.
+
+The first additive amendment changed only the dependency gate and this
+candidate evidence. It iterated the parsed module's top-level statement list,
+accepted `ImportFrom` only when `level == 0`, recorded imported names and
+aliases, and required exact equality for the current statements:
+
+```text
+scripts/utils/log.py
+  from colorama import Fore, Style
+scripts/utils/migration.py
+  from mergedeep import merge
+```
+
+Separate negative mutations prove that the same imports under `if False` and
+the corresponding one-dot/two-dot relative imports do not satisfy the gate.
+The requirement input and lock remain byte-identical at the hashes above; no
+runtime/operator file or dependency version changed.
+
+| Amendment validation | Result |
+|---|---|
+| focused exact-import and two negative-mutation cases | 3 passed, 94 deselected in 0.18 s; 2.92 s wall |
+| import smoke for both unchanged candidate modules, RPC and credential variables unset | pass; 1.74 s wall |
+| complete dependency gate with repository addopts cleared | 97 passed, one preserved Websockets deprecation warning, in 3.70 s; 6.24 s wall |
+| dependency-gate module compilation and `git diff --check` | pass |
+
+This test-boundary correction does not change the Pymdown blocker, Web3
+closure, exception status, H-06 boundary, or any deployment authority.
+
+### Second independent-review amendment — leading block and multiplicity
+
+Second independent review found two residual structural gaps. Iterating the
+whole module body still accepted a matching import after an unconditional
+`raise` or an `if True` block that raises, and a set erased duplicate exact
+import occurrences.
+
+The second additive amendment keeps the same two-file scope. The helper now:
+
+1. skips at most one module docstring;
+2. skips the following zero or more absolute `from __future__` imports;
+3. reads only the consecutive import statements before the first non-import
+   module statement;
+4. records only absolute imports; and
+5. returns an ordered list, so one exact expected occurrence is distinct from
+   zero, two, or differently ordered occurrences.
+
+The regression matrix retains nested/dead-code, relative, aliased, and wrong
+module/member-name cases. It adds exact failures for a matching import after a
+module-level `raise`, after an `if True` block that raises, and for two matching
+imports in the leading block. A positive case preserves the optional
+docstring/`from __future__` allowance.
+
+This is a structural source assertion only. It proves exact placement and
+multiplicity in the leading import block; it does not prove that earlier
+imports succeed, that the whole module finishes importing, or general runtime
+control flow. Requirement and operator/migration bytes remain unchanged.
+
+| Second-amendment validation | Result |
+|---|---|
+| focused declared-import matrix | 10 passed, 94 deselected in 0.18 s; 2.57 s wall |
+| import smoke for both unchanged modules with RPC and credential variables unset | pass; 1.69 s wall |
+| complete dependency gate with repository addopts cleared | 104 passed, one preserved Websockets deprecation warning, in 3.62 s; 6.11 s wall |
+| dependency-gate module compilation and `git diff --check` | pass |
+
+The amendment does not change dependency selection, Web3 closure, the pending
+Pymdown disposition, exception authority, H-06, deployment, or release state.
+
+## Non-operative dependency-train integration rehearsal — 11 August 2026
+
+**Status:** Local integration candidate only. This record is not an H-01 owner
+decision, accepted exception, merge proposal, release approval, H-06
+qualification, deployment artifact, or alert-state update. The rehearsal is
+bound to exact local `origin/rh` commit
+`02468586d710e2cce2360c2bc07e94de6ebdab29`; it changes no authoritative ref.
+
+This candidate rehearses the required semantic order without replacing the
+three short landing units:
+
+1. pending Pymdown ReDoS containment at
+   `de0d46728b9341d3f0e36554a765d841ef1b0aa7`;
+2. reviewed Web3 `7.16.0` closure at
+   `85af5fc437367b378d437c6201ce3c31256e8a08`; and
+3. reviewed direct Colorama/Mergedeep declarations and final import guards at
+   `f6686caa3a79dd44afe4dd23ff703853dc4c325a`.
+
+The last input already descends from the Web3 input. The rehearsal merged its
+content with the independent Pymdown input against exact `origin/rh` base
+`02468586d710e2cce2360c2bc07e94de6ebdab29` / tree
+`082a460d0ee190ac74a87ab29828d9c867ddff06`. The resulting reconciled
+pre-record tree was `820f951fb03b9b42f48d5066d754cd6eab3579c3` and changed exactly
+`requirements.in`, `requirements.txt`,
+`tests/deployment/test_dependency_gate.py`, and this evidence path.
+
+### Intentional shared-surface reconciliation
+
+The Pymdown aliases and `EX-H01-PYMDOWN-REDOS-01` remain in the pending set,
+which is disjoint from the operative and retired sets. The Web3 prerequisite's
+separate review-blocker assertion also remains: it prevents that prerequisite
+from treating the pending H-01 proposal as disposed. The two controls are
+complementary. Neither converts the proposal into an operative exception or
+represents owner adoption.
+
+All inherited candidate records and their standalone artifact hashes above
+remain historical descriptions of those exact candidates. They were not
+silently rebound to this composite. The reconciled inherited evidence prefix
+immediately before this section has SHA-256
+`36bf25ec26f55a3b8e311daf9920e42b471bea9a7b9e402c3150d954fd3f42fa`.
+That digest excludes the single Markdown separator line before this heading.
+This section alone records the composite identities and results.
+
+### Final lock reproduction and delta
+
+Two isolated mode-`0700` resolver roots used CPython `3.12.0`, pip `23.2.1`,
+pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`, packaging `26.3`,
+pyproject-hooks `1.2.0`, setuptools `84.0.0`, and wheel `0.47.0`. Each began
+with its own copy of the exact candidate input and seeded output, used its own
+private cache, and resolved from public `https://pypi.org/simple` only:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+CUSTOM_COMPILE_COMMAND='pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in'
+pip-compile --quiet --cache-dir=PRIVATE --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt requirements.in
+```
+
+The two authoritative public-PyPI resolutions completed in `19.13 s` and
+`19.15 s` wall and reproduced byte-identical output. An earlier sandboxed
+attempt could not resolve public-PyPI DNS, stopped at Titanoboa before
+producing a resolved output, and is not counted as either authoritative
+regeneration.
+
+| Composite artifact | SHA-256 |
+|---|---|
+| `requirements.in` | `56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf` |
+| `requirements.txt` | `781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007` |
+| `tests/deployment/test_dependency_gate.py` | `1b017ed881dc2468af20fe7181aaccafb5ac64ac4cf484939fa31261ab875d7f` |
+
+Normalized lock comparison against the exact base found 92 prior pin lines
+and 103 final pin lines. Every prior pin is unchanged; there are no removals
+or version changes. The eleven additions are exactly the reviewed Web3
+closure. Colorama `0.4.6` and Mergedeep `1.3.4` were already transitive lock
+members, so making them direct roots changes only their `via` annotations.
+The direct input and lock contain no direct, VCS, editable, file, private-index,
+extra-index, or find-links source.
+
+### Offline rehearsal results
+
+All validation used the exact final lock, unset RPC/provider, private-key,
+mnemonic, and AWS credential variables, redirected generated state to
+mode-`0700` disposable roots, and made no live query.
+
+| Validation | Result |
+|---|---|
+| initial composite dependency gate before this record | 115 passed, one preserved Websockets deprecation warning, in 3.59 s |
+| final evidence-bound dependency gate and module compilation | 115 passed, one preserved warning, in 3.52 s; 6.07 s wall; compile pass |
+| pending Pymdown control, seven root-configuration cases, and five affected Markdown activation cases | 14 passed, 101 deselected in 0.20 s |
+| final Web3 selection, including exact closure and network-deny regressions | 49 passed, 66 deselected, one preserved warning, in 0.81 s |
+| final runtime-import guard selection | 10 passed, 105 deselected in 0.18 s |
+| `python -m pip check` and offline Web3/operator import smoke | pass; no broken requirements and no provider construction |
+| exact PR87 head `4b60cffbb0613efd7e628bdbaa9f644af71dd744`, `tests/test_prepare_defaults_snapshot.py` | 30 passed, one preserved warning, in 0.35 s; detached worktree clean before and after |
+| default lean collection | 3,550 selected of 3,832 total; 282 expected deselections; 8.17 s |
+| addopts-cleared collection with only `fork_qualification` deselected | 4,591 selected of 4,734 total; 143 expected safe-default deselections; 8.72 s |
+
+The first collection attempt did not call Boa's cache setter and failed closed
+on two attempts to use the inaccessible default user cache. The recorded
+collections explicitly called `boa.interpret.set_cache_dir` before invoking
+pytest and completed cleanly. This execution correction changed no repository
+byte.
+
+### Landing, qualification, and rollback boundary
+
+This composite is an integration rehearsal, not a request to publish a single
+large pull request. Preserve the three short units and their review history.
+Pymdown containment remains pending owner authorization; downstream Web3 and
+runtime-declaration candidates cannot treat it as accepted or bypass that
+landing gate. If any input changes, discard this rehearsal result and rebuild
+the train from the newly reviewed exact commits.
+
+The lock identity differs from authoritative `rh`, so every H-06 result tied
+to the old lock requires prescribed requalification after an authorized final
+integration. PR87 snapshots and collection prove bounded compatibility only;
+they do not establish downstream remediation, fork qualification, deployment
+readiness, or release authority. No push, PR, merge, settings change, RPC,
+deployment, device action, or owner acceptance occurred.
+
+## Authorized Web3 and runtime dependency candidate — 11 August 2026
+
+This latest section supersedes only the publication disposition of the
+non-operative rehearsal immediately above. Mick Hagen's explicit H-01 owner
+authorization is recorded in the controlling transition section, and the
+containment branch remains the required integration parent. The historical
+standalone and rehearsal records remain exact descriptions of their named
+candidate bytes and checkpoints.
+
+The bounded follow-on candidate combines two already independent-reviewed
+dependency units because they share the same four files and exact lock:
+
+1. declare `web3==7.16.0` and its reviewed eleven-distribution public-PyPI
+   closure; and
+2. declare already-locked `colorama==0.4.6` and `mergedeep==1.3.4` as honest
+   direct runtime inputs without changing either installed version.
+
+The exact scope remains `requirements.in`, `requirements.txt`,
+`tests/deployment/test_dependency_gate.py`, and this evidence record. No
+contract, migration, operator implementation, workflow, generated file,
+manifest, deployment, or alert state changes. The branch may be published and
+reviewed in parallel, but it must not integrate before the exact owner-
+authorized containment bytes are authoritative in `rh`.
+
+The resulting input and lock identities remain:
+
+```text
+requirements.in
+  56023a39105dd39ce9caad356ea2b11dc3843d7bf72482aa54414163c5f0cfcf
+requirements.txt
+  781f6e04d0df489d27772bf68077f39458b7e16a0cbdf62ae10d1a3dfb2b4007
+```
+
+The normalized lock retains every prior version, adds exactly the reviewed
+eleven-package Web3 closure, and changes Colorama/Mergedeep only from
+transitive to direct-input provenance. Public-source, exact-closure,
+direct-URL, supported import-syntax, low-level network-deny, direct-runtime-
+import, and Pymdown reachability controls remain fail closed.
+
+Fresh validation used a new CPython `3.12.0` virtual environment installed
+from the exact final lock and public `https://pypi.org/simple` only. With all
+RPC/provider, private-key, mnemonic, and AWS credential variables unset, the
+complete dependency gate passed `115` tests in `3.42 s`; `python -m pip check`
+reported no broken requirements; and the offline Web3 checksum plus
+`safe_account`, `log`, and `migration` import smoke passed without constructing
+a provider. Ruff/compile/diff/scope checks remain required at publication.
+
+These results do not transfer H-06 qualification, authorize PR 87, release,
+deployment, connected-device use, RPC access, or alert dismissal. Any
+dependency, resolver, containment, or scanner change invalidates this record
+and requires a new bounded review.

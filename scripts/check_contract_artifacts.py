@@ -17,6 +17,12 @@ import cbor2
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from config.artifact_expectations import load_artifact_expectations  # noqa: E402
+
+
 DEFAULT_EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
 EIP_170_LIMIT = 24_576
 SCHEMA_VERSION = 1
@@ -435,7 +441,7 @@ def check(
     selected_contracts: Sequence[str],
     source_overrides: Mapping[str, Path],
 ) -> Sequence[str]:
-    expectations = json.loads(expectations_path.read_text())
+    expectations = load_artifact_expectations(expectations_path, root=ROOT)
     _assert_equal(
         "expectations", "schema_version", expectations.get("schema_version"), SCHEMA_VERSION
     )
@@ -497,8 +503,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         overrides = _parse_source_overrides(args.source_override)
+        expectations_path = Path.cwd() / args.expectations
         results = check(
-            args.expectations.resolve(),
+            expectations_path,
             args.contract,
             overrides,
         )

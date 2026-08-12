@@ -46,6 +46,12 @@ import pytest
 from eth_utils import is_address
 from scripts.utils.migration import Migration
 
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep offline manifest tests independent of protocol deployment."""
+
+
 # Methods `scripts/ccip_send.py` calls on the token it resolves: `balanceOf` at
 # the balance check and `approve` before the router send. A record can name a
 # real file at a real address and still be unusable if the artifact that file

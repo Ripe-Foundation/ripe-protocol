@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import check_contract_artifacts as checker
+from config.artifact_expectations import load_artifact_expectations  # noqa: E402
+from scripts import check_contract_artifacts as checker  # noqa: E402
 
 
 EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
@@ -123,7 +124,9 @@ def _record(name: str, source: Path, prior: dict, vyper: Path) -> dict:
 
 
 def main() -> int:
-    values = json.loads(EXPECTATIONS.read_text())
+    values = load_artifact_expectations(
+        EXPECTATIONS, root=ROOT, allow_v2=False
+    )
     governed_names = set(values["contracts"]) | REMEDIATION_CONTRACTS
     names = sys.argv[1:] or sorted(governed_names)
     unknown = sorted(set(names) - governed_names)

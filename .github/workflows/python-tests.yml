@@ -2,10 +2,14 @@ name: Python tests
 
 on:
   pull_request:
+    branches:
+      - rh
+  merge_group:
+    branches:
+      - rh
   push:
     branches:
       - master
-      - rh
   workflow_dispatch:
     inputs:
       lane:
@@ -26,13 +30,13 @@ concurrency:
 
 jobs:
   test:
-    name: Python 3.12.0 / ${{ matrix.lane }}
+    name: Python 3.12.0 / ${{ matrix.lane }} / ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ matrix.lane == 'comprehensive' && 180 || 120 }}
     strategy:
       fail-fast: false
       matrix:
-        lane: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('["{0}"]', inputs.lane) || '["lean","comprehensive"]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core"},{"lane":"lean","shard":"vaults-tokens"},{"lane":"lean","shard":"supporting"}]') }}
     env:
       # The runner context is not available in jobs.<id>.env — only inside
       # steps — so these use github.workspace, which is.
@@ -61,8 +65,9 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/.ci/boa
-          key: boa-${{ runner.os }}-py312-${{ matrix.lane }}-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-${{ github.run_id }}
+          key: boa-${{ runner.os }}-py312-${{ matrix.lane }}-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-${{ matrix.shard }}-${{ github.run_id }}
           restore-keys: |
+            boa-${{ runner.os }}-py312-${{ matrix.lane }}-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-${{ matrix.shard }}-
             boa-${{ runner.os }}-py312-${{ matrix.lane }}-${{ hashFiles('requirements.txt', 'contracts/**/*.vy', 'interfaces/**/*.vyi') }}-
             boa-${{ runner.os }}-py312-${{ matrix.lane }}-
             boa-${{ runner.os }}-py312-
@@ -85,13 +90,36 @@ jobs:
 
       - name: Run lean default lane
         if: matrix.lane == 'lean'
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          case "$TEST_SHARD" in
+            core)
+              shard_args=(tests/core)
+              ;;
+            vaults-tokens)
+              shard_args=(tests/vaults tests/tokens)
+              ;;
+            supporting)
+              shard_args=(
+                tests
+                --ignore=tests/core
+                --ignore=tests/vaults
+                --ignore=tests/tokens
+              )
+              ;;
+            *)
+              echo "Unknown lean test shard: $TEST_SHARD"
+              exit 2
+              ;;
+          esac
           /usr/bin/time -p python -m pytest \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            --durations=50
+            --durations=50 \
+            "${shard_args[@]}"
 
       - name: Run comprehensive lane
         if: matrix.lane == 'comprehensive'
@@ -113,9 +141,26 @@ jobs:
           path: ${{ github.workspace }}/.ci/boa
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
 
+  rh-pr-gate:
+    name: rh-pr-gate
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+    needs:
+      - test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful lean lane
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ]; then
+            echo "Lean test lane did not succeed: $TEST_RESULT"
+            exit 1
+          fi
+
   manifest-promotion-macos:
     name: Python 3.12.0 / manifest-promotion-macos
-    if: github.event_name != 'workflow_dispatch' || inputs.lane == 'comprehensive'
+    if: github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive'
     runs-on: macos-latest
     timeout-minutes: 60
     env:
