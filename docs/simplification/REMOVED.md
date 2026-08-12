@@ -150,7 +150,7 @@ top pointing here.
 
 The two `Deployment tooling` sections below are this PR's removals — the unused
 H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
-Recovery metadata for the 20 (git mode, blob id, byte length, sha256, and a
+Recovery metadata for the 19 (git mode, blob id, byte length, sha256, and a
 commit each is retrievable from) is in `extracted-files.tsv` under the
 `deployment-tooling` and `deployment-tooling-test` categories.
 
