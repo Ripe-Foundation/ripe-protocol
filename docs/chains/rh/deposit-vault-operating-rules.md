@@ -13,7 +13,8 @@ Findings are referenced by their DV identifier from that record.
 
 > **PR #67 remediation candidate (11 August 2026).** The isolated candidate now
 > enforces DV-04, DV-05, DV-07, DV-08, DV-09, DV-10, and DV-13 in contracts:
-> same-user RipeGov transfers are validated accounting no-ops; contributor
+> AuctionHouse and CreditRedeem reject same-user collateral movement before a
+> vault transfer is attempted; contributor
 > durations are clamped without shortening a later refreshed lock; Teller
 > blocks every housekeeping route during custody receipt measurement; zero asset weight now
 > earns zero governance points; AuctionHouse measures each
@@ -40,7 +41,7 @@ Findings are referenced by their DV identifier from that record.
 | 3 | Configuring a RipeGov vault asset | zero weight earns zero points | enforced | DV-07 |
 | 4 | Pausing RipeGov | pause Teller in the same operation | operational | DV-06 |
 | 5 | Registering a price source | it must never revert | operational | DV-14 |
-| 6 | Changing AuctionHouse / CreditEngine seizure logic | same-address `transferBalanceWithinVault` is a validated accounting no-op | enforced | DV-04 |
+| 6 | Changing AuctionHouse / CreditRedeem collateral routing | reject recipient-equals-user before calling a vault transfer | enforced at callers | DV-04 |
 
 Rule 1 carries four findings on its own. It is the single most important item in
 this document.
@@ -211,19 +212,19 @@ without changing claim registration, liabilities, or historical shares.
 
 ---
 
-## 6. AuctionHouse / CreditEngine — never emit a same-address vault transfer
+## 6. AuctionHouse / CreditRedeem — never emit a same-address vault transfer
 
-**Enforced behavior.** `RipeGov.transferBalanceWithinVault` validates the caller,
-pause state, addresses, migration tombstone, user shares, custody, and requested
-amount for `_fromUser == _toUser`, then returns `(0, False)` without changing shares,
-points, locks, totals, or emitting a transfer event. Invalid zero-amount or missing-
-position requests still revert. Different-user seizure behavior is unchanged (DV-04).
+**Enforced behavior.** AuctionHouse rejects an auction purchase when the buyer
+recipient equals the liquidated user. CreditRedeem likewise rejects a
+redemption recipient equal to the user whose collateral would move. These
+checks run before AuctionHouse or CreditEngine can call
+`transferBalanceWithinVault`. RipeGov does not duplicate this routing policy.
 
 **The check, when changing seizure or liquidation routing.**
 
-- [ ] Retain caller-side avoidance of same-address transfers to avoid wasted gas;
-      correctness no longer depends on it.
-- [ ] Keep zero-amount same-address requests failing closed (`no withdrawal amount`).
+- [ ] Retain both caller-side recipient-equals-user checks.
+- [ ] Add a caller-level regression for every new path that can reach
+      `transferBalanceWithinVault`.
 
 ---
 
@@ -286,7 +287,7 @@ free.
 | 3 | `test_ripe_gov_vault.py::test_zero_asset_weight_means_zero_points`, `::test_nonzero_asset_weight_boundaries_are_exact` | passing policy regression |
 | 4 | `test_ripe_gov_controls_and_migration.py::test_ripe_gov_pause_matrix_while_paused` | passing enforcement regression |
 | 5 | `test_stab_vault_hardening.py::test_reverting_price_source_takes_down_every_nav_dependent_action` | passing enforcement regression |
-| 6 | `test_ripe_gov_controls_and_migration.py::test_gov_same_user_transfer_is_complete_noop`, `::test_gov_same_user_zero_amount_transfer_reverts_without_state_change` | passing enforcement regressions |
+| 6 | `test_ah_auction_mgmt.py::test_auction_buyer_cannot_be_liquidated_user`, `test_credit_redemptions.py::test_credit_redemption_recipient_equals_user` | passing caller-level enforcement regressions |
 | Dormant dust | `test_stab_vault_hardening.py::test_dormant_dust_is_claimable_before_exit_but_stranded_after`, `::test_dormant_dust_remains_recoverable_after_full_exit` | first is passing characterization; post-exit recovery remains `xfail(strict=True)` by accepted product disposition |
 
 The remaining `xfail(strict=True)` checkpoint records only the accepted dormant-dust

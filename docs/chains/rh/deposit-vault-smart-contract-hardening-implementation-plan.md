@@ -127,7 +127,10 @@ The implementation work is motivated by these concrete behaviors on the bound tr
 - RipeGov lock deposit, lock adjustment, and lock release trust every registered RIPE address rather than a purpose-specific caller.
 - A registered contract can create governance shares against custody already attributed to another user, with no new token receipt at the direct vault boundary.
 - A registered but unrelated contract can change another user’s lock and can trigger release-fee effects.
-- A vault-level same-user governance transfer initiated through the authorized AuctionHouse or CreditEngine path can mutate lock state. It is not an ordinary user-callable method. The Contributor wrapper creates a separate constrained same-owner case, but neither reachability constraint makes the vault invariant safe.
+- A direct vault-level same-user governance transfer can mutate lock state, but
+  the complete production caller inventory rejects recipient-equals-user in
+  AuctionHouse and CreditRedeem before any vault transfer. DV-04 is therefore
+  caller-owned; do not duplicate this policy in RipeGov.
 - An active StabilityPool claim asset whose returned price is zero is omitted from NAV while deposits and withdrawals remain live, creating an explicit cohort-redistribution surface.
 - The reviewed StabilityPool tests appeared to cover only small zero-price examples. Work Package 1 must reproduce and quantify the existing cases before treating large-value, multi-cohort economics as an established gap.
 - A pre-existing token donation can help aggregate custody appear sufficient when a later settlement transfers less than the declared claim amount.
@@ -167,9 +170,10 @@ RG-2. lastShares is the user’s actual post-operation share balance, never a no
 
 RG-3. Global point totals equal the sum of user point contributions for every asset and point type.
 
-RG-4. A lock cannot be shortened by transfer, same-address transfer, contributor movement, configuration change, or indirect protocol call. The only exception is a separately authorized release path whose fee and effects are exact.
+RG-4. A lock cannot be shortened by a reachable transfer, contributor movement, configuration change, or indirect protocol call. The only exception is a separately authorized release path whose fee and effects are exact.
 
-RG-5. A same-user transfer is a true no-op for shares, locks, points, checkpoints, and timestamps.
+RG-5. AuctionHouse and CreditRedeem reject recipient-equals-user before calling
+any vault transfer.
 
 RG-6. Disabling point updates permits safe exits but does not permit deposits, transfers, or unrelated state mutation to bypass a broken accounting path.
 
@@ -423,9 +427,8 @@ Expected test names, subject to the WP0 caller inventory confirming Teller-only 
 
 Exercise:
 
-- same-address transferBalanceWithinVault initiated by AuctionHouse;
-- same-address transferBalanceWithinVault initiated by CreditEngine;
-- rejected same-address attempt by an ordinary user;
+- auction purchase whose recipient is the liquidated user;
+- collateral redemption whose recipient is the source user;
 - same-address contributor transfer;
 - transfer to a different user;
 - zero amount;
@@ -437,11 +440,12 @@ Exercise:
 - configured duration below minimum;
 - prior unlock later than newly computed unlock.
 
-Assert that same-address movement changes no state and that contributor transfer never shortens an existing lock.
+Assert that both caller routes stop before vault movement and that contributor transfer never shortens an existing lock.
 
 Suggested test names:
 
-- test_gov_same_user_transfer_is_complete_noop
+- test_auction_buyer_cannot_be_liquidated_user
+- test_credit_redemption_recipient_equals_user
 - test_contributor_transfer_cannot_shorten_existing_lock
 - test_contributor_duration_is_clamped_to_current_governance_bounds
 
@@ -509,11 +513,12 @@ Do not use the broad valid-RIPE-address predicate for capabilities that mutate a
 
 If a second legitimate production caller exists, give that caller a narrowly named and separately tested capability. Do not retain the broad registry-wide authorization as a convenience.
 
-### 9.2 Make same-address transfers true no-ops
+### 9.2 Keep same-address rejection at the routing callers
 
-Add the narrowest RipeGov-level guard so owner equals recipient returns before any lock, point, checkpoint, or transfer mutation.
-
-Do not change SharesVault family-wide behavior unless a full consumer inventory proves that every inheriting vault wants identical semantics.
+AuctionHouse and CreditRedeem must return before any vault transfer when the
+recipient equals the source user. RipeGov and SharesVault do not duplicate
+that routing policy. A new caller must add and test the same guard before it
+may reach `transferBalanceWithinVault`.
 
 ### 9.3 Prevent contributor lock shortening
 

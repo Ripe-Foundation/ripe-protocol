@@ -1,8 +1,8 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from conf_utils import buy_fungible_auction, filter_logs
 
 
 @pytest.fixture(scope="module")
@@ -83,6 +83,41 @@ def setupAuctionMgmntTest(
 
 
 # access control tests
+
+
+def test_auction_buyer_cannot_be_liquidated_user(
+    setupAuctionMgmntTest,
+    alpha_token,
+    bob,
+    teller,
+    green_token,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    debt_before = ledger.userDebt(bob).amount
+    shares_before = simple_erc20_vault.userBalances(bob, alpha_token)
+    green_before = green_token.balanceOf(bob)
+    green_token.approve(teller, MAX_UINT256, sender=bob)
+
+    with boa.reverts("no green spent"):
+        buy_fungible_auction(
+            teller,
+            bob,
+            vault_id,
+            alpha_token,
+            10 * EIGHTEEN_DECIMALS,
+            should_transfer_balance=True,
+            recipient=bob,
+            sender=bob,
+        )
+
+    assert ledger.userDebt(bob).amount == debt_before
+    assert simple_erc20_vault.userBalances(bob, alpha_token) == shares_before
+    assert green_token.balanceOf(bob) == green_before
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
 
 
 def test_ah_auction_mgmt_only_mission_control_access(

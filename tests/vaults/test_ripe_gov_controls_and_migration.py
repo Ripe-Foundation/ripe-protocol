@@ -3208,69 +3208,6 @@ def test_registered_non_teller_cannot_release_another_users_lock(
     assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
 
 
-# --------------------------------------------------------------------------
-# DV-04: same-address transferBalanceWithinVault is a validated no-op
-# --------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
-def test_gov_same_user_zero_amount_transfer_reverts_without_state_change(
-    caller_name,
-    ripe_gov_vault,
-    ripe_token,
-    bob,
-    auction_house,
-    credit_engine,
-    locked_gov_position,
-    switchboard_alpha,
-):
-    """DV-04 boundary: the zero-amount same-address case already fails closed.
-
-    SharesVault._calcWithdrawalSharesAndAmount asserts a nonzero withdrawal
-    amount, so this corner of the Section 8.2 matrix is safe today. It is a
-    plain passing regression, not a checkpoint.
-    """
-    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
-    boa.env.time_travel(blocks=50)
-    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
-    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
-
-    with boa.reverts("no withdrawal amount"):
-        ripe_gov_vault.transferBalanceWithinVault(
-            ripe_token, bob, bob, 0, sender=caller.address
-        )
-
-    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
-
-
-@pytest.mark.parametrize("caller_name", ("auction_house", "credit_engine"))
-@pytest.mark.parametrize("portion", ("partial", "full"))
-def test_gov_same_user_transfer_is_complete_noop(
-    caller_name,
-    portion,
-    ripe_gov_vault,
-    ripe_token,
-    bob,
-    auction_house,
-    credit_engine,
-    locked_gov_position,
-    switchboard_alpha,
-):
-    """DV-04: valid same-address transfers leave all accounting untouched."""
-    caller = {"auction_house": auction_house, "credit_engine": credit_engine}[caller_name]
-    amount = locked_gov_position if portion == "full" else locked_gov_position // 4
-
-    boa.env.time_travel(blocks=50)
-    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
-    before = _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob])
-    result = ripe_gov_vault.transferBalanceWithinVault(
-        ripe_token, bob, bob, amount, sender=caller.address
-    )
-    assert result == (0, False)
-    assert _gov_state_snapshot(ripe_gov_vault, ripe_token, [bob]) == before
-    assert filter_logs(ripe_gov_vault, "RipeGovVaultTransfer") == []
-
-
 def test_gov_transfer_to_a_different_user_still_moves_shares(
     ripe_gov_vault,
     ripe_token,
@@ -3279,11 +3216,7 @@ def test_gov_transfer_to_a_different_user_still_moves_shares(
     auction_house,
     locked_gov_position,
 ):
-    """Section 8.2 control: the non-same-address case must keep working.
-
-    Guards against a Section 9.2 fix that over-reaches and breaks the real
-    AuctionHouse seizure path.
-    """
+    """A valid different-user AuctionHouse seizure still moves shares."""
     bob_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
     assert ripe_gov_vault.userBalances(alice, ripe_token) == 0
 

@@ -387,18 +387,6 @@ def transferBalanceWithinVault(
     assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
 
-    # A seizure routed back to the same owner must not run withdrawal/deposit
-    # governance accounting. Preserve the normal input and position validation,
-    # but leave shares, points, locks, totals, and events untouched.
-    if _fromUser == _toUser:
-        assert not vaultData.isPaused # dev: contract paused
-        assert empty(address) not in [_fromUser, _asset] # dev: invalid users or asset
-        assert not self.positionMigratedOut[_toUser][_asset] # dev: recipient position migrated
-        ignoredShares: uint256 = 0
-        ignoredAmount: uint256 = 0
-        ignoredShares, ignoredAmount = sharesVault._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount)
-        return 0, False
-
     # transfer tokens (using shares module)
     transferAmount: uint256 = 0
     transferShares: uint256 = 0

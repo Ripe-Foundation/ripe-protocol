@@ -29,7 +29,7 @@ There are 13 changed production contract files:
 | `contracts/core/VaultMigrator.vy` | Migration route and state preservation | Keep historical RipeGov vaults out of generic migration while preserving balances, points, and lock terms. |
 | `contracts/modules/Addys.vy` | Registry constants | Match the immutable live RipeHq order: RIPE CCIP pool ID 23 and GREEN CCIP pool ID 24. |
 | `contracts/priceSources/UniswapV2Prices.vy` | Price-authority boundary | Keep manipulable Uniswap V2 observations available for monitoring but impossible to consume as a protocol price feed. |
-| `contracts/vaults/RipeGov.vy` | Lock, points, transfer, and migration behavior | Preserve original migration terms, stop same-user accounting corruption, and constrain privileged contributor locks. |
+| `contracts/vaults/RipeGov.vy` | Lock, points, and migration behavior | Preserve original migration terms and constrain privileged contributor locks. |
 | `contracts/vaults/modules/StabVault.vy` | NAV, custody, claims, and delivery accounting | Keep claim liabilities reserved, fail closed on missing prices/custody, and reject short user deliveries. |
 | `solidity/src/RipeCcipBurnMintTokenPools.sol` | Comments/provenance clarification only | Remove false claims that the repository candidate proves the source used for already-live pools. |
 | `solidity/src/RipeTokenPool.sol` | Comments/provenance clarification only | Classify this configurable-capability pool as retained legacy/testnet history, not the selected mainnet candidate. |
@@ -525,38 +525,26 @@ turn the adapter into protocol pricing authority.
 
 ### What changed
 
-#### A. Same-user internal transfer is a validated no-op
-
-When `_fromUser == _toUser`, `transferBalanceWithinVault` performs the normal
-pause/address/tombstone and withdrawal-amount validation, then returns `(0,
-false)` without changing shares, locks, points, totals, or emitting a transfer
-event.
-
-#### B. Contributor lock duration is constrained
+#### A. Contributor lock duration is constrained
 
 The HumanResources contributor transfer duration is clamped to the current
 governance-configured minimum and maximum. If the recipient already has a later
 lock after normal terms refresh, the transfer cannot shorten it.
 
-#### C. Migration export accrues without rewriting stored terms
+#### B. Migration export accrues without rewriting stored terms
 
 `_updateGovPointsForUserAsset` now takes an internal refresh flag. Normal point
 updates still refresh to current MissionControl terms. Migration export uses
 the stored `lastTerms` to accrue through the current block and deliberately
 does not replace `unlock` or `lastTerms` with the temporary wind-down config.
 
-#### D. Public point refresh is closed while the vault is paused
+#### C. Public point refresh is closed while the vault is paused
 
 `updateUserGovPoints` now rejects calls while paused. This prevents an unrelated
 registered protocol caller from rewriting imported or not-yet-exported lock
 metadata during the migration window.
 
 ### Why these changes are required
-
-A same-user seizure/transfer previously ran the full withdrawal and deposit
-governance accounting against one row. That can burn/recreate points or alter a
-lock even though ownership did not change. The correct economic result is no
-transfer, while invalid zero/unsupported/no-position inputs must still fail.
 
 HumanResources is privileged to move contributor RIPE, but the supplied lock
 duration should not bypass the same current min/max policy imposed on normal
@@ -573,15 +561,12 @@ than the user's original terms—the opposite of the migration objective.
 - No persistent storage variable is added.
 - Governance-point disable setters remain Switchboard-only; VaultMigrator has
   no authority to apply them.
-- Same-user calls report zero moved rather than manufacturing a transfer.
 - Paused migration state becomes intentionally more restrictive.
 - Measured deployed runtime: 23,667 bytes, leaving 909 bytes of EIP-170
   headroom.
 
 ### Representative validation
 
-- `test_gov_same_user_zero_amount_transfer_reverts_without_state_change`
-- `test_gov_same_user_transfer_is_complete_noop`
 - `test_contributor_transfer_cannot_shorten_existing_lock`
 - contributor min/max clamp and existing-lock coverage in
   `tests/vaults/test_ripe_gov_controls_and_migration.py`
