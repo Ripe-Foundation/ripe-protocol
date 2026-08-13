@@ -128,12 +128,46 @@ def test_deployed_history_accepts_an_explicit_start_point(tmp_path):
 
 
 @pytest.mark.parametrize("start", (None, "", "0"))
-def test_deployed_history_accepts_is_retry(tmp_path, start):
-    # Resuming a run that failed partway. --is-retry is also what makes the
-    # per-step skip read the transaction log at all.
-    _runner(_history(tmp_path, deployed=True))._require_start_point(
-        _args(is_retry=True), start
-    )
+def test_replay_does_not_bypass_the_start_point(tmp_path, start):
+    """--force-replay is the dangerous mode, so it is not an escape hatch.
+
+    An earlier version let `--is-retry` through, on the reading that retrying
+    means resuming and is therefore safe. rh inverted that flag:
+    `ignore_logs=is_retry`, so the default now resumes and --force-replay
+    re-executes. Carried across unchanged, the bypass fired on the default and
+    refused the explicit flag -- exactly backwards.
+    """
+    with pytest.raises(
+        MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
+    ):
+        _runner(_history(tmp_path, deployed=True))._require_start_point(
+            _args(is_retry=True), start
+        )
+
+
+def test_auto_resume_cannot_rerun_a_migration_that_wrote_no_manifest():
+    """The concrete case: CcipWire ran on both mainnets and left no manifest.
+
+    It only calls execute(), so _append_manifest never runs and no numbered
+    manifest exists for it. The checkpoint therefore reports the migration
+    before it, and auto-resume would select CcipWire again -- re-running
+    applyChainUpdates and transferOwnership against live CCIP pools.
+    """
+    root = Path(__file__).resolve().parents[2]
+    for chain in ("base-mainnet", "robinhood-mainnet"):
+        runner = MigrationRunner(
+            str(root / f"migrations/{chain}"),
+            str(root / f"migration_history/{chain}/v1"),
+            {},
+        )
+        # The hazard is real: auto-resume would pick the unrecorded migration.
+        assert [t for _, t, _ in runner._migrations(None, "0")] == ["2026080701"]
+        # And the guard refuses to get there without an explicit start point.
+        with pytest.raises(
+            MigrationHistoryError,
+            match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP",
+        ):
+            runner._require_start_point(_args(), None)
 
 
 @pytest.mark.parametrize("start", (None, "0", "2026081200"))

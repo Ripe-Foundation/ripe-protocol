@@ -38,20 +38,24 @@ class MigrationRunner:
         self.gas = 0
 
     def _require_start_point(self, deploy_args, start_timestamp):
-        # A history that already has a current-manifest.json has been deployed.
-        # Extending it is fine; redoing it by accident is not, and those are the
-        # same command: `--start-timestamp` defaults to "0", which selects every
-        # migration from the first one. Nothing here corrects for that -- the
-        # numbered step manifests are pruned by policy, `end()` deletes the
-        # transaction log on success, and current-manifest.json records no step
-        # attribution, so nothing says which migration ran last.
+        # A history holding current-manifest.json has been deployed. Extending
+        # it is fine; resuming into it by accident is not, and the auto-resume
+        # checkpoint cannot be trusted to tell them apart.
         #
-        # Two ways to proceed deliberately: name the first migration to run, or
-        # pass --is-retry to resume a run that failed partway (which is also
-        # what makes the per-step skip read the log at all).
+        # The checkpoint is derived from numbered manifests, and a migration
+        # that only calls execute() writes none -- it deploys nothing, so
+        # _append_manifest never runs. migrations/*/2026080701_CcipWire.py is
+        # exactly that: it wires the CCIP pools and hands them to the Safe, and
+        # it has run on both mainnets. The checkpoint therefore reports
+        # 2026080700, and auto-resume selects 2026080701 -- re-running
+        # applyChainUpdates and transferOwnership against live pools.
+        #
+        # So an explicit --start-timestamp is required here, with no bypass.
+        # There deliberately is not one for --force-replay: replay is the more
+        # dangerous mode, not the safer one. An operator resuming a real
+        # deployment has to name where to resume from, which is the decision
+        # the checkpoint cannot make for them.
         if not history_has_deployment(self.history_dir):
-            return
-        if not getattr(deploy_args, "ignore_logs", True):  # --is-retry
             return
         try:
             if int(str(start_timestamp).strip()) > 0:
@@ -60,10 +64,10 @@ class MigrationRunner:
             pass
         raise MigrationHistoryError(
             "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
-            f"{self.history_dir} already holds a deployed current-manifest.json. "
-            "Running from the default start point would execute every migration "
-            "from the first one against it. Pass --start-timestamp naming the "
-            "first migration to run, or --is-retry to resume a failed run."
+            f"{self.history_dir} already holds a deployed current-manifest.json, "
+            "and the auto-resume checkpoint does not record migrations that "
+            "deploy nothing. Pass --start-timestamp naming the first migration "
+            "to run."
         )
 
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
