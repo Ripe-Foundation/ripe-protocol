@@ -823,7 +823,7 @@ def _getGreenAmountToAdd(
     _data: StabilizerConfig,
 ) -> uint256:
     # only add green when green ratio < 50% (pool has excess other asset)
-    if _data.greenRatio >= FIFTY_PERCENT:
+    if _data.greenRatio == 0 or _data.greenRatio >= FIFTY_PERCENT:
         return 0
     
     totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
