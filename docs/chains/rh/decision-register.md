@@ -1,6 +1,6 @@
 # Robinhood deployment decision register
 
-**Snapshot date:** 11 August 2026
+**Snapshot date:** 12 August 2026
 **Current production-source candidate:** commit
 `e12b1abe26218acb804d84670099c41169e5f515`, tree
 `b680f0016f29f9a217054db9f80c0bbf9f0b9916`, under draft PR #73 status
@@ -22,14 +22,15 @@ The historical import ancestor `ad831669…` is not the present branch authority
 No launch-remediation candidate execution or release is authorized. Separately,
 the GREEN/RIPE CCIP topology is confirmed live as recorded in
 [`ccip-live-state.md`](ccip-live-state.md); that state does not authorize another
-transaction or release action. The four corrected-PR controls remain zero and deferred and lack
-Robinhood machine-facing parameter/planning representation. Every Deleverage
-task is parked, and no Deleverage implementation track is open. The current
-five parked lanes match the canonical [`status.yaml`](status.yaml) inventory
-exactly: CreditEngine zero-backing reassessment and policy; every Deleverage
-task; UniswapV2Prices admission and deployment; Sites recovery; and dashboard
-deployment. The S4 zero-cooldown decision remains closed. All five lanes are
-nonblocking until explicitly reopened.
+transaction or release action. The four corrected-PR controls remain zero and
+deferred and lack Robinhood machine-facing parameter/planning representation.
+RH-D028 is a bounded candidate-only exception to the historical CreditEngine
+zero-backing and Deleverage parked instructions; it does not reopen cooldown,
+Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
+candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
+Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
+closed.
 
 The earlier `ae0cb49…` protocol/pause baseline remains historical evidence.
 `DefaultsRobinhood.vy` now exists and compiles, Blueprint and Defaults are the
@@ -181,6 +182,11 @@ introduced by historical import ancestor
 also remain zero and deferred. Reopen S4 only before a nonzero cooldown, queued
 cooldown action, or Underscore inclusion. The separately tracked machine-facing
 representation gap for the four new controls does not reopen this decision.
+
+RH-D028 is a narrow exception for the exact custody-shortfall candidate: it
+removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
+adds quarantine suppression without changing zero cooldown, enabling
+Underscore, or reopening the four deferred controls.
 
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
@@ -404,9 +410,10 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-CreditEngine zero-backing reassessment, every Deleverage task including
-size/headroom work, UniswapV2Prices admission and deployment, Sites recovery,
-and non-CCIP live deployment are deferred or separately unauthorized. CCIP is
+Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
+every Deleverage task including size/headroom work, UniswapV2Prices admission
+and deployment, Sites recovery, and non-CCIP live deployment are deferred or
+separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
 separately gated. Future work is grouped
 into the large packages defined by
@@ -683,11 +690,19 @@ the two tables cannot drift apart in either direction.
 
 ### RH-D027 — Teller carries an exact migration and receipt-guard waiver at 71 bytes
 
-**Status:** Owner-granted on 10 August 2026 for the VaultMigrator integration
-candidate in PR #83; exact artifact replaced by owner decision on 11 August
-2026 for PR #95.
+**Status:** Retired on 12 August 2026 by the exact uncommitted RH-D028
+candidate. The owner-granted 10 August waiver and its 11 August replacement
+remain historical evidence for their exact prior artifacts.
 
-The ratified runtime-size rule remains at least 200 bytes of EIP-170 headroom.
+**Retirement.** Removing Teller's singular `deleverageUser` API changes the
+waived source and produces a 24,218-byte deployed runtime with 358 bytes of
+EIP-170 headroom. Teller is therefore back above the ratified 200-byte floor;
+its `MIN_HEADROOM_OVERRIDES` and exact identity entries are removed rather than
+refreshed. This retirement is candidate-local until the RH-D028 package is
+committed and integrated.
+
+The historical ratified runtime-size rule remains at least 200 bytes of
+EIP-170 headroom.
 The integrated VaultMigrator design deliberately keeps Teller as the thin,
 identity-authenticated router for actions only Teller may perform. The owner
 reviewed that result, accepted Teller's measured size, and authorized this
@@ -740,6 +755,86 @@ does not continue this approval.
 
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/base/ripe-gov-vault-migration/BRANCH-STATE.md`.
+
+### RH-D028 — BasicVault custody-shortfall quarantine is account-scoped
+
+**Status:** Owner-accepted on 12 August 2026 for the exact candidate on
+`codex/rh-basic-vault-quarantine`, based at
+`bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
+
+The quarantine remains dynamically derived and has no stored quarantine state.
+An asset marks an account quarantined only when all four conditions hold: the
+position has positive LTV, its usable amount is zero, the user's nominal or
+reward share is nonzero, and the vault-wide usable total is zero. The complete
+condition excludes share-rounding dust.
+
+**Accepted account scope.** If any position satisfies that classifier, the
+indebted account as a whole cannot borrow more or withdraw positive-LTV
+collateral, and new liquidation, collateral redemption, and forced deleveraging
+are suppressed for the whole account. This is deliberately not per-asset
+suppression. The owner accepts that one quarantined position therefore shields
+other collateral from those forced actions while interest continues to accrue.
+Repayment, healthy deposits into other assets, and the governance-controlled
+`swapCollateral` path remain available. Ordinary behavior resumes automatically
+when custody is restored.
+
+**Rewards remain outside quarantine.** Lootbox stays byte-for-byte identical to
+the base commit. Staker and voter points continue at their configured rates.
+General points retain the existing behavior: the last recorded USD value accrues
+through the first asset-specific update after the shortfall, that update refreshes
+the value to zero while usable custody remains zero, and ordinary accrual resumes
+after custody restoration. Governance may use the existing timelocked asset
+configuration path if incident-specific allocation suppression is desired. This
+explicitly replaces the candidate's earlier automatic reward-suppression policy;
+quarantine does not modify configured allocations or previously earned points.
+
+Type-1 health and threshold views remain truthful mathematical reports even while
+the corresponding forced-action eligibility views return false.
+
+This bounded owner decision supersedes RH-D020's parked zero-backing instruction
+only for the exact custody-shortfall candidate above. It does not authorize a
+commit, publication, integration, deployment, configuration, activation,
+liquidation, redemption, deleverage, recovery transaction, or release, and it
+does not open a broader bad-debt or settlement redesign.
+
+**Source:** `tests/vaults/test_basic_vault_quarantine.py` and the exact candidate
+diff against `bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
+
+### RH-D029 — CreditEngine carries an exact quarantine-version waiver at 21 bytes
+
+**Status:** Owner-granted on 12 August 2026 for the exact RH-D028 candidate with
+the defensive debt-type guards restored.
+
+The ratified 200-byte minimum remains controlling for non-waived contracts.
+RH-D028 changes CreditEngine and, with the defensive debt-type guards restored,
+produces a 24,555-byte deployed runtime, including immutable data, leaving **21
+bytes** before EIP-170. A narrow behavior-preserving refactor inlines the
+single-use debt-threshold helper; no quarantine detection condition was removed.
+The owner accepts that exact margin.
+
+**What exactly is waived.** One contract version and one complete deployed-byte
+identity at a declared constructor input:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/CreditEngine.vy` SHA-256 | `5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946` |
+| Runtime-template SHA-256 (immutable-free) | `5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac` |
+| Runtime-template bytes | 24,459 |
+| Deployed runtime bytes, including immutables | 24,555 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `ce80ba109e99d52ee5983eb7f9b40e994392b241d29268ad754315778a2dc97e` |
+
+The declared HQ is a deterministic test input, not a production address. Actual
+constructor binding remains a separate deployment concern. The governed artifact
+ledger separately binds its declared production-capture inputs.
+
+**Residual risk accepted.** Only 21 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any CreditEngine source or compiler-output change,
+including a same-size change, invalidates the pinned identity and reopens this
+decision. A future change must restore at least 200 bytes or receive a new exact
+owner waiver; refreshing these values merely to make a test pass is prohibited.
+
+**Source:** `tests/test_vault_pointer_runtime_sizes.py` and
+`config/contract-artifact-expectations.json`.
 
 ## Maintenance rule
 

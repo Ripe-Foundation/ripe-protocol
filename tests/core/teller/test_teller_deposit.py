@@ -3808,7 +3808,9 @@ def test_receipt_window_remaining_nested_routes(
     elif nested_action == "claim_loot":
         nested = teller.claimLoot.prepare_calldata(user, False)
     else:
-        nested = teller.deleverageUser.prepare_calldata(user, MAX_UINT256)
+        nested = teller.deleverageManyUsers.prepare_calldata(
+            [(user, MAX_UINT256)]
+        )
 
     token.configure_callback(teller, nested, True)
     token.configure_callback_rejection_policy(True)

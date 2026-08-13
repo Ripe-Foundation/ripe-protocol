@@ -6,6 +6,13 @@ from conf_utils import filter_logs, set_full_payoff_params
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
 
+def _deleverage_one(teller, user, target_repay_amount, *, sender):
+    return teller.deleverageManyUsers(
+        [(user, target_repay_amount)],
+        sender=sender,
+    )
+
+
 @pytest.fixture(autouse=True)
 def setup(
     setGeneralConfig,
@@ -150,7 +157,7 @@ def test_basic_endaoment_transfer(
     assert pre_user_balance >= pre_debt, "User should have sufficient collateral"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
@@ -244,7 +251,7 @@ def test_multiple_assets_priority_order(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -325,7 +332,7 @@ def test_multiple_assets_first_sufficient(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -405,7 +412,7 @@ def test_multiple_assets_both_needed(
     total_collateral = pre_alpha_balance + pre_bravo_balance
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -478,7 +485,7 @@ def test_no_balance_in_priority_asset(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -528,7 +535,7 @@ def test_empty_priority_list(
     )
 
     # Deleverage (will fall through to Phase 3)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Phase 2 skipped - but Phase 3 should still handle it
     assert repaid_amount > 0, "Should still deleverage via Phase 3"
@@ -577,7 +584,7 @@ def test_target_repay_amount(
     target_repay = 200 * EIGHTEEN_DECIMALS
 
     # Deleverage with target
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     # Get events
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
@@ -645,7 +652,7 @@ def test_vault_balance_changes(
     pre_endaoment_token_balance = alpha_token.balanceOf(endaoment_funds)
 
     # Deleverage
-    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_user_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -719,7 +726,7 @@ def test_balance_changes_multiple_assets_all_depleted(
     pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
 
     # Deleverage
-    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -819,7 +826,7 @@ def test_balance_changes_multiple_assets_partial(
     pre_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Deleverage
-    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -933,7 +940,7 @@ def test_balance_changes_different_decimals(
     pre_delta_endaoment = delta_token.balanceOf(endaoment_funds)
 
     # Deleverage
-    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1030,7 +1037,7 @@ def test_balance_changes_with_target_amount(
 
     # Deleverage with target
     target_repay = 300 * EIGHTEEN_DECIMALS
-    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1127,7 +1134,7 @@ def test_balance_changes_skip_empty_asset(
     assert pre_alpha_vault == 0, "Alpha should be empty"
 
     # Deleverage
-    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1242,7 +1249,7 @@ def test_four_assets_priority(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -1373,7 +1380,7 @@ def test_phase2_then_phase3_prevents_double_processing(
     assert pre_bravo_vault3 == 100 * EIGHTEEN_DECIMALS
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get transfer events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -1518,7 +1525,7 @@ def test_phase2_with_non_dollar_asset_prices(
     assert pre_charlie_vault == 20 * SIX_DECIMALS
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get transfer events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -1625,7 +1632,7 @@ def test_phase2_tiny_debt_amount(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get event
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
@@ -1732,7 +1739,7 @@ def test_phase2_underscore_earn_vault_uses_underlying_share_conversion(
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault.address)
@@ -1831,7 +1838,7 @@ def test_phase2_non_basic_underscore_vault_uses_standard_pricedesk_amount(
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault.address)
@@ -1919,7 +1926,7 @@ def test_phase2_underscore_earn_vault_credit_uses_convertToAssets_when_spread_is
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
@@ -2006,7 +2013,7 @@ def test_phase2_underscore_earn_vault_clamps_credit_and_sizing_when_safe_spread_
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
@@ -2104,7 +2111,7 @@ def test_phase2_underscore_earn_vault_no_sizing_adjustment_at_99bps_gap(
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
@@ -2184,7 +2191,7 @@ def test_phase2_underscore_earn_vault_applies_sizing_adjustment_at_100bps_gap(
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
@@ -2287,8 +2294,8 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
     pre_vault_shares = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
     pre_endaoment_shares = alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds)
 
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
@@ -2378,8 +2385,8 @@ def test_phase2_underscore_earn_vault_dust_amount_safe_zero_skips_before_withdra
         priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
     )
 
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
@@ -2401,7 +2408,7 @@ def test_phase2_underscore_earn_vault_dust_amount_safe_zero_skips_before_withdra
     )
     target_repay = 10 * EIGHTEEN_DECIMALS
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     assert repaid == target_repay
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt - target_repay
@@ -2505,14 +2512,15 @@ def test_phase2_underscore_earn_vault_balance_clamp_safe_zero_skips_before_withd
     target_repay = 10 * EIGHTEEN_DECIMALS
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_endaoment_shares = alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds)
-    repaid = teller.deleverageUser(
-        bob,
-        target_repay,
-        sender=switchboard_alpha.address,
-    )
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(
+            teller,
+            bob,
+            target_repay,
+            sender=switchboard_alpha.address,
+        )
 
-    assert repaid == target_repay
-    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt - target_repay
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == pre_debt
     assert simple_erc20_vault.userBalances(
         bob,
         alpha_token_vault_with_safe_gap,
@@ -2613,7 +2621,7 @@ def test_phase2_underscore_earn_vault_post_withdraw_safe_zero_reverts_atomically
     alpha_token_vault_with_safe_gap.setZeroSafeConversionOnTransfer(True)
 
     with boa.reverts("zero safe underlying"):
-        teller.deleverageUser(
+        _deleverage_one(teller,
             bob,
             target_repay,
             sender=switchboard_alpha.address,
@@ -2801,7 +2809,7 @@ def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent
         priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
     )
 
-    teller.deleverageUser(bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    _deleverage_one(teller, bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
@@ -2869,10 +2877,10 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
 
     # Pin the deployed measurements, not only the legal ceiling. This catches
     # code-size creep before either contract silently consumes its final bytes.
-    assert deleverage_size == 24_569
-    assert auction_house_size == 23_863
-    assert EIP170_LIMIT - deleverage_size == 7
-    assert EIP170_LIMIT - auction_house_size == 713
+    assert deleverage_size == 23_241
+    assert auction_house_size == 23_929
+    assert EIP170_LIMIT - deleverage_size == 1_335
+    assert EIP170_LIMIT - auction_house_size == 647
 
 
 @pytest.mark.parametrize(
@@ -2996,7 +3004,7 @@ def test_full_payoff_buffer_consumes_extra_collateral_and_exposes_overage(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     expected_overage = min(10**15, pre_debt * 100 // 100_00)
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
@@ -3052,7 +3060,7 @@ def test_full_payoff_max_buffer_params_stay_bounded(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     expected_overage = min(10**18, pre_debt * 500 // 100_00)
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
@@ -3109,7 +3117,7 @@ def test_full_payoff_buffer_requires_both_absolute_and_bps_config(
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     assert repaid_amount == pre_debt
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
@@ -3169,7 +3177,7 @@ def test_full_payoff_dust_forgiveness_clears_sub_threshold_remainder(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
@@ -3239,7 +3247,7 @@ def test_full_payoff_max_dust_params_clear_threshold_boundary(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
@@ -3304,7 +3312,7 @@ def test_full_payoff_dust_forgiveness_respects_bps_cap_for_small_debt(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     assert repaid_amount == pre_debt - 1
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 1
@@ -3396,7 +3404,7 @@ def test_full_payoff_dust_forgiveness_relative_bps_boundary(
     expected_debt_to_clear = pre_debt if should_forgive else collateral_to_consume
     expected_remaining_debt = 0 if should_forgive else dust_amount
 
-    repaid_amount = teller.deleverageUser(
+    repaid_amount = _deleverage_one(teller,
         bob,
         0,
         sender=switchboard_alpha.address,
@@ -3481,7 +3489,7 @@ def test_full_payoff_dust_forgiveness_requires_absolute_and_bps_config(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
     assert repaid_amount == pre_debt - 1
@@ -3543,7 +3551,7 @@ def test_full_payoff_dust_forgiveness_respects_absolute_threshold(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
     assert repaid_amount == pre_debt - 2
@@ -3605,7 +3613,7 @@ def test_full_payoff_dust_forgiveness_blocks_when_both_caps_fail(
         priority_liq_assets=[(simple_erc20_vault, bravo_token)],
     )
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
     assert repaid_amount == pre_debt - 2
@@ -3657,7 +3665,7 @@ def test_full_payoff_extras_do_not_apply_to_partial_targets(
     )
 
     partial_target = 250 * EIGHTEEN_DECIMALS
-    repaid_amount = teller.deleverageUser(bob, partial_target, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, partial_target, sender=switchboard_alpha.address)
     transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
 
@@ -3719,8 +3727,8 @@ def test_full_payoff_extras_do_not_turn_zero_repayment_into_forgiveness(
     )
     setup_priority_configs(priority_stab_assets=[], priority_liq_assets=[])
 
-    with boa.reverts("cannot deleverage"):
-        teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    with boa.reverts("nobody deleveraged"):
+        _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
 
 def test_full_payoff_buffer_applies_to_admin_with_basic_underscore_collateral(
@@ -3803,7 +3811,7 @@ def test_full_payoff_buffer_applies_to_admin_with_basic_underscore_collateral(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     expected_overage = min(10**15, pre_debt * 100 // 100_00)
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
     deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
@@ -3867,7 +3875,7 @@ def test_full_payoff_extras_apply_for_ordinary_user_when_caller_is_earn_vault(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     expected_overage = min(10**15, pre_debt * 100 // 100_00)
 
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     assert repaid_amount == pre_debt
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
@@ -3930,7 +3938,7 @@ def test_full_payoff_extras_disabled_for_earn_vault_user_when_caller_is_non_earn
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid_amount = teller.deleverageUser(bob, 0, sender=alice)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=alice)
 
     assert repaid_amount == pre_debt
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
