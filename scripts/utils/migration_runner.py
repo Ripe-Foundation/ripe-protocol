@@ -37,38 +37,71 @@ class MigrationRunner:
         self.files = files
         self.gas = 0
 
+    def _known_migration_timestamps(self):
+        return {
+            timestamp
+            for _filename, timestamp, _prev in self._filtered_migration_filenames(
+                None, "0"
+            )
+        }
+
+    def _recorded_frontier(self):
+        """Latest migration this history has a completion marker for."""
+        try:
+            return self._latest_manifest_timestamp()
+        except RuntimeError:
+            # MIGRATION_RESUME_CHECKPOINT_REQUIRED: a current manifest with no
+            # numeric checkpoint. Nothing is proven complete, so no start point
+            # can be shown to be safe.
+            return None
+
     def _require_start_point(self, deploy_args, start_timestamp):
-        # A history holding current-manifest.json has been deployed. Extending
-        # it is fine; resuming into it by accident is not, and the auto-resume
-        # checkpoint cannot be trusted to tell them apart.
+        # A history holding current-manifest.json has been deployed. Running
+        # against it again requires naming where to continue from, and the name
+        # has to be checked rather than merely non-empty: `int(value) > 0` was
+        # satisfied by `1`, which selects essentially the whole history -- 16
+        # migrations on robinhood-mainnet, the exact redeployment this guard
+        # exists to prevent.
         #
-        # The checkpoint is derived from numbered manifests, and a migration
-        # that only calls execute() writes none -- it deploys nothing, so
-        # _append_manifest never runs. migrations/*/2026080701_CcipWire.py is
-        # exactly that: it wires the CCIP pools and hands them to the Safe, and
-        # it has run on both mainnets. The checkpoint therefore reports
-        # 2026080700, and auto-resume selects 2026080701 -- re-running
-        # applyChainUpdates and transferOwnership against live pools.
-        #
-        # So an explicit --start-timestamp is required here, with no bypass.
-        # There deliberately is not one for --force-replay: replay is the more
-        # dangerous mode, not the safer one. An operator resuming a real
-        # deployment has to name where to resume from, which is the decision
-        # the checkpoint cannot make for them.
+        # Three things are required, and none of them can be derived for the
+        # caller: the value names a migration that exists, and it is strictly
+        # after the latest migration this history has a completion marker for.
+        # There is deliberately no override; --force-replay is the more
+        # dangerous mode, not a bypass.
         if not history_has_deployment(self.history_dir):
             return
-        try:
-            if int(str(start_timestamp).strip()) > 0:
-                return
-        except (TypeError, ValueError):
-            pass
-        raise MigrationHistoryError(
-            "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
-            f"{self.history_dir} already holds a deployed current-manifest.json, "
-            "and the auto-resume checkpoint does not record migrations that "
-            "deploy nothing. Pass --start-timestamp naming the first migration "
-            "to run."
-        )
+
+        text = "" if start_timestamp is None else str(start_timestamp).strip()
+        # "0" is the sentinel for "from the beginning", not a start point.
+        if not text.isdigit() or int(text) == 0:
+            raise MigrationHistoryError(
+                "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP: "
+                f"{self.history_dir} already holds a deployed "
+                "current-manifest.json, and the auto-resume checkpoint does not "
+                "record migrations that deploy nothing. Pass --start-timestamp "
+                "naming the first migration to run."
+            )
+
+        known = self._known_migration_timestamps()
+        if text not in known:
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_UNKNOWN: {text} names no migration in "
+                f"{self.migrations_dir}."
+            )
+
+        frontier = self._recorded_frontier()
+        if frontier is None:
+            raise MigrationHistoryError(
+                "H06_NO_RECORDED_FRONTIER: "
+                f"{self.history_dir} has a current manifest but no numeric "
+                "completion marker, so no start point can be shown to be safe."
+            )
+        if int(text) <= int(frontier):
+            raise MigrationHistoryError(
+                f"H06_START_TIMESTAMP_NOT_AFTER_FRONTIER: {text} is at or "
+                f"before {frontier}, the latest migration this history records "
+                "as complete. Re-running it would repeat work already done."
+            )
 
     def run(self, deploy_args: DeployArgs, start_timestamp=None, end_timestamp=None, continue_running=True):
         """

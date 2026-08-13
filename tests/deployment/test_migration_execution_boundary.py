@@ -124,14 +124,16 @@ def test_deployed_history_refuses_a_default_start_point(tmp_path, start):
         )
 
 
-def test_deployed_history_accepts_an_explicit_start_point(tmp_path):
-    # The case that has to work: landing a new migration.
-    _runner(_history(tmp_path, deployed=True))._require_start_point(
-        _args(), "2026081200"
-    )
+def test_a_history_without_a_checkpoint_cannot_be_continued(tmp_path):
+    # A current manifest with no numeric completion marker proves nothing is
+    # finished, so no start point can be shown to be safe.
+    with pytest.raises(MigrationHistoryError, match="H06_NO_RECORDED_FRONTIER"):
+        _runner(_history(tmp_path, deployed=True))._require_start_point(
+            _args(), "2026080701"
+        )
 
 
-@pytest.mark.parametrize("start", (None, "", "0"))
+@pytest.mark.parametrize("start", (None, "", "0", "1", "2026080700"))
 def test_replay_does_not_bypass_the_start_point(tmp_path, start):
     """--force-replay is the dangerous mode, so it is not an escape hatch.
 
@@ -140,10 +142,11 @@ def test_replay_does_not_bypass_the_start_point(tmp_path, start):
     `ignore_logs=is_retry`, so the default now resumes and --force-replay
     re-executes. Carried across unchanged, the bypass fired on the default and
     refused the explicit flag -- exactly backwards.
+
+    Each value fails for its own reason (no start point, unknown migration, no
+    recorded frontier); what matters here is that replay never unlocks one.
     """
-    with pytest.raises(
-        MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
-    ):
+    with pytest.raises(MigrationHistoryError):
         _runner(_history(tmp_path, deployed=True))._require_start_point(
             _args(force_replay=True), start
         )
@@ -473,3 +476,75 @@ def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
         MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
     ):
         runner.run(_args(), None, "0", True)
+
+
+# --- the start point has to name something, and be after the frontier -------
+
+
+def _real_runner(chain="robinhood-mainnet"):
+    root = Path(__file__).resolve().parents[2]
+    return MigrationRunner(
+        str(root / f"migrations/{chain}"),
+        str(root / f"migration_history/{chain}/v1"),
+        {},
+    )
+
+
+@pytest.mark.parametrize(
+    ("start", "code"),
+    (
+        (None, "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
+        ("", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
+        ("0", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
+        ("nonsense", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
+        # `1` satisfied int(value) > 0 and selected 16 migrations on
+        # robinhood-mainnet -- the redeployment the guard exists to prevent.
+        ("1", "H06_START_TIMESTAMP_UNKNOWN"),
+        ("9", "H06_START_TIMESTAMP_UNKNOWN"),
+        ("99999999999", "H06_START_TIMESTAMP_UNKNOWN"),
+        # Names a real migration, but one this history already completed.
+        ("2026080700", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+        ("0000", "H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"),
+        ("0009", "H06_START_TIMESTAMP_NOT_AFTER_FRONTIER"),
+    ),
+)
+def test_unsafe_start_points_are_refused(start, code):
+    with pytest.raises(MigrationHistoryError, match=code):
+        _real_runner()._require_start_point(_args(), start)
+
+
+def test_a_start_point_after_the_frontier_is_accepted():
+    runner = _real_runner()
+    frontier = runner._latest_manifest_timestamp()
+
+    # 2026080701 exists and is after the recorded frontier.
+    runner._require_start_point(_args(), "2026080701")
+    assert int("2026080701") > int(frontier)
+
+
+@pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))
+def test_run_rejects_before_importing_or_writing_anything(tmp_path, chain):
+    """The refusal binds to run(), not just the helper.
+
+    A guard that only holds when called directly proves nothing about the
+    execution path: run() imports the migration module, invokes its callback,
+    writes a log and can broadcast. Nothing of that may happen.
+    """
+    root = Path(__file__).resolve().parents[2]
+    history = tmp_path / "history"
+    history.mkdir()
+    # A deployed history, copied so the real one cannot be written to.
+    (history / CURRENT_MANIFEST).write_text(
+        (root / f"migration_history/{chain}/v1/{CURRENT_MANIFEST}").read_text()
+    )
+    (history / "2026080700-manifest.json").write_text(json.dumps({"contracts": {}}))
+    runner = MigrationRunner(str(root / f"migrations/{chain}"), str(history), {})
+
+    with pytest.raises(MigrationHistoryError):
+        runner.run(_args(), "1", "0", True)
+
+    # No log, no manifest, nothing executed.
+    assert sorted(p.name for p in history.iterdir()) == [
+        "2026080700-manifest.json",
+        CURRENT_MANIFEST,
+    ]
