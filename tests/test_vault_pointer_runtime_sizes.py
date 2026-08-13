@@ -25,7 +25,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Ledger": 13_306,
     "Lootbox": 23_448,
     "RipeGov": 23_257,
-    "CreditEngine": 24_511,
+    "CreditEngine": 24_555,
     "StabilityPool": 24_371,
 }
 
@@ -48,17 +48,17 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit after the custody-shortfall change:
-#   Teller 358, CreditEngine 65, StabilityPool 263, SwitchboardCharlie 819,
+#   Teller 358, CreditEngine 21, StabilityPool 263, SwitchboardCharlie 819,
 #   SwitchboardAlpha 339, Lootbox 1,128, RipeGov 1,271, SwitchboardBravo
 #   1,073, SwitchboardEcho 1,523, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
-# granted RH-D029 for this exact 65-byte-headroom quarantine artifact. Removing
+# granted RH-D029 for this exact 21-byte-headroom quarantine artifact. Removing
 # Teller's singular deleverage API moved it above the floor, so RH-D027 and its
 # exact identity self-retire in this candidate. See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
-    "CreditEngine": 65,  # RH-D029; exact quarantine artifact, zero growth
+    "CreditEngine": 21,  # RH-D029; exact quarantine artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -128,19 +128,19 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "credit_engine",
         "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
-            "d4885a355c80263817ad82cb2bfd234ee4e796d103669028dfa6ea3199b584a8"
+            "5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946"
         ),
         "runtime_sha256": (
-            "c83fef41ef92fb72edbdd1e445aa4c4dc9411b57b87ee0e846092fad54867b49"
+            "5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac"
         ),
-        "runtime_template_bytes": 24_415,
-        "deployed_runtime_bytes": 24_511,
+        "runtime_template_bytes": 24_459,
+        "deployed_runtime_bytes": 24_555,
         "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
             "0x00000000000000000000000000000000000000A1",
         ),
         "deployed_sha256": (
-            "98ece66166a4666cb2f3bb8a554429f13319f17bc6832bd15cc1364ecb1fa417"
+            "ce80ba109e99d52ee5983eb7f9b40e994392b241d29268ad754315778a2dc97e"
         ),
     },
 }

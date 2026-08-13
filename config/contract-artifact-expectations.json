@@ -382,21 +382,21 @@
         "committed_path": "scripts/abis/CreditEngine.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "543bdf61ac75b51a426e40ab6294d4f986712a19f22446d903e7ebbb653a965d",
-        "creation_executable_prefix_size": 24549,
-        "creation_metadata_sha256": "5ff2a0440b6e0f377b686902d649f227d3d5a457dcfa11fe6b83857b17c1db21",
+        "creation_executable_prefix_sha256": "bb47d756f6dda37543fbea7e9e01adec2cf8dc14e80078771c9e0cae0077167e",
+        "creation_executable_prefix_size": 24593,
+        "creation_metadata_sha256": "1d3ca2fdcef0af1bb589c2b01d9135cd6806d64d8dd67a4eb6ed6802ca3b1b23",
         "creation_metadata_size": 70,
-        "creation_sha256": "2144f7d50ded6fcc9e2c04d2f7a9ce35fa0b16e99f9ea0215320c3a639fb6a88",
-        "creation_size": 24619,
-        "deployed_eip170_headroom": 65,
+        "creation_sha256": "0f9ff1e10f4b4bab527757e2d0eb3c96c1df305cc04e5113690ff6f3d3852af6",
+        "creation_size": 24663,
+        "deployed_eip170_headroom": 21,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "8f58b36931b4197aefa57b962574e890150f3d3afceeae4125f6099bf88b97d0",
-        "deployed_runtime_size": 24511,
-        "eip170_headroom": 161,
-        "runtime_template_sha256": "c83fef41ef92fb72edbdd1e445aa4c4dc9411b57b87ee0e846092fad54867b49",
-        "runtime_template_size": 24415
+        "deployed_runtime_sha256": "f53dbcb2d9497fd6852b3bf76bf426903c994c0d4e9fc711cd830fc8611b1fe7",
+        "deployed_runtime_size": 24555,
+        "eip170_headroom": 117,
+        "runtime_template_sha256": "5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac",
+        "runtime_template_size": 24459
       },
       "code_layout": {
         "addys": {
@@ -446,9 +446,9 @@
         "canonical_sha256": "4fd29412b11eab9b8406f18f7209bb4022902293893e17c6cf1f0429735a4c38",
         "count": 51
       },
-      "source_git_blob": "f7e2933cad52b26132dc8680490cda2e0b711505",
+      "source_git_blob": "745e443c7c9a243ef4efb1d0613b3e85b290b11d",
       "source_path": "contracts/core/CreditEngine.vy",
-      "source_sha256": "d4885a355c80263817ad82cb2bfd234ee4e796d103669028dfa6ea3199b584a8",
+      "source_sha256": "5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946",
       "storage_layout": {
         "buybackRatio": {
           "n_slots": 1,
@@ -469,7 +469,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "724d4c95a3ba5f4ef3f072b163950767ffb44d116cae743446d2195150ca9127"
+      "transitive_compiler_input_integrity": "48fff3d94d0fa0fe2a1ea220b2dc72fb1cee2cf123f40e52f035dcc517620243"
     },
     "DefaultsRobinhood": {
       "abi": {

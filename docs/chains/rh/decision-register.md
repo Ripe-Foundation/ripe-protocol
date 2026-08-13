@@ -793,32 +793,34 @@ does not open a broader bad-debt or settlement redesign.
 **Source:** `tests/vaults/test_basic_vault_quarantine.py` and the exact candidate
 diff against `bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
 
-### RH-D029 — CreditEngine carries an exact quarantine-version waiver at 65 bytes
+### RH-D029 — CreditEngine carries an exact quarantine-version waiver at 21 bytes
 
-**Status:** Owner-granted on 12 August 2026 for the exact uncommitted RH-D028
-candidate.
+**Status:** Owner-granted on 12 August 2026 for the exact RH-D028 candidate with
+the defensive debt-type guards restored.
 
 The ratified 200-byte minimum remains controlling for non-waived contracts.
-RH-D028 changes CreditEngine and produces a 24,511-byte deployed runtime,
-including immutable data, leaving **65 bytes** before EIP-170. The owner accepts
-that exact margin rather than authorizing a separate optimization pass.
+RH-D028 changes CreditEngine and, with the defensive debt-type guards restored,
+produces a 24,555-byte deployed runtime, including immutable data, leaving **21
+bytes** before EIP-170. A narrow behavior-preserving refactor inlines the
+single-use debt-threshold helper; no quarantine detection condition was removed.
+The owner accepts that exact margin.
 
 **What exactly is waived.** One contract version and one complete deployed-byte
 identity at a declared constructor input:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/CreditEngine.vy` SHA-256 | `d4885a355c80263817ad82cb2bfd234ee4e796d103669028dfa6ea3199b584a8` |
-| Runtime-template SHA-256 (immutable-free) | `c83fef41ef92fb72edbdd1e445aa4c4dc9411b57b87ee0e846092fad54867b49` |
-| Runtime-template bytes | 24,415 |
-| Deployed runtime bytes, including immutables | 24,511 |
-| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `98ece66166a4666cb2f3bb8a554429f13319f17bc6832bd15cc1364ecb1fa417` |
+| `contracts/core/CreditEngine.vy` SHA-256 | `5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946` |
+| Runtime-template SHA-256 (immutable-free) | `5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac` |
+| Runtime-template bytes | 24,459 |
+| Deployed runtime bytes, including immutables | 24,555 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `ce80ba109e99d52ee5983eb7f9b40e994392b241d29268ad754315778a2dc97e` |
 
 The declared HQ is a deterministic test input, not a production address. Actual
 constructor binding remains a separate deployment concern. The governed artifact
 ledger separately binds its declared production-capture inputs.
 
-**Residual risk accepted.** Only 65 bytes remain before EIP-170, and this waiver
+**Residual risk accepted.** Only 21 bytes remain before EIP-170, and this waiver
 permits **0 bytes of growth**. Any CreditEngine source or compiler-output change,
 including a same-size change, invalidates the pinned identity and reopens this
 decision. A future change must restore at least 200 bytes or receive a new exact
