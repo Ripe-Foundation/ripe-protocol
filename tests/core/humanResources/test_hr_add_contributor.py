@@ -336,7 +336,8 @@ def test_hr_confirm_new_contributor_timelock_not_reached(
 
 
 def test_hr_cancel_new_contributor_success(
-    human_resources, 
+    human_resources,
+    ledger,
     setupHrConfig,
     setupLedgerBalance,
     valid_terms,
@@ -360,7 +361,21 @@ def test_hr_cancel_new_contributor_success(
         valid_terms["depositLockDuration"],
         sender=governance.address
     )
-    
+
+    expected_confirmation_block = human_resources.getActionConfirmationBlock(action_id)
+    pending = human_resources.pendingContributor(action_id)
+    initial_num_contributors = ledger.numContributors()
+    assert expected_confirmation_block != 0
+    assert pending.owner == valid_terms["owner"]
+    assert pending.manager == valid_terms["manager"]
+    assert pending.compensation == valid_terms["compensation"]
+    assert pending.startDelay == valid_terms["startDelay"]
+    assert pending.vestingLength == valid_terms["vestingLength"]
+    assert pending.cliffLength == valid_terms["cliffLength"]
+    assert pending.unlockLength == valid_terms["unlockLength"]
+    assert pending.depositLockDuration == valid_terms["depositLockDuration"]
+    assert human_resources.hasPendingAction(action_id)
+
     # Cancel the contributor
     result = human_resources.cancelNewContributor(action_id, sender=governance.address)
     
@@ -368,15 +383,27 @@ def test_hr_cancel_new_contributor_success(
     events = filter_logs(human_resources, "NewContributorCancelled")
     assert len(events) == 1
     event = events[0]
-    assert event.owner == valid_terms["owner"]
+    assert event.owner == pending.owner
+    assert event.manager == pending.manager
+    assert event.compensation == pending.compensation
+    assert event.startDelay == pending.startDelay
+    assert event.vestingLength == pending.vestingLength
+    assert event.cliffLength == pending.cliffLength
+    assert event.unlockLength == pending.unlockLength
+    assert event.depositLockDuration == pending.depositLockDuration
+    assert event.confirmationBlock == expected_confirmation_block
+    assert event.confirmationBlock != 0
     assert event.actionId == action_id
     
     # Check return value
-    assert result
+    assert result is True
     
     # Check pending contributor was cleared
     pending = human_resources.pendingContributor(action_id)
     assert pending.owner == ZERO_ADDRESS  # Should be empty
+    assert not human_resources.hasPendingAction(action_id)
+    assert human_resources.getActionConfirmationBlock(action_id) == 0
+    assert ledger.numContributors() == initial_num_contributors
 
 
 def test_hr_cancel_new_contributor_invalid_perms(
