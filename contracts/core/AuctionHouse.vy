@@ -1041,6 +1041,8 @@ def removeExpiredFungibleAuction(
         _asset,
     )
 
+    # isActive is governance status, not whether the purchase window is open.
+    # Keep missing/paused auctions and auctions that have not yet expired.
     if not auc.isActive or block.number < auc.endBlock:
         return False
 
