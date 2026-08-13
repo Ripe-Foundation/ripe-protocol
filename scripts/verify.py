@@ -45,17 +45,39 @@ def _canonical_segment(value, option):
 
 
 def _history_manifest_path(chain, environment, manifest):
-    """Resolve the manifest path and prove it stays inside the history tree."""
+    """Resolve the manifest and prove it stays inside the *selected* history.
+
+    Containment is checked twice, against two different roots, because one
+    check is not enough. Verifying only against `migration_history/` let a
+    symlink inside the tree redirect `base-mainnet/v1` at another chain's
+    history and still pass -- the resolved path was elsewhere but still under
+    the global root, so the wrong contracts would be submitted under the
+    selected chain's explorer and key.
+    """
     root = Path(MIGRATION_HISTORY_DIR).resolve()
-    candidate = (
-        root / chain / environment / f"{manifest}-manifest.json"
-    ).resolve()
-    # The segment rules already forbid traversal. Re-checking the *resolved*
-    # path is what stops a symlink planted inside the tree from widening it,
-    # and it is cheap next to submitting contract records with a live key.
-    if not candidate.is_relative_to(root):
+
+    # The selected history must itself live under migration_history: this is
+    # what stops a symlinked chain or environment directory pointing out of
+    # the repository entirely.
+    declared = root / chain / environment
+    history = declared.resolve()
+    # Equality, not containment. A symlinked `base-mainnet/evil` pointing at
+    # `robinhood-mainnet/v1` resolves to a path that is still under the global
+    # root, so a containment check passes it -- and the wrong chain's contracts
+    # get submitted under the selected chain's explorer and key. The history
+    # has to be exactly where it claims to be.
+    if history != declared:
         raise click.ClickException(
-            "Resolved manifest path escapes the migration history directory."
+            f"Selected history {chain}/{environment} resolves elsewhere; "
+            "it must not be a link."
+        )
+
+    # And the manifest must live under that history, not merely under the
+    # global root -- which is what forbids cross-chain redirection.
+    candidate = (history / f"{manifest}-manifest.json").resolve()
+    if not candidate.is_relative_to(history):
+        raise click.ClickException(
+            f"Resolved manifest path escapes {chain}/{environment}."
         )
     return candidate
 

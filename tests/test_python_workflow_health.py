@@ -349,13 +349,52 @@ def test_python_workflow_runs_ignored_deployment_controls_credential_free():
     command = _step(job, "Run deployment control suites")["run"]
     assert "-o addopts=''" in command
     assert "tests/deployment" in command
-    for secret in (
+    # Substring checks passed as soon as the script contained any `unset` and
+    # the name appeared anywhere -- an env: declaration or a comment satisfied
+    # them. Parse the unset commands and require the names to be actual
+    # arguments of one.
+    unset_tokens = set()
+    for line in command.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("unset "):
+            unset_tokens.update(stripped.split()[1:])
+
+    required = {
         "ETHERSCAN_API_KEY",
         "BASESCAN_API_KEY",
         "PRIVATE_KEY",
         "WEB3_ALCHEMY_API_KEY",
-    ):
-        assert f"unset " in command and secret in command
+    }
+    missing = required - unset_tokens
+    assert not missing, f"not explicitly unset: {sorted(missing)}"
 
     # The ignored directories must stay in sync with what this job covers.
     assert "tests/deployment" in PYTEST_IGNORED_DIRECTORIES
+
+
+def test_unset_validation_fails_when_a_credential_is_only_mentioned():
+    """The check must not be satisfied by a name appearing elsewhere.
+
+    Removes each credential from the `unset` command while leaving its name in
+    the step (as an env declaration would), and confirms the parse rejects it.
+    A substring check accepted exactly this.
+    """
+    required = {
+        "ETHERSCAN_API_KEY",
+        "BASESCAN_API_KEY",
+        "PRIVATE_KEY",
+        "WEB3_ALCHEMY_API_KEY",
+    }
+
+    def unset_tokens(script):
+        tokens = set()
+        for line in script.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("unset "):
+                tokens.update(stripped.split()[1:])
+        return tokens
+
+    for dropped in sorted(required):
+        remaining = " ".join(sorted(required - {dropped}))
+        script = f"  {dropped}: local-placeholder\n  unset {remaining}\n"
+        assert required - unset_tokens(script) == {dropped}, dropped

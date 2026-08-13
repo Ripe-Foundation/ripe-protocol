@@ -256,9 +256,16 @@ def test_committed_base_history_inventory_is_unchanged():
     ),
 )
 def test_verify_rejects_noncanonical_path_segments(option, value, label):
-    result = _run_module("scripts.verify", option, value)
+    # Start from a complete, valid invocation and vary exactly one option, so
+    # a rejection cannot be an unrelated early exit from a partial command.
+    argv = ["--chain", "base-mainnet", "--environment", "v1",
+            "--manifest", "current"]
+    argv[argv.index(option) + 1] = value
+    result = _run_module("scripts.verify", *argv)
 
     assert result.returncode != 0, label
+    # And it must be the segment rule that rejected it, not something else.
+    assert "must be a single path segment" in result.stderr, label
     # It must fail before a path is built, so nothing path-shaped is printed.
     assert "migration_history" not in result.stdout, label
     assert "migration_history" not in result.stderr, label
@@ -346,3 +353,46 @@ def test_verification_policy_and_verify_cli_disagree_by_design():
     )
     assert "No manifest found" in result.stderr
     assert "BLOCKED_PENDING_POLICY" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("name", "target", "why"),
+    (
+        ("linked_outside", "/tmp", "escape outside the repository"),
+        (
+            "linked_crosschain",
+            "migration_history/robinhood-mainnet/v1",
+            "redirect into another chain's history",
+        ),
+    ),
+)
+def test_a_symlinked_history_cannot_redirect_the_selected_manifest(
+    name, target, why
+):
+    """Containment under `migration_history/` is not sufficient on its own.
+
+    A symlinked `base-mainnet/<name>` pointing at another chain resolves to a
+    path that is still under the global root, so a containment check passes it
+    -- and the wrong chain's contracts would be submitted under the selected
+    chain's explorer and API key. The selected history must be exactly where
+    it claims to be.
+    """
+    root = ROOT / "migration_history"
+    destination = target if target.startswith("/") else str(ROOT / target)
+    link = root / "base-mainnet" / name
+    link.symlink_to(destination, target_is_directory=True)
+    try:
+        with pytest.raises(Exception) as captured:
+            verify._history_manifest_path("base-mainnet", name, "current")
+        assert "resolves elsewhere" in str(captured.value), why
+    finally:
+        link.unlink()
+
+
+def test_the_committed_histories_are_real_directories():
+    # The identity check above only helps if the real histories are not links.
+    root = ROOT / "migration_history"
+    for history in root.glob("*/*"):
+        if history.is_dir():
+            assert not history.is_symlink(), history
+            assert history.resolve() == history, history
