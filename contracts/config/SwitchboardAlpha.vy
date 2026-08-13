@@ -694,14 +694,14 @@ def _setGenConfigFlag(_flag: GenConfigFlag, _shouldEnable: bool, _missionControl
 @external
 def setGlobalDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
     mc: address = self._resolveMissionControl(_missionControl)
+    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers, mc) # dev: invalid debt limits
     return self._setPendingDebtConfig(ActionType.DEBT_GLOBAL_LIMITS, mc, _perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers)
 
 
 @view
 @internal
-def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256) -> bool:
+def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256, _missionControl: address) -> bool:
     if 0 in [_perUserDebtLimit, _globalDebtLimit, _numAllowedBorrowers]:
         return False
     if max_value(uint256) in [_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers]:
@@ -709,6 +709,9 @@ def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _
     if _perUserDebtLimit > _globalDebtLimit:
         return False
     if _minDebtAmount > _perUserDebtLimit:
+        return False
+    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig()
+    if _minDebtAmount > config.maxBorrowPerInterval:
         return False
     return True
 
@@ -1515,6 +1518,7 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.DEBT_GLOBAL_LIMITS:
         config: cs.GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
         p: cs.GenDebtConfig = self.pendingDebtConfig[_aid]
+        assert p.minDebtAmount <= config.maxBorrowPerInterval # dev: invalid debt limits
         config.perUserDebtLimit = p.perUserDebtLimit
         config.globalDebtLimit = p.globalDebtLimit
         config.minDebtAmount = p.minDebtAmount

@@ -1891,21 +1891,21 @@
         "committed_path": "scripts/abis/SwitchboardAlpha.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "2d682626c08be9560738ea6d543fde8d51977bccbda2f63aadc73d285754c0d3",
-        "creation_executable_prefix_size": 25381,
-        "creation_metadata_sha256": "7958b226a7f0f03df0cf481427a3ea1f83631143070d93384e51219bd78b1659",
+        "creation_executable_prefix_sha256": "5d31701b94e9f62cadd75f127b4bb2c3036d22f4a4fb4fa0892bd0bbd1e12242",
+        "creation_executable_prefix_size": 25586,
+        "creation_metadata_sha256": "5bb887f8a462bbabf5923ab106b3c0b1648bde9184f7f2c29aa513b0fd4e6377",
         "creation_metadata_size": 82,
-        "creation_sha256": "0ca0d1bd10b2320a0a10625ab6f2106380145a46807cc6435bd80825af2becb6",
-        "creation_size": 25463,
-        "deployed_eip170_headroom": 245,
+        "creation_sha256": "8ab2c9efb4c6852208af2392a136b940a847492849b61acef601ce6fc32b86a6",
+        "creation_size": 25668,
+        "deployed_eip170_headroom": 40,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000000000000000000000000000000000000000012c0000000000000000000000000000000000000000000000000000000000093a80",
         "deployed_runtime_immutable_data_sha256": "156f17733e5823a3192850fc862f41788674f177bad603ad532978de76782c1d",
         "deployed_runtime_immutable_data_size": 224,
-        "deployed_runtime_sha256": "5a8d89363abaccdee5c3c08924a7889dbdd534b8d8c732101f746c4bac773905",
-        "deployed_runtime_size": 24331,
-        "eip170_headroom": 469,
-        "runtime_template_sha256": "cf5c827fd3c0cf44030e537acb55cd3a4a25664ac763febdf4fb0e68d941e391",
-        "runtime_template_size": 24107
+        "deployed_runtime_sha256": "bac0f43801fe9bce75fc06164f914b83323046b83963c95974ec5c97779c1e2d",
+        "deployed_runtime_size": 24536,
+        "eip170_headroom": 264,
+        "runtime_template_sha256": "7e117940f163fc2205fa43beeedb4b71cfea70e9d0bc9304eb909cce76e65dab",
+        "runtime_template_size": 24312
       },
       "code_layout": {
         "MAX_STALE_TIME": {
@@ -1995,9 +1995,9 @@
         "canonical_sha256": "a8984bb3c721d4a15e024955c13c853f9704cd4cf7a37f0375d2cde1a6b97560",
         "count": 113
       },
-      "source_git_blob": "facfd8cf0fb727d81139a5813674286d95efec58",
+      "source_git_blob": "b1f956c9565157a8bc62c5f76ee0feffebec3e86",
       "source_path": "contracts/config/SwitchboardAlpha.vy",
-      "source_sha256": "d29f487437248ce0ee7848bd3226e48ab4edb78bdd84d8c87a764d3f349840c3",
+      "source_sha256": "15b1e727a4235ac2f16dd93c6fb0cc991d4ee96a3ac8d4cf4ac41d71e0e7f19d",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2116,7 +2116,7 @@
           "type": "HashMap[uint256, HashMap[address, bool]]"
         }
       },
-      "transitive_compiler_input_integrity": "886dea5943a4c024923107f94a8bd8362a59f443d6523ffbb3a2849dec51f994"
+      "transitive_compiler_input_integrity": "a987408d9ea16e6114ce86e1eb6ca604ced7ff6445bb40d26e0ae4dc1a7b2e94"
     },
     "SwitchboardBravo": {
       "abi": {
