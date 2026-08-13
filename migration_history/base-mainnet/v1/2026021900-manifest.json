@@ -1,0 +1,16 @@
+{
+  "contracts": {
+    "Deleverage": {
+      "address": "0x936186F8b9120AEE134Fc1E27FbB3b47d1792964",
+      "file": "contracts/core/Deleverage.vy"
+    },
+    "SwitchboardDelta": {
+      "address": "0x028c32A2075406157f2778eAC94a705aE7d01Fea",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "UndyVaultPrices": {
+      "address": "0x64D0F785c3D4bf4675f4b8432D765175F014A8Ac",
+      "file": "contracts/priceSources/UndyVaultPrices.vy"
+    }
+  }
+}

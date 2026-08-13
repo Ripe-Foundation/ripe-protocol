@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "EndaomentPSM": {
+      "address": "0x58Eed464070BF2249DF6273157367041394527D4",
+      "file": "contracts/core/EndaomentPSM.vy"
+    }
+  }
+}

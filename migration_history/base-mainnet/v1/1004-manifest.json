@@ -1,0 +1,36 @@
+{
+  "contracts": {
+    "GreenToken": {
+      "address": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+      "file": "contracts/tokens/GreenToken.vy"
+    },
+    "RipeToken": {
+      "address": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+      "file": "contracts/tokens/RipeToken.vy"
+    },
+    "SavingsGreen": {
+      "address": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+      "file": "contracts/tokens/SavingsGreen.vy"
+    },
+    "RipeHq": {
+      "address": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "file": "contracts/registries/RipeHq.vy"
+    },
+    "Contributor": {
+      "address": "0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1",
+      "file": "contracts/modules/Contributor.vy"
+    },
+    "TrainingWheels": {
+      "address": "0x2255b0006A3DA38AA184E0F9d5e056C2d0448065",
+      "file": "contracts/config/TrainingWheels.vy"
+    },
+    "DefaultsBase": {
+      "address": "0xE12a0621487C5Cb9FD9582B33618319bbBAd8346",
+      "file": "contracts/config/DefaultsBase.vy"
+    },
+    "Ledger": {
+      "address": "0x365256e322a47Aa2015F6724783F326e9B24fA47",
+      "file": "contracts/data/Ledger.vy"
+    }
+  }
+}

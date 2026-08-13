@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "SwitchboardAlpha": {
+      "address": "0x4bf9025D76FeDd6331661C5de482b0a607D912B9",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    }
+  }
+}

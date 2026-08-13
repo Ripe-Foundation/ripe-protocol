@@ -17,7 +17,6 @@ import pytest
 
 from config import BluePrint as blueprint_source
 from scripts.params import generate_robinhood_defaults as sync
-from scripts.utils import deployment_assertions
 
 
 pytestmark = pytest.mark.release
@@ -557,15 +556,6 @@ def test_ccip_source_reference_rejects_same_path_byte_replacement(
     monkeypatch.setattr(sync, "ROOT", tmp_path)
     with pytest.raises(sync.ManifestError, match="H04_CCIP_EVIDENCE_DIGEST"):
         sync._validated_ccip_live_evidence()
-
-
-def test_ccip_evidence_identity_is_shared_by_ledger_and_deployment_assertions():
-    assert deployment_assertions.CCIP_LIVE_EVIDENCE_PATH == (
-        sync.CCIP_LIVE_EVIDENCE_PATH
-    )
-    assert deployment_assertions.CCIP_LIVE_EVIDENCE_SHA256 == (
-        sync.CCIP_LIVE_EVIDENCE_SHA256
-    )
 
 
 @pytest.mark.parametrize(

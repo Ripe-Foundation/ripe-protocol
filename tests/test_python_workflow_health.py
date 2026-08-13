@@ -49,8 +49,6 @@ MATRIX_INCLUDE_EXPRESSION = (
 )
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
-    "tests/deployment_profiles",
-    "tests/inventory",
 }
 
 
@@ -293,16 +291,9 @@ def test_python_workflow_uses_full_history_and_bounded_lane_timeouts():
 def test_python_workflow_pins_node24_action_releases_by_commit():
     jobs = _workflow()["jobs"]
     test_job = jobs["test"]
-    macos_job = jobs["manifest-promotion-macos"]
 
     assert _step(test_job, "Check out source")["uses"] == CHECKOUT_ACTION
-    assert _step(macos_job, "Check out full source history")["uses"] == (
-        CHECKOUT_ACTION
-    )
     assert _step(test_job, "Use Python 3.12.0")["uses"] == (
-        SETUP_PYTHON_ACTION
-    )
-    assert _step(macos_job, "Use Python 3.12.0")["uses"] == (
         SETUP_PYTHON_ACTION
     )
     assert _step(test_job, "Restore Titanoboa compiler artifacts")[
@@ -324,7 +315,7 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test"]
+    assert job["needs"] == ["test", "deployment-controls"]
     assert job["runs-on"] == "ubuntu-latest"
     assert job["timeout-minutes"] == "5"
     assert job["if"] == (
@@ -337,23 +328,73 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
 
+    controls = _step(job, "Require successful deployment controls")
+    assert controls["env"]["CONTROLS_RESULT"] == (
+        "${{ needs.deployment-controls.result }}"
+    )
+    assert 'if [ "$CONTROLS_RESULT" != "success" ]' in controls["run"]
+    assert "exit 1" in controls["run"]
 
-def test_python_workflow_runs_manifest_promotion_only_for_manual_comprehensive():
-    jobs = _workflow()["jobs"]
-    job = jobs["manifest-promotion-macos"]
-    assert job["runs-on"] == "macos-latest"
-    assert job["timeout-minutes"] == "60"
-    assert job["if"] == (
-        "github.event_name == 'workflow_dispatch' && "
-        "inputs.lane == 'comprehensive'"
-    )
-    checkout = _step(job, "Check out full source history")
-    assert checkout["with"]["fetch-depth"] == "0"
-    command = _step(job, "Run macOS manifest-promotion coverage")["run"]
+
+def test_python_workflow_runs_ignored_deployment_controls_credential_free():
+    """The lean lane cannot see tests/deployment, so a required job must.
+
+    pytest.ini ignores that tree, which is exactly where this branch's
+    deploy-path controls live. The job has to run it with addopts cleared and
+    with every credential unset, or it proves nothing about an offline gate.
+    """
+    job = _workflow()["jobs"]["deployment-controls"]
+    assert job["runs-on"] == "ubuntu-latest"
+
+    command = _step(job, "Run deployment control suites")["run"]
     assert "-o addopts=''" in command
-    assert "tests/deployment/test_current_manifest_promotion.py" in command
-    linux_command = _step(jobs["test"], "Run comprehensive lane")["run"]
-    assert (
-        "--ignore=tests/deployment/test_current_manifest_promotion.py"
-        in linux_command
-    )
+    assert "tests/deployment" in command
+    # Substring checks passed as soon as the script contained any `unset` and
+    # the name appeared anywhere -- an env: declaration or a comment satisfied
+    # them. Parse the unset commands and require the names to be actual
+    # arguments of one.
+    unset_tokens = set()
+    for line in command.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("unset "):
+            unset_tokens.update(stripped.split()[1:])
+
+    required = {
+        "ETHERSCAN_API_KEY",
+        "BASESCAN_API_KEY",
+        "PRIVATE_KEY",
+        "WEB3_ALCHEMY_API_KEY",
+    }
+    missing = required - unset_tokens
+    assert not missing, f"not explicitly unset: {sorted(missing)}"
+
+    # The ignored directories must stay in sync with what this job covers.
+    assert "tests/deployment" in PYTEST_IGNORED_DIRECTORIES
+
+
+def test_unset_validation_fails_when_a_credential_is_only_mentioned():
+    """The check must not be satisfied by a name appearing elsewhere.
+
+    Removes each credential from the `unset` command while leaving its name in
+    the step (as an env declaration would), and confirms the parse rejects it.
+    A substring check accepted exactly this.
+    """
+    required = {
+        "ETHERSCAN_API_KEY",
+        "BASESCAN_API_KEY",
+        "PRIVATE_KEY",
+        "WEB3_ALCHEMY_API_KEY",
+    }
+
+    def unset_tokens(script):
+        tokens = set()
+        for line in script.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("unset "):
+                tokens.update(stripped.split()[1:])
+        return tokens
+
+    for dropped in sorted(required):
+        remaining = " ".join(sorted(required - {dropped}))
+        script = f"  {dropped}: local-placeholder\n  unset {remaining}\n"
+        assert required - unset_tokens(script) == {dropped}, dropped

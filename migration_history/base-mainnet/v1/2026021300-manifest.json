@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "wsuperOETHbPrices": {
+      "address": "0x064488f53849616eeE3EE32c29307922B319bb7C",
+      "file": "contracts/priceSources/wsuperOETHbPrices.vy"
+    }
+  }
+}

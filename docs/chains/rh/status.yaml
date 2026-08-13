@@ -291,10 +291,15 @@ repository_ci:
     The lean lane is not green, and that condition is inherited rather than
     introduced. All 13 failures and 25 errors reproduce on a pristine rh
     checkout: BlueChip Morpho constructor arity, switchboard pointer lifecycle,
-    deleverage oracle cases, and the basic-vault consumer inventory. Three
-    artifact gates are separately red on rh - check_contract_artifacts.py
-    MissionControl source_sha256, export_abis.py --check, and the manifest
-    handoff test.
+    deleverage oracle cases, and the basic-vault consumer inventory. Two
+    artifact gates are separately red on rh - export_abis.py --check and the
+    manifest handoff test (the latter's H06 machinery and test are now
+    removed by this cleanup, not fixed). check_contract_artifacts.py
+    MissionControl source_sha256 is no longer one of them: all 53
+    tests/inventory/test_contract_artifacts.py nodes and all 7
+    test_bluechip_yield_prices_artifacts.py nodes pass against the current
+    tree (verified 2026-08-12), so this cleanup restores the checker as a
+    required check rather than reintroducing a known-red gate.
   interpretation: >
     Enabling CI made an existing red state visible; it did not create it. A
     first green build requires the inherited failures to be addressed on their

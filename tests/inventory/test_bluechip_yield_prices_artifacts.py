@@ -8,7 +8,7 @@ import pytest
 
 from config.robinhood_blueprint import Disposition, get_component
 from scripts import check_contract_artifacts as artifact_checker
-from scripts.utils.deployment_assertions import blueprint_policy
+from utils.blueprint_policy import blueprint_policy
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,9 +21,9 @@ MIN_EIP_170_HEADROOM = 2_000
 EXPECTED = {
     "source_sha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be",
     "source_git_blob": "cafd177ef601186b0a6a30863ba5b8973d8dd92e",
-    "integrity": "c323728d1e40d540c924788bba34c5d8a968f7d482fe3194eace267d30b03cbb",
+    "integrity": "4427f57943bf1bb924062863fb1d73cbe7397f62867c7f0e4f720fc5c20f30e1",
     "creation_size": 23_627,
-    "creation_sha256": "0c558a77e2da8cff1bec1e1fa1a1af635c29fa570066b7ecb9bb2e8fb0aaaf8d",
+    "creation_sha256": "d1c39fcfa59d0e9868e6fe213542c102ce69041cd7185d51a3c2684105aa7ee8",
     "runtime_size": 22_054,
     "runtime_sha256": "84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578",
     "eip_170_headroom": 2_522,

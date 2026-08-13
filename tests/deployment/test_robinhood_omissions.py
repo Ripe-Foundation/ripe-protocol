@@ -24,7 +24,7 @@ from config.robinhood_blueprint import (
     get_symbolic_input,
     validate_blueprint,
 )
-from scripts.utils.deployment_assertions import (
+from utils.blueprint_policy import (
     blueprint_policy,
     blueprint_registry_map as registry_map,
 )

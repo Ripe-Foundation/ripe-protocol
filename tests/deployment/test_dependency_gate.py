@@ -150,7 +150,6 @@ REACHABILITY_EXCLUDED_DIRS = {
     "vendor",
 }
 APPROVED_CLICK_SURFACES = {
-    Path("scripts/ccip_send.py"),
     Path("scripts/console.py"),
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
@@ -160,6 +159,7 @@ APPROVED_CLICK_SURFACES = {
     Path("tests/test_ccip_hardening.py"),
 }
 CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
+    Path("scripts/verify_defaults.py"),
     Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
     Path("migrations/base-mainnet/2026080701_CcipWire.py"),
     Path("migrations/robinhood-mainnet/0001_Registries.py"),
