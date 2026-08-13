@@ -13,21 +13,21 @@
         "committed_path": "scripts/abis/AuctionHouse.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "588ccc30d450972c1e60f16b995b20091a0b36bc31a8d14a4ca3287a1e568972",
-        "creation_executable_prefix_size": 23957,
-        "creation_metadata_sha256": "0a6207ac9ea78687513d7c489cb5b9471d15aea91edf3141672455e4b5f5459a",
+        "creation_executable_prefix_sha256": "dad6b2878bf3de1c08805438d5c2afdae579048eb53e8daa88431776ab1b645f",
+        "creation_executable_prefix_size": 23959,
+        "creation_metadata_sha256": "06f50e5ce31270e37c362a83e79e36caaa8fe6ba06ed3bb51ab4be9f6ea25336",
         "creation_metadata_size": 59,
-        "creation_sha256": "3e8b9791eb7b06946fcb92863647825e86dfd498cf9120f363f5718bbcde7f2b",
-        "creation_size": 24016,
-        "deployed_eip170_headroom": 647,
+        "creation_sha256": "3b184fd7f641e28c8e83b0efc9847a9aad976b20df08a14b2fac0e2375d31db9",
+        "creation_size": 24018,
+        "deployed_eip170_headroom": 645,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "a5703fa70b781ae9c63d7abf1f80df60dd97e217a4e85257dccd6502341a4270",
-        "deployed_runtime_size": 23929,
-        "eip170_headroom": 743,
-        "runtime_template_sha256": "0a1081e4901b96a69b67d8d845100a2f3831682a3444cc078f5ded35875b773f",
-        "runtime_template_size": 23833
+        "deployed_runtime_sha256": "2063c9adc249622d23468209b1da145f6061d074756cec4d575cda708d88bd18",
+        "deployed_runtime_size": 23931,
+        "eip170_headroom": 741,
+        "runtime_template_sha256": "397368f84d63eca56e6b465ccfc8c5af711e2100c2657579c69299b7b46c8f7d",
+        "runtime_template_size": 23835
       },
       "code_layout": {
         "addys": {
@@ -77,9 +77,9 @@
         "canonical_sha256": "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         "count": 28
       },
-      "source_git_blob": "704eb457f0055c0d1e031f5fb57675f5de4f1ba7",
+      "source_git_blob": "268f69c9b20cf83bdb3fbdea81ac912897d6da1c",
       "source_path": "contracts/core/AuctionHouse.vy",
-      "source_sha256": "f963bb4f27448290a1ee0bd43ecae136a8d684368f7f30665942b174b5b1666d",
+      "source_sha256": "b575591d3d796d9a9ac6b9a07d1828ecf45a0b219442df13b4eb1fc6902541e3",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -121,7 +121,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "45c8d6007dd16f7d35b63c9dc7b32aa32b7af2b9f5878b570f85876fc0ab6f24"
+      "transitive_compiler_input_integrity": "ca72619f33d91c0423527e3c34495bbf99a9e699f7a38b3db55937b98a9c2eb5"
     },
     "BlueChipYieldPrices": {
       "abi": {

@@ -15,7 +15,7 @@ def test_auction_house_source_abi_and_vault_interface_are_frozen():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/AuctionHouse.vy": (
-            "f963bb4f27448290a1ee0bd43ecae136a8d684368f7f30665942b174b5b1666d"
+            "b575591d3d796d9a9ac6b9a07d1828ecf45a0b219442df13b4eb1fc6902541e3"
         ),
         "scripts/abis/AuctionHouse.json": (
             "97b39517f9b527e4bcdf9dc50b4f418d4036367e5f3f4d62a0ffdd68d29ee276"

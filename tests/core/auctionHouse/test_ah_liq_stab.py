@@ -1476,6 +1476,7 @@ def test_ah_liquidation_multiple_collateral_types(
 def test_ah_liquidation_multiple_collateral_different_configs(
     setupStabAssetConfig,
     setAssetConfig,
+    setGeneralDebtConfig,
     green_lp_token,
     green_lp_token_whale,
     alpha_token,
@@ -1492,8 +1493,9 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     performDeposit,
     endaoment_funds,
 ):
-    """Test liquidation with multiple collateral types having different liquidation configs"""
+    """Endaoment-reserved collateral is excluded from keeper accounting."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(_keeperFeeRatio=1_00)
     
     # Setup alpha for stability pool swap
     alpha_debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
@@ -1507,20 +1509,21 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
-    # Setup bravo for endaoment transfer (no stab pool swap)
+    # Endaoment takes precedence even when every later AuctionHouse route is
+    # enabled. Without that early return, bravo could swap or enter auction.
     bravo_debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=5_00, _borrowRate=0)  # Lower liq fee
     setAssetConfig(
         bravo_token,
         _debtTerms=bravo_debt_terms,
         _shouldBurnAsPayment=False,
-        _shouldTransferToEndaoment=True,  # Direct to endaoment
-        _shouldSwapInStabPools=False,     # No stab pool
-        _shouldAuctionInstantly=False,
+        _shouldTransferToEndaoment=True,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
     
     # Deposit stab assets
-    glp_deposit = 100 * EIGHTEEN_DECIMALS
+    glp_deposit = 300 * EIGHTEEN_DECIMALS
     green_lp_token.transfer(sally, glp_deposit, sender=green_lp_token_whale)
     green_lp_token.approve(teller, glp_deposit, sender=sally)
     teller.deposit(green_lp_token, glp_deposit, sally, stability_pool, 0, sender=sally)
@@ -1548,6 +1551,7 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     
     # Track initial state
     initial_bravo_in_endaoment_funds = bravo_token.balanceOf(endaoment_funds)
+    debt_before = credit_engine.getUserDebtAmount(bob)
     
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
@@ -1555,6 +1559,8 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     # Check different handling for each collateral type
     swap_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
     endaoment_logs = filter_logs(teller, "CollateralSentToEndaoment")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
     
     # Alpha should go through stab pool
     alpha_swapped = False
@@ -1564,10 +1570,33 @@ def test_ah_liquidation_multiple_collateral_different_configs(
             assert log.stabAsset == green_lp_token.address, "Should use green LP for alpha"
     
     assert alpha_swapped, "Alpha must be swapped through stab pool"
+    assert all(log.liqAsset != bravo_token.address for log in swap_logs)
     
-    # Bravo should go directly to endaoment -- so it's skipped
+    # Bravo is reserved for Endaoment handling, so AuctionHouse skips it.
     assert len(endaoment_logs) == 0, "Bravo should NOT go to endaoment"
+    assert all(log.asset != bravo_token.address for log in auction_logs)
     assert bravo_token.balanceOf(endaoment_funds) == initial_bravo_in_endaoment_funds
+
+    # Direct Endaoment collateral is skipped before AuctionHouse updates
+    # collateralValueOut. Only Stability swaps can cover the base fee; the
+    # skipped bravo value cannot reduce liqFeesUnpaid.
+    assert liq_log.collateralValueOut == sum(
+        log.collateralValueOut for log in swap_logs
+    )
+    assert liq_log.repayAmount == sum(log.valueSwapped for log in swap_logs)
+    assert liq_log.repayAmount < liq_log.targetRepayAmount
+    base_fee = liq_log.totalLiqFees - liq_log.keeperFee
+    assert liq_log.keeperFee > 0
+    paid_base_fee = min(
+        liq_log.collateralValueOut - liq_log.repayAmount,
+        base_fee,
+    )
+    assert liq_log.liqFeesUnpaid == (
+        base_fee - paid_base_fee + liq_log.keeperFee
+    )
+    assert credit_engine.getUserDebtAmount(bob) == (
+        debt_before + liq_log.liqFeesUnpaid - liq_log.repayAmount
+    )
     
     # Verify alpha is in stability pool
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be in stability pool"
@@ -1700,6 +1729,7 @@ def test_ah_liquidation_multiple_collateral_partial_liquidation(
 def test_ah_liquidation_user_with_stab_pool_position(
     setupStabAssetConfig,
     setAssetConfig,
+    setGeneralDebtConfig,
     green_lp_token,
     green_lp_token_whale,
     savings_green,
@@ -1712,12 +1742,27 @@ def test_ah_liquidation_user_with_stab_pool_position(
     createDebtTerms,
     credit_engine,
     stability_pool,
+    simple_erc20_vault,
+    vault_book,
     performDeposit,
     green_token,
     endaoment_funds,
 ):
-    """Test Phase 1: Liquidating user who also has stability pool positions"""
+    """Burn and Endaoment assets are excluded from keeper accounting."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(_keeperFeeRatio=1_00)
+
+    simple_vault_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(
+        green_token,
+        _vaultIds=[simple_vault_id],
+        _debtTerms=createDebtTerms(),
+        _shouldBurnAsPayment=True,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
     
     # Setup alpha token as collateral
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
@@ -1731,9 +1776,21 @@ def test_ah_liquidation_user_with_stab_pool_position(
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
-    # Bob deposits into stability pool (PHASE 1 assets)
+    # Bob deposits GREEN collateral plus Stability Pool positions.
+    bob_green_deposit = 20 * EIGHTEEN_DECIMALS
     bob_sgreen_deposit = 50 * EIGHTEEN_DECIMALS
     bob_glp_deposit = 30 * EIGHTEEN_DECIMALS
+
+    green_token.mint(bob, bob_green_deposit, sender=credit_engine.address)
+    green_token.approve(teller, bob_green_deposit, sender=bob)
+    teller.deposit(
+        green_token,
+        bob_green_deposit,
+        bob,
+        simple_erc20_vault,
+        0,
+        sender=bob,
+    )
     
     # Get GREEN tokens for Bob to deposit into savings_green
     green_for_bob = bob_sgreen_deposit  # 1:1 for simplicity
@@ -1779,11 +1836,18 @@ def test_ah_liquidation_user_with_stab_pool_position(
     initial_green_supply = green_token.totalSupply()
     initial_glp_supply = green_lp_token.totalSupply()
     endaoment_funds_initial_glp_balance = green_lp_token.balanceOf(endaoment_funds)
+    bob_initial_green_amount = simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        green_token,
+    )
     bob_initial_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_initial_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
+    debt_before = credit_engine.getUserDebtAmount(bob)
     
     # Trigger liquidation
-    new_price = 125 * EIGHTEEN_DECIMALS // 200
+    # Keep total collateral just below the $125 liquidation threshold after
+    # adding the $20 GREEN position: $104 alpha + $20 GREEN = $124.
+    new_price = 104 * EIGHTEEN_DECIMALS // 200
     mock_price_source.setPrice(alpha_token, new_price)
     assert credit_engine.canLiquidateUser(bob)
     
@@ -1792,11 +1856,41 @@ def test_ah_liquidation_user_with_stab_pool_position(
     
     # Get logs
     logs = filter_logs(teller, "CollateralSwappedWithStabPool")
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+
+    # Bob's GREEN collateral and sGREEN/GLP positions are respectively
+    # shouldBurnAsPayment and shouldTransferToEndaoment assets. AuctionHouse
+    # must skip all three, so only alpha swaps may contribute to
+    # collateralValueOut and paidBaseFee.
+    assert logs
+    assert all(log.liqAsset == alpha_token.address for log in logs)
+    assert liq_log.collateralValueOut == sum(
+        log.collateralValueOut for log in logs
+    )
+    assert liq_log.repayAmount == sum(log.valueSwapped for log in logs)
+    assert liq_log.repayAmount < liq_log.targetRepayAmount
+    base_fee = liq_log.totalLiqFees - liq_log.keeperFee
+    assert liq_log.keeperFee > 0
+    paid_base_fee = min(
+        liq_log.collateralValueOut - liq_log.repayAmount,
+        base_fee,
+    )
+    assert liq_log.liqFeesUnpaid == (
+        base_fee - paid_base_fee + liq_log.keeperFee
+    )
+    assert credit_engine.getUserDebtAmount(bob) == (
+        debt_before + liq_log.liqFeesUnpaid - liq_log.repayAmount
+    )
     
     # stability pool should be same as before
+    bob_final_green_amount = simple_erc20_vault.getTotalAmountForUser(
+        bob,
+        green_token,
+    )
     bob_final_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_final_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
     
+    assert bob_final_green_amount == bob_initial_green_amount, "Bob's GREEN collateral must be the same"
     assert bob_final_sgreen_value == bob_initial_sgreen_value, "Bob's savings_green position must be the same"
     assert bob_final_glp_value > bob_initial_glp_value, "Bob's green_lp position must be greater"
     
@@ -1804,7 +1898,7 @@ def test_ah_liquidation_user_with_stab_pool_position(
     final_green_supply = green_token.totalSupply()
     final_glp_supply = green_lp_token.totalSupply()
     endaoment_funds_final_glp_balance = green_lp_token.balanceOf(endaoment_funds)
-    assert final_green_supply == initial_green_supply, "Green must be the same"
+    assert final_green_supply - initial_green_supply == liq_log.keeperFee
     assert final_glp_supply == initial_glp_supply, "Green LP is less than initial"
     assert endaoment_funds_final_glp_balance > endaoment_funds_initial_glp_balance, "Green LP must go to endaoment"
 
