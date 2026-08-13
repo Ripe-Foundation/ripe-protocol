@@ -2127,9 +2127,9 @@
       "artifacts": {
         "creation_executable_prefix_sha256": "c0f0f38f13a93643008e8944362365852ef5e5d419732abd129a8a3cb651c3b5",
         "creation_executable_prefix_size": 25428,
-        "creation_metadata_sha256": "ea1f5a36bb92818aaa9965c1ecbc3eeea02b426cf5bbb9f231e25f282aecfb72",
+        "creation_metadata_sha256": "69d3fb864d397a1defd3fcef5214e3145ff122f9438c99089adf4f0b1ef343c9",
         "creation_metadata_size": 74,
-        "creation_sha256": "9a2b1100d4b8af7d1e7de71f5854bf1891de50e2aa8ce7ae1c3b6d94d416df8c",
+        "creation_sha256": "4ce11a972885bdfa4d685aebd446dcf95d7bb66d590c46bbc39c544bf9acc6b2",
         "creation_size": 25502,
         "deployed_eip170_headroom": 212,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0",
@@ -2211,9 +2211,9 @@
         "canonical_sha256": "06cf2d9b23a48b003915009348ff097586900e59a5b62e30c18f3f0bdd75d4cf",
         "count": 66
       },
-      "source_git_blob": "abb7165846d1f1fc3285f9aede53b5e88ef17d90",
+      "source_git_blob": "28c81c98ca3fd58c5ae0f168eb9e58f7feeae6b7",
       "source_path": "contracts/config/SwitchboardBravo.vy",
-      "source_sha256": "468639ad979eb5352cf00abef5883444321b747914e7e7eee29c7b901d80a827",
+      "source_sha256": "381540b58d534dafc7cbc9c4a80acc6fa6e7b0cd8c96603ab1dd369dc22684ed",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2276,7 +2276,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "51872c03e5dac3c0240aeed41274ec467e249d5edbb993607e156ecb3a0d2f4c"
+      "transitive_compiler_input_integrity": "348945bdbe97f5de49af3daef64ab1c635bef5f09e6c814314620dbe5ceb85ee"
     },
     "SwitchboardCharlie": {
       "abi": {
