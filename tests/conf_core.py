@@ -681,12 +681,12 @@ def switchboard_echo(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def defaults(fork, contributor_template, training_wheels, mock_undy_v2):
+def defaults(fork):
     d = ZERO_ADDRESS
     if fork == "local":
         d = boa.load("contracts/config/DefaultsLocal.vy")
     elif fork == "base":
-        d = boa.load("contracts/config/DefaultsBase.vy", contributor_template, training_wheels, mock_undy_v2)
+        d = boa.load("contracts/config/DefaultsBase.vy")
     return d
 
 

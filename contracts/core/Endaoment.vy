@@ -127,7 +127,7 @@ event PartnerLiquidityAdded:
     asset: indexed(address)
     partnerAmount: uint256
     greenAmount: uint256
-    lpBalance: uint256
+    lpBalance: uint256  # verified LP received by this action, not total custody
 
 event PartnerLiquidityMinted:
     partner: indexed(address)
@@ -623,7 +623,7 @@ def addLiquidity(
     addedTokenA: uint256 = 0
     addedTokenB: uint256 = 0
     txUsdValue: uint256 = 0
-    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = self._addLiquidity(_legoId, _pool, _tokenA, _tokenB, _amountA, _amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData)
+    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = self._addLiquidity(_legoId, _pool, _tokenA, _tokenB, _amountA, _amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData, addys._getEndaomentFundsAddr())
     return lpAmountReceived, addedTokenA, addedTokenB, txUsdValue
 
 
@@ -639,6 +639,7 @@ def _addLiquidity(
     _minAmountB: uint256,
     _minLpAmount: uint256,
     _extraData: bytes32,
+    _lpRecipient: address,
 ) -> (address, uint256, uint256, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -657,7 +658,7 @@ def _addLiquidity(
     addedTokenA: uint256 = 0
     addedTokenB: uint256 = 0
     txUsdValue: uint256 = 0
-    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = extcall UndyLego(legoAddr).addLiquidity(_pool, _tokenA, _tokenB, amountA, amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData, endaoFunds)
+    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = extcall UndyLego(legoAddr).addLiquidity(_pool, _tokenA, _tokenB, amountA, amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData, _lpRecipient)
 
     # remove approvals
     if amountA != 0:
@@ -991,11 +992,13 @@ def addPartnerLiquidity(
     _pool: address,
     _partner: address,
     _asset: address,
-    _amount: uint256 = max_value(uint256),
-    _minLpAmount: uint256 = 0,
+    _amount: uint256,
+    _minLpAmount: uint256,
+    _expectedLpToken: address,
 ) -> (uint256, uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _expectedLpToken != empty(address) # dev: invalid lp token
     a: addys.Addys = addys._getAddys()
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
@@ -1005,34 +1008,36 @@ def addPartnerLiquidity(
     greenMinted: uint256 = 0
     partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
 
-    # add liquidity (LP goes to vault)
+    # add liquidity (LP goes here so only the current action's delta is split)
+    lpBefore: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
     lpToken: address = empty(address)
     lpAmountReceived: uint256 = 0
     liqAmountA: uint256 = 0
     liqAmountB: uint256 = 0
     usdValue: uint256 = 0
-    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount, empty(bytes32))
-
-    # pull LP from vault to split with partner
-    self._prepareEndaomentFunds(lpToken, max_value(uint256), endaoFunds)
-    lpBalance: uint256 = staticcall IERC20(lpToken).balanceOf(self)
-    assert lpBalance != 0 # dev: no liquidity added
+    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount, empty(bytes32), self)
+    assert lpToken == _expectedLpToken # dev: unexpected lp token
+    assert lpAmountReceived != 0 # dev: no liquidity added
+    lpAfter: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
+    assert lpAfter - lpBefore == lpAmountReceived # dev: lp amount mismatch
 
     # transfer partner's half
-    partnerShare: uint256 = lpBalance // 2
-    if _partner != self and partnerShare != 0:
+    partnerShare: uint256 = 0
+    if _partner != self:
+        partnerShare = lpAmountReceived // 2
+    if partnerShare != 0:
         assert extcall IERC20(lpToken).transfer(_partner, partnerShare, default_return_value=True) # dev: could not transfer
 
     # transfer vault's half back to vault
-    vaultShare: uint256 = lpBalance - partnerShare
+    vaultShare: uint256 = lpAmountReceived - partnerShare
     if vaultShare != 0:
-        self._transferToEndaomentFunds(lpToken, endaoFunds)
+        assert extcall IERC20(lpToken).transfer(endaoFunds, vaultShare, default_return_value=True) # dev: could not transfer
 
     # add pool debt
     if greenMinted != 0:
         extcall Ledger(a.ledger).updateGreenPoolDebt(_pool, greenMinted, True)
 
-    log PartnerLiquidityAdded(partner=_partner, asset=_asset, partnerAmount=partnerAmount, greenAmount=greenAmount, lpBalance=lpBalance)
+    log PartnerLiquidityAdded(partner=_partner, asset=_asset, partnerAmount=partnerAmount, greenAmount=greenAmount, lpBalance=lpAmountReceived)
     return lpAmountReceived, liqAmountA, liqAmountB
 
 

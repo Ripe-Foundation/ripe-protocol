@@ -9,16 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 EIP170_LIMIT = 24_576
 
-# Reference sizes recorded by the deposit-vault position migration. These are a
-# review aid only; nothing asserts equality against them, because they go stale
-# whenever a contract legitimately changes. What is enforced is the EIP-170
-# ceiling and the headroom floors below.
+# Reference sizes recorded by the deposit-vault position migration and refreshed
+# when one of these contracts is explicitly changed. These are a review aid only;
+# nothing asserts equality against them. What is enforced is the EIP-170 ceiling
+# and the headroom floors below.
 EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "MissionControl": 16_064,
     "SwitchboardBravo": 23_082,
     # VaultMigrator centralizes all three migration paths. Adding its canonical
     # ID/getters to Addys also changes the runtime of Addys consumers.
-    "SwitchboardEcho": 23_053,
+    "SwitchboardEcho": 23_104,
     "VaultMigrator": 12_042,
     "Teller": 24_525,
     "TellerUtils": 8_976,
@@ -47,10 +47,11 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # passed. The default is now the ratified value.
 DEFAULT_MIN_HEADROOM = 200
 
-# Measured headroom against the 24,576 limit after the liquidation-state change:
+# Current measured headroom against the 24,576 limit; values are refreshed when
+# an explicitly changed contract is recompiled:
 #   Teller 71, CreditEngine 209, StabilityPool 205, SwitchboardCharlie 1,091,
 #   SwitchboardAlpha 1,142, Lootbox 1,583, RipeGov 1,319, SwitchboardBravo
-#   1,494, SwitchboardEcho 1,523, and the rest far larger.
+#   1,494, SwitchboardEcho 1,472, and the rest far larger.
 #
 # CreditEngine has self-retired RH-D026 by returning above the 200-byte floor.
 # Teller leaves 71 bytes after retaining the receipt-window guard and inlining a
