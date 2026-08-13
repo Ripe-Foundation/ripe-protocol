@@ -907,7 +907,11 @@ def _getGreenAmountToRemove(
     
     greenAdjustFull: uint256 = (_data.greenBalance - targetBalance) * 2
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
-    maxGreenToRemove: uint256 = max(_poolDebt, _data.greenBalance * _lpBalance // staticcall IERC20(_data.lpToken).totalSupply())
+    lpTotalSupply: uint256 = staticcall IERC20(_data.lpToken).totalSupply()
+    if lpTotalSupply == 0:
+        return 0
+
+    maxGreenToRemove: uint256 = max(_poolDebt, _data.greenBalance * _lpBalance // lpTotalSupply)
     return min(greenAdjustWeighted, maxGreenToRemove)
 
 
