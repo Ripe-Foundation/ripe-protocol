@@ -162,6 +162,7 @@ def purchaseRipeBond(
     # main ripe payout
     oneUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256)
     units: uint256 = paymentAmount // oneUnit
+    paymentAmount = units * oneUnit
     baseRipePayout: uint256 = ripePerUnit * units
     assert baseRipePayout != 0 # dev: must have base ripe payout
     totalRipePayout: uint256 = baseRipePayout

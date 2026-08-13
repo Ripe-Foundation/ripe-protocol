@@ -567,6 +567,324 @@ def test_purchase_ripe_bond_8_decimal_token(
     _test(ripe_payout, expected_ripe)
 
 
+def test_fractional_payment_below_one_unit_reverts_atomically(
+    teller, bond_room, setupRipeBonds, bob, charlie_token_whale, charlie_token,
+    endaoment_funds, ledger, ripe_token,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = one_unit - 1
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+
+    assert bond_room.previewRipeBondPayout(bob, 0, requested) == 0
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    state_before = (
+        charlie_token.balanceOf(bob),
+        charlie_token.allowance(bob, teller.address),
+        charlie_token.balanceOf(bond_room.address),
+        charlie_token.balanceOf(endaoment_funds.address),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+        ledger.ripePaidOutForBadDebt(),
+        ripe_token.totalSupply(),
+        ripe_token.balanceOf(bob),
+    )
+
+    with boa.reverts("must have base ripe payout"):
+        teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+
+    assert (
+        charlie_token.balanceOf(bob),
+        charlie_token.allowance(bob, teller.address),
+        charlie_token.balanceOf(bond_room.address),
+        charlie_token.balanceOf(endaoment_funds.address),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+        ledger.ripePaidOutForBadDebt(),
+        ripe_token.totalSupply(),
+        ripe_token.balanceOf(bob),
+    ) == state_before
+
+
+@pytest.mark.parametrize("unit_count", [1, 2], ids=["one_unit", "two_units"])
+def test_fractional_payment_exact_unit_boundaries(
+    unit_count, teller, bond_room, setupRipeBonds, bob, charlie_token_whale,
+    charlie_token, endaoment_funds, ledger, ripe_token,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = unit_count * one_unit
+    expected_payout = unit_count * EIGHTEEN_DECIMALS
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+
+    assert bond_room.previewRipeBondPayout(bob, 0, requested) == expected_payout
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+    epoch_before = ledger.paymentAmountAvailInEpoch()
+    bond_budget_before = ledger.ripeAvailForBonds()
+    supply_before = ripe_token.totalSupply()
+    ripe_before = ripe_token.balanceOf(bob)
+
+    payout = teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == expected_payout
+    assert charlie_token.balanceOf(bob) == payer_before - requested
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + requested
+    assert charlie_token.balanceOf(bond_room.address) == 0
+    assert ledger.paymentAmountAvailInEpoch() == epoch_before - requested
+    assert ledger.ripeAvailForBonds() == bond_budget_before - expected_payout
+    assert ripe_token.totalSupply() == supply_before + expected_payout
+    assert ripe_token.balanceOf(bob) == ripe_before + expected_payout
+    assert event.paymentAmount == requested
+    assert event.refundAmount == 0
+    assert event.baseRipePayout == expected_payout
+    assert event.totalRipePayout == expected_payout
+
+
+def test_fractional_payment_is_rounded_down_and_refunded(
+    teller, bond_room, setupRipeBonds, bob, charlie_token_whale, charlie_token,
+    endaoment_funds, ledger, ripe_token,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = 2 * one_unit - 1
+    charged = one_unit
+    refund = one_unit - 1
+    expected_payout = EIGHTEEN_DECIMALS
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+
+    assert bond_room.previewRipeBondPayout(bob, 0, requested) == expected_payout
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+    epoch_before = ledger.paymentAmountAvailInEpoch()
+    bond_budget_before = ledger.ripeAvailForBonds()
+    supply_before = ripe_token.totalSupply()
+    ripe_before = ripe_token.balanceOf(bob)
+
+    payout = teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == expected_payout
+    assert charlie_token.balanceOf(bob) == payer_before - charged
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + charged
+    assert charlie_token.balanceOf(bond_room.address) == 0
+    assert ledger.paymentAmountAvailInEpoch() == epoch_before - charged
+    assert ledger.ripeAvailForBonds() == bond_budget_before - expected_payout
+    assert ripe_token.totalSupply() == supply_before + expected_payout
+    assert ripe_token.balanceOf(bob) == ripe_before + expected_payout
+    assert event.paymentAmount == charged
+    assert event.refundAmount == refund
+    assert event.baseRipePayout == expected_payout
+    assert event.totalRipePayout == expected_payout
+
+
+@pytest.mark.parametrize(
+    "should_auto_restart",
+    [False, True],
+    ids=["effectively_closed", "auto_restart"],
+)
+def test_fractional_payment_partial_epoch_capacity(
+    should_auto_restart, teller, bond_room, setupRipeBonds, bob,
+    charlie_token_whale, charlie_token, endaoment_funds, ledger,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    available = 2 * one_unit - 1
+    requested = 2 * one_unit
+    charged = one_unit
+    start, end = setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=available,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _shouldAutoRestart=should_auto_restart,
+    )
+
+    assert bond_room.previewRipeBondPayout(bob, 0, requested) == EIGHTEEN_DECIMALS
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+
+    payout = teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == EIGHTEEN_DECIMALS
+    assert charlie_token.balanceOf(bob) == payer_before - charged
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + charged
+    assert charlie_token.balanceOf(bond_room.address) == 0
+    assert available - event.paymentAmount == one_unit - 1
+    assert event.paymentAmount == charged
+    assert event.refundAmount == one_unit
+
+    if should_auto_restart:
+        assert ledger.epochStart() == end + 50
+        assert ledger.epochEnd() == end + 150
+        assert ledger.paymentAmountAvailInEpoch() == available
+    else:
+        assert ledger.epochStart() == start
+        assert ledger.epochEnd() == end
+        assert ledger.paymentAmountAvailInEpoch() == one_unit - 1
+        assert bond_room.previewRipeBondPayout(bob, 0, one_unit) == 0
+
+        charlie_token.approve(teller, one_unit, sender=bob)
+        state_before = (
+            charlie_token.balanceOf(bob),
+            charlie_token.allowance(bob, teller.address),
+            charlie_token.balanceOf(bond_room.address),
+            charlie_token.balanceOf(endaoment_funds.address),
+            ledger.paymentAmountAvailInEpoch(),
+        )
+        with boa.reverts("must have base ripe payout"):
+            teller.purchaseRipeBond(charlie_token, one_unit, sender=bob)
+        assert (
+            charlie_token.balanceOf(bob),
+            charlie_token.allowance(bob, teller.address),
+            charlie_token.balanceOf(bond_room.address),
+            charlie_token.balanceOf(endaoment_funds.address),
+            ledger.paymentAmountAvailInEpoch(),
+        ) == state_before
+
+
+def test_fractional_payment_on_behalf_refunds_payer(
+    teller, setupRipeBonds, bob, alice, charlie_token_whale, charlie_token,
+    endaoment_funds, ledger, ripe_token, setUserConfig,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = 2 * one_unit - 1
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+    setUserConfig(alice, _canAnyoneBondForUser=True)
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    recipient_payment_before = charlie_token.balanceOf(alice)
+    recipient_ripe_before = ripe_token.balanceOf(alice)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+    epoch_before = ledger.paymentAmountAvailInEpoch()
+
+    payout = teller.purchaseRipeBond(
+        charlie_token, requested, 0, alice, sender=bob,
+    )
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == EIGHTEEN_DECIMALS
+    assert ripe_token.balanceOf(alice) == recipient_ripe_before + payout
+    assert charlie_token.balanceOf(bob) == payer_before - one_unit
+    assert charlie_token.balanceOf(alice) == recipient_payment_before
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + one_unit
+    assert ledger.paymentAmountAvailInEpoch() == epoch_before - one_unit
+    assert event.recipient == alice
+    assert event.caller == bob
+    assert event.paymentAmount == one_unit
+    assert event.refundAmount == one_unit - 1
+
+
+def test_fractional_payment_bad_debt_uses_charged_amount(
+    teller, bond_room, setupRipeBonds, bob, charlie_token_whale, charlie_token,
+    endaoment_funds, ledger, switchboard_alpha, mock_price_source, price_desk,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = 2 * one_unit - 1
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+    charged_usd_value = price_desk.getUsdValue(charlie_token, one_unit)
+    assert charged_usd_value == EIGHTEEN_DECIMALS
+    assert price_desk.getUsdValue(charlie_token, requested) > charged_usd_value
+    ledger.setBadDebt(3 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+    epoch_before = ledger.paymentAmountAvailInEpoch()
+    bond_budget_before = ledger.ripeAvailForBonds()
+    ripe_for_debt_before = ledger.ripePaidOutForBadDebt()
+
+    payout = teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == EIGHTEEN_DECIMALS
+    assert ledger.badDebt() == 2 * EIGHTEEN_DECIMALS
+    assert ledger.ripePaidOutForBadDebt() == ripe_for_debt_before + payout
+    assert ledger.ripeAvailForBonds() == bond_budget_before
+    assert ledger.paymentAmountAvailInEpoch() == epoch_before - one_unit
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + one_unit
+    assert charlie_token.balanceOf(bob) == payer_before - one_unit
+    assert charlie_token.balanceOf(bond_room.address) == 0
+    assert event.paymentAmount == one_unit
+    assert event.refundAmount == one_unit - 1
+    assert event.ripeForBadDebt == payout
+
+
+def test_fractional_payment_booster_consumes_whole_units(
+    teller, setupRipeBonds, bob, charlie_token_whale, charlie_token,
+    endaoment_funds, ledger, bond_booster, switchboard_delta,
+):
+    one_unit = 10 ** charlie_token.decimals()
+    requested = 2 * one_unit - 1
+    setupRipeBonds(
+        _asset=charlie_token,
+        _amountPerEpoch=10 * one_unit,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+    )
+    bond_booster.setBondBooster(
+        (bob, HUNDRED_PERCENT, 10, boa.env.evm.patch.block_number + 1000),
+        sender=switchboard_delta.address,
+    )
+
+    charlie_token.transfer(bob, requested, sender=charlie_token_whale)
+    charlie_token.approve(teller, requested, sender=bob)
+    payer_before = charlie_token.balanceOf(bob)
+    endaoment_before = charlie_token.balanceOf(endaoment_funds.address)
+    epoch_before = ledger.paymentAmountAvailInEpoch()
+
+    payout = teller.purchaseRipeBond(charlie_token, requested, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert payout == 2 * EIGHTEEN_DECIMALS
+    assert bond_booster.unitsUsed(bob) == 1
+    assert charlie_token.balanceOf(bob) == payer_before - one_unit
+    assert charlie_token.balanceOf(endaoment_funds.address) == endaoment_before + one_unit
+    assert ledger.paymentAmountAvailInEpoch() == epoch_before - one_unit
+    assert event.paymentAmount == one_unit
+    assert event.refundAmount == one_unit - 1
+    assert event.baseRipePayout == EIGHTEEN_DECIMALS
+    assert event.ripeBoostBonus == EIGHTEEN_DECIMALS
+
+
 def test_purchase_ripe_bond_payment_unavailable(
     teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, ledger
 ):
@@ -3470,4 +3788,4 @@ def test_purchase_ripe_bond_rounding_errors(
     
     # Verify no tokens are stuck due to rounding
     bond_balance = alpha_token.balanceOf(bond_room.address)
-    assert bond_balance == 0  # All should be transferred to endaoment
+    assert bond_balance == 0  # Whole units are forwarded; the fractional remainder is refunded
