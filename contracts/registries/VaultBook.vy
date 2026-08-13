@@ -41,7 +41,11 @@ from interfaces import Vault
 from interfaces import Department
 
 interface Ledger:
+    def ripeAvailForRewards() -> uint256: view
     def didGetRewardsFromStabClaims(_amount: uint256): nonpayable
+
+interface MissionControl:
+    def isStabVaultId(_vaultId: uint256) -> bool: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
@@ -159,9 +163,20 @@ def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
 
 @external
 def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool:
-    assert registry._isValidAddr(msg.sender) # dev: no perms
-    extcall RipeToken(_ripeToken).mint(msg.sender, _amount)
-    extcall Ledger(_ledger).didGetRewardsFromStabClaims(_amount)
+    vaultId: uint256 = registry._getRegId(msg.sender)
+    assert vaultId != 0 # dev: no perms
+
+    missionControl: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(missionControl).isStabVaultId(vaultId) # dev: not stab vault
+
+    ripeToken: address = addys._getRipeToken()
+    ledger: address = addys._getLedgerAddr()
+    assert _ripeToken == ripeToken # dev: invalid ripe token
+    assert _ledger == ledger # dev: invalid ledger
+    assert _amount <= staticcall Ledger(ledger).ripeAvailForRewards() # dev: insufficient rewards
+
+    extcall RipeToken(ripeToken).mint(msg.sender, _amount)
+    extcall Ledger(ledger).didGetRewardsFromStabClaims(_amount)
     return True
 
 

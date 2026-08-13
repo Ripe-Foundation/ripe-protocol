@@ -2516,8 +2516,10 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     
     expected_actual_rewards = min(theoretical_rewards, ripe_available)
 
-    # Record initial balance
+    # Record the exact canonical reward state before the real claim path.
     initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_ripe_supply = ripe_token.totalSupply()
+    initial_reward_budget = ledger.ripeAvailForRewards()
 
     # Claim from stability pool
     vault_id = vault_book.getRegId(stability_pool)
@@ -2531,6 +2533,8 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     assert actual_rewards <= expected_actual_rewards
     assert actual_rewards == min(theoretical_rewards, ripe_available)
     assert actual_rewards == limited_ripe_available, "Should receive exactly the limited amount available"
+    assert ripe_token.totalSupply() == initial_ripe_supply + limited_ripe_available
+    assert ledger.ripeAvailForRewards() == initial_reward_budget - limited_ripe_available
 
 
 def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
@@ -2601,6 +2605,8 @@ def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
     )
 
     initial_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_ripe_supply = ripe_token.totalSupply()
+    initial_reward_budget = ledger.ripeAvailForRewards()
     vault_id = vault_book.getRegId(stability_pool)
     claim_from_stability_pool(teller,
         vault_id,
@@ -2612,6 +2618,8 @@ def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
         ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) - initial_balance
     )
     assert claimed_reward == 100 * EIGHTEEN_DECIMALS
+    assert ripe_token.totalSupply() == initial_ripe_supply + claimed_reward
+    assert ledger.ripeAvailForRewards() == initial_reward_budget - claimed_reward
     assert ledger.ripeAvailForRewards() == 0
 
 
