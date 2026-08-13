@@ -41,6 +41,17 @@ import os
 from scripts.prepare_defaults import NETWORKS, DEFAULT_NETWORK, Network
 
 MISSION_CONTROL_SOURCE = "contracts/data/MissionControl.vy"
+LEDGER_SOURCE = "contracts/data/Ledger.vy"
+
+# Ledger is the second consumer of a generated defaults contract. Its
+# constructor copies exactly these three, and nothing else in the repo reads
+# Defaults besides it and MissionControl (`grep 'staticcall Defaults'`).
+# tests/test_verify_defaults_coverage.py fails if that stops being true.
+LEDGER_GETTERS = (
+    "ripeAvailForRewards",
+    "ripeAvailForHr",
+    "ripeAvailForBonds",
+)
 SNAPSHOT_BLOCK_RE = re.compile(r"^#\s+snapshot block:\s*(\d+)\s*$", re.MULTILINE)
 
 # Read straight off the live contract; every one of these is either copied
@@ -177,6 +188,32 @@ def verify(network: Network, defaults_path: Path, block_number: int | None) -> i
             f"canPerformLiteAction({signer})",
             replacement.canPerformLiteAction(signer),
             live_call("canPerformLiteAction", signer),
+        )
+
+    # Ledger, the other half. It copies three values from the same defaults
+    # contract, and until this was added none of them was ever checked -- a
+    # generated file could reproduce MissionControl exactly and still hand a
+    # replacement Ledger the wrong RIPE availability for rewards, HR and bonds.
+    #
+    # The third constructor argument is passed as empty(address) deliberately
+    # rather than recovered from the live deployment. It selects the action
+    # block source, takes no part in the Defaults reads above it, and the live
+    # base-mainnet Ledger predates the parameter entirely -- its recorded
+    # constructor args are two addresses, not three. Pinning it to empty keeps
+    # the replacement built for exactly one purpose: observing what Defaults
+    # hands it at construction.
+    ledger_addr = _manifest_address(manifest, "Ledger")
+    live_ledger = w3.eth.contract(
+        address=ledger_addr, abi=manifest["Ledger"]["abi"]
+    )
+    replacement_ledger = boa.load(
+        LEDGER_SOURCE, hq_addr, defaults.address, "0x" + "00" * 20
+    )
+    for name in LEDGER_GETTERS:
+        compare(
+            f"Ledger.{name}",
+            getattr(replacement_ledger, name)(),
+            getattr(live_ledger.functions, name)().call(block_identifier=block),
         )
 
     print(f"compared {compared} live values across {len(assets)} assets")
