@@ -552,7 +552,7 @@ def setAssetDebtTerms(
     mc: address = self._resolveMissionControl(_missionControl)
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
-    assert self._isLtvWithinMaxDeviation(_ltv, assetConfig.debtTerms.ltv, staticcall MissionControl(mc).maxLtvDeviation()) # dev: ltv is outside max deviation
+    maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
 
     debtTerms: cs.DebtTerms = cs.DebtTerms(
         ltv=_ltv,
@@ -562,6 +562,10 @@ def setAssetDebtTerms(
         borrowRate=_borrowRate,
         daowry=_daowry,
     )
+    assert self._isLtvWithinMaxDeviation(debtTerms.ltv, assetConfig.debtTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
+    assert self._isWithinMaxStepDown(debtTerms.redemptionThreshold, assetConfig.debtTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
+    assert self._isWithinMaxStepDown(debtTerms.liqThreshold, assetConfig.debtTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
+    assert self._isWithinMaxStepUp(debtTerms.borrowRate, assetConfig.debtTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
     assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
     return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, _missionControl, [], 0, 0, 0, 0, 0, debtTerms)
 
@@ -591,6 +595,22 @@ def _isValidDebtTerms(_debtTerms: cs.DebtTerms) -> bool:
 
 @view
 @internal
+def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new >= _prev or _prev - _new <= _maxDeviation
+
+
+@view
+@internal
+def _isWithinMaxStepUp(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new <= _prev or _new - _prev <= _maxDeviation
+
+
+@view
+@internal
 def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation: uint256) -> bool:
 
     # cannot set ltv to 0 after already non-zero
@@ -600,8 +620,7 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
     if _prevLtv == 0 or _maxDeviation == 0:
         return True
 
-    lowerBound: uint256 = _prevLtv - min(_maxDeviation, _prevLtv)
-    return HUNDRED_PERCENT > _newLtv and _newLtv >= lowerBound
+    return HUNDRED_PERCENT > _newLtv and self._isWithinMaxStepDown(_newLtv, _prevLtv, _maxDeviation)
 
 
 #####################
@@ -820,10 +839,17 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.ASSET_DEBT_TERMS:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
-        config.debtTerms = p.config.debtTerms
+        previousTerms: cs.DebtTerms = config.debtTerms
+        pendingTerms: cs.DebtTerms = p.config.debtTerms
+        maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
+        assert self._isLtvWithinMaxDeviation(pendingTerms.ltv, previousTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
+        assert self._isWithinMaxStepDown(pendingTerms.redemptionThreshold, previousTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
+        assert self._isWithinMaxStepDown(pendingTerms.liqThreshold, previousTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
+        assert self._isWithinMaxStepUp(pendingTerms.borrowRate, previousTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
+        config.debtTerms = pendingTerms
         assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
-        log AssetDebtTermsSet(asset=p.asset, ltv=p.config.debtTerms.ltv, redemptionThreshold=p.config.debtTerms.redemptionThreshold, liqThreshold=p.config.debtTerms.liqThreshold, liqFee=p.config.debtTerms.liqFee, borrowRate=p.config.debtTerms.borrowRate, daowry=p.config.debtTerms.daowry)
+        log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
     elif actionType == ActionType.ASSET_WHITELIST:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
