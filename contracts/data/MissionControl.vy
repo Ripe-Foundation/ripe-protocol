@@ -341,6 +341,8 @@ def deregisterAsset(_asset: address) -> bool:
     if targetIndex == 0:
         return False
 
+    assert self.assetConfig[_asset].stakersPointsAlloc == 0 and self.assetConfig[_asset].voterPointsAlloc == 0 # dev: active points alloc
+
     # update data
     lastIndex: uint256 = numAssets - 1
     self.numAssets = lastIndex
