@@ -1242,21 +1242,21 @@
         "committed_path": "scripts/abis/MissionControl.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "f4f87612d4b9c49d6436762794ff7a6ca4eb340d19bb849ffd8f039127aa80a0",
-        "creation_executable_prefix_size": 21631,
-        "creation_metadata_sha256": "a8300b975097dcea240acae6d8f8b6c478baef224b74d66ef3ab5756a3dab3c4",
+        "creation_executable_prefix_sha256": "9234ee2826797a02da43bf9abad1503f20c53c952539a12ff051f43dbb31d251",
+        "creation_executable_prefix_size": 21690,
+        "creation_metadata_sha256": "5c096fc1206c73e62fdb2dc8ba89ebd6372536fc75652d938a41a64a1078335b",
         "creation_metadata_size": 78,
-        "creation_sha256": "90eff6f2a8f65f7a820aa3dfdb0f86d33f2deeefd1f5b0c4092c6dff96bee0ff",
-        "creation_size": 21709,
-        "deployed_eip170_headroom": 8512,
+        "creation_sha256": "596588d217c6fd722ba7650cde980e72e33330e25003fc434c99f228a0aa7b79",
+        "creation_size": 21768,
+        "deployed_eip170_headroom": 8453,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "a66885c9d0e9046d1b13300d517ff4ff51b5b48666c85572b9be2b311b21a416",
-        "deployed_runtime_size": 16064,
-        "eip170_headroom": 8608,
-        "runtime_template_sha256": "d449cfde315648a2d13fed883f84134aa7d08ca1d053dc4467ed5934bac5fd42",
-        "runtime_template_size": 15968
+        "deployed_runtime_sha256": "c07b5c2544ef84156251327501b1379aa5877d06c0a75dbbaca5a38af292ba27",
+        "deployed_runtime_size": 16123,
+        "eip170_headroom": 8549,
+        "runtime_template_sha256": "4f26185210a54aa6e8758a2e3ffc4a921be86647227a45d608fe64983c503524",
+        "runtime_template_size": 16027
       },
       "code_layout": {
         "addys": {
@@ -1310,9 +1310,9 @@
         "canonical_sha256": "5ed15c3111a296776a3db9edeecd11f27a68973572154e05a78210c1341c5d89",
         "count": 83
       },
-      "source_git_blob": "ea26c0abfa9b8b03cd174ca7841f0a6fbc3cc84e",
+      "source_git_blob": "4292b162cd6acd356c17c8b690af68cbdb7c03d8",
       "source_path": "contracts/data/MissionControl.vy",
-      "source_sha256": "e88aa25361c0a188b7ff463ba0c3cf13982cc5af842072eb8f771205cb788cd3",
+      "source_sha256": "db9176af792f4fba09ff5e6e5494716e345206ed6e16ff2b9ec41810997f392c",
       "storage_layout": {
         "assetConfig": {
           "n_slots": 1,
@@ -1453,7 +1453,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "89384a3df18447d313fe3db1e007509adebb3e1a54fed7848cb727f3defb65ff"
+      "transitive_compiler_input_integrity": "c347b5d6a34128ccebc58281d291e11f74cb176adbfd19c028fec7bb15120d78"
     },
     "RipeGov": {
       "abi": {
@@ -2285,21 +2285,21 @@
         "committed_path": "scripts/abis/SwitchboardCharlie.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "761289213eb3a15f1b17e3e868797911cd2fe1183de6e82bac8777ed102d3818",
-        "creation_executable_prefix_size": 24909,
-        "creation_metadata_sha256": "ca00aded0a845304072abcae999472cb1176fcc22268df3eee8a2ff86c705806",
+        "creation_executable_prefix_sha256": "edb4f35e1767df1aca2c83cb26e4e1ab782cf11dfa21fd1211767fe277d30df8",
+        "creation_executable_prefix_size": 24937,
+        "creation_metadata_sha256": "8ab0b3c8df7342673c3814533c642fe5ea7a53c4ada26728dd9ee46bbade0f43",
         "creation_metadata_size": 56,
-        "creation_sha256": "4b289b1766abf7d6d13a06b4cc5c2844a64a9ca1a2b4c0ff17b488ac553966c2",
-        "creation_size": 24965,
-        "deployed_eip170_headroom": 731,
+        "creation_sha256": "7e41c45ad9435bfcee7c8d1b628b9a2bfdbbe12d89e1fcb59821a907e52df060",
+        "creation_size": 24993,
+        "deployed_eip170_headroom": 703,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0",
         "deployed_runtime_immutable_data_sha256": "da02c06d7af6d4a82d56dc4575888dc3ddf18a41afd2ea0d93ffb5a0237c13f6",
         "deployed_runtime_immutable_data_size": 160,
-        "deployed_runtime_sha256": "5ffd03b17924091f3a111949178d2c7374458827aa3b37a96e1aa89c24ff965d",
-        "deployed_runtime_size": 23845,
-        "eip170_headroom": 891,
-        "runtime_template_sha256": "e98bc2fdffbf762f22446d772defd44fec5a45f7c748b7898452d776fdf39647",
-        "runtime_template_size": 23685
+        "deployed_runtime_sha256": "e97ceaceb392ffa2a966befbf5ebac3f0af2546c859c37c647c838f0db1669a9",
+        "deployed_runtime_size": 23873,
+        "eip170_headroom": 863,
+        "runtime_template_sha256": "e70521d943017daf78287862245a423e21b17e61a5e46e6b6165ad7f21868846",
+        "runtime_template_size": 23713
       },
       "code_layout": {
         "gov": {
@@ -2371,9 +2371,9 @@
         "canonical_sha256": "6beb2e43547928a6ef14eb77cbe90904efd1f34782b09347e1824f5a4a191856",
         "count": 101
       },
-      "source_git_blob": "3f0005de5102e889a19f27e9c45c5590563efa20",
+      "source_git_blob": "259b53a81db01d6cf1199d58e9c2a012d26172a3",
       "source_path": "contracts/config/SwitchboardCharlie.vy",
-      "source_sha256": "c75f36b266c522db3077fd2da900ca0c358d6b8e2deae36595a1ba6b4d98c2b8",
+      "source_sha256": "8e9294d93af0c3d39433b70085a79e2638c7b6203141966565bde7ca21112082",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2511,7 +2511,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "6027404bb0add996c83d987469fdbc0b525dfe323a0010316d096ad784bd284d"
+      "transitive_compiler_input_integrity": "18b7737fd9ecc08aef518140a42a528070ecea9f7130a89ced8a7edf61c2d6d0"
     },
     "SwitchboardDelta": {
       "abi": {
