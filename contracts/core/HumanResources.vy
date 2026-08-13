@@ -258,9 +258,10 @@ def cancelNewContributor(_aid: uint256) -> bool:
 
     terms: ContributorTerms = self.pendingContributor[_aid]
     assert terms.owner != empty(address) # dev: no pending contributor
-    self._cancelNewPendingContributor(_aid)
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(_aid)
+    self._cancelNewPendingContributor(_aid)
+
     log NewContributorCancelled(
         owner=terms.owner,
         manager=terms.manager,
