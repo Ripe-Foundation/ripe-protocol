@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from config.BluePrint import CORE_TOKENS, CURVE_PARAMS, ADDYS, WHALES
 from conf_utils import filter_logs
 
@@ -147,18 +147,23 @@ def addSeedGreenLiq(
     usdc_token,
     bob,
 ):
-    def addSeedGreenLiq():
+    def addSeedGreenLiq(_usdcAmount=None, _greenAmount=None):
         green_pool = boa.env.lookup_contract(deployed_green_pool)
 
         # usdc
-        usdc_amount = 10_000 * (10 ** usdc_token.decimals())
+        usdc_amount = _usdcAmount
+        if usdc_amount is None:
+            usdc_amount = 10_000 * (10 ** usdc_token.decimals())
         usdc_token.transfer(bob, usdc_amount, sender=WHALES[fork]["usdc"])
         usdc_token.approve(green_pool, usdc_amount, sender=bob)
 
         # green
-        green_amount = 10_000 * EIGHTEEN_DECIMALS
-        green_token.transfer(bob, green_amount, sender=whale)
-        green_token.approve(green_pool, green_amount, sender=bob)
+        green_amount = _greenAmount
+        if green_amount is None:
+            green_amount = 10_000 * EIGHTEEN_DECIMALS
+        if green_amount != 0:
+            green_token.transfer(bob, green_amount, sender=whale)
+            green_token.approve(green_pool, green_amount, sender=bob)
 
         # add liquidity
         green_pool.add_liquidity([usdc_amount, green_amount], 0, bob, sender=bob)
@@ -232,6 +237,179 @@ def setup_mock_undy_v2(mock_undy_v2):
 ####################
 
 
+# These boundary regressions intentionally use the real Base Curve factory and
+# production Endaoment entry points, so they remain in the Base fork lane.
+@pytest.base
+def test_endao_stabilizer_add_green_rounded_zero_ratio(
+    setGreenRefConfig,
+    endaoment,
+    curve_prices,
+    addSeedGreenLiq,
+    usdc_token,
+    deployed_green_pool,
+):
+    green_amount = 1 * EIGHTEEN_DECIMALS
+    initial_usdc_amount = 9_999 * (10 ** usdc_token.decimals())
+    rounding_usdc_amount = 1 * (10 ** usdc_token.decimals())
+    addSeedGreenLiq(initial_usdc_amount, green_amount)
+    setGreenRefConfig(
+        _stabilizerAdjustWeight=50_00,
+        _stabilizerMaxPoolDebt=10_000 * EIGHTEEN_DECIMALS,
+    )
+    addSeedGreenLiq(rounding_usdc_amount, 0)
+
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    pool_balances = green_pool.get_balances()
+    green_balance, green_ratio = curve_prices.getCurvePoolData()
+    normalized_total_pool_balance = green_balance + pool_balances[0] * (
+        10 ** (18 - usdc_token.decimals())
+    )
+    assert curve_prices.greenRefPoolConfig().pool == deployed_green_pool
+    assert green_balance == pool_balances[1] != 0
+    assert green_balance * HUNDRED_PERCENT < normalized_total_pool_balance
+    assert green_ratio == 0
+    assert endaoment.getGreenAmountToAddInStabilizer() == 0
+
+
+@pytest.base
+def test_endao_stabilizer_action_rounded_zero_ratio_is_noop(
+    setGreenRefConfig,
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    addSeedGreenLiq,
+    usdc_token,
+    green_token,
+    whale,
+    bob,
+    switchboard_delta,
+    deployed_green_pool,
+    ledger,
+):
+    green_amount = 1 * EIGHTEEN_DECIMALS
+    initial_usdc_amount = 9_999 * (10 ** usdc_token.decimals())
+    rounding_usdc_amount = 1 * (10 ** usdc_token.decimals())
+    addSeedGreenLiq(initial_usdc_amount, green_amount)
+    setGreenRefConfig(
+        _stabilizerAdjustWeight=50_00,
+        _stabilizerMaxPoolDebt=10_000 * EIGHTEEN_DECIMALS,
+    )
+    addSeedGreenLiq(rounding_usdc_amount, 0)
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+
+    staged_green = 7 * EIGHTEEN_DECIMALS
+    staged_lp = green_pool.balanceOf(bob) // 2
+    assert staged_lp != 0
+    green_token.transfer(endaoment_funds, staged_green, sender=whale)
+    green_pool.transfer(endaoment_funds, staged_lp, sender=bob)
+
+    pool_balances = green_pool.get_balances()
+    green_balance, green_ratio = curve_prices.getCurvePoolData()
+    normalized_total_pool_balance = green_balance + pool_balances[0] * (
+        10 ** (18 - usdc_token.decimals())
+    )
+    assert green_balance == pool_balances[1] != 0
+    assert green_balance * HUNDRED_PERCENT < normalized_total_pool_balance
+    assert green_ratio == 0
+
+    pool_debt_before = ledger.greenPoolDebt(green_pool)
+    green_supply_before = green_token.totalSupply()
+    pool_balances_before = green_pool.get_balances()
+    funds_green_before = green_token.balanceOf(endaoment_funds)
+    funds_lp_before = green_pool.balanceOf(endaoment_funds)
+    endaoment_green_before = green_token.balanceOf(endaoment)
+    endaoment_lp_before = green_pool.balanceOf(endaoment)
+
+    assert not endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+    assert ledger.greenPoolDebt(green_pool) == pool_debt_before
+    assert green_token.totalSupply() == green_supply_before
+    assert green_pool.get_balances() == pool_balances_before
+    assert green_token.balanceOf(endaoment_funds) == funds_green_before
+    assert green_pool.balanceOf(endaoment_funds) == funds_lp_before
+    assert green_token.balanceOf(endaoment) == endaoment_green_before == 0
+    assert green_pool.balanceOf(endaoment) == endaoment_lp_before == 0
+    assert not filter_logs(endaoment, "StabilizerPoolLiqAdded")
+    assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
+
+
+@pytest.base
+def test_endao_stabilizer_add_green_smallest_nonzero_ratio(
+    setGreenRefConfig,
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    addSeedGreenLiq,
+    usdc_token,
+    green_token,
+    whale,
+    deployed_green_pool,
+    ledger,
+):
+    green_amount = 1 * EIGHTEEN_DECIMALS
+    usdc_amount = 9_999 * (10 ** usdc_token.decimals())
+    max_pool_debt = 10_000 * EIGHTEEN_DECIMALS
+    leftover_green = 1_000 * EIGHTEEN_DECIMALS
+    addSeedGreenLiq(usdc_amount, green_amount)
+    setGreenRefConfig(
+        _stabilizerAdjustWeight=50_00,
+        _stabilizerMaxPoolDebt=max_pool_debt,
+    )
+    green_token.transfer(endaoment_funds, leftover_green, sender=whale)
+
+    data = curve_prices.getGreenStabilizerConfig()
+    pool_debt = ledger.greenPoolDebt(deployed_green_pool)
+    actual_leftover_green = green_token.balanceOf(endaoment_funds)
+    assert data.greenRatio == 1
+    assert data.stabilizerMaxPoolDebt > pool_debt
+
+    total_pool_balance = data.greenBalance * HUNDRED_PERCENT // data.greenRatio
+    target_balance = total_pool_balance // 2
+    green_adjust_full = (target_balance - data.greenBalance) * 2
+    green_adjust_weighted = (
+        green_adjust_full * data.stabilizerAdjustWeight // HUNDRED_PERCENT
+    )
+    debt_avail = data.stabilizerMaxPoolDebt - pool_debt
+    expected = min(green_adjust_weighted, debt_avail + actual_leftover_green)
+
+    assert expected == 4_999 * EIGHTEEN_DECIMALS
+    assert endaoment.getGreenAmountToAddInStabilizer() == expected
+
+
+@pytest.base
+def test_endao_stabilizer_add_green_fifty_percent_boundary(
+    setGreenRefConfig,
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    addSeedGreenLiq,
+    green_token,
+    whale,
+    deployed_green_pool,
+    ledger,
+):
+    addSeedGreenLiq()
+    max_pool_debt = 50_000 * EIGHTEEN_DECIMALS
+    leftover_green = 1_000 * EIGHTEEN_DECIMALS
+    setGreenRefConfig(
+        _stabilizerAdjustWeight=100_00,
+        _stabilizerMaxPoolDebt=max_pool_debt,
+    )
+    green_token.transfer(endaoment_funds, leftover_green, sender=whale)
+
+    data = curve_prices.getGreenStabilizerConfig()
+    pool_debt = ledger.greenPoolDebt(deployed_green_pool)
+    # At exactly 50%, the downstream target math also resolves to zero. This
+    # test documents the explicit API boundary and proves no capacity cap is
+    # independently forcing the result.
+    assert data.greenRatio == 50_00
+    assert data.stabilizerAdjustWeight != 0
+    assert data.stabilizerMaxPoolDebt > pool_debt
+    assert data.stabilizerMaxPoolDebt - pool_debt > 0
+    assert green_token.balanceOf(endaoment_funds) == leftover_green
+    assert endaoment.getGreenAmountToAddInStabilizer() == 0
+
+
 @pytest.base
 def test_endao_stabilizer_add_green(
     setGreenRefConfig,
@@ -245,6 +423,7 @@ def test_endao_stabilizer_add_green(
     switchboard_delta,
     deployed_green_pool,
     ledger,
+    green_token,
 ):
     addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
@@ -258,8 +437,24 @@ def test_endao_stabilizer_add_green(
     na, new_ratio = curve_prices.getCurvePoolData()
     _test(new_ratio, 25_00)
 
-    # test expected green amount
-    expected_green_amount = endaoment.getGreenAmountToAddInStabilizer()
+    # test expected green amount using the configured debt and leftover capacity
+    data = curve_prices.getGreenStabilizerConfig()
+    pool_debt = ledger.greenPoolDebt(deployed_green_pool)
+    leftover_green = green_token.balanceOf(endaoment_funds)
+    assert 0 < data.greenRatio < 50_00
+    assert data.stabilizerMaxPoolDebt > pool_debt
+    debt_avail = data.stabilizerMaxPoolDebt - pool_debt
+    total_pool_balance = data.greenBalance * HUNDRED_PERCENT // data.greenRatio
+    target_balance = total_pool_balance // 2
+    green_adjust_full = (target_balance - data.greenBalance) * 2
+    green_adjust_weighted = (
+        green_adjust_full * data.stabilizerAdjustWeight // HUNDRED_PERCENT
+    )
+    expected_green_amount = min(
+        green_adjust_weighted,
+        debt_avail + leftover_green,
+    )
+    assert endaoment.getGreenAmountToAddInStabilizer() == expected_green_amount
     _test(expected_green_amount, 10_000 * EIGHTEEN_DECIMALS)
 
     # stabilize pool
