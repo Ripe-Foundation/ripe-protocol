@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs, get_boa_dev_reasons
 
 
@@ -533,6 +533,71 @@ def test_repay_during_liquidation(
     # verify debt is cleared
     assert ledger.userDebt(bob).amount == borrow_amount - repay_value
     assert not ledger.isUserInLiquidation(bob)
+
+
+@pytest.mark.parametrize(
+    "department_fixture",
+    ["auction_house", "deleverage", "credit_redeem"],
+)
+def test_repay_from_department_keeps_zero_recipient_no_burn_no_refund_behavior(
+    department_fixture,
+    request,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    debt = 50 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt, bob, False, sender=bob) == debt
+
+    caller = request.getfixturevalue(department_fixture)
+    user_debt = ledger.userDebt(bob)
+    repay_value = 10 * EIGHTEEN_DECIMALS
+    supply_before = green_token.totalSupply()
+    debtor_green_before = green_token.balanceOf(bob)
+    engine_green_before = green_token.balanceOf(credit_engine)
+    zero_green_before = green_token.balanceOf(ZERO_ADDRESS)
+
+    assert credit_engine.repayFromDept(
+        bob,
+        user_debt,
+        repay_value,
+        0,
+        0,
+        sender=caller.address,
+    )
+
+    # CreditEngine is the direct callee, so its computation includes child logs.
+    assert not filter_logs(credit_engine, "Transfer")
+    repay_log = filter_logs(credit_engine, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert repay_log.repayValue == repay_value
+    assert repay_log.refundAmount == 0
+    assert not repay_log.refundWasSavingsGreen
+
+    assert ledger.userDebt(bob).amount == debt - repay_value
+    assert green_token.totalSupply() == supply_before
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert green_token.balanceOf(credit_engine) == engine_green_before
+    assert green_token.balanceOf(ZERO_ADDRESS) == zero_green_before
 
 
 def test_repay_during_auction_purchase(

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import boa
 
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from conf_utils import buy_fungible_auction, filter_logs
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
@@ -1451,6 +1451,115 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     final_ltv = user_debt_final.amount * 100 // bt_final.collateralVal if bt_final.collateralVal > 0 else 0
     assert final_ltv < 80  # LTV is definitely safe (should be around 76% based on our calculation)
     
+
+def test_ah_auction_repayment_burns_and_refunds_real_nonzero_liq_user(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    credit_engine,
+    ledger,
+    green_token,
+    savings_green,
+    whale,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    debt = 100 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt, bob, False, sender=bob) == debt
+
+    # $110 of collateral against $100 debt is liquidatable but still creates
+    # an auction purchase whose GREEN spend can exceed the remaining debt.
+    mock_price_source.setPrice(
+        alpha_token,
+        55 * EIGHTEEN_DECIMALS // 100,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
+    assert auction_log.liqUser == bob
+    assert auction_log.liqUser != ZERO_ADDRESS
+    assert ledger.hasFungibleAuction(
+        bob,
+        auction_log.vaultId,
+        alpha_token,
+    )
+
+    debt_before = ledger.userDebt(bob).amount
+    supply_before = green_token.totalSupply()
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    payer_sgreen_before = savings_green.balanceOf(alice)
+    savings_assets_before = green_token.balanceOf(savings_green)
+
+    payment = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    green_spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction_log.vaultId,
+        alpha_token,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    )
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert repay_log.repayValue == debt_before
+    assert repay_log.refundAmount == green_spent - debt_before
+    assert repay_log.refundAmount > 0
+    assert repay_log.refundWasSavingsGreen
+    assert ledger.userDebt(bob).amount == 0
+
+    # Auction repayment still burns only actual debt and routes its sGREEN
+    # overage to the liquidation user, never to the auction buyer.
+    assert green_token.totalSupply() == supply_before - debt_before
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) > debtor_sgreen_before
+    assert savings_green.balanceOf(alice) == payer_sgreen_before
+    assert (
+        green_token.balanceOf(savings_green) - savings_assets_before
+        == repay_log.refundAmount
+    )
+    purchase_log = filter_logs(teller, "FungAuctionPurchased")[0]
+    assert purchase_log.liqUser == bob
+    assert purchase_log.greenSpent == green_spent
+
 
 def test_ah_auction_collateral_amounts_and_discount_verification(
     setGeneralConfig,
