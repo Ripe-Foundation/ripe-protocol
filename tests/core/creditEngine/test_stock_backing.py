@@ -91,10 +91,11 @@ def getUserAssetAndAmountAtIndex(
 
 @view
 @external
-def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
-    if true_zero or _asset != asset:
-        return 0
-    return nominal_amount
+def doesUserHaveBalance(
+    _user: address,
+    _asset: address,
+) -> bool:
+    return not true_zero and _asset == asset and nominal_amount != 0
 
 @view
 @external

@@ -740,15 +740,16 @@ def _getUserBorrowTerms(
             if debtTerms.ltv == 0:
                 continue
 
-            # A zero usable amount is a quarantine only when the user still has
-            # a nominal/reward share and the whole vault has zero usable amount.
-            # The vault-wide condition excludes per-user share-rounding dust.
-            if amount == 0 and staticcall Vault(vaultAddr).getUserLootBoxShare(_user, asset) != 0 and staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
-                bt.hasQuarantinedAsset = True
-
             # collateral value, max debt
             collateralVal: uint256 = 0
-            if amount != 0:
+            if amount == 0:
+                # A zero usable amount is a quarantine only when the user still
+                # has a nominal balance and the whole vault has zero usable amount.
+                # The vault-wide condition excludes per-user share-rounding dust.
+                if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
+                    if staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset):
+                        bt.hasQuarantinedAsset = True
+            else:
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 

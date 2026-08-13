@@ -25,7 +25,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Ledger": 13_306,
     "Lootbox": 22_993,
     "RipeGov": 23_257,
-    "CreditEngine": 24_555,
+    "CreditEngine": 24_568,
     "StabilityPool": 24_371,
 }
 
@@ -48,17 +48,17 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit after the custody-shortfall and
-# partner-liquidity changes: Teller 358, CreditEngine 21, StabilityPool 263,
+# partner-liquidity changes: Teller 358, CreditEngine 8, StabilityPool 263,
 # SwitchboardCharlie 819, SwitchboardAlpha 339, Lootbox 1,583, RipeGov 1,271,
 # SwitchboardBravo 1,073, SwitchboardEcho 1,472, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
-# granted RH-D029 for this exact 21-byte-headroom quarantine artifact. Removing
+# granted RH-D029 for this exact 8-byte-headroom reward-suppression artifact. Removing
 # Teller's singular deleverage API moved it above the floor, so RH-D027 and its
 # exact identity self-retire in this candidate. See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
-    "CreditEngine": 21,  # RH-D029; exact quarantine artifact, zero growth
+    "CreditEngine": 8,  # RH-D029; exact reward-suppression artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -128,19 +128,19 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "credit_engine",
         "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
-            "5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946"
+            "cc1ecad3b798bef4fd9788f1885e32736beea833fe9672c7840f555d89ad13e4"
         ),
         "runtime_sha256": (
-            "5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac"
+            "9acae4cc64812f5fbe6039d7d83bc341b5d0b1a0ee31b999616f2d9724254ecf"
         ),
-        "runtime_template_bytes": 24_459,
-        "deployed_runtime_bytes": 24_555,
+        "runtime_template_bytes": 24_472,
+        "deployed_runtime_bytes": 24_568,
         "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
             "0x00000000000000000000000000000000000000A1",
         ),
         "deployed_sha256": (
-            "ce80ba109e99d52ee5983eb7f9b40e994392b241d29268ad754315778a2dc97e"
+            "d8a4631991ee69c5a8e8dd08619e41c1099a2e20cbe32b659c35e92cb7d0b06b"
         ),
     },
 }

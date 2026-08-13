@@ -758,15 +758,19 @@ does not continue this approval.
 
 ### RH-D028 — BasicVault custody-shortfall quarantine is account-scoped
 
-**Status:** Owner-accepted on 12 August 2026 for the exact candidate on
-`codex/rh-basic-vault-quarantine`, based at
-`bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
+**Status:** Owner-accepted on 12 August 2026 and revised on 13 August 2026 for
+the exact B-AUD-008 candidate on
+`codex/rh-basic-vault-reward-suppression`, originally reviewed at
+`f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
+remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`.
 
 The quarantine remains dynamically derived and has no stored quarantine state.
 An asset marks an account quarantined only when all four conditions hold: the
-position has positive LTV, its usable amount is zero, the user's nominal or
-reward share is nonzero, and the vault-wide usable total is zero. The complete
-condition excludes share-rounding dust.
+position has positive LTV, its usable amount is zero, the user's nominal balance
+still exists, and the vault-wide usable total is zero. CreditEngine uses
+`doesUserHaveBalance` for that nominal-position fact; it does not reuse a reward
+share as a collateral or quarantine oracle. The complete condition excludes
+share-rounding dust.
 
 **Accepted account scope.** If any position satisfies that classifier, the
 indebted account as a whole cannot borrow more or withdraw positive-LTV
@@ -778,62 +782,69 @@ Repayment, healthy deposits into other assets, and the governance-controlled
 `swapCollateral` path remain available. Ordinary behavior resumes automatically
 when custody is restored.
 
-**Rewards remain outside quarantine.** Lootbox stays byte-for-byte identical to
-the base commit. Staker and voter points continue at their configured rates.
-General points retain the existing behavior: the last recorded USD value accrues
-through the first asset-specific update after the shortfall, that update refreshes
-the value to zero while usable custody remains zero, and ordinary accrual resumes
-after custody restoration. Governance may use the existing timelocked asset
-configuration path if incident-specific allocation suppression is desired. This
-explicitly replaces the candidate's earlier automatic reward-suppression policy;
-quarantine does not modify configured allocations or previously earned points.
+**Current user rewards are custody-suppressed.** Lootbox itself stays
+byte-for-byte identical to the base commit, but BasicVault returns zero from
+`getUserLootBoxShare` while actual custody is below nominal liabilities. On the
+affected asset's next update, Lootbox checkpoints that user's current share to
+zero; no further user balance points accrue until custody is restored, and the
+deficient interval is not caught up. Previously earned points are preserved.
+Configured asset allocations are not mutated: fixed staker and voter points
+continue at their configured rates, while general points retain the existing
+first-touch behavior—the last recorded USD value accrues through the first
+asset-specific update, then refreshes to zero until custody recovery. Exact
+custody restoration re-enables the current share and ordinary future accrual.
 
 Type-1 health and threshold views remain truthful mathematical reports even while
 the corresponding forced-action eligibility views return false.
 
 This bounded owner decision supersedes RH-D020's parked zero-backing instruction
-only for the exact custody-shortfall candidate above. It does not authorize a
-commit, publication, integration, deployment, configuration, activation,
+only for the exact custody-shortfall candidate above. The owner's subsequent PR
+instruction authorizes this package's commit, branch push, and PR publication;
+it does not authorize integration, deployment, configuration, activation,
 liquidation, redemption, deleverage, recovery transaction, or release, and it
 does not open a broader bad-debt or settlement redesign.
 
-**Source:** `tests/vaults/test_basic_vault_quarantine.py` and the exact candidate
-diff against `bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
+**Source:** [`evidence/basic-vault-reward-suppression-waiver.md`](evidence/basic-vault-reward-suppression-waiver.md),
+`tests/vaults/test_basic_vault_quarantine.py`, and the exact candidate diff
+against `f9152f27ab8b14ede0ce562974430d57168960b0`.
 
-### RH-D029 — CreditEngine carries an exact quarantine-version waiver at 21 bytes
+### RH-D029 — CreditEngine carries an exact BasicVault reward-suppression waiver at 8 bytes
 
-**Status:** Owner-granted on 12 August 2026 for the exact RH-D028 candidate with
-the defensive debt-type guards restored.
+**Status:** Owner-granted on 13 August 2026 for the exact B-AUD-008 candidate.
+This replaces the prior 21-byte RH-D029 identity; it does not create a second or
+cumulative waiver.
 
-The ratified 200-byte minimum remains controlling for non-waived contracts.
-RH-D028 changes CreditEngine and, with the defensive debt-type guards restored,
-produces a 24,555-byte deployed runtime, including immutable data, leaving **21
-bytes** before EIP-170. A narrow behavior-preserving refactor inlines the
-single-use debt-threshold helper; no quarantine detection condition was removed.
-The owner accepts that exact margin.
+The ratified 200-byte minimum remains controlling for non-waived contracts. The
+B-AUD-008 correction makes BasicVault's current Lootbox share zero while its
+custody is below nominal liabilities. CreditEngine therefore detects a nominal
+position through `doesUserHaveBalance` rather than using that now-suppressed
+reward share as a collateral/quarantine oracle. The resulting CreditEngine
+deployed runtime is 24,568 bytes including immutable data, leaving **8 bytes**
+before EIP-170. The owner accepts that exact, technically deployable margin.
 
 **What exactly is waived.** One contract version and one complete deployed-byte
 identity at a declared constructor input:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/CreditEngine.vy` SHA-256 | `5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946` |
-| Runtime-template SHA-256 (immutable-free) | `5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac` |
-| Runtime-template bytes | 24,459 |
-| Deployed runtime bytes, including immutables | 24,555 |
-| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `ce80ba109e99d52ee5983eb7f9b40e994392b241d29268ad754315778a2dc97e` |
+| `contracts/core/CreditEngine.vy` SHA-256 | `cc1ecad3b798bef4fd9788f1885e32736beea833fe9672c7840f555d89ad13e4` |
+| Runtime-template SHA-256 (immutable-free) | `9acae4cc64812f5fbe6039d7d83bc341b5d0b1a0ee31b999616f2d9724254ecf` |
+| Runtime-template bytes | 24,472 |
+| Deployed runtime bytes, including immutables | 24,568 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `d8a4631991ee69c5a8e8dd08619e41c1099a2e20cbe32b659c35e92cb7d0b06b` |
 
 The declared HQ is a deterministic test input, not a production address. Actual
 constructor binding remains a separate deployment concern. The governed artifact
 ledger separately binds its declared production-capture inputs.
 
-**Residual risk accepted.** Only 21 bytes remain before EIP-170, and this waiver
+**Residual risk accepted.** Only 8 bytes remain before EIP-170, and this waiver
 permits **0 bytes of growth**. Any CreditEngine source or compiler-output change,
 including a same-size change, invalidates the pinned identity and reopens this
 decision. A future change must restore at least 200 bytes or receive a new exact
 owner waiver; refreshing these values merely to make a test pass is prohibited.
 
-**Source:** `tests/test_vault_pointer_runtime_sizes.py` and
+**Source:** [`evidence/basic-vault-reward-suppression-waiver.md`](evidence/basic-vault-reward-suppression-waiver.md),
+`tests/test_vault_pointer_runtime_sizes.py`, and
 `config/contract-artifact-expectations.json`.
 
 ## Maintenance rule
@@ -843,7 +854,8 @@ When an owner decision changes, update:
 1. the controlling decision/evidence record;
 2. this register;
 3. [`status.yaml`](status.yaml), preserving exact identifier/title parity; and
-4. the generated dashboard.
+4. the generated dashboard, when present. RH-D024 currently keeps the dashboard
+   extracted from the active tree, so there is no dashboard artifact to regenerate.
 
 Keep the distinction between:
 

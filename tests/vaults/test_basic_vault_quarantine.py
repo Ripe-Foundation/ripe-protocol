@@ -131,6 +131,13 @@ def test_quarantine_detection_borrow_block_and_automatic_recovery(
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
     debt, terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     assert debt.amount == 50 * EIGHTEEN_DECIMALS
+    assert simple_erc20_vault.getUserLootBoxShare(bob, stock_token) == 0
+    stock_index = simple_erc20_vault.indexOfUserAsset(bob, stock_token)
+    assert simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, stock_index) == (
+        stock_token.address,
+        True,
+    )
+    assert simple_erc20_vault.doesUserHaveBalance(bob, stock_token)
     assert terms.hasQuarantinedAsset
     assert terms.collateralVal == 0
     assert simple_erc20_vault.getTotalAmountForVault(stock_token) == 0
@@ -558,7 +565,7 @@ def test_share_rounding_dust_does_not_trigger_quarantine(
     assert not credit_engine.getUserBorrowTerms(alice, False).hasQuarantinedAsset
 
 
-def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
+def test_zero_ltv_shortfall_suppresses_user_rewards_without_debt_quarantine(
     stock_token,
     simple_erc20_vault,
     setGeneralConfig,
@@ -571,6 +578,7 @@ def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
     credit_engine,
     lootbox,
     ledger,
+    switchboard_alpha,
     deploy3r,
     bob,
 ):
@@ -585,15 +593,20 @@ def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
         _shouldSwapInStabPools=False,
     )
     setRipeRewardsConfig(True)
+    ledger.setRipeAvailForRewards(
+        1_000 * EIGHTEEN_DECIMALS,
+        sender=switchboard_alpha.address,
+    )
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
     assert _deposit(
         stock_token,
         simple_erc20_vault,
         teller,
         bob,
-        100 * EIGHTEEN_DECIMALS,
+        deposit_amount,
         deploy3r,
-    ) == 100 * EIGHTEEN_DECIMALS
+    ) == deposit_amount
 
     boa.env.time_travel(blocks=10)
     lootbox.updateDepositPoints(
@@ -603,9 +616,84 @@ def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
         stock_token,
         sender=teller.address,
     )
-    before = ledger.assetDepositPoints(3, stock_token)
+    healthy_user = ledger.userDepositPoints(bob, 3, stock_token)
+    healthy_asset = ledger.assetDepositPoints(3, stock_token)
+    claimable_before = lootbox.getClaimableDepositLootForAsset(bob, 3, stock_token)
+    assert healthy_user.balancePoints > 0
+    assert healthy_user.lastBalance == deposit_amount // healthy_asset.precision
+    assert healthy_asset.lastBalance == healthy_user.lastBalance
+    assert claimable_before > 0
+
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
     assert not credit_engine.getUserBorrowTerms(bob, False).hasQuarantinedAsset
+    assert simple_erc20_vault.getUserLootBoxShare(bob, stock_token) == 0
+    stock_index = simple_erc20_vault.indexOfUserAsset(bob, stock_token)
+    assert simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, stock_index) == (
+        stock_token.address,
+        True,
+    )
+    assert simple_erc20_vault.userBalances(bob, stock_token) == deposit_amount
+    assert simple_erc20_vault.totalBalances(stock_token) == deposit_amount
+
+    # Enumeration remains nominal, so Lootbox visits the asset and writes the
+    # custody-suppressed share into the user's current reward balance.
+    lootbox.updateDepositPoints(
+        bob,
+        3,
+        simple_erc20_vault,
+        stock_token,
+        sender=teller.address,
+    )
+    suppressed_user = ledger.userDepositPoints(bob, 3, stock_token)
+    suppressed_asset = ledger.assetDepositPoints(3, stock_token)
+    assert suppressed_user.lastBalance == 0
+    assert suppressed_user.balancePoints == healthy_user.balancePoints
+    assert suppressed_asset.lastBalance == (
+        healthy_asset.lastBalance - healthy_user.lastBalance
+    )
+    assert suppressed_asset.lastBalance == 0
+    assert lootbox.getClaimableDepositLootForAsset(bob, 3, stock_token) == claimable_before
+
+    # Historical balance points remain, but no new user balance points accrue
+    # after the suppressed zero balance has been checkpointed.
+    boa.env.time_travel(blocks=10)
+    lootbox.updateDepositPoints(
+        bob,
+        3,
+        simple_erc20_vault,
+        stock_token,
+        sender=teller.address,
+    )
+    still_suppressed_user = ledger.userDepositPoints(bob, 3, stock_token)
+    still_suppressed_asset = ledger.assetDepositPoints(3, stock_token)
+    assert still_suppressed_user.lastBalance == 0
+    assert still_suppressed_user.balancePoints == suppressed_user.balancePoints
+    assert still_suppressed_asset.lastBalance == 0
+    assert still_suppressed_asset.ripeStakerPoints > suppressed_asset.ripeStakerPoints
+    assert still_suppressed_asset.ripeVotePoints > suppressed_asset.ripeVotePoints
+    assert lootbox.getClaimableDepositLootForAsset(bob, 3, stock_token) >= claimable_before
+
+    # Exact custody restoration is sufficient: no storage reset or governance
+    # cleanup is needed, and no balance points are caught up for the deficient interval.
+    stock_token.mint(simple_erc20_vault, 1, sender=deploy3r)
+    assert simple_erc20_vault.getUserLootBoxShare(bob, stock_token) == deposit_amount
+    before_recovery_user = ledger.userDepositPoints(bob, 3, stock_token)
+    before_recovery_asset = ledger.assetDepositPoints(3, stock_token)
+    expected_stored_share = deposit_amount // before_recovery_asset.precision
+    lootbox.updateDepositPoints(
+        bob,
+        3,
+        simple_erc20_vault,
+        stock_token,
+        sender=teller.address,
+    )
+    recovered_user = ledger.userDepositPoints(bob, 3, stock_token)
+    recovered_asset = ledger.assetDepositPoints(3, stock_token)
+    assert recovered_user.lastBalance == expected_stored_share
+    assert recovered_user.balancePoints == before_recovery_user.balancePoints
+    assert recovered_asset.lastBalance == (
+        before_recovery_asset.lastBalance + expected_stored_share
+    )
 
     boa.env.time_travel(blocks=10)
     lootbox.updateDepositPoints(
@@ -615,9 +703,133 @@ def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
         stock_token,
         sender=teller.address,
     )
-    after = ledger.assetDepositPoints(3, stock_token)
-    assert after.ripeStakerPoints > before.ripeStakerPoints
-    assert after.ripeVotePoints > before.ripeVotePoints
+    resumed_user = ledger.userDepositPoints(bob, 3, stock_token)
+    assert resumed_user.balancePoints == recovered_user.balancePoints + expected_stored_share * 10
+    assert resumed_user.lastBalance == expected_stored_share
+
+
+def test_shortfall_checkpoints_each_normalized_user_share_and_leaves_healthy_asset_untouched(
+    stock_token,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    setRipeRewardsConfig,
+    mock_price_source,
+    teller,
+    lootbox,
+    ledger,
+    deploy3r,
+    bob,
+    alice,
+):
+    bob_stock = 100 * EIGHTEEN_DECIMALS
+    alice_stock = 50 * EIGHTEEN_DECIMALS
+    alice_alpha = 40 * EIGHTEEN_DECIMALS
+    _setup_stock_position(
+        stock_token,
+        simple_erc20_vault,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+        mock_price_source,
+        teller,
+        deploy3r,
+        bob,
+        deposit_amount=bob_stock,
+        borrow_amount=0,
+    )
+    assert _deposit(
+        stock_token,
+        simple_erc20_vault,
+        teller,
+        alice,
+        alice_stock,
+        deploy3r,
+    ) == alice_stock
+    _configure_asset(alpha_token, 3, setAssetConfig, createDebtTerms)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    alpha_token.transfer(alice, alice_alpha, sender=alpha_token_whale)
+    alpha_token.approve(teller, alice_alpha, sender=alice)
+    assert teller.deposit(
+        alpha_token,
+        alice_alpha,
+        alice,
+        simple_erc20_vault,
+        sender=alice,
+    ) == alice_alpha
+    setRipeRewardsConfig(True)
+
+    for user, asset in (
+        (bob, stock_token),
+        (alice, stock_token),
+        (alice, alpha_token),
+    ):
+        lootbox.updateDepositPoints(
+            user,
+            3,
+            simple_erc20_vault,
+            asset,
+            sender=teller.address,
+        )
+
+    bob_before = ledger.userDepositPoints(bob, 3, stock_token)
+    alice_before = ledger.userDepositPoints(alice, 3, stock_token)
+    stock_before = ledger.assetDepositPoints(3, stock_token)
+    alpha_user_before = ledger.userDepositPoints(alice, 3, alpha_token)
+    alpha_before = ledger.assetDepositPoints(3, alpha_token)
+    assert stock_before.precision == 10**9
+    assert bob_before.lastBalance == bob_stock // stock_before.precision
+    assert alice_before.lastBalance == alice_stock // stock_before.precision
+    assert stock_before.lastBalance == bob_before.lastBalance + alice_before.lastBalance
+
+    _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
+    for user, nominal in ((bob, bob_stock), (alice, alice_stock)):
+        assert simple_erc20_vault.getUserLootBoxShare(user, stock_token) == 0
+        assert simple_erc20_vault.userBalances(user, stock_token) == nominal
+        index = simple_erc20_vault.indexOfUserAsset(user, stock_token)
+        assert simple_erc20_vault.getUserAssetAtIndexAndHasBalance(user, index) == (
+            stock_token.address,
+            True,
+        )
+
+    assert simple_erc20_vault.getUserLootBoxShare(alice, alpha_token) == alice_alpha
+    lootbox.updateDepositPoints(
+        bob,
+        3,
+        simple_erc20_vault,
+        stock_token,
+        sender=teller.address,
+    )
+    bob_after = ledger.userDepositPoints(bob, 3, stock_token)
+    alice_unchanged = ledger.userDepositPoints(alice, 3, stock_token)
+    stock_after_bob = ledger.assetDepositPoints(3, stock_token)
+    assert bob_after.lastBalance == 0
+    assert alice_unchanged.lastBalance == alice_before.lastBalance
+    assert stock_after_bob.lastBalance == stock_before.lastBalance - bob_before.lastBalance
+    assert ledger.userDepositPoints(alice, 3, alpha_token) == alpha_user_before
+    assert ledger.assetDepositPoints(3, alpha_token) == alpha_before
+
+    lootbox.updateDepositPoints(
+        alice,
+        3,
+        simple_erc20_vault,
+        stock_token,
+        sender=teller.address,
+    )
+    alice_after = ledger.userDepositPoints(alice, 3, stock_token)
+    stock_after_alice = ledger.assetDepositPoints(3, stock_token)
+    assert alice_after.lastBalance == 0
+    assert stock_after_alice.lastBalance == (
+        stock_after_bob.lastBalance - alice_before.lastBalance
+    )
+    assert stock_after_alice.lastBalance == 0
+    assert ledger.userDepositPoints(alice, 3, alpha_token) == alpha_user_before
+    assert ledger.assetDepositPoints(3, alpha_token) == alpha_before
 
 
 @pytest.mark.parametrize(
@@ -669,7 +881,9 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         sender=teller.address,
     )
     before = ledger.assetDepositPoints(3, stock_token)
+    user_before = ledger.userDepositPoints(bob, 3, stock_token)
     global_before = ledger.globalDepositPoints()
+    assert user_before.lastBalance > 0
     assert before.ripeVotePoints > 0
     if stakers_alloc == 0:
         assert before.ripeGenPoints > 0
@@ -678,6 +892,12 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
     configured_before = mission_control.getDepositPointsConfig(stock_token)
 
     _create_custody_shortfall(stock_token, simple_erc20_vault, deploy3r)
+    assert simple_erc20_vault.getUserLootBoxShare(bob, stock_token) == 0
+    stock_index = simple_erc20_vault.indexOfUserAsset(bob, stock_token)
+    assert simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, stock_index) == (
+        stock_token.address,
+        True,
+    )
     boa.env.time_travel(blocks=10)
     lootbox.updateDepositPoints(
         bob,
@@ -687,7 +907,11 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         sender=teller.address,
     )
     quarantined = ledger.assetDepositPoints(3, stock_token)
+    suppressed_user = ledger.userDepositPoints(bob, 3, stock_token)
     global_quarantined = ledger.globalDepositPoints()
+    assert suppressed_user.lastBalance == 0
+    assert suppressed_user.balancePoints >= user_before.balancePoints
+    assert quarantined.lastBalance == 0
     if stakers_alloc == 0:
         assert quarantined.ripeStakerPoints == before.ripeStakerPoints
         assert global_quarantined.ripeStakerPoints >= global_before.ripeStakerPoints
@@ -723,6 +947,10 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         sender=teller.address,
     )
     recovered = ledger.assetDepositPoints(3, stock_token)
+    recovered_user = ledger.userDepositPoints(bob, 3, stock_token)
+    assert recovered_user.lastBalance == (
+        simple_erc20_vault.userBalances(bob, stock_token) // recovered.precision
+    )
     assert recovered.ripeVotePoints > quarantined.ripeVotePoints
     if stakers_alloc == 0:
         assert recovered.ripeGenPoints > quarantined.ripeGenPoints
@@ -730,7 +958,7 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
         assert recovered.ripeStakerPoints > quarantined.ripeStakerPoints
 
 
-def test_unrelated_update_does_not_change_legacy_quarantine_rewards(
+def test_unrelated_reward_update_preserves_shortfall_asset_fixed_allocation_state(
     stock_token,
     simple_erc20_vault,
     alpha_token,
@@ -813,7 +1041,8 @@ def test_unrelated_update_does_not_change_legacy_quarantine_rewards(
         sender=teller.address,
     )
     # Updating an unrelated healthy asset does not mutate this asset's record.
-    # Its next own calculation keeps using the configured staker/voter allocs.
+    # Its next own calculation keeps using the configured fixed allocations,
+    # even though the affected user's current balance share is suppressed.
     assert ledger.assetDepositPoints(3, stock_token) == stock_before
 
     boa.env.time_travel(blocks=10)

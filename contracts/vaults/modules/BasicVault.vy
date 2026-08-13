@@ -124,8 +124,15 @@ def _getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOn
 @view
 @internal
 def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
-    # used in Lootbox.vy
-    return vaultData.userBalances[_user][_asset]
+    # current reward share used in Lootbox.vy
+    userBalance: uint256 = vaultData.userBalances[_user][_asset]
+    if userBalance == 0:
+        return 0
+
+    if staticcall IERC20(_asset).balanceOf(self) < vaultData.totalBalances[_asset]:
+        return 0
+
+    return userBalance
 
 
 @view

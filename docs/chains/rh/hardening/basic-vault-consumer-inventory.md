@@ -1,9 +1,10 @@
 # BasicVault consumer inventory
 
-> **10 August 2026 repository currentness:** the shared BasicVault safety change
-> is integrated in the current `rh` source tree. This source state does not
-> modify an immutable deployed vault, configure an asset, or activate a launch
-> route.
+> **13 August 2026 candidate currentness:** this inventory is refreshed against
+> the exact local B-AUD-008 source candidate, originally reviewed at
+> `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
+> remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`. The package does not modify an
+> immutable deployed vault, configure an asset, or activate a launch route.
 
 This is the G4 inventory rooted at feature baseline
 `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`
@@ -26,12 +27,17 @@ instead of being interpreted as usable backing
 
 Position discovery may remain nominal: a consumer may locate an asset or learn
 that a nominal balance exists, but it must obtain a backing-aware amount before
-using the position for value or borrowing. Capability lookup and Lootbox reward
-bookkeeping are not collateral-value or borrowing consumers and are retained
-as explicit included exceptions. In particular, Lootbox's vault-total and
-loot-share reads affect reward accounting, not CreditEngine collateral value
-([Lootbox source](../../../../contracts/core/Lootbox.vy#L912),
-[CreditEngine source](../../../../contracts/core/CreditEngine.vy#L723)).
+using the position for value or borrowing. CreditEngine uses that distinction
+explicitly: a backing-aware zero vault total plus a nominal user-balance bit
+identifies custody quarantine without treating nominal balance as collateral.
+
+Capability lookup remains a nominal included exception. Lootbox reward reads
+are included but no longer classified as nominal: BasicVault suppresses
+`getUserLootBoxShare` during a custody shortfall, while the already
+backing-aware `getTotalAmountForVault` refreshes the vault's reward USD value to
+zero. Neither getter supplies CreditEngine collateral value
+([Lootbox source](../../../../contracts/core/Lootbox.vy#L892),
+[CreditEngine source](../../../../contracts/core/CreditEngine.vy#L749)).
 
 ## Frozen machine inventory
 
@@ -44,13 +50,13 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
-    "contracts/core/CreditEngine.vy": "96e7deef17d5fe094c964090850cae9eb9293350eff94567519444631701deb6",
-    "contracts/core/CreditRedeem.vy": "36daec6010821ddc5a0da31e958c692869bfdd7797fc90431e5922f9bb516937",
-    "contracts/core/Deleverage.vy": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
-    "contracts/core/HumanResources.vy": "7422f2dee9b5898b0f163371477bbea7c4a9b03a22b393e15594bbaadb00cddb",
-    "contracts/core/Lootbox.vy": "279b859a6e5234676e091cecb8736aeadac68bc8f1b909267b7a06c69a901f43",
-    "contracts/core/Teller.vy": "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476",
+    "contracts/core/AuctionHouse.vy": "b575591d3d796d9a9ac6b9a07d1828ecf45a0b219442df13b4eb1fc6902541e3",
+    "contracts/core/CreditEngine.vy": "cc1ecad3b798bef4fd9788f1885e32736beea833fe9672c7840f555d89ad13e4",
+    "contracts/core/CreditRedeem.vy": "af05327acae0002b005fccd5ff319aef911947542e36ae11bddcab79e0f46711",
+    "contracts/core/Deleverage.vy": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
+    "contracts/core/HumanResources.vy": "d3d16ed31349cae16e901e02b48719922e891a23139a51b71f3845a652115942",
+    "contracts/core/Lootbox.vy": "18ad4dbe47920da1d50d5dd0c9ef93344335f56c863aa3486b0f8e54e980f535",
+    "contracts/core/Teller.vy": "663a23c8d45155507af738199b5ab7e289f47dffc0a2fc961cd82b97440bdcd5",
     "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
   },
   "getter_scope": [
@@ -73,7 +79,7 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Skips a deficient priority asset before any stability-pool swap or auction attempt.",
-      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
+      "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
       "id": "AH-513",
@@ -93,7 +99,7 @@ source review and test update.
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
       "reason": "Enumerates only candidates with a nonzero backing-aware amount before liquidation handling.",
-      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
+      "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
       "id": "AH-902",
@@ -103,7 +109,7 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Prevents creation of an auction whose collateral became deficient.",
-      "evidence_test": "test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation"
+      "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
       "id": "AH-1215",
@@ -123,12 +129,12 @@ source review and test update.
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Soft-skips deficient collateral before internal transfer or external withdrawal settlement.",
-      "evidence_test": "test_safe_nominal_volatile_deleverage_skips_deficit_and_continues"
+      "evidence_test": "test_safe_nominal_volatile_deleverage_suppresses_quarantined_account"
     },
     {
-      "id": "CE-723",
+      "id": "CE-726",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 723,
+      "line": 726,
       "function": "_getUserBorrowTerms",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -136,9 +142,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "CE-729",
+      "id": "CE-732",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 729,
+      "line": 732,
       "function": "_getUserBorrowTerms",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -146,9 +152,29 @@ source review and test update.
       "evidence_test": "test_unsafe_backing_failures_keep_terms_with_zero_capacity"
     },
     {
-      "id": "CE-1249",
+      "id": "CE-749",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 1249,
+      "line": 749,
+      "function": "_getUserBorrowTerms",
+      "getter": "getTotalAmountForVault",
+      "classification": "quarantine_status_backing_required",
+      "reason": "Requires the whole vault to report zero usable custody before a nominal zero-amount position is classified as quarantined.",
+      "evidence_test": "test_quarantine_detection_borrow_block_and_automatic_recovery"
+    },
+    {
+      "id": "CE-750",
+      "path": "contracts/core/CreditEngine.vy",
+      "line": 750,
+      "function": "_getUserBorrowTerms",
+      "getter": "doesUserHaveBalance",
+      "classification": "position_discovery_nominal_allowed",
+      "reason": "Confirms a nominal position remains after the backing-aware amount reaches zero; it is a quarantine discriminator and never supplies collateral value.",
+      "evidence_test": "test_quarantine_detection_borrow_block_and_automatic_recovery"
+    },
+    {
+      "id": "CE-1248",
+      "path": "contracts/core/CreditEngine.vy",
+      "line": 1248,
       "function": "getMaxWithdrawableForAsset",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -156,19 +182,19 @@ source review and test update.
       "evidence_test": "test_unsafe_backing_failures_keep_terms_with_zero_capacity"
     },
     {
-      "id": "CR-190",
+      "id": "CR-191",
       "path": "contracts/core/CreditRedeem.vy",
-      "line": 190,
+      "line": 191,
       "function": "_redeemCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
       "reason": "Soft-skips a deficient redemption entry before pricing or collateral movement.",
-      "evidence_test": "test_credit_redeem_many_skips_deficient_and_preserves_healthy_entry"
+      "evidence_test": "test_credit_redeem_many_suppresses_all_entries_for_quarantined_user"
     },
     {
-      "id": "DL-579",
+      "id": "DL-561",
       "path": "contracts/core/Deleverage.vy",
-      "line": 579,
+      "line": 561,
       "function": "deleverageForWithdrawal",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -176,9 +202,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-823",
+      "id": "DL-805",
       "path": "contracts/core/Deleverage.vy",
-      "line": 823,
+      "line": 805,
       "function": "_performDeleveragePhases",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -186,9 +212,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-898",
+      "id": "DL-880",
       "path": "contracts/core/Deleverage.vy",
-      "line": 898,
+      "line": 880,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -196,9 +222,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-911",
+      "id": "DL-893",
       "path": "contracts/core/Deleverage.vy",
-      "line": 911,
+      "line": 893,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -206,9 +232,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1073",
+      "id": "DL-1055",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1073,
+      "line": 1055,
       "function": "_getDeleverageInfo",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -216,9 +242,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1081",
+      "id": "DL-1063",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1081,
+      "line": 1063,
       "function": "_getDeleverageInfo",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -226,9 +252,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1086",
+      "id": "DL-1068",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1086,
+      "line": 1068,
       "function": "_getDeleverageInfo",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -301,9 +327,9 @@ source review and test update.
       "line": 892,
       "function": "_getLatestDepositPoints",
       "getter": "getUserLootBoxShare",
-      "classification": "reward_accounting_nominal_allowed",
-      "reason": "Computes configured deposit-reward share; it does not set collateral value or borrowing power.",
-      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
+      "classification": "reward_accounting_backing_aware",
+      "reason": "Reads the current reward-eligible share; BasicVault returns zero during custody shortfall and restores it with custody without mutating nominal balances.",
+      "evidence_test": "test_zero_ltv_shortfall_suppresses_user_rewards_without_debt_quarantine"
     },
     {
       "id": "LB-912",
@@ -311,14 +337,14 @@ source review and test update.
       "line": 912,
       "function": "_refreshAssetUsdValue",
       "getter": "getTotalAmountForVault",
-      "classification": "reward_accounting_nominal_allowed",
-      "reason": "Refreshes global deposit reward points; it is outside CreditEngine collateral valuation.",
-      "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
+      "classification": "reward_accounting_backing_aware",
+      "reason": "Refreshes vault-wide reward USD value from a backing-aware total, which becomes zero during custody shortfall.",
+      "evidence_test": "test_shortfall_checkpoints_each_normalized_user_share_and_leaves_healthy_asset_untouched"
     },
     {
-      "id": "TL-407",
+      "id": "TL-408",
       "path": "contracts/core/Teller.vy",
-      "line": 407,
+      "line": 408,
       "function": "_withdraw",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -326,7 +352,7 @@ source review and test update.
       "evidence_test": "test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal"
     },
     {
-      "id": "VM-157",
+      "id": "VM-154",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 154,
       "function": "migrateVaultPositions",
@@ -336,7 +362,7 @@ source review and test update.
       "evidence_test": "test_normal_migration_rejects_more_than_twenty_source_asset_slots"
     },
     {
-      "id": "VM-165",
+      "id": "VM-162",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 162,
       "function": "migrateVaultPositions",
@@ -346,7 +372,7 @@ source review and test update.
       "evidence_test": "test_all_user_assets_migrate_with_one_housekeeping_call"
     },
     {
-      "id": "VM-189",
+      "id": "VM-186",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 186,
       "function": "migrateVaultPositions",
@@ -356,7 +382,7 @@ source review and test update.
       "evidence_test": "test_all_user_assets_migrate_with_one_housekeeping_call"
     },
     {
-      "id": "VM-256",
+      "id": "VM-253",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 253,
       "function": "migrateRipeGovPositions",
@@ -366,7 +392,7 @@ source review and test update.
       "evidence_test": "test_governance_migration_rejects_more_than_five_source_asset_slots"
     },
     {
-      "id": "VM-264",
+      "id": "VM-261",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 261,
       "function": "migrateRipeGovPositions",
@@ -376,7 +402,7 @@ source review and test update.
       "evidence_test": "test_one_user_migrates_all_governance_assets_with_one_housekeeping_call"
     },
     {
-      "id": "VM-352",
+      "id": "VM-348",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 348,
       "function": "migrateLegacyRipeGovPositions",
@@ -386,7 +412,7 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-360",
+      "id": "VM-356",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 356,
       "function": "migrateLegacyRipeGovPositions",
@@ -396,7 +422,7 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-479",
+      "id": "VM-472",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 472,
       "function": "_getPreMigrationData",
@@ -406,7 +432,7 @@ source review and test update.
       "evidence_test": "test_base_legacy_route_preserves_position_then_normal_claim_cleans_source"
     },
     {
-      "id": "VM-600",
+      "id": "VM-523",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 523,
       "function": "_verifyRipeGovExport",
@@ -416,7 +442,7 @@ source review and test update.
       "evidence_test": "test_teller_migration_preserves_position_and_updates_ledger_and_deposit_points"
     },
     {
-      "id": "VM-601",
+      "id": "VM-524",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 524,
       "function": "_verifyRipeGovExport",
@@ -426,7 +452,7 @@ source review and test update.
       "evidence_test": "test_teller_migration_preserves_position_and_updates_ledger_and_deposit_points"
     },
     {
-      "id": "VM-626",
+      "id": "VM-549",
       "path": "contracts/core/VaultMigrator.vy",
       "line": 549,
       "function": "_verifyRipeGovImport",
