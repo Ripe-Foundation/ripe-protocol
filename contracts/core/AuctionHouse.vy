@@ -323,8 +323,6 @@ def _liquidateUser(
 
     # liquidation fees
     baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
-    totalLiqFees: uint256 = baseLiqFee
-    liqFeeRatio: uint256 = bt.debtTerms.liqFee
 
     # keeper fee (for liquidator)
     keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
@@ -346,9 +344,8 @@ def _liquidateUser(
             keeperFee = 0
             baseLiqFee = maxAllowableFees
 
-    totalLiqFees = baseLiqFee + keeperFee
-    if totalLiqFees != 0:
-        liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
+    totalLiqFees: uint256 = baseLiqFee + keeperFee
+    liqFeeRatio: uint256 = baseLiqFee * HUNDRED_PERCENT // userDebt.amount
 
     targetLtv: uint256 = bt.lowestLtv
     if _config.ltvPaybackBuffer != 0:
@@ -373,14 +370,16 @@ def _liquidateUser(
     # no asset was queued lets repeated calls increase debt without advancing
     # liquidation.
     if repayValueIn == 0 and not hasQueuedAuction:
+        baseLiqFee = 0
         totalLiqFees = 0
         keeperFee = 0
 
-    # check if liq fees were already covered (stability pool swaps)
-    liqFeesUnpaid: uint256 = totalLiqFees
+    # Stability pool collateral spread covers only the base liquidation fee.
+    paidBaseFee: uint256 = 0
     if collateralValueOut > repayValueIn:
-        paidLiqFees: uint256 = collateralValueOut - repayValueIn
-        liqFeesUnpaid -= min(paidLiqFees, liqFeesUnpaid)
+        paidBaseFee = min(collateralValueOut - repayValueIn, baseLiqFee)
+    unpaidBaseFee: uint256 = baseLiqFee - paidBaseFee
+    liqFeesUnpaid: uint256 = unpaidBaseFee + keeperFee
 
     # repayValueIn may be zero, but need to update debt
     userDebt.amount += liqFeesUnpaid

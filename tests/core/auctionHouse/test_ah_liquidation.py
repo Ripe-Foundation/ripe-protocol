@@ -9,7 +9,7 @@ from conf_utils import filter_logs, get_boa_dev_reasons
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "ce082d12d5e40dd3e9834ed91a76717b7af48a7d6ab5fd9c897c766d1bec5e04"
+    "bba353589baa19283aee51a2260226c15f4196758ac7cd3d9c740789f61e1050"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -1393,10 +1393,15 @@ def test_ah_liquidation_caching_batch_liquidation(
 
         # Verify final debt state
         user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(user, False)
-        total_liquidated = sum(log.collateralValueOut for log in user_logs)
-        exp_liq_fees = debt_amount * 10_00 // HUNDRED_PERCENT
-        expected_final_debt = debt_amount - total_liquidated + exp_liq_fees
-        _test(expected_final_debt, user_debt.amount)
+        liquidation_log = next(
+            log for log in all_liquidation_logs if log.user == user
+        )
+        expected_final_debt = (
+            debt_amount
+            + liquidation_log.liqFeesUnpaid
+            - liquidation_log.repayAmount
+        )
+        assert expected_final_debt == user_debt.amount
 
     # Verify total stability pool balances (tokens are swapped to stability pool)
     total_alpha_expected = sum(log.collateralAmountOut for log in all_swap_logs if log.liqAsset == alpha_token.address)
@@ -1641,9 +1646,18 @@ def test_ah_liquidation_keeper_fee_ratio(
     # Verify final debt with new lowest LTV formula
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
-    # With new formula, verify debt was substantially reduced
-    assert user_debt.amount >= 0, "Should have non-negative debt"
-    assert user_debt.amount < 2 * EIGHTEEN_DECIMALS, "Debt should be substantially reduced"
+    paid_base_fee = min(
+        liquidation_log.collateralValueOut - liquidation_log.repayAmount,
+        expected_liq_fee,
+    )
+    assert liquidation_log.liqFeesUnpaid == (
+        expected_keeper_fee + expected_liq_fee - paid_base_fee
+    )
+    assert user_debt.amount == (
+        debt_amount
+        + liquidation_log.liqFeesUnpaid
+        - liquidation_log.repayAmount
+    )
 
 
 def test_ah_liquidation_keeper_minimum_fee(
@@ -2081,6 +2095,7 @@ def test_ah_liquidation_edge_cases(
     assert green_token.balanceOf(sally) == keeper_green_before
     first_log = filter_logs(teller, "LiquidateUser")[0]
     assert first_log.totalLiqFees == 0
+    assert first_log.liqFeesUnpaid == 0
     assert first_log.keeperFee == 0
     assert first_log.repayAmount == 0
     assert first_log.numAuctionsStarted == 0
@@ -2097,6 +2112,7 @@ def test_ah_liquidation_edge_cases(
     assert green_token.balanceOf(sally) == keeper_green_before
     second_log = filter_logs(teller, "LiquidateUser")[0]
     assert second_log.totalLiqFees == 0
+    assert second_log.liqFeesUnpaid == 0
     assert second_log.keeperFee == 0
     assert second_log.repayAmount == 0
     assert second_log.numAuctionsStarted == 0

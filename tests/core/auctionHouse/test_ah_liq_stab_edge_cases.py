@@ -535,7 +535,8 @@ def test_ah_liquidation_zero_price(
     # With near-zero collateral value, liquidation can't repay much
     # The key is that collateral is now worthless
     assert log.collateralValueOut == 200  # 200 wei - essentially worthless
-    assert log.repayAmount == 180  # Can only repay 180 wei
+    assert log.repayAmount == 200
+    assert log.collateralValueOut == log.repayAmount
     assert log.didRestoreDebtHealth == False  # Can't restore with worthless collateral
     
     # The liquidation couldn't recover meaningful value
@@ -804,32 +805,25 @@ def test_ah_liquidation_zero_ltv_buffer(
     # 1. Liquidation must restore debt health
     assert log.didRestoreDebtHealth, "Liquidation must restore debt health"
 
-    # 2. Partial liquidation - exact expected amounts
-    # Debt calculation: 100 + 0.38 unpaid fees - 88 repaid = 12.38 remaining
-    expected_remaining_debt = int(12.38 * EIGHTEEN_DECIMALS)
-    # Use a small absolute tolerance for rounding differences
-    assert abs(user_debt.amount - expected_remaining_debt) < 1e16, f"Expected ~12.38 GREEN debt, got {user_debt.amount/EIGHTEEN_DECIMALS}"
+    # 2. Only the final base fee can be covered by the Stability spread. The
+    # keeper fee and any unpaid base fee are booked before repayment.
+    base_fee = pre_user_debt.amount * 5_00 // HUNDRED_PERCENT
+    keeper_fee = pre_user_debt.amount * 1_00 // HUNDRED_PERCENT
+    paid_base = min(log.collateralValueOut - log.repayAmount, base_fee)
+    expected_unpaid_fees = base_fee - paid_base + keeper_fee
+    assert log.liqFeesUnpaid == expected_unpaid_fees
+    assert user_debt.amount == (
+        pre_user_debt.amount + expected_unpaid_fees - log.repayAmount
+    )
+    assert bt.collateralVal == pre_bt.collateralVal - log.collateralValueOut
 
-    # Collateral: 124 - 93.62 = ~30.38 remaining
-    expected_remaining_collateral = 30.38 * EIGHTEEN_DECIMALS
-    _test(expected_remaining_collateral, bt.collateralVal, 1)  # 1% tolerance
-
-    # 3. Final LTV is ~40.75%, not exactly 50% because:
-    # - Formula conservatively ensures health even if not all fees can be paid
-    # - Only 5.62 of 6 GREEN fees paid from spread, 0.38 becomes debt
-    # - Final state: 12.38 debt / 30.38 collateral = 40.75% LTV
-    # This is expected behavior - formula is conservative to ensure safety
+    # 3. The conservative target restores the account below its target LTV.
     final_ltv = user_debt.amount * HUNDRED_PERCENT // bt.collateralVal
-    expected_ltv = 40_75  # 40.75%
-    assert abs(final_ltv - expected_ltv) < 50, f"LTV should be ~40.75%, got {final_ltv/100:.2f}%"
+    assert final_ltv < 50_00
 
     # 4. Verify liquidation fees (5% liq fee + 1% keeper fee = 6% total)
     expected_total_fees = pre_user_debt.amount * 6_00 // HUNDRED_PERCENT
     _test(expected_total_fees, log.totalLiqFees)
-
-    # Verify unpaid fees (~0.38 GREEN becomes debt)
-    expected_unpaid_fees = int(0.38 * EIGHTEEN_DECIMALS)
-    assert abs(log.liqFeesUnpaid - expected_unpaid_fees) < 1e16, f"Expected ~0.38 GREEN unpaid fees, got {log.liqFeesUnpaid/EIGHTEEN_DECIMALS}"
 
     # 5. Repay amount is ~88 GREEN (with rounding)
     expected_repay = 88 * EIGHTEEN_DECIMALS
@@ -838,14 +832,15 @@ def test_ah_liquidation_zero_ltv_buffer(
     # 6. No auctions should be started when debt health is restored
     assert log.numAuctionsStarted == 0, "No auctions should be started when debt health is restored"
 
-    # 7. Collateral taken = 88 / 0.94 = ~93.62 GREEN
-    expected_collateral = 93.62 * EIGHTEEN_DECIMALS
-    _test(expected_collateral, log.collateralValueOut, 1)  # 1% tolerance for rounding
+    # 7. Collateral taken uses the 5% base fee ratio, not the combined 6%.
+    expected_collateral = (
+        log.repayAmount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 5_00)
+    )
+    _test(expected_collateral, log.collateralValueOut, 1)
 
-    # 8. Debt reduction should be ~87.62 GREEN (100 - 12.38)
+    # 8. Debt reduction equals repayment net of fees booked to debt.
     debt_reduction = pre_user_debt.amount - user_debt.amount
-    expected_debt_reduction = int(87.62 * EIGHTEEN_DECIMALS)
-    assert abs(debt_reduction - expected_debt_reduction) < 1e16, f"Debt reduction should be ~87.62 GREEN, got {debt_reduction/EIGHTEEN_DECIMALS}"
+    assert debt_reduction == log.repayAmount - log.liqFeesUnpaid
 
     # 9. Collateral reduction equals collateral taken
     collateral_reduction = pre_bt.collateralVal - bt.collateralVal

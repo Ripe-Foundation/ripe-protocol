@@ -117,33 +117,34 @@ def test_ah_liquidation_stab_pool_with_sgreen(
     expected_keeper_fee = orig_debt_amount * 1_00 // HUNDRED_PERCENT
     assert log.keeperFee == expected_keeper_fee, f"Keeper fee should be 1%: expected {expected_keeper_fee}, actual {log.keeperFee}"
     
-    # 4. Repay amount should equal original debt (capped at debt amount even though target is higher)
-    assert log.repayAmount == orig_debt_amount, f"Actual repay {log.repayAmount} should equal original debt {orig_debt_amount}"
+    # 4. The keeper fee is booked before repayment, so repayment covers the
+    # original debt plus the keeper debt recorded by this liquidation.
+    assert log.liqFeesUnpaid == expected_keeper_fee
+    assert log.repayAmount == orig_debt_amount + expected_keeper_fee
     
-    # 5. Collateral taken should be based on target repay amount / (1 - liq fee ratio)
-    # Target is 510, so collateral = 510 / 0.89 = 573.03 GREEN
-    expected_collateral_out = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 11_00)
+    # 5. Only the 10% base fee controls the Stability Pool spread.
+    expected_collateral_out = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 10_00)
     _test(expected_collateral_out, log.collateralValueOut)  # default tolerance
     
     # 6. Debt reduction should equal original debt (all debt paid off)
     debt_reduction = orig_user_debt.amount - post_user_debt.amount
     assert debt_reduction == orig_debt_amount, f"Debt reduction {debt_reduction} should equal original debt {orig_debt_amount}"
-    assert debt_reduction == log.repayAmount, f"Debt reduction {debt_reduction} should equal repay amount {log.repayAmount}"
+    assert debt_reduction == log.repayAmount - log.liqFeesUnpaid
     
     # 7. Collateral reduction should equal collateral taken
     collateral_reduction = orig_bt.collateralVal - post_bt.collateralVal
     assert collateral_reduction == log.collateralValueOut, f"Collateral reduction {collateral_reduction} should equal collateral taken {log.collateralValueOut}"
     
     # 8. Stability pool mechanics should be correct
-    # GREEN used should match target repay (510), not actual repay (500) due to how swaps work
+    # GREEN used should match the conservative target repay.
     green_used = pre_green_bal - post_green_bal
     _test(target_repay_amount, green_used)  # default tolerance
     
     # Alice should have received collateral value > GREEN given up (she profits from the liquidation)
-    # Alice gave up 510 GREEN (target) but got collateral worth 573.03 GREEN
+    # Alice receives only the base-fee Stability spread.
     alice_profit = log.collateralValueOut - target_repay_amount
     expected_alice_value = alice_amount + alice_profit
     _test(expected_alice_value, user_stab_value)  # default tolerance
     
-    # 9. No unpaid liquidation fees (all fees covered by collateral difference)
-    assert log.liqFeesUnpaid == 0, "All liquidation fees should be covered by collateral difference"
+    # 9. The base fee is covered by collateral; the keeper fee is borrower debt.
+    assert log.liqFeesUnpaid == log.keeperFee
