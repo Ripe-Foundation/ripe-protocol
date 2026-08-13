@@ -496,3 +496,92 @@ def test_existing_erc4626_yield_vault_protocols_still_price(
         assert latest.totalSupply == 0
         assert latest.pricePerShare > 0
         assert blue_chip_prices.getPrice(vault) == EIGHTEEN_DECIMALS
+
+
+def test_morpho_v2_update_confirmation_preserves_live_snapshot_progress(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+    governance,
+    teller,
+):
+    morpho_v2_vault.setSupply(100 * EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setPricePerShare(EIGHTEEN_DECIMALS)
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
+        morpho_v2_vault,
+        alpha_token,
+        mock_price_source,
+        governance,
+        max_upside=1_000,
+    )
+    initial = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert initial.lastSnapshot.pricePerShare == EIGHTEEN_DECIMALS
+    assert initial.nextIndex == 1
+    assert morpho_v2_prices.updatePriceConfig(
+        morpho_v2_vault,
+        0,
+        5,
+        1_000,
+        100,
+        sender=governance.address,
+    )
+    pending = morpho_v2_prices.pendingPriceConfigs(morpho_v2_vault).config
+    assert pending.lastSnapshot.pricePerShare == EIGHTEEN_DECIMALS
+    assert pending.nextIndex == 1
+
+    morpho_v2_vault.setPricePerShare(EIGHTEEN_DECIMALS // 2)
+    boa.env.time_travel(seconds=1)
+    assert morpho_v2_prices.addPriceSnapshot(
+        morpho_v2_vault,
+        sender=teller.address,
+    )
+    morpho_v2_vault.setPricePerShare(8 * EIGHTEEN_DECIMALS // 10)
+    boa.env.time_travel(seconds=1)
+    assert morpho_v2_prices.addPriceSnapshot(
+        morpho_v2_vault,
+        sender=teller.address,
+    )
+    before = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert before.lastSnapshot.pricePerShare == 55 * 10**16
+    assert before.nextIndex == 3
+
+    boa.env.time_travel(blocks=morpho_v2_prices.actionTimeLock() + 1)
+    assert morpho_v2_prices.confirmPriceFeedUpdate(
+        morpho_v2_vault,
+        sender=governance.address,
+    )
+    after = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert after.lastSnapshot.pricePerShare == 605 * 10**15
+    assert after.nextIndex == 4
+    written = morpho_v2_prices.snapShots(morpho_v2_vault, before.nextIndex)
+    assert written.pricePerShare == after.lastSnapshot.pricePerShare
+    assert written.lastUpdate == after.lastSnapshot.lastUpdate
+    assert not morpho_v2_prices.hasPendingPriceFeedUpdate(morpho_v2_vault)
+
+
+def test_morpho_v2_successful_zero_live_pps_control_remains_fail_closed(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+    governance,
+):
+    morpho_v2_vault.setSupply(100 * EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setPricePerShare(EIGHTEEN_DECIMALS)
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
+        morpho_v2_vault,
+        alpha_token,
+        mock_price_source,
+        governance,
+    )
+    assert morpho_v2_prices.getWeightedPrice(morpho_v2_vault) > 0
+    morpho_v2_vault.setPricePerShare(0)
+    assert morpho_v2_vault.pricePerShare() == 0
+    assert morpho_v2_prices.getPrice(morpho_v2_vault) == 0

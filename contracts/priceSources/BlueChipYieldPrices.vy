@@ -661,6 +661,11 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
+    # preserve snapshot progress made while the config update was pending
+    currentConfig: PriceConfig = self.priceConfigs[_asset]
+    d.config.lastSnapshot = currentConfig.lastSnapshot
+    d.config.nextIndex = currentConfig.nextIndex % d.config.maxNumSnapshots
+
     # save new feed config
     self.priceConfigs[_asset] = d.config
     self.pendingPriceConfigs[_asset] = empty(PendingPriceConfig)
@@ -1056,17 +1061,16 @@ def _getErc4626Price(
     currentPricePerShare: uint256 = 0
     if _config.protocol == Protocol.MORPHO_V2:
         currentPricePerShare = self._getCurrentMorphoV2PricePerShare(_asset, _config.vaultTokenDecimals)
-        if currentPricePerShare == 0:
-            return 0
     else:
         currentPricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
-    if currentPricePerShare != 0:
-        currentCompatible: bool = False
-        currentProduct: uint256 = 0
-        currentCompatible, currentProduct = self._tryMul(_underlyingPrice, currentPricePerShare)
-        if not currentCompatible:
-            return 0
-        pricePerShare = min(pricePerShare, currentPricePerShare)
+    if currentPricePerShare == 0:
+        return 0
+    currentCompatible: bool = False
+    currentProduct: uint256 = 0
+    currentCompatible, currentProduct = self._tryMul(_underlyingPrice, currentPricePerShare)
+    if not currentCompatible:
+        return 0
+    pricePerShare = min(pricePerShare, currentPricePerShare)
 
     didCalculate: bool = False
     product: uint256 = 0
@@ -1264,8 +1268,9 @@ def _getMoonwellPrice(
 
     # allow downside if current price per share is lower
     currentPricePerShare: uint256 = self._getCurrentMoonwellPricePerShare(_asset, _config.vaultTokenDecimals)
-    if currentPricePerShare != 0:
-        pricePerShare = min(pricePerShare, currentPricePerShare)
+    if currentPricePerShare == 0:
+        return 0
+    pricePerShare = min(pricePerShare, currentPricePerShare)
 
     didCalculate: bool = False
     product: uint256 = 0

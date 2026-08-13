@@ -454,6 +454,11 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
+    # preserve snapshot progress made while the config update was pending
+    currentConfig: PriceConfig = self.priceConfigs[_asset]
+    d.config.lastSnapshot = currentConfig.lastSnapshot
+    d.config.nextIndex = currentConfig.nextIndex % d.config.maxNumSnapshots
+
     # save new feed config
     self.priceConfigs[_asset] = d.config
     self.pendingPriceConfigs[_asset] = empty(PendingPriceConfig)
@@ -762,8 +767,9 @@ def _getUnderscoreVaultPrice(
 
     # allow downside if current price per share is lower
     currentPricePerShare: uint256 = self._getCurrentVaultPricePerShare(_asset, _config.vaultTokenDecimals)
-    if currentPricePerShare != 0:
-        pricePerShare = min(pricePerShare, currentPricePerShare)
+    if currentPricePerShare == 0:
+        return 0
+    pricePerShare = min(pricePerShare, currentPricePerShare)
 
     return _underlyingPrice * pricePerShare // (10 ** _config.underlyingDecimals)
 
