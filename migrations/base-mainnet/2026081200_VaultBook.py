@@ -27,4 +27,4 @@ def migrate(migration: Migration):
                 migration.execute(vault_book.startAddNewAddressToRegistry, addr.addr, addr.description)
             migration.execute(vault_book.confirmNewAddressToRegistry, addr.addr)
 
-    vault_book.relinquishGov()
+    migration.execute(vault_book.relinquishGov)
