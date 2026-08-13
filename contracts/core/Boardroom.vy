@@ -15,6 +15,12 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
+interface MissionControl:
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+
+interface VaultBook:
+    def getRegId(_vaultAddr: address) -> uint256: view
+
 
 @deploy
 def __init__(_ripeHq: address):
@@ -26,4 +32,7 @@ def __init__(_ripeHq: address):
 
 @external
 def govPowerDidChangeForUser(_user: address, _userGovPoints: uint256, _totalGovPoints: uint256):
+    vaultId: uint256 = staticcall VaultBook(addys._getVaultBookAddr()).getRegId(msg.sender)
+    assert vaultId != 0 # dev: no perms
+    assert staticcall MissionControl(addys._getMissionControlAddr()).isRipeGovVaultId(vaultId) # dev: no perms
     pass
