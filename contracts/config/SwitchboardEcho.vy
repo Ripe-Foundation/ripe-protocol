@@ -28,7 +28,7 @@ interface Endaoment:
     def depositForYield(_legoId: uint256, _asset: address, _vaultAddr: address = empty(address), _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def claimIncentives(_user: address, _legoId: uint256, _rewardToken: address = empty(address), _rewardAmount: uint256 = max_value(uint256), _proofs: DynArray[bytes32, MAX_PROOFS] = []) -> (uint256, uint256): nonpayable
     def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
-    def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> (uint256, uint256, uint256): nonpayable
+    def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> (uint256, uint256, uint256): nonpayable
     def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
@@ -128,6 +128,7 @@ struct EndaoPartnerPoolAction:
     asset: address
     amount: uint256
     minLpAmount: uint256
+    expectedLpToken: address
 
 struct EndaoRepayAction:
     pool: address
@@ -942,10 +943,11 @@ def mintPartnerLiquidityInEndaoment(_partner: address, _asset: address, _amount:
 
 
 @external
-def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> uint256:
+def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256, _expectedLpToken: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _legoId != 0 # dev: invalid lego id
     assert _partner != empty(address) # dev: invalid partner
+    assert _expectedLpToken != empty(address) # dev: invalid lp token
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ENDAO_PARTNER_POOL
@@ -955,7 +957,8 @@ def addPartnerLiquidityInEndaoment(_legoId: uint256, _pool: address, _partner: a
         partner=_partner,
         asset=_asset,
         amount=_amount,
-        minLpAmount=_minLpAmount
+        minLpAmount=_minLpAmount,
+        expectedLpToken=_expectedLpToken
     )
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1278,7 +1281,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ENDAO_PARTNER_POOL:
         p: EndaoPartnerPoolAction = self.pendingEndaoPartnerPoolActions[_aid]
-        extcall Endaoment(self._getEndaomentAddr()).addPartnerLiquidity(p.legoId, p.pool, p.partner, p.asset, p.amount, p.minLpAmount)
+        extcall Endaoment(self._getEndaomentAddr()).addPartnerLiquidity(p.legoId, p.pool, p.partner, p.asset, p.amount, p.minLpAmount, p.expectedLpToken)
         log EndaoPartnerPoolExecuted(legoId=p.legoId, pool=p.pool, partner=p.partner, asset=p.asset)
 
     elif actionType == ActionType.ENDAO_REPAY:
