@@ -873,7 +873,7 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.startDiscount > HUNDRED_PERCENT:
         return False
-    if _params.maxDiscount > HUNDRED_PERCENT:
+    if _params.maxDiscount >= HUNDRED_PERCENT:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
