@@ -178,6 +178,28 @@
     "type": "event"
   },
   {
+    "name": "ExpiredFungibleAuctionRemoved",
+    "inputs": [
+      {
+        "name": "liqUser",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
     "name": "FungAuctionPurchased",
     "inputs": [
       {
@@ -1260,6 +1282,31 @@
       {
         "name": "",
         "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeExpiredFungibleAuction",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ]
   },

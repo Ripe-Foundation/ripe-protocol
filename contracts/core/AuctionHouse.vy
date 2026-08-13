@@ -193,6 +193,11 @@ event FungibleAuctionPaused:
     vaultId: uint256
     asset: indexed(address)
 
+event ExpiredFungibleAuctionRemoved:
+    liqUser: indexed(address)
+    vaultId: uint256
+    asset: indexed(address)
+
 event FungAuctionPurchased:
     liqUser: indexed(address)
     liqVaultId: uint256
@@ -1017,6 +1022,37 @@ def _pauseAuction(
         liqUser=_liqUser,
         vaultId=_liqVaultId,
         asset=_liqAsset,
+    )
+    return True
+
+
+@external
+def removeExpiredFungibleAuction(
+    _liqUser: address,
+    _vaultId: uint256,
+    _asset: address,
+) -> bool:
+    assert not deptBasics.isPaused # dev: contract paused
+
+    ledger: address = addys._getLedgerAddr()
+    auc: FungibleAuction = staticcall Ledger(ledger).getFungibleAuctionDuringPurchase(
+        _liqUser,
+        _vaultId,
+        _asset,
+    )
+
+    if not auc.isActive or block.number < auc.endBlock:
+        return False
+
+    extcall Ledger(ledger).removeFungibleAuction(
+        _liqUser,
+        _vaultId,
+        _asset,
+    )
+    log ExpiredFungibleAuctionRemoved(
+        liqUser=_liqUser,
+        vaultId=_vaultId,
+        asset=_asset,
     )
     return True
 
