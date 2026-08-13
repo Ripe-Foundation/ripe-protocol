@@ -1,8 +1,9 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import assert_reverted_call, filter_logs
 
 
 @pytest.fixture(scope="module")
@@ -245,6 +246,108 @@ def test_purchase_ripe_bond_with_minimum_lock_duration(
     # verify tokens were deposited into gov vault
     expected_deposit = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     _test(ripe_payout, expected_deposit)
+
+
+def test_locked_bond_zero_share_payout_reverts_atomically_and_can_retry(
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ripe_token,
+    bond_room,
+    endaoment_funds,
+    ledger,
+    setAssetConfig,
+    cleanCoreRipeGovFixture,
+    switchboard_delta,
+    whale,
+):
+    """AUD-024: a locked one-wei RIPE payout cannot be silently absorbed."""
+    setupRipeBonds(
+        _amountPerEpoch=10 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=1,
+        _maxRipePerUnit=1,
+        _maxRipePerUnitLockBonus=0,
+    )
+    finite_limit = 10 ** 40
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[2],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=finite_limit,
+        _globalDepositLimit=finite_limit,
+    )
+    core = cleanCoreRipeGovFixture()
+    clean_vault = core["vault"]
+    bond_room.startBondEpochAtBlock(
+        boa.env.evm.patch.block_number,
+        sender=switchboard_delta.address,
+    )
+
+    donation = 10 ** 8
+    ripe_token.transfer(clean_vault, donation, sender=whale)
+    payment_amount = EIGHTEEN_DECIMALS
+    assert bond_room.previewRipeBondPayout(bob, 100, payment_amount) == 1
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    purchaser_balance_before = alpha_token.balanceOf(bob)
+    purchaser_allowance_before = alpha_token.allowance(bob, teller)
+    bond_balance_before = alpha_token.balanceOf(bond_room)
+    endaoment_balance_before = alpha_token.balanceOf(endaoment_funds)
+    epoch_available_before = ledger.paymentAmountAvailInEpoch()
+    ripe_available_before = ledger.ripeAvailForBonds()
+    bad_debt_before = ledger.badDebt()
+    supply_before = ripe_token.totalSupply()
+    bond_ripe_before = ripe_token.balanceOf(bond_room)
+    teller_allowance_before = ripe_token.allowance(bond_room, teller)
+    shares_before = clean_vault.userBalances(bob, ripe_token)
+    core_id = core["vault_id"]
+    core_ledger_before = ledger.getDepositLedgerData(bob, core_id)
+    core_user_points_before = ledger.userDepositPoints(bob, core_id, ripe_token)
+    core_asset_points_before = ledger.assetDepositPoints(core_id, ripe_token)
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+
+    with pytest.raises(BoaError) as exc_info:
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            100,
+            sender=bob,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert alpha_token.balanceOf(bob) == purchaser_balance_before
+    assert alpha_token.allowance(bob, teller) == purchaser_allowance_before
+    assert alpha_token.balanceOf(bond_room) == bond_balance_before
+    assert alpha_token.balanceOf(endaoment_funds) == endaoment_balance_before
+    assert ledger.paymentAmountAvailInEpoch() == epoch_available_before
+    assert ledger.ripeAvailForBonds() == ripe_available_before
+    assert ledger.badDebt() == bad_debt_before
+    assert ripe_token.totalSupply() == supply_before
+    assert ripe_token.balanceOf(bond_room) == bond_ripe_before
+    assert ripe_token.allowance(bond_room, teller) == teller_allowance_before
+    assert clean_vault.userBalances(bob, ripe_token) == shares_before
+    assert ledger.getDepositLedgerData(bob, core_id) == core_ledger_before
+    assert ledger.userDepositPoints(bob, core_id, ripe_token) == core_user_points_before
+    assert ledger.assetDepositPoints(core_id, ripe_token) == core_asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+
+    retry_payment = 2 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(teller, retry_payment, sender=bob)
+    assert bond_room.previewRipeBondPayout(bob, 100, retry_payment) == 2
+    assert teller.purchaseRipeBond(
+        alpha_token,
+        retry_payment,
+        100,
+        sender=bob,
+    ) == 2
+    assert clean_vault.userBalances(bob, ripe_token) == 1
 
 
 def test_locked_bond_purchase_uses_core_governance_vault_pointer(

@@ -1,8 +1,9 @@
 import boa
 import pytest
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import filter_logs
+from conf_utils import assert_reverted_call, filter_logs
 
 
 TELLER_ID = 17
@@ -2689,6 +2690,130 @@ def test_loot_claim_borrow_zero_rewards(
 
 
 # auto-staking ripe claims
+
+
+def test_loot_claim_zero_share_autostake_reverts_atomically_and_remains_claimable(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_alpha,
+    whale,
+    cleanCoreRipeGovFixture,
+):
+    """AUD-024: a dust auto-stake reverts the complete Lootbox claim."""
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=1)
+    setRipeRewardsConfig(
+        _arePointsEnabled=False,
+        _ripePerBlock=0,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+        _autoStakeRatio=100_00,
+        _autoStakeDurationRatio=0,
+    )
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,
+        False,
+        (100, 1000, 200_00, True, 5_00),
+        sender=switchboard_alpha.address,
+    )
+    finite_limit = 10 ** 40
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[2],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=finite_limit,
+        _globalDepositLimit=finite_limit,
+    )
+    core = cleanCoreRipeGovFixture()
+    clean_vault = core["vault"]
+
+    source_vault_id = _create_dust_ticket_position(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        performDeposit,
+        simple_erc20_vault,
+        vault_book,
+        teller,
+        True,
+    )
+    _seed_exact_dust_ticket(
+        ledger,
+        lootbox,
+        bob,
+        source_vault_id,
+        alpha_token,
+        staker_rewards=1,
+        staker_points=1,
+    )
+    assert lootbox.getClaimableDepositLootForAsset(
+        bob, source_vault_id, alpha_token
+    ) == 1
+
+    donation = 10 ** 8
+    ripe_token.transfer(clean_vault, donation, sender=whale)
+    supply_before = ripe_token.totalSupply()
+    lootbox_balance_before = ripe_token.balanceOf(lootbox)
+    allowance_before = ripe_token.allowance(lootbox, teller)
+    user_points_before = ledger.userDepositPoints(
+        bob, source_vault_id, alpha_token
+    )
+    asset_points_before = ledger.assetDepositPoints(source_vault_id, alpha_token)
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+    shares_before = clean_vault.userBalances(bob, ripe_token)
+
+    with pytest.raises(BoaError) as exc_info:
+        teller.claimLoot(bob, False, sender=bob)
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert ripe_token.totalSupply() == supply_before
+    assert ripe_token.balanceOf(lootbox) == lootbox_balance_before
+    assert ripe_token.allowance(lootbox, teller) == allowance_before
+    assert clean_vault.userBalances(bob, ripe_token) == shares_before
+    assert ledger.userDepositPoints(
+        bob, source_vault_id, alpha_token
+    ) == user_points_before
+    assert ledger.assetDepositPoints(source_vault_id, alpha_token) == asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+    assert lootbox.getClaimableDepositLootForAsset(
+        bob, source_vault_id, alpha_token
+    ) == 1
+
+    # Increase the still-live entitlement to the adjacent one-share boundary.
+    _seed_exact_dust_ticket(
+        ledger,
+        lootbox,
+        bob,
+        source_vault_id,
+        alpha_token,
+        staker_rewards=2,
+        staker_points=1,
+        asset_balance_points=1,
+        staker_global_points=1,
+    )
+    assert teller.claimLoot(bob, False, sender=bob) == 2
+    assert clean_vault.userBalances(bob, ripe_token) == 1
+    assert lootbox.getClaimableDepositLootForAsset(
+        bob, source_vault_id, alpha_token
+    ) == 0
 
 
 def test_loot_claim_no_auto_staking(

@@ -1,7 +1,12 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS
+from conf_utils import assert_reverted_call
+
+
+DECIMAL_OFFSET = 10 ** 8
 
 
 @pytest.fixture(scope="module")
@@ -39,6 +44,144 @@ def setupRipeGovVaultConfig(mission_control, setAssetConfig, switchboard_alpha, 
     yield setupRipeGovVaultConfig
 
 
+
+
+def test_ripe_gov_clean_core_zero_share_deposit_rolls_back_and_boundaries_hold(
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+    setAssetConfig,
+    cleanCoreRipeGovFixture,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    ledger,
+    mission_control,
+    boardroom,
+    lootbox,
+):
+    """AUD-024 direct RipeGov path, including clean-core delayed binding."""
+    setGeneralConfig()
+    setupRipeGovVaultConfig()
+    # SwitchboardBravo deliberately rejects unlimited caps. Establish finite
+    # test caps before the fixture performs its preservation-sensitive update.
+    finite_limit = 10 ** 40
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[2],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=finite_limit,
+        _globalDepositLimit=finite_limit,
+    )
+    core = cleanCoreRipeGovFixture()
+    clean_vault = core["vault"]
+    vault_id = core["vault_id"]
+
+    assert mission_control.coreRipeGovVaultId() == vault_id
+    assert core["new_vault_ids"] == core["existing_vault_ids"] + [vault_id]
+    assert core["support_confirmation"] < core["pointer_confirmation"]
+
+    donation = DECIMAL_OFFSET
+    attempted_deposit = 1
+    ripe_token.transfer(clean_vault, donation, sender=whale)
+    ripe_token.transfer(bob, 3, sender=whale)
+    ripe_token.approve(teller, 3, sender=bob)
+
+    assert clean_vault.amountToShares(ripe_token, attempted_deposit, False) == 0
+    assert attempted_deposit * DECIMAL_OFFSET // (donation + 1) == 0
+
+    balance_before = ripe_token.balanceOf(bob)
+    allowance_before = ripe_token.allowance(bob, teller)
+    custody_before = ripe_token.balanceOf(clean_vault)
+    user_shares_before = clean_vault.userBalances(bob, ripe_token)
+    total_shares_before = clean_vault.totalBalances(ripe_token)
+    gov_data_before = clean_vault.userGovData(bob, ripe_token)
+    user_gov_points_before = clean_vault.totalUserGovPoints(bob)
+    total_gov_points_before = clean_vault.totalGovPoints()
+    ledger_data_before = ledger.getDepositLedgerData(bob, vault_id)
+    user_points_before = ledger.userDepositPoints(bob, vault_id, ripe_token)
+    asset_points_before = ledger.assetDepositPoints(vault_id, ripe_token)
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+    # The temporary Boardroom's only persisted field is DeptBasics.isPaused;
+    # getRipeHq binds its immutable deployment identity as well.
+    boardroom_state_before = (boardroom.isPaused(), boardroom.getRipeHq())
+    lootbox_state_before = (
+        lootbox.hasUnderscoreRewards(),
+        lootbox.underscoreSendInterval(),
+        lootbox.lastUnderscoreSend(),
+        lootbox.undyDepositRewardsAmount(),
+        lootbox.undyYieldBonusAmount(),
+    )
+
+    with pytest.raises(BoaError) as exc_info:
+        teller.deposit(
+            ripe_token,
+            attempted_deposit,
+            bob,
+            clean_vault,
+            vault_id,
+            sender=bob,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert ripe_token.balanceOf(bob) == balance_before
+    assert ripe_token.allowance(bob, teller) == allowance_before
+    assert ripe_token.balanceOf(clean_vault) == custody_before
+    assert clean_vault.userBalances(bob, ripe_token) == user_shares_before
+    assert clean_vault.totalBalances(ripe_token) == total_shares_before
+    assert clean_vault.userGovData(bob, ripe_token) == gov_data_before
+    assert clean_vault.totalUserGovPoints(bob) == user_gov_points_before
+    assert clean_vault.totalGovPoints() == total_gov_points_before
+    assert ledger.getDepositLedgerData(bob, vault_id) == ledger_data_before
+    assert ledger.userDepositPoints(bob, vault_id, ripe_token) == user_points_before
+    assert ledger.assetDepositPoints(vault_id, ripe_token) == asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+    assert (boardroom.isPaused(), boardroom.getRipeHq()) == boardroom_state_before
+    assert (
+        lootbox.hasUnderscoreRewards(),
+        lootbox.underscoreSendInterval(),
+        lootbox.lastUnderscoreSend(),
+        lootbox.undyDepositRewardsAmount(),
+        lootbox.undyYieldBonusAmount(),
+    ) == lootbox_state_before
+
+    one_share_amount = 2
+    assert one_share_amount * DECIMAL_OFFSET // (donation + 1) == 1
+    assert teller.deposit(
+        ripe_token,
+        one_share_amount,
+        bob,
+        clean_vault,
+        vault_id,
+        sender=bob,
+    ) == one_share_amount
+    one_share_logs = teller.get_logs()
+    assert clean_vault.userBalances(bob, ripe_token) == 1
+    assert clean_vault.totalBalances(ripe_token) == 1
+    vault_log = next(
+        log for log in one_share_logs if type(log).__name__ == "RipeGovVaultDeposit"
+    )
+    assert vault_log.user == bob
+    assert vault_log.asset == ripe_token.address
+    assert vault_log.amount == one_share_amount
+    assert vault_log.shares == 1
+
+    ordinary_amount = EIGHTEEN_DECIMALS
+    ripe_token.transfer(bob, ordinary_amount, sender=whale)
+    ripe_token.approve(teller, ordinary_amount, sender=bob)
+    shares_before_ordinary = clean_vault.userBalances(bob, ripe_token)
+    assert teller.deposit(
+        ripe_token,
+        ordinary_amount,
+        bob,
+        clean_vault,
+        vault_id,
+        sender=bob,
+    ) == ordinary_amount
+    assert clean_vault.userBalances(bob, ripe_token) > shares_before_ordinary
 
 
 def test_ripe_gov_vault_initial_deposit_no_lock(

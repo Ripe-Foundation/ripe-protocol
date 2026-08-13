@@ -1,8 +1,9 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import assert_reverted_call, filter_logs
 from contracts.modules import Contributor
 
 
@@ -279,6 +280,135 @@ def test_contributor_cash_ripe_check_after_cliff(
     
     # Total claimed should be updated
     assert contributor_contract.totalClaimed() == claimable
+
+
+def test_contributor_zero_share_paycheck_reverts_atomically_and_can_retry(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    setAssetConfig,
+    cleanCoreRipeGovFixture,
+    ripe_token,
+    whale,
+    teller,
+    ledger,
+    human_resources,
+    owner_address,
+    boardroom,
+    lootbox,
+):
+    """AUD-024: compensation stays claimable when auto-deposit mints no shares."""
+    terms = dict(valid_contributor_terms)
+    terms["compensation"] = 2
+    contributor = Contributor.at(deployedContributor(terms))
+
+    setupRipeGovVaultConfig()
+    finite_limit = 10 ** 40
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[2],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=finite_limit,
+        _globalDepositLimit=finite_limit,
+    )
+    core = cleanCoreRipeGovFixture()
+    clean_vault = core["vault"]
+    vault_id = core["vault_id"]
+    ripe_token.transfer(clean_vault, 10 ** 8, sender=whale)
+
+    halfway = contributor.startTime() + terms["vestingLength"] // 2
+    now = boa.env.evm.patch.timestamp
+    if now < halfway:
+        boa.env.time_travel(seconds=halfway - now)
+    assert contributor.getClaimable() == 1
+
+    claimed_before = contributor.totalClaimed()
+    claimable_before = contributor.getClaimable()
+    hr_available_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+    hr_balance_before = ripe_token.balanceOf(human_resources)
+    allowance_before = ripe_token.allowance(human_resources, teller)
+    shares_before = clean_vault.userBalances(contributor, ripe_token)
+    total_shares_before = clean_vault.totalBalances(ripe_token)
+    gov_data_before = clean_vault.userGovData(contributor, ripe_token)
+    user_points_before = ledger.userDepositPoints(
+        contributor, vault_id, ripe_token
+    )
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+    contributor_state_before = (
+        contributor.compensation(),
+        contributor.startTime(),
+        contributor.endTime(),
+        contributor.cliffTime(),
+        contributor.unlockTime(),
+        contributor.depositLockDuration(),
+        contributor.owner(),
+        contributor.manager(),
+        contributor.isFrozen(),
+        contributor.pendingOwner(),
+        contributor.pendingRipeTransfer(),
+    )
+    # The temporary Boardroom's only persisted field is DeptBasics.isPaused;
+    # getRipeHq binds its immutable deployment identity as well.
+    boardroom_state_before = (boardroom.isPaused(), boardroom.getRipeHq())
+    lootbox_state_before = (
+        lootbox.hasUnderscoreRewards(),
+        lootbox.underscoreSendInterval(),
+        lootbox.lastUnderscoreSend(),
+        lootbox.undyDepositRewardsAmount(),
+        lootbox.undyYieldBonusAmount(),
+    )
+
+    with pytest.raises(BoaError) as exc_info:
+        contributor.cashRipeCheck(sender=owner_address)
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", contributor)
+
+    assert contributor.totalClaimed() == claimed_before
+    assert contributor.getClaimable() == claimable_before
+    assert ledger.ripeAvailForHr() == hr_available_before
+    assert ripe_token.totalSupply() == supply_before
+    assert ripe_token.balanceOf(human_resources) == hr_balance_before
+    assert ripe_token.allowance(human_resources, teller) == allowance_before
+    assert clean_vault.userBalances(contributor, ripe_token) == shares_before
+    assert clean_vault.totalBalances(ripe_token) == total_shares_before
+    assert clean_vault.userGovData(contributor, ripe_token) == gov_data_before
+    assert ledger.userDepositPoints(
+        contributor, vault_id, ripe_token
+    ) == user_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+    assert (
+        contributor.compensation(),
+        contributor.startTime(),
+        contributor.endTime(),
+        contributor.cliffTime(),
+        contributor.unlockTime(),
+        contributor.depositLockDuration(),
+        contributor.owner(),
+        contributor.manager(),
+        contributor.isFrozen(),
+        contributor.pendingOwner(),
+        contributor.pendingRipeTransfer(),
+    ) == contributor_state_before
+    assert (boardroom.isPaused(), boardroom.getRipeHq()) == boardroom_state_before
+    assert (
+        lootbox.hasUnderscoreRewards(),
+        lootbox.underscoreSendInterval(),
+        lootbox.lastUnderscoreSend(),
+        lootbox.undyDepositRewardsAmount(),
+        lootbox.undyYieldBonusAmount(),
+    ) == lootbox_state_before
+
+    end = contributor.endTime()
+    now = boa.env.evm.patch.timestamp
+    if now < end:
+        boa.env.time_travel(seconds=end - now)
+    assert contributor.getClaimable() == 2
+    assert contributor.cashRipeCheck(sender=owner_address) == 2
+    assert contributor.totalClaimed() == 2
+    assert clean_vault.userBalances(contributor, ripe_token) == 1
 
 
 def test_contributor_cash_ripe_check_by_manager(
