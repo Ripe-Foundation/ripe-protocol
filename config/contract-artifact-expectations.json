@@ -1462,21 +1462,21 @@
         "committed_path": "scripts/abis/RipeGov.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "dc73d443d4970cb6bde2e3e55e5b48764f4be70e6652fae2dc19d8c9e58fed98",
-        "creation_executable_prefix_size": 23393,
-        "creation_metadata_sha256": "331ee79dc5ff116e075f33f6a5d8dcf2eb5b9849dec7a97ac618ea898521215e",
+        "creation_executable_prefix_sha256": "cbec4c9338fc5ee4be39cfffd8722669508ea5f59a86fc4f9ea01efbff85bcfc",
+        "creation_executable_prefix_size": 23705,
+        "creation_metadata_sha256": "affdfad5e37c39d61eaf48a4b7a86f2d21092e3bd548e13e207db00548bf380b",
         "creation_metadata_size": 70,
-        "creation_sha256": "4718815761bf72f4c4740f5746c7dd38150cad516aa3355fe32e29599a03953a",
-        "creation_size": 23463,
-        "deployed_eip170_headroom": 1262,
+        "creation_sha256": "cfe6a77d7c7d37671ac27ce45d2e524538f918ba3a7d9cf2f5627b898a38bf0a",
+        "creation_size": 23775,
+        "deployed_eip170_headroom": 950,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
         "deployed_runtime_immutable_data_sha256": "ed83a2128f485fcbc1398a96a19ee7ca74d961970458483ec5d3c6457210d7c1",
         "deployed_runtime_immutable_data_size": 32,
-        "deployed_runtime_sha256": "8ed79945188e552b2ef4489a68f06b0c13c991d2d47e5e58bd73a11c23651c29",
-        "deployed_runtime_size": 23314,
-        "eip170_headroom": 1294,
-        "runtime_template_sha256": "0215972ce8aab49111444fe1e17c4755cecb5571c94e28cd5f61e6e3ec9cf99d",
-        "runtime_template_size": 23282
+        "deployed_runtime_sha256": "060ed6e22e744ede0c68f1685fcbf295f7f57341934207afc4127f9513cf6a79",
+        "deployed_runtime_size": 23626,
+        "eip170_headroom": 982,
+        "runtime_template_sha256": "7bdc7ef8827395f50d21bdc58933f51d8a49d2ccdfc47d9ff4a48e997055ba7a",
+        "runtime_template_size": 23594
       },
       "code_layout": {
         "addys": {
@@ -1603,7 +1603,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "c7debd3645530ba2409d70cf3dd54b154a408a2ddf6560bec0b4a78735e0b843"
+      "transitive_compiler_input_integrity": "ec5a2d58287d2713907dd057cce9c96068d6f656e74bff1f8cc54163bb0b8f99"
     },
     "SimpleErc20": {
       "abi": {

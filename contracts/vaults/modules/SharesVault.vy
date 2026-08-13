@@ -62,12 +62,23 @@ def _withdrawTokensFromVault(
     withdrawalAmount: uint256 = 0
     withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
 
+    # check pre withdrawal values
+    vaultBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+
     # reduce balance on withdrawal
     isDepleted: bool = False
     withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
 
     # move tokens to recipient
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
+
+    # check post withdrawal values
+    vaultAfter: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientAfter: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+    assert vaultBefore - vaultAfter == withdrawalAmount # dev: invalid vault outflow
+    assert recipientAfter - recipientBefore == withdrawalAmount # dev: invalid recipient delivery
+
     return withdrawalAmount, withdrawalShares, isDepleted
 
 

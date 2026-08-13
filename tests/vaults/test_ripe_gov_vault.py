@@ -280,7 +280,14 @@ def test_ripe_gov_vault_deposit_validation(
 
 
 def test_ripe_gov_vault_basic_withdrawal(
-    ripe_gov_vault, ripe_token, whale, bob, alice, teller, _test, setupRipeGovVaultConfig
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    _test,
+    setupRipeGovVaultConfig,
 ):
     """Test basic withdrawal after lock period"""
     setupRipeGovVaultConfig()
@@ -299,7 +306,33 @@ def test_ripe_gov_vault_basic_withdrawal(
     
     # Withdraw tokens
     withdraw_amount = 50 * EIGHTEEN_DECIMALS
-    initial_balance = ripe_token.balanceOf(alice)
+    vault_before = ripe_token.balanceOf(ripe_gov_vault)
+    recipient_before = ripe_token.balanceOf(alice)
+    user_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    withdrawal_shares = ripe_gov_vault.amountToShares(
+        ripe_token, withdraw_amount, True
+    )
+    gov_data_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    total_user_points_before = ripe_gov_vault.totalUserGovPoints(bob)
+    total_points_before = ripe_gov_vault.totalGovPoints()
+    accrued_points = ripe_gov_vault.getLatestGovPoints(
+        gov_data_before.lastShares,
+        gov_data_before.lastPointsUpdate,
+        gov_data_before.unlock,
+        gov_data_before.lastTerms,
+        100_00,
+    )
+    points_before_reduction = gov_data_before.govPoints + accrued_points
+    expected_asset_points = points_before_reduction - (
+        points_before_reduction * withdrawal_shares // gov_data_before.lastShares
+    )
+    expected_user_points = (
+        total_user_points_before - gov_data_before.govPoints + expected_asset_points
+    )
+    expected_total_points = (
+        total_points_before - total_user_points_before + expected_user_points
+    )
     
     withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
         bob, ripe_token, withdraw_amount, alice, sender=teller.address
@@ -308,11 +341,111 @@ def test_ripe_gov_vault_basic_withdrawal(
     # Check withdrawal
     assert withdrawn == withdraw_amount
     assert not is_depleted
-    assert ripe_token.balanceOf(alice) == initial_balance + withdraw_amount
+    assert vault_before - ripe_token.balanceOf(ripe_gov_vault) == withdrawn
+    assert ripe_token.balanceOf(alice) - recipient_before == withdrawn
+    assert (
+        ripe_gov_vault.userBalances(bob, ripe_token)
+        == user_shares_before - withdrawal_shares
+    )
+    assert (
+        ripe_gov_vault.totalBalances(ripe_token)
+        == total_shares_before - withdrawal_shares
+    )
+    gov_data_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert gov_data_after.lastShares == user_shares_before - withdrawal_shares
+    assert gov_data_after.govPoints == expected_asset_points
+    assert ripe_gov_vault.totalUserGovPoints(bob) == expected_user_points
+    assert ripe_gov_vault.totalGovPoints() == expected_total_points
     
     # Check remaining balance
     remaining = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     _test(deposit_amount - withdraw_amount, remaining)
+
+
+def test_ripe_gov_vault_inexact_withdrawal_reverts_atomically(
+    ripe_gov_vault,
+    vault_book,
+    governance,
+    bob,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    setAssetConfig,
+):
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance.address,
+        0,
+        name="ripe_gov_short_delivery_token",
+    )
+    vault_id = vault_book.getRegId(ripe_gov_vault)
+    assert vault_id != 0
+    lock_terms = (100, 1_000, 200_00, True, 10_00)
+    mission_control.setRipeGovVaultConfig(
+        fee_token,
+        100_00,
+        False,
+        lock_terms,
+        sender=switchboard_alpha.address,
+    )
+    setAssetConfig(
+        fee_token,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    withdrawal_amount = 40 * EIGHTEEN_DECIMALS
+    fee_token.transfer(ripe_gov_vault, deposit_amount, sender=governance.address)
+    ripe_gov_vault.depositTokensInVault(
+        bob, fee_token, deposit_amount, sender=teller.address
+    )
+    unlock_block = ripe_gov_vault.userGovData(bob, fee_token).unlock
+    boa.env.time_travel(
+        blocks=unlock_block - boa.env.evm.patch.block_number + 1
+    )
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.totalUserGovPoints(bob) > 0
+    fee_token.setTransferFee(5_00, sender=governance.address)
+
+    state_before = (
+        ripe_gov_vault.userBalances(bob, fee_token),
+        ripe_gov_vault.totalBalances(fee_token),
+        ripe_gov_vault.getTotalAmountForUser(bob, fee_token),
+        ripe_gov_vault.getTotalAmountForVault(fee_token),
+        ripe_gov_vault.numUserAssets(bob),
+        ripe_gov_vault.numAssets(),
+        fee_token.balanceOf(ripe_gov_vault),
+        fee_token.balanceOf(bob),
+        fee_token.balanceOf(governance),
+        ripe_gov_vault.userGovData(bob, fee_token),
+        ripe_gov_vault.totalUserGovPoints(bob),
+        ripe_gov_vault.totalGovPoints(),
+    )
+
+    with boa.reverts("invalid recipient delivery"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob,
+            fee_token,
+            withdrawal_amount,
+            bob,
+            sender=teller.address,
+        )
+
+    assert (
+        ripe_gov_vault.userBalances(bob, fee_token),
+        ripe_gov_vault.totalBalances(fee_token),
+        ripe_gov_vault.getTotalAmountForUser(bob, fee_token),
+        ripe_gov_vault.getTotalAmountForVault(fee_token),
+        ripe_gov_vault.numUserAssets(bob),
+        ripe_gov_vault.numAssets(),
+        fee_token.balanceOf(ripe_gov_vault),
+        fee_token.balanceOf(bob),
+        fee_token.balanceOf(governance),
+        ripe_gov_vault.userGovData(bob, fee_token),
+        ripe_gov_vault.totalUserGovPoints(bob),
+        ripe_gov_vault.totalGovPoints(),
+    ) == state_before
 
 
 def test_ripe_gov_vault_withdrawal_before_unlock_fails(
