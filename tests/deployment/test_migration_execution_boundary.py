@@ -145,29 +145,42 @@ def test_replay_does_not_bypass_the_start_point(tmp_path, start):
         )
 
 
-def test_auto_resume_cannot_rerun_a_migration_that_wrote_no_manifest():
-    """The concrete case: CcipWire ran on both mainnets and left no manifest.
+def test_ccip_wire_is_invisible_to_the_resume_checkpoint():
+    """A migration that deploys nothing leaves no numbered manifest.
 
-    It only calls execute(), so _append_manifest never runs and no numbered
-    manifest exists for it. The checkpoint therefore reports the migration
-    before it, and auto-resume would select CcipWire again -- re-running
-    applyChainUpdates and transferOwnership against live CCIP pools.
+    2026080701_CcipWire only calls execute() -- it wires the CCIP pools and
+    hands them to the Safe -- so _append_manifest never runs. The resume
+    checkpoint is derived from numbered manifests, so it cannot see that this
+    migration completed, and it has completed: CCIP is live on both mainnets.
+
+    Asserted as the durable fact rather than as "auto-resume selects X", which
+    is a function of whatever has been deployed since. Adding a later migration
+    that does record a manifest moves the checkpoint past this one and changes
+    that answer without changing the hazard.
     """
     root = Path(__file__).resolve().parents[2]
     for chain in ("base-mainnet", "robinhood-mainnet"):
-        runner = MigrationRunner(
-            str(root / f"migrations/{chain}"),
-            str(root / f"migration_history/{chain}/v1"),
-            {},
-        )
-        # The hazard is real: auto-resume would pick the unrecorded migration.
-        assert [t for _, t, _ in runner._migrations(None, "0")] == ["2026080701"]
-        # And the guard refuses to get there without an explicit start point.
-        with pytest.raises(
-            MigrationHistoryError,
-            match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP",
-        ):
-            runner._require_start_point(_args(), None)
+        assert (root / f"migrations/{chain}/2026080701_CcipWire.py").exists()
+        assert not (
+            root / f"migration_history/{chain}/v1/2026080701-manifest.json"
+        ).exists()
+
+
+@pytest.mark.parametrize("chain", ("base-mainnet", "robinhood-mainnet"))
+def test_no_deployed_history_can_be_auto_resumed(chain):
+    # Whatever the checkpoint currently reports, a bare run against a deployed
+    # history is refused. This is the invariant; the selection is not.
+    root = Path(__file__).resolve().parents[2]
+    runner = MigrationRunner(
+        str(root / f"migrations/{chain}"),
+        str(root / f"migration_history/{chain}/v1"),
+        {},
+    )
+
+    with pytest.raises(
+        MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
+    ):
+        runner._require_start_point(_args(), None)
 
 
 @pytest.mark.parametrize("start", (None, "0", "2026081200"))

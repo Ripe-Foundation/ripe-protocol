@@ -14,6 +14,7 @@
     "CreditRedeem.json": "a05878daef85273d072b4b8e730986f1bbb59ad890828f627c9a45e45bfc16a2",
     "CurvePrices.json": "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772",
     "DefaultsBase.json": "00e7bce5b2019a76642828d0f26eaa117bf2b55db09b4c16a75e5acb45e2f62e",
+    "DefaultsBaseLive.json": "cee0fff9240379d818c40c0d334d0a7f88fbef2e73d97059db1a43d74979bc1b",
     "DefaultsLocal.json": "00e7bce5b2019a76642828d0f26eaa117bf2b55db09b4c16a75e5acb45e2f62e",
     "DefaultsRobinhood.json": "5f06b45de81e79b4eadc81de26e3c5c46fd137094e828847b03b8fd376898ce8",
     "DefaultsRobinhoodLive.json": "cee0fff9240379d818c40c0d334d0a7f88fbef2e73d97059db1a43d74979bc1b",
