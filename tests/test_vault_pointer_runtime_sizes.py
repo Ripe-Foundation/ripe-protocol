@@ -23,7 +23,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Teller": 24_218,
     "TellerUtils": 8_976,
     "Ledger": 13_306,
-    "Lootbox": 23_448,
+    "Lootbox": 22_993,
     "RipeGov": 23_257,
     "CreditEngine": 24_555,
     "StabilityPool": 24_371,
@@ -49,7 +49,7 @@ DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit after the custody-shortfall change:
 #   Teller 358, CreditEngine 21, StabilityPool 263, SwitchboardCharlie 819,
-#   SwitchboardAlpha 339, Lootbox 1,128, RipeGov 1,271, SwitchboardBravo
+#   SwitchboardAlpha 339, Lootbox 1,583, RipeGov 1,271, SwitchboardBravo
 #   1,073, SwitchboardEcho 1,523, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
