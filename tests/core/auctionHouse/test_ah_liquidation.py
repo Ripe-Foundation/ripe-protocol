@@ -5,7 +5,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import filter_logs, get_boa_dev_reasons
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
@@ -305,6 +305,63 @@ def test_ah_liquidation_stab_pool_swap(
         user_debt, bt, debt_amount, orig_bt.collateralVal,
         log, exp_liq_fees, ltv, _test
     )
+
+
+def test_ah_sgreen_stability_pool_liquidation_obeys_pause_atomically(
+    setupStabPoolLiquidation,
+    alpha_token,
+    savings_green,
+    green_token,
+    stability_pool,
+    bob,
+    sally,
+    teller,
+    credit_engine,
+    governance,
+):
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    setupStabPoolLiquidation(
+        debt_amount,
+        200 * EIGHTEEN_DECIMALS,
+        80_00,
+        10_00,
+        50_00,
+        0,
+        0.625,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+
+    def liquidation_state():
+        user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+        return (
+            user_debt.amount,
+            bt.collateralVal,
+            savings_green.balanceOf(stability_pool),
+            stability_pool.getTotalAmountForUser(sally, savings_green),
+            savings_green.totalSupply(),
+            savings_green.lastPricePerShare(),
+            green_token.balanceOf(savings_green),
+            green_token.balanceOf(stability_pool),
+            green_token.totalSupply(),
+            alpha_token.balanceOf(stability_pool),
+        )
+
+    savings_green.pause(True, sender=governance.address)
+    before = liquidation_state()
+    with pytest.raises(boa.BoaError) as exc_info:
+        teller.liquidateUser(bob, False, sender=sally)
+    assert "token paused" in get_boa_dev_reasons(exc_info.value)
+    assert liquidation_state() == before
+
+    savings_green.pause(False, sender=governance.address)
+    teller.liquidateUser(bob, False, sender=sally)
+    after = liquidation_state()
+
+    assert after[0] < before[0]
+    assert after[1] < before[1]
+    assert after[2] < before[2]
+    assert after[9] > before[9]
+    assert filter_logs(teller, "CollateralSwappedWithStabPool")
 
 
 @pytest.mark.parametrize("debt_amount,collateral_amount,liq_threshold,liq_fee,ltv,ltv_payback_buffer,collateral_price_drop", [
