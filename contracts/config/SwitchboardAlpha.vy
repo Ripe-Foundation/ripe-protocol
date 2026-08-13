@@ -719,19 +719,19 @@ def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _
 @external
 def setBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval) # dev: invalid borrow interval config
     mc: address = self._resolveMissionControl(_missionControl)
+    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, mc) # dev: invalid borrow interval config
     return self._setPendingDebtConfig(ActionType.DEBT_BORROW_INTERVAL, mc, 0, 0, 0, 0, _maxBorrowPerInterval, _numBlocksPerInterval)
 
 
 @view
 @internal
-def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256) -> bool:
+def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256, _missionControl: address) -> bool:
     if 0 in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
     if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
-    config: cs.GenDebtConfig = staticcall MissionControl(self._getMissionControlAddr()).genDebtConfig()
+    config: cs.GenDebtConfig = staticcall MissionControl(_missionControl).genDebtConfig()
     if _maxBorrowPerInterval < config.minDebtAmount:
         return False
     return True
@@ -1525,6 +1525,7 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.DEBT_BORROW_INTERVAL:
         config: cs.GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
         p: cs.GenDebtConfig = self.pendingDebtConfig[_aid]
+        assert p.maxBorrowPerInterval >= config.minDebtAmount # dev: invalid borrow interval config
         config.maxBorrowPerInterval = p.maxBorrowPerInterval
         config.numBlocksPerInterval = p.numBlocksPerInterval
         extcall MissionControl(mc).setGeneralDebtConfig(config)
