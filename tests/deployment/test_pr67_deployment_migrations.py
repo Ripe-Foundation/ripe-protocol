@@ -374,7 +374,12 @@ def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
     stability_functions = {
         entry["name"] for entry in stability if entry.get("type") == "function"
     }
-    assert {"sharesToValue", "valueToShares"}.isdisjoint(stability_functions)
+    assert {
+        "sharesToValue",
+        "valueToShares",
+        "claimFromStabilityPool",
+        "redeemFromStabilityPool",
+    }.isdisjoint(stability_functions)
     assert {"getTotalValue", "getTotalUserValue"} <= stability_functions
 
     stability_events = {

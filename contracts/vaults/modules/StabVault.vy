@@ -270,12 +270,60 @@ def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 
 @view
 @internal
+def _isCohortLiquidationReady(_stabAsset: address) -> bool:
+    if vaultData.isPaused:
+        return False
+
+    if vaultData.totalBalances[_stabAsset] == 0 and self._getNumActiveClaimAssets(_stabAsset) == 0:
+        # A configured empty cohort may receive its first liquidation, but any
+        # legacy cross-cohort reservation makes AuctionHouse's raw-custody
+        # sizing unsafe because it cannot distinguish the reserved amount.
+        return self.totalClaimableBalances[_stabAsset] == 0
+
+    success: bool = False
+    response: Bytes[32] = b""
+    success, response = raw_call(
+        self,
+        abi_encode(_stabAsset, method_id=method_id("getTotalValue(address)")),
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32 or convert(response, uint256) == 0:
+        return False
+
+    # This is the fail-soft identity enforced strictly by
+    # _getUnreservedBalance: raw custody minus liabilities reserved for every
+    # cohort. AuctionHouse sizes normal swaps from raw custody before the pool
+    # subtracts those liabilities, so require a positive transferable balance
+    # before any collateral moves. This conservatively skips claimable-GREEN-
+    # only liquidity when no stabilization asset is transferable.
+    success, response = raw_call(
+        _stabAsset,
+        abi_encode(self, method_id=method_id("balanceOf(address)")),
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    return (
+        success
+        and len(response) == 32
+        and convert(response, uint256) > self.totalClaimableBalances[_stabAsset]
+    )
+
+
+@view
+@internal
 def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    # AuctionHouse phase 2 needs a truthful position iterator. CreditEngine
-    # excludes the Stability Pool by vault ID rather than hiding positions here.
+    # CreditEngine excludes Stability Pool vault IDs before collateral valuation.
+    # AuctionHouse uses this iterator in liquidation phase 2; an unhealthy cohort
+    # deliberately reports zero so liquidation can continue through the ordinary
+    # auction path while its nominal position and asset enumeration remain intact.
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
         return empty(address), 0
+    if not self._isCohortLiquidationReady(asset):
+        return asset, 0
     return asset, self._getTotalAmountForUser(_user, asset)
 
 
@@ -1128,6 +1176,7 @@ def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool
             self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
             or self._getNumActiveClaimAssets(_stabAsset) < MAX_ACTIVE_CLAIM_ASSETS
         )
+        and self._isCohortLiquidationReady(_stabAsset)
     )
 
 

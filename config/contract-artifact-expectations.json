@@ -1727,26 +1727,26 @@
     },
     "StabilityPool": {
       "abi": {
-        "canonical_sha256": "8086009513c4557dc8a12fec7829c0f3782693001ebc7d21dddab2944084812a",
-        "committed_file_sha256": "4b720ba58cb96db1eb5e3b9cb30698283da0d5e7d90db55e2170a8674982a543",
+        "canonical_sha256": "e4bd708030873a11bf6051ec4f5aa356aebda3a1a677c60af84cfb06cf098bc5",
+        "committed_file_sha256": "18e25406c85ea9c981efb5e39c1c971106b3e7cc6866b00a62607cb938415af1",
         "committed_path": "scripts/abis/StabilityPool.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "d41d2010cd224caf70cf0bb6296349519be7b0e0b6de7fe63ff43147310d534e",
-        "creation_executable_prefix_size": 24536,
-        "creation_metadata_sha256": "0a255bd2e3143cad3e7607bd8c42e3c7e284b57768a666dfa75707a43543e36d",
+        "creation_executable_prefix_sha256": "4197c796e2d13622b6ca654b366a068117a5114bbc3ed059806ca44ab1dfb6ba",
+        "creation_executable_prefix_size": 23767,
+        "creation_metadata_sha256": "301027df5a552298639666ec8ed85adc42331d896060db1e7421a708bcefe45b",
         "creation_metadata_size": 66,
-        "creation_sha256": "b5038af7439a63351f29bb12cdf826951ff4c9b4f99ed077b2ffa8d39750a656",
-        "creation_size": 24602,
-        "deployed_eip170_headroom": 263,
+        "creation_sha256": "797884da26ff9134ecd882af2570c46f10c49d53ff6b5531f22f5ae945097b8f",
+        "creation_size": 23833,
+        "deployed_eip170_headroom": 1032,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940000000000000000000000000355bb7f0f6c730e4460d620420a300fa08ff82f3000000000000000000000000290a52380a88f743813b8c3e9f6b0e61db5fdf73",
         "deployed_runtime_immutable_data_sha256": "a439092a6586624248787ebe865e59ce27dc444f8081833174946f103ca07741",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "7b89774731cafba9e4704fee420b9a0fcd9f819f13b7f486847b7fdd86c814eb",
-        "deployed_runtime_size": 24313,
-        "eip170_headroom": 359,
-        "runtime_template_sha256": "0792942a6a88c7c6d03569f60b001ce6d2acd452022203cf9aace0962820f86a",
-        "runtime_template_size": 24217
+        "deployed_runtime_sha256": "cad1ec10ea61c53222bf548b8943130c2a662b67f083076e0d34c87afc63269e",
+        "deployed_runtime_size": 23544,
+        "eip170_headroom": 1128,
+        "runtime_template_sha256": "c79c884c0cfad56123d4c1e4e2e3949a8934b592b6a59f6ae356d39d887ec715",
+        "runtime_template_size": 23448
       },
       "code_layout": {
         "addys": {
@@ -1793,12 +1793,12 @@
         "count": 8
       },
       "selectors": {
-        "canonical_sha256": "7524780e1d548349e7a65ebffeb9c6a24d0207e5dcf77abdf8f8a09341c620bd",
-        "count": 56
+        "canonical_sha256": "1c6d2f7dcc786682bb1e0d738348e8b7934423204f1076c94763bc4c1e036306",
+        "count": 52
       },
-      "source_git_blob": "22f6225b952608f65c9f5a8bc50b808f1c4b47c0",
+      "source_git_blob": "44dc02a66ec21118de9212e3ce7f1940a6376f13",
       "source_path": "contracts/vaults/StabilityPool.vy",
-      "source_sha256": "c5167e72339f94201fbcede74ed7ca856108bf2fb45659720bbe1ea1e301f158",
+      "source_sha256": "0071b9c9680c9e7a8e2ab8602c6e2260999bcee38ed52744f27970d35f0d0be0",
       "storage_layout": {
         "stabVault": {
           "claimableAssets": {
@@ -1882,7 +1882,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "10bc78f3cf9bb94c223a78e03af3b775b75198ee4f7f873150ff5249acdf5aae"
+      "transitive_compiler_input_integrity": "ac81797676a97eec909a39d7ec76114f384020a5747ea172e6b191d42125724c"
     },
     "SwitchboardAlpha": {
       "abi": {
@@ -2125,21 +2125,21 @@
         "committed_path": "scripts/abis/SwitchboardBravo.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "fc0e00904fd911c709207a2b1d48c87ba3e33eb8e9f171b804189d7abd1b672a",
-        "creation_executable_prefix_size": 24655,
-        "creation_metadata_sha256": "0f9c9c943b7344e66c41338241d74fbbcb8e03d8463a631e360af423fcce56e3",
+        "creation_executable_prefix_sha256": "c0f0f38f13a93643008e8944362365852ef5e5d419732abd129a8a3cb651c3b5",
+        "creation_executable_prefix_size": 25428,
+        "creation_metadata_sha256": "ea1f5a36bb92818aaa9965c1ecbc3eeea02b426cf5bbb9f231e25f282aecfb72",
         "creation_metadata_size": 74,
-        "creation_sha256": "3c610b01e12c39891c83d6642836e34815f68abc33bdc5f33c5012f74e34c91b",
-        "creation_size": 24729,
-        "deployed_eip170_headroom": 985,
+        "creation_sha256": "9a2b1100d4b8af7d1e7de71f5854bf1891de50e2aa8ce7ae1c3b6d94d416df8c",
+        "creation_size": 25502,
+        "deployed_eip170_headroom": 212,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0",
         "deployed_runtime_immutable_data_sha256": "da02c06d7af6d4a82d56dc4575888dc3ddf18a41afd2ea0d93ffb5a0237c13f6",
         "deployed_runtime_immutable_data_size": 160,
-        "deployed_runtime_sha256": "06cf2718048afabb10eee53059ebe21f8ec905ad9d4c5627c854119d77b0282b",
-        "deployed_runtime_size": 23591,
-        "eip170_headroom": 1145,
-        "runtime_template_sha256": "708aecea0624f12304bec9f92a9b6765fcee8a61c8c15b74e3101afe496fab67",
-        "runtime_template_size": 23431
+        "deployed_runtime_sha256": "d9252c6dc66097b75f8d7e666e0d57fbbaf6e05acd8d28fc44635efbf95783a3",
+        "deployed_runtime_size": 24364,
+        "eip170_headroom": 372,
+        "runtime_template_sha256": "26cc3c500067dc702a2350e78248a078efa46851eaaf7a12d37ccd861cf9dd33",
+        "runtime_template_size": 24204
       },
       "code_layout": {
         "gov": {
@@ -2211,9 +2211,9 @@
         "canonical_sha256": "06cf2d9b23a48b003915009348ff097586900e59a5b62e30c18f3f0bdd75d4cf",
         "count": 66
       },
-      "source_git_blob": "025e577d1aa128a847ce35525216e18a801cdf8f",
+      "source_git_blob": "abb7165846d1f1fc3285f9aede53b5e88ef17d90",
       "source_path": "contracts/config/SwitchboardBravo.vy",
-      "source_sha256": "b874f2a5b34fb74e95f0812d9c2f2df7e99b26c1ab5990cd0fd15f302b6cc872",
+      "source_sha256": "468639ad979eb5352cf00abef5883444321b747914e7e7eee29c7b901d80a827",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2276,7 +2276,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "54a5be9b295845c1f294d7b3666bc6cb648419f7cd48084ef5a3b366b70524bc"
+      "transitive_compiler_input_integrity": "51872c03e5dac3c0240aeed41274ec467e249d5edbb993607e156ecb3a0d2f4c"
     },
     "SwitchboardCharlie": {
       "abi": {

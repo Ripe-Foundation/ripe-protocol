@@ -46,9 +46,11 @@ interface VaultBook:
 interface StabilityPool:
     def getNumVaultAssets() -> uint256: view
     def vaultAssets(_index: uint256) -> address: view
+    def indexOfAsset(_asset: address) -> uint256: view
+    def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def getNumActiveClaimAssets(_stabAsset: address) -> uint256: view
     def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def totalClaimableBalances(_asset: address) -> uint256: view
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
     def isPaused() -> bool: view
 
 interface RipeHq:
@@ -67,6 +69,8 @@ flag ActionType:
 struct AssetUpdate:
     asset: address
     config: cs.AssetConfig
+
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 
 event NewAssetPending:
     asset: indexed(address)
@@ -469,6 +473,9 @@ def _isValidAssetLiqConfig(
     savingsGreen: address = staticcall RipeHq(ripeHq).getAddr(SAVINGS_GREEN_ID)
     vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
 
+    if _shouldSwapInStabPools and not _shouldAuctionInstantly:
+        return False
+
     if _shouldBurnAsPayment:
 
         # can only burn if green or savings green
@@ -511,8 +518,16 @@ def _isValidAssetLiqConfig(
             stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
             if stabAsset == empty(address):
                 return False
-        canAccept: bool = staticcall StabilityPool(stabPool).canAcceptLiquidationAsset(stabAsset, _asset)
-        if hasStabAsset and not canAccept:
+        # Configuration validity is structural. Transient oracle/NAV/custody
+        # health is enforced by canAcceptLiquidationAsset at liquidation time,
+        # where the mandatory ordinary-auction path provides the fallback.
+        claimAssetIndex: uint256 = staticcall StabilityPool(stabPool).indexOfAsset(_asset)
+        claimIndex: uint256 = staticcall StabilityPool(stabPool).indexOfClaimableAsset(stabAsset, _asset)
+        activeClaimCount: uint256 = staticcall StabilityPool(stabPool).getNumActiveClaimAssets(stabAsset)
+        if hasStabAsset and (
+            claimAssetIndex != 0
+            or (claimIndex == 0 and activeClaimCount >= MAX_ACTIVE_CLAIM_ASSETS)
+        ):
             return False
         naPair: uint256 = staticcall StabilityPool(stabPool).claimableBalances(stabAsset, _asset)
         na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)

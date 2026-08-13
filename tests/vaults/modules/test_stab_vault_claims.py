@@ -218,7 +218,13 @@ def test_stab_vault_claims_validation(
 
     # Test unauthorized caller
     with boa.reverts("only Teller allowed"):
-        stability_pool.claimFromStabilityPool(bob, alpha_token, bravo_token, 100, bob, False, sender=alice)
+        stability_pool.claimManyFromStabilityPool(
+            bob,
+            [(alpha_token.address, bravo_token.address, 100)],
+            bob,
+            False,
+            sender=alice,
+        )
 
 
 def test_stab_vault_claims_no_shares(

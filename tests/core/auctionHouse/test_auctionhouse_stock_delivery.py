@@ -945,7 +945,7 @@ def test_standard_deficit_suppresses_cross_vault_auction_only_liquidation(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
         stab_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
         setAssetConfig(
