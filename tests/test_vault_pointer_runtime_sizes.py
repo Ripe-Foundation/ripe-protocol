@@ -20,12 +20,12 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     # ID/getters to Addys also changes the runtime of Addys consumers.
     "SwitchboardEcho": 23_053,
     "VaultMigrator": 12_042,
-    "Teller": 24_525,
+    "Teller": 24_218,
     "TellerUtils": 8_976,
     "Ledger": 13_306,
-    "Lootbox": 22_993,
+    "Lootbox": 23_448,
     "RipeGov": 23_257,
-    "CreditEngine": 24_367,
+    "CreditEngine": 24_511,
     "StabilityPool": 24_371,
 }
 
@@ -47,18 +47,18 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # passed. The default is now the ratified value.
 DEFAULT_MIN_HEADROOM = 200
 
-# Measured headroom against the 24,576 limit after the liquidation-state change:
-#   Teller 71, CreditEngine 209, StabilityPool 205, SwitchboardCharlie 1,091,
-#   SwitchboardAlpha 1,142, Lootbox 1,583, RipeGov 1,319, SwitchboardBravo
-#   1,494, SwitchboardEcho 1,523, and the rest far larger.
+# Measured headroom against the 24,576 limit after the custody-shortfall change:
+#   Teller 358, CreditEngine 65, StabilityPool 263, SwitchboardCharlie 819,
+#   SwitchboardAlpha 339, Lootbox 1,128, RipeGov 1,271, SwitchboardBravo
+#   1,073, SwitchboardEcho 1,523, and the rest far larger.
 #
-# CreditEngine has self-retired RH-D026 by returning above the 200-byte floor.
-# Teller leaves 71 bytes after retaining the receipt-window guard and inlining a
-# one-use preferred-pool lookup. The owner replaced RH-D027 with this exact
-# artifact identity. See the decision register for its scope and triggers.
+# CreditEngine reopened and retired RH-D026 when this source changed. The owner
+# granted RH-D029 for this exact 65-byte-headroom quarantine artifact. Removing
+# Teller's singular deleverage API moved it above the floor, so RH-D027 and its
+# exact identity self-retire in this candidate. See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
-    "Teller": 71,  # RH-D027 replacement; do not change without a new decision
+    "CreditEngine": 65,  # RH-D029; exact quarantine artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -123,27 +123,24 @@ MIN_RIPE_GOV_MARGIN = 1_000
 # headroom, its override and identity entry are both removed, and it goes back to
 # being governed by the floor like everything else.
 WAIVED_CONTRACT_IDENTITIES = {
-    "Teller": {
-        "decision": "RH-D027",
-        "fixture": "teller",
-        "source": "contracts/core/Teller.vy",
+    "CreditEngine": {
+        "decision": "RH-D029",
+        "fixture": "credit_engine",
+        "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
-            "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476"
+            "d4885a355c80263817ad82cb2bfd234ee4e796d103669028dfa6ea3199b584a8"
         ),
         "runtime_sha256": (
-            "3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8"
+            "c83fef41ef92fb72edbdd1e445aa4c4dc9411b57b87ee0e846092fad54867b49"
         ),
-        "runtime_template_bytes": 24_409,
-        "deployed_runtime_bytes": 24_505,
-        # The paused-state constructor input is pinned together with HQ because
-        # both are immutable parts of the complete deployed byte string.
-        "pinned_hq": "0x00000000000000000000000000000000000000A2",
+        "runtime_template_bytes": 24_415,
+        "deployed_runtime_bytes": 24_511,
+        "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
-            "0x00000000000000000000000000000000000000A2",
-            False,
+            "0x00000000000000000000000000000000000000A1",
         ),
         "deployed_sha256": (
-            "8980ea1cae7a32927d120e3fc333d3a1039d778cf09c1b7293a57cd755d67ea9"
+            "98ece66166a4666cb2f3bb8a554429f13319f17bc6832bd15cc1364ecb1fa417"
         ),
     },
 }

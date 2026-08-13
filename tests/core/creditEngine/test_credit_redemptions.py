@@ -2277,7 +2277,7 @@ def test_credit_redeem_single_deficient_asset_fails_without_side_effects(
             bob,
         )
     )
-    assert credit_engine.canRedeemUserCollateral(bob)
+    assert not credit_engine.canRedeemUserCollateral(bob)
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == bravo_amount
 
@@ -2334,7 +2334,7 @@ def test_credit_redeem_single_deficient_asset_fails_without_side_effects(
         pytest.param(False, id="deficient-last"),
     ),
 )
-def test_credit_redeem_many_skips_deficient_and_preserves_healthy_entry(
+def test_credit_redeem_many_suppresses_all_entries_for_quarantined_user(
     should_transfer_balance,
     deficient_first,
     setGeneralConfig,
@@ -2382,52 +2382,46 @@ def test_credit_redeem_many_skips_deficient_and_preserves_healthy_entry(
     payment = 60 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, payment, sender=whale)
     green_token.approve(teller, payment, sender=alice)
-    green_before = green_token.balanceOf(alice)
-    bravo_custody_before = bravo_token.balanceOf(simple_erc20_vault)
-    bravo_recipient_before = bravo_token.balanceOf(alice)
-
-    spent = teller.redeemCollateralFromMany(
-        redemptions,
-        payment,
-        False,
-        should_transfer_balance,
-        False,
-        sender=alice,
+    before = (
+        green_token.balanceOf(alice),
+        credit_engine.getUserDebtAmount(bob),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        bravo_token.balanceOf(simple_erc20_vault),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, bravo_token),
+        simple_erc20_vault.userBalances(alice, bravo_token),
+        simple_erc20_vault.totalBalances(bravo_token),
     )
 
-    events = filter_logs(teller, "CollateralRedeemed")
-    assert spent == max_per_entry
-    assert green_token.balanceOf(alice) == green_before - spent
-    assert credit_engine.getUserDebtAmount(bob) == debt_amount - spent
-    assert len(events) == 1
-    assert events[0].user == bob
-    assert events[0].asset == bravo_token.address
-    assert events[0].repayValue == spent
-    assert events[0].amount == max_per_entry
+    with boa.reverts("no redemptions occurred"):
+        teller.redeemCollateralFromMany(
+            redemptions,
+            payment,
+            False,
+            should_transfer_balance,
+            False,
+            sender=alice,
+        )
 
-    assert alpha_token.balanceOf(simple_erc20_vault) == alpha_amount - 1
-    assert alpha_token.balanceOf(alice) == 0
-    assert simple_erc20_vault.userBalances(bob, alpha_token) == alpha_amount
-    assert simple_erc20_vault.userBalances(alice, alpha_token) == 0
-    assert simple_erc20_vault.totalBalances(alpha_token) == alpha_amount
-
-    if should_transfer_balance:
-        assert bravo_token.balanceOf(simple_erc20_vault) == bravo_custody_before
-        assert bravo_token.balanceOf(alice) == bravo_recipient_before
-        assert simple_erc20_vault.userBalances(bob, bravo_token) == (
-            bravo_amount - events[0].amount
-        )
-        assert simple_erc20_vault.userBalances(alice, bravo_token) == events[0].amount
-        assert simple_erc20_vault.totalBalances(bravo_token) == bravo_amount
-    else:
-        assert bravo_token.balanceOf(simple_erc20_vault) == (
-            bravo_custody_before - events[0].amount
-        )
-        assert bravo_token.balanceOf(alice) == bravo_recipient_before + events[0].amount
-        assert simple_erc20_vault.userBalances(bob, bravo_token) == (
-            bravo_amount - events[0].amount
-        )
-        assert simple_erc20_vault.userBalances(alice, bravo_token) == 0
-        assert simple_erc20_vault.totalBalances(bravo_token) == (
-            bravo_amount - events[0].amount
-        )
+    assert (
+        green_token.balanceOf(alice),
+        credit_engine.getUserDebtAmount(bob),
+        alpha_token.balanceOf(simple_erc20_vault),
+        alpha_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, alpha_token),
+        simple_erc20_vault.userBalances(alice, alpha_token),
+        simple_erc20_vault.totalBalances(alpha_token),
+        bravo_token.balanceOf(simple_erc20_vault),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.userBalances(bob, bravo_token),
+        simple_erc20_vault.userBalances(alice, bravo_token),
+        simple_erc20_vault.totalBalances(bravo_token),
+    ) == before
+    assert before[1] == debt_amount
+    assert before[2] == alpha_amount - 1
+    assert before[9] == bravo_amount
+    assert filter_logs(teller, "CollateralRedeemed") == []

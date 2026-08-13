@@ -105,6 +105,7 @@ struct UserBorrowTerms:
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
     highestLtv: uint256
+    hasQuarantinedAsset: bool
 
 struct UserDebt:
     amount: uint256
@@ -233,6 +234,7 @@ def borrowForUser(
 
     # get borrow data (debt terms for user)
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), isUndyVault, a)
+    assert not bt.hasQuarantinedAsset # dev: quarantined asset
 
     # get config
     config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
@@ -400,6 +402,8 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 
     # avail debt based on collateral value / ltv
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, a)
+    if bt.hasQuarantinedAsset:
+        return 0
     availDebtPerLtv: uint256 = 0
     if bt.totalMaxDebt > userDebt.amount:
         availDebtPerLtv = bt.totalMaxDebt - userDebt.amount
@@ -700,7 +704,6 @@ def _getUserBorrowTerms(
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     bt.lowestLtv = max_value(uint256)
-    bt.highestLtv = 0
     ltvSum: uint256 = 0
     redemptionThresholdSum: uint256 = 0
     liqThresholdSum: uint256 = 0
@@ -737,6 +740,12 @@ def _getUserBorrowTerms(
             if debtTerms.ltv == 0:
                 continue
 
+            # A zero usable amount is a quarantine only when the user still has
+            # a nominal/reward share and the whole vault has zero usable amount.
+            # The vault-wide condition excludes per-user share-rounding dust.
+            if amount == 0 and staticcall Vault(vaultAddr).getUserLootBoxShare(_user, asset) != 0 and staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
+                bt.hasQuarantinedAsset = True
+
             # collateral value, max debt
             collateralVal: uint256 = 0
             if amount != 0:
@@ -758,7 +767,7 @@ def _getUserBorrowTerms(
             totalSum += debtTermsWeight
 
             # lowest ltv
-            if debtTerms.ltv != 0 and debtTerms.ltv < bt.lowestLtv:
+            if debtTerms.ltv < bt.lowestLtv:
                 bt.lowestLtv = debtTerms.ltv
 
             # highest ltv
@@ -958,20 +967,14 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     if _debtType == 1:
         return userDebt.amount <= bt.totalMaxDebt
-    if _debtType != 2 and _debtType != 3:
+    # All callers bind debt type to 1, 2, or 3; type 1 returned above.
+    if bt.hasQuarantinedAsset:
         return False
 
     threshold: uint256 = bt.debtTerms.liqThreshold
     if _debtType == 3:
         threshold = bt.debtTerms.redemptionThreshold
     return self._isAtDebtThreshold(userDebt.amount, bt.collateralVal, threshold)
-
-
-@view
-@internal
-def _hasGoodDebtHealth(_userDebtAmount: uint256, _collateralVal: uint256, _ltv: uint256) -> bool:
-    maxUserDebt: uint256 = _collateralVal * _ltv // HUNDRED_PERCENT
-    return _userDebtAmount <= maxUserDebt
 
 
 @view
@@ -1014,9 +1017,6 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
     na: uint256 = 0
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
     if userDebt.amount == 0:
-        return 0
-
-    if _debtType != 2 and _debtType != 3:
         return 0
 
     threshold: uint256 = bt.debtTerms.liqThreshold
@@ -1254,6 +1254,8 @@ def getMaxWithdrawableForAsset(
     # get borrow terms excluding the asset to withdraw
     isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
     btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, isUndyVault, a)
+    if btExcluding.hasQuarantinedAsset:
+        return 0
 
     # calculate minimum asset value that must remain
     minAssetValueToRemain: uint256 = 0

@@ -881,7 +881,7 @@ def test_standard_batch_later_deficit_preserves_earlier_healthy_purchase(
     assert ledger.hasFungibleAuction(bob, vault_id, bravo_token)
 
 
-def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
+def test_standard_deficit_suppresses_cross_vault_auction_only_liquidation(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -1091,7 +1091,7 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
     assert liq_config.shouldSwapInStabPools
     assert not liq_config.shouldTransferToEndaoment
     assert liq_config.shouldAuctionInstantly
-    assert credit_engine.canLiquidateUser(bob)
+    assert not credit_engine.canLiquidateUser(bob)
     assert not auction_house.canStartAuction(
         bob,
         safe_nominal_id,
@@ -1103,16 +1103,17 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
         bravo_token,
     )
 
-    teller.liquidateUser(bob, False, sender=sally)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
 
     assert not ledger.hasFungibleAuction(bob, safe_nominal_id, stock_token)
-    assert ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    assert not ledger.hasFungibleAuction(bob, simple_id, bravo_token)
     assert not auction_house.canStartAuction(
         bob,
         safe_nominal_id,
         stock_token,
     )
-    assert auction_house.canStartAuction(
+    assert not auction_house.canStartAuction(
         bob,
         simple_id,
         bravo_token,
@@ -1134,3 +1135,5 @@ def test_standard_deficit_does_not_block_cross_vault_auction_only_liquidation(
     assert stock_token.balanceOf(endaoment_funds) == 0
     assert stock_token.balanceOf(endaoment_psm) == 0
     assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+    assert not ledger.userDebt(bob).inLiquidation
+    assert credit_engine.getUserDebtAmount(bob) == debt_before

@@ -154,7 +154,7 @@ def test_liquidation_eligibility_after_total_issuer_burn(
 
     assert stock_token.balanceOf(vault) == 0
     assert credit_engine.getUserDebtAmount(bob) == debt_amount
-    assert credit_engine.canLiquidateUser(bob)
+    assert not credit_engine.canLiquidateUser(bob)
     assert credit_engine.getCollateralValue(bob) == 0
 
 
@@ -882,7 +882,7 @@ def test_partial_issuer_reduction_updates_only_live_share_claims(
     assert vault.getUserLootBoxShare(bob, stock_token) == loot_share_before
     if vault_kind == "simple":
         assert vault.getTotalAmountForUser(bob, stock_token) == 0
-        assert vault.getTotalAmountForVault(stock_token) == amount
+        assert vault.getTotalAmountForVault(stock_token) == 0
     else:
         assert amount - loss - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= amount - loss
         assert vault.getTotalAmountForVault(stock_token) == amount - loss
@@ -912,7 +912,7 @@ def test_donation_after_total_loss_revalues_only_share_claims(
 
     if vault_kind == "simple":
         assert vault.getTotalAmountForUser(bob, stock_token) == 0
-        assert vault.getTotalAmountForVault(stock_token) == amount
+        assert vault.getTotalAmountForVault(stock_token) == 0
     else:
         assert donation - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= donation
         assert vault.getTotalAmountForVault(stock_token) == donation
@@ -1180,7 +1180,7 @@ def test_deleverage_external_withdrawal_after_partial_and_total_loss(
     deploy3r,
     bob,
 ):
-    """The governance volatile-asset path is live-backed and atomic at zero."""
+    """The governance volatile-asset path skips quarantined positions."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -1203,12 +1203,11 @@ def test_deleverage_external_withdrawal_after_partial_and_total_loss(
     target = 20 * EIGHTEEN_DECIMALS
     debt_before = credit_engine.getUserDebtAmount(bob)
     if vault_kind == "simple":
-        with boa.reverts():
-            deleverage.deleverageWithVolAssets(
-                bob,
-                [(vault_id, stock_token.address, target)],
-                sender=switchboard_alpha.address,
-            )
+        assert deleverage.deleverageWithVolAssets(
+            bob,
+            [(vault_id, stock_token.address, target)],
+            sender=switchboard_alpha.address,
+        ) == 0
         assert credit_engine.getUserDebtAmount(bob) == debt_before
         assert stock_token.balanceOf(vault) == 100 * EIGHTEEN_DECIMALS
         return
@@ -1223,12 +1222,11 @@ def test_deleverage_external_withdrawal_after_partial_and_total_loss(
 
     stock_token.adminBurn(vault, stock_token.balanceOf(vault), sender=deploy3r)
     debt_before_zero_attempt = credit_engine.getUserDebtAmount(bob)
-    with boa.reverts():
-        deleverage.deleverageWithVolAssets(
-            bob,
-            [(vault_id, stock_token.address, target)],
-            sender=switchboard_alpha.address,
-        )
+    assert deleverage.deleverageWithVolAssets(
+        bob,
+        [(vault_id, stock_token.address, target)],
+        sender=switchboard_alpha.address,
+    ) == 0
     assert credit_engine.getUserDebtAmount(bob) == debt_before_zero_attempt
     assert stock_token.balanceOf(vault) == 0
 
@@ -1574,7 +1572,7 @@ def test_auction_started_after_partial_issuer_loss_skips_deficient_simple(
     # The issuer action precedes the price change and liquidation call.
     stock_token.adminBurn(vault, 100 * EIGHTEEN_DECIMALS, sender=deploy3r)
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
-    assert credit_engine.canLiquidateUser(bob)
+    assert credit_engine.canLiquidateUser(bob) == (vault_kind == "rebase")
     liquidation_result = teller.liquidateUser(bob, False, sender=sally)
     if vault_kind == "simple":
         assert liquidation_result == 0
@@ -1655,7 +1653,7 @@ def test_auction_started_after_total_issuer_loss(
     stock_token.adminBurn(vault, deposit_amount, sender=deploy3r)
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
 
-    assert credit_engine.canLiquidateUser(bob)
+    assert not credit_engine.canLiquidateUser(bob)
     liquidation_result = teller.liquidateUser(bob, False, sender=sally)
     assert liquidation_result == 0
     assert not ledger.hasFungibleAuction(bob, vault_id, stock_token)
@@ -1970,7 +1968,7 @@ def test_lootbox_points_update_after_donation_and_total_loss(
     assert lost_user.balancePoints == expected_user_weight * 20
     assert lost_user.lastBalance == expected_user_weight
     assert lost_asset.lastBalance == expected_user_weight
-    assert lost_asset.lastUsdValue == (100 if vault_kind == "simple" else 0)
+    assert lost_asset.lastUsdValue == 0
 
 
 @pytest.mark.parametrize("first_buyer_name", ("alice", "sally"))

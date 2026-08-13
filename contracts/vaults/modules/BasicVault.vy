@@ -173,4 +173,7 @@ def _getTotalAmountForUser(_user: address, _asset: address) -> uint256:
 @view
 @internal
 def _getTotalAmountForVault(_asset: address) -> uint256:
-    return vaultData.totalBalances[_asset]
+    totalBalance: uint256 = vaultData.totalBalances[_asset]
+    if staticcall IERC20(_asset).balanceOf(self) < totalBalance:
+        return 0
+    return totalBalance

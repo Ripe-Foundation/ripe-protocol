@@ -101,6 +101,7 @@ struct UserBorrowTerms:
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
     highestLtv: uint256
+    hasQuarantinedAsset: bool
 
 struct UserDebt:
     amount: uint256
@@ -301,7 +302,7 @@ def _liquidateUser(
     userDebt, bt, newInterest = staticcall CreditEngine(_a.creditEngine).getLatestUserDebtAndTerms(_liqUser, True, _a)
 
     # no debt
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
     # An outstanding auction owns the current liquidation pass. A user that is
@@ -1340,7 +1341,7 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
     
     # No debt to repay
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
     # liquidation fees
