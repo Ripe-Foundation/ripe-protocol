@@ -405,6 +405,7 @@ def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> ui
     amount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).transferContributorRipeTokens(msg.sender, _owner, _lockDuration, a)
 
     extcall Ledger(a.ledger).addVaultToUser(_owner, vaultId)
+    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     extcall Lootbox(a.lootbox).updateDepositPoints(_owner, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     return amount
 
@@ -448,6 +449,7 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     vaultId: uint256 = self._getCoreRipeGovVaultId(a.missionControl)
     ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
     withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
+    extcall Lootbox(a.lootbox).updateDepositPoints(msg.sender, vaultId, ripeGovVaultAddr, a.ripeToken, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     if burnAmount != 0:
         extcall RipeToken(a.ripeToken).burn(burnAmount)
