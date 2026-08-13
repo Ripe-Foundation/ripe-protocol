@@ -1,5 +1,15 @@
 # Robinhood Manifest v2 macOS/APFS Operator Runbook
 
+> **11 August 2026 removal overlay:** `scripts/utils/manifest_schema.py` — the
+> H-06 manifest-v2 schema and writer this runbook operates — has been removed,
+> along with `tests/deployment/test_manifest_schema.py` and
+> `tests/deployment/test_current_manifest_promotion.py`, and the
+> `manifest-promotion-macos` CI job that ran them. Every import, command, and
+> hash below is therefore historical; nothing enforces them any more. The
+> canonical-JSON helpers the fork suite still needs were preserved as
+> `tests/utils/canonical_json.py`. Removed sources are recoverable from git
+> history.
+
 > **31 July 2026 currentness overlay:** Ready to begin deployment preparation
 > from current configuration-source baseline `e4473ce6485888f1b747761a5ee8693443108877`,
 > tree `33b705690007bda9b11900b5775bd9230e79f09e`. H-06 qualifies a candidate

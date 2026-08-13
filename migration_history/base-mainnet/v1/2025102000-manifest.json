@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "UndyVaultPrices": {
+      "address": "0x2210a9b994CC0F13689043A34F2E11d17DB2099C",
+      "file": "contracts/priceSources/UndyVaultPrices.vy"
+    }
+  }
+}

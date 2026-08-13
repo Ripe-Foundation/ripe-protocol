@@ -569,15 +569,33 @@ def test_explorer_key_is_not_read_at_import_or_help():
         assert "KeyError" not in result.stderr
 
 
-def test_unsupported_verifier_does_not_read_key(monkeypatch):
+@pytest.mark.parametrize(
+    ("environment_name", "chain", "expected"),
+    (
+        # Unset chain: the shape a scripted run takes when it drops the option.
+        ("base-mainnet", None, "Unknown chain"),
+        # Robinhood has committed manifests, so this route gets far enough to
+        # matter -- it must still refuse before the explorer key is read. A
+        # known chain without a provider is a different failure from an
+        # unknown one, and reports differently.
+        (
+            "v1",
+            "robinhood-mainnet",
+            "has no Etherscan-family verifier configured",
+        ),
+    ),
+)
+def test_unsupported_verifier_does_not_read_key(
+    environment_name, chain, expected, monkeypatch
+):
     environment = SpyEnvironment(
         {"ETHERSCAN_API_KEY": "synthetic-explorer-value"}
     )
     monkeypatch.setattr(os, "environ", environment)
     with pytest.raises(Exception) as captured:
-        verify.cli.callback("base-mainnet", None, "current")
+        verify.cli.callback(environment_name, chain, "current")
     rendered = f"{captured.value} {captured.value!r}"
-    assert "H02_VERIFIER_BLOCKED" in rendered
+    assert expected in rendered
     assert environment.accesses == []
 
 

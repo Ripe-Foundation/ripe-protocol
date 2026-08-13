@@ -22,20 +22,8 @@ from scripts.utils.migration_helpers import (
     deployed_contracts_manifest,
     execute_transaction,
 )
-from scripts.utils.manifest_schema import (
-    ManifestError,
-    validate_execution_handoff,
-)
-from scripts.utils.migration_runner import (
-    MigrationPlanError,
-    validate_execution_plan_artifact,
-)
 
 
-_ROBINHOOD_HISTORY_SUFFIXES = (
-    PurePosixPath("migration_history/robinhood-mainnet/v1"),
-    PurePosixPath("migration_history/robinhood-testnet/v1"),
-)
 
 _PROMOTABLE_MANIFEST_FIELDS = frozenset({"address", "file", "abi", "solc_json", "args"})
 _PROMOTABLE_SOLC_FIELDS = frozenset(
@@ -145,14 +133,6 @@ def _encode_expected_constructor_args(abi, values, *, blueprint=False):
         )
     except Exception:
         raise RuntimeError("MIGRATION_CONSTRUCTOR_INTENT_INVALID") from None
-
-
-def _is_robinhood_v2_history_path(history_path):
-    normalized = PurePosixPath(str(history_path).replace("\\", "/"))
-    return any(
-        normalized == suffix or normalized.parts[-len(suffix.parts) :] == suffix.parts
-        for suffix in _ROBINHOOD_HISTORY_SUFFIXES
-    )
 
 
 def _compile_authenticated_record(
@@ -397,6 +377,59 @@ def _validate_activation_dependency(
         raise RuntimeError("MIGRATION_ACTIVATION_DEPENDENCY_MISMATCH")
 
 
+# A history that already holds a current-manifest.json has been deployed.
+# `_append_manifest` writes it on the first successful step, so its presence is
+# the surviving evidence that migrations have run here -- the numbered step
+# manifests are pruned as a matter of policy (see docs/simplification), and the
+# transaction log is deleted by `end()` on success, so neither can be used.
+#
+# Running against such a history is allowed, but not by accident:
+# `--start-timestamp` defaults to "0", which selects every migration from the
+# first one, so a bare run is a full redeploy rather than a resume.
+# MigrationRunner decides; anything constructing a Migration directly fails
+# closed.
+CURRENT_MANIFEST = "current-manifest.json"
+
+
+class MigrationHistoryError(Exception):
+    """Raised when a migration would execute against a deployed history."""
+
+
+def history_has_deployment(history_path):
+    """True if `history_path` already holds a deployed current manifest."""
+    return os.path.exists(os.path.join(str(history_path), CURRENT_MANIFEST))
+
+
+_STEP_MANIFEST_FIELDS = frozenset({"address", "file"})
+
+
+def _slim_step_manifest(manifest, contract_names):
+    """Reduce a full manifest to a step manifest: this step's attribution only.
+
+    current-manifest.json is the cumulative, verifiable record (abi, solc_json,
+    args, address, file, for every contract deployed to date); a numbered step
+    manifest exists only so a migration ID can be resolved back to the
+    addresses *it* deployed (`verify --migration <timestamp>`, history
+    readers). `manifest` here is the post-merge cumulative record, so this
+    both narrows to `contract_names` -- what this migration actually touched,
+    tracked in `self._contracts` -- and drops every field but address/file.
+    An execute-only migration that deploys nothing correctly gets an empty
+    step manifest rather than a copy of everything deployed before it.
+    """
+    contracts = manifest.get("contracts", {})
+    return {
+        "contracts": {
+            name: {
+                key: value
+                for key, value in contracts[name].items()
+                if key in _STEP_MANIFEST_FIELDS
+            }
+            for name in contract_names
+            if name in contracts
+        }
+    }
+
+
 class Migration:
     def __init__(
         self,
@@ -417,15 +450,9 @@ class Migration:
         self._contracts = {}
         self._contract_files = {}
         self._args = {}
-        self._manifest_v2 = _is_robinhood_v2_history_path(history_path)
-        self._manifest_v2_results = {}
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
         self.gas = 0
-
-        if self._manifest_v2:
-            self._previous_manifest = {}
-            return
 
         try:
             filename = self._manifest_filename("current")
@@ -460,60 +487,6 @@ class Migration:
 
     def rpc(self):
         return self._deploy_args.rpc
-
-    def handoff_manifest_v2_action_result(self, semantic_plan, action_result):
-        """
-        Validate and retain one typed Robinhood result for an H-06 record.
-
-        This is an in-memory semantic handoff only. It never submits, retries,
-        writes history, or promotes current.
-        """
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        validated = validate_execution_handoff(
-            semantic_plan,
-            action_result,
-        )
-        action_id = validated["action_id"]
-        if action_id in self._manifest_v2_results:
-            raise ManifestError("H06_HANDOFF_ACTION_DUPLICATE")
-        self._manifest_v2_results[action_id] = validated
-        return validated
-
-    def manifest_v2_action_results(self):
-        """Return validated typed results in semantic action-ID order."""
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        return tuple(
-            self._manifest_v2_results[action_id]
-            for action_id in sorted(self._manifest_v2_results)
-        )
-
-    def apply_robinhood_stage(self, stage):
-        """Hand one shared literal stage to a separately authorized executor.
-
-        Static planning reads the exact same ``MIGRATION_STAGE`` literal.  The
-        Network policy remains controlling.  The CLI installs the dedicated
-        executor only after its profile, identity, account, plan, repository,
-        envelope, and history gates succeed.  Merely importing or invoking a
-        Robinhood migration can never fall through to legacy transactions.
-        """
-        if not self._manifest_v2:
-            raise ManifestError("H06_HANDOFF_PROFILE_REQUIRED")
-        execution_plan = getattr(self._deploy_args, "robinhood_execution_plan", None)
-        repository_root = getattr(self._deploy_args, "robinhood_repository_root", None)
-        if execution_plan is None or repository_root is None:
-            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED")
-        try:
-            validate_execution_plan_artifact(
-                execution_plan, repository_root=repository_root
-            )
-        except MigrationPlanError:
-            raise ManifestError("H06_PRODUCTION_PLAN_REQUIRED") from None
-        executor = getattr(self._deploy_args, "robinhood_stage_executor", None)
-        if executor is None:
-            raise ManifestError("H06_EXECUTION_HANDOFF_REQUIRED")
-        return executor(self, stage)
 
     def execute(self, transaction, *args, **kwargs):
         """
@@ -692,9 +665,6 @@ class Migration:
         with foundry) or skips if already deployed.
         Returns the deployed contract.
         """
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         label = kwargs.pop("label", name)
         source_file = kwargs.pop("source_file", None)
 
@@ -767,10 +737,6 @@ class Migration:
         """
         Ends the migration and saves the manifest file
         """
-        if self._manifest_v2:
-            log.info(f"Gas spent for migration: {self.gas}")
-            return self.gas
-
         # A numbered manifest is a completed-migration checkpoint. During the
         # migration, deployments live only in a timestamp-scoped pending file;
         # neither a partial step nor a failed retry may become `current`.
@@ -786,7 +752,10 @@ class Migration:
         # and its log/pending journal completes the checkpoint; it never skips
         # ahead with an old current manifest.
         json_file.save(self._manifest_filename("current"), final_manifest)
-        json_file.save(self._manifest_filename(self._timestamp), final_manifest)
+        json_file.save(
+            self._manifest_filename(self._timestamp),
+            _slim_step_manifest(final_manifest, self._contracts),
+        )
 
         if os.path.exists(pending_filename):
             os.remove(pending_filename)
@@ -885,8 +854,6 @@ class Migration:
         validated before the pending manifest is written once. Candidate
         records are copied whole so stale metadata cannot survive promotion.
         """
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
         if not isinstance(promotions, (list, tuple)) or not promotions:
             raise RuntimeError("MIGRATION_PROMOTION_BATCH_INVALID")
 
@@ -995,9 +962,15 @@ class Migration:
             _label,
             _activation,
             candidate,
-            _address,
+            address,
         ) in validated:
             promoted_manifest["contracts"][canonical_name] = copy.deepcopy(candidate)
+            # Promotion bypasses `_register_contract`, which is the usual
+            # place `self._contracts` gets a new key. `end()` slims the step
+            # manifest to exactly the names in `self._contracts`, so without
+            # this a promoted contract would be silently absent from its own
+            # step manifest's attribution.
+            self._contracts[canonical_name] = address
         # A pending manifest is resumable only when its timestamp log exists.
         # Persist the (possibly empty) transaction list first. A crash after the
         # subsequent manifest save can then reload this same local checkpoint.
@@ -1054,9 +1027,6 @@ class Migration:
         """
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
 
@@ -1113,9 +1083,6 @@ class Migration:
         )
 
     def _append_manifest(self, contract_name):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
-
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
@@ -1131,16 +1098,12 @@ class Migration:
         return merged_manifest
 
     def _load_log_file(self):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_LOG_FORBIDDEN")
         if self._deploy_args.ignore_logs:
             raise RuntimeError("MIGRATION_LOG_REPLAY_REQUESTED")
         logs = json_file.load(self._log_filename())
         self._transactions = logs["transactions"]
 
     def _save_log_file(self):
-        if self._manifest_v2:
-            raise ManifestError("H06_LEGACY_LOG_FORBIDDEN")
         json_file.save(
             self._log_filename(),
             {

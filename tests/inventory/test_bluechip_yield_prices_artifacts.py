@@ -8,7 +8,7 @@ import pytest
 
 from config.robinhood_blueprint import Disposition, get_component
 from scripts import check_contract_artifacts as artifact_checker
-from scripts.utils.deployment_assertions import blueprint_policy
+from utils.blueprint_policy import blueprint_policy
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,12 +21,12 @@ MIN_EIP_170_HEADROOM = 2_000
 EXPECTED = {
     "source_sha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be",
     "source_git_blob": "cafd177ef601186b0a6a30863ba5b8973d8dd92e",
-    "integrity": "c323728d1e40d540c924788bba34c5d8a968f7d482fe3194eace267d30b03cbb",
-    "creation_size": 23_627,
-    "creation_sha256": "0c558a77e2da8cff1bec1e1fa1a1af635c29fa570066b7ecb9bb2e8fb0aaaf8d",
-    "runtime_size": 22_054,
-    "runtime_sha256": "84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578",
-    "eip_170_headroom": 2_522,
+    "integrity": "c7a4026d8c3f698d73521a927d083915f23768093d6eee63397fd467b6a63c9e",
+    "creation_size": 23_736,
+    "creation_sha256": "299f9bc849436bb776b83f4f07508a2066cbd099a2b2f15380b9b22e8f3a7861",
+    "runtime_size": 22_142,
+    "runtime_sha256": "cbcfc54ec127d75830f8eed1c6da7e70f07ca1cd39eb605667b51b0833cad799",
+    "eip_170_headroom": 2_434,
     "abi_sha256": "d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73",
     "abi_file_sha256": "b4c17cf9a87cd3325fba306cc9e4a9595c2e0689c18fb4fc2da2aed5622e91f7",
     "selector_count": 84,

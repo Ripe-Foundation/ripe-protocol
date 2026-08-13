@@ -73,45 +73,28 @@ def test_base_mainnet_source_and_history_are_preserved():
 
 
 def test_legacy_chain_option_resolves_only_to_canonical_base():
+    # A case variant must not be silently folded onto the canonical chain:
+    # `verify` looks the label up verbatim and refuses anything it misses.
     result = _run_module(
         "scripts.verify", "--chain", "BASE-MAINNET"
     )
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
-    assert "H02_VERIFIER_BLOCKED profile=base-mainnet" in result.stderr
+    assert "Unknown chain" in result.stderr
 
 
 def test_blocked_robinhood_verification_never_advertises_proposed_path():
+    # Robinhood manifests exist on disk, so the refusal has to land before the
+    # manifest path is resolved or printed -- otherwise the output implies a
+    # verification route that cannot exist.
     result = _run_module(
-        "scripts.verify", "--profile", "robinhood-mainnet"
+        "scripts.verify", "--chain", "robinhood-mainnet"
     )
     assert result.returncode != 0
     assert "Manifest:" not in result.stdout
     assert "migration_history/robinhood-mainnet" not in result.stdout
-    assert "H02_VERIFIER_BLOCKED profile=robinhood-mainnet" in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("option", "value", "error_code"),
-    (
-        ("--manifest", "../evil", "H02_REPOSITORY_UNAVAILABLE"),
-        ("--environment", "bogus", "H02_HISTORY_ALIAS"),
-    ),
-)
-def test_verify_validates_assertions_before_blocked_route(
-    option, value, error_code
-):
-    result = _run_module(
-        "scripts.verify",
-        "--profile",
-        "base-mainnet",
-        option,
-        value,
-    )
-    assert result.returncode != 0
-    assert "Manifest:" not in result.stdout
-    assert error_code in result.stderr
-    assert value not in result.stderr
+    assert "has no Etherscan-family verifier configured" in result.stderr
+    assert "verify_blockscout" in result.stderr
 
 
 def test_base_sepolia_identity_valid_repository_unsupported():
@@ -133,9 +116,6 @@ def test_base_sepolia_identity_valid_repository_unsupported():
 def test_ethereum_labels_are_not_supported_profiles(label):
     with pytest.raises(NetworkProfileError, match="H02_PROFILE_UNKNOWN"):
         get_profile(label)
-    result = _run_module("scripts.verify", "--profile", label)
-    assert result.returncode != 0
-    assert "Invalid value" in result.stderr
 
 
 def test_base_manifest_path_remains_compatible():
@@ -209,16 +189,18 @@ def test_unknown_provider_returns_typed_outcome_not_keyerror():
         validate_registry((replace(profile, verifier=invalid_verifier),))
 
 
-def test_base_verification_route_is_truthfully_blocked(monkeypatch):
+def test_unresolvable_chain_fails_before_any_network_call(monkeypatch):
     calls = []
     monkeypatch.setattr(
         requests.sessions.Session,
         "request",
         lambda *args, **kwargs: calls.append(args),
     )
+    # `chain` is unset here, which is the shape a scripted run takes when it
+    # forgets the option. The refusal must precede any submission attempt.
     with pytest.raises(Exception) as captured:
         verify.cli.callback("base-mainnet", None, "current")
-    assert "H02_VERIFIER_BLOCKED" in str(captured.value)
+    assert "Unknown chain" in str(captured.value)
     assert calls == []
 
 
@@ -249,3 +231,168 @@ def test_committed_base_history_inventory_is_unchanged():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
+
+
+# --- verify.py input containment -------------------------------------------
+#
+# `verify` submits contract records with a live explorer credential, so the
+# manifest it reads must come from inside the selected history directory. The
+# path was previously built by interpolating the three options straight into a
+# format string, which let `--environment`/`--manifest` walk out of the tree.
+
+
+@pytest.mark.parametrize(
+    ("option", "value", "label"),
+    (
+        ("--environment", "../../..", "parent traversal"),
+        ("--manifest", "../../../../etc/passwd", "deep traversal"),
+        ("--environment", "/etc", "absolute path"),
+        ("--manifest", "/etc/passwd", "absolute manifest"),
+        ("--environment", "a/b", "forward separator"),
+        ("--manifest", "a\\b", "backslash separator"),
+        ("--environment", ".", "single dot"),
+        ("--environment", "..", "double dot"),
+        ("--environment", "", "empty segment"),
+    ),
+)
+def test_verify_rejects_noncanonical_path_segments(option, value, label):
+    # Start from a complete, valid invocation and vary exactly one option, so
+    # a rejection cannot be an unrelated early exit from a partial command.
+    argv = ["--chain", "base-mainnet", "--environment", "v1",
+            "--manifest", "current"]
+    argv[argv.index(option) + 1] = value
+    result = _run_module("scripts.verify", *argv)
+
+    assert result.returncode != 0, label
+    # And it must be the segment rule that rejected it, not something else.
+    assert "must be a single path segment" in result.stderr, label
+    # It must fail before a path is built, so nothing path-shaped is printed.
+    assert "migration_history" not in result.stdout, label
+    assert "migration_history" not in result.stderr, label
+    # And the rejected value is not echoed back into logs.
+    if value not in ("", ".", ".."):
+        assert value not in result.stderr, label
+        assert value not in result.stdout, label
+
+
+def test_verify_resolved_manifest_stays_inside_history_directory():
+    root = (ROOT / "migration_history").resolve()
+    resolved = verify._history_manifest_path("base-mainnet", "v1", "current")
+
+    assert resolved.is_relative_to(root)
+    assert resolved == root / "base-mainnet/v1/current-manifest.json"
+
+
+@pytest.mark.parametrize("label", ("BASE-MAINNET", "Base-Mainnet", "bogus-chain", "local"))
+def test_verify_rejects_unknown_chain_without_blockscout_advice(label):
+    result = _run_module("scripts.verify", "--chain", label)
+
+    assert result.returncode != 0
+    assert "Unknown chain" in result.stderr
+    # A typo or a case variant is not a Robinhood problem; sending it to the
+    # Blockscout script would be false advice.
+    assert "verify_blockscout" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("chain", "expect_blockscout"),
+    (
+        ("robinhood-mainnet", True),
+        # verify_blockscout targets Robinhood mainnet only, so testnet and the
+        # retired goerli networks must not be pointed at it.
+        ("robinhood-testnet", False),
+        ("base-goerli", False),
+        ("eth-goerli", False),
+    ),
+)
+def test_verify_separates_unsupported_provider_from_unknown_chain(
+    chain, expect_blockscout
+):
+    result = _run_module("scripts.verify", "--chain", chain)
+
+    assert result.returncode != 0
+    assert "no Etherscan-family verifier configured" in result.stderr
+    assert "Unknown chain" not in result.stderr
+    assert ("verify_blockscout" in result.stderr) is expect_blockscout
+
+
+def test_verify_reports_missing_manifest_for_canonical_segments():
+    result = _run_module(
+        "scripts.verify", "--chain", "base-mainnet", "--environment", "v999"
+    )
+
+    assert result.returncode != 0
+    assert "No manifest found" in result.stderr
+
+
+def test_verification_policy_and_verify_cli_disagree_by_design():
+    """Characterization: the registry blocks VERIFICATION, the CLI ignores it.
+
+    `verify.py` was wired to `verify_from_manifest` in this cleanup, so it now
+    has a real submission path -- but it resolves chains from
+    `verify_etherscan.CHAIN_SPECS` and never calls `operation_decision`. The
+    profile registry still records VERIFICATION as blocked.
+
+    Owner decision (2026-08-12): verify.py stays as simple as it is on master
+    and is not routed through the registry, so this divergence is permanent by
+    choice rather than pending work. The test stays to keep it explicit -- the
+    policy must not be read as enforcement of what the CLI does.
+    """
+    profile = get_profile("base-mainnet")
+    decision = operation_decision(profile, Operation.VERIFICATION)
+    assert decision.outcome is OperationOutcome.BLOCKED_PENDING_POLICY
+
+    # The CLI does not consult that decision: base-mainnet resolves and gets
+    # as far as the manifest/key checks rather than being refused as blocked.
+    source = (ROOT / "scripts/verify.py").read_text()
+    assert "operation_decision" not in source
+    assert "network_profiles" not in source
+
+    result = _run_module(
+        "scripts.verify", "--chain", "base-mainnet", "--environment", "v999"
+    )
+    assert "No manifest found" in result.stderr
+    assert "BLOCKED_PENDING_POLICY" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("name", "target", "why"),
+    (
+        ("linked_outside", "/tmp", "escape outside the repository"),
+        (
+            "linked_crosschain",
+            "migration_history/robinhood-mainnet/v1",
+            "redirect into another chain's history",
+        ),
+    ),
+)
+def test_a_symlinked_history_cannot_redirect_the_selected_manifest(
+    name, target, why
+):
+    """Containment under `migration_history/` is not sufficient on its own.
+
+    A symlinked `base-mainnet/<name>` pointing at another chain resolves to a
+    path that is still under the global root, so a containment check passes it
+    -- and the wrong chain's contracts would be submitted under the selected
+    chain's explorer and API key. The selected history must be exactly where
+    it claims to be.
+    """
+    root = ROOT / "migration_history"
+    destination = target if target.startswith("/") else str(ROOT / target)
+    link = root / "base-mainnet" / name
+    link.symlink_to(destination, target_is_directory=True)
+    try:
+        with pytest.raises(Exception) as captured:
+            verify._history_manifest_path("base-mainnet", name, "current")
+        assert "resolves elsewhere" in str(captured.value), why
+    finally:
+        link.unlink()
+
+
+def test_the_committed_histories_are_real_directories():
+    # The identity check above only helps if the real histories are not links.
+    root = ROOT / "migration_history"
+    for history in root.glob("*/*"):
+        if history.is_dir():
+            assert not history.is_symlink(), history
+            assert history.resolve() == history, history

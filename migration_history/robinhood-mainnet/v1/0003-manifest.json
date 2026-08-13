@@ -1,0 +1,16 @@
+{
+  "contracts": {
+    "PriceDesk": {
+      "address": "0x694a1F8525483cFf3142770395Ec310bf954b0C0",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPrices": {
+      "address": "0xeAfE60Df55F4B1eDE8852C75Fe21c3224EEa4f24",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePrices": {
+      "address": "0x236Af2b8d0867f898FeD3fBFDfcDD131001135F3",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "Deleverage": {
+      "address": "0x62591b3058c1428FA4b5eD2160387725be285a64",
+      "file": "contracts/core/Deleverage.vy"
+    }
+  }
+}

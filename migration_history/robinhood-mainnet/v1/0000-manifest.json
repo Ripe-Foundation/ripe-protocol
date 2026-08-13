@@ -1,0 +1,32 @@
+{
+  "contracts": {
+    "GreenToken": {
+      "address": "0x355bB7F0f6c730e4460d620420a300fa08FF82F3",
+      "file": "contracts/tokens/GreenToken.vy"
+    },
+    "RipeToken": {
+      "address": "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b",
+      "file": "contracts/tokens/RipeToken.vy"
+    },
+    "SavingsGreen": {
+      "address": "0x290a52380A88f743813B8C3e9F6B0e61DB5FDF73",
+      "file": "contracts/tokens/SavingsGreen.vy"
+    },
+    "RipeHq": {
+      "address": "0xD4e82AE1De673bba3B53386A2D2C630AE6630940",
+      "file": "contracts/registries/RipeHq.vy"
+    },
+    "Contributor": {
+      "address": "0x2593D4eeEeaB39Eb5F86B76AE54C6f0F1A7cC567",
+      "file": "contracts/modules/Contributor.vy"
+    },
+    "TrainingWheels": {
+      "address": "0x987DEa46AEfA442B67Faa5Db6F71024e5be01406",
+      "file": "contracts/config/TrainingWheels.vy"
+    },
+    "DefaultsRobinhood": {
+      "address": "0x5B385644E8adE9d5135aE5EDb43c62B92726F83b",
+      "file": "contracts/config/DefaultsRobinhood.vy"
+    }
+  }
+}

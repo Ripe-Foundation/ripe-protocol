@@ -4,12 +4,14 @@ This exists because of a defect that shipped and was caught in review rather
 than by a test. An earlier revision of the codebase-simplification branch deleted
 the four testnet `current-manifest.json` files as "disposable". They are not:
 
-- `scripts/ccip_send.py` requires an explicit chain/environment pair and loads
-  that manifest directly through `_manifest()`;
 - `migrations/base-sepolia/0002_CcipWire.py` and
   `migrations/robinhood-testnet/0002_CcipWire.py` instruct the operator to re-run
   the step later with `--start-timestamp`, which resolves `RipeToken`, `RipeHq`,
   and `RipeTokenPool` locally and `RipeTokenPool`/`RipeToken` on the remote chain.
+
+`scripts/ccip_send.py` was a third reader of these manifests and was deleted as
+dead code -- its broadcast path had never executed. That removes a consumer, not
+the requirement: the CcipWire recovery path above still needs every one of them.
 
 Deleting them turned a documented recovery path into a `FileNotFoundError`, and
 no test objected. Neither lane was green at the time, so the accurate statement
@@ -17,13 +19,11 @@ is that this produced **no new red** — the deletion was invisible to the suite
 
 `REQUIRED_CURRENT_MANIFESTS` records *how* each key is consumed, because that
 decides what has to be valid in the record. A first revision of this module
-checked only addresses, and a review defeated it twice: renaming the default
-manifest's `RipeToken.file` to `file_missing` left every test green even though
-`ccip_send` would die at `boa.load_partial`, and changing the real `--chain`
-default to a nonexistent chain also left every test green, because the defaults
-were retyped here as constants instead of read from the command. Both are closed
-below: the modes distinguish an address-only read from a `load_partial`, and the
-required targeting comes from `scripts.ccip_send.cli` itself.
+checked only addresses, and a review defeated it: renaming a manifest's
+`RipeToken.file` to `file_missing` left every test green even though a
+`boa.load_partial` consumer would die on it. That is closed below -- the modes
+distinguish an address-only read from a `load_partial`, and a `LOADABLE` record
+must name a file that actually resolves.
 
 These tests are offline: they read committed JSON and touch no network, RPC, or
 private key. They live at `tests/` root rather than `tests/deployment/` because
@@ -37,11 +37,8 @@ from __future__ import annotations
 
 import ast
 import json
-import warnings
 from pathlib import Path
-from unittest import mock
 
-import boa
 import pytest
 from eth_utils import is_address
 from scripts.utils.migration import Migration
@@ -50,14 +47,6 @@ from scripts.utils.migration import Migration
 @pytest.fixture(scope="session")
 def ripe_hq() -> None:
     """Keep offline manifest tests independent of protocol deployment."""
-
-
-# Methods `scripts/ccip_send.py` calls on the token it resolves: `balanceOf` at
-# the balance check and `approve` before the router send. A record can name a
-# real file at a real address and still be unusable if the artifact that file
-# compiles to lacks these.
-CCIP_SEND_TOKEN_METHODS = ("balanceOf", "approve")
-
 
 ROOT = Path(__file__).resolve().parents[1]
 HISTORY = ROOT / "migration_history"
@@ -97,8 +86,8 @@ CCIP_RUNNER_CONSUMERS = {
 #                   in fact does not; requiring one would be wrong.
 #   LOADABLE     -- reached through `boa.load_partial(record["file"]).at(
 #                   record["address"])`, which is what `migration.get_contract`
-#                   and `scripts/ccip_send.py` both do. The `file` must exist,
-#                   or the consumer raises at the point of use.
+#                   does. The `file` must exist, or the consumer raises at the
+#                   point of use.
 ADDRESS_ONLY = "address_only"
 LOADABLE = "loadable"
 
@@ -136,21 +125,6 @@ REQUIRED_CURRENT_MANIFESTS = {
 }
 
 
-def _ccip_send_module():
-    """`scripts.ccip_send`, imported without its module-level dotenv side effect.
-
-    The module calls `dotenv.load_dotenv()` at import. That is right for an
-    operator running the script and wrong for a test lane, where it would read
-    the developer's `.env` into `os.environ` for every subsequent test in the
-    process. Patching it keeps this guard inert on first import; if some earlier
-    test already imported the module, this is a harmless no-op.
-    """
-    with mock.patch("dotenv.load_dotenv"):
-        import scripts.ccip_send as module
-
-    return module
-
-
 def _migration_runner_calls(path):
     calls = set()
     tree = ast.parse(path.read_bytes(), filename=str(path))
@@ -163,19 +137,6 @@ def _migration_runner_calls(path):
         ):
             calls.add(function.attr)
     return calls
-
-
-def _ccip_send_option(name):
-    """Return a `ccip_send` command option from the actual command."""
-    cli = _ccip_send_module().cli
-    for param in cli.params:
-        if param.name == name:
-            return param
-
-    raise AssertionError(
-        f"scripts/ccip_send.py has no --{name.replace('_', '-')} option; "
-        "this guard is bound to an option that no longer exists"
-    )
 
 
 def _assert_record_is_usable(chain, environment, key, mode, record):
@@ -261,65 +222,6 @@ def test_required_current_manifest_resolves_every_field_its_consumers_read(
 
     for key, mode in sorted(expected.items()):
         _assert_record_is_usable(chain, environment, key, mode, contracts[key])
-
-
-def test_ccip_send_requires_explicit_target_and_supported_manifests_resolve(monkeypatch):
-    """The CLI must not silently select a chain or manifest environment."""
-    assert _ccip_send_option("chain").required
-    assert _ccip_send_option("environment").required
-    assert _ccip_send_option("amount").required
-    token = _ccip_send_option("token").default
-
-    supported = {
-        target: declared
-        for target, declared in REQUIRED_CURRENT_MANIFESTS.items()
-        if declared.get(token) == LOADABLE
-    }
-    assert supported
-    for (chain, environment), declared in sorted(supported.items()):
-        contracts = _ccip_send_module()._manifest(chain, environment)
-        for key, mode in sorted(declared.items()):
-            assert key in contracts, (
-                f"ccip_send target {chain}/{environment} cannot resolve {key}"
-            )
-            _assert_record_is_usable(chain, environment, key, mode, contracts[key])
-
-    # Perform the consumer's own compilation/resolution for one representative
-    # supported target; the per-manifest bindings above ensure every other
-    # target names its own loadable compiler input.
-    chain, environment = "base-mainnet", "v1"
-    declared = supported[(chain, environment)]
-    assert declared.get(token) == LOADABLE, (
-        f"scripts/ccip_send.py defaults to --token {token}, which it loads with "
-        f"boa.load_partial, but {chain}/{environment} declares it as "
-        f"{declared.get(token)!r} here"
-    )
-
-    # `_manifest` is rooted at the repository; changing cwd must not redirect it.
-    monkeypatch.chdir(ROOT)
-    contracts = _ccip_send_module()._manifest(chain, environment)
-
-    # Finally, perform the consumer's own resolution rather than approximating
-    # it. `ccip_send` does exactly this on the token it was told to send:
-    #
-    #     erc20 = boa.load_partial(manifest["file"]).at(manifest["address"])
-    #     ... erc20.balanceOf(sender) ... erc20.approve(router, amount)
-    #
-    # Anything that survives the checks above but cannot produce a usable token
-    # wrapper fails here, at the same call the operator would hit. This compiles
-    # one contract; boa caches it, and the lane already compiles this token.
-    record = contracts[token]
-    with warnings.catch_warnings():
-        # `.at()` on an address with no code in this env is expected and warns.
-        warnings.simplefilter("ignore")
-        erc20 = boa.load_partial(str(ROOT / record["file"])).at(record["address"])
-
-    missing = [m for m in CCIP_SEND_TOKEN_METHODS if not hasattr(erc20, m)]
-    assert not missing, (
-        f"ccip_send resolves {chain}/{environment} {token} to "
-        f"{record['file']}, which compiles to an artifact without {missing}. "
-        f"The script calls {list(CCIP_SEND_TOKEN_METHODS)} on it."
-    )
 
 
 def test_every_committed_current_manifest_is_declared_here():

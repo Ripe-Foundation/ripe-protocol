@@ -39,6 +39,22 @@ def _support_asset(mission_control, switchboard_bravo, asset, vault_ids):
     )
 
 
+def _set_existing_borrow_interval(
+    mission_control,
+    switchboard_alpha,
+    max_borrow_per_interval=10_000,
+    num_blocks_per_interval=100,
+):
+    config = mission_control.genDebtConfig()._replace(
+        maxBorrowPerInterval=max_borrow_per_interval,
+        numBlocksPerInterval=num_blocks_per_interval,
+    )
+    mission_control.setGeneralDebtConfig(
+        config,
+        sender=switchboard_alpha.address,
+    )
+
+
 def _register_vault(vault_book, governance, vault, description):
     assert vault_book.startAddNewAddressToRegistry(
         vault.address,
@@ -339,7 +355,8 @@ def test_global_debt_limits_validation(switchboard_alpha, governance):
         switchboard_alpha.setGlobalDebtLimits(MAX_UINT256, 10000, 100, 50, sender=governance.address)  # max uint256
 
 
-def test_global_debt_limits_success(switchboard_alpha, governance):
+def test_global_debt_limits_success(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     assert action_id > 0
     
@@ -479,6 +496,7 @@ def test_keeper_config_permissions(switchboard_alpha, governance, bob):
 
 def test_keeper_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
     """Test that keeper config only modifies the specific fields"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set some other debt config fields
     debt_action = switchboard_alpha.setGlobalDebtLimits(6000, 60000, 200, 120, sender=governance.address)
     
@@ -560,6 +578,7 @@ def test_auction_params_direct_validator_boundaries(switchboard_alpha):
 
 
 def test_execute_debt_configs(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Test executing global debt limits
     action_id = switchboard_alpha.setGlobalDebtLimits(6000, 60000, 200, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -966,6 +985,7 @@ def test_pending_action_cleanup(switchboard_alpha, governance):
 
 
 def test_borrow_interval_with_existing_debt_config(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set global debt limits to establish minDebtAmount
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -981,6 +1001,7 @@ def test_borrow_interval_with_existing_debt_config(switchboard_alpha, mission_co
 
 
 def test_full_config_workflow(switchboard_alpha, mission_control, governance):
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     time_lock = switchboard_alpha.actionTimeLock()
     
     # Create multiple configuration changes
@@ -1139,8 +1160,13 @@ def test_auction_params_boundary_conditions(switchboard_alpha, mission_control, 
     assert action_id > 0
 
 
-def test_debt_limits_boundary_conditions(switchboard_alpha, governance):
+def test_debt_limits_boundary_conditions(switchboard_alpha, mission_control, governance):
     """Test debt limits validation at boundary conditions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
+
+    # minDebtAmount may remain zero when the other fields are valid.
+    action_id = switchboard_alpha.setGlobalDebtLimits(1000, 10000, 0, 100, sender=governance.address)
+    assert action_id > 0
     
     # Test where minDebtAmount equals perUserDebtLimit (should be valid)
     action_id = switchboard_alpha.setGlobalDebtLimits(1000, 10000, 1000, 100, sender=governance.address)
@@ -1281,8 +1307,13 @@ def test_cancel_action_edge_cases(switchboard_alpha, governance):
         switchboard_alpha.cancelPendingAction(action_id3, sender=governance.address)
 
 
-def test_complex_workflow_multiple_pending_actions(switchboard_alpha, governance):
+def test_complex_workflow_multiple_pending_actions(
+    switchboard_alpha,
+    mission_control,
+    governance,
+):
     """Test complex workflows with multiple pending actions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     
     # Create multiple different types of actions
     vault_action = switchboard_alpha.setVaultLimits(15, 8, sender=governance.address)
@@ -1654,8 +1685,9 @@ def test_all_enable_disable_concurrent_state_changes(switchboard_alpha, mission_
     assert config.canClaimLoot  # Never disabled
 
 
-def test_debt_config_interdependencies(switchboard_alpha, governance):
+def test_debt_config_interdependencies(switchboard_alpha, mission_control, governance):
     """Test debt config settings that have interdependencies"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set initial debt limits
     action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -1674,10 +1706,9 @@ def test_debt_config_interdependencies(switchboard_alpha, governance):
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     
-    # Now try to set minDebtAmount higher than maxBorrowPerInterval
-    # This should succeed because we're not validating against existing borrow config
-    action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 200, 100, sender=governance.address)
-    assert action_id > 0
+    # The opposite update direction must preserve the same cross-field invariant.
+    with boa.reverts("invalid debt limits"):
+        switchboard_alpha.setGlobalDebtLimits(5000, 50000, 200, 100, sender=governance.address)
 
 
 def test_auction_params_comprehensive_validation(switchboard_alpha, governance):
@@ -1717,8 +1748,9 @@ def test_rewards_config_zero_allocations(switchboard_alpha, mission_control, gov
     assert config.genDepositorsAlloc == 0
 
 
-def test_multiple_pending_actions_cleanup(switchboard_alpha, governance):
+def test_multiple_pending_actions_cleanup(switchboard_alpha, mission_control, governance):
     """Test cleanup of multiple pending actions of different types"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Create one of each type of action
     vault_action = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
     stale_action = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
@@ -1767,8 +1799,9 @@ def test_gas_optimization_large_arrays(switchboard_alpha, governance):
     assert action_id > 0
 
 
-def test_action_type_enum_coverage(switchboard_alpha, governance):
+def test_action_type_enum_coverage(switchboard_alpha, mission_control, governance):
     """Ensure all ActionType enum values are tested"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # This test verifies we've covered all action types
     # Based on the contract, these are all the ActionType values:
     action_types_tested = set()
@@ -1864,6 +1897,7 @@ def test_priority_stab_vault_validation_edge_cases(switchboard_alpha, governance
 
 def test_complex_workflow_with_failures(switchboard_alpha, mission_control, governance):
     """Test complex workflow with some actions failing and others succeeding"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Create multiple actions
     action1 = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
     action2 = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
@@ -1919,6 +1953,7 @@ def test_enable_disable_rapid_toggle(switchboard_alpha, mission_control, governa
 
 def test_all_debt_config_fields_modified(switchboard_alpha, mission_control, governance):
     """Test modifying all debt config fields through different actions"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     time_lock = switchboard_alpha.actionTimeLock()
     
     # Set all debt config fields
@@ -2848,6 +2883,7 @@ def test_execute_multiple_dynamic_rate_configs(switchboard_alpha, mission_contro
 
 def test_dynamic_rate_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
     """Test that dynamic rate config only modifies the specific fields"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # First set some other debt config fields
     debt_action = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     keeper_action = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
@@ -3266,6 +3302,7 @@ def test_undy_vault_discount_cancel_action(switchboard_alpha, credit_engine, gov
 
 def test_undy_vault_discount_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
     """Test that undy vault discount works independently of other debt configs"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set some other debt config
     debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
@@ -3497,6 +3534,7 @@ def test_buyback_ratio_cancel_action(switchboard_alpha, credit_engine, governanc
 
 def test_buyback_ratio_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
     """Test that buyback ratio works independently of other debt configs"""
+    _set_existing_borrow_interval(mission_control, switchboard_alpha)
     # Set some other debt config
     debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())

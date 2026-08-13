@@ -150,7 +150,6 @@ REACHABILITY_EXCLUDED_DIRS = {
     "vendor",
 }
 APPROVED_CLICK_SURFACES = {
-    Path("scripts/ccip_send.py"),
     Path("scripts/console.py"),
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
@@ -160,9 +159,9 @@ APPROVED_CLICK_SURFACES = {
     Path("tests/test_ccip_hardening.py"),
 }
 CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
+    Path("scripts/verify_defaults.py"),
     Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
     Path("migrations/base-mainnet/2026080701_CcipWire.py"),
-    Path("migrations/robinhood-mainnet/0001_Registries.py"),
     Path("migrations/robinhood-mainnet/0009_RedeployStaleContracts.py"),
     Path("migrations/robinhood-mainnet/0010_RedeployLedger.py"),
     Path("migrations/robinhood-mainnet/0011_BlueChipYieldPricesCandidate.py"),
@@ -171,6 +170,7 @@ CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
     Path("scripts/ledger_signing_smoke.py"),
     Path("scripts/prepare_defaults.py"),
     Path("scripts/utils/ledger_account.py"),
+    Path("scripts/utils/ledger_deployment.py"),
     Path("scripts/utils/safe_account.py"),
 }
 DECLARED_RUNTIME_IMPORTS = {
