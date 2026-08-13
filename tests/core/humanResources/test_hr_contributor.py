@@ -2,7 +2,7 @@ import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
+from constants import MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
 from conf_utils import assert_reverted_call, filter_logs
 from contracts.modules import Contributor
 
@@ -191,6 +191,7 @@ def test_contributor_initialization_success(
     
     # Check initial states
     assert contributor_contract.totalClaimed() == 0
+    assert contributor_contract.numOwnerChanges() == 0
     assert not contributor_contract.isFrozen()
     assert not contributor_contract.hasPendingRipeTransfer()
     assert not contributor_contract.hasPendingOwnerChange()
@@ -782,6 +783,10 @@ def test_contributor_change_ownership_invalid_new_owner(
     with boa.reverts("invalid new owner"):
         contributor_contract.changeOwnership(owner_address, sender=owner_address)
 
+    # Cannot make the contributor contract its own owner
+    with boa.reverts("invalid new owner"):
+        contributor_contract.changeOwnership(contributor_contract.address, sender=owner_address)
+
 
 def test_contributor_confirm_ownership_change_success(
     contributor_contract,
@@ -809,7 +814,39 @@ def test_contributor_confirm_ownership_change_success(
     
     # Owner should be changed
     assert contributor_contract.owner() == alice
+    assert contributor_contract.numOwnerChanges() == 1
     assert not contributor_contract.hasPendingOwnerChange()
+
+
+def test_contributor_ownership_change_headroom(
+    contributor_contract,
+    owner_address,
+    alice,
+):
+    key_action_delay = contributor_contract.keyActionDelay()
+    boa.env.evm.patch.block_number = MAX_UINT256 - key_action_delay + 1
+
+    with boa.reverts("owner confirmation overflow"):
+        contributor_contract.changeOwnership(alice, sender=owner_address)
+
+    assert contributor_contract.numOwnerChanges() == 0
+    assert not contributor_contract.hasPendingOwnerChange()
+
+
+def test_contributor_ownership_change_count_headroom(
+    contributor_contract,
+    owner_address,
+    alice,
+):
+    contributor_contract.changeOwnership(alice, sender=owner_address)
+    boa.env.time_travel(blocks=contributor_contract.keyActionDelay())
+    contributor_contract.eval(f"self.numOwnerChanges = {MAX_UINT256}")
+
+    with boa.reverts("owner change count overflow"):
+        contributor_contract.confirmOwnershipChange(sender=alice)
+
+    assert contributor_contract.owner() == owner_address
+    assert contributor_contract.hasPendingOwnerChange()
 
 
 def test_contributor_confirm_ownership_change_wrong_user(
