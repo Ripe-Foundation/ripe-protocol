@@ -175,14 +175,13 @@ def test_configured_green_feed_safe_and_unsafe_modes_fail_without_fabrication(
         route.price_desk.getPrice(route.green, True)
 
 
-def test_reverting_pool_response_reverts_closed_in_both_raise_modes(
+def test_reverting_pool_response_isolated_by_strictness(
     robinhood_curve_launch_route,
 ):
     route = robinhood_curve_launch_route
     route.curve_system.setShouldRevert(True)
-    with boa.reverts("pool revert"):
-        route.price_desk.getPrice(route.green, False)
-    with boa.reverts("pool revert"):
+    assert route.price_desk.getPrice(route.green, False) == 0
+    with boa.reverts("has price config, no price"):
         route.price_desk.getPrice(route.green, True)
 
 
