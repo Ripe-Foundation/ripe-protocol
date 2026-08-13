@@ -272,6 +272,16 @@ Recovery metadata for the 19 (git mode, blob id, byte length, sha256, and a
 commit each is retrievable from) is in `extracted-files.tsv` under the
 `deployment-tooling` and `deployment-tooling-test` categories.
 
+Each row records **the version that was actually deleted**, which is not always
+the version at the merge base. `rh` kept developing four of these files after
+`3c4b06b`, and the merge (`a2d515d`) brought its work in before the conflicts
+were resolved as deletions — so what left the tree was `rh`'s version, not ours.
+Those rows are anchored to `bb84a17`, the merge's `rh`-side parent, rather than
+to `3c4b06b`: recovering from the older blob would silently hand back a copy
+missing `rh`'s later changes, which is the failure this column exists to prevent.
+`bb84a17` is a parent of a commit on this branch, so it stays reachable
+regardless of where `origin/rh` moves next.
+
 ## Block-clock inventory (4)
 
 - `config/block-clock-inventory.json`
