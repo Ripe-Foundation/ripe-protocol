@@ -61,6 +61,20 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
     yield setupRipeBonds
 
 
+def _ripe_bond_config_with_epoch_length(config, epoch_length):
+    return (
+        config.asset,
+        config.amountPerEpoch,
+        config.canBond,
+        config.minRipePerUnit,
+        config.maxRipePerUnit,
+        config.maxRipePerUnitLockBonus,
+        epoch_length,
+        config.shouldAutoRestart,
+        config.restartDelayBlocks,
+    )
+
+
 def test_initial_epoch_blocks(
     ledger, setupRipeBonds
 ):
@@ -1397,6 +1411,135 @@ def test_get_latest_epoch_block_times_edge_cases(
     assert start == expected_start
     assert end == expected_start + epoch_length
     assert changed
+
+
+def test_get_latest_epoch_block_times_rejects_zero_length_expired_epoch(
+    bond_room,
+):
+    boa.env.time_travel(blocks=100)
+    current_block = boa.env.evm.patch.block_number
+    previous_end = current_block
+    previous_start = max(1, previous_end - 100)
+
+    with boa.reverts("invalid epoch length"):
+        bond_room.getLatestEpochBlockTimes(previous_start, previous_end, 0)
+
+
+@pytest.mark.parametrize(
+    "epoch_state",
+    (
+        pytest.param("no prior epoch", id="no-prior-epoch"),
+        pytest.param("future epoch", id="future-epoch"),
+        pytest.param("active epoch", id="active-epoch"),
+        pytest.param("expired epoch", id="expired-epoch"),
+    ),
+)
+def test_get_latest_epoch_block_times_rejects_zero_length_for_all_states(
+    bond_room,
+    epoch_state,
+):
+    boa.env.time_travel(blocks=100)
+    current_block = boa.env.evm.patch.block_number
+    epoch_states = {
+        "no prior epoch": (0, 0),
+        "future epoch": (current_block + 10, current_block + 20),
+        "active epoch": (current_block - 10, current_block + 10),
+        "expired epoch": (current_block - 20, current_block - 10),
+    }
+    previous_start, previous_end = epoch_states[epoch_state]
+
+    with boa.reverts("invalid epoch length"):
+        bond_room.getLatestEpochBlockTimes(previous_start, previous_end, 0)
+
+
+def test_get_latest_epoch_block_times_epoch_length_one(bond_room):
+    boa.env.time_travel(blocks=100)
+    current_block = boa.env.evm.patch.block_number
+
+    start, end, changed = bond_room.getLatestEpochBlockTimes(0, 0, 1)
+    assert (start, end, changed) == (current_block, current_block + 1, True)
+
+    active_start = current_block
+    active_end = current_block + 1
+    start, end, changed = bond_room.getLatestEpochBlockTimes(
+        active_start,
+        active_end,
+        1,
+    )
+    assert (start, end, changed) == (active_start, active_end, False)
+
+    previous_end = current_block - 5
+    previous_start = previous_end - 1
+    epochs_ahead = (current_block - previous_end) // 1
+    expected_start = epochs_ahead + previous_end
+    start, end, changed = bond_room.getLatestEpochBlockTimes(
+        previous_start,
+        previous_end,
+        1,
+    )
+    assert (start, end, changed) == (expected_start, expected_start + 1, True)
+
+
+def test_refresh_bond_epoch_rejects_zero_stored_length_without_state_changes(
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    start, end = setupRipeBonds(_epochLength=100)
+    boa.env.time_travel(blocks=end - boa.env.evm.patch.block_number)
+
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+    )
+    assert state_before[0:2] == (start, end)
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_epoch_length(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        with boa.reverts("invalid epoch length"):
+            bond_room.refreshBondEpoch(sender=switchboard_delta.address)
+
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+        ) == state_before
+
+    assert mission_control.ripeBondConfig().epochLength == config.epochLength
+
+
+def test_bond_epoch_previews_rejects_zero_stored_length(
+    bond_room,
+    bob,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds(_epochLength=100)
+    config = mission_control.ripeBondConfig()
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_epoch_length(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        with boa.reverts("invalid epoch length"):
+            bond_room.previewNextEpoch()
+        with boa.reverts("invalid epoch length"):
+            bond_room.previewRipeBondPayout(bob, 0, 1)
+
+    assert mission_control.ripeBondConfig().epochLength == config.epochLength
 
 
 def test_epoch_management_integration(

@@ -417,6 +417,8 @@ def _getLatestEpochBlockTimes(
     _prevEndBlock: uint256,
     _epochLength: uint256,
 ) -> (uint256, uint256, bool):
+    assert _epochLength != 0 # dev: invalid epoch length
+
     startBlock: uint256 = _prevStartBlock
     endBlock: uint256 = _prevEndBlock
 
@@ -447,4 +449,4 @@ def _getLatestEpochBlockTimes(
 ########  ##     ## ## ## ## ##     ## 
 ##     ## ##     ## ##  #### ##     ## 
 ##     ## ##     ## ##   ### ##     ## 
-########   #######  ##    ## ######## 
+########   #######  ##    ## ########
