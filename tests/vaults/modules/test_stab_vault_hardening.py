@@ -122,7 +122,10 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     # monotonic matrix proves the cap bounds the linear NAV traversal.
     assert all(a < b for a, b in zip(deposit_gas, deposit_gas[1:]))
     assert all(a < b for a, b in zip(withdrawal_gas, withdrawal_gas[1:]))
-    assert deposit_gas[-1] < 500_000
+    # PriceDesk's guarded raw-call boundary raises the measured ceiling case to
+    # 506,004 gas. Keep ~2.8% local-EVM regression headroom for that accepted
+    # source-isolation cost without weakening the monotonic traversal checks.
+    assert deposit_gas[-1] < 520_000
     assert withdrawal_gas[-1] < 450_000
 
     with boa.env.anchor():
@@ -3330,10 +3333,9 @@ def test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares(
 # WP5 (Section 12.1) / DV-14: the PriceDesk boundary, per price state
 #
 # SP-PRICE-01 is option A on the bound baseline, so these are characterizations
-# of the exact result each price state produces. Section 12.2 requires source
-# revert, malformed response, and unexpected call failure to remain atomic
-# failures unless the approved policy explicitly classifies them as zero -- so
-# the source-revert row is a checkpoint, not an accepted behavior.
+# of the exact result each price state produces. PriceDesk now isolates source
+# failures: strict NAV calls still fail closed without a healthy fallback,
+# while non-strict maintenance sees zero and leaves the priceless asset active.
 ############################################################################
 
 # (price state, applies it, expected NAV outcome on the bound tree)
@@ -3403,18 +3405,25 @@ def test_reverting_price_source_takes_down_every_nav_dependent_action(
 ):
     """DV-14 characterization (SP-3, Section 12.1) across the affected methods.
 
-    A single reverting price source is not a "zero price"; it is a hard
-    liveness failure for every path that touches NAV, including the deposits
-    and withdrawals that SP-PRICE-01 option A is supposed to keep available.
+    Without a healthy fallback, strict NAV paths still fail closed. Non-strict
+    pruning no longer propagates the source revert, but it cannot remove the
+    active asset because the isolated lookup returns zero.
     """
     vault_id = vault_book.getRegId(stability_pool)
     alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     mock_price_source.setShouldRevert(bravo_token, True)
 
     if action == "prune":
-        # Pruning reads the claim price too, so it also fails closed.
-        with boa.reverts():
-            stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+        active_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+        stability_pool.pruneClaimableAssets(
+            alpha_token,
+            [bravo_token],
+            sender=alice,
+        )
+        assert stability_pool.indexOfClaimableAsset(
+            alpha_token,
+            bravo_token,
+        ) == active_index
         return
 
     with boa.reverts():
@@ -3458,6 +3467,48 @@ def test_reverting_price_source_is_fully_atomic_and_recovers(
     assert stability_pool.depositTokensInVault(
         alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
     ) == EIGHTEEN_DECIMALS
+
+
+def test_reverting_priority_source_with_healthy_fallback_keeps_stability_live(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, alice, teller,
+    price_desk, governance, mission_control, switchboard_alpha, priced_claim_pool,
+    mock_price_source,
+):
+    failed = boa.load(
+        "contracts/mock/MockRawPriceSource.vy",
+        name="stab_reverting_price_source",
+    )
+    failed.configure(0, True, 1, 0, 0)
+
+    assert price_desk.startAddNewAddressToRegistry(
+        failed,
+        "reverting priority",
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=price_desk.registryChangeTimeLock() + 1)
+    failed_id = price_desk.confirmNewAddressToRegistry(
+        failed,
+        sender=governance.address,
+    )
+    healthy_id = price_desk.getRegId(mock_price_source)
+    assert healthy_id != 0
+    mission_control.setPriorityPriceSourceIds(
+        [failed_id, healthy_id],
+        sender=switchboard_alpha.address,
+    )
+
+    alpha_token.transfer(
+        stability_pool,
+        EIGHTEEN_DECIMALS,
+        sender=alpha_token_whale,
+    )
+    assert stability_pool.depositTokensInVault(
+        alice,
+        alpha_token,
+        EIGHTEEN_DECIMALS,
+        sender=teller.address,
+    ) == EIGHTEEN_DECIMALS
+    assert stability_pool.getTotalValue(alpha_token) != 0
 
 
 @pytest.mark.parametrize("state", ("zero", "absent_feed", "source_revert"))
