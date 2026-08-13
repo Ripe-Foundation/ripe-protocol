@@ -76,7 +76,7 @@ PARAMS = {
         "PRICE_DESK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
         # vault book (blocks)
-        "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 12 hours on Base
+        "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
     },
     "local": {

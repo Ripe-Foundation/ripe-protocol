@@ -58,13 +58,40 @@ MC_ABI = [
     ),
     _struct_abi("hrConfig", [{"name": "contributor", "type": "address"}]),
     _struct_abi("assetConfig", [{"name": "value", "type": "uint256"}]),
+    # The generator also reads these; the deployed-ABI agreement check requires
+    # every one of them to be present on both sides.
+    {"type": "function", "name": "assets", "inputs": [{"type": "uint256"}],
+     "outputs": [{"type": "address"}]},
+    {"type": "function", "name": "numAssets", "inputs": [],
+     "outputs": [{"type": "uint256"}]},
+    {"type": "function", "name": "numLiteSigners", "inputs": [],
+     "outputs": [{"type": "uint256"}]},
+    {"type": "function", "name": "liteSigners", "inputs": [{"type": "uint256"}],
+     "outputs": [{"type": "address"}]},
+    {"type": "function", "name": "getPriorityLiqAssetVaults", "inputs": [],
+     "outputs": [{"type": "tuple[]"}]},
+    {"type": "function", "name": "getPriorityStabVaults", "inputs": [],
+     "outputs": [{"type": "tuple[]"}]},
+    {"type": "function", "name": "getPriorityPriceSourceIds", "inputs": [],
+     "outputs": [{"type": "uint256[]"}]},
+    {"type": "function", "name": "underscoreRegistry", "inputs": [],
+     "outputs": [{"type": "address"}]},
+    {"type": "function", "name": "trainingWheels", "inputs": [],
+     "outputs": [{"type": "address"}]},
+    {"type": "function", "name": "shouldCheckLastTouch", "inputs": [],
+     "outputs": [{"type": "bool"}]},
+]
+
+LEDGER_ABI = [
+    {"type": "function", "name": name, "inputs": [], "outputs": [{"type": "uint256"}]}
+    for name in prepare_defaults.LEDGER_READS
 ]
 
 MANIFEST_BYTES = json.dumps(
     {
         "contracts": {
-            "MissionControl": {"address": MC},
-            "Ledger": {"address": LEDGER},
+            "MissionControl": {"address": MC, "abi": MC_ABI},
+            "Ledger": {"address": LEDGER, "abi": LEDGER_ABI},
             "GreenUsdgPool": {"address": USDG},
             "TrainingWheels": {"address": TRAINING_WHEELS},
             "Contributor": {"address": CONTRIBUTOR},
@@ -90,7 +117,7 @@ def _canonical_abi(abi: list[dict]) -> bytes:
 
 ABI_INPUTS = prepare_defaults.AbiInputs(
     mission_control_abi_bytes=_canonical_abi(MC_ABI),
-    ledger_abi_bytes=b"[]",
+    ledger_abi_bytes=_canonical_abi(LEDGER_ABI),
     compiler_version="v0.4.3+commit.testfixture",
     mission_control_input_integrity="ab" * 32,
     ledger_input_integrity="cd" * 32,
@@ -233,7 +260,7 @@ def _snapshot_and_source(eth: FakeEth) -> tuple[object, str]:
         generator_bytes=GENERATOR_BYTES,
         abi_inputs=ABI_INPUTS,
     )
-    source = prepare_defaults.build(
+    result = prepare_defaults.build(
         w3,
         MC,
         LEDGER,
@@ -242,7 +269,7 @@ def _snapshot_and_source(eth: FakeEth) -> tuple[object, str]:
         abi_inputs=ABI_INPUTS,
     )
     prepare_defaults.verify_snapshot(w3, snapshot)
-    return snapshot, source
+    return snapshot, result.source
 
 
 def test_every_live_read_is_pinned_and_provenance_is_embedded():
@@ -265,6 +292,7 @@ def test_every_live_read_is_pinned_and_provenance_is_embedded():
     assert f"#   snapshot block: {BLOCK_NUMBER}" in source
     assert (
         "# Regenerate with:  python scripts/prepare_defaults.py "
+        f"--network {prepare_defaults.DEFAULT_NETWORK.key} "
         f"--block-number {BLOCK_NUMBER}"
     ) in source
     assert (
@@ -660,3 +688,174 @@ def test_load_abi_inputs_compiles_each_canonical_abi_once(monkeypatch):
     ]
     assert inputs.mission_control_abi_bytes == _canonical_abi(MC_ABI)
     assert inputs.ledger_abi_bytes == b"[]"
+
+
+BASE = prepare_defaults.NETWORKS["base-mainnet"]
+ROBINHOOD = prepare_defaults.NETWORKS["robinhood-mainnet"]
+
+
+def _manifest(*, mc_abi=MC_ABI, ledger_abi=None) -> bytes:
+    contracts = json.loads(MANIFEST_BYTES)["contracts"]
+    contracts["MissionControl"] = {"address": MC, "abi": mc_abi}
+    if ledger_abi is None:
+        ledger_abi = LEDGER_ABI
+    contracts["Ledger"] = {"address": LEDGER, "abi": ledger_abi}
+    return json.dumps(
+        {"contracts": contracts}, sort_keys=True, separators=(",", ":")
+    ).encode()
+
+
+def test_every_shipped_network_points_at_its_own_chain_and_manifest():
+    assert {n.chain_id for n in prepare_defaults.NETWORKS.values()} == {4663, 8453}
+    for network in prepare_defaults.NETWORKS.values():
+        assert network.manifest_path.exists(), network.key
+        assert network.target_path.suffix == ".vy"
+        # A snapshot must never be written over the launch defaults.
+        assert network.target_path.name != network.launch_defaults
+    assert BASE.chain_id == 8453
+    assert BASE.rpc_env == "BASE_MAINNET_RPC_URL"
+    assert BASE.target_path.name == "DefaultsBaseLive.vy"
+
+
+def test_wrong_chain_names_the_network_that_was_asked_for():
+    # Base RPC URL pointed at the Robinhood chain, or any other mix-up.
+    eth = FakeEth(chain_id=ROBINHOOD.chain_id)
+
+    with pytest.raises(prepare_defaults.SnapshotError, match="expected Base chain id 8453"):
+        prepare_defaults.select_snapshot(
+            FakeWeb3(eth),
+            MC,
+            LEDGER,
+            block_number=BLOCK_NUMBER,
+            manifest_bytes=MANIFEST_BYTES,
+            generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
+            network=BASE,
+        )
+
+    assert not eth.block_reads
+    assert not eth.code_reads
+
+
+@pytest.mark.parametrize(
+    ("manifest_bytes", "error"),
+    [
+        # MissionControl has gained getters since the live deployments were
+        # cut, so a drifted getter must fail rather than mis-decode.
+        (
+            _manifest(mc_abi=[e for e in MC_ABI if e["name"] != "assetConfig"]),
+            "deployed MissionControl has no assetConfig getter",
+        ),
+        (
+            _manifest(
+                mc_abi=[
+                    e
+                    if e["name"] != "numAssets"
+                    else {**e, "outputs": [{"type": "uint128"}]}
+                    for e in MC_ABI
+                ]
+            ),
+            "deployed MissionControl.numAssets does not match",
+        ),
+        (
+            _manifest(ledger_abi=[e for e in LEDGER_ABI if e["name"] != "ripeAvailForHr"]),
+            "deployed Ledger has no ripeAvailForHr getter",
+        ),
+        (_manifest(mc_abi="not-a-list"), "missing the deployed MissionControl ABI"),
+    ],
+)
+def test_deployed_abi_drift_fails_before_provider_reads(manifest_bytes, error):
+    eth = FakeEth()
+
+    with pytest.raises(prepare_defaults.SnapshotError, match=error):
+        prepare_defaults.select_snapshot(
+            FakeWeb3(eth),
+            MC,
+            LEDGER,
+            block_number=BLOCK_NUMBER,
+            manifest_bytes=manifest_bytes,
+            generator_bytes=GENERATOR_BYTES,
+            abi_inputs=ABI_INPUTS,
+        )
+
+    assert not eth.block_reads
+    assert not eth.code_reads
+
+
+def test_live_state_that_outgrew_a_defaults_cap_fails_closed(monkeypatch):
+    # 59 registered assets cannot be expressed in DynArray[..., 50].
+    monkeypatch.setitem(MC_VALUES, "numAssets", 60)
+    monkeypatch.setitem(MC_VALUES, "assets", lambda index: f"0x{index:040x}")
+
+    with pytest.raises(
+        prepare_defaults.SnapshotError,
+        match="live assetConfigs holds 59 entries but Defaults caps it at 50",
+    ):
+        _snapshot_and_source(FakeEth())
+
+
+def test_require_cap_admits_exactly_the_declared_bound():
+    for name, cap in prepare_defaults.DEFAULTS_CAPS.items():
+        prepare_defaults._require_cap(name, cap)
+        with pytest.raises(prepare_defaults.SnapshotError, match=name):
+            prepare_defaults._require_cap(name, cap + 1)
+
+
+def test_a_snapshot_cannot_be_rebuilt_as_another_network():
+    snapshot, _ = _snapshot_and_source(FakeEth())
+
+    with pytest.raises(prepare_defaults.SnapshotError, match="network does not match"):
+        prepare_defaults.build(
+            FakeWeb3(FakeEth()),
+            MC,
+            LEDGER,
+            snapshot,
+            manifest_bytes=MANIFEST_BYTES,
+            abi_inputs=ABI_INPUTS,
+            network=BASE,
+        )
+
+    with pytest.raises(prepare_defaults.SnapshotError, match="network does not match"):
+        snapshot.header(BASE)
+
+
+def test_coverage_report_names_what_defaults_cannot_carry():
+    eth = FakeEth()
+    w3 = FakeWeb3(eth)
+    snapshot = prepare_defaults.select_snapshot(
+        w3,
+        MC,
+        LEDGER,
+        block_number=BLOCK_NUMBER,
+        manifest_bytes=MANIFEST_BYTES,
+        generator_bytes=GENERATOR_BYTES,
+        abi_inputs=ABI_INPUTS,
+    )
+    result = prepare_defaults.build(
+        w3,
+        MC,
+        LEDGER,
+        snapshot,
+        manifest_bytes=MANIFEST_BYTES,
+        abi_inputs=ABI_INPUTS,
+    )
+
+    assert result.counts == {
+        "assetConfigs": 1,
+        "ripeGovVaultConfigs": 0,
+        "priorityLiqAssetVaults": 1,
+        "priorityStabVaults": 0,
+        "priorityPriceSourceIds": 2,
+        "liteSigners": 1,
+    }
+    report = result.coverage_report(ROBINHOOD)
+    assert "userConfig" in report and "userDelegation" in report
+    assert "preferredStabVaultId = 1, coreRipeGovVaultId = 2" in report
+    assert "assetConfigs: 1" in report
+
+
+def test_generated_source_warns_that_user_state_is_not_carried():
+    _, source = _snapshot_and_source(FakeEth())
+
+    assert "userConfig and" in source
+    assert "does NOT survive the redeploy" in source
