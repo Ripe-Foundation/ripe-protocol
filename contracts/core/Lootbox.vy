@@ -1066,6 +1066,54 @@ def _getLatestBorrowPoints(
 ##########################
 
 
+@pure
+@internal
+def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    # Fast path: the product fits in 256 bits.
+    if hi == 0:
+        return lo // _d
+
+    # The full-precision result must fit in uint256.
+    assert _d > hi # dev: result overflows
+
+    # Make the 512-bit product exactly divisible by the denominator.
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    # Factor powers of two out of the denominator and shift the
+    # high product bits into the low product word.
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    # Compute the modular inverse of the now-odd denominator.
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)
+
+
 @external
 def claimBorrowLoot(_user: address) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
@@ -1106,18 +1154,23 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
     gp: BorrowPoints = empty(BorrowPoints)
     up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, _a.ledger)
 
-    # calc user's share
-    userShare: uint256 = 0
-    if gp.points != 0:
-        userShare = min(up.points * HUNDRED_PERCENT // gp.points, HUNDRED_PERCENT)
-
     # calc borrower rewards
-    userRipeRewards: uint256 = globalRewards.borrowers * userShare // HUNDRED_PERCENT
+    cappedPoints: uint256 = min(up.points, gp.points)
+    userRipeRewards: uint256 = 0
+    if gp.points != 0 and cappedPoints != 0 and globalRewards.borrowers != 0:
+        if cappedPoints == gp.points:
+            userRipeRewards = globalRewards.borrowers
+        else:
+            userRipeRewards = self._mulDivFloor(
+                globalRewards.borrowers,
+                cappedPoints,
+                gp.points,
+            )
 
     # update structs
     if userRipeRewards != 0:
         globalRewards.borrowers -= userRipeRewards
-        gp.points -= min(up.points, gp.points) # do first
+        gp.points -= cappedPoints # do first
         up.points = 0
 
     return userRipeRewards, up, gp, globalRewards
