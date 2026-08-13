@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
-import eth_account
+import click
 import pytest
 import requests
 
@@ -23,6 +23,7 @@ from config.network_profiles import (
 )
 from scripts import console, migrate, verify
 from scripts.utils import migration_helpers
+from scripts.utils.migration_helpers import TransactionExecutionError
 from scripts.utils.migration_runner import MigrationError
 
 
@@ -138,6 +139,57 @@ def test_spy_environment_records_common_read_paths():
     ]
 
 
+def _call_migrate(**overrides):
+    values = {
+        "ask": False,
+        "safe": "",
+        "fork": True,
+        "is_retry": False,
+        "rpc": "https://rpc.invalid.example",
+        "single": False,
+        "environment": "v1",
+        "start_timestamp": "0",
+        "end_timestamp": "0",
+        "profile_id": "base-mainnet",
+        "blueprint": None,
+        "account": "DEPLOYER",
+        "ledger": -1,
+    }
+    values.update(overrides)
+    return migrate.cli.callback(**values)
+
+
+def _prepare_migration_execution(monkeypatch, run):
+    sender = SimpleNamespace(
+        address="0x0000000000000000000000000000000000000001"
+    )
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(migrate, "get_account", lambda *args: sender)
+    monkeypatch.setattr(migrate, "load_vyper_files", lambda: {})
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: SimpleNamespace(run=run),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "DeploymentsDB",
+        lambda *args: object(),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "set_deployments_db",
+        lambda *args: None,
+    )
+
+    @contextmanager
+    def fake_fork(rpc_url, **kwargs):
+        assert rpc_url == _SENSITIVE_RPC
+        yield SimpleNamespace(set_balance=lambda *args: None)
+
+    monkeypatch.setattr(migrate.boa, "fork", fake_fork)
+
+
 @pytest.mark.parametrize(
     "module",
     (
@@ -205,6 +257,41 @@ def test_missing_rpc_env_fails_lazily():
     assert environment.accesses == ["BASE_MAINNET_RPC_URL"]
 
 
+def test_missing_private_key_never_uses_public_fallback(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: calls.append(value),
+    )
+    with pytest.raises(NetworkProfileError, match="H02_PRIVATE_KEY_MISSING"):
+        migration_helpers.get_account(
+            "DEPLOYER",
+            _verified("base-mainnet", Operation.MIGRATION_FORK),
+            Operation.MIGRATION_FORK,
+            environ=SpyEnvironment(),
+        )
+    assert calls == []
+
+
+def test_verified_live_private_key_backend_is_profile_gated(monkeypatch):
+    expected = object()
+    loaded = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: loaded.append(value) or expected,
+    )
+    result = migration_helpers.get_account(
+        "DEPLOYER",
+        _verified("base-mainnet", Operation.MIGRATION_LIVE),
+        Operation.MIGRATION_LIVE,
+        environ=SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "synthetic-key"}),
+    )
+    assert result is expected
+    assert loaded == ["synthetic-key"]
+
+
 def test_public_local_key_is_test_only():
     occurrences = []
     # This scanner intentionally searches for the one contiguous production
@@ -223,6 +310,141 @@ def test_public_local_key_is_test_only():
                     assert "tests.deployment.test_secret_handling" not in (
                         ast.unparse(node)
                     )
+
+
+def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
+    loaded = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: loaded.append(value) or object(),
+    )
+    local_identity = VerifiedNetworkIdentity(
+        "local", Operation.LOCAL_RUNTIME, 31337, 31337
+    )
+    account = migration_helpers.get_account(
+        "LOCAL_TEST",
+        local_identity,
+        Operation.LOCAL_RUNTIME,
+        private_key=_PUBLIC_ANVIL_TEST_KEY,
+        local_test_only=True,
+    )
+    assert account is not None
+    assert loaded == [_PUBLIC_ANVIL_TEST_KEY]
+
+
+@pytest.mark.parametrize(
+    ("identity", "operation", "error_code"),
+    (
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 8453, 8453
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
+            ),
+            Operation.MIGRATION_LIVE,
+            # Base live is supported again, so the rejection reason is now the
+            # account backend rather than the operation. The guarantee under
+            # test is unchanged: a local test key is refused and never loaded.
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+    ),
+)
+def test_injected_local_test_account_rejected_for_live_or_fork(
+    identity, operation, error_code, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: calls.append(value),
+    )
+    with pytest.raises(NetworkProfileError, match=error_code):
+        migration_helpers.get_account(
+            "LOCAL_TEST",
+            identity,
+            operation,
+            private_key=_PUBLIC_ANVIL_TEST_KEY,
+            local_test_only=True,
+        )
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("identity", "operation", "error_code"),
+    (
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 8453, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "unknown-profile", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_PROFILE_UNKNOWN",
+        ),
+        (
+            # MIGRATION_FORK is owner-approved for Robinhood now. CONSOLE_EVIDENCE
+            # is the remaining blocked operation, so identity validation still has
+            # a blocked case to precede key access for.
+            VerifiedNetworkIdentity(
+                "robinhood-mainnet",
+                Operation.CONSOLE_EVIDENCE,
+                4663,
+                4663,
+            ),
+            Operation.CONSOLE_EVIDENCE,
+            "H02_OPERATION_BLOCKED",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet",
+                Operation.REPOSITORY_READ,
+                8453,
+                8453,
+            ),
+            Operation.REPOSITORY_READ,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+    ),
+)
+def test_account_identity_validation_precedes_key_access(
+    identity, operation, error_code, monkeypatch
+):
+    environment = SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "not-read"})
+    account_calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: account_calls.append(value),
+    )
+
+    with pytest.raises(NetworkProfileError, match=error_code):
+        migration_helpers.get_account(
+            "DEPLOYER",
+            identity,
+            operation,
+            environ=environment,
+        )
+
+    assert environment.accesses == []
+    assert account_calls == []
 
 
 def test_console_wrong_chain_prevents_manifest_and_fork(monkeypatch):
@@ -280,14 +502,19 @@ def test_rpc_components_never_appear_in_logs_exceptions_or_repr():
 
 def test_execute_transaction_failure_never_logs_exception_text(capsys):
     failure_text = f"synthetic provider failure {_SENSITIVE_RPC}"
+    calls = []
 
     def fail():
+        calls.append("called")
         raise RuntimeError(failure_text)
 
-    result = migration_helpers.execute_transaction(fail, no_retry=True)
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_FAILED"
+    ):
+        migration_helpers.execute_transaction(fail)
     rendered = capsys.readouterr().out
 
-    assert result is None
+    assert calls == ["called"]
     assert "H02_TRANSACTION_FAILED" in rendered
     assert failure_text not in rendered
     assert "synthetic provider failure" not in rendered
@@ -300,6 +527,39 @@ def test_execute_transaction_failure_never_logs_exception_text(capsys):
         "fragment-token",
     ):
         assert component not in rendered
+
+
+def test_execute_transaction_none_result_fails_without_replay():
+    calls = []
+
+    def missing_result():
+        calls.append("called")
+        return None
+
+    with pytest.raises(
+        TransactionExecutionError, match="MIGRATION_TRANSACTION_RESULT_MISSING"
+    ):
+        migration_helpers.execute_transaction(
+            missing_result, max_attempts=20
+        )
+    assert calls == ["called"]
+
+
+def test_execute_transaction_retries_then_returns_confirmed_result(monkeypatch):
+    monkeypatch.setattr(migration_helpers.time, "sleep", lambda value: None)
+    calls = []
+    expected = object()
+
+    def eventually_succeeds():
+        calls.append("called")
+        if len(calls) == 1:
+            raise RuntimeError("transient")
+        return expected
+
+    assert migration_helpers.execute_transaction(
+        eventually_succeeds, max_attempts=2
+    ) is expected
+    assert calls == ["called", "called"]
 
 
 def test_explorer_key_is_not_read_at_import_or_help():
@@ -394,92 +654,105 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
     assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
 
 
-# Safe and Ledger are approved backends for Base on their own, so neither is
-# rejected in isolation any more. Requesting BOTH is still unapproved, and it is
-# rejected on the same path with the same code -- which is what this test is
-# actually about: an unapproved backend never reaches a chain read or a secret.
+# Live Safe proposal submission is deliberately unadvertised until a qualified
+# backend exists. Fork-only Safe impersonation and live Ledger signing remain
+# separate paths.
 
 
-# --- _local_account -------------------------------------------------------
-#
-# ab3100d removed the H-02 `migration_helpers.get_account`, which had the only
-# direct missing-key coverage. `scripts.migrate._local_account` is now the
-# normal private-key loader on the live deploy path and had none of its own.
-
-# Well formed (any in-range 32 bytes is a real key), used with a faked loader.
-_WELL_FORMED_TEST_KEY = "0x" + "ab" * 31 + "cd"
-# Genuinely malformed: wrong length and non-hex, so eth_account rejects it.
-_MALFORMED_TEST_KEY = "0xnot-a-real-private-key-value"
-
-
-def test_local_account_missing_key_raises_before_reading_the_key(monkeypatch):
-    loaded = []
+def test_migrate_wrong_chain_stops_before_account_history_or_fork(monkeypatch):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
     monkeypatch.setattr(
-        eth_account.Account, "from_key", lambda value: loaded.append(value)
+        migrate, "read_chain_id", lambda value: events.append("chain") or 1
     )
-    monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: events.append("history"),
+    )
+    monkeypatch.setattr(
+        migrate.boa, "fork", lambda *args, **kwargs: events.append("fork")
+    )
 
-    with pytest.raises(migrate.click.ClickException) as captured:
-        migrate._local_account("DEPLOYER")
-
-    assert "DEPLOYER_PRIVATE_KEY is not set" in str(captured.value)
-    # The loader must not be reached at all when the key is absent.
-    assert loaded == []
-
-
-def test_local_account_has_no_well_known_key_fallback(monkeypatch):
-    monkeypatch.delenv("DEPLOYER_PRIVATE_KEY", raising=False)
-
-    with pytest.raises(migrate.click.ClickException) as captured:
-        migrate._local_account("DEPLOYER")
-
-    rendered = f"{captured.value} {captured.value!r}"
-    assert _PUBLIC_ANVIL_TEST_KEY not in rendered
-    assert "0x" not in rendered.replace("0x0", "")
+    with pytest.raises(click.ClickException, match="H02_CHAIN_ID_MISMATCH"):
+        _call_migrate()
+    assert events == ["chain"]
 
 
-def test_local_account_invalid_key_never_appears_in_the_failure(monkeypatch):
-    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _MALFORMED_TEST_KEY)
+@pytest.mark.parametrize(
+    ("force_replay", "expected_ignore_logs"),
+    ((False, False), (True, True)),
+)
+def test_migrate_resume_and_force_replay_semantics(
+    monkeypatch, force_replay, expected_ignore_logs
+):
+    observed = {}
 
-    with pytest.raises(Exception) as captured:
-        migrate._local_account("DEPLOYER")
+    def run(deploy_args, start, end, continue_running):
+        observed.update(
+            ignore_logs=deploy_args.ignore_logs,
+            start=start,
+            end=end,
+            continue_running=continue_running,
+            chain=deploy_args.chain,
+            blueprint=deploy_args.blueprint.blueprint,
+        )
+        return 0
 
-    rendered = f"{captured.value} {captured.value!r} {captured.traceback}"
-    assert _MALFORMED_TEST_KEY not in rendered
-    assert _MALFORMED_TEST_KEY[2:] not in rendered
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    _prepare_migration_execution(monkeypatch, run)
+    _call_migrate(
+        rpc=_SENSITIVE_RPC,
+        start_timestamp=None,
+        end_timestamp=None,
+        is_retry=force_replay,
+    )
 
-
-def test_local_account_loads_a_valid_key(monkeypatch):
-    seen = []
-
-    def fake_from_key(value):
-        seen.append(value)
-        return SimpleNamespace(address="0x" + "5" * 40)
-
-    monkeypatch.setattr(eth_account.Account, "from_key", fake_from_key)
-    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _WELL_FORMED_TEST_KEY)
-
-    account = migrate._local_account("DEPLOYER")
-
-    assert account.address == "0x" + "5" * 40
-    assert seen == [_WELL_FORMED_TEST_KEY]
-
-
-def test_local_account_reads_only_the_named_account_variable(monkeypatch):
-    monkeypatch.delenv("TREASURY_PRIVATE_KEY", raising=False)
-    monkeypatch.setenv("DEPLOYER_PRIVATE_KEY", _WELL_FORMED_TEST_KEY)
-
-    with pytest.raises(migrate.click.ClickException) as captured:
-        migrate._local_account("TREASURY")
-
-    assert "TREASURY_PRIVATE_KEY is not set" in str(captured.value)
-    assert _WELL_FORMED_TEST_KEY not in str(captured.value)
+    assert observed == {
+        "ignore_logs": expected_ignore_logs,
+        "start": None,
+        "end": None,
+        "continue_running": True,
+        "chain": "base-mainnet",
+        "blueprint": "base",
+    }
 
 
-def test_ledger_branch_bypasses_local_account_entirely():
-    # `--ledger` must sign with the device, never fall back to an env key.
-    source = (ROOT / "scripts/migrate.py").read_text()
-    ledger_branch = source.split("elif ledger != -1:")[1].split("else:")[0]
+def test_live_safe_backend_fails_before_signer_construction(monkeypatch):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: events.append("history"),
+    )
 
-    assert "LedgerAccount(final_rpc, ledger)" in ledger_branch
-    assert "_local_account" not in ledger_branch
+    with pytest.raises(
+        click.ClickException, match="H02_ACCOUNT_BACKEND_UNAPPROVED"
+    ):
+        _call_migrate(fork=False, safe="0x" + "1" * 40)
+    assert events == []
+
+
+def test_migrate_rejects_history_and_blueprint_aliases_before_account(
+    monkeypatch,
+):
+    events = []
+    monkeypatch.setattr(migrate, "_load_dotenv", lambda: None)
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(
+        migrate, "get_account", lambda *args: events.append("account")
+    )
+
+    with pytest.raises(click.ClickException, match="H02_HISTORY_ALIAS"):
+        _call_migrate(environment="v2")
+    with pytest.raises(click.ClickException, match="H02_PROFILE_INVALID"):
+        _call_migrate(blueprint="robinhood")
+    assert events == []

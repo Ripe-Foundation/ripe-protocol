@@ -188,21 +188,22 @@ class MigrationRunner:
 
         latest_timestamp = None
 
-        # create the history directory if it doesn't already exist
-        os.makedirs(self.history_dir, exist_ok=True)
+        if not os.path.isdir(self.history_dir):
+            raise RuntimeError("MIGRATION_HISTORY_UNAVAILABLE")
 
-        # Scan each file to get the latest timestamp. The pattern is anchored to
-        # digits on purpose: `current-manifest.json` sits in the same directory
-        # and a `(.*)` group matched it too, so this walked into
-        # int("current") -- a ValueError -- as soon as a history held both a
-        # numbered manifest and the current one. That is every history with
-        # step manifests, which is to say every real deployment.
+        # Only a numeric manifest is a completed checkpoint. `current` is a
+        # state index, and `*-pending-manifest.json` is an incomplete journal;
+        # neither may silently advance resume.
         for file in os.listdir(self.history_dir):
             match = re.fullmatch(r"(\d+)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
-                # Convert timestamps to integers for proper numerical comparison
                 if latest_timestamp == None or int(timestamp) > int(latest_timestamp):
                     latest_timestamp = timestamp
+
+        if latest_timestamp is None and os.path.exists(
+            os.path.join(self.history_dir, "current-manifest.json")
+        ):
+            raise RuntimeError("MIGRATION_RESUME_CHECKPOINT_REQUIRED")
 
         return latest_timestamp

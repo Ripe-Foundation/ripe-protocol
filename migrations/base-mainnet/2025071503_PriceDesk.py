@@ -1,6 +1,6 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
-from tests.constants import EIGHTEEN_DECIMALS
+from tests.constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 def migrate(migration: Migration):
@@ -92,6 +92,7 @@ def migrate(migration: Migration):
         blueprint.ADDYS["COMPOUND_V3_CONFIGURATOR"],
         blueprint.ADDYS["MOONWELL_COMPTROLLER"],
         blueprint.ADDYS["AAVE_V3_ADDRESS_PROVIDER"],
+        ZERO_ADDRESS,
     )
     migration.execute(price_desk.startAddNewAddressToRegistry, bluechip_yield_prices, "BlueChip Yield Prices")
     migration.execute(price_desk.confirmNewAddressToRegistry, bluechip_yield_prices)

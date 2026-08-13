@@ -155,18 +155,18 @@ def ripe_hq(
     # 23 and 24 are occupied by the two CCIP pools on both deployment chains.
     # Local tests use inert departments so VaultMigrator retains its production id.
     assert ripe_hq_deploy.startAddNewAddressToRegistry(
-        green_ccip_pool_placeholder, "GREEN CCIP Pool Placeholder", sender=deploy3r,
-    )
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(
-        green_ccip_pool_placeholder, sender=deploy3r,
-    ) == GREEN_CCIP_POOL_HQ_ID
-
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(
         ripe_ccip_pool_placeholder, "RIPE CCIP Pool Placeholder", sender=deploy3r,
     )
     assert ripe_hq_deploy.confirmNewAddressToRegistry(
         ripe_ccip_pool_placeholder, sender=deploy3r,
     ) == RIPE_CCIP_POOL_HQ_ID
+
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(
+        green_ccip_pool_placeholder, "GREEN CCIP Pool Placeholder", sender=deploy3r,
+    )
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(
+        green_ccip_pool_placeholder, sender=deploy3r,
+    ) == GREEN_CCIP_POOL_HQ_ID
 
     # 25
     assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_migrator, "Vault Migrator", sender=deploy3r)

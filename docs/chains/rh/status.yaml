@@ -1,8 +1,8 @@
-schema_version: 13
+schema_version: 14
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-10
+  as_of: 2026-08-11
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
@@ -25,11 +25,12 @@ snapshot:
     publication lifecycle are derived at build time, never hardcoded. Earlier
     launch and transaction-executor records remain historical evidence; this
     file is the sole current machine-readable lifecycle authority.
-  posture: "Repository configuration is prepared and consistent; production/onchain configuration has not occurred."
+  posture: "Repository launch-remediation configuration remains pre-execution; separately, the GREEN/RIPE CCIP topology is confirmed live on Base and Robinhood mainnet."
   hero_lead: "Ready to begin deployment preparation."
-  hero_emphasis: Repository configuration is prepared and consistent; production/onchain configuration has not occurred.
-  launch_readiness: "Ready to continue bounded launch preparation; 65 unresolved or unverified bindings prevent deployment readiness."
-  live_actions_completed: 0
+  hero_emphasis: Launch-remediation repository configuration is prepared; separately, the GREEN/RIPE CCIP topology is confirmed live.
+  launch_readiness: "Ready to continue bounded launch preparation; 64 unresolved or unverified bindings prevent deployment readiness."
+  live_actions_completed: 1
+  live_action_counting_unit: externally_completed_packages_not_transactions
   status_owner: Robinhood deployment owner
   freshness_rule: >
     Reconcile this file in the same commit whenever an integrated change closes,
@@ -44,16 +45,16 @@ counts:
   h04_approved_operative: 21
   h04_retired_non_operative: 1
   h04_open: 0
-  deployment_readiness_blockers: 65
+  deployment_readiness_blockers: 64
   binding_schedules: 14
   hard_gates: 10
   handoff_documents: 14
-  parked_lanes: 6
-  live_actions: 0
+  parked_lanes: 5
+  live_actions: 1
 
 migration_readiness:
   source_configuration:
-    blockers: 65
+    blockers: 64
     configuration_consistent: true
     deployment_ready: false
   executable_plan:
@@ -64,8 +65,29 @@ migration_readiness:
   relationship: >
     The former 86-key declarative-plan census is retired with its removed
     runner. The eight-file imperative migration candidate remains
-    non-executable and unauthorized; the 65 source/configuration blockers are
+    non-executable and unauthorized; the 64 source/configuration blockers are
     current but are not a substitute executable-plan census.
+
+ccip_live_state:
+  status: live_topology_confirmed_operational_gates_open
+  evidence_as_of: "2026-08-11T20:29:21Z"
+  authority: docs/chains/rh/ccip-live-state.md
+  evidence: docs/chains/rh/evidence/ccip-live-snapshot-20260811.json
+  evidence_sha256: 41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa
+  topology: { ripe_hq_id: 23, green_hq_id: 24, base_chain_id: 8453, robinhood_chain_id: 4663 }
+  active: [RipeHq registration, token-pool assignment, reciprocal remote wiring, governance ownership, token-specific mint capabilities]
+  owner_disposition_gates: [inbound and outbound rate-limit policy, rateLimitAdmin]
+  evidence_gates: [full real-token OffRamp automatic-execution destination gas, exact historical setPool and applyChainUpdates transaction hashes, exact live pool source/compiler/constructor-bound identity, license and legal conclusions]
+  tooling_boundary: scripts/ccip_send.py is fork/preflight-only; live signer or Safe backend is unbound
+  authorization_boundary: Existing live state does not authorize another transaction or release decision.
+
+live_action_records:
+  - id: ccip_mainnet_topology
+    counting_unit: one externally completed CCIP package, not one transaction
+    state: confirmed_existing_state
+    scope: GREEN and RIPE registration, routing, ownership, reciprocal wiring, and token-specific mint capabilities on Base and Robinhood mainnet
+    authority: docs/chains/rh/evidence/ccip-live-snapshot-20260811.json
+    authorization_boundary: Evidence of existing state only; no further transaction or release is authorized.
 
 post_freeze_reconciliation:
   frozen_protocol_pause_commit: ae0cb49bad9ad615deb11cbca5d3a2c20e38bb4c
@@ -155,8 +177,8 @@ post_freeze_reconciliation:
     bluechip_eip170_headroom_bytes: 2522
     defaults_state: present_compiling_source_authoritative_derived_ledger_synchronized
     configuration_consistency: passing
-    deployment_readiness: blocked_65_unresolved_and_unverified_bindings
-    excluded_lanes: [PSM parameters or activation, Deleverage values, CCIP, CreditEngine zero-backing changes, Curve higher powers or LP activation, Uniswap admission and manipulation-defense redesign, retired declarative migration runner]
+    deployment_readiness: blocked_64_unresolved_and_unverified_bindings
+    excluded_lanes: [PSM parameters or activation, Deleverage values, further CCIP mutations or release, CreditEngine zero-backing changes, Curve higher powers or LP activation, Uniswap admission and manipulation-defense redesign, retired declarative migration runner]
     lifecycle_effect: none_no_deployment_migration_configuration_activation_or_release
 
 publication:
@@ -335,7 +357,6 @@ reassessment_and_qualification:
     - CreditEngine zero-backing reassessment
     - Every Deleverage task including parameter representation, tests, fork scenarios, documentation, and size/headroom work
     - Uniswap V2 price-source registration, configuration, admission, deployment, and activation; the tested spot-reserve candidate is non-admitted and has unresolved manipulation, pair-provenance, and liquidity-floor policy
-    - CCIP
     - Sites recovery and dashboard publication
     - Live deployment, migration execution, production configuration, activation, and release
   future_packages:
@@ -373,16 +394,6 @@ owner_priority_overlay:
     rehearsal and release packets without executing a migration or touching
     live state.
   parked_lanes:
-    - id: PARK-CCIP
-      subject: all CCIP workflows
-      state: parked_nonblocking
-      blocker_effect: nonblocking
-      instruction: >
-        Do not perform CCIP research, implementation, review, coordination,
-        packaging, testnet, deployment, promotion, or status work. Keep CCIP
-        disabled. Historical CCIP records remain preserved but are not an
-        active dependency or blocker for current non-CCIP work.
-      reopen_condition: Explicit owner instruction.
     - id: PARK-ZERO-BACKING-POLICY
       subject: CreditEngine zero-backing reassessment, settlement, and bad-debt policy
       state: parked_nonblocking
@@ -410,11 +421,12 @@ owner_priority_overlay:
       state: parked_nonblocking
       blocker_effect: nonblocking
       instruction: >
-        The smaller UniswapV2Prices candidate replaces the deleted cumulative-
-        price prototype. Its spot-reserve input, pair provenance, minimum-
-        liquidity requirement, and repeatable snapshot poisoning remain
-        unresolved. Bootstrap and fully stale snapshot states fail closed. It
-        remains unregistered, unconfigured, non-admitted,
+        The stripped UniswapV2Prices replacement is a stateless RIPE/WETH
+        monitor. Its PriceSource interface is permanently inert, while its
+        explicitly named monitoring views expose a manipulable spot-reserve
+        observation. Pair provenance and minimum-liquidity policy remain
+        operational monitoring concerns. It remains unregistered,
+        unconfigured, non-admitted,
         undeployed, unactivated, and unavailable for protocol accounting. Do
         not add a checkpoint service, PriceDesk
         registration, Chainlink fallback, pool address, liquidity amount,
@@ -469,7 +481,7 @@ deployment_owner:
     - order: 3
       label: Honor consolidated scope and deferrals
       owns: Keep bounded launch preparation inside the synthesis and exclude every deferred lane and Curve higher power.
-      output: A dependency register that leaves CreditEngine zero-backing, Deleverage, UniswapV2Prices admission and deployment, CCIP, Sites, and live execution unopened.
+      output: A dependency register that leaves CreditEngine zero-backing, Deleverage, UniswapV2Prices admission and deployment, further CCIP mutation/release, Sites, and non-CCIP live execution unopened.
       boundary: Preserve the four Deleverage values at zero without creating representation or size/headroom work.
     - order: 4
       label: Maintain and synchronize source-authoritative DefaultsRobinhood
@@ -522,15 +534,16 @@ overall:
     structurally selected at slot 3 in the blueprint but is deliberately not
     deployed or finalized by this migration candidate. Both LP admissions and
     every Curve higher power remain separate. Every Deleverage task is
-    deferred. Repository configuration is consistent but 65 unresolved or
+    deferred. Repository configuration is consistent but 64 unresolved or
     unverified bindings keep deployment readiness false;
-    production/onchain configuration has not occurred. Nothing is deployed,
-    activated, or released.
-  architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and only GREEN/RIPE bridge candidates remain controlling."}
-  engineering_foundation: { status: complete, note: "S1-S5, H-01-H-05, H-06 implementation and candidate-class qualification, M1-M4, corrected PR #61, Morpho V2 support, and the two-source configuration authority are integrated for their exact scopes."}
+    production/onchain configuration for the launch-remediation candidate has
+    not occurred. The separately confirmed CCIP topology is already live;
+    that does not authorize another transaction or release decision.
+  architecture: { status: complete, note: "One shared source line, chain-local positions and governance, and live GREEN/RIPE bridge routes remain controlling; sGREEN has no CCIP route."}
+  engineering_foundation: { status: complete, note: "S1-S5, H-01-H-04, H-06 implementation and candidate-class qualification, M1-M4, corrected PR #61, Morpho V2 support, and the two-source configuration authority are integrated for their exact scopes. The H-05 imperative migration candidate remains under repository review; the former declarative planner is retired."}
   launch_implementation: { status: draft_pr_73_reviewed_candidate, note: "The current production-remediation candidate contains eight imperative Robinhood migration files, 0000 through 0007. The former 17-stage declarative plan, action census, executor, and 86-key blocker census were retired with their removed runner. No executable plan is authorized or currently censused. PR #73 is a repository candidate only; no migration history, execution, deployment, configuration, activation, or release authority exists."}
   testnet: { status: not_started, note: "No testnet deployment, funding, configuration, role setup, CCIP route, or soak is authorized."}
-  production: { status: not_started, note: "No production deployment, migration, registration, role transfer, configuration, activation, or release is authorized."}
+  production: { status: not_started, note: "No production-remediation deployment, migration, role transfer, configuration, activation, or release is authorized. Separately, CCIP registration and routing are confirmed live."}
 
 s2_current_authority:
   collected_tests: 95
@@ -546,7 +559,7 @@ s2_current_authority:
 
 authorization_boundaries:
   - "PR #61 is merged and closed on master; its production contract changes are integrated into rh."
-  - All CCIP workflows are parked and nonblocking until explicit owner reopening; CCIP remains disabled.
+  - CCIP registration, routing, ownership, and mint capabilities are confirmed live; rate policy, rateLimitAdmin, full destination-gas evidence, exact live source/compiler/constructor identity, license and historical-transaction provenance, live-send backend, further transactions, and release remain separately gated.
   - Zero-backing settlement and bad-debt policy work is parked and nonblocking for current work; integrated M2/M3 behavior remains unchanged.
   - Stock remains disabled and unreachable.
   - H-04 source authority is present and its derived ledger is synchronized; unverified external facts and unresolved deployment identities independently keep deployment readiness fail-closed.
@@ -559,7 +572,7 @@ authorization_boundaries:
   - Current source sets RIPE availability to 1,000,000e18 for rewards, 0 for HR, and 1,000,000e18 for bonds; B-REWARD-PROMOTION remains open for checkpoints, identities, runbook acceptance, monitoring, operator binding, rehearsal, and release prerequisites. Stock rewards remain disabled.
   - The fresh LP qualification preserves the selected GREEN/USDG launch-pricing pool while rejecting its LP token as a Ripe asset; RIPE/WETH remains external-canary-only, Uniswap remains PriceDesk-inert, and PSM reserves cannot fund LP liquidity.
   - H-09 is network-disabled by default and owns explicit opt-in read-only archive-fork qualification; H-10 separately owns live rehearsal.
-  - CCIP is disabled; examples are non-production and manual execution is recovery only.
+  - CCIP topology and token-specific capabilities are live. Exact live pool source/compiler/constructor identity and license conclusions remain unproven; scripts/ccip_send.py is fork/preflight-only and has no live signer or Safe backend.
   - No testnet or production action is authorized.
   - Ready to begin deployment preparation does not mean ready to deploy or authorized to deploy.
   - No address, role, signer, feed, cap, rate, cadence, allocation, artifact, or activation value may be inferred from implementation.
@@ -583,7 +596,7 @@ h04_decisions:
   defaults_source_authoritative: true
   configuration_consistent: true
   deployment_ready: false
-  deployment_readiness_blocker_count: 65
+  deployment_readiness_blocker_count: 64
   approved_ids: [D-H04-01, D-H04-02, D-H04-03, D-H04-04, D-H04-05, D-H04-06, D-H04-07, D-H04-08, D-H04-09, D-H04-10, D-H04-11, D-H04-12, D-H04-13, D-H04-14, D-H04-15, D-H04-16, D-H04-17, D-H04-18, D-H04-20, D-H04-21, D-H04-22]
   open_ids: []
   retired_ids: [D-H04-19]
@@ -638,7 +651,7 @@ h03_blockers:
   - { id: B-LP-ARTIFACTS, state: "open", implementation_predicate: "not_satisfied", remaining: "LP artifacts, custody, valuation-route exclusions, and composed proof remain unbound. Neither LP token is admitted at launch. GREEN/USDG is a bounded pricing venue candidate only, not an LP admission; RIPE/WETH V2 remains only an externally held launch-liquidity canary candidate. LP requirements gate later activation, not the bounded GREEN pricing route."}
   - { id: B-PSM-SEQUENCE, state: "open", implementation_predicate: "not_satisfied", remaining: "PSM runtime, disabled posture, ordered activation, re-verification, and mint activation proof are absent."}
   - { id: B-REWARD-PROMOTION, state: "open", implementation_predicate: "not_satisfied", remaining: "Current source sets RIPE availability to 1,000,000e18 for rewards, 0 for HR, and 1,000,000e18 for bonds; remaining prerequisites are initial global and points checkpoint execution/binding, exact governance and any qualified lite-signer identities, registered RIPE checkpoint-caller identity, emergency-runbook operational acceptance, monitoring owners and alert routes, H-05 deterministic planning, H-06 operator binding, H-08 post-deployment assertions, H-09 fork qualification, testnet rehearsal, and release authorization."}
-  - { id: B-T1-CCIP, state: "open", implementation_predicate: "not_satisfied", remaining: "Historical technical gaps remain recorded, but CCIP is owner-parked and nonblocking for current non-CCIP work until explicitly reopened."}
+  - { id: B-T1-CCIP, state: "open", implementation_predicate: "partially_satisfied", remaining: "Live topology is confirmed. Owner disposition for rate limits and rateLimitAdmin, accepted full OffRamp destination-gas evidence, exact live source/compiler/constructor identity, license and historical-transaction provenance, a reviewed live transaction backend, and any further transaction or release authority remain open."}
   - { id: B-T1-TOOLCHAIN, state: "open", implementation_predicate: "not_satisfied", remaining: "No canonical pinned production Solidity toolchain is approved."}
   - { id: B-H08-PROOF, state: "open", implementation_predicate: "not_satisfied", remaining: "Read-only deployed topology and negative-reachability proof does not exist."}
   - { id: B-H09-RELEASE, state: "open", implementation_predicate: "not_satisfied", remaining: "Clean deployment, reproducibility, adversarial, Base regression, smoke, soak, and release proof do not exist."}
@@ -654,13 +667,13 @@ h03_blockers:
   - { id: B-CURVE-POOL-PRODUCTION-OBSERVATION, state: "open", implementation_predicate: "not_satisfied", remaining: "No production pool observation exists."}
 
 glossary:
-  - { term: CCIP, meaning: "Chainlink Cross-Chain Interoperability Protocol; currently disabled, owner-parked, and nonblocking for current non-CCIP work."}
+  - { term: CCIP, meaning: "Chainlink Cross-Chain Interoperability Protocol; GREEN/RIPE topology is live, while operational policy, destination-gas evidence, exact source/compiler/constructor identity, license and transaction provenance, live-send tooling, further transactions, and release remain gated."}
   - { term: PSM, meaning: "Peg Stability Module for reserve minting and redemption; its parameters and activation are outside the current production candidate and the existing capability remains disabled."}
   - { term: CLI, meaning: "Command-line interface used to select a network and prepare actions; profiles do not authorize live use."}
   - { term: ArbSys at 0x64, meaning: "Robinhood system contract used by the portable Ledger to read child-block identity."}
   - { term: EIP-170, meaning: "Ethereum deployed-contract size limit that constrained the integrated M1 Teller change."}
   - { term: Phase A, meaning: "Evidence and decisions for an exact boundary; it does not authorize implementation unless separately stated."}
-  - { term: Phase B, meaning: "Separately authorized implementation on an exact baseline and file ceiling; H-04 schema v2 and H-05 blocked planning are integrated, while execution remains gated."}
+  - { term: Phase B, meaning: "Separately authorized implementation on an exact baseline and file ceiling; H-04 schema v2 is integrated, the H-05 imperative migration candidate remains under repository review, the former declarative planner is retired, and execution remains gated."}
   - { term: Gate 1, meaning: "Independent review of a completed implementation candidate and its validation evidence."}
   - { term: Gate 2, meaning: "Independent final merge-readiness review of the exact reconciled candidate."}
   - { term: Stage C, meaning: "Post-Gate-1 checked inventory and planning-document reconciliation; it is not implementation validation."}
@@ -945,16 +958,16 @@ workstreams:
     group: Bridge tooling
     plain_language_scope: Convert reviewed thin Solidity examples into pinned production source, artifacts, gas proof, and lifecycle tests.
     why_it_matters: Reference subclasses and local gas measurements cannot authorize a production bridge or mint capability.
-    current_phase: owner-parked; non-production examples remain historical context
-    implementation_state: parked; do not start
-    integration_state: examples only
-    review_state: reference delta reviewed; production package unreviewed
-    owner_decision_state: explicitly parked until owner reopening
-    remaining_blockers: [Historical CCIP gaps remain preserved but are nonblocking for current non-CCIP work.]
-    deployment_release_state: CCIP disabled; no route, registration, or promotion
-    exact_next_action: Take no action until an explicit owner instruction reopens CCIP.
-    authority: Current owner-priority overlay plus integrated historical examples.
-    docs: [{ label: CCIP examples, path: docs/chains/rh/examples/README.md }]
+    current_phase: live topology evidence reconciled; operational hardening open
+    implementation_state: repository 1.5.1 source and focused Foundry tests integrated; exact live source/compiler/constructor binding unproven
+    integration_state: live pools and reciprocal topology confirmed
+    review_state: current-state topology reconciled; repository candidate source exists but exact live creation identity remains unresolved; operational gates open
+    owner_decision_state: rate-limit and rateLimitAdmin disposition required
+    remaining_blockers: [Full real-token OffRamp destination-gas evidence, owner rate-policy disposition, exact live source/compiler/constructor identity, license and legal conclusions, reviewed live transaction backend, further transaction and release authority.]
+    deployment_release_state: existing topology live; no additional transaction or release authorized
+    exact_next_action: Resolve owner policy and accepted gas evidence without inferring defaults or applying live changes.
+    authority: Current CCIP live-state document and bound JSON evidence snapshot.
+    docs: [{ label: CCIP live state, path: docs/chains/rh/ccip-live-state.md }, { label: Historical CCIP examples, path: docs/chains/rh/examples/README.md }]
   - id: M0
     name: Stock launch boundary
     group: Stock containment
@@ -1027,7 +1040,7 @@ workstreams:
     owner_decision_state: bounded proof scope approved; policy work remains parked
     remaining_blockers: [Deployment binding, M5 configuration, H-08/H-09 proof, activation and release.]
     deployment_release_state: proof only; nothing deployed or active
-    exact_next_action: Consume the integrated proof in M5/H-09 without reopening parked settlement, bad-debt, or CCIP work.
+    exact_next_action: Consume the integrated proof in M5/H-09 without reopening parked settlement or bad-debt work and without changing the separately live CCIP topology.
     authority: Integrated M4 composed-route tests and M1-M3 production behavior.
     docs: [{ label: Removed - Track 8 specification, path: docs/simplification/REMOVED.md }]
   - id: M5
@@ -1050,16 +1063,16 @@ workstreams:
     group: Bridge promotion
     plain_language_scope: Provide BurnMint routes only after support, artifact, gas, role, testnet, operations, and promotion evidence closes.
     why_it_matters: A bridge controls direct mint authority and cross-chain supply; examples or recovery paths are insufficient.
-    current_phase: owner-parked; bridge disabled
-    implementation_state: parked; do not start
-    integration_state: reference examples only
-    review_state: reference delta reviewed; production path open
-    owner_decision_state: explicitly parked until owner reopening
-    remaining_blockers: [Historical production gaps remain preserved but are nonblocking for current non-CCIP work.]
-    deployment_release_state: disabled; no route or registration
-    exact_next_action: Take no CCIP action until an explicit owner instruction reopens the workflow.
-    authority: Current owner-priority overlay plus integrated historical CCIP documentation.
-    docs: [{ label: CCIP decision, path: docs/chains/rh/ccip-integration-decision.md }]
+    current_phase: live topology confirmed; operational readiness incomplete
+    implementation_state: token-specific live 1.5.1 pools observed; repository vendored source exists, but exact source/compiler/constructor binding is unproven
+    integration_state: registered, routed, reciprocally wired, governance-owned, and mint-enabled
+    review_state: current topology reconciled; remaining operational evidence explicit
+    owner_decision_state: rate-limit and rateLimitAdmin disposition required
+    remaining_blockers: [Full real-token OffRamp destination-gas evidence, live transaction backend, exact live source/compiler/constructor identity, license and legal conclusions, exact historical setPool/applyChainUpdates provenance if required, further transaction and release authority.]
+    deployment_release_state: existing topology live; no additional transaction or release authorized
+    exact_next_action: Resolve explicit policy and evidence gates; do not infer or apply defaults.
+    authority: CCIP live-state document and 2026-08-11 onchain evidence snapshot.
+    docs: [{ label: CCIP live state, path: docs/chains/rh/ccip-live-state.md }, { label: Historical CCIP decision, path: docs/chains/rh/ccip-integration-decision.md }]
   - id: SecOps
     name: Security operations handoff
     group: Operations
@@ -1114,7 +1127,7 @@ decisions:
   - { id: RH-D005, title: "Stock routes remain unreachable until containment closes", status: "approved_routes_disabled", summary: "M1-M4 proof is integrated; Stock remains disabled through M5, audit, configuration, deployment, and release.", source: "docs/chains/rh/track-8-m0-owner-decision-packet.md"}
   - { id: RH-D006, title: "Exact receipt on every Teller deposit route", status: "implementation_integrated", summary: "M1 exact receipt is integrated but does not activate Stock.", source: "docs/chains/rh/evidence/stock-token-m1-exact-receipt.md"}
   - { id: RH-D007, title: "Chain-native sGREEN, never bridged", status: "approved", summary: "sGREEN is chain-native and never receives a CCIP route.", source: "docs/chains/rh/track-8-m0-owner-decision-packet.md"}
-  - { id: RH-D008, title: "CCIP complete or disabled", status: "approved_disabled_gates_open", summary: "CCIP remains disabled unless every production, support, gas, testnet, operations, and promotion gate closes.", source: "docs/chains/rh/track-8-m0-owner-decision-packet.md"}
+  - { id: RH-D008, title: "CCIP complete or disabled", status: "superseded_by_confirmed_live_state", summary: "The historical disabled posture was overtaken by live activation. Current topology is confirmed; explicit rate policy, destination-gas evidence, exact source/compiler/constructor identity, license and transaction provenance, live-send backend, further transaction authority, and release gates remain open.", source: "docs/chains/rh/ccip-live-state.md"}
   - { id: RH-D009, title: "USDG price path", status: "price_path_approved_activation_gated", summary: "Use the shared official feed path; PSM deployment and activation remain separate gates.", source: "docs/chains/rh/usdg-psm-decision.md"}
   - { id: RH-D010, title: "Lootbox immutable floor", status: "approved_reviewed_integrated", summary: "Base uses 43,200 and Robinhood 7,200 with strict greater-than behavior.", source: "docs/chains/rh/lootbox-floor-implementation-record.md"}
   - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
@@ -1128,12 +1141,12 @@ decisions:
   - { id: RH-D019, title: "Private dashboard is a temporary presentation mirror", status: "approved_temporary", summary: "The private mirror is optional; repository documents remain complete authority and fallback.", source: "docs/chains/rh/decision-register.md", source_availability: "private_handoff"}
   - { id: RH-D024, title: "The dashboard is extracted from the active tree", status: "approved_extraction", summary: "The dashboard application and its workflow are removed from the active tree and recoverable from 610b43f4508e85628a1362532a79d68d71ea902c; this supersedes the RH-D018 placement clause and leaves the RH-D019 publication posture parked.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D020, title: "Consolidated Profile 1 launch and Profile 2 follow-on", status: "approved_superseded_for_curve_topology", summary: "Preserve Ledger, Teller, and separate Stock-specific Guarded architecture. RH-D021 supersedes only the earlier empty-ID-2 and all-Curve-in-Profile-2 boundary; the remaining H-09/H-10 lifecycle separation continues.", source: "docs/chains/rh/reassessment-and-qualification-synthesis.md"}
-  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, configure priorities [1,2], keep USDG Chainlink-only and IDs 4/5 empty, and keep blueprint-selected ID 3 undeployed by the current candidate. Exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and Uniswap. Sixty-five unresolved or unverified bindings keep deployment readiness false.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
+  - { id: RH-D021, title: "Bounded Curve launch pricing", status: "approved_candidate_implementation_blocked_for_deployment", summary: "Select unchanged CurvePrices at PriceDesk ID 2 for GREEN only, configure priorities [1,2], keep USDG Chainlink-only and IDs 4/5 empty, and keep blueprint-selected ID 3 undeployed by the current candidate. Exclude LP admission, additional feeds or consumers, dynamic rates, Teller snapshots, Endaoment stabilization, PSM Curve use, and Uniswap. Sixty-four unresolved or unverified bindings keep deployment readiness false.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D022, title: "RIPE reward launch product decision approved; operations open", status: "approved_product_decision_operationally_blocked", summary: "Current source assigns 1,000,000e18 RIPE to rewards, 0 to HR, and 1,000,000e18 to bonds while retaining the approved rewards configuration. Operational prerequisites remain open, Stock rewards remain disabled, and no lifecycle authority is granted.", source: "docs/chains/rh/rh-production-vyper-remediation.md"}
   - { id: RH-D023, title: "LP launch admission reconsidered independently", status: "qualified_no_protocol_admission", summary: "Fresh per-LP source-path qualification preserves the selected GREEN/USDG launch-pricing pool but excludes its LP token; RIPE/WETH remains external-canary-only, both protocol admissions and all DP-14 leaves remain blocked, and no lifecycle authority is granted.", source: "docs/chains/rh/qualification/lp-launch-admission.md"}
   - { id: RH-D025, title: "Production clock usage is no longer scanned", status: "owner_accepted_coverage_loss", summary: "The block-clock inventory, its checker, and its tests are removed and nothing replaces them. Production block.number and block.timestamp usage, mixed-clock arithmetic, and unclassified Vyper paths are no longer scanned; clock-affecting changes are reviewed on their own merits. Reopen if a clock-related defect reaches a deployment candidate or a second chain with a divergent block clock is added.", source: "docs/chains/rh/decision-register.md"}
-  - { id: RH-D026, title: "CreditEngine carries an exact headroom waiver at 184 bytes", status: "owner_granted_waiver", summary: "Hardening plan section 11.5 requires at least 200 bytes of EIP-170 headroom for a changed deployed contract, with anything lower needing an exact owner waiver. CreditEngine sits at 184 bytes, inherited from rh and not caused by this branch. The waiver is scoped to CreditEngine; every other contract is held to 200. It waives one contract version, pinned by source sha256, immutable-free runtime-template sha256, an exact 24,392-byte deployed size, and the sha256 of the complete deployed runtime at a declared constructor input. Two reviews drove that: a size floor alone let a size-preserving semantic edit keep the waiver, and source+template hashes alone still let a changed constructor immutable through at identical length. Deployment constructor arguments are deliberately not bound. Permitted runtime growth is 0 bytes, not 184. Withdraw when CreditEngine next changes.", source: "docs/chains/rh/decision-register.md"}
-  - { id: RH-D027, title: "Teller carries an exact migration headroom waiver at 51 bytes", status: "owner_granted_waiver", summary: "The 200-byte EIP-170 headroom rule remains controlling. PR #83 leaves Teller at an exact 24,525-byte deployed runtime with 51 bytes of headroom after retaining only the identity-authenticated migration actions Teller must perform. The owner accepted this exact result. The waiver pins Teller source sha256, immutable-free runtime-template sha256 and size, exact deployed size, and complete deployed-runtime sha256 at declared HQ and pause constructor inputs. It permits 0 bytes of growth and reopens on any Teller or compiler-output change; reassess when the transitional legacy route is removed.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D026, title: "CreditEngine exact 184-byte headroom waiver retired", status: "retired_default_floor_restored", summary: "The exact prior-version waiver reopened when CreditEngine changed. The new constructor-bound runtime is 24,367 bytes with 209 bytes of EIP-170 headroom, so its override and pinned waiver identity are removed and the default 200-byte floor applies. No new below-floor waiver was granted.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D027, title: "Teller carries an exact migration and receipt-guard headroom waiver at 71 bytes", status: "owner_granted_waiver", summary: "The 200-byte EIP-170 headroom rule remains controlling. On 11 August 2026 the owner replaced RH-D027's exact artifact for PR #95: Teller retains the receipt-window housekeeping guard and inlines a one-use preferred-StabilityPool lookup, producing an exact 24,505-byte deployed runtime with 71 bytes of headroom. The waiver pins Teller source sha256, immutable-free runtime-template sha256 and size, exact deployed size, and complete deployed-runtime sha256 at declared HQ and pause constructor inputs. It permits 0 bytes of growth and reopens on any Teller or compiler-output change; reassess when the transitional legacy route is removed.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
@@ -1146,7 +1159,7 @@ hard_gates:
   - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero without opening representation, configuration, test, fork, documentation, or size/headroom work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred every Deleverage task rather than authorizing a machine implementation.", state: "parked_nonblocking", effect: "Does not block current non-Deleverage launch preparation; explicit owner reopening is required before any Deleverage work."}
   - { id: G-H05-READINESS, label: "Promote deterministic planning after bindings", plain_language_scope: "Rebuild the integrated deterministic reports only after required bindings exist, preserving typed blocked and non-executable rows.", why_it_matters: "Planning code must not turn missing inputs or reservations into transactions.", state: "open", effect: "Blocks an executable release-candidate plan and later deployment evidence; migration execution remains separately unauthorized."}
   - { id: G-H06-OPS, label: "Qualify intended manifest operator and storage", plain_language_scope: "Repeat exact macOS/APFS qualification for the intended operator, device, filesystem, and runbook.", why_it_matters: "Integrated implementation evidence is not operational publication or release qualification.", state: "open", effect: "Blocks operational publication, deployment evidence, and release."}
-  - { id: G-T1-CCIP, label: "CCIP workflow parked by owner", plain_language_scope: "Preserve historical support, tooling, role, gas, testnet, operations, and promotion gaps without doing new CCIP work.", why_it_matters: "Parking prevents bridge work from consuming or blocking the current non-CCIP program while CCIP remains disabled.", state: "parked_nonblocking", effect: "Does not block current non-CCIP work; CCIP remains disabled until explicitly reopened."}
+  - { id: G-T1-CCIP, label: "CCIP live operational disposition", plain_language_scope: "Preserve the confirmed live topology while the owner selects rate-limit and rateLimitAdmin policy, accepted full OffRamp destination-gas evidence is produced, and exact live identity, license, and transaction provenance gaps are closed or explicitly accepted.", why_it_matters: "Live mint authority and cross-chain routing require explicit operating controls; current state must not be mistaken for policy, source-equivalence, or legal approval.", state: "open", effect: "Blocks an operational-readiness or release claim and any inferred policy, source equivalence, license conclusion, or tooling backend; it does not authorize or apply a live change."}
   - { id: G-SECOPS, label: "Freeze operational authorities and monitoring", plain_language_scope: "Approve signer policy, roles, capability handoff, monitoring, escalation, kill procedures, and operators.", why_it_matters: "Privileged capabilities and incidents require explicit ownership before live handoff.", state: "open", effect: "Blocks testnet, production, activation, and release."}
   - { id: G-TESTNET, label: "Authorize an exact testnet rehearsal", plain_language_scope: "Name the exact plan, network, provider, accounts, funds, roles, commands, evidence, and stops.", why_it_matters: "Testnet mutates external state and cannot be inferred from local validation.", state: "open", effect: "Blocks testnet deployment, configuration, funding, signing, and broadcasts."}
   - { id: G-PROD, label: "Authorize restricted production deployment and release", plain_language_scope: "Approve the exact production plan, authorities, artifacts, configuration, monitoring, activation, and release sequence.", why_it_matters: "Production affects real users and assets and has no implied authority from earlier phases.", state: "open", effect: "Blocks production deployment, migration, registration, role transfer, configuration, activation, and release."}

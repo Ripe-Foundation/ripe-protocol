@@ -420,8 +420,10 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
         ),
         # Required whenever MIGRATION_LIVE is SUPPORTED: the registry refuses to
         # enable live deployment without naming the approved signing backends.
-        # These are the three scripts/migrate.py can select between.
-        live_account_backend_ids=("env-private-key", "ledger", "safe"),
+        # Safe proposal submission is not implemented by scripts/migrate.py;
+        # --safe remains fork-only impersonation and must never be advertised
+        # as a live signer.
+        live_account_backend_ids=("env-private-key", "ledger"),
         operations=_BASE_MAINNET_OPERATIONS,
     ),
     NetworkProfile(

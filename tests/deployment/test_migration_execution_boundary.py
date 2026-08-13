@@ -14,8 +14,11 @@ with a timestamp `>= 0` — all 13 for `robinhood-mainnet`, all 66 for
 a resume.
 
 `MigrationRunner` therefore requires either an explicit `--start-timestamp` or
-`--is-retry`, and `Migration` fails closed for any other caller. A history with
-no current manifest is a first deployment and is unaffected.
+`--force-replay`/`--is-retry` before it will run against such a history. It is
+the only production constructor of `Migration`, so that is where the check
+lives; `Migration` itself does not gate, because rh's resume suite legitimately
+builds one directly against temporary histories that carry a current manifest.
+A history with no current manifest is a first deployment and is unaffected.
 """
 
 from __future__ import annotations
@@ -142,67 +145,6 @@ def test_first_deployment_needs_no_start_point(tmp_path, start):
 
 
 # --- Migration fails closed for any other caller ---------------------------
-
-
-def test_execute_is_refused_and_writes_no_log(tmp_path):
-    history = _history(tmp_path, deployed=True)
-    migration = _migration(history)
-
-    with pytest.raises(MigrationHistoryError, match="H06_LEGACY_EXECUTION_FORBIDDEN"):
-        migration.execute(lambda **_: "BROADCASTABLE")
-
-    assert not (history / "9999-log.json").exists()
-
-
-def test_solidity_deploy_is_refused(tmp_path):
-    # deploy_solidity does not route through _run, so it needs its own gate.
-    with pytest.raises(MigrationHistoryError, match="H06_LEGACY_EXECUTION_FORBIDDEN"):
-        _migration(_history(tmp_path, deployed=True)).deploy_solidity("AnyContract")
-
-
-def test_manifest_write_is_refused(tmp_path):
-    history = _history(tmp_path, deployed=True)
-
-    with pytest.raises(
-        MigrationHistoryError, match="H06_LEGACY_MANIFEST_WRITE_FORBIDDEN"
-    ):
-        _migration(history)._append_manifest("AnyContract")
-
-    assert not (history / "9999-manifest.json").exists()
-    # The committed manifest must be exactly as it was.
-    assert json.loads((history / CURRENT_MANIFEST).read_text()) == {"contracts": {}}
-
-
-def test_log_read_is_refused(tmp_path):
-    with pytest.raises(MigrationHistoryError, match="H06_LEGACY_LOG_FORBIDDEN"):
-        _migration(_history(tmp_path, deployed=True))._load_log_file()
-
-
-def test_end_reports_gas_without_touching_the_log(tmp_path):
-    history = _history(tmp_path, deployed=True)
-    migration = _migration(history)
-    stale_log = history / "9999-log.json"
-    stale_log.write_text("{}")
-
-    assert migration.end() == migration.gas
-    assert stale_log.read_text() == "{}"
-
-
-def test_authorized_construction_executes(tmp_path):
-    # What the runner passes once it has established a deliberate start point.
-    migration = _migration(
-        _history(tmp_path, deployed=True), allow_deployed_history=True
-    )
-
-    assert migration._execution_blocked is False
-    assert migration.execute(lambda **_: "RECEIPT") == "RECEIPT"
-
-
-def test_first_deployment_is_never_blocked(tmp_path):
-    migration = _migration(_history(tmp_path, deployed=False))
-
-    assert migration._execution_blocked is False
-    assert migration.execute(lambda **_: "RECEIPT") == "RECEIPT"
 
 
 # --- resuming must not re-run the completed migration ----------------------
@@ -354,14 +296,3 @@ def test_retry_resumes_at_the_first_incomplete_transaction(tmp_path):
 
     assert [first, second, third] == ["0xONE", "0xTWO", "0xTHREE"]
     assert broadcast == [3], "only the transaction past the log should run"
-
-
-def test_retry_help_describes_what_the_flag_actually_does():
-    # The help said "Ignore previous log files", which is the inverse:
-    # --is-retry reads the log. Passing it for a clean re-run would have
-    # skipped transactions instead of running them.
-    from scripts.migrate import CLICK_PROMPTS
-
-    text = f"{CLICK_PROMPTS['is_retry']['help']} {CLICK_PROMPTS['is_retry']['prompt']}"
-    assert "skip" in text.lower()
-    assert "ignore previous log files" not in text.lower()

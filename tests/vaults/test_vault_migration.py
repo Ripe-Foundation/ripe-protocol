@@ -314,7 +314,7 @@ def test_core_ripe_gov_id_rejected_as_target(
     teller.pause(True, sender=switchboard_alpha.address)
 
     assert mission_control.coreRipeGovVaultId() == CORE_RIPE_GOV_ID
-    with boa.reverts("target is core ripe gov"):
+    with boa.reverts("target is ripe gov"):
         _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, CORE_RIPE_GOV_ID)
 
 
@@ -338,38 +338,37 @@ def test_core_ripe_gov_id_rejected_as_source(
 
     teller.pause(True, sender=switchboard_alpha.address)
     assert mission_control.coreRipeGovVaultId() == CORE_RIPE_GOV_ID
-    with boa.reverts("source is core ripe gov"):
+    with boa.reverts("source is ripe gov"):
         _migrate(teller, switchboard_echo, bob, alpha_token, CORE_RIPE_GOV_ID, target_id)
 
 
-def test_core_pointer_rotation_moves_the_exclusion_boundary(
+def test_core_pointer_rotation_preserves_the_historical_exclusion_boundary(
     teller, simple_erc20_vault, ripe_gov_vault, target_simple_vault, alpha_token,
     alpha_token_whale, bob, setGeneralConfig, setAssetConfig, switchboard_alpha,
     switchboard_echo, mission_control,
 ):
-    """The rule is a current-pointer rule: rotating the pointer moves which id is excluded."""
+    """Every current or historical core RipeGov stays out of the generic path."""
     _, target_id = target_simple_vault
     setGeneralConfig()
     setAssetConfig(alpha_token, _vaultIds=[SIMPLE_VAULT_ID, target_id, CORE_RIPE_GOV_ID])
     _seed_position(teller, simple_erc20_vault, alpha_token, alpha_token_whale, bob)
     teller.pause(True, sender=switchboard_alpha.address)
 
-    # before rotation, id 2 is excluded by the pointer rule
-    with boa.reverts("target is core ripe gov"):
+    # before rotation, id 2 is classified as RipeGov
+    with boa.reverts("target is ripe gov"):
         _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, CORE_RIPE_GOV_ID)
 
     mission_control.setCoreRipeGovVaultId(target_id, sender=switchboard_alpha.address)
     assert mission_control.coreRipeGovVaultId() == target_id
 
     # the NEW core id is rejected immediately
-    with boa.reverts("target is core ripe gov"):
+    with boa.reverts("target is ripe gov"):
         _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, target_id)
 
-    # the PREVIOUS id is no longer rejected by the pointer rule. Pausing it makes the new
-    # failure reason deterministic and proves the pointer check is no longer what stops it.
-    # This is the documented boundary: the rule never claimed to identify RipeGov bytecode.
+    # The previous core id remains classified even after rotation. Classification
+    # runs before endpoint pause checks, so it is the deterministic rejection.
     ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("target vault paused"):
+    with boa.reverts("target is ripe gov"):
         _migrate(teller, switchboard_echo, bob, alpha_token, SIMPLE_VAULT_ID, CORE_RIPE_GOV_ID)
 
 

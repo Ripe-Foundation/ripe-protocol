@@ -90,19 +90,21 @@ are the two human-edited value authorities. The
 [`robinhood-parameters.json`](../../../../config/robinhood-parameters.json)
 ledger is derived evidence, not a third value authority.
 
-## Non-admitted Uniswap V2 candidate
+## Monitoring-only Uniswap V2 component
 
 [`contracts/priceSources/UniswapV2Prices.vy`](../../../../contracts/priceSources/UniswapV2Prices.vy)
-replaces the deleted cumulative-price research prototype on this branch. It is
-not an admitted production price source:
+replaces the deleted cumulative-price research prototype. The owner approved
+deployment for direct monitoring, not oracle admission. The replacement has
+no local governance, timelock, configuration, or snapshot state.
 
-| Rationale | Git blob | SHA-256 | Source bytes | Current disposition |
-| --- | --- | --- | ---: | --- |
-| [`uniswap-v2-prices.md`](uniswap-v2-prices.md) | `866cc922d44fa44ef0fe8f3c3d8fcd745d72a1b4` | `5f783d681b919a1f42b266ac3bef881c90c0083b389b941652cdeebaaa2a5699` | 15,636 | Aero-derived candidate with the standard UndyVault/BlueChipYield configuration lifecycle; spot-reserve manipulation, approved-pair provenance, and liquidity floor remain unresolved; unregistered, unconfigured, non-admitted, undeployed, and unavailable for protocol accounting |
-
-No launch Uniswap oracle authority was approved. The source and its tests do
-not authorize a migration, PriceDesk registration, configuration, deployment,
-or activation.
+The standard PriceSource entrypoints remain callable but are permanently
+inert. They return no price or feed, even if the component is accidentally
+registered. Only explicitly named RIPE/WETH monitoring views expose the
+accepted spot-reserve manipulation and liquidity limitations documented in
+[`uniswap-v2-prices.md`](uniswap-v2-prices.md). Deployment does not authorize
+PriceDesk registration, collateral valuation, LP admission, or any other
+value-bearing consumer. Exact source and artifact identities are generated
+from the final integrated bytes, not copied from the superseded candidate row.
 
 ## Historical/shared-source rationale inventory
 
@@ -127,8 +129,8 @@ These are the authoritative values in
 
 | Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
-| AuctionHouse | 24,460 | 116 | 24,556 | 20 | `4890eee8c2d3b92b4142fa05738936e79bfcd7e00e5d15c7f578aaeb4570baaf` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
-| CreditEngine | 24,296 | 280 | 24,392 | 184 | `e75de103fc42b14907ddc409e55cc1366a82c6c8f9cf0719dd3dbe197610b943` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
+| AuctionHouse | 23,767 | 809 | 23,863 | 713 | `6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa` | `4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387` |
+| CreditEngine | 24,271 | 305 | 24,367 | 209 | `ad40bde63aee7e41933c2cbe6012de9940791a4f28a85328b8accdf3dabf635e` | `1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24` |
 | DefaultsRobinhood | 2,474 | 22,102 | 2,698 | 21,878 | `b424af2dc57a90b7332aab302df9acfbb716f91e6a11f31446ea109f3ac075c9` | `6878e6b5bd5b34906a96ac60e03df7db322dc01d546de6385ec6a70fc9fae1a2` |
 | Deleverage | 24,473 | 103 | 24,569 | 7 | `baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57` | `61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752` |
 | Ledger | 13,264 | 11,312 | 13,392 | 11,184 | `fe65aaa826003b14518824bf6219b33cde311db63687a9b9c23baf7fb4708380` | `0a10ba343608af86094ef62417285e32e3abe6a976bdf63590706310e9771f34` |
@@ -140,7 +142,7 @@ These are the authoritative values in
 | SwitchboardBravo | 22,922 | 1,654 | 23,082 | 1,494 | `d7af2f3f3adf8ddc1088f19bc7295e07b058eee18420eb6f227ce4912c1da65f` | `8a30c7b4483192513051c1162f235d02549e708aab4173d79597609ffab39202` |
 | SwitchboardDelta | 23,102 | 1,474 | 23,262 | 1,314 | `77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61` | `6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f` |
 | Teller | 24,151 | 425 | 24,247 | 329 | `21d15c2b77d9f513cb8a0957daa42910150ba5661883913ea8bbf4a9ec6343d1` | `9cca03351cd8ead87160401be263732376fb4ab7d4913b0d59ce6ad271e4dabb` |
-| UniswapV2Prices | 13,866 | 10,710 | 14,122 | 10,454 | `8a54a6b8ac9c746a43e59a06d10dcf4a7454996a0adaa1b8be3021c31a207a88` | `e38fc81f7af8c64219e6b7484d458a68756fd8cb771ca434509b7fbe00fc423b` |
+| UniswapV2Prices | 3,621 | 20,955 | 3,781 | 20,795 | `88cbf9a963bf38bfcf83ea95317356bf44e50052973748968e1f8bf34574910f` | `787994c73fa92e072833734f3c079215eace4bc7159305bcd059989b62deef6f` |
 
 Runtime templates with constructor-bound immutables are compiler artifacts,
 not final deployed-runtime identities.
@@ -249,8 +251,9 @@ built were extracted from the active tree; both remain recoverable from
 - [`ccip-burn-mint-token-pools.md`](ccip-burn-mint-token-pools.md) — changed
   GREEN/RIPE thin-Solidity reference subclasses and their production-package
   boundary;
-- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — tested, non-admitted
-  Uniswap V2 spot/snapshot candidate and its unresolved readiness boundary;
+- [`uniswap-v2-prices.md`](uniswap-v2-prices.md) — RIPE/WETH-only stateless
+  monitoring component and its prohibited value-bearing
+  admission boundary;
 - [`deleverage.md`](deleverage.md) — historical/shared full-payoff and dust
   rationale;
 - [`auction-house.md`](auction-house.md) — historical/shared safe conversion,
@@ -279,9 +282,11 @@ and source-level Defaults values are not onchain configuration.
 At this exact baseline, the AAPL launch-input authority, qualified non-admission
 of launch LP tokens, owner-approved reward product packet, bounded Curve launch
 topology, deterministic Robinhood migration sources, and transaction executor
-are integrated repository facts. Their unresolved bindings keep the deployment
-plan non-executable; there is no migration history, execution, deployment,
-onchain configuration, registration, activation, or release.
+are integrated repository facts. Those facts alone do not prove any later
+lifecycle state, and unresolved bindings keep the remaining deployment plan
+non-executable. The separately owner-confirmed Uniswap monitoring deployment
+is an explicit exception; it does not establish PriceDesk registration,
+value-bearing activation, or release.
 
 The shared `Erc20Token.getCCIPAdmin()` hook is also integrated. It does not
 establish CCIP registration, pools, remotes, rate limits, or mint/burn

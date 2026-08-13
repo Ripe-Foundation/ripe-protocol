@@ -175,6 +175,234 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     assert ledger.userDebt(bob).inLiquidation
 
 
+def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_without_auction(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    savings_green,
+    whale,
+    mock_price_source,
+    simple_erc20_vault,
+    teller,
+    credit_engine,
+    stability_pool,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    bob,
+    sally,
+):
+    """An unhealthy remainder stays frozen but retryable when no auction exists."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[simple_id],
+        _debtTerms=terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, savings_green)], sender=switchboard_alpha.address
+    )
+
+    alpha_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, alpha_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, alpha_amount, sender=bob)
+    teller.deposit(
+        alpha_token, alpha_amount, bob, simple_erc20_vault, sender=bob
+    )
+
+    bravo_amount = 200 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(bob, bravo_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller, bravo_amount, sender=bob)
+    teller.deposit(
+        bravo_token, bravo_amount, bob, simple_erc20_vault, sender=bob
+    )
+
+    pool_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_amount, sender=whale)
+    green_token.approve(savings_green, pool_amount, sender=sally)
+    pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green, pool_shares, sally, stability_pool, sender=sally
+    )
+
+    max_debt = credit_engine.getUserBorrowTerms(bob, True).totalMaxDebt
+    teller.borrow(max_debt, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 25 * EIGHTEEN_DECIMALS // 100)
+
+    # A one-unit aggregate deficit makes the full nominal bravo position
+    # unusable. The healthy alpha position is still consumed by the pool.
+    bravo_token.burn(1, sender=simple_erc20_vault.address)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
+    assert not ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    assert not ledger.hasFungibleAuctions(bob)
+    assert ledger.userDebt(bob).inLiquidation
+    assert credit_engine.canLiquidateUser(bob)
+
+    # Repairing bravo custody restores the same position. A second liquidation
+    # must now run and create its auction instead of treating the account-wide
+    # freeze as proof that an auction is already handling the user.
+    bravo_token.transfer(simple_erc20_vault, 1, sender=bravo_token_whale)
+    assert credit_engine.canLiquidateUser(bob)
+    # Titanoboa retains EIP-1153 values between simulated top-level calls;
+    # production EVMs clear the liquidation caches before this transaction.
+    boa.env.evm.vm.state.clear_transient_storage()
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    # Boa exposes logs from the latest top-level computation, not cumulative
+    # transaction history. This is the repaired position's liquidation event.
+    liquidation_logs = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation_logs) == 1
+    assert liquidation_logs[0].user == bob
+    assert (
+        credit_engine.getUserDebtAmount(bob) < debt_before
+        or ledger.hasFungibleAuction(bob, simple_id, bravo_token)
+    )
+
+
+def test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    governance,
+    alpha_token,
+    green_token,
+    savings_green,
+    whale,
+    mock_price_source,
+    rebase_erc20_vault,
+    stability_pool,
+    teller,
+    credit_engine,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+    vault_book,
+    bob,
+    sally,
+):
+    """Prior pool surplus cannot subsidize a short current liquidation leg."""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        0,
+        name="short_liquidation_receipt_token",
+    )
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        fee_token,
+        _vaultIds=[rebase_id],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityStabVaults(
+        [(stab_id, savings_green)], sender=switchboard_alpha.address
+    )
+
+    pool_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_amount, sender=whale)
+    green_token.approve(savings_green, pool_amount, sender=sally)
+    pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green, pool_shares, sally, stability_pool, sender=sally
+    )
+
+    collateral = 100 * EIGHTEEN_DECIMALS
+    fee_token.transfer(bob, collateral, sender=governance.address)
+    fee_token.approve(teller, collateral, sender=bob)
+    teller.deposit(
+        fee_token, collateral, bob, rebase_erc20_vault, sender=bob
+    )
+    teller.borrow(40 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(fee_token, 40 * EIGHTEEN_DECIMALS // 100)
+
+    donation = 5 * EIGHTEEN_DECIMALS
+    fee_token.transfer(stability_pool, donation, sender=governance.address)
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    before = (
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(stability_pool),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        stability_pool.totalClaimableBalances(fee_token),
+        credit_engine.getUserDebtAmount(bob),
+        ledger.userDebt(bob).inLiquidation,
+    )
+
+    with boa.reverts():
+        teller.liquidateUser(bob, False, sender=sally)
+
+    assert (
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(stability_pool),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        stability_pool.totalClaimableBalances(fee_token),
+        credit_engine.getUserDebtAmount(bob),
+        ledger.userDebt(bob).inLiquidation,
+    ) == before
+
+
 def test_ah_liquidation_with_stab_pool_both_assets_debug(
     setupStabAssetConfig,
     setAssetConfig,

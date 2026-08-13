@@ -1,10 +1,9 @@
 """Deploy the CCIP burn/mint pools for RIPE and GREEN.
 
-One contract per token. The mint capability is compiled in as a `pure` view
-rather than taken as a constructor argument, so a pool cannot be deployed
-claiming to be for a token it is not -- the capability is a property of the
-bytecode, visible in the verified source, and there are no flags to pass in
-the wrong order.
+One contract per capability. The mint capability is compiled in as a `pure`
+view, so GREEN/RIPE flags cannot be passed in the wrong order. The inherited
+constructor still accepts a token address; the deployment arguments and the
+post-deployment getToken() assertion below bind the intended token.
 
 Deployment only. The pools are inert until two things happen, both of them
 Safe transactions: RipeHq grants mint rights, and the TokenAdminRegistry
@@ -17,7 +16,7 @@ every mint. These are that same pool plus those two answers.
 """
 
 from config.Ccip import CCIP
-from scripts.utils import log, solidity
+from scripts.utils import ccip, log, solidity
 from scripts.utils.migration import Migration
 
 SOURCE_FILE = "RipeCcipBurnMintTokenPools.sol"
@@ -39,6 +38,8 @@ def migrate(migration: Migration):
     green_token = migration.get_address("GreenToken")
 
     log.h1("Deploying the RIPE pool")
+    ccip.require_activation_policy(migration, "RIPE")
+    ccip.require_activation_policy(migration, "GREEN")
 
     ripe_args = (
         ripe_token,

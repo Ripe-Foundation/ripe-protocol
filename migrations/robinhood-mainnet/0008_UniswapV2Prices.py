@@ -1,11 +1,17 @@
+"""Replay-safe deployment shape for the RIPE/WETH monitoring contract.
+
+Editing this historical module does not prove or mutate the current on-chain
+instance. The stripped monitor has no local governance, timelock, snapshot, or
+price-feed state. A deployment must bind the exact RIPE/WETH pair and the four
+constructor identities before it can replace an older monitoring instance.
+"""
+
 from scripts.utils import log
 from scripts.utils.migration import Migration
 
 from config.robinhood_launch import (
-    PRICE_CHANGE_MAX_TIMELOCK,
-    PRICE_CHANGE_MIN_TIMELOCK,
-    ZERO_ADDRESS,
     RIPE_WETH_POOL,
+    address,
 )
 
 
@@ -15,17 +21,19 @@ def migrate(migration: Migration):
 
     log.h1("Deploying UniswapV2Prices")
 
-    # Unlike every other Robinhood contract, this one takes the deployer as
-    # tempGov instead of ZERO_ADDRESS. Governance has already moved to the
-    # Safe, so a contract with no local governance could not have its snapshot
-    # config set without a Safe transaction. The deployer holds local gov only
-    # long enough to configure the feed, then gives it up below.
-    migration.deploy(
+    # The source implements PriceSource only as an inert compatibility shell.
+    # Its only functional methods are explicitly named RIPE monitoring views.
+    uniswap = migration.deploy(
         "UniswapV2Prices",
         hq,
-        ZERO_ADDRESS,
         RIPE_WETH_POOL,
         ripe_token,
-        PRICE_CHANGE_MIN_TIMELOCK,
-        PRICE_CHANGE_MAX_TIMELOCK,
+        address("WETH"),
     )
+
+    assert uniswap.isMonitoringOnly()
+    assert uniswap.RIPE_HQ() == hq.address
+    assert uniswap.RIPE_WETH_POOL() == RIPE_WETH_POOL
+    assert uniswap.RIPE_TOKEN() == ripe_token.address
+    assert uniswap.WETH_TOKEN() == address("WETH")
+    assert uniswap.getPriceAndHasFeed(ripe_token.address) == (0, False)

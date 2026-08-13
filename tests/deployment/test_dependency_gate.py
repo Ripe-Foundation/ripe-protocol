@@ -153,6 +153,10 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/console.py"),
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
+    # Test-only Click consumers exercise the approved CLI surfaces. The
+    # reachability scanner still rejects Click's editor API in every file.
+    Path("tests/deployment/test_secret_handling.py"),
+    Path("tests/test_ccip_hardening.py"),
 }
 CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
     Path("migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py"),
@@ -160,6 +164,8 @@ CURRENT_SUPPORTED_WEB3_IMPORT_PATHS = {
     Path("migrations/robinhood-mainnet/0001_Registries.py"),
     Path("migrations/robinhood-mainnet/0009_RedeployStaleContracts.py"),
     Path("migrations/robinhood-mainnet/0010_RedeployLedger.py"),
+    Path("migrations/robinhood-mainnet/0011_BlueChipYieldPricesCandidate.py"),
+    Path("migrations/robinhood-mainnet/0013_VaultMigratorCandidate.py"),
     Path("migrations/robinhood-mainnet/2026080701_CcipWire.py"),
     Path("scripts/ledger_signing_smoke.py"),
     Path("scripts/prepare_defaults.py"),

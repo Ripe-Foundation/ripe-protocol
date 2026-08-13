@@ -92,7 +92,7 @@ def robinhood_curve_launch_route(
             )
 
         priority_action = switchboard_alpha.setPriorityPriceSourceIds(
-            [1, 3], sender=governance.address
+            [1, 2], sender=governance.address
         )
         boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
         assert switchboard_alpha.executePendingAction(
@@ -126,7 +126,7 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
     assert route.price_desk.getAddr(1) == route.chainlink.address
     assert route.price_desk.getAddr(2) == route.curve.address
     assert route.price_desk.getAddr(3) != ZERO_ADDRESS
-    assert tuple(mission_control.getPriceConfig().priorityPriceSourceIds) == (1, 3)
+    assert tuple(mission_control.getPriceConfig().priorityPriceSourceIds) == (1, 2)
 
     config = route.curve.curveConfig(route.green)
     assert config.pool == route.curve_system.address

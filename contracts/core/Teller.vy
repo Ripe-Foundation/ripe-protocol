@@ -680,7 +680,8 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    vaultId: uint256 = self._getPreferredStabVaultId(a.missionControl)
+    vaultId: uint256 = staticcall MissionControl(a.missionControl).preferredStabVaultId()
+    assert vaultId != 0 # dev: invalid vault id
     return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), vaultId, msg.sender, 0, False, True, True, a)
 
 
@@ -976,14 +977,6 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     return vaultId
 
 
-@view
-@internal
-def _getPreferredStabVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
-
-
 # housekeeping
 
 
@@ -1006,6 +999,8 @@ def _performHousekeeping(
     _shouldUpdateDebt: bool,
     _a: addys.Addys,
 ):
+    assert not self.receiptMeasurementActive # dev: receipt window active
+
     # one action per block
     shouldCheckLastTouch: bool = False
     if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():

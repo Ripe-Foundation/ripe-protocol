@@ -7,8 +7,8 @@ ONE_YEAR = 60 * 60 * 24 * 365 # seconds
 ONE_DAY_IN_SECS = 60 * 60 * 24 # seconds
 
 # RipeHQ ids reserved across Base and Robinhood deployments.
-GREEN_CCIP_POOL_HQ_ID = 23
-RIPE_CCIP_POOL_HQ_ID = 24
+RIPE_CCIP_POOL_HQ_ID = 23
+GREEN_CCIP_POOL_HQ_ID = 24
 VAULT_MIGRATOR_HQ_ID = 25
 
 # curve pool types

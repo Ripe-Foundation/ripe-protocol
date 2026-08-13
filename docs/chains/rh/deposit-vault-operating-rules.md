@@ -1,15 +1,32 @@
 # Deposit-Vault Operating Rules — RH
 
-**Scope:** the operating conditions that the deposit-vault hardening review left as
-*accepted residual risk* rather than contract changes. Each rule below is the thing
-that makes an acceptance safe. If a rule is broken, the corresponding risk becomes
-live in production.
+**Scope:** the contract-enforced invariants and remaining operating conditions from
+the deposit-vault hardening review. A rule marked operational is still required even
+where the candidate adds defense in depth; a rule marked enforced is pinned directly
+by production code and tests.
 
 This runbook documents operational procedure only. It authorizes no production
 transaction.
 
 Evidence and measurements: [`deposit-vault-hardening-wp0-evidence.md`](deposit-vault-hardening-wp0-evidence.md).
 Findings are referenced by their DV identifier from that record.
+
+> **PR #67 remediation candidate (11 August 2026).** The isolated candidate now
+> enforces DV-04, DV-07, DV-08, DV-09, DV-10, and DV-13 in contracts:
+> AuctionHouse and CreditRedeem reject same-user collateral movement before a
+> vault transfer is attempted; Teller
+> blocks every housekeeping route during custody receipt measurement; zero asset weight now
+> earns zero governance points; AuctionHouse measures each
+> Stability Pool receipt across the collateral transfer; active-claim NAV fails
+> closed if aggregate custody is deficient or any active claim is unpriced; and
+> StabilityPool verifies exact recipient delivery before a withdrawal or claim
+> can commit. Claim custody cannot be reclassified as stability backing.
+> Exact-transfer/non-rebasing admission remains defense in depth, while the Teller
+> callback-free token admission remains defense in depth. Dormant claim dust
+> retains the explicit pre-exit operating disposition stated below.
+> DV-05 is reclassified as intentional contributor policy: the separately
+> governed `depositLockDuration` is honored on the final owner transfer rather
+> than being rebound to general RipeGov deposit bounds.
 
 > **Not covered here.** DV-01/02/03 (RipeGov privileged-caller breadth) was remediated
 > in code — `depositTokensWithLockDuration`, `adjustLock` and `releaseLock` are now
@@ -19,14 +36,14 @@ Findings are referenced by their DV identifier from that record.
 
 ## 0. The rules at a glance
 
-| # | Decision point | Rule | Mitigates |
-|---|---|---|---|
-| 1 | Admitting any asset that can reach the Stability Pool | exact-transfer, non-rebasing, callback-free only | DV-08, DV-09, DV-10, DV-13 |
-| 2 | Deploying a `Contributor` | `depositLockDuration` inside `[minLockDuration, maxLockDuration]` | DV-05 |
-| 3 | Configuring a RipeGov vault asset | never set `assetWeight = 0` | DV-07 |
-| 4 | Pausing RipeGov | pause Teller in the same operation | DV-06 |
-| 5 | Registering a price source | it must never revert | DV-14 |
-| 6 | Changing AuctionHouse / CreditEngine seizure logic | never emit a same-address `transferBalanceWithinVault` | DV-04 |
+| # | Decision point | Rule | Status | Mitigates |
+|---|---|---|---|---|
+| 1 | Admitting any asset that can reach the Stability Pool | exact-transfer, non-rebasing, callback-free only | operational defense in depth | DV-08, DV-09, DV-10, DV-13 |
+| 2 | Deploying a `Contributor` | select and record the contributor-specific `depositLockDuration`; the final transfer honors it exactly | governed HR policy; contract-enforced | DV-05 reclassified |
+| 3 | Configuring a RipeGov vault asset | zero weight earns zero points | enforced | DV-07 |
+| 4 | Pausing RipeGov | pause Teller in the same operation | operational | DV-06 |
+| 5 | Registering a price source | it must never revert | operational | DV-14 |
+| 6 | Changing AuctionHouse / CreditRedeem collateral routing | reject recipient-equals-user before calling a vault transfer | enforced at callers | DV-04 |
 
 Rule 1 carries four findings on its own. It is the single most important item in
 this document.
@@ -51,30 +68,31 @@ any asset admitted as a stability asset. In practice: every asset you call
 
 **Why each one matters.**
 
-*Fee-on-transfer, inbound.* `StabVault._addClaimableBalance` validates a settlement
-receipt against the **aggregate** free surplus (`custody − totalClaimableBalances`),
-not against a delta measured across the transaction. If anyone has donated `D` of the
-token to the pool beforehand, a liquidation that declares `Q` while delivering `Q − D`
-still passes the check. The donation is silently consumed and the pool books a
-liability it cannot cover. Without a donation the guard fires correctly — the donation
-is what defeats it (DV-08).
+*Fee-on-transfer, inbound.* `StabVault._addClaimableBalance` retains an aggregate
+custody check, but the only production liquidation caller is AuctionHouse. It now
+measures the Stability Pool's claim-token balance immediately before and after the
+collateral transfer and requires an exact `Q` delta before it reports `Q` to the pool.
+A donation can still mask a short receipt only in a unit test that directly
+impersonates AuctionHouse and bypasses that canonical transfer path; the production
+composition reverts atomically (DV-08).
 
-*Fee-on-transfer, outbound.* A claim burns the user's shares and clears the recorded
-liability for the full amount, while `_handleAssetForUser` transfers out and never
-measures what the recipient actually received. The difference is lost by the claimer
+*Fee-on-transfer, outbound.* Withdrawal, claim, and non-auto-deposit redemption now
+measure the recipient balance delta and require exact delivery before shares or
+liability changes can commit. A fee/burn/skim therefore rolls the transaction back
 (DV-13).
 
-*Rebase or burn.* Recorded liability stays fixed while custody shrinks. Only the
-*activation* paths assert `custody >= priorLiability`; NAV, deposit and withdrawal do
-not. The pool keeps valuing collateral that no longer exists and keeps accepting
-deposits and withdrawals against that inflated number, socializing the shortfall
-across every depositor in that stability asset (DV-09).
+*Rebase or burn.* Every backing/NAV/withdrawal/liquidation-spend path now subtracts
+aggregate claim liability from custody and fails closed when custody is below that
+liability. A claim token cannot be admitted as a stability asset while any aggregate
+claim liability exists, and a new claim cannot use an already-registered stability
+asset. A deficit can no longer be valued or spent as if it were real backing (DV-09).
 
 *Transfer callbacks.* While `Teller._deposit` measures the destination's custody
-before and after a transfer, the mutex it sets is only read inside `_deposit` itself,
-and `depositFromTrusted` / `depositIntoGovVault` are not `@nonreentrant`. A callback
-fired mid-transfer can complete a nested withdrawal or liquidation against a different
-vault and invalidate the measurement (DV-10).
+before and after a transfer, `Teller._performHousekeeping` now rejects every nested
+custody-changing route while that receipt window is active. A callback cannot complete
+a withdrawal, rebalance, redemption, liquidation, claim, deleverage, or nested deposit
+inside the measurement. Callback-free admission remains required as defense in depth
+for token-specific behavior outside the pinned route matrix (DV-10).
 
 **The check, before calling `setAssetConfig`.**
 
@@ -89,54 +107,63 @@ vault and invalidate the measurement (DV-10).
 - [ ] Record the decision and the reviewed implementation address in the asset's
       config change notes.
 
-**If a non-conforming asset must be admitted anyway,** the four accepted risks above
-become live simultaneously. Reopen RH-CHANGE-01 first. Note the measured constraint:
-StabilityPool has **205 bytes** of EIP-170 headroom, the preferred pull-and-measure
-fix needs **+295**, and the custody-deficit and exact-delivery guards need **+78** and
-**+151** — so at most one of them fits today, and the preferred one does not fit at
-all. A size reduction has to come first.
+**If a non-conforming asset must be admitted anyway,** the code now rejects the known
+short-receipt, custody-deficit, claim/backing-overlap, and claim/withdrawal/direct-
+redemption short-delivery cases. The non-GREEN stability-asset liquidation-proceeds
+transfer still relies on exact-transfer admission. These checks are not a general
+token-behavior proof: admission must still be reopened for token-specific callbacks,
+upgrades, balance semantics, and any path outside the exact checks above.
 
 ---
 
-## 2. Contributor deployment — keep `depositLockDuration` in bounds
+## 2. Contributor deployment — preserve the contributor-specific lock term
 
-**The rule.** Every deployed `Contributor` must carry a `depositLockDuration` inside
-the RipeGov asset's `[minLockDuration, maxLockDuration]`.
+**The rule.** Treat `depositLockDuration` as an explicit term of the Contributor
+agreement, denominated in blocks. Do not derive or silently rewrite it from the
+general RipeGov asset bounds.
 
-**Why.** `RipeGov.transferContributorRipeTokens` forwards the configured duration
-straight into `_getWeightedLockOnTokenDeposit` **without clamping it**. On a recipient
-with no prior position the resulting unlock is exactly `block.number + duration` — so
-a duration of 0 leaves the position immediately withdrawable, and a duration above the
-maximum sticks. On a recipient who already holds a locked position, a large contributor
-payout with a short duration drags their existing unlock down, and the result can land
-**below** `minLockDuration` (DV-05).
+**Enforced behavior.** During vesting, `cashRipeCheck` deposits RIPE into the
+Contributor's RipeGov position through Teller, so that ordinary deposit is still
+clamped to current general RipeGov bounds. The position cannot be transferred to the
+owner until the Contributor's separately configured timestamp `unlockTime` and the
+block-based transfer confirmation delay have elapsed. At final transfer,
+`RipeGov.transferContributorRipeTokens` passes the stored `depositLockDuration`
+unchanged into the normal weighted-lock calculation. It does not substitute the
+recipient's existing lock or rebind the Contributor agreement to current general
+deposit terms.
+
+This means a configured Contributor duration may be below or above the current
+general min/max, and a large short-duration contributor transfer may reduce an
+existing recipient position's weighted unlock. That is the intended consequence of
+combining positions under the repository's weighted-lock model, not a bypass of the
+Contributor's vesting contract. DV-05 is therefore closed as a design clarification,
+not as a hardening invariant.
 
 **The check, at Contributor deployment.**
 
-- [ ] Read the current terms: `MissionControl.ripeGovVaultConfig(ripeToken).lockTerms`.
-- [ ] Assert `minLockDuration <= depositLockDuration <= maxLockDuration`.
-- [ ] Re-check every existing Contributor whenever those governance bounds change —
-      a bounds change can put an already-deployed Contributor out of range.
+- [ ] Record the exact `depositLockDuration` and that its unit is blocks, while
+      vesting/cliff/unlock terms are timestamp seconds.
+- [ ] Confirm the agreement intentionally accepts the resulting final-owner lock and
+      weighted merge with any existing owner position.
+- [ ] Do not treat later RipeGov min/max changes as amendments to this stored term.
 
 ---
 
-## 3. RipeGov asset config — never set `assetWeight = 0`
+## 3. RipeGov asset config — zero weight is enforced
 
-**The rule.** `assetWeight` must be nonzero on every asset configured for the RipeGov
-vault.
+**Current behavior.** `assetWeight = 0` earns zero new governance points. No special
+operating prohibition is needed for correctness.
 
-**Why.** `RipeGov._getLatestGovPoints` guards the multiplier with `if _weight != 0`,
-so a configured zero **skips the multiplication entirely** and produces the full
-unweighted points — identical to 100.00%, the exact opposite of the intent (DV-07).
+**Why.** The candidate applies `newPoints * assetWeight / HUNDRED_PERCENT`
+unconditionally. The former zero-weight bypass, which accidentally produced full
+unweighted points, is removed (DV-07).
 
 **Current state.** `DefaultsRobinhood` sets RIPE to `100_00`, so the launch
 configuration is unaffected. This rule is about future governance actions.
 
-**The check, before `setRipeGovVaultConfig`.**
-
-- [ ] Assert `_assetWeight != 0`.
-- [ ] To give an asset no governance weight, do **not** use zero. Remove the asset
-      from the vault, or use the smallest meaningful nonzero weight and record why.
+**The check, before `setRipeGovVaultConfig`.** Record whether a zero weight is
+intentional, because it stops future accrual for that asset; code and tests now make
+that meaning exact.
 
 ---
 
@@ -184,10 +211,10 @@ prune (DV-14).
 This is broader than the deposit vaults. It is a protocol-wide liveness property of
 the price layer.
 
-**Note on the accepted price policy.** SP-PRICE-01 option A says an unpriceable claim
-asset is skipped from NAV while deposits and withdrawals stay live. That holds for a
-**zero price** and for an **absent feed**. It does **not** hold for a source that
-reverts — the whole vault stops. Do not treat the three cases as equivalent.
+**Current candidate price policy.** Any nonzero active claim liability is part of its
+cohort's NAV until settled. A zero price, absent feed, or reverting source therefore
+fails NAV-dependent share movement closed. Price restoration resumes operation
+without changing claim registration, liabilities, or historical shares.
 
 **The check, before registering a price source.**
 
@@ -200,108 +227,85 @@ reverts — the whole vault stops. Do not treat the three cases as equivalent.
 
 ---
 
-## 6. AuctionHouse / CreditEngine — never emit a same-address vault transfer
+## 6. AuctionHouse / CreditRedeem — never emit a same-address vault transfer
 
-**The rule.** Collateral-seizure logic must never call
-`Vault.transferBalanceWithinVault` with `_fromUser == _toUser`.
-
-**Why.** `RipeGov.transferBalanceWithinVault` has no owner-equals-recipient
-short-circuit. A same-address move runs the full withdrawal-then-deposit governance
-bookkeeping against one user: it burns the proportional point penalty and re-weights
-the unlock toward `minLockDuration`. A **full** same-address transfer destroys the
-user's entire point balance, because the withdrawal side reduces all points and the
-caller passes `_shouldTransferPoints = False`, so nothing is credited back (DV-04).
-
-**Current state.** Neither production caller produces this today. It is a latent
-condition preserved by the callers, not by the vault.
+**Enforced behavior.** AuctionHouse rejects an auction purchase when the buyer
+recipient equals the liquidated user. CreditRedeem likewise rejects a
+redemption recipient equal to the user whose collateral would move. These
+checks run before AuctionHouse or CreditEngine can call
+`transferBalanceWithinVault`. RipeGov does not duplicate this routing policy.
 
 **The check, when changing seizure or liquidation routing.**
 
-- [ ] Confirm the liquidated user and the recipient can never be the same address on
-      any path, including self-liquidation and any keeper-as-recipient flow.
-- [ ] Zero-amount same-address transfers already fail closed
-      (`no withdrawal amount`) — that corner is safe and is covered by
-      `test_gov_same_user_zero_amount_transfer_reverts_without_state_change`.
+- [ ] Retain both caller-side recipient-equals-user checks.
+- [ ] Add a caller-level regression for every new path that can reach
+      `transferBalanceWithinVault`.
 
 ---
 
-## 6b. Recorded disposition — no StabilityPool contract change
+## 6b. Current StabilityPool contract disposition
 
-**Decision:** none of the three StabilityPool hardening changes specified by the
-hardening plan will be made. Rule 1 above is the standing mitigation.
+The earlier no-change disposition is superseded by the PR #67 remediation
+candidate. The final composition now includes all of the following:
 
-**Why.** All three defend against exactly one thing: a claim asset that is
-fee-on-transfer, rebasing/burnable, or callback-capable. Rule 1 excludes that
-entire token class. Making the changes would spend the contract's last remaining
-bytes — and, for the custody-deficit guard, permanent gas on the hottest path —
-defending against assets that are not admitted.
+- AuctionHouse measures the exact claim-token receipt across its collateral
+  transfer before invoking StabilityPool;
+- StabilityPool fails closed when aggregate claim custody is deficient;
+- backing, NAV, withdrawals, and liquidation spending use custody net of claim
+  liabilities;
+- claim tokens and stability assets cannot overlap while either role is active;
+- unavailable active-claim prices stop share movement without deleting claims;
+  and
+- withdrawal, claim, and direct redemption delivery is measured exactly at the
+  recipient.
 
-**What was measured.** StabilityPool has **205 bytes** of EIP-170 headroom
-(24,371 deployed of 24,576). Each candidate was built and compiled; the exact
-patches are retained at
-`~/dev/ripe-protocol-review-archives/rh-deposit-vault/size-probes/`.
+The exact constructor-bound candidate measured in the focused regression is
+**24,313 deployed bytes**, leaving **263 bytes** below EIP-170. ABI and storage
+layout are unchanged. The final artifact ledger must rebind this value from the
+fully integrated source before release; this runbook measurement is not a
+deployment identity.
 
-| Candidate | Plan section | Template Δ | Deployed headroom after |
-|---|---|---:|---:|
-| Custody-deficit guard on the NAV path | §11.1 | +78 | 127 |
-| Exact outbound delivery measurement | §11.3 | +151 | 54 |
-| Pull-and-measure settlement | §11.2 (**the plan's preferred design**) | +295 | **−90** |
+Two boundaries remain explicit. First, direct unit-level impersonation of
+AuctionHouse can bypass its call-local receipt measurement; production authority
+and composition are what close that boundary. Second, dormant sub-threshold claim
+dust remains directly claimable only while the owner still holds stability shares.
+Its final product disposition is recorded separately rather than being hidden by
+the completed DV-08/09/13 fixes.
 
-Two consequences the plan does not anticipate:
+### Dormant claim dust before final share exit
 
-1. **§11.2 as specified cannot be deployed.** At 24,666 bytes it exceeds EIP-170
-   outright. It also requires a matching AuctionHouse change — approve instead of
-   transfer — on a contract with 20 bytes of headroom. The plan mandates it as
-   the preferred design; it is unbuildable at current sizes.
-2. **§11.1 and §11.3 cannot both be taken.** Together they are +229, which also
-   exceeds the limit. Individually each fits but lands below the plan's own
-   200-byte safety floor, so either would need an explicit RG-SIZE-01 waiver.
-
-Beyond bytes, the custody-deficit guard sits inside the loop over active claim
-assets — up to 20 — which already makes one PriceDesk call per asset. It would
-double the external calls on every NAV read, and NAV is read on deposit,
-withdrawal, claim and redemption. `test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling`
-would need its bounds revisited.
-
-**Standing constraint.** Independent of this review, StabilityPool is 99.2% of
-the way to the EIP-170 limit and already compiles with
-`# pragma optimize codesize`, so that lever is spent. Any future StabilityPool
-feature needs a size reduction first. No reduction search has been run on this
-contract; the equivalent search on RipeGov found 523 bytes in unused public view
-wrappers, so room may well exist — but it would be ABI-breaking and has not been
-measured.
-
-**To revisit:** if rule 1 is ever waived for a specific asset, reopen
-RH-CHANGE-01 before admitting it. The hardening tests are already written and
-sit as `xfail(strict=True)` checkpoints (DV-08, DV-09, DV-13).
-
-**Registry follow-up.** This disposition has not been minted as an `RH-D`
-identifier in [`decision-register.md`](decision-register.md), because that
-register requires a mirrored entry in [`status.yaml`](status.yaml) and that file
-should not be edited during an active deployment. Worth adding once the
-deployment settles.
+A sub-threshold dormant claim remains directly claimable while its owner still holds
+stability shares, but there is intentionally no post-exit recovery ABI. Before burning
+the final stability share, the UI/operator must enumerate and claim every claimable
+balance, including dormant entries, and confirm the user's claimable balances read
+back as zero. Final share exit must not be treated as complete until that check passes.
+This is an accepted product workflow limitation, not a claim that dormant liabilities
+become recoverable after exit.
 
 ---
 
 ## 7. What is verified in tests, and what is not
 
-Every behavior above is pinned by a passing characterization test, so a future code
-change that alters the behavior will fail CI. **No test enforces the operating rules
-themselves** — nothing prevents an operator from admitting a fee-on-transfer token or
-configuring a zero weight.
+The table distinguishes passing contract-enforcement regressions from the single strict
+expected-failure characterization that pins the accepted dormant-dust limitation.
+Operational admission rules still require human review; tests cannot prove
+that a newly admitted or upgraded token is exact-transfer, non-rebasing, or callback-
+free.
 
-| Rule | Behavior pinned by |
-|---|---|
-| 1 (inbound fee, donation) | `test_stab_vault_hardening.py::test_preexisting_donation_masks_short_stability_receipt`, `::test_inbound_fee_on_transfer_settlement_reverts_atomically` |
-| 1 (rebase / burn) | `::test_active_claim_custody_deficit_does_not_block_value_extracting_actions` |
-| 1 (outbound fee) | `::test_outbound_fee_on_transfer_short_delivery_still_clears_the_liability` |
-| 1 (callbacks) | `test_teller_deposit.py::test_predeployment_undecorated_route_reentrancy_cross_product`, `::test_after_credit_callback_cannot_corrupt_the_measured_receipt` |
-| 2 | `test_ripe_gov_controls_and_migration.py::test_contributor_duration_lands_unclamped_on_a_fresh_recipient`, `::test_contributor_transfer_shortens_recipient_lock_below_minimum` |
-| 3 | `test_ripe_gov_vault.py::test_zero_asset_weight_behaves_as_full_weight` |
-| 4 | `test_ripe_gov_controls_and_migration.py::test_ripe_gov_pause_matrix_while_paused` |
-| 5 | `test_stab_vault_hardening.py::test_reverting_price_source_takes_down_every_nav_dependent_action` |
-| 6 | `test_ripe_gov_controls_and_migration.py::test_gov_same_user_transfer_mutates_lock_and_points` |
+| Rule | Test evidence | Status |
+|---|---|---|
+| 1 (inbound fee, donation) | `test_ah_liq_stab.py::test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault`, `test_stab_vault_hardening.py::test_direct_stability_pool_primitive_relies_on_auctionhouse_receipt_delta` | passing enforcement/composition regression |
+| 1 (rebase / burn) | `test_stab_vault_hardening.py::test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions`, `::test_claim_reserve_cannot_be_reclassified_as_stability_backing` | passing enforcement regression |
+| 1 (outbound fee) | `::test_outbound_fee_on_transfer_short_delivery_reverts_atomically`, `::test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares` | passing enforcement regression for the named paths |
+| 1 (callbacks) | `test_teller_deposit.py::test_predeployment_undecorated_route_reentrancy_cross_product`, `::test_receipt_window_blocks_every_custody_changing_nested_route`, `::test_after_credit_callback_cannot_corrupt_the_measured_receipt` | passing central-guard regressions |
+| 2 | `test_hr_contributor.py::test_contributor_final_transfer_honors_its_separate_deposit_lock_term`, `test_ripe_gov_controls_and_migration.py::test_contributor_transfer_honors_configured_duration_on_fresh_recipient`, `::test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock` | passing contributor-policy regressions |
+| 3 | `test_ripe_gov_vault.py::test_zero_asset_weight_means_zero_points`, `::test_nonzero_asset_weight_boundaries_are_exact` | passing policy regression |
+| 4 | `test_ripe_gov_controls_and_migration.py::test_ripe_gov_pause_matrix_while_paused` | passing enforcement regression |
+| 5 | `test_stab_vault_hardening.py::test_reverting_price_source_takes_down_every_nav_dependent_action` | passing enforcement regression |
+| 6 | `test_ah_auction_mgmt.py::test_auction_buyer_cannot_be_liquidated_user`, `test_credit_redemptions.py::test_credit_redemption_recipient_equals_user` | passing caller-level enforcement regressions |
+| Dormant dust | `test_stab_vault_hardening.py::test_dormant_dust_is_claimable_before_exit_but_stranded_after`, `::test_dormant_dust_remains_recoverable_after_full_exit` | first is passing characterization; post-exit recovery remains `xfail(strict=True)` by accepted product disposition |
 
-Each finding also carries an `xfail(strict=True)` checkpoint stating the invariant the
-hardening plan wants. Those are the tests to un-skip if a rule is ever traded for a
-contract change.
+The remaining `xfail(strict=True)` checkpoint records only the accepted dormant-dust
+post-exit limitation. Completed DV-04/07/08/09/10/13 changes are ordinary passing
+tests, not expected failures. DV-05 is covered by passing tests of the owner-confirmed
+contributor-specific behavior rather than by a clamp.

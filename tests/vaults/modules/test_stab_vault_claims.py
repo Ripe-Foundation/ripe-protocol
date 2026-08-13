@@ -305,13 +305,20 @@ def test_stab_vault_claims_insufficient_balance(
     # Remove most of the claimable tokens from the contract
     bravo_token.transfer(bravo_token_whale, claimable_amount - 1, sender=stability_pool.address)
 
-    # Try to claim - should only get what's available
+    # A custody deficit must fail closed. Paying the remaining token would burn
+    # the user's full recorded claim and socialize the missing custody.
     vault_id = vault_book.getRegId(stability_pool)
-    usd_value = claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
-    
-    # Should have claimed the 1 token that was available
-    assert usd_value == 1
-    assert bravo_token.balanceOf(bob) == 1
+    claim_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    shares_before = stability_pool.userBalances(bob, alpha_token)
+    with boa.reverts("claim custody deficit"):
+        claim_from_stability_pool(
+            teller, vault_id, alpha_token, bravo_token, sender=bob
+        )
+    assert bravo_token.balanceOf(bob) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == claim_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
+    assert stability_pool.userBalances(bob, alpha_token) == shares_before
 
 
 def test_stab_vault_claims_multiple_users(
@@ -1740,17 +1747,25 @@ def test_stab_vault_claims_concurrent_claims_edge_case(
 
     vault_id = vault_book.getRegId(stability_pool)
 
-    # Both users try to claim - should gracefully handle insufficient balance
-    bob_usd_value = claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
-    alice_usd_value = claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=alice)
-
-    # Total claimed should not exceed what was actually available
-    total_claimed_tokens = bravo_token.balanceOf(bob) + bravo_token.balanceOf(alice)
-    assert total_claimed_tokens <= claimable_amount - tokens_to_remove
-
-    # Both users should have gotten something (though less than expected)
-    assert bob_usd_value > 0
-    assert alice_usd_value > 0
+    # Neither claimant may consume a partial aggregate reserve. Both attempts
+    # revert atomically until custody again covers the recorded liability.
+    claim_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    shares_before = {
+        bob: stability_pool.userBalances(bob, alpha_token),
+        alice: stability_pool.userBalances(alice, alpha_token),
+    }
+    for user in (bob, alice):
+        with boa.reverts("claim custody deficit"):
+            claim_from_stability_pool(
+                teller, vault_id, alpha_token, bravo_token, sender=user
+            )
+    assert bravo_token.balanceOf(bob) == 0
+    assert bravo_token.balanceOf(alice) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == claim_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
+    assert stability_pool.userBalances(bob, alpha_token) == shares_before[bob]
+    assert stability_pool.userBalances(alice, alpha_token) == shares_before[alice]
 
 
 def test_stab_vault_claims_claim_many_over_limit(

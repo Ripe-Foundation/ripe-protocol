@@ -40,7 +40,7 @@ Ready to begin deployment preparation.
   non-operative, and zero open.
 - All 28 canonical H-03 blockers remain open, including nine Curve-specific
   blockers.
-- `configuration_consistent=true`; `deployment_ready=false`; 65 unresolved or
+- `configuration_consistent=true`; `deployment_ready=false`; 64 unresolved or
   unverified bindings currently prevent deployment readiness.
 - The current candidate uses eight imperative migration files,
   `migrations/robinhood-mainnet/0000_TokensAndHq.py` through
@@ -48,8 +48,10 @@ Ready to begin deployment preparation.
 - No executable migration plan is authorized or currently censused. The former
   17-stage declarative plan, runner, transaction executor, action census, and
   86-key plan census are retired historical evidence.
-- No Robinhood deployment or migration has occurred. Nothing has been
-  configured onchain, activated, or released.
+- No non-CCIP Robinhood launch deployment or migration has occurred. Separately,
+  GREEN/RIPE CCIP topology and token-specific capabilities are confirmed live;
+  that external fact authorizes no further transaction or release. Nothing else
+  in the launch candidate has been configured onchain, activated, or released.
 
 [`status.yaml`](status.yaml) is the sole machine-readable current-status
 authority. The [production-remediation correction](rh-production-vyper-remediation.md)
@@ -127,7 +129,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=65
+configuration_consistent=true deployment_ready=false blockers=64
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:
@@ -150,7 +152,7 @@ and credential-free live `rh`. Bind the exact parent commit/tree, candidate
 commit/tree, source diff, artifact expectations, and validation evidence. Stop
 on drift.
 
-### 2. Close the 65 readiness bindings
+### 2. Close the 64 readiness bindings
 
 Classify every unresolved binding by its named owner. The nine Curve items are
 the official AddressProvider plus IDs 7, 11, 12, and 13; the deployment-produced

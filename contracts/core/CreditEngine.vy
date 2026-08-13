@@ -45,6 +45,7 @@ interface Ledger:
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
     def numUserVaults(_user: address) -> uint256: view
+    def hasFungibleAuctions(_user: address) -> bool: view
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface MissionControl:
@@ -614,13 +615,8 @@ def _validateOnRepay(
 @internal
 def _getRepayAmountAndRefundAmount(_userDebtAmount: uint256, _greenAmount: uint256, _greenToken: address) -> (uint256, uint256):
     availAmount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
-
     repayAmount: uint256 = min(availAmount, _userDebtAmount)
-    refundAmount: uint256 = 0
-    if availAmount > _userDebtAmount:
-        refundAmount = availAmount - _userDebtAmount
-
-    return repayAmount, refundAmount
+    return repayAmount, unsafe_sub(availAmount, repayAmount)
 
 
 # reduce debt amount
@@ -952,19 +948,23 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     if userDebt.amount == 0:
         return _debtType == 1 # nothing to check
 
-    # in liquidation, can't do anything
+    # The liquidation flag is an account-wide freeze. It blocks ordinary debt
+    # health and redemption checks, but a frozen user with no outstanding
+    # auction remains eligible for another permissionless liquidation pass.
     if userDebt.inLiquidation:
-        return False
+        if _debtType != 2 or staticcall Ledger(a.ledger).hasFungibleAuctions(_user):
+            return False
 
     # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     if _debtType == 1:
         return userDebt.amount <= bt.totalMaxDebt
-    elif _debtType == 2:
-        return self._canLiquidateUser(userDebt.amount, bt.collateralVal, bt.debtTerms.liqThreshold)
-    elif _debtType == 3:
-        return self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold)
-    else:
+    if _debtType != 2 and _debtType != 3:
         return False
+
+    threshold: uint256 = bt.debtTerms.liqThreshold
+    if _debtType == 3:
+        threshold = bt.debtTerms.redemptionThreshold
+    return self._isAtDebtThreshold(userDebt.amount, bt.collateralVal, threshold)
 
 
 @view
@@ -976,24 +976,16 @@ def _hasGoodDebtHealth(_userDebtAmount: uint256, _collateralVal: uint256, _ltv: 
 
 @view
 @internal
-def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThreshold: uint256) -> bool:
-    if _liqThreshold == 0:
+def _isAtDebtThreshold(_userDebtAmount: uint256, _collateralVal: uint256, _threshold: uint256) -> bool:
+    if _threshold == 0:
         return False
-    
-    # check if collateral value is below (or equal) to liquidation threshold
-    collateralLiqThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _liqThreshold
-    return _collateralVal <= collateralLiqThreshold
+    return _collateralVal <= self._calcDebtThreshold(_userDebtAmount, _threshold)
 
 
 @view
 @internal
-def _canRedeemUserCollateral(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
-    if _redemptionThreshold == 0:
-        return False
-    
-    # check if collateral value is below (or equal) to redemption threshold
-    redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
-    return _collateralVal <= redemptionThreshold
+def _calcDebtThreshold(_userDebtAmount: uint256, _threshold: uint256) -> uint256:
+    return _userDebtAmount * HUNDRED_PERCENT // _threshold
 
 
 # thresholds
@@ -1024,16 +1016,15 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
     if userDebt.amount == 0:
         return 0
 
-    if _debtType == 2:
-        if bt.debtTerms.liqThreshold == 0:
-            return 0
-        return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
-    elif _debtType == 3:
-        if bt.debtTerms.redemptionThreshold == 0:
-            return 0
-        return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.redemptionThreshold
-    else:
+    if _debtType != 2 and _debtType != 3:
         return 0
+
+    threshold: uint256 = bt.debtTerms.liqThreshold
+    if _debtType == 3:
+        threshold = bt.debtTerms.redemptionThreshold
+    if threshold == 0:
+        return 0
+    return self._calcDebtThreshold(userDebt.amount, threshold)
 
 
 ################
@@ -1080,9 +1071,7 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
 def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint256) -> uint256:
     if _ratio == 0 or _minBoost == _maxBoost:
         return _minBoost
-    valRange: uint256 = _maxBoost - _minBoost
-    adjustment: uint256 =  _ratio * valRange // HUNDRED_PERCENT
-    return _minBoost + adjustment
+    return _minBoost + _ratio * (_maxBoost - _minBoost) // HUNDRED_PERCENT
 
 
 ##############

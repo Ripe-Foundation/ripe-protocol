@@ -13,6 +13,15 @@ This plan does not authorize a deployment, merge, push, configuration change, or
 
 It also does not, by itself, authorize production-contract edits. The owner’s standing RH rule is to make the fewest possible production smart-contract changes. Section 5.4 is therefore a mandatory owner gate before Work Packages 2 through 6 may change production source.
 
+> **Owner supersession — 2026-08-11 (DV-05).** The proposed contributor clamp in
+> the original plan was rejected after tracing the full HumanResources/Contributor
+> lifecycle. `depositLockDuration` is an explicit, separately governed Contributor
+> term. Ordinary paycheck deposits still use normal RipeGov bounds while held by the
+> Contributor, but the final owner transfer—after timestamp unlock and the transfer
+> confirmation delay—must honor that stored term and the normal weighted-lock
+> calculation. Sections 8.2, 9.3, and the completion criteria below incorporate this
+> controlling decision; older expected-red/evidence descriptions are historical.
+
 ## 2. Bound baseline and startup gate
 
 The analysis behind this plan was performed against the local RH branch at:
@@ -127,7 +136,10 @@ The implementation work is motivated by these concrete behaviors on the bound tr
 - RipeGov lock deposit, lock adjustment, and lock release trust every registered RIPE address rather than a purpose-specific caller.
 - A registered contract can create governance shares against custody already attributed to another user, with no new token receipt at the direct vault boundary.
 - A registered but unrelated contract can change another user’s lock and can trigger release-fee effects.
-- A vault-level same-user governance transfer initiated through the authorized AuctionHouse or CreditEngine path can mutate lock state. It is not an ordinary user-callable method. The Contributor wrapper creates a separate constrained same-owner case, but neither reachability constraint makes the vault invariant safe.
+- A direct vault-level same-user governance transfer can mutate lock state, but
+  the complete production caller inventory rejects recipient-equals-user in
+  AuctionHouse and CreditRedeem before any vault transfer. DV-04 is therefore
+  caller-owned; do not duplicate this policy in RipeGov.
 - An active StabilityPool claim asset whose returned price is zero is omitted from NAV while deposits and withdrawals remain live, creating an explicit cohort-redistribution surface.
 - The reviewed StabilityPool tests appeared to cover only small zero-price examples. Work Package 1 must reproduce and quantify the existing cases before treating large-value, multi-cohort economics as an established gap.
 - A pre-existing token donation can help aggregate custody appear sufficient when a later settlement transfers less than the declared claim amount.
@@ -167,9 +179,10 @@ RG-2. lastShares is the user’s actual post-operation share balance, never a no
 
 RG-3. Global point totals equal the sum of user point contributions for every asset and point type.
 
-RG-4. A lock cannot be shortened by transfer, same-address transfer, contributor movement, configuration change, or indirect protocol call. The only exception is a separately authorized release path whose fee and effects are exact.
+RG-4. A lock cannot be shortened by a reachable transfer, contributor movement, configuration change, or indirect protocol call. The only exception is a separately authorized release path whose fee and effects are exact.
 
-RG-5. A same-user transfer is a true no-op for shares, locks, points, checkpoints, and timestamps.
+RG-5. AuctionHouse and CreditRedeem reject recipient-equals-user before calling
+any vault transfer.
 
 RG-6. Disabling point updates permits safe exits but does not permit deposits, transfers, or unrelated state mutation to bypass a broken accounting path.
 
@@ -419,13 +432,12 @@ Expected test names, subject to the WP0 caller inventory confirming Teller-only 
 - test_registered_non_teller_cannot_release_another_users_lock
 - test_rejected_gov_privileged_call_is_fully_atomic
 
-### 8.2 Same-address and contributor lock matrix
+### 8.2 Same-address and contributor-term matrix
 
 Exercise:
 
-- same-address transferBalanceWithinVault initiated by AuctionHouse;
-- same-address transferBalanceWithinVault initiated by CreditEngine;
-- rejected same-address attempt by an ordinary user;
+- auction purchase whose recipient is the liquidated user;
+- collateral redemption whose recipient is the source user;
 - same-address contributor transfer;
 - transfer to a different user;
 - zero amount;
@@ -435,15 +447,21 @@ Exercise:
 - maximum lock;
 - configured duration above maximum;
 - configured duration below minimum;
-- prior unlock later than newly computed unlock.
+- prior unlock later than the contributor-weighted result.
 
-Assert that same-address movement changes no state and that contributor transfer never shortens an existing lock.
+Assert that both collateral-routing callers stop before vault movement. Separately
+assert that contributor transfer honors its configured duration on a fresh recipient
+and feeds that exact duration into the normal weighted-lock calculation for an
+existing recipient. Do not require preservation of the recipient's earlier unlock;
+weighted shortening is an intended consequence of combining positions.
 
 Suggested test names:
 
-- test_gov_same_user_transfer_is_complete_noop
-- test_contributor_transfer_cannot_shorten_existing_lock
-- test_contributor_duration_is_clamped_to_current_governance_bounds
+- test_auction_buyer_cannot_be_liquidated_user
+- test_credit_redemption_recipient_equals_user
+- test_contributor_transfer_honors_configured_duration_on_fresh_recipient
+- test_contributor_transfer_uses_configured_duration_in_weighted_recipient_lock
+- test_contributor_final_transfer_honors_its_separate_deposit_lock_term
 
 ### 8.3 Stability zero-price economics
 
@@ -509,21 +527,25 @@ Do not use the broad valid-RIPE-address predicate for capabilities that mutate a
 
 If a second legitimate production caller exists, give that caller a narrowly named and separately tested capability. Do not retain the broad registry-wide authorization as a convenience.
 
-### 9.2 Make same-address transfers true no-ops
+### 9.2 Keep same-address rejection at the routing callers
 
-Add the narrowest RipeGov-level guard so owner equals recipient returns before any lock, point, checkpoint, or transfer mutation.
+AuctionHouse and CreditRedeem must return before any vault transfer when the
+recipient equals the source user. RipeGov and SharesVault do not duplicate
+that routing policy. A new caller must add and test the same guard before it
+may reach `transferBalanceWithinVault`.
 
-Do not change SharesVault family-wide behavior unless a full consumer inventory proves that every inheriting vault wants identical semantics.
+### 9.3 Preserve the contributor-specific final-transfer term
 
-### 9.3 Prevent contributor lock shortening
+When contributor shares move into the owner's RipeGov position:
 
-When contributor shares move into RipeGov:
-
-- resolve the current minimum and maximum governance lock bounds;
-- clamp the contributor duration to those bounds;
-- preserve the recipient’s later existing unlock;
-- reject or safely handle a contradictory configuration;
-- calculate points from the final effective lock, not the nominal requested duration.
+- pass the Contributor contract's stored `depositLockDuration` unchanged;
+- do not clamp it to the current general RipeGov min/max;
+- do not replace it with the recipient's remaining lock;
+- use the existing weighted-lock calculation when the recipient already has shares;
+- retain the Contributor's independent timestamp vesting/unlock and block-based
+  transfer confirmation gates; and
+- keep ordinary paycheck deposits through Teller subject to normal RipeGov deposit
+  bounds while the position remains owned by the Contributor contract.
 
 ### 9.4 Pause semantics
 
@@ -543,7 +565,9 @@ Also retain exact-once migration, source tombstone, destination shares, locks, p
 
 - Only the intended caller can create locked governance shares or mutate a user lock.
 - Same-user transfer changes no state.
-- Contributor movement cannot shorten a lock.
+- Contributor movement honors the separately configured duration and normal
+  weighted-lock semantics, including a shorter aggregate unlock where the weights
+  produce one.
 - Pause behavior is explicit for every public mutation.
 - Existing legitimate Teller, HumanResources, reward, withdrawal, and migration flows remain green.
 
