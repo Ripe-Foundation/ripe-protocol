@@ -70,6 +70,7 @@ struct AssetUpdate:
     asset: address
     config: cs.AssetConfig
 
+# Must track StabVault.MAX_ACTIVE_CLAIM_ASSETS; this validator mirrors its capacity gate.
 MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 
 event NewAssetPending:
