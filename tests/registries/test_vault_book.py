@@ -133,6 +133,30 @@ def _debt_risk_state(credit_engine, ledger, user, vault_id, asset, vault):
     }
 
 
+def _reward_state(ripe_token, ledger, caller):
+    return {
+        "total_supply": ripe_token.totalSupply(),
+        "caller_balance": ripe_token.balanceOf(caller),
+        "reward_budget": ledger.ripeAvailForRewards(),
+    }
+
+
+def _deploy_fake_ledger(reward_budget=1_000 * EIGHTEEN_DECIMALS):
+    return boa.load(
+        "contracts/mock/MockStabClaimLedger.vy",
+        reward_budget,
+        name="fake_stab_claim_ledger",
+    )
+
+
+def _fake_ledger_state(fake_ledger):
+    return {
+        "reward_budget": fake_ledger.ripeAvailForRewards(),
+        "num_calls": fake_ledger.numCalls(),
+        "last_amount": fake_ledger.lastAmount(),
+    }
+
+
 def test_confirm_new_address_to_registry_lifecycle_still_works(
     ripe_hq,
     governance,
@@ -619,3 +643,240 @@ def test_confirmation_checks_permission_before_funded_vault_state(
     with boa.reverts("vault has funds"):
         _confirm_retirement(action_kind, vault_book, governance, vault_id)
     assert _pending_retirement(action_kind, vault_book, vault_id) == pending
+
+
+def test_stab_claim_mint_rejects_unregistered_caller_and_preserves_state(
+    vault_book,
+    ripe_token,
+    ledger,
+    bob,
+):
+    assert vault_book.getRegId(bob) == 0
+    state_before = _reward_state(ripe_token, ledger, bob)
+
+    with boa.reverts("no perms"):
+        vault_book.mintRipeForStabPoolClaims(
+            EIGHTEEN_DECIMALS,
+            ripe_token.address,
+            ledger.address,
+            sender=bob,
+        )
+
+    assert _reward_state(ripe_token, ledger, bob) == state_before
+
+
+def test_stab_claim_mint_rejects_registered_non_stability_vault(
+    vault_book,
+    ripe_token,
+    ledger,
+    ripe_gov_vault,
+    mission_control,
+):
+    vault_id = vault_book.getRegId(ripe_gov_vault)
+    assert vault_id != 0
+    assert mission_control.isRipeGovVaultId(vault_id)
+    assert not mission_control.isStabVaultId(vault_id)
+    state_before = _reward_state(ripe_token, ledger, ripe_gov_vault)
+
+    with boa.reverts("not stab vault"):
+        vault_book.mintRipeForStabPoolClaims(
+            EIGHTEEN_DECIMALS,
+            ripe_token.address,
+            ledger.address,
+            sender=ripe_gov_vault.address,
+        )
+
+    assert _reward_state(ripe_token, ledger, ripe_gov_vault) == state_before
+
+
+def test_stab_claim_mint_rejects_noncanonical_ripe_and_preserves_all_state(
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    alpha_token,
+    ledger,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert mission_control.isStabVaultId(vault_id)
+    canonical_before = _reward_state(ripe_token, ledger, stability_pool)
+    fake_before = {
+        "total_supply": alpha_token.totalSupply(),
+        "caller_balance": alpha_token.balanceOf(stability_pool),
+    }
+
+    with boa.reverts("invalid ripe token"):
+        vault_book.mintRipeForStabPoolClaims(
+            EIGHTEEN_DECIMALS,
+            alpha_token.address,
+            ledger.address,
+            sender=stability_pool.address,
+        )
+
+    assert _reward_state(ripe_token, ledger, stability_pool) == canonical_before
+    assert alpha_token.totalSupply() == fake_before["total_supply"]
+    assert alpha_token.balanceOf(stability_pool) == fake_before["caller_balance"]
+
+
+def test_stab_claim_mint_rejects_noncanonical_ledger_and_preserves_all_state(
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    ledger,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert mission_control.isStabVaultId(vault_id)
+    fake_ledger = _deploy_fake_ledger()
+    canonical_before = _reward_state(ripe_token, ledger, stability_pool)
+    fake_before = _fake_ledger_state(fake_ledger)
+
+    with boa.reverts("invalid ledger"):
+        vault_book.mintRipeForStabPoolClaims(
+            EIGHTEEN_DECIMALS,
+            ripe_token.address,
+            fake_ledger.address,
+            sender=stability_pool.address,
+        )
+
+    assert _reward_state(ripe_token, ledger, stability_pool) == canonical_before
+    assert _fake_ledger_state(fake_ledger) == fake_before
+
+
+@pytest.mark.parametrize(
+    ("reward_budget", "amount"),
+    [
+        (10 * EIGHTEEN_DECIMALS, 4 * EIGHTEEN_DECIMALS),
+        (10 * EIGHTEEN_DECIMALS, 10 * EIGHTEEN_DECIMALS),
+    ],
+    ids=["partial_budget", "exact_budget"],
+)
+def test_stab_claim_mint_uses_canonical_targets_and_budget(
+    reward_budget,
+    amount,
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    alpha_token,
+    ledger,
+    switchboard_alpha,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert mission_control.isStabVaultId(vault_id)
+    ledger.setRipeAvailForRewards(reward_budget, sender=switchboard_alpha.address)
+    fake_ledger = _deploy_fake_ledger()
+
+    canonical_before = _reward_state(ripe_token, ledger, stability_pool)
+    fake_token_before = {
+        "total_supply": alpha_token.totalSupply(),
+        "caller_balance": alpha_token.balanceOf(stability_pool),
+    }
+    fake_ledger_before = _fake_ledger_state(fake_ledger)
+
+    assert vault_book.mintRipeForStabPoolClaims(
+        amount,
+        ripe_token.address,
+        ledger.address,
+        sender=stability_pool.address,
+    )
+
+    canonical_after = _reward_state(ripe_token, ledger, stability_pool)
+    assert canonical_after["total_supply"] == canonical_before["total_supply"] + amount
+    assert canonical_after["caller_balance"] == canonical_before["caller_balance"] + amount
+    assert canonical_after["reward_budget"] == reward_budget - amount
+    if amount == reward_budget:
+        assert ledger.ripeAvailForRewards() == 0
+    assert alpha_token.totalSupply() == fake_token_before["total_supply"]
+    assert alpha_token.balanceOf(stability_pool) == fake_token_before["caller_balance"]
+    assert _fake_ledger_state(fake_ledger) == fake_ledger_before
+
+
+def test_stab_claim_mint_rejects_over_budget_before_minting(
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    ledger,
+    switchboard_alpha,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert mission_control.isStabVaultId(vault_id)
+    reward_budget = 7 * EIGHTEEN_DECIMALS
+    ledger.setRipeAvailForRewards(reward_budget, sender=switchboard_alpha.address)
+    state_before = _reward_state(ripe_token, ledger, stability_pool)
+
+    with boa.reverts("insufficient rewards"):
+        vault_book.mintRipeForStabPoolClaims(
+            reward_budget + 1,
+            ripe_token.address,
+            ledger.address,
+            sender=stability_pool.address,
+        )
+
+    assert _reward_state(ripe_token, ledger, stability_pool) == state_before
+
+
+def test_stab_claim_zero_amount_succeeds_without_state_change(
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    ledger,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    assert mission_control.isStabVaultId(vault_id)
+    state_before = _reward_state(ripe_token, ledger, stability_pool)
+
+    assert vault_book.mintRipeForStabPoolClaims(
+        0,
+        ripe_token.address,
+        ledger.address,
+        sender=stability_pool.address,
+    )
+
+    # A zero-value mint emits Transfer(0); this assertion intentionally checks state only.
+    assert _reward_state(ripe_token, ledger, stability_pool) == state_before
+
+
+def test_historically_classified_stability_id_reuse_characterization(
+    ripe_hq,
+    governance,
+    vault_book,
+    stability_pool,
+    mission_control,
+    ripe_token,
+    ledger,
+):
+    """Document the accepted boundary: classified Stability Pool IDs are permanent."""
+    vault_id = vault_book.getRegId(stability_pool)
+    assert vault_id != 0
+    assert mission_control.isStabVaultId(vault_id)
+    assert not stability_pool.doesVaultHaveAnyFunds()
+
+    replacement = _deploy_replacement(ripe_hq, "historically_classified_replacement")
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        replacement,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    assert vault_book.getRegId(stability_pool) == 0
+    assert vault_book.getRegId(replacement) == vault_id
+    assert mission_control.isStabVaultId(vault_id)
+
+    state_before = _reward_state(ripe_token, ledger, replacement)
+    assert vault_book.mintRipeForStabPoolClaims(
+        0,
+        ripe_token.address,
+        ledger.address,
+        sender=replacement.address,
+    )
+
+    # This is an accepted operational boundary, not desirable vault-ID reuse behavior.
+    # The zero-value Transfer event is expected; reward state remains unchanged.
+    assert _reward_state(ripe_token, ledger, replacement) == state_before
