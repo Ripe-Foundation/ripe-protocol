@@ -37,7 +37,7 @@ are included but no longer classified as nominal: BasicVault suppresses
 backing-aware `getTotalAmountForVault` refreshes the vault's reward USD value to
 zero. Neither getter supplies CreditEngine collateral value
 ([Lootbox source](../../../../contracts/core/Lootbox.vy#L892),
-[CreditEngine source](../../../../contracts/core/CreditEngine.vy#L749)).
+[CreditEngine source](../../../../contracts/core/CreditEngine.vy#L755)).
 
 ## Frozen machine inventory
 
@@ -51,7 +51,7 @@ source review and test update.
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
     "contracts/core/AuctionHouse.vy": "b575591d3d796d9a9ac6b9a07d1828ecf45a0b219442df13b4eb1fc6902541e3",
-    "contracts/core/CreditEngine.vy": "cc1ecad3b798bef4fd9788f1885e32736beea833fe9672c7840f555d89ad13e4",
+    "contracts/core/CreditEngine.vy": "8c1255de86fe776bb8999dec603d3de43c2c07c0551c2d6eb7fed93f5f17f447",
     "contracts/core/CreditRedeem.vy": "af05327acae0002b005fccd5ff319aef911947542e36ae11bddcab79e0f46711",
     "contracts/core/Deleverage.vy": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
     "contracts/core/HumanResources.vy": "d3d16ed31349cae16e901e02b48719922e891a23139a51b71f3845a652115942",
@@ -132,9 +132,9 @@ source review and test update.
       "evidence_test": "test_safe_nominal_volatile_deleverage_suppresses_quarantined_account"
     },
     {
-      "id": "CE-726",
+      "id": "CE-732",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 726,
+      "line": 732,
       "function": "_getUserBorrowTerms",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -142,9 +142,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "CE-732",
+      "id": "CE-738",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 732,
+      "line": 738,
       "function": "_getUserBorrowTerms",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -152,9 +152,9 @@ source review and test update.
       "evidence_test": "test_unsafe_backing_failures_keep_terms_with_zero_capacity"
     },
     {
-      "id": "CE-749",
+      "id": "CE-755",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 749,
+      "line": 755,
       "function": "_getUserBorrowTerms",
       "getter": "getTotalAmountForVault",
       "classification": "quarantine_status_backing_required",
@@ -162,9 +162,9 @@ source review and test update.
       "evidence_test": "test_quarantine_detection_borrow_block_and_automatic_recovery"
     },
     {
-      "id": "CE-750",
+      "id": "CE-756",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 750,
+      "line": 756,
       "function": "_getUserBorrowTerms",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -172,9 +172,9 @@ source review and test update.
       "evidence_test": "test_quarantine_detection_borrow_block_and_automatic_recovery"
     },
     {
-      "id": "CE-1248",
+      "id": "CE-1254",
       "path": "contracts/core/CreditEngine.vy",
-      "line": 1248,
+      "line": 1254,
       "function": "getMaxWithdrawableForAsset",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",

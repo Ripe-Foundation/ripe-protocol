@@ -481,7 +481,7 @@ def repayForUser(
     repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.missionControl, a.greenToken, a.teller)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
-    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldRefundSavingsGreen, RepayType.STANDARD, a)
+    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, _caller, _shouldRefundSavingsGreen, RepayType.STANDARD, a)
 
 
 # repay during auction purchase
@@ -505,7 +505,7 @@ def repayDuringAuctionPurchase(_liqUser: address, _repayValue: uint256, _a: addy
     repayAmount, refundAmount = self._getRepayAmountAndRefundAmount(userDebt.amount, _repayValue, a.greenToken)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
-    return self._repayDebt(_liqUser, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, True, RepayType.AUCTION, a)
+    return self._repayDebt(_liqUser, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, _liqUser, True, RepayType.AUCTION, a)
 
 
 # generic repay (liquidation, deleverage, redemption)
@@ -538,7 +538,7 @@ def repayFromDept(
     numUserVaults: uint256 = _numUserVaults
     if numUserVaults == 0:
         numUserVaults = staticcall Ledger(a.ledger).numUserVaults(_user)
-    return self._repayDebt(_user, _userDebt, numUserVaults, _repayValue, 0, _newInterest, False, False, repayType, a)
+    return self._repayDebt(_user, _userDebt, numUserVaults, _repayValue, 0, _newInterest, empty(address), False, repayType, a)
 
 
 # shared repay functionality
@@ -552,7 +552,13 @@ def _repayDebt(
     _repayValue: uint256,
     _refundAmount: uint256,
     _newInterest: uint256,
-    _shouldBurnGreen: bool,
+    # `_burnAndRefundRecipient` is dual-purpose: a nonzero address identifies the
+    # standard and auction paths that burn GREEN and names their refund recipient.
+    # `empty(address)` identifies department paths that neither burn nor refund.
+    # Burning paths must always pass a nonzero address; passing zero would silently
+    # skip the burn. This is not asserted here because CreditEngine has effectively
+    # no EIP-170 headroom.
+    _burnAndRefundRecipient: address,
     _wantsSavingsGreen: bool,
     _repayType: RepayType,
     _a: addys.Addys,
@@ -574,12 +580,12 @@ def _repayDebt(
     extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
 
     # burn green repayment
-    if _shouldBurnGreen:
+    if _burnAndRefundRecipient != empty(address):
         assert extcall GreenToken(_a.greenToken).burn(_repayValue) # dev: could not burn green
 
     # handle refund
     if _refundAmount != 0:
-        self._handleGreenForUser(_user, _refundAmount, _wantsSavingsGreen, False, _a)
+        self._handleGreenForUser(_burnAndRefundRecipient, _refundAmount, _wantsSavingsGreen, False, _a)
 
     log RepayDebt(user=_user, repayValue=_repayValue, repayType=_repayType, refundAmount=_refundAmount, refundWasSavingsGreen=_wantsSavingsGreen, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
     return hasGoodDebtHealth
