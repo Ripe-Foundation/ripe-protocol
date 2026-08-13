@@ -1102,22 +1102,32 @@ def test_asset_liq_config_validation(switchboard_bravo, governance, alpha_token)
     assert action_id > 0
 
 
-def test_asset_liq_config_with_auction_params(switchboard_bravo, governance, alpha_token):
+def test_asset_liq_config_with_auction_params(
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
     """Test asset liquidation config with custom auction params"""
-    # First add the asset with debt terms so we can swap in stab pools
-    action_id = switchboard_bravo.addAsset(
+    # First register a Bravo-validated asset configuration.
+    add_action_id = switchboard_bravo.addAsset(
         alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
-        (75_00, 80_00, 85_00, 5_00, 10_00, 2_00),  # debt terms with LTV
+        (75_00, 80_00, 85_00, 5_00, 10_00, 2_00),
         False, False, True, True, True, True, True, True, True, True, 0,
         sender=governance.address
     )
     boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
-    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    assert switchboard_bravo.executePendingAction(
+        add_action_id,
+        sender=governance.address,
+    )
     
-    # Test with custom auction params
-    auction_params = (True, 10_00, 50_00, 1000, 3000)  # hasParams, start, max, delay, duration
+    # Test the highest valid custom maximum discount.
+    auction_params = (True, 10_00, 99_99, 1000, 3000)  # hasParams, start, max, delay, duration
+    # The registered asset remains redeemable, so transfer-to-endaoment must
+    # stay disabled when Bravo revalidates the composed config at execution.
     action_id = switchboard_bravo.setAssetLiqConfig(
-        alpha_token, False, True, True, True, 0, auction_params,
+        alpha_token, False, False, True, True, 0, auction_params,
         sender=governance.address
     )
     assert action_id > 0
@@ -1128,7 +1138,17 @@ def test_asset_liq_config_with_auction_params(switchboard_bravo, governance, alp
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.auctionStartDiscount == 10_00
-    assert log.auctionMaxDiscount == 50_00
+    assert log.auctionMaxDiscount == 99_99
+
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+
+    stored = mission_control.assetConfig(alpha_token).customAuctionParams
+    assert stored.hasParams
+    assert stored.startDiscount == 10_00
+    assert stored.maxDiscount == 99_99
+    assert stored.delay == 1000
+    assert stored.duration == 3000
 
 
 def test_execute_asset_liq_config(switchboard_bravo, mission_control, governance, alpha_token):
@@ -1715,17 +1735,58 @@ def test_whitelist_special_stab_pool_validation(switchboard_bravo, governance, a
         )
 
 
-def test_auction_params_validation_delegation(switchboard_bravo, governance, alpha_token):
-    """Test that auction params validation is delegated to SwitchboardOne"""
+def test_auction_params_validation_delegation(
+    switchboard_bravo,
+    governance,
+    alpha_token,
+):
+    """Test that auction params validation is delegated to SwitchboardAlpha"""
     # Create invalid auction params (start >= max discount)
     invalid_auction_params = (True, 50_00, 40_00, 1000, 3000)  # start 50% >= max 40%
     
-    # This should fail because SwitchboardOne validates auction params
+    # This should fail because SwitchboardAlpha validates auction params
     with boa.reverts("invalid auction params"):
         switchboard_bravo.setAssetLiqConfig(
             alpha_token, False, True, False, True, 0, invalid_auction_params,
             sender=governance.address
         )
+
+    max_discount_at_hundred_percent = (True, 10_00, 100_00, 1000, 3000)
+    with boa.reverts("invalid auction params"):
+        switchboard_bravo.setAssetLiqConfig(
+            alpha_token,
+            False,
+            True,
+            False,
+            True,
+            0,
+            max_discount_at_hundred_percent,
+            sender=governance.address,
+        )
+
+
+def test_add_asset_auction_params_boundary_delegation(
+    switchboard_bravo,
+    governance,
+    alpha_token,
+):
+    """Test addAsset delegates custom auction validation to SwitchboardAlpha."""
+    def add_asset_with_auction_params(auction_params):
+        return switchboard_bravo.addAsset(
+            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+            (75_00, 80_00, 85_00, 5_00, 10_00, 2_00),
+            False, False, True, True, True, True, True, True, True, True, 0,
+            auction_params,
+            sender=governance.address,
+        )
+
+    assert add_asset_with_auction_params(
+        (True, 10_00, 99_99, 1000, 3000)
+    ) > 0
+
+    # addAsset reports composed configuration admission failures as invalid asset.
+    with boa.reverts("invalid asset"):
+        add_asset_with_auction_params((True, 10_00, 100_00, 1000, 3000))
 
 
 def test_asset_configuration_validation_comprehensive(switchboard_bravo, governance, alpha_token):

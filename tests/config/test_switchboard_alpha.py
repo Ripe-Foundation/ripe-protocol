@@ -520,7 +520,10 @@ def test_auction_params_validation(switchboard_alpha, governance):
         switchboard_alpha.setGenAuctionParams(100_01, 50_00, 1000, 2000, sender=governance.address)  # start >= 100%
     
     with boa.reverts("invalid auction params"):
-        switchboard_alpha.setGenAuctionParams(50_00, 100_01, 1000, 2000, sender=governance.address)  # max >= 100%
+        switchboard_alpha.setGenAuctionParams(10_00, 100_00, 1000, 2000, sender=governance.address)  # max = 100%
+
+    with boa.reverts("invalid auction params"):
+        switchboard_alpha.setGenAuctionParams(50_00, 100_01, 1000, 2000, sender=governance.address)  # max > 100%
     
     with boa.reverts("invalid auction params"):
         switchboard_alpha.setGenAuctionParams(60_00, 50_00, 1000, 2000, sender=governance.address)  # start >= max
@@ -533,6 +536,27 @@ def test_auction_params_validation(switchboard_alpha, governance):
     
     with boa.reverts("invalid auction params"):
         switchboard_alpha.setGenAuctionParams(30_00, 50_00, 1000, MAX_UINT256, sender=governance.address)  # max duration
+
+
+def test_auction_params_direct_validator_boundaries(switchboard_alpha):
+    valid_delay = 1000
+    valid_duration = 2000
+
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 99_99, valid_delay, valid_duration)
+    )
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 99_98, 99_99, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 99_99, 99_99, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 100_00, valid_delay, valid_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 100_01, valid_delay, valid_duration)
+    )
 
 
 def test_execute_debt_configs(switchboard_alpha, mission_control, governance):
@@ -1073,19 +1097,26 @@ def test_sanitize_priority_sources_deduplication(switchboard_alpha, governance):
     assert logs[0].numPriorityPriceSourceIds == 2  # Only unique valid IDs 1 and 2
 
 
-def test_auction_params_boundary_conditions(switchboard_alpha, governance):
+def test_auction_params_boundary_conditions(switchboard_alpha, mission_control, governance):
     """Test auction params validation at boundary conditions"""
     
     # Test with exact boundary values
     HUNDRED_PERCENT = 100_00
     
-    # startDiscount just under maxDiscount (both under 100%)
+    # Highest valid maximum discount, with a clearly lower start discount.
     action_id = switchboard_alpha.setGenAuctionParams(
-        HUNDRED_PERCENT - 2, HUNDRED_PERCENT - 1, 1000, 2000, 
+        10_00, HUNDRED_PERCENT - 1, 1000, 2000,
         sender=governance.address
     )
-    assert action_id > 0
-    
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+
+    params = mission_control.genDebtConfig().genAuctionParams
+    assert params.startDiscount == 10_00
+    assert params.maxDiscount == 99_99
+    assert params.delay == 1000
+    assert params.duration == 2000
+
     # Test delay = duration - 1 (just valid)
     action_id = switchboard_alpha.setGenAuctionParams(
         50_00, 80_00, 1999, 2000, 
