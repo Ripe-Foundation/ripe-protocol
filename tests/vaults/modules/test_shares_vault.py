@@ -1,6 +1,334 @@
 import boa
+import pytest
+from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from conf_utils import assert_reverted_call
+
+
+DECIMAL_OFFSET = 10 ** 8
+
+
+REBASE_TOKEN_SOURCE = """
+# pragma version ~=0.4.3
+
+scaledBalances: HashMap[address, uint256]
+allowance: public(HashMap[address, HashMap[address, uint256]])
+scaledTotalSupply: uint256
+index: public(uint256)
+
+@deploy
+def __init__():
+    self.index = 10 ** 18
+
+@view
+@external
+def decimals() -> uint8:
+    return 18
+
+@view
+@external
+def balanceOf(_user: address) -> uint256:
+    return self.scaledBalances[_user] * self.index // 10 ** 18
+
+@view
+@external
+def totalSupply() -> uint256:
+    return self.scaledTotalSupply * self.index // 10 ** 18
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _amount
+    return True
+
+@internal
+def _transfer(_sender: address, _recipient: address, _amount: uint256):
+    scaledAmount: uint256 = _amount * 10 ** 18 // self.index
+    assert scaledAmount != 0
+    assert self.scaledBalances[_sender] >= scaledAmount
+    self.scaledBalances[_sender] -= scaledAmount
+    self.scaledBalances[_recipient] += scaledAmount
+
+@external
+def transfer(_recipient: address, _amount: uint256) -> bool:
+    self._transfer(msg.sender, _recipient, _amount)
+    return True
+
+@external
+def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> bool:
+    allowed: uint256 = self.allowance[_sender][msg.sender]
+    assert allowed >= _amount
+    self.allowance[_sender][msg.sender] = allowed - _amount
+    self._transfer(_sender, _recipient, _amount)
+    return True
+
+@external
+def mint(_recipient: address, _amount: uint256):
+    scaledAmount: uint256 = _amount * 10 ** 18 // self.index
+    self.scaledBalances[_recipient] += scaledAmount
+    self.scaledTotalSupply += scaledAmount
+
+@external
+def rebase(_newIndex: uint256):
+    assert _newIndex > self.index
+    self.index = _newIndex
+"""
+
+
+def test_shares_vault_teller_zero_share_deposit_reverts_atomically(
+    rebase_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    ledger,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """AUD-024: a nonzero receipt may never be recorded for zero shares."""
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[4],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+
+    donation = DECIMAL_OFFSET
+    attempted_deposit = 1
+    alpha_token.transfer(rebase_erc20_vault, donation, sender=alpha_token_whale)
+    alpha_token.transfer(bob, attempted_deposit, sender=alpha_token_whale)
+    alpha_token.approve(teller, attempted_deposit, sender=bob)
+
+    vault_id = 4
+    assert rebase_erc20_vault.amountToShares(alpha_token, attempted_deposit, False) == 0
+    assert attempted_deposit * DECIMAL_OFFSET // (donation + 1) == 0
+
+    user_balance_before = alpha_token.balanceOf(bob)
+    allowance_before = alpha_token.allowance(bob, teller)
+    custody_before = alpha_token.balanceOf(rebase_erc20_vault)
+    user_shares_before = rebase_erc20_vault.userBalances(bob, alpha_token)
+    total_shares_before = rebase_erc20_vault.totalBalances(alpha_token)
+    user_assets_before = rebase_erc20_vault.numUserAssets(bob)
+    vault_assets_before = rebase_erc20_vault.numAssets()
+    ledger_data_before = ledger.getDepositLedgerData(bob, vault_id)
+    user_points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    asset_points_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+
+    # The outer Teller extcall masks nested dev labels from boa.reverts(...),
+    # so inspect every structured trace frame for the exact SharesVault reason.
+    with pytest.raises(BoaError) as exc_info:
+        teller.deposit(
+            alpha_token,
+            attempted_deposit,
+            bob,
+            rebase_erc20_vault,
+            vault_id,
+            sender=bob,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert alpha_token.balanceOf(bob) == user_balance_before
+    assert alpha_token.allowance(bob, teller) == allowance_before
+    assert alpha_token.balanceOf(rebase_erc20_vault) == custody_before
+    assert rebase_erc20_vault.userBalances(bob, alpha_token) == user_shares_before
+    assert rebase_erc20_vault.totalBalances(alpha_token) == total_shares_before
+    assert rebase_erc20_vault.numUserAssets(bob) == user_assets_before
+    assert rebase_erc20_vault.numAssets() == vault_assets_before
+    assert ledger.getDepositLedgerData(bob, vault_id) == ledger_data_before
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token) == user_points_before
+    assert ledger.assetDepositPoints(vault_id, alpha_token) == asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+
+
+def test_shares_vault_teller_exact_one_share_boundary_succeeds(
+    rebase_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    ledger,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """AUD-024: the adjacent fresh-vault boundary still issues one share."""
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[4],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+
+    donation = DECIMAL_OFFSET
+    deposit_amount = 2
+    alpha_token.transfer(rebase_erc20_vault, donation, sender=alpha_token_whale)
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, deposit_amount, sender=bob)
+
+    assert deposit_amount * DECIMAL_OFFSET // (donation + 1) == 1
+    deposited = teller.deposit(
+        alpha_token,
+        deposit_amount,
+        bob,
+        rebase_erc20_vault,
+        4,
+        sender=bob,
+    )
+    deposit_logs = teller.get_logs()
+
+    assert deposited == deposit_amount
+    assert alpha_token.balanceOf(rebase_erc20_vault) == donation + deposit_amount
+    assert rebase_erc20_vault.userBalances(bob, alpha_token) == 1
+    assert rebase_erc20_vault.totalBalances(alpha_token) == 1
+    assert ledger.getDepositLedgerData(bob, 4).isParticipatingInVault
+
+    teller_log = next(log for log in deposit_logs if type(log).__name__ == "TellerDeposit")
+    assert teller_log.user == bob
+    assert teller_log.depositor == bob
+    assert teller_log.asset == alpha_token.address
+    assert teller_log.amount == deposit_amount
+    assert teller_log.vaultAddr == rebase_erc20_vault.address
+    assert teller_log.vaultId == 4
+    vault_log = next(
+        log for log in deposit_logs if type(log).__name__ == "RebaseErc20VaultDeposit"
+    )
+    assert vault_log.user == bob
+    assert vault_log.asset == alpha_token.address
+    assert vault_log.amount == deposit_amount
+    assert vault_log.shares == 1
+
+    redeemable = rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    assert redeemable == 1
+    assert teller.withdraw(
+        alpha_token,
+        MAX_UINT256,
+        bob,
+        rebase_erc20_vault,
+        4,
+        sender=bob,
+    ) == redeemable
+    assert rebase_erc20_vault.userBalances(bob, alpha_token) == 0
+    assert rebase_erc20_vault.totalBalances(alpha_token) == 0
+
+
+def test_shares_vault_seeded_zero_and_one_share_boundaries(
+    rebase_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    teller,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """AUD-024 seeded-vault D_min is derived from live S and B."""
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[4],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    alpha_token.transfer(bob, 1, sender=alpha_token_whale)
+    alpha_token.approve(teller, 1, sender=bob)
+    assert teller.deposit(
+        alpha_token, 1, bob, rebase_erc20_vault, 4, sender=bob
+    ) == 1
+
+    existing_shares = rebase_erc20_vault.totalBalances(alpha_token)
+    underlying_before_donation = alpha_token.balanceOf(rebase_erc20_vault)
+    attempted_deposit = 1
+    minimum_donation = max(
+        0,
+        attempted_deposit * (existing_shares + DECIMAL_OFFSET)
+        - underlying_before_donation,
+    )
+    assert existing_shares == DECIMAL_OFFSET
+    assert underlying_before_donation == 1
+    assert minimum_donation == 199_999_999
+    alpha_token.transfer(
+        rebase_erc20_vault, minimum_donation, sender=alpha_token_whale
+    )
+    alpha_token.transfer(sally, 3, sender=alpha_token_whale)
+    alpha_token.approve(teller, 3, sender=sally)
+
+    assert rebase_erc20_vault.amountToShares(
+        alpha_token, attempted_deposit, False
+    ) == 0
+    with pytest.raises(BoaError) as exc_info:
+        teller.deposit(
+            alpha_token,
+            attempted_deposit,
+            sally,
+            rebase_erc20_vault,
+            4,
+            sender=sally,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+    assert alpha_token.balanceOf(sally) == 3
+    assert alpha_token.allowance(sally, teller) == 3
+    assert rebase_erc20_vault.userBalances(sally, alpha_token) == 0
+
+    assert teller.deposit(
+        alpha_token,
+        2,
+        sally,
+        rebase_erc20_vault,
+        4,
+        sender=sally,
+    ) == 2
+    assert rebase_erc20_vault.userBalances(sally, alpha_token) == 1
+
+
+def test_shares_vault_positive_rebase_preserves_shares_and_increases_value(
+    rebase_erc20_vault,
+    bob,
+    teller,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """AUD-024 ordinary RebaseErc20 accounting under a true positive rebase."""
+    rebase_token = boa.loads(REBASE_TOKEN_SOURCE, name="aud_024_rebase_token")
+    setGeneralConfig()
+    setAssetConfig(
+        rebase_token,
+        _vaultIds=[4],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    rebase_token.mint(bob, deposit_amount)
+    rebase_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.deposit(
+        rebase_token,
+        deposit_amount,
+        bob,
+        rebase_erc20_vault,
+        4,
+        sender=bob,
+    ) == deposit_amount
+
+    shares_before = rebase_erc20_vault.userBalances(bob, rebase_token)
+    total_shares_before = rebase_erc20_vault.totalBalances(rebase_token)
+    amount_before = rebase_erc20_vault.getTotalAmountForUser(bob, rebase_token)
+    custody_before = rebase_token.balanceOf(rebase_erc20_vault)
+    assert amount_before == deposit_amount
+
+    rebase_token.rebase(2 * EIGHTEEN_DECIMALS)
+
+    custody_after = rebase_token.balanceOf(rebase_erc20_vault)
+    amount_after = rebase_erc20_vault.getTotalAmountForUser(bob, rebase_token)
+    assert custody_after == 2 * custody_before
+    assert rebase_erc20_vault.userBalances(bob, rebase_token) == shares_before
+    assert rebase_erc20_vault.totalBalances(rebase_token) == total_shares_before
+    assert amount_after == shares_before * (custody_after + 1) // (
+        total_shares_before + DECIMAL_OFFSET
+    )
+    assert amount_after > amount_before
 
 
 def test_shares_vault_deposit_validation(
@@ -536,4 +864,4 @@ def test_shares_vault_zero_balance_scenarios(
     # Should still show has balance (because shares exist)
     asset, has_balance = rebase_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1)
     assert asset == alpha_token.address
-    assert has_balance  # Should be true because shares exist 
+    assert has_balance  # Should be true because shares exist

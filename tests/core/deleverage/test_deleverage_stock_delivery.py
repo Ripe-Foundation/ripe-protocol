@@ -1,8 +1,10 @@
 """Track 8 M4 composed stock delivery proof for unchanged Deleverage ordering."""
 
 import boa
+import pytest
+from boa.contracts.base_evm_contract import BoaError
 
-from conf_utils import filter_logs
+from conf_utils import assert_reverted_call, filter_logs
 from constants import EIGHTEEN_DECIMALS
 from tests.vaults.test_basic_vault_safety import (
     _register_safe_nominal_vault,
@@ -276,6 +278,139 @@ def test_standard_swap_delivers_withdrawal_and_exact_teller_deposit(
     assert standard_deposits[0].amount == deposited
     assert swaps[0].withdrawAmount == withdrawn
     assert swaps[0].depositAmount == deposited
+
+
+def test_deleverage_zero_share_output_deposit_reverts_entire_swap(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    bob,
+    teller,
+    deleverage,
+    mock_price_source,
+    ledger,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    governance,
+):
+    """AUD-024: output deposit failure rolls back collateral and debt state."""
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldSwapInStabPools=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[4],
+        _debtTerms=debt_terms,
+        _shouldSwapInStabPools=False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    collateral = 100 * EIGHTEEN_DECIMALS
+    debt = 25 * EIGHTEEN_DECIMALS
+    output_amount = EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral, alpha_token, alpha_token_whale)
+    teller.borrow(debt, bob, False, sender=bob)
+
+    donation = output_amount * 10 ** 8
+    bravo_token.mint(bravo_token_whale, donation, sender=governance.address)
+    bravo_token.transfer(rebase_erc20_vault, donation, sender=bravo_token_whale)
+    assert rebase_erc20_vault.amountToShares(
+        bravo_token, output_amount, False
+    ) == 0
+    bravo_token.transfer(governance, output_amount, sender=bravo_token_whale)
+    bravo_token.approve(deleverage, output_amount, sender=governance.address)
+
+    source_custody_before = alpha_token.balanceOf(simple_erc20_vault)
+    source_shares_before = simple_erc20_vault.userBalances(bob, alpha_token)
+    governance_alpha_before = alpha_token.balanceOf(governance)
+    governance_bravo_before = bravo_token.balanceOf(governance)
+    governance_allowance_before = bravo_token.allowance(governance, deleverage)
+    deleverage_bravo_before = bravo_token.balanceOf(deleverage)
+    teller_allowance_before = bravo_token.allowance(deleverage, teller)
+    target_custody_before = bravo_token.balanceOf(rebase_erc20_vault)
+    target_user_shares_before = rebase_erc20_vault.userBalances(bob, bravo_token)
+    target_total_shares_before = rebase_erc20_vault.totalBalances(bravo_token)
+    debt_before = ledger.userDebt(bob)
+    touch_before = ledger.lastTouch(bob)
+    source_ledger_before = ledger.getDepositLedgerData(bob, 3)
+    target_ledger_before = ledger.getDepositLedgerData(bob, 4)
+    source_user_points_before = ledger.userDepositPoints(bob, 3, alpha_token)
+    source_asset_points_before = ledger.assetDepositPoints(3, alpha_token)
+    target_user_points_before = ledger.userDepositPoints(bob, 4, bravo_token)
+    target_asset_points_before = ledger.assetDepositPoints(4, bravo_token)
+    global_points_before = ledger.globalDepositPoints()
+    rewards_before = ledger.ripeRewards()
+
+    with pytest.raises(BoaError) as exc_info:
+        deleverage.swapCollateral(
+            bob,
+            3,
+            alpha_token,
+            4,
+            bravo_token,
+            output_amount,
+            sender=governance.address,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", deleverage)
+
+    assert alpha_token.balanceOf(simple_erc20_vault) == source_custody_before
+    assert simple_erc20_vault.userBalances(bob, alpha_token) == source_shares_before
+    assert alpha_token.balanceOf(governance) == governance_alpha_before
+    assert bravo_token.balanceOf(governance) == governance_bravo_before
+    assert bravo_token.allowance(governance, deleverage) == governance_allowance_before
+    assert bravo_token.balanceOf(deleverage) == deleverage_bravo_before
+    assert bravo_token.allowance(deleverage, teller) == teller_allowance_before
+    assert bravo_token.balanceOf(rebase_erc20_vault) == target_custody_before
+    assert rebase_erc20_vault.userBalances(
+        bob, bravo_token
+    ) == target_user_shares_before
+    assert rebase_erc20_vault.totalBalances(bravo_token) == target_total_shares_before
+    assert ledger.userDebt(bob) == debt_before
+    assert ledger.lastTouch(bob) == touch_before
+    assert ledger.getDepositLedgerData(bob, 3) == source_ledger_before
+    assert ledger.getDepositLedgerData(bob, 4) == target_ledger_before
+    assert ledger.userDepositPoints(bob, 3, alpha_token) == source_user_points_before
+    assert ledger.assetDepositPoints(3, alpha_token) == source_asset_points_before
+    assert ledger.userDepositPoints(bob, 4, bravo_token) == target_user_points_before
+    assert ledger.assetDepositPoints(4, bravo_token) == target_asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == rewards_before
+
+    adjacent_amount = 2 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(governance, EIGHTEEN_DECIMALS, sender=bravo_token_whale)
+    bravo_token.approve(deleverage, adjacent_amount, sender=governance.address)
+    assert adjacent_amount * 10 ** 8 // (donation + 1) == 1
+    assert deleverage.swapCollateral(
+        bob,
+        3,
+        alpha_token,
+        4,
+        bravo_token,
+        adjacent_amount,
+        sender=governance.address,
+    ) == (adjacent_amount, adjacent_amount)
+    assert rebase_erc20_vault.userBalances(bob, bravo_token) == 1
 
 
 def test_deleverage_swap_housekeeping_uses_user_low_risk_and_updates_debt(
