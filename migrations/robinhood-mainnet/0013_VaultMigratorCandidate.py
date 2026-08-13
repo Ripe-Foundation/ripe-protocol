@@ -7,8 +7,10 @@ unpaused Robinhood candidate with no Base legacy-vault binding, then emits the
 exact Safe calldata for the timelocked append. ``0014`` performs registry
 readback before creating the first canonical manifest record.
 
-The H-06 Robinhood runner intentionally rejects this legacy deploy/send API.
-This plan requires a typed ``MIGRATION_STAGE`` conversion before execution.
+The H-06 runner that rejected this legacy deploy/send API has been removed.
+What now gates execution is MigrationRunner: it refuses a history that already
+holds a ``current-manifest.json`` unless an explicit ``--start-timestamp`` is
+given.
 """
 
 from scripts.utils import log

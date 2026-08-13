@@ -173,7 +173,11 @@ What does survive is `current-manifest.json` itself, written by
 `_append_manifest` on the first successful step. So that is the signal:
 
 - History has a `current-manifest.json` → refuse, unless the caller passes an
-  explicit `--start-timestamp` or `--is-retry`.
+  explicit `--start-timestamp`. `--force-replay` is **not** a bypass: after
+  merging rh it maps to `ignore_logs=is_retry`, so it ignores the transaction
+  journal and rebroadcasts -- the more dangerous mode, not the safer one. The
+  default already resumes from the journal and skips recorded receipts, so
+  resuming needs no flag at all.
 - No current manifest → first deployment, nothing to protect, runs as before.
 
 `MigrationRunner` enforces it and `Migration` fails closed for any other caller.
@@ -182,7 +186,8 @@ manifest check needs no list and covers Base, whose 66-migration redeploy was
 the larger exposure.
 
     python -m scripts.migrate --chain robinhood-mainnet --start-timestamp 2026081200
-    python -m scripts.migrate --chain robinhood-mainnet --is-retry
+    # resuming needs no flag: the default consumes the journal
+    python -m scripts.migrate --chain robinhood-mainnet --start-timestamp 2026081300
 
 **Owner decision (2026-08-12): deprecated, not to be rebuilt.** The script was
 scaffolding for exercising a lane before it was live, not an operator tool. The

@@ -13,8 +13,9 @@ with a timestamp `>= 0` — all 13 for `robinhood-mainnet`, all 66 for
 `base-mainnet`. So a bare run against a deployed history is a full redeploy, not
 a resume.
 
-`MigrationRunner` therefore requires either an explicit `--start-timestamp` or
-`--force-replay`/`--is-retry` before it will run against such a history. It is
+`MigrationRunner` therefore requires an explicit `--start-timestamp` before it
+will run against such a history. `--force-replay` is not a bypass: it ignores
+the transaction journal and rebroadcasts, which is the more dangerous mode. It is
 the only production constructor of `Migration`, so that is where the check
 lives; `Migration` itself does not gate, because rh's resume suite legitimately
 builds one directly against temporary histories that carry a current manifest.
@@ -40,11 +41,13 @@ def ripe_hq() -> None:
     """Keep this suite independent of protocol deployment."""
 
 
-def _args(is_retry: bool = False) -> SimpleNamespace:
+def _args(force_replay: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
         sender=SimpleNamespace(address="0x" + "1" * 40),
-        # migrate.py passes ignore_logs=not is_retry.
-        ignore_logs=not is_retry,
+        # Production mapping, from scripts/migrate.py: ignore_logs=is_retry,
+        # exposed as --force-replay (legacy alias --is-retry). Setting it
+        # ignores the journal and rebroadcasts; the default resumes from it.
+        ignore_logs=force_replay,
         rpc=None,
         chain="robinhood-mainnet",
         blueprint=None,
@@ -141,7 +144,7 @@ def test_replay_does_not_bypass_the_start_point(tmp_path, start):
         MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
     ):
         _runner(_history(tmp_path, deployed=True))._require_start_point(
-            _args(is_retry=True), start
+            _args(force_replay=True), start
         )
 
 
@@ -296,25 +299,26 @@ def test_current_manifests_keep_everything():
 # --- retrying a migration that failed partway ------------------------------
 
 
-def _with_log(tmp_path: Path, recorded, *, is_retry: bool):
+def _with_log(tmp_path: Path, recorded, *, force_replay: bool):
     history = _history(tmp_path, deployed=True)
     (history / "9999-log.json").write_text(json.dumps({"transactions": recorded}))
     args = SimpleNamespace(
         sender=SimpleNamespace(address="0x" + "1" * 40),
-        # scripts/migrate.py passes ignore_logs=not is_retry.
-        ignore_logs=not is_retry,
+        ignore_logs=force_replay,
         rpc=None,
         chain="robinhood-mainnet",
         blueprint=None,
     )
     return Migration(
-        args, {}, "9999", None, str(history), allow_deployed_history=True
+        args, {}, "9999", None, str(history)
     )
 
 
-def test_retry_skips_transactions_already_in_the_log(tmp_path):
+def test_default_resume_consumes_recorded_receipts(tmp_path):
+    # Default mode (no --force-replay) reads the journal and skips what it
+    # records. This is the production default, so a re-run resumes.
     broadcast = []
-    migration = _with_log(tmp_path, ["0xRECORDED"], is_retry=True)
+    migration = _with_log(tmp_path, ["0xRECORDED"], force_replay=False)
 
     result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
 
@@ -323,9 +327,10 @@ def test_retry_skips_transactions_already_in_the_log(tmp_path):
     assert broadcast == []
 
 
-def test_without_retry_the_log_is_ignored_and_everything_runs(tmp_path):
+def test_force_replay_ignores_the_journal_and_rebroadcasts(tmp_path):
+    # --force-replay is the dangerous mode: it ignores recorded receipts.
     broadcast = []
-    migration = _with_log(tmp_path, ["0xRECORDED"], is_retry=False)
+    migration = _with_log(tmp_path, ["0xRECORDED"], force_replay=True)
 
     result = migration.execute(lambda **_: broadcast.append("sent") or "0xNEW")
 
@@ -333,9 +338,9 @@ def test_without_retry_the_log_is_ignored_and_everything_runs(tmp_path):
     assert broadcast == ["sent"]
 
 
-def test_retry_resumes_at_the_first_incomplete_transaction(tmp_path):
+def test_resume_restarts_at_the_first_incomplete_transaction(tmp_path):
     broadcast = []
-    migration = _with_log(tmp_path, ["0xONE", "0xTWO"], is_retry=True)
+    migration = _with_log(tmp_path, ["0xONE", "0xTWO"], force_replay=False)
 
     first = migration.execute(lambda **_: broadcast.append(1) or "new")
     second = migration.execute(lambda **_: broadcast.append(2) or "new")
@@ -343,3 +348,50 @@ def test_retry_resumes_at_the_first_incomplete_transaction(tmp_path):
 
     assert [first, second, third] == ["0xONE", "0xTWO", "0xTHREE"]
     assert broadcast == [3], "only the transaction past the log should run"
+
+# --- one boundary, and it is the runner's -----------------------------------
+
+
+def test_migration_advertises_no_second_boundary():
+    """There is exactly one execution boundary and it lives in the runner.
+
+    An earlier revision left `Migration` carrying an `allow_deployed_history`
+    kwarg defaulted to True and `_execution_blocked` assigned False, with
+    branches that could never fire -- a safety API that read as enforcement and
+    was inert. Enforcement is `MigrationRunner._require_start_point`; the class
+    makes no claim of its own.
+    """
+    import inspect
+
+    from scripts.utils import migration as module
+
+    assert "allow_deployed_history" not in inspect.signature(
+        module.Migration.__init__
+    ).parameters
+    source = Path(module.__file__).read_text()
+    assert "_execution_blocked" not in source
+
+    # And the migrations no longer promise a protection that was removed.
+    root = Path(__file__).resolve().parents[2]
+    for path in (root / "migrations/robinhood-mainnet").glob("*.py"):
+        text = path.read_text()
+        assert "H-06 Robinhood runner intentionally rejects" not in text, path
+        assert "H-06 Robinhood runner deliberately forbids" not in text, path
+
+
+def test_direct_construction_cannot_bypass_the_runner_boundary(tmp_path):
+    """Constructing a Migration directly is not a way around the check.
+
+    The runner is the only production constructor, so the boundary sits there.
+    This pins the fact the reviewer asked for: the deployed-history refusal
+    cannot be sidestepped by building a Migration yourself and calling run
+    logic, because the refusal is what stands between a caller and a Migration
+    at all.
+    """
+    history = _history(tmp_path, deployed=True)
+    runner = MigrationRunner("migrations/robinhood-mainnet", str(history), {})
+
+    with pytest.raises(
+        MigrationHistoryError, match="H06_DEPLOYED_HISTORY_NEEDS_START_TIMESTAMP"
+    ):
+        runner.run(_args(), None, "0", True)

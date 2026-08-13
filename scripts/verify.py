@@ -9,7 +9,13 @@ import click
 from scripts.migrate import param_prompt, CLICK_PROMPTS
 from scripts.utils.verify_etherscan import CHAIN_SPECS, verify_from_manifest
 
-MIGRATION_HISTORY_DIR = "./migration_history"
+# Anchored to the repository, not the caller. A relative path made both the
+# manifest selected and the containment root of _history_manifest_path depend
+# on the working directory, so `python -m scripts.verify` outside the repo
+# resolved a different tree -- and the traversal guard was checking against
+# whatever root the caller happened to supply.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MIGRATION_HISTORY_DIR = REPO_ROOT / "migration_history"
 
 # scripts/verify_blockscout.py targets Robinhood mainnet only, so that is the
 # one chain we can honestly redirect to it. Pointing anything else there --

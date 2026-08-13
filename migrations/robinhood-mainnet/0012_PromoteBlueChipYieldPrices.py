@@ -1,7 +1,8 @@
 """Static plan to promote BlueChip only after PriceDesk slot-3 readback.
 
-The H-06 Robinhood runner intentionally rejects this legacy API. Convert this
-postcondition to a typed ``MIGRATION_STAGE`` action before execution.
+The H-06 runner that rejected this legacy API has been removed. Execution is
+now gated by MigrationRunner, which refuses a history that already holds a
+``current-manifest.json`` unless an explicit ``--start-timestamp`` is given.
 """
 
 from scripts.utils import log

@@ -37,10 +37,12 @@ off-repository consumer must use the regenerated ABIs before activation.
 UniswapV2Prices is intentionally absent. Its deployed instance is a direct
 monitoring surface and must never occupy a PriceDesk registry slot.
 
-The H-06 Robinhood runner deliberately forbids this legacy deploy/send API.
-This module is therefore a reviewable action plan, not an executable
-production migration, until converted to typed ``MIGRATION_STAGE`` actions and
-the separately authorized executor/manifest lifecycle.
+The H-06 runner that forbade this legacy deploy/send API has been removed, so
+that is no longer what holds this back. What does: ``MigrationRunner`` refuses
+to run against a history that already holds a ``current-manifest.json`` unless
+the caller names an explicit ``--start-timestamp``. Deploying still changes no
+live wiring on its own, and promotion to the canonical label remains a
+separate, governance-gated migration.
 """
 
 from scripts.utils import log

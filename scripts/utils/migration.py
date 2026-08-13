@@ -408,9 +408,6 @@ class Migration:
         timestamp,
         previous_timestamp,
         history_path,
-        # Retained for callers that passed it while Migration also gated;
-        # enforcement now lives in MigrationRunner._require_start_point.
-        allow_deployed_history=True,
     ):
         self._hq = None
         self._files = files
@@ -423,14 +420,9 @@ class Migration:
         self._contracts = {}
         self._contract_files = {}
         self._args = {}
-        self._execution_blocked = False
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
         self.gas = 0
-
-        if self._execution_blocked:
-            self._previous_manifest = {}
-            return
 
         try:
             filename = self._manifest_filename("current")
@@ -643,9 +635,6 @@ class Migration:
         with foundry) or skips if already deployed.
         Returns the deployed contract.
         """
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         label = kwargs.pop("label", name)
         source_file = kwargs.pop("source_file", None)
 
@@ -718,10 +707,6 @@ class Migration:
         """
         Ends the migration and saves the manifest file
         """
-        if self._execution_blocked:
-            log.info(f"Gas spent for migration: {self.gas}")
-            return self.gas
-
         # A numbered manifest is a completed-migration checkpoint. During the
         # migration, deployments live only in a timestamp-scoped pending file;
         # neither a partial step nor a failed retry may become `current`.
@@ -836,8 +821,6 @@ class Migration:
         validated before the pending manifest is written once. Candidate
         records are copied whole so stale metadata cannot survive promotion.
         """
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
         if not isinstance(promotions, (list, tuple)) or not promotions:
             raise RuntimeError("MIGRATION_PROMOTION_BATCH_INVALID")
 
@@ -1005,9 +988,6 @@ class Migration:
         """
         self._last_run_was_resume = False
         self._last_resumed_transaction = None
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_EXECUTION_FORBIDDEN")
-
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
 
@@ -1064,9 +1044,6 @@ class Migration:
         )
 
     def _append_manifest(self, contract_name):
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_MANIFEST_WRITE_FORBIDDEN")
-
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
@@ -1082,16 +1059,12 @@ class Migration:
         return merged_manifest
 
     def _load_log_file(self):
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_LOG_FORBIDDEN")
         if self._deploy_args.ignore_logs:
             raise RuntimeError("MIGRATION_LOG_REPLAY_REQUESTED")
         logs = json_file.load(self._log_filename())
         self._transactions = logs["transactions"]
 
     def _save_log_file(self):
-        if self._execution_blocked:
-            raise MigrationHistoryError("H06_LEGACY_LOG_FORBIDDEN")
         json_file.save(
             self._log_filename(),
             {
