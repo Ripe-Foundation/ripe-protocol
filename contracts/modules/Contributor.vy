@@ -494,6 +494,8 @@ def _getTotalVested() -> uint256:
     if block.timestamp <= startTime:
         return 0 # has future start time
     compensation: uint256 = self.compensation
+    if compensation == 0:
+        return 0 # cancelled / terminal agreement
     return min(compensation, compensation * (block.timestamp - startTime) // (self.endTime - startTime))
 
 

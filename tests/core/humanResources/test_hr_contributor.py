@@ -160,6 +160,12 @@ def manager_address(valid_contributor_terms):
     return valid_contributor_terms["manager"]
 
 
+def _assert_zero_vesting_views(contributor):
+    assert contributor.getTotalVested() == 0
+    assert contributor.getClaimable() == 0
+    assert contributor.getUnvestedComp() == 0
+
+
 # Test Initialization
 
 
@@ -1091,6 +1097,190 @@ def test_contributor_cancel_paycheck_before_cliff(
     assert contributor_contract.compensation() == 0  # All forfeited
     assert contributor_contract.endTime() == boa.env.evm.patch.timestamp
     assert contributor_contract.totalClaimed() == original_total_claimed  # No change since no cash
+
+
+def test_contributor_cancel_before_future_start_keeps_terminal_views_callable(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    switchboard_alpha,
+    ledger,
+):
+    """AUD-015: a pre-start cancellation remains a valid terminal agreement."""
+    terms = dict(valid_contributor_terms)
+    contributor = Contributor.at(deployedContributor(terms))
+    setupRipeGovVaultConfig()
+
+    original_start = contributor.startTime()
+    original_compensation = contributor.compensation()
+    available_before = ledger.ripeAvailForHr()
+    assert boa.env.evm.patch.timestamp < original_start
+
+    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+
+    assert contributor.compensation() == 0
+    assert contributor.endTime() < original_start
+    assert ledger.ripeAvailForHr() == available_before + original_compensation
+
+    boa.env.time_travel(
+        seconds=original_start - boa.env.evm.patch.timestamp + 1
+    )
+    _assert_zero_vesting_views(contributor)
+
+
+def test_contributor_cancel_exactly_at_start_keeps_terminal_views_callable(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    switchboard_alpha,
+    ledger,
+):
+    """AUD-015: an exact-start cancellation cannot leave a zero denominator."""
+    contributor = Contributor.at(deployedContributor(dict(valid_contributor_terms)))
+    setupRipeGovVaultConfig()
+
+    original_start = contributor.startTime()
+    original_compensation = contributor.compensation()
+    available_before = ledger.ripeAvailForHr()
+    boa.env.time_travel(seconds=original_start - boa.env.evm.patch.timestamp)
+    assert boa.env.evm.patch.timestamp == original_start
+
+    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+
+    assert contributor.compensation() == 0
+    assert contributor.endTime() == original_start
+    assert ledger.ripeAvailForHr() == available_before + original_compensation
+
+    boa.env.time_travel(seconds=1)
+    _assert_zero_vesting_views(contributor)
+
+
+def test_contributor_cancel_after_start_before_cliff_stays_terminal(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    switchboard_alpha,
+    ledger,
+):
+    """A no-claim pre-cliff cancellation stays terminal as time advances."""
+    contributor = Contributor.at(deployedContributor(dict(valid_contributor_terms)))
+    setupRipeGovVaultConfig()
+
+    original_compensation = contributor.compensation()
+    original_cliff = contributor.cliffTime()
+    target = contributor.startTime() + (
+        original_cliff - contributor.startTime()
+    ) // 2
+    boa.env.time_travel(seconds=target - boa.env.evm.patch.timestamp)
+    assert contributor.startTime() < boa.env.evm.patch.timestamp < original_cliff
+    assert contributor.getTotalVested() > 0
+    available_before = ledger.ripeAvailForHr()
+
+    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+
+    assert contributor.compensation() == 0
+    assert ledger.ripeAvailForHr() == available_before + original_compensation
+    _assert_zero_vesting_views(contributor)
+
+    boa.env.time_travel(
+        seconds=original_cliff - boa.env.evm.patch.timestamp + 1
+    )
+    _assert_zero_vesting_views(contributor)
+
+
+def test_contributor_pre_cliff_claim_stays_in_contributor_custody_until_unlock(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+):
+    """AUD-013: the cliff is not a claim or Contributor-custody boundary."""
+    contributor = Contributor.at(deployedContributor(dict(valid_contributor_terms)))
+    setupRipeGovVaultConfig()
+
+    target = contributor.startTime() + (
+        contributor.cliffTime() - contributor.startTime()
+    ) // 2
+    boa.env.time_travel(seconds=target - boa.env.evm.patch.timestamp)
+    assert contributor.startTime() < boa.env.evm.patch.timestamp < contributor.cliffTime()
+    vested = contributor.getTotalVested()
+    claimable = contributor.getClaimable()
+    assert vested > 0
+    assert claimable > 0
+
+    claimed_before = contributor.totalClaimed()
+    position_before = ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
+    owner_balance_before = ripe_token.balanceOf(contributor.owner())
+    contributor_balance_before = ripe_token.balanceOf(contributor)
+    assert contributor_balance_before == 0
+    claimed = contributor.cashRipeCheck(sender=contributor.owner())
+
+    assert claimed == claimable
+    assert contributor.totalClaimed() == claimed_before + claimed
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
+        == position_before + claimed
+    )
+    assert ripe_token.balanceOf(contributor.owner()) == owner_balance_before
+    assert ripe_token.balanceOf(contributor) == contributor_balance_before
+
+    contributor_position = ripe_gov_vault.getTotalAmountForUser(
+        contributor, ripe_token
+    )
+    assert not contributor.hasPendingRipeTransfer()
+    with boa.reverts("time not past unlock"):
+        contributor.initiateRipeTransfer(False, sender=contributor.owner())
+    assert not contributor.hasPendingRipeTransfer()
+    assert (
+        ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token)
+        == contributor_position
+    )
+
+
+def test_contributor_pre_cliff_cancel_burns_claimed_position_and_stays_terminal(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+    switchboard_alpha,
+    ledger,
+):
+    """A pre-cliff claim remains fully forfeitable through the existing HR path."""
+    contributor = Contributor.at(deployedContributor(dict(valid_contributor_terms)))
+    setupRipeGovVaultConfig()
+
+    original_compensation = contributor.compensation()
+    original_cliff = contributor.cliffTime()
+    target = contributor.startTime() + (
+        original_cliff - contributor.startTime()
+    ) // 2
+    boa.env.time_travel(seconds=target - boa.env.evm.patch.timestamp)
+    claimable = contributor.getClaimable()
+    assert claimable > 0
+    assert contributor.cashRipeCheck(sender=contributor.owner()) == claimable
+
+    contributor_position = ripe_gov_vault.getTotalAmountForUser(
+        contributor, ripe_token
+    )
+    assert contributor_position == claimable
+    assert contributor_position > 0
+    available_before = ledger.ripeAvailForHr()
+    supply_before = ripe_token.totalSupply()
+
+    contributor.cancelPaycheck(sender=switchboard_alpha.address)
+
+    assert contributor.compensation() == 0
+    assert ripe_gov_vault.getTotalAmountForUser(contributor, ripe_token) == 0
+    assert ledger.ripeAvailForHr() == available_before + original_compensation
+    assert ripe_token.totalSupply() == supply_before - contributor_position
+    _assert_zero_vesting_views(contributor)
+
+    boa.env.time_travel(
+        seconds=original_cliff - boa.env.evm.patch.timestamp + 1
+    )
+    _assert_zero_vesting_views(contributor)
 
 
 def test_contributor_cancel_paycheck_after_end(
