@@ -21,6 +21,14 @@ def filter_logs(contract, event_name, _strict=False):
     return [e for e in contract.get_logs(strict=_strict) if type(e).__name__ == event_name]
 
 
+def get_boa_dev_reasons(error):
+    return {
+        frame.dev_reason.reason_str
+        for frame in error.stack_trace
+        if getattr(frame, "dev_reason", None) is not None
+    }
+
+
 def redeem_collateral(
     teller,
     user,

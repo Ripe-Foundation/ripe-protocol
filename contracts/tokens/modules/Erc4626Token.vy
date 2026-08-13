@@ -54,6 +54,8 @@ def totalAssets() -> uint256:
 @view
 @external
 def maxDeposit(_receiver: address) -> uint256:
+    if token.isPaused or token.blacklisted[_receiver]:
+        return 0
     return max_value(uint256)
 
 
@@ -83,6 +85,8 @@ def deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:
 @view
 @external
 def maxMint(_receiver: address) -> uint256:
+    if token.isPaused or token.blacklisted[_receiver]:
+        return 0
     return max_value(uint256)
 
 
@@ -127,7 +131,9 @@ def _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: ad
 @view
 @external
 def maxWithdraw(_owner: address) -> uint256:
-    return staticcall IERC20(ASSET).balanceOf(self)
+    if token.isPaused or token.blacklisted[_owner]:
+        return 0
+    return self._sharesToAmount(token.balanceOf[_owner], token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)
 
 
 @view
@@ -150,6 +156,8 @@ def withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address 
 @view
 @external
 def maxRedeem(_owner: address) -> uint256:
+    if token.isPaused or token.blacklisted[_owner]:
+        return 0
     return token.balanceOf[_owner]
 
 
@@ -187,9 +195,12 @@ def _redeem(
     assert _shares != 0 # dev: cannot redeem 0 shares
     assert _recipient != empty(address) # dev: invalid recipient
 
+    assert not token.isPaused # dev: token paused
+    assert not token.blacklisted[_owner] # dev: owner blacklisted
     assert token.balanceOf[_owner] >= _shares # dev: insufficient shares
 
     if _sender != _owner:
+        assert not token.blacklisted[_sender] # dev: spender blacklisted
         token._spendAllowance(_owner, _sender, _shares)
 
     token._burn(_owner, _shares)

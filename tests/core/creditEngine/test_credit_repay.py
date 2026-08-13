@@ -1,7 +1,8 @@
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import filter_logs, get_boa_dev_reasons
 
 
 def test_basic_repay(
@@ -722,6 +723,98 @@ def test_repay_with_savings_green_payment(
 
     # verify green tokens were sent to credit engine
     assert green_token.balanceOf(credit_engine) == 0  # credit engine burns them immediately
+
+
+def test_teller_savings_green_payment_control_boundaries_are_atomic(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    switchboard,
+    governance,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    borrow_amount = teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    green_token.approve(savings_green, borrow_amount, sender=bob)
+    shares = savings_green.deposit(borrow_amount, bob, sender=bob)
+    savings_green.approve(teller, shares, sender=bob)
+    repay_shares = shares // 2
+
+    def payment_state():
+        return (
+            savings_green.balanceOf(bob),
+            savings_green.balanceOf(teller),
+            savings_green.balanceOf(credit_engine),
+            savings_green.totalSupply(),
+            savings_green.allowance(bob, teller),
+            savings_green.lastPricePerShare(),
+            green_token.balanceOf(bob),
+            green_token.balanceOf(teller),
+            green_token.balanceOf(credit_engine),
+            green_token.balanceOf(savings_green),
+            ledger.userDebt(bob).amount,
+        )
+
+    with boa.env.anchor():
+        savings_green.setBlacklist(bob, True, sender=switchboard.address)
+        assert savings_green.blacklisted(bob)
+        before = payment_state()
+        with pytest.raises(boa.BoaError) as exc_info:
+            teller.repay(repay_shares, bob, True, False, sender=bob)
+        assert "sender blacklisted" in get_boa_dev_reasons(exc_info.value)
+        assert payment_state() == before
+
+    with boa.env.anchor():
+        green_token.setBlacklist(credit_engine, True, sender=switchboard.address)
+        assert green_token.blacklisted(credit_engine)
+        assert not savings_green.blacklisted(credit_engine)
+        before = payment_state()
+        with pytest.raises(boa.BoaError) as exc_info:
+            teller.repay(repay_shares, bob, True, False, sender=bob)
+        assert "recipient blacklisted" in get_boa_dev_reasons(exc_info.value)
+        assert payment_state() == before
+
+    with boa.env.anchor():
+        savings_green.pause(True, sender=governance.address)
+        assert savings_green.isPaused()
+        before = payment_state()
+        with pytest.raises(boa.BoaError) as exc_info:
+            teller.repay(repay_shares, bob, True, False, sender=bob)
+        assert "token paused" in get_boa_dev_reasons(exc_info.value)
+        assert payment_state() == before
+
+    with boa.env.anchor():
+        savings_green.setBlacklist(
+            credit_engine,
+            True,
+            sender=switchboard.address,
+        )
+        assert savings_green.blacklisted(credit_engine)
+        assert not green_token.blacklisted(credit_engine)
+        debt_before = ledger.userDebt(bob).amount
+        assert teller.repay(repay_shares, bob, True, False, sender=bob)
+        assert savings_green.balanceOf(bob) == shares - repay_shares
+        assert ledger.userDebt(bob).amount < debt_before
+        assert green_token.balanceOf(credit_engine) == 0
 
 
 def test_repay_with_savings_green_payment_max_amount(
