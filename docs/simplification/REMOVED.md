@@ -264,11 +264,11 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**119 files removed.**
+**118 files removed.**
 
 The two `Deployment tooling` sections below are this PR's removals — the unused
 H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
-Recovery metadata for the 19 (git mode, blob id, byte length, sha256, and a
+Recovery metadata for the 18 (git mode, blob id, byte length, sha256, and a
 commit each is retrievable from) is in `extracted-files.tsv` under the
 `deployment-tooling` and `deployment-tooling-test` categories.
 
@@ -314,7 +314,7 @@ regardless of where `origin/rh` moves next.
 - `scripts/utils/deployment_assertions.py`
 - `scripts/utils/manifest_schema.py`
 
-## Deployment tooling tests (8)
+## Deployment tooling tests (7)
 
 - `tests/deployment/test_current_manifest_promotion.py`
 - `tests/deployment/test_manifest_schema.py`
@@ -323,7 +323,6 @@ regardless of where `origin/rh` moves next.
 - `tests/deployment_profiles/test_ledger_artifact_bundle.py`
 - `tests/deployment_profiles/test_ledger_robinhood_profile.py`
 - `tests/deployment_profiles/test_lootbox_deployment_profiles.py`
-- `tests/test_ccip_hardening.py`
 
 ## Evidence records (13)
 
