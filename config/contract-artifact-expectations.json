@@ -382,21 +382,21 @@
         "committed_path": "scripts/abis/CreditEngine.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "bb47d756f6dda37543fbea7e9e01adec2cf8dc14e80078771c9e0cae0077167e",
-        "creation_executable_prefix_size": 24593,
-        "creation_metadata_sha256": "1d3ca2fdcef0af1bb589c2b01d9135cd6806d64d8dd67a4eb6ed6802ca3b1b23",
+        "creation_executable_prefix_sha256": "da4e728bbda8fae03e0308d180d4a6f3be6294c0c003017fb43ae52dbe01c315",
+        "creation_executable_prefix_size": 24606,
+        "creation_metadata_sha256": "957d78771db9c4e2fb4fcd999bba2d72ffecbc6ef25a9820e3aacbacab8f6bb6",
         "creation_metadata_size": 70,
-        "creation_sha256": "0f9ff1e10f4b4bab527757e2d0eb3c96c1df305cc04e5113690ff6f3d3852af6",
-        "creation_size": 24663,
-        "deployed_eip170_headroom": 21,
+        "creation_sha256": "30faef87959b42792a3210e10c8528fac6df7e92cc34b8b8fb9ad535da22e122",
+        "creation_size": 24676,
+        "deployed_eip170_headroom": 8,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "f53dbcb2d9497fd6852b3bf76bf426903c994c0d4e9fc711cd830fc8611b1fe7",
-        "deployed_runtime_size": 24555,
-        "eip170_headroom": 117,
-        "runtime_template_sha256": "5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac",
-        "runtime_template_size": 24459
+        "deployed_runtime_sha256": "8571a7113606ed6d9c7680388a8d5ff73ae2f83cd224177e2bcf16bf6a77a691",
+        "deployed_runtime_size": 24568,
+        "eip170_headroom": 104,
+        "runtime_template_sha256": "9acae4cc64812f5fbe6039d7d83bc341b5d0b1a0ee31b999616f2d9724254ecf",
+        "runtime_template_size": 24472
       },
       "code_layout": {
         "addys": {
@@ -446,9 +446,9 @@
         "canonical_sha256": "4fd29412b11eab9b8406f18f7209bb4022902293893e17c6cf1f0429735a4c38",
         "count": 51
       },
-      "source_git_blob": "745e443c7c9a243ef4efb1d0613b3e85b290b11d",
+      "source_git_blob": "e6765113ad57b825bdafebccb65c33cf56041daa",
       "source_path": "contracts/core/CreditEngine.vy",
-      "source_sha256": "5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946",
+      "source_sha256": "cc1ecad3b798bef4fd9788f1885e32736beea833fe9672c7840f555d89ad13e4",
       "storage_layout": {
         "buybackRatio": {
           "n_slots": 1,
@@ -469,7 +469,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "48fff3d94d0fa0fe2a1ea220b2dc72fb1cee2cf123f40e52f035dcc517620243"
+      "transitive_compiler_input_integrity": "c20a3a6866482acbba886419e82d9e1d46ca31aa7df2960a068bc24a79c67ffb"
     },
     "DefaultsRobinhood": {
       "abi": {
@@ -1612,21 +1612,21 @@
         "committed_path": "scripts/abis/SimpleErc20.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "7ae127e5089f44695b68f144a8eb834772669152d04c90f59f995fb7ba7d3b25",
-        "creation_executable_prefix_size": 9555,
-        "creation_metadata_sha256": "c0caea777af5503d879d106c93f72f66fa73412ed92a70e30ad927599b4fe965",
+        "creation_executable_prefix_sha256": "bc255cbd213247c84930e5096eb67230f1fa5b5ea787c3c55b7ade39fa8e4e23",
+        "creation_executable_prefix_size": 9662,
+        "creation_metadata_sha256": "a81f768fc938d48bfa11fc10414ed1559dbdab131f6a9a94a7c92e829e9ccb62",
         "creation_metadata_size": 56,
-        "creation_sha256": "eba2a6713ef9bf1577f83eb009781372b71fe34ad9c86a6b6c982b325e7282ff",
-        "creation_size": 9611,
-        "deployed_eip170_headroom": 15100,
+        "creation_sha256": "f285d360cb5552a84b752281a15c51eaa135ab01875994d84f359b9f4434049d",
+        "creation_size": 9718,
+        "deployed_eip170_headroom": 14993,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
         "deployed_runtime_immutable_data_sha256": "ed83a2128f485fcbc1398a96a19ee7ca74d961970458483ec5d3c6457210d7c1",
         "deployed_runtime_immutable_data_size": 32,
-        "deployed_runtime_sha256": "76744f443fb3e130d81221d61f855c1d9af78dca2ff747de81875b783918ebbe",
-        "deployed_runtime_size": 9476,
-        "eip170_headroom": 15132,
-        "runtime_template_sha256": "08299d1c0de3fa5e21bad90dce1ebf849a40b85ced79dc66aebe21bdf93c9354",
-        "runtime_template_size": 9444
+        "deployed_runtime_sha256": "c44749e07b0396e6431f6b05de3253409cee4c97a1434de470a538c129af60aa",
+        "deployed_runtime_size": 9583,
+        "eip170_headroom": 15025,
+        "runtime_template_sha256": "a2d0c17272251c4313555ea564b5f201f2817a149089891898a222e0c149252b",
+        "runtime_template_size": 9551
       },
       "code_layout": {
         "addys": {
@@ -1723,7 +1723,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "565e3e8f89cc93ee1223b214181a63ad2b7b54b5fe27bca43677eccb4a4eefa5"
+      "transitive_compiler_input_integrity": "114fdc312c617c3ce07add3a413d07dafb7806e64766a5eb01df41a5eeaa63fe"
     },
     "StabilityPool": {
       "abi": {

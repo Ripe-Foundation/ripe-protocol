@@ -26,10 +26,8 @@ POSITION_DISCOVERY_GETTERS = {
     "numUserAssets",
     "userAssets",
 }
-REWARD_GETTERS = {
-    "getTotalAmountForVault",
-    "getUserLootBoxShare",
-}
+QUARANTINE_STATUS_GETTERS = {"getTotalAmountForVault"}
+REWARD_GETTERS = {"getTotalAmountForVault", "getUserLootBoxShare"}
 CAPABILITY_GETTERS = {"isSupportedVaultAsset"}
 
 
@@ -120,7 +118,8 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
     category_getters = {
         "value_backing_required": BACKING_AWARE_GETTERS,
         "position_discovery_nominal_allowed": POSITION_DISCOVERY_GETTERS,
-        "reward_accounting_nominal_allowed": REWARD_GETTERS,
+        "quarantine_status_backing_required": QUARANTINE_STATUS_GETTERS,
+        "reward_accounting_backing_aware": REWARD_GETTERS,
         "capability_discovery_nominal_allowed": CAPABILITY_GETTERS,
     }
     assert set(inventory["getter_scope"]) == set().union(
@@ -143,23 +142,25 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
             for source in test_sources
         )
 
-    required_paths = {
+    backing_aware_paths = {
         (row["path"], row["line"])
         for row in inventory["rows"]
-        if row["classification"] == "value_backing_required"
+        if row["classification"]
+        in {"value_backing_required", "quarantine_status_backing_required"}
     }
-    assert required_paths == {
+    assert backing_aware_paths == {
         ("contracts/core/AuctionHouse.vy", 431),
         ("contracts/core/AuctionHouse.vy", 527),
         ("contracts/core/AuctionHouse.vy", 902),
         ("contracts/core/AuctionHouse.vy", 1215),
         ("contracts/core/AuctionHouse.vy", 1243),
-        ("contracts/core/CreditEngine.vy", 729),
-        ("contracts/core/CreditEngine.vy", 1249),
-        ("contracts/core/CreditRedeem.vy", 190),
-        ("contracts/core/Deleverage.vy", 579),
-        ("contracts/core/Deleverage.vy", 1086),
-        ("contracts/core/Teller.vy", 407),
+        ("contracts/core/CreditEngine.vy", 732),
+        ("contracts/core/CreditEngine.vy", 749),
+        ("contracts/core/CreditEngine.vy", 1248),
+        ("contracts/core/CreditRedeem.vy", 191),
+        ("contracts/core/Deleverage.vy", 561),
+        ("contracts/core/Deleverage.vy", 1068),
+        ("contracts/core/Teller.vy", 408),
         ("contracts/core/VaultMigrator.vy", 472),
         ("contracts/core/VaultMigrator.vy", 523),
     }
