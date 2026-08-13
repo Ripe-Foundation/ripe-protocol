@@ -40,7 +40,7 @@ payload, and verification runs against `current-manifest.json`.
 unusable. `Migration._append_manifest` reads only a step's own file, during that
 step, to accumulate within it; `current-manifest.json` is the cumulative
 authority every other reader uses. So a numbered manifest is a record, and
-address/file/args is the whole record.
+address/file is the whole record.
 
 Do not extend this to `current-manifest.json`. `solc_json` is exactly what makes
 a contract verifiable -- it carries the standard-JSON input and the compiler

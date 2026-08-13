@@ -30,6 +30,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import scripts.utils.migration as migration_module
 from scripts.utils.migration import (CURRENT_MANIFEST, Migration,
                                      MigrationHistoryError,
                                      history_has_deployment)
@@ -272,6 +273,83 @@ def test_step_manifests_keep_the_record_and_drop_the_bulk():
             where = f"{path.name}:{name}"
             assert set(record) <= {"address", "file"}, where
             assert "address" in record, where
+
+
+def test_end_writes_a_slim_step_manifest_scoped_to_this_migration(tmp_path, monkeypatch):
+    """The producer, not just the committed data, matches the documented schema.
+
+    A prior revision documented the address/file-only, this-step-only shape
+    but never implemented it: `end()` copied the full cumulative manifest --
+    same bytes as current-manifest.json -- to the numbered file too. It read
+    as slim only because the committed step manifests had been hand-trimmed
+    after the fact; the next real migration would have silently written the
+    bulk format again. This exercises the actual write path.
+    """
+    history = _history(tmp_path, deployed=False)
+    (history / "current-manifest.json").write_text(json.dumps({
+        "contracts": {
+            "Existing": {
+                "address": "0x" + "1" * 40,
+                "file": "Existing.vy",
+                "abi": [{"name": "old"}],
+                "solc_json": {"old": True},
+                "args": "old",
+            }
+        }
+    }))
+
+    def fake_manifest(contracts, contract_files, args, files):
+        return {
+            "contracts": {
+                name: {
+                    "address": value,
+                    "file": "New.vy",
+                    "abi": [{"name": "new"}],
+                    "solc_json": {"language": "Vyper"},
+                    "args": "encoded",
+                }
+                for name, value in contracts.items()
+            }
+        }
+
+    monkeypatch.setattr(migration_module, "deployed_contracts_manifest", fake_manifest)
+    migration = _migration(history)
+    migration._contracts["New"] = "0x" + "2" * 40
+    migration._append_manifest("New")
+    migration.end()
+
+    step = json.loads((history / "9999-manifest.json").read_text())
+    current = json.loads((history / "current-manifest.json").read_text())
+
+    # current-manifest.json is untouched: cumulative, full record, both
+    # contracts.
+    assert set(current["contracts"]) == {"Existing", "New"}
+    assert current["contracts"]["New"]["abi"] == [{"name": "new"}]
+
+    # The step manifest attributes only what *this* migration deployed --
+    # "New", not the pre-existing "Existing" -- and only address/file.
+    assert step == {"contracts": {"New": {"address": "0x" + "2" * 40, "file": "New.vy"}}}
+
+
+def test_end_writes_an_empty_step_manifest_when_nothing_was_deployed(tmp_path):
+    """An execute-only migration attributes nothing, not everything before it.
+
+    CcipWire-shaped migrations call only `execute()`, which never reaches
+    `_append_manifest`. Before this, `end()` fell back to
+    `self._previous_manifest` -- the full cumulative history -- and wrote
+    that to the numbered manifest, so an execute-only step would have claimed
+    every contract ever deployed as its own.
+    """
+    history = _history(tmp_path, deployed=False)
+    (history / "current-manifest.json").write_text(json.dumps({
+        "contracts": {"Existing": {"address": "0x" + "1" * 40, "file": "Existing.vy"}}
+    }))
+
+    migration = _migration(history)
+    migration.end()
+
+    step = json.loads((history / "9999-manifest.json").read_text())
+    assert step == {"contracts": {}}
 
 
 def test_current_manifests_keep_everything():

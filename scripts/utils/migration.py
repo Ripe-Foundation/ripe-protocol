@@ -400,6 +400,36 @@ def history_has_deployment(history_path):
     return os.path.exists(os.path.join(str(history_path), CURRENT_MANIFEST))
 
 
+_STEP_MANIFEST_FIELDS = frozenset({"address", "file"})
+
+
+def _slim_step_manifest(manifest, contract_names):
+    """Reduce a full manifest to a step manifest: this step's attribution only.
+
+    current-manifest.json is the cumulative, verifiable record (abi, solc_json,
+    args, address, file, for every contract deployed to date); a numbered step
+    manifest exists only so a migration ID can be resolved back to the
+    addresses *it* deployed (`verify --migration <timestamp>`, history
+    readers). `manifest` here is the post-merge cumulative record, so this
+    both narrows to `contract_names` -- what this migration actually touched,
+    tracked in `self._contracts` -- and drops every field but address/file.
+    An execute-only migration that deploys nothing correctly gets an empty
+    step manifest rather than a copy of everything deployed before it.
+    """
+    contracts = manifest.get("contracts", {})
+    return {
+        "contracts": {
+            name: {
+                key: value
+                for key, value in contracts[name].items()
+                if key in _STEP_MANIFEST_FIELDS
+            }
+            for name in contract_names
+            if name in contracts
+        }
+    }
+
+
 class Migration:
     def __init__(
         self,
@@ -722,7 +752,10 @@ class Migration:
         # and its log/pending journal completes the checkpoint; it never skips
         # ahead with an old current manifest.
         json_file.save(self._manifest_filename("current"), final_manifest)
-        json_file.save(self._manifest_filename(self._timestamp), final_manifest)
+        json_file.save(
+            self._manifest_filename(self._timestamp),
+            _slim_step_manifest(final_manifest, self._contracts),
+        )
 
         if os.path.exists(pending_filename):
             os.remove(pending_filename)
@@ -929,9 +962,15 @@ class Migration:
             _label,
             _activation,
             candidate,
-            _address,
+            address,
         ) in validated:
             promoted_manifest["contracts"][canonical_name] = copy.deepcopy(candidate)
+            # Promotion bypasses `_register_contract`, which is the usual
+            # place `self._contracts` gets a new key. `end()` slims the step
+            # manifest to exactly the names in `self._contracts`, so without
+            # this a promoted contract would be silently absent from its own
+            # step manifest's attribution.
+            self._contracts[canonical_name] = address
         # A pending manifest is resumable only when its timestamp log exists.
         # Persist the (possibly empty) transaction list first. A crash after the
         # subsequent manifest save can then reload this same local checkpoint.
