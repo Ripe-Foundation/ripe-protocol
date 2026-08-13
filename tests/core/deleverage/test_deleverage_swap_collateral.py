@@ -7,16 +7,16 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
 
 
-def test_m4_deleverage_source_abi_and_vault_interface_are_frozen():
-    """M4 adds proof only: consumer source, ABI, and shared interface stay exact."""
+def test_deleverage_source_abi_and_vault_interface_hashes_are_current():
+    """Pin the approved quarantine implementation and its exported ABI."""
 
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/Deleverage.vy": (
-            "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138"
+            "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c"
         ),
         "scripts/abis/Deleverage.json": (
-            "7de1944637565f5640169b879a13705706332cd171ae41579c45dfe5da72cb43"
+            "e1d03ccd37548984f2c0a0b016cdb3c2730549793676f6172f3a70670cb43b3e"
         ),
         "interfaces/Vault.vyi": (
             "6769283fa780a63e1b2e2fc56b8ef51f3ff9b5883f4f1c4af8905fd0b20ffde7"

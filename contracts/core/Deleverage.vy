@@ -114,6 +114,7 @@ struct UserBorrowTerms:
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
     highestLtv: uint256
+    hasQuarantinedAsset: bool
 
 struct UserDebt:
     amount: uint256
@@ -256,25 +257,6 @@ def __init__(
 ###################
 
 
-# single user
-
-
-@external
-def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    isTrusted: bool = addys._isValidRipeAddr(_caller)
-    if not isTrusted:
-        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
-    endaomentPsm: address = addys._getEndaomentPsmAddr()
-    psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
-    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, _targetRepayAmount, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
-    assert repaidAmount != 0 # dev: cannot deleverage
-    return repaidAmount
-
-
 # many users
 
 
@@ -333,7 +315,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     newInterest: uint256 = 0
     userDebt, bt, newInterest = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
     # This tracks remaining collateral budget, not just remaining debt, once the buffer fires.
@@ -423,7 +405,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     newInterest: uint256 = 0
     userDebt, bt, newInterest = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
     maxTargetRepayAmount: uint256 = userDebt.amount
@@ -567,7 +549,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return False
 
     vaultId: uint256 = _vaultId
@@ -691,7 +673,7 @@ def _deleverageUser(
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     newInterest: uint256 = 0
     userDebt, bt, newInterest = staticcall CreditEngine(_a.creditEngine).getLatestUserDebtAndTerms(_user, True, _a)
-    if userDebt.amount == 0:
+    if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
     # finalize target repay amount
@@ -1126,7 +1108,7 @@ def getMaxDeleverageAmount(_user: address) -> uint256:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, False, a)
-    if userDebt.amount == 0 or userDebt.inLiquidation or bt.collateralVal == 0:
+    if userDebt.amount == 0 or userDebt.inLiquidation or bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
     if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):

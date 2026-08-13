@@ -1714,15 +1714,8 @@ def test_remove_single_bond_booster_immediate_execution(
 # ========================================
 
 
-def test_deleverage_user_permissions(switchboard_delta, governance, alice, bob, mission_control):
-    """Test deleverageUser requires governance or lite action permission to enable"""
-    # Non-governance without lite access cannot call
-    with boa.reverts("no perms"):
-        switchboard_delta.deleverageUser(alice, sender=bob)
-
-    # Grant bob lite access - verify the permission is granted
-    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
-    assert mission_control.canPerformLiteAction(bob)
+def test_singular_deleverage_api_is_removed(switchboard_delta):
+    assert not hasattr(switchboard_delta, "deleverageUser")
 
 
 def test_deleverage_many_users_permissions(switchboard_delta, governance, alice, bob, mission_control):

@@ -391,26 +391,26 @@ owner_priority_overlay:
   parked_lanes:
     - id: PARK-ZERO-BACKING-POLICY
       subject: CreditEngine zero-backing reassessment, settlement, and bad-debt policy
-      state: parked_nonblocking
+      state: parked_nonblocking_except_exact_rh_d028_candidate
       blocker_effect: nonblocking
       instruction: >
-        Preserve the integrated M2/M3 source and regression behavior, but do
-        not reassess CreditEngine zero backing or design, remediate, review, or
-        schedule zero-backing settlement or bad-debt policy work. The parked
-        residual is not an active blocker for current planning, parameter,
-        tooling, or non-policy proof work.
-      reopen_condition: Explicit owner instruction.
+        RH-D028 reopens only the exact uncommitted BasicVault custody-shortfall
+        candidate on codex/rh-basic-vault-quarantine. Outside that candidate,
+        preserve the integrated M2/M3 behavior and do not design, remediate,
+        review, or schedule broader zero-backing settlement or bad-debt policy
+        work. The parked residual is not an active blocker for unrelated work.
+      reopen_condition: RH-D028 for its exact candidate; otherwise explicit owner instruction.
     - id: PARK-DELEVERAGE
       subject: every Deleverage task
-      state: parked_nonblocking
+      state: parked_nonblocking_except_exact_rh_d028_candidate
       blocker_effect: nonblocking
       instruction: >
-        Preserve the historical zero-cooldown decision, integrated PR #61
-        bytes, and four zero-valued controls. Do not perform contract,
-        interface, ABI, parameter, configuration, test, fork, documentation,
-        size/headroom, deployment, or operational work. Do not implement the
-        provisional H-09 Deleverage path.
-      reopen_condition: Explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
+        RH-D028 reopens only the exact candidate's singular-API removal and
+        quarantine suppression. Preserve zero cooldown, omitted Underscore,
+        and the four zero-valued controls; do not perform broader Deleverage,
+        fork, deployment, configuration, or operational work or implement the
+        provisional H-09 path.
+      reopen_condition: RH-D028 for its exact candidate; otherwise explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
     - id: PARK-UNISWAP-TWAP
       subject: Uniswap V2 price-source admission and activation
       state: parked_nonblocking
@@ -1125,7 +1125,7 @@ decisions:
   - { id: RH-D008, title: "CCIP complete or disabled", status: "superseded_by_confirmed_live_state", summary: "The historical disabled posture was overtaken by live activation. Current topology is confirmed; explicit rate policy, destination-gas evidence, exact source/compiler/constructor identity, license and transaction provenance, live-send backend, further transaction authority, and release gates remain open.", source: "docs/chains/rh/ccip-live-state.md"}
   - { id: RH-D009, title: "USDG price path", status: "price_path_approved_activation_gated", summary: "Use the shared official feed path; PSM deployment and activation remain separate gates.", source: "docs/chains/rh/usdg-psm-decision.md"}
   - { id: RH-D010, title: "Lootbox immutable floor", status: "approved_reviewed_integrated", summary: "Base uses 43,200 and Robinhood 7,200 with strict greater-than behavior.", source: "docs/chains/rh/lootbox-floor-implementation-record.md"}
-  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_pr61_integrated_all_tasks_parked", summary: "Use corrected shared source while zero cooldown remains closed; four controls stay zero and every Deleverage task is parked until explicit reopening.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
+  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_rh_d028_exact_candidate_exception", summary: "Zero cooldown, omitted Underscore, and four deferred controls remain closed. RH-D028 narrowly reopens only the exact custody-shortfall candidate's singular-API removal and quarantine suppression; all broader Deleverage work stays parked.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
   - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; all 28 canonical H-03 blockers, including nine Curve launch inputs, remain open and grant no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
@@ -1141,7 +1141,9 @@ decisions:
   - { id: RH-D023, title: "LP launch admission reconsidered independently", status: "qualified_no_protocol_admission", summary: "Fresh per-LP source-path qualification preserves the selected GREEN/USDG launch-pricing pool but excludes its LP token; RIPE/WETH remains external-canary-only, both protocol admissions and all DP-14 leaves remain blocked, and no lifecycle authority is granted.", source: "docs/chains/rh/qualification/lp-launch-admission.md"}
   - { id: RH-D025, title: "Production clock usage is no longer scanned", status: "owner_accepted_coverage_loss", summary: "The block-clock inventory, its checker, and its tests are removed and nothing replaces them. Production block.number and block.timestamp usage, mixed-clock arithmetic, and unclassified Vyper paths are no longer scanned; clock-affecting changes are reviewed on their own merits. Reopen if a clock-related defect reaches a deployment candidate or a second chain with a divergent block clock is added.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D026, title: "CreditEngine exact 184-byte headroom waiver retired", status: "retired_default_floor_restored", summary: "The exact prior-version waiver reopened when CreditEngine changed. The new constructor-bound runtime is 24,367 bytes with 209 bytes of EIP-170 headroom, so its override and pinned waiver identity are removed and the default 200-byte floor applies. No new below-floor waiver was granted.", source: "docs/chains/rh/decision-register.md"}
-  - { id: RH-D027, title: "Teller carries an exact migration and receipt-guard headroom waiver at 71 bytes", status: "owner_granted_waiver", summary: "The 200-byte EIP-170 headroom rule remains controlling. On 11 August 2026 the owner replaced RH-D027's exact artifact for PR #95: Teller retains the receipt-window housekeeping guard and inlines a one-use preferred-StabilityPool lookup, producing an exact 24,505-byte deployed runtime with 71 bytes of headroom. The waiver pins Teller source sha256, immutable-free runtime-template sha256 and size, exact deployed size, and complete deployed-runtime sha256 at declared HQ and pause constructor inputs. It permits 0 bytes of growth and reopens on any Teller or compiler-output change; reassess when the transitional legacy route is removed.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D027, title: "Teller carries an exact migration and receipt-guard headroom waiver at 71 bytes", status: "retired_candidate_local_default_floor_restored", summary: "The RH-D028 candidate changes Teller by removing the singular deleverageUser API and deploys at 24,218 bytes with 358 bytes of headroom. The prior 71-byte exact waiver self-retires, and its override and identity are removed. This retirement remains candidate-local until the package is committed and integrated.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D028, title: "BasicVault custody-shortfall quarantine is account-scoped", status: "owner_accepted_candidate", summary: "The exact candidate dynamically quarantines an affected account only under the complete four-condition classifier. Account-wide borrowing, positive-LTV withdrawal, liquidation, redemption, and forced-deleveraging suppression is accepted while repayment, unrelated healthy deposits, governance swapCollateral, truthful type-1 reporting, and automatic custody recovery remain. Lootbox stays byte-for-byte at the base version: configured staker/voter rewards continue, general rewards follow the existing first-touch refresh behavior, and quarantine changes neither configured allocations nor prior points. No deployment or release authority is granted.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D029, title: "CreditEngine carries an exact quarantine-version waiver at 21 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact RH-D028 candidate with defensive debt-type guards restored, CreditEngine deploys at 24,555 bytes including immutables, leaving 21 bytes. Source, runtime template, exact deployed size, and a deterministic immutable-bound deployed hash are pinned; the waiver permits zero growth and reopens on any source or compiler-output change.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}

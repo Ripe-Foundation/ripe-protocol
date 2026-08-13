@@ -488,7 +488,7 @@ def test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal(
     assert safe_simple_erc20_vault.getTotalAmountForVault(vault_token) == amount
 
 
-def test_deficit_preserves_position_and_reward_getter_asymmetry(
+def test_deficit_zeroes_vault_total_but_preserves_position_and_reward_share(
     safe_simple_erc20_vault,
     vault_token,
     deploy3r,
@@ -504,7 +504,7 @@ def test_deficit_preserves_position_and_reward_getter_asymmetry(
         vault_token.address,
         0,
     )
-    assert safe_simple_erc20_vault.getTotalAmountForVault(vault_token) == amount
+    assert safe_simple_erc20_vault.getTotalAmountForVault(vault_token) == 0
     assert safe_simple_erc20_vault.getUserLootBoxShare(bob, vault_token) == amount
     assert safe_simple_erc20_vault.getUserAssetAtIndexAndHasBalance(bob, 1) == (
         vault_token.address,

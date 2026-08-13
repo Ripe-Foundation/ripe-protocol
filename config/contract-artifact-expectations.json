@@ -13,21 +13,21 @@
         "committed_path": "scripts/abis/AuctionHouse.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "1092939f2cb87b379ae7c38168dc1c0196f004c55202fb82552e6a5de138c1e9",
-        "creation_executable_prefix_size": 23891,
-        "creation_metadata_sha256": "4e2763e3d9448c874a72e4ca013a5c89eda7a44ec3c0ab81fe5026e61756ae80",
+        "creation_executable_prefix_sha256": "588ccc30d450972c1e60f16b995b20091a0b36bc31a8d14a4ca3287a1e568972",
+        "creation_executable_prefix_size": 23957,
+        "creation_metadata_sha256": "0a6207ac9ea78687513d7c489cb5b9471d15aea91edf3141672455e4b5f5459a",
         "creation_metadata_size": 59,
-        "creation_sha256": "31b858e2b36a4210ecd23c94421303569b158721b30865dff8fc3cf7c86bcca6",
-        "creation_size": 23950,
-        "deployed_eip170_headroom": 713,
+        "creation_sha256": "3e8b9791eb7b06946fcb92863647825e86dfd498cf9120f363f5718bbcde7f2b",
+        "creation_size": 24016,
+        "deployed_eip170_headroom": 647,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "4f49993a625ce0be50fe8f2ce08eeca359abc8ffa8917dd4e40d6138b7d99ddd",
-        "deployed_runtime_size": 23863,
-        "eip170_headroom": 809,
-        "runtime_template_sha256": "6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa",
-        "runtime_template_size": 23767
+        "deployed_runtime_sha256": "a5703fa70b781ae9c63d7abf1f80df60dd97e217a4e85257dccd6502341a4270",
+        "deployed_runtime_size": 23929,
+        "eip170_headroom": 743,
+        "runtime_template_sha256": "0a1081e4901b96a69b67d8d845100a2f3831682a3444cc078f5ded35875b773f",
+        "runtime_template_size": 23833
       },
       "code_layout": {
         "addys": {
@@ -77,9 +77,9 @@
         "canonical_sha256": "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         "count": 28
       },
-      "source_git_blob": "73c2239ea9af646ec79ce2a8a59349a25f6a79df",
+      "source_git_blob": "704eb457f0055c0d1e031f5fb57675f5de4f1ba7",
       "source_path": "contracts/core/AuctionHouse.vy",
-      "source_sha256": "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
+      "source_sha256": "f963bb4f27448290a1ee0bd43ecae136a8d684368f7f30665942b174b5b1666d",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -121,7 +121,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "6e32aea985583ecc920144063f8115b3d1431de698dd32912c1fc86face0fb3e"
+      "transitive_compiler_input_integrity": "45c8d6007dd16f7d35b63c9dc7b32aa32b7af2b9f5878b570f85876fc0ab6f24"
     },
     "BlueChipYieldPrices": {
       "abi": {
@@ -377,26 +377,26 @@
     },
     "CreditEngine": {
       "abi": {
-        "canonical_sha256": "1b5616ca9b7df4dc88f013be7b0c69ec54006cf856e2e768a852d47b6d960e24",
-        "committed_file_sha256": "3fda93ab4569e9bf4da3f628b97228b44e2f37575486dc014fc9cf6a0cc5414e",
+        "canonical_sha256": "61eae96416d3c1828a2a98d483cbd832ee16e898664bd84bd033d1a83474bdb9",
+        "committed_file_sha256": "fa6509857e023d83a183572bff19f150376dfe08522d599aa156a04f5d4b0e92",
         "committed_path": "scripts/abis/CreditEngine.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "93c1f19de01fbf5b463544f5358840c1552089190ea2388e8cfbaa1d70b01b78",
-        "creation_executable_prefix_size": 24405,
-        "creation_metadata_sha256": "7912d6f646098e824249daff66ebc193e3bf9d9241fd868e589385d1dc8b5003",
+        "creation_executable_prefix_sha256": "bb47d756f6dda37543fbea7e9e01adec2cf8dc14e80078771c9e0cae0077167e",
+        "creation_executable_prefix_size": 24593,
+        "creation_metadata_sha256": "1d3ca2fdcef0af1bb589c2b01d9135cd6806d64d8dd67a4eb6ed6802ca3b1b23",
         "creation_metadata_size": 70,
-        "creation_sha256": "d29e16162ee2e3a0bfad6a936cfc6c8233f93ef65243fe560a106e41d3fc96f4",
-        "creation_size": 24475,
-        "deployed_eip170_headroom": 209,
+        "creation_sha256": "0f9ff1e10f4b4bab527757e2d0eb3c96c1df305cc04e5113690ff6f3d3852af6",
+        "creation_size": 24663,
+        "deployed_eip170_headroom": 21,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "6103f571291c04566d35b857886bed114cb5042b6624d2395f28fab76ebdaf1b",
-        "deployed_runtime_size": 24367,
-        "eip170_headroom": 305,
-        "runtime_template_sha256": "ad40bde63aee7e41933c2cbe6012de9940791a4f28a85328b8accdf3dabf635e",
-        "runtime_template_size": 24271
+        "deployed_runtime_sha256": "f53dbcb2d9497fd6852b3bf76bf426903c994c0d4e9fc711cd830fc8611b1fe7",
+        "deployed_runtime_size": 24555,
+        "eip170_headroom": 117,
+        "runtime_template_sha256": "5d3bbbea323bdafd8acfaa9de6ff3a02e29128bac871f7e4165d74aba47382ac",
+        "runtime_template_size": 24459
       },
       "code_layout": {
         "addys": {
@@ -446,9 +446,9 @@
         "canonical_sha256": "4fd29412b11eab9b8406f18f7209bb4022902293893e17c6cf1f0429735a4c38",
         "count": 51
       },
-      "source_git_blob": "9ee46df96d0dc29bdd2328ca243c32db492bcab2",
+      "source_git_blob": "745e443c7c9a243ef4efb1d0613b3e85b290b11d",
       "source_path": "contracts/core/CreditEngine.vy",
-      "source_sha256": "96e7deef17d5fe094c964090850cae9eb9293350eff94567519444631701deb6",
+      "source_sha256": "5b45113894a10f32d9621cd7a30d07a39c792db0f7286731dadb8ff08c975946",
       "storage_layout": {
         "buybackRatio": {
           "n_slots": 1,
@@ -469,7 +469,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "1b0b6ab5dd2d5edf680830c9d350f88cd26923f0e34e1517afa3ab4ef79726c8"
+      "transitive_compiler_input_integrity": "48fff3d94d0fa0fe2a1ea220b2dc72fb1cee2cf123f40e52f035dcc517620243"
     },
     "DefaultsRobinhood": {
       "abi": {
@@ -637,26 +637,26 @@
     },
     "Deleverage": {
       "abi": {
-        "canonical_sha256": "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
-        "committed_file_sha256": "7de1944637565f5640169b879a13705706332cd171ae41579c45dfe5da72cb43",
+        "canonical_sha256": "5e2602cbbb1271664dcc9552476e121481f506ade8bf6f44ce762abc34fca3b3",
+        "committed_file_sha256": "e1d03ccd37548984f2c0a0b016cdb3c2730549793676f6172f3a70670cb43b3e",
         "committed_path": "scripts/abis/Deleverage.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "26ff82b5e245dbcc146adc36452a4352581c81d04820d95194fe58611d49e219",
-        "creation_executable_prefix_size": 24833,
-        "creation_metadata_sha256": "e5bb0d914fba63bdc71362312092918b21c9df7799ba2db569bf1a994204417f",
+        "creation_executable_prefix_sha256": "780db310c4c30121f8c2b22c679962ba6a514da1d132637c9640047d7f039396",
+        "creation_executable_prefix_size": 23505,
+        "creation_metadata_sha256": "a3f73109cd50901d8c480b2195e992fa1170d4df11e15de31656971d5370c6ce",
         "creation_metadata_size": 61,
-        "creation_sha256": "aab99ede7492d5f7f4769493c55ba04f28478caccbe9f32075dd9ef9b8c2acc7",
-        "creation_size": 24894,
-        "deployed_eip170_headroom": 7,
+        "creation_sha256": "a266fd27c5e1835f422d26b841a0f7b6c64c0d0f0ccbc151e5a25c6418332bf4",
+        "creation_size": 23566,
+        "deployed_eip170_headroom": 1335,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "46e7d4ac521f0164a91cc537334a9fd4280b5140918170cf26910515ae20466e",
-        "deployed_runtime_size": 24569,
-        "eip170_headroom": 103,
-        "runtime_template_sha256": "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
-        "runtime_template_size": 24473
+        "deployed_runtime_sha256": "26a184cb2095f5baf31592b4ec2708cc9a56b6e5334981336f950398d43983be",
+        "deployed_runtime_size": 23241,
+        "eip170_headroom": 1431,
+        "runtime_template_sha256": "f7115ab1a808cc683cbeda088bd210af4d5c0f1616713e13d4f0daa053f77a40",
+        "runtime_template_size": 23145
       },
       "code_layout": {
         "addys": {
@@ -735,12 +735,12 @@
         "count": 12
       },
       "selectors": {
-        "canonical_sha256": "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
-        "count": 34
+        "canonical_sha256": "8d85266d2a525641a2edcb36d8fbd1e39e4e00bc530aa14f28013260b15436ef",
+        "count": 32
       },
-      "source_git_blob": "b43d373039b352d6eab240be714134764901b947",
+      "source_git_blob": "95c8ade9b7522328c28ec5cd21989246b8c2e75d",
       "source_path": "contracts/core/Deleverage.vy",
-      "source_sha256": "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
+      "source_sha256": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
       "storage_layout": {
         "deleverageBuffer": {
           "n_slots": 1,
@@ -822,7 +822,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "e54b617ae86d24559a8bb3d29a50804de1905674365a1af729373b23f29498b5"
+      "transitive_compiler_input_integrity": "4a7db90f0361886c3cb5319c5c477f2a183ee6ccfc3f0c41836da80c1c4d78b2"
     },
     "Ledger": {
       "abi": {
@@ -1612,21 +1612,21 @@
         "committed_path": "scripts/abis/SimpleErc20.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "ee58a1eea39f21f6b4babfe3f36473ffff4374fa319af11b16457fb15c37727e",
-        "creation_executable_prefix_size": 9479,
-        "creation_metadata_sha256": "4d378f59bb5d5325caa13e534053cbe2cb0b288bbf638061bafc07cb9d1962e8",
+        "creation_executable_prefix_sha256": "7ae127e5089f44695b68f144a8eb834772669152d04c90f59f995fb7ba7d3b25",
+        "creation_executable_prefix_size": 9555,
+        "creation_metadata_sha256": "c0caea777af5503d879d106c93f72f66fa73412ed92a70e30ad927599b4fe965",
         "creation_metadata_size": 56,
-        "creation_sha256": "ec9daa8c14f70bacf1e83f0061e6865d27641a151090917f2d1f82ba2503ffe5",
-        "creation_size": 9535,
-        "deployed_eip170_headroom": 15176,
+        "creation_sha256": "eba2a6713ef9bf1577f83eb009781372b71fe34ad9c86a6b6c982b325e7282ff",
+        "creation_size": 9611,
+        "deployed_eip170_headroom": 15100,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
         "deployed_runtime_immutable_data_sha256": "ed83a2128f485fcbc1398a96a19ee7ca74d961970458483ec5d3c6457210d7c1",
         "deployed_runtime_immutable_data_size": 32,
-        "deployed_runtime_sha256": "f43851d983fe640cfcc221e097f63eded87c84627353fc7f8478380c19a84e22",
-        "deployed_runtime_size": 9400,
-        "eip170_headroom": 15208,
-        "runtime_template_sha256": "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
-        "runtime_template_size": 9368
+        "deployed_runtime_sha256": "76744f443fb3e130d81221d61f855c1d9af78dca2ff747de81875b783918ebbe",
+        "deployed_runtime_size": 9476,
+        "eip170_headroom": 15132,
+        "runtime_template_sha256": "08299d1c0de3fa5e21bad90dce1ebf849a40b85ced79dc66aebe21bdf93c9354",
+        "runtime_template_size": 9444
       },
       "code_layout": {
         "addys": {
@@ -1723,7 +1723,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "945373010122d07ac8291982d81663bcb8ffcecd34c22a7652f4b60d4fa575ff"
+      "transitive_compiler_input_integrity": "565e3e8f89cc93ee1223b214181a63ad2b7b54b5fe27bca43677eccb4a4eefa5"
     },
     "StabilityPool": {
       "abi": {
@@ -2515,26 +2515,26 @@
     },
     "SwitchboardDelta": {
       "abi": {
-        "canonical_sha256": "6d2bb3cfa9244b49bc180351316dc5d9ca0265bebcba90a2c84fbf8e3ea7909f",
-        "committed_file_sha256": "1f2d7ff329d4e470e1d684ddb139bb1268b4104909f8373b0b1e1c01e2da7eda",
+        "canonical_sha256": "7c7014dad8c3e455e243f3fec5d6a7e2a9e2dc3498f547a9a728a6a8bf077591",
+        "committed_file_sha256": "89f519e76977674c7d7c94da39f023d25d086c869d0a3602ae271a64b9eb7a54",
         "committed_path": "scripts/abis/SwitchboardDelta.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "5d7e5a00144259460b75b0e623b3371b05e122c4491423f42c6ca7e49ae6fe4f",
-        "creation_executable_prefix_size": 24305,
-        "creation_metadata_sha256": "cc1bcadb5528be3f406a18544734a3a08de07719ec230abf79ff988ac1428f18",
+        "creation_executable_prefix_sha256": "ab4920591b337c514fafbb56113de9a674eae250c02c20a80442f5fd81d1a630",
+        "creation_executable_prefix_size": 24117,
+        "creation_metadata_sha256": "63c715298d12eb186c06205fbf35cc5c0942c0e0d68c4538810a5dfbf478150e",
         "creation_metadata_size": 84,
-        "creation_sha256": "b2d2fad0e1562628e6b4def697731e85f78b4e99bf78f41fe9659c5bfc6cff5e",
-        "creation_size": 24389,
-        "deployed_eip170_headroom": 1314,
+        "creation_sha256": "cbb114f0039cfa174ee0a5de479e6e6c926724ff7097f7894f68d53eddf3567b",
+        "creation_size": 24201,
+        "deployed_eip170_headroom": 1502,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0",
         "deployed_runtime_immutable_data_sha256": "da02c06d7af6d4a82d56dc4575888dc3ddf18a41afd2ea0d93ffb5a0237c13f6",
         "deployed_runtime_immutable_data_size": 160,
-        "deployed_runtime_sha256": "1abdb04cd34afb7faa5f3a6d92f972fd60795746f495f86d9d9144a6429acd75",
-        "deployed_runtime_size": 23262,
-        "eip170_headroom": 1474,
-        "runtime_template_sha256": "77553ded4c1e8de0754b25e0dbb0fa18be25657b3134c90bc071a99306bfca61",
-        "runtime_template_size": 23102
+        "deployed_runtime_sha256": "513f77f9e16a76906c18282f85d0d6806406e24166a4358c83bd5ace7cb0536a",
+        "deployed_runtime_size": 23074,
+        "eip170_headroom": 1662,
+        "runtime_template_sha256": "48cc4544665b3864fcd992728b063258e00dbf6658df7cb8fd482d0fb8bb3792",
+        "runtime_template_size": 22914
       },
       "code_layout": {
         "gov": {
@@ -2603,12 +2603,12 @@
         "count": 76
       },
       "selectors": {
-        "canonical_sha256": "5640d4bc1386e0064078a5ec79e4f7d1b0c250a4ac69622e2a34e52821cf508d",
-        "count": 114
+        "canonical_sha256": "88f8ae482c277199700ba068dd0530da7150a13cf54fa68ae155609cf7085aa8",
+        "count": 112
       },
-      "source_git_blob": "4e234df7626eb332836aceb5cbca2daaef2a0390",
+      "source_git_blob": "1ace1344a1854e399ebeb77027a9137cbcbd69cb",
       "source_path": "contracts/config/SwitchboardDelta.vy",
-      "source_sha256": "12604c00353b2b4e7519ffd316883e1e64394af53dd79f2c9866765d7385eb79",
+      "source_sha256": "f0f8f20bf98a2e4a23c9798ab8d4f2e073773e6062146f0c25034292ecdd6296",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2776,31 +2776,31 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "4c4d2bb4f27d32dd216d6dbac903538a179ff71ec0d7644bb29056bf24001a99"
+      "transitive_compiler_input_integrity": "d0f8ab667fab761532a695aa3a1c8d4a39bdb5631b6a964ff40253e15c1fac92"
     },
     "Teller": {
       "abi": {
-        "canonical_sha256": "d2ca4f2e5a45eab697b376d8aa7a7f792fe96a26aa05902192d723c581355318",
-        "committed_file_sha256": "2affb9bace3696cbb95525945746546a1517ea23ca691ee8ea492f90c2387193",
+        "canonical_sha256": "90cc1c1bd422a10e2ce13eec1e8685aa8c8e63cbffae852ff1b4283ebe27f048",
+        "committed_file_sha256": "e63d6cd1d6171143264c0a75cb84061447eef88f1b049807f76183e930a79976",
         "committed_path": "scripts/abis/Teller.json"
       },
       "artifacts": {
         "accepted_runtime_ceiling": 24436,
-        "creation_executable_prefix_sha256": "9dd2825a4bb946d534e316117dcb501a6c54a818569e507dd83b80e4fde387b8",
-        "creation_executable_prefix_size": 24552,
-        "creation_metadata_sha256": "55a28f98da230052aff5b2ec29d8e0193839fbcaaa6efd629df2967e98c636c2",
+        "creation_executable_prefix_sha256": "14ccdf6d168ab9718e96af971933807c059ed4879f88b9a10f0eeb5bb35fd0b3",
+        "creation_executable_prefix_size": 24265,
+        "creation_metadata_sha256": "6e702d92981eab79b701e356fc5630a36be3e2b71956e87dc059e383898d8673",
         "creation_metadata_size": 83,
-        "creation_sha256": "62151e3501668b0c0f1aa11a2ed7723c061c6f5579fdaeb8897ed5fe66b9ad43",
-        "creation_size": 24635,
-        "deployed_eip170_headroom": 71,
+        "creation_sha256": "f4e519f3de713218cdf455a612c61ef3957f8e8397f9d7c18d12bc0585790792",
+        "creation_size": 24348,
+        "deployed_eip170_headroom": 358,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "a07176c5878268b4b704c79d08440e4dacdb5d484b913a842992a69d09998b3c",
-        "deployed_runtime_size": 24505,
-        "eip170_headroom": 167,
-        "runtime_template_sha256": "3e1fa83b151ee933d28a0268975a47610f87d14ca18f248e79e0db80563398c8",
-        "runtime_template_size": 24409
+        "deployed_runtime_sha256": "8bcd18a8625d7a0320f34d7cfeb0f778c0e8e51e7116d673ade8386fcd994c5f",
+        "deployed_runtime_size": 24218,
+        "eip170_headroom": 454,
+        "runtime_template_sha256": "75ed0966c93b928f86fc164ec1e5d1d2ffff854e434a468ddb0bbec992316e34",
+        "runtime_template_size": 24122
       },
       "code_layout": {
         "addys": {
@@ -2851,12 +2851,12 @@
         "count": 7
       },
       "selectors": {
-        "canonical_sha256": "ca59ea101febde31384c85ac9711488501aba09ba55269f56c7dac42861ab0d3",
-        "count": 110
+        "canonical_sha256": "fd62e6b46d9fa6dc6c0794d5c47c852d19c933a4f156226bbdda2b71c91f0d89",
+        "count": 107
       },
-      "source_git_blob": "e1260cc1fcb328d221d408f584c82010ec7557a2",
+      "source_git_blob": "63d92ce5e2e13255f0f4b4073def0f476557d3e9",
       "source_path": "contracts/core/Teller.vy",
-      "source_sha256": "fe99197239821ef0eae63409fdca39aa4bd84b501697915150d0fec050406476",
+      "source_sha256": "83600b226cc71d5ccbe63312cac6b1fa912f2458997bd39de0ae846f96b4da2d",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -2878,7 +2878,7 @@
           "type": "bool"
         }
       },
-      "transitive_compiler_input_integrity": "0f30eae6ed773a465ba46d87d27e2c909442e375bcd3b01a14653910fb531ffd"
+      "transitive_compiler_input_integrity": "80e0a5f4c9bffa53333fa2d6be0abf271d1c8599cc644fa1a7b447c29d838adf"
     },
     "UniswapV2Prices": {
       "abi": {

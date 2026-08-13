@@ -679,7 +679,7 @@ def test_safe_nominal_volatile_deleverage_can_deliver_to_endaoment_funds(
     assert deleverage.lastDeleverageBlock(bob) == 0
 
 
-def test_safe_nominal_volatile_deleverage_skips_deficit_and_continues(
+def test_safe_nominal_volatile_deleverage_suppresses_quarantined_account(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -745,24 +745,16 @@ def test_safe_nominal_volatile_deleverage_skips_deficit_and_continues(
         sender=switchboard_alpha.address,
     )
 
-    assert repaid == target
-    assert credit_engine.getUserDebtAmount(bob) == debt_amount - target
+    assert repaid == 0
+    assert credit_engine.getUserDebtAmount(bob) == debt_amount
     assert safe_simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
     assert safe_simple_erc20_vault.userBalances(bob, alpha_token) == deposit_amount
     assert alpha_token.balanceOf(safe_simple_erc20_vault) == deposit_amount - 1
-    assert safe_simple_erc20_vault.userBalances(bob, bravo_token) == (
-        deposit_amount - target
-    )
-    assert bravo_token.balanceOf(safe_simple_erc20_vault) == (
-        deposit_amount - target
-    )
-    assert bravo_token.balanceOf(endaoment_funds) == funds_before + target
+    assert safe_simple_erc20_vault.userBalances(bob, bravo_token) == deposit_amount
+    assert bravo_token.balanceOf(safe_simple_erc20_vault) == deposit_amount
+    assert bravo_token.balanceOf(endaoment_funds) == funds_before
     assert not ledger.userDebt(bob).inLiquidation
 
     transfers = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
     withdrawals = filter_logs(deleverage, "SimpleErc20VaultWithdrawal")
-    assert len(transfers) == len(withdrawals) == 1
-    assert transfers[0].asset == bravo_token.address
-    assert transfers[0].amountSent == target
-    assert withdrawals[0].asset == bravo_token.address
-    assert withdrawals[0].amount == target
+    assert len(transfers) == len(withdrawals) == 0

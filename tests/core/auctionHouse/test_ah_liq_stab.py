@@ -85,7 +85,7 @@ def setupStabAssetConfig(
 ###############
 
 
-def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
+def test_basic_vault_quarantine_suppresses_phase_two_stability_pool_assets(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -105,7 +105,7 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     bob,
     sally,
 ):
-    """Stability Pool positions remain non-collateral but phase-2 liquidatable."""
+    """A quarantined collateral account cannot enter phase-2 liquidation."""
 
     setGeneralConfig()
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
@@ -166,16 +166,19 @@ def test_phase_two_sees_stability_pool_positions_but_credit_engine_does_not(
     alpha_token.burn(alpha_amount, sender=simple_erc20_vault.address)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 2)
     assert credit_engine.getCollateralValue(bob) == 0
-    assert credit_engine.canLiquidateUser(bob)
-    teller.liquidateUser(bob, False, sender=sally)
+    assert credit_engine.getUserBorrowTerms(bob, False).hasQuarantinedAsset
+    assert not credit_engine.canLiquidateUser(bob)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
 
     stab_id = vault_book.getRegId(stability_pool)
     assert stab_id == 1
-    assert ledger.hasFungibleAuction(bob, stab_id, bravo_token)
-    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuction(bob, stab_id, bravo_token)
+    assert not ledger.userDebt(bob).inLiquidation
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
 
 
-def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_without_auction(
+def test_quarantine_suppresses_direct_settlement_until_custody_recovers(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -199,7 +202,7 @@ def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_withou
     bob,
     sally,
 ):
-    """An unhealthy remainder stays frozen but retryable when no auction exists."""
+    """Direct settlement resumes automatically after custody is repaired."""
     setGeneralConfig()
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
     terms = createDebtTerms(
@@ -268,17 +271,18 @@ def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_withou
     mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
     mock_price_source.setPrice(bravo_token, 25 * EIGHTEEN_DECIMALS // 100)
 
-    # A one-unit aggregate deficit makes the full nominal bravo position
-    # unusable. The healthy alpha position is still consumed by the pool.
+    # A one-unit aggregate deficit quarantines the account, so even the healthy
+    # alpha position remains untouched by forced settlement.
     bravo_token.burn(1, sender=simple_erc20_vault.address)
-    assert credit_engine.canLiquidateUser(bob)
-    teller.liquidateUser(bob, False, sender=sally)
+    debt_before_quarantine = credit_engine.getUserDebtAmount(bob)
+    assert not credit_engine.canLiquidateUser(bob)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
 
-    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
+    assert stability_pool.claimableBalances(savings_green, alpha_token) == 0
     assert not ledger.hasFungibleAuction(bob, simple_id, bravo_token)
     assert not ledger.hasFungibleAuctions(bob)
-    assert ledger.userDebt(bob).inLiquidation
-    assert credit_engine.canLiquidateUser(bob)
+    assert not ledger.userDebt(bob).inLiquidation
+    assert credit_engine.getUserDebtAmount(bob) == debt_before_quarantine
 
     # Repairing bravo custody restores the same position. A second liquidation
     # must now run and create its auction instead of treating the account-wide
@@ -295,6 +299,7 @@ def test_direct_settlement_keeps_unhealthy_remainder_frozen_and_retryable_withou
     liquidation_logs = filter_logs(teller, "LiquidateUser")
     assert len(liquidation_logs) == 1
     assert liquidation_logs[0].user == bob
+    assert stability_pool.claimableBalances(savings_green, alpha_token) > 0
     assert (
         credit_engine.getUserDebtAmount(bob) < debt_before
         or ledger.hasFungibleAuction(bob, simple_id, bravo_token)
