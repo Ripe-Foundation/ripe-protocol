@@ -967,22 +967,17 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     if _debtType == 1:
         return userDebt.amount <= bt.totalMaxDebt
-    # All callers bind debt type to 1, 2, or 3; type 1 returned above.
+    if _debtType != 2 and _debtType != 3:
+        return False
     if bt.hasQuarantinedAsset:
         return False
 
     threshold: uint256 = bt.debtTerms.liqThreshold
     if _debtType == 3:
         threshold = bt.debtTerms.redemptionThreshold
-    return self._isAtDebtThreshold(userDebt.amount, bt.collateralVal, threshold)
-
-
-@view
-@internal
-def _isAtDebtThreshold(_userDebtAmount: uint256, _collateralVal: uint256, _threshold: uint256) -> bool:
-    if _threshold == 0:
+    if threshold == 0:
         return False
-    return _collateralVal <= self._calcDebtThreshold(_userDebtAmount, _threshold)
+    return bt.collateralVal <= self._calcDebtThreshold(userDebt.amount, threshold)
 
 
 @view
@@ -1017,6 +1012,9 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
     na: uint256 = 0
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
     if userDebt.amount == 0:
+        return 0
+
+    if _debtType != 2 and _debtType != 3:
         return 0
 
     threshold: uint256 = bt.debtTerms.liqThreshold
