@@ -105,6 +105,7 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 @external
 def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
     assert self._canPerformAction(msg.sender) # dev: no perms
+    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
     return registry._confirmAddressUpdateToRegistry(_regId)
 
 
@@ -128,6 +129,7 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 @external
 def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
     assert self._canPerformAction(msg.sender) # dev: no perms
+    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
     return registry._confirmAddressDisableInRegistry(_regId)
 
 
