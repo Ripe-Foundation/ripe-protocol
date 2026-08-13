@@ -304,11 +304,11 @@ commit each is retrievable from) is in `extracted-files.tsv` under the
 - `tests/deployment/test_current_manifest_promotion.py`
 - `tests/deployment/test_manifest_schema.py`
 - `tests/deployment/test_post_deployment_assertions.py`
-- `tests/deployment/test_registry_topology.py`
 - `tests/deployment_profiles/conftest.py`
 - `tests/deployment_profiles/test_ledger_artifact_bundle.py`
 - `tests/deployment_profiles/test_ledger_robinhood_profile.py`
 - `tests/deployment_profiles/test_lootbox_deployment_profiles.py`
+- `tests/test_ccip_hardening.py`
 
 ## Evidence records (13)
 
