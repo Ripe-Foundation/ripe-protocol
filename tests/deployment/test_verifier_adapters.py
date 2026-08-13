@@ -309,3 +309,48 @@ def test_current_manifests_remain_verifiable_in_bulk():
     assert unsupported == sum(
         1 for r in manifest["contracts"].values() if "solc_json" not in r
     )
+
+
+def test_multi_source_contracts_submit_under_their_own_source():
+    """A multi-source contract must not be submitted as one of its imports.
+
+    Selection used to fall back to the lexicographically first key in
+    `solc_json.sources` when a record had no `source_path`. No committed record
+    has one, so that fallback was the path every record took, and for anything
+    importing a shared module it chose the module: `RipeHq` submitted as
+    `contracts/modules/LocalGov.vy`, `Switchboard`/`PriceDesk`/
+    `ChainlinkPrices` as `contracts/modules/Addys.vy`. 17 of the 50 records in
+    base-mainnet/v1 were affected.
+    """
+    root = Path(__file__).resolve().parents[2]
+    manifest = json.loads(
+        (root / "migration_history/base-mainnet/v1/current-manifest.json").read_text()
+    )
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+
+    multi_source = 0
+    for name, record in manifest["contracts"].items():
+        if not isinstance(record.get("solc_json"), Mapping):
+            continue
+        selected, _ = verifier._validate_manifest(name, record)
+        assert selected == record["file"], name
+        if len(record["solc_json"].get("sources", {})) > 1:
+            multi_source += 1
+
+    assert multi_source >= 17, "expected the multi-source records to be covered"
+
+
+def test_a_record_without_source_path_or_file_is_refused():
+    # No silent fallback: if neither is recorded there is nothing that
+    # identifies the contract, and guessing is what caused the bug above.
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+    record = {
+        "address": "0x" + "1" * 40,
+        "solc_json": {
+            "sources": {"contracts/modules/Addys.vy": {"content": ""}},
+            "compiler_version": "v0.4.3+commit.bff19ea2",
+        },
+    }
+
+    with pytest.raises(VerifierConfigurationError, match="source_path or file"):
+        verifier._validate_manifest("VaultBook", record)

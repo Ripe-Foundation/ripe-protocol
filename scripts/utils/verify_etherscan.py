@@ -249,9 +249,20 @@ class EtherscanVerifier:
             raise VerifierConfigurationError(
                 "manifest solc_json.sources must be a nonempty object"
             )
-        source_path = manifest_data.get("source_path")
-        if source_path is None:
-            source_path = sorted(str(path) for path in sources)[0]
+        # The contract being verified, not whichever source sorts first.
+        # Falling back to sorted(sources)[0] picked an imported module for
+        # every multi-source contract -- 17 of the 50 records in
+        # base-mainnet/v1 would have submitted as contracts/modules/Addys.vy
+        # or LocalGov.vy. The record already names its own source in `file`;
+        # committed records carry no `source_path`, so that fallback was the
+        # path every one of them took.
+        source_path = manifest_data.get("source_path") or manifest_data.get("file")
+        if not source_path:
+            raise VerifierConfigurationError(
+                "manifest must record source_path or file to identify the "
+                "contract being verified"
+            )
+        source_path = str(source_path)
         if source_path not in sources:
             raise VerifierConfigurationError(
                 f"manifest source_path is not in solc_json.sources: {source_path}"
