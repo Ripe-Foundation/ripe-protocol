@@ -379,7 +379,7 @@ def isUnderscoreAddr(_addr: address, _mc: address = empty(address)) -> bool:
     missionControl: address = _mc
     if _mc == empty(address):
         missionControl = addys._getMissionControlAddr()
-    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    underscore: address = staticcall MissionControl(missionControl).underscoreRegistry()
     return self._isUnderscoreAddr(_addr, underscore)
 
 
