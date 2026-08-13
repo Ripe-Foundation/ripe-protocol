@@ -786,6 +786,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     if actionType == ActionType.ASSET_ADD_NEW:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
         assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
         log AssetAdded(asset=p.asset)

@@ -178,6 +178,82 @@ def test_execute_debt_terms_revalidates_current_mission_control_target(
     assert not zero_pointer_mission_control.isSupportedAsset(alpha_token)
 
 
+def test_stale_add_asset_revalidates_asset_is_still_new_at_execution(
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    stale_terms = (30_00, 30_00, 50_00, 10_00, 80_00, 2_00)
+    live_terms = (30_00, 50_00, 80_00, 10_00, 10_00, 2_00)
+    stale_action = switchboard_bravo.addAsset(
+        alpha_token,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        stale_terms,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    live_action = switchboard_bravo.addAsset(
+        alpha_token,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        live_terms,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    assert switchboard_bravo.executePendingAction(
+        live_action,
+        sender=governance.address,
+    )
+
+    live_before = mission_control.assetConfig(alpha_token)
+    pending_before = switchboard_bravo.pendingAssetConfig(stale_action)
+    action_type_before = switchboard_bravo.actionType(stale_action)
+    assert live_before.debtTerms == live_terms
+    assert pending_before.config.debtTerms == stale_terms
+
+    with boa.reverts("must be new asset"):
+        switchboard_bravo.executePendingAction(
+            stale_action,
+            sender=governance.address,
+        )
+
+    assert mission_control.assetConfig(alpha_token) == live_before
+    assert switchboard_bravo.hasPendingAction(stale_action)
+    assert switchboard_bravo.actionType(stale_action) == action_type_before
+    assert switchboard_bravo.pendingAssetConfig(stale_action) == pending_before
+
+
 def test_execute_whitelist_revalidates_current_mission_control_target(
     switchboard_bravo,
     governance,
