@@ -253,6 +253,7 @@ def deposit(
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
+    assert len(_deposits) != 0 # dev: empty batch
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, False, a)
@@ -371,6 +372,7 @@ def withdraw(
 @external
 def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
+    assert len(_withdrawals) != 0 # dev: empty batch
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
