@@ -2,8 +2,6 @@
 # Ripe Foundation (C) 2025
 
 # @version 0.4.3
-# pragma evm-version cancun
-
 interface HumanResources:
     def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable

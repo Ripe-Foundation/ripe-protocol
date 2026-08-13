@@ -2,8 +2,6 @@
 # Ripe Foundation (C) 2025
 
 # @version 0.4.3
-# pragma evm-version cancun
-
 interface RipeHq:
     def minGovChangeTimeLock() -> uint256: view
     def maxGovChangeTimeLock() -> uint256: view
