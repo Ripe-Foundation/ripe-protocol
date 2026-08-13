@@ -223,34 +223,126 @@ def test_finish_setup_records_all_twelve_readbacks_before_safe_handoff():
         assert component.value == component.minimum != 0
 
 
-def test_ledger_live_profile_requires_real_rpc():
-    class MissingRpc:
-        def rpc(self):
-            return None
+class _RegistryContract:
+    def __init__(self, address):
+        self.address = address
 
-    with pytest.raises(AssertionError, match="real RPC"):
-        REGISTRIES._node_read_word(MissingRpc(), "0x" + "1" * 40, "x()")
+    def startAddNewAddressToRegistry(self, contract, name):
+        return contract, name
 
-
-@pytest.mark.parametrize(
-    "source,action_block",
-    [(0, 1), (0x65, 1), (0x64, 0)],
-)
-def test_ledger_live_profile_rejects_wrong_source_or_zero_health(
-    monkeypatch,
-    source,
-    action_block,
-):
-    answers = iter((source, action_block))
-    monkeypatch.setattr(REGISTRIES, "_node_read_word", lambda *_args: next(answers))
-    with pytest.raises(AssertionError):
-        REGISTRIES._validate_ledger_profile(object(), "0x" + "1" * 40)
+    def confirmNewAddressToRegistry(self, contract):
+        return contract
 
 
-def test_ledger_live_profile_accepts_exact_source_and_nonzero_health(monkeypatch):
-    answers = iter((0x64, 99))
-    monkeypatch.setattr(REGISTRIES, "_node_read_word", lambda *_args: next(answers))
-    assert REGISTRIES._validate_ledger_profile(
-        object(),
-        "0x" + "1" * 40,
-    ) == (0x64, 99)
+class _RegistriesMigration:
+    def __init__(self):
+        self.hq = _RegistryContract("0x" + "1" * 40)
+        self.defaults = _RegistryContract("0x" + "2" * 40)
+        self.events = []
+        self.deployments = []
+        self.registry_calls = []
+        self._next_address = 10
+        self._confirmation = 4
+
+    def get_contract(self, name):
+        return self.hq if name == "RipeHq" else self.defaults
+
+    def deploy(self, name, *args):
+        contract = _RegistryContract(f"0x{self._next_address:040x}")
+        self._next_address += 1
+        self.events.append(("deploy", name))
+        self.deployments.append((name, args, contract))
+        return contract
+
+    def execute(self, transaction, *args):
+        self.events.append(("registry", transaction.__name__))
+        self.registry_calls.append((transaction.__name__, args))
+        if transaction.__name__ == "confirmNewAddressToRegistry":
+            result = self._confirmation
+            self._confirmation += 1
+            return result
+        return transaction(*args)
+
+
+def test_0001_ledger_rejects_non_arbsys_policy_before_helper_or_registry(monkeypatch):
+    migration = _RegistriesMigration()
+    helper_calls = []
+    monkeypatch.setattr(
+        REGISTRIES,
+        "LEDGER_ACTION_BLOCK_SOURCE",
+        "0x0000000000000000000000000000000000000065",
+    )
+    monkeypatch.setattr(
+        REGISTRIES,
+        "validate_ledger_action_block_source",
+        lambda *args, **kwargs: helper_calls.append((args, kwargs)),
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="production action-block source must be ArbSys",
+    ):
+        REGISTRIES.migrate(migration)
+
+    assert helper_calls == []
+    assert migration.registry_calls == []
+
+
+def test_0001_ledger_validates_strictly_before_registry_mutation(monkeypatch):
+    migration = _RegistriesMigration()
+    helper_calls = []
+
+    def validate(candidate_migration, ledger_address, expected_source, **kwargs):
+        helper_calls.append(
+            (candidate_migration, ledger_address, expected_source, kwargs)
+        )
+        migration.events.append(("validate", ledger_address))
+        return 0x64, 99
+
+    monkeypatch.setattr(
+        REGISTRIES,
+        "validate_ledger_action_block_source",
+        validate,
+    )
+
+    assert REGISTRIES.migrate(migration) is None
+    assert helper_calls == [
+        (
+            migration,
+            migration.deployments[0][2].address,
+            0x64,
+            {"allow_local_preview": False},
+        )
+    ]
+    assert migration.events[:3] == [
+        ("deploy", "Ledger"),
+        ("validate", migration.deployments[0][2].address),
+        ("registry", "startAddNewAddressToRegistry"),
+    ]
+    assert [call[0] for call in migration.registry_calls] == [
+        "startAddNewAddressToRegistry",
+        "confirmNewAddressToRegistry",
+        "startAddNewAddressToRegistry",
+        "confirmNewAddressToRegistry",
+    ]
+
+
+def test_0001_ledger_validation_failure_leaves_registry_untouched(monkeypatch):
+    migration = _RegistriesMigration()
+
+    def fail_validation(*_args, **_kwargs):
+        raise AssertionError("Ledger action-block source mismatch")
+
+    monkeypatch.setattr(
+        REGISTRIES,
+        "validate_ledger_action_block_source",
+        fail_validation,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Ledger action-block source mismatch",
+    ):
+        REGISTRIES.migrate(migration)
+
+    assert migration.registry_calls == []
