@@ -2,6 +2,7 @@
 # Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma evm-version cancun
 
 uses: gov
 import contracts.modules.LocalGov as gov
@@ -65,7 +66,9 @@ def __init__(
 @internal
 def _initiateAction() -> uint256:
     actionId: uint256 = self.actionId
+    assert block.number <= max_value(uint256) - self.actionTimeLock # dev: action confirmation overflow
     confirmBlock: uint256 = block.number + self.actionTimeLock
+    assert confirmBlock <= max_value(uint256) - self.expiration # dev: action expiration overflow
     self.pendingActions[actionId] = PendingAction(
         initiatedBlock= block.number,
         confirmBlock= confirmBlock,
@@ -204,7 +207,7 @@ def isValidActionTimeLock(_newTimeLock: uint256) -> bool:
 def _isValidActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
     if _newTimeLock == _prevTimeLock:
         return False # no change
-    return _newTimeLock >= MIN_ACTION_TIMELOCK and _newTimeLock <= MAX_ACTION_TIMELOCK
+    return _newTimeLock >= MIN_ACTION_TIMELOCK and _newTimeLock <= MAX_ACTION_TIMELOCK and _newTimeLock <= self.expiration
 
 
 # utils
@@ -247,7 +250,7 @@ def _setExpiration(_expiration: uint256, _timeLock: uint256) -> bool:
 @view
 @internal
 def _isValidExpiration(_expiration: uint256, _timeLock: uint256) -> bool:
-    if _expiration == 0 or _expiration == max_value(uint256):
+    if _expiration == 0 or _expiration > MAX_ACTION_TIMELOCK:
         return False
     if _expiration < _timeLock:
         return False

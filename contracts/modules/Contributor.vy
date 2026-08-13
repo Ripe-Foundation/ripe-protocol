@@ -2,6 +2,7 @@
 # Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma evm-version cancun
 
 interface HumanResources:
     def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
@@ -101,6 +102,7 @@ depositLockDuration: public(uint256) # num blocks!
 # admin
 owner: public(address)
 manager: public(address)
+numOwnerChanges: public(uint256)
 
 # important data!
 totalClaimed: public(uint256)
@@ -138,7 +140,7 @@ def __init__(
     RIPE_HQ = _ripeHq
 
     # key terms validation
-    assert empty(address) not in [_owner, _manager] # dev: invalid owner / manager
+    assert empty(address) not in [_owner, _manager] and _owner != self # dev: invalid owner / manager
     assert _compensation != 0 # dev: invalid compensation
     assert _vestingLength != 0 # dev: invalid vesting length
     assert _unlockLength <= _vestingLength # dev: unlock must be <= vesting
@@ -299,10 +301,12 @@ def _hasPendingRipeTransfer() -> bool:
 def changeOwnership(_newOwner: address):
     currentOwner: address = self.owner
     assert msg.sender == currentOwner # dev: no perms
-    assert _newOwner not in [empty(address), currentOwner] # dev: invalid new owner
+    assert _newOwner not in [empty(address), currentOwner, self] # dev: invalid new owner
     assert not self._hasPendingRipeTransfer() # dev: cannot do with pending ripe transfer
 
-    confirmBlock: uint256 = block.number + self.keyActionDelay
+    currentDelay: uint256 = self.keyActionDelay
+    assert block.number <= max_value(uint256) - currentDelay # dev: owner confirmation overflow
+    confirmBlock: uint256 = block.number + currentDelay
     self.pendingOwner = PendingOwnerChange(
         newOwner = _newOwner,
         initiatedBlock = block.number,
@@ -317,9 +321,11 @@ def confirmOwnershipChange():
     assert data.newOwner != empty(address) # dev: no pending owner
     assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time delay not reached
     assert msg.sender == data.newOwner # dev: only new owner can confirm
+    assert self.numOwnerChanges != max_value(uint256) # dev: owner change count overflow
 
     prevOwner: address = self.owner
     self.owner = data.newOwner
+    self.numOwnerChanges += 1
     self.pendingOwner = empty(PendingOwnerChange)
     log OwnershipChangeConfirmed(prevOwner=prevOwner, newOwner=data.newOwner, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
 
