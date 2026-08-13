@@ -313,14 +313,22 @@ _BASE_MAINNET_OPERATIONS = _operations(
         identity=True,
         repository=True,
     ),
-    # VERIFICATION stays blocked deliberately. scripts/verify.py has no
-    # submission path -- it selects a route, echoes the manifest, then raises
-    # H02_OPERATION_INVALID unconditionally. The real implementation lives in
-    # scripts/utils/verify_etherscan.py (verify_from_manifest) and is tested by
-    # tests/deployment/test_verifier_adapters.py, but nothing calls it.
-    # Marking this SUPPORTED would advertise a capability the CLI lacks and
-    # disclose the manifest path before dead-ending. Flip it only together with
-    # wiring verify.py to verify_from_manifest.
+    # VERIFICATION is BLOCKED here and that is currently NOT what happens.
+    #
+    # This used to read "scripts/verify.py has no submission path ... flip it
+    # only together with wiring verify.py to verify_from_manifest". verify.py
+    # has since been wired to verify_from_manifest and does submit, but it
+    # resolves chains from verify_etherscan.CHAIN_SPECS and never consults this
+    # registry -- so this policy does not gate it. The two authorities
+    # disagree, deliberately and visibly, rather than silently:
+    # tests/deployment/test_base_profile_regression.py pins the contradiction
+    # so that closing it has to be a decision, not a drive-by edit.
+    #
+    # Owner decision (2026-08-12): verify.py stays as simple as it is on
+    # master and is NOT routed through this registry. So the gap is permanent
+    # by choice, not pending work. This policy therefore governs the other
+    # consumers of the registry (console.py, resolve_rpc_reference) and does
+    # not describe what `python -m scripts.verify` will do.
     _policy(Operation.VERIFICATION, _BLOCKED, verifier=True),
 )
 

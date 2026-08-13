@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "CreditEngine": {
+      "address": "0xEdd0563D06CC52fb5F264A2366A31d9776f6dcC7",
+      "file": "contracts/core/CreditEngine.vy"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "SwitchboardDelta": {
+      "address": "0xCdD15077231FEbe9e6393cf91d500984973FFcA0",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    }
+  }
+}

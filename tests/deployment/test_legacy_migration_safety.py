@@ -586,7 +586,20 @@ def test_candidate_promotion_copies_complete_record_after_registry_readback(
 
     migration.end()
     assert json.loads((tmp_path / "current-manifest.json").read_text()) == pending
-    assert json.loads((tmp_path / "2-manifest.json").read_text()) == pending
+    # The step manifest attributes only what this migration promoted -
+    # "Service" (this step's canonical name) - not "ServiceCandidate", which
+    # was already deployed and recorded in an earlier step. And per the
+    # step-manifest schema, only address/file survive: not abi/args/
+    # old_only/future_field.
+    step = json.loads((tmp_path / "2-manifest.json").read_text())
+    assert step == {
+        "contracts": {
+            "Service": {
+                "address": candidate["address"],
+                "file": candidate["file"],
+            }
+        }
+    }
 
 
 def test_candidate_promotion_mismatch_is_write_free(tmp_path):

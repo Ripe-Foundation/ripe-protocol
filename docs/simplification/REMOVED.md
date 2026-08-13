@@ -19,9 +19,76 @@ Archived copies are also kept outside the repo at
 
 ## Deployment manifests: what is kept and why
 
-Step manifests are removed on an ongoing basis as rh produces them. Only the
-`current-manifest.json` of each chain/version is read at runtime, by
-`prepare_defaults.py`, `verify_blockscout.py`, `ccip_send.py`, and `console.py`.
+**Step manifests are retained for the mainnets.** An earlier revision of this
+branch pruned every numbered manifest, keeping only `current-manifest.json`.
+That was reversed on owner instruction: per-step attribution -- which migration
+deployed which contract, and each generation of a redeployed one -- is history
+worth keeping, and its absence is also what left
+`MigrationRunner._latest_manifest_timestamp()` with nothing to resume from.
+
+60 `base-mainnet/v1` and 11 `robinhood-mainnet/v1` step manifests were recovered
+from git (`origin/master` and the commits that removed them: `51616b9`,
+`cc7a0a7`, `075c146`) and are committed again.
+
+**Step manifests keep the record, not the payload.** Restored at full fidelity
+they were 133.6 MB. The numbered manifests now keep `address` and `file` only
+-- which contract, deployed where, from which source, at which step -- which is
+227 KB. `abi`, `solc_json` and `args` are dropped: they are the verification
+payload, and verification runs against `current-manifest.json`.
+
+**The reason is that nothing reads a step manifest**, not that the fields are
+unusable. `Migration._append_manifest` reads only a step's own file, during that
+step, to accumulate within it; `current-manifest.json` is the cumulative
+authority every other reader uses. So a numbered manifest is a record, and
+address/file is the whole record.
+
+Do not extend this to `current-manifest.json`. `solc_json` is exactly what makes
+a contract verifiable -- it carries the standard-JSON input and the compiler
+version -- and 45 of the 50 contracts in `base-mainnet/v1/current-manifest.json`
+submit successfully through `verify_from_manifest`. The other 5 have no
+`solc_json` at all, because they were deployed with `deploy_solidity`, which
+records an address only. Stripping `solc_json` from the current manifests would
+make those 45 unverifiable on a live mainnet.
+
+(An earlier revision of this note claimed verification failed for every manifest
+and that `solc_json` was therefore unusable bytes. That was true when written --
+the adapter required a record-level `compiler_version` that no manifest emits --
+and stopped being true when that was fixed by deriving the version from
+`solc_json.compiler_version`. The conclusion held; the premise did not.)
+
+`current-manifest.json` is untouched and keeps all five fields for every chain.
+
+**Owner decision (2026-08-12): verification is current-manifest-only; step
+manifests are attribution-only.** Three things follow, and they are one
+decision rather than three:
+
+- `current-manifest.json` keeps all five fields and is the only thing
+  verification reads.
+- Numbered manifests keep `address` and `file`. That is what
+  `verify --migration` and the checklist attribute against, and it is all
+  anything reads from one. `scripts/verify.py` refuses a numbered manifest
+  outright and redirects to `--migration <timestamp>`.
+- Superseded contract generations -- 94 addresses on `base-mainnet`, 21 on
+  `robinhood-mainnet` -- are out of scope, deliberately.
+
+Restoring `solc_json` to the numbered manifests was considered and declined at
+~3 MB for `robinhood-mainnet` and ~66 MB for `base-mainnet`. Note that the
+price quoted while it was open is now understated: since `args` was stripped
+too, verifying from a step manifest would need `solc_json` *and* `args` *and*
+reopening the numbered-manifest path in `verify` -- which is code, and
+contradicts the first bullet. It is not a 3 MB data question any more.
+
+If it is ever revisited, `extracted-files.tsv` records the blob id, byte length
+and sha256 of every full-fidelity manifest, and they are reachable in git. The base-sepolia and
+robinhood-testnet step manifests are not retained; 31 of them are unreadable
+from any commit reachable here, and the rest are testnet churn.
+
+Only the `current-manifest.json` of each chain/version is read at runtime, by
+`prepare_defaults.py`, `verify.py`, `verify_blockscout.py`, `console.py`, and
+`Migration.__init__` itself. `verify.py` belongs on that list because its
+`--manifest` option defaults to `current` (`scripts/migrate.py:131-135`), so an
+operator verifying a deployment reads the current manifest unless they name
+another one.
 
 **Every `current-manifest.json` is retained — mainnet and testnet alike.** Six
 remain: `base-mainnet/v1`, `base-sepolia/v1`, `base-sepolia/v2`,
@@ -30,14 +97,131 @@ numbered and timestamped step manifests are removed.
 
 An earlier revision of this branch deleted the four testnet current manifests as
 "disposable". **That was wrong and has been reverted.** Retained tooling reads
-them: `scripts/ccip_send.py` requires an explicit chain/environment and loads
-the selected current manifest directly, and `migrations/base-sepolia/0002_CcipWire.py`
-and `migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run
-the step later with `--start-timestamp`, which needs the manifest to resolve
-local and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting
-them turned a documented recovery path into a `FileNotFoundError`. The test suite
-did not catch it because nothing exercised `ccip_send`; an independent review
-did.
+them: `migrations/base-sepolia/0002_CcipWire.py` and
+`migrations/robinhood-testnet/0002_CcipWire.py` instruct operators to re-run the
+step later with `--start-timestamp`, which needs the manifest to resolve local
+and remote `RipeToken`, `RipeHq`, and `RipeTokenPool` addresses. Deleting them
+turned a documented recovery path into a `FileNotFoundError`. The test suite did
+not catch it because nothing exercised the readers; an independent review did.
+
+`scripts/ccip_send.py` was a second reader — it defaulted to `--chain
+base-sepolia --environment v2` and loaded that manifest directly — and it has
+since been deleted as dead code, because its own broadcast path never executed
+(`get_account(account)` passed one argument to a three-argument signature, so
+every real invocation raised `TypeError`). **That removes a consumer, not the
+requirement.** The CcipWire recovery path above still resolves against all six
+manifests, so none of them became disposable when `ccip_send.py` went. Do not
+re-derive "nothing reads these" from its absence; that is the exact inference
+that produced the reverted deletion. `tests/test_current_manifest_consumers.py`
+now pins the set in both directions — every declared manifest must be present
+and usable, and every manifest on disk must be declared.
+
+### Disposition of `scripts/ccip_send.py` — deprecated, owner decision closed
+
+"It was broken" is why it was safe to delete this week. It is not a finding that
+the capability is unwanted, and those are different claims. Recording the
+difference, because the deletion rationale was doing duty for a disposition it
+never established.
+
+**The gap is real and specific.** The tool's own opening line states it:
+Chainlink's Transporter UI only lists tokens Chainlink has onboarded, so a
+self-served token like RIPE has to call `Router.ccipSend()` itself. RIPE and
+GREEN are not onboarded. With the script gone there is no in-repo path to move
+them across a lane — the remaining CCIP surface is the `CcipWire` migrations,
+which wire pools and hand ownership to the Safe, and pool wiring is not a token
+send. Anyone needing one now hand-builds the router call. No runbook ever
+documented the script, so nothing operator-facing broke, but that absence is
+also why the gap is easy to miss.
+
+**The deleted implementation should not come back unchanged.** Three defects,
+each independently disqualifying for a tool that moves value:
+
+1. The broadcast path never executed. `get_account(account)` passed one argument
+   to a three-argument signature, so every real send raised `TypeError`. The
+   `--fork --as-address` simulation path skipped that call and did work, so the
+   accurate statement is that it could dry-run and could never send.
+2. `rpc` defaulted to
+   `f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}"`,
+   which becomes `.../v2/None` when the key is unset. It fails open on RPC
+   configuration rather than refusing.
+3. It read a raw `<NAME>_PRIVATE_KEY` hot key and broadcast by default —
+   `--fork` was opt-in, so the bare invocation was a live send with no
+   confirmation step.
+
+**Recommendation: deprecate the implementation, keep the gap on the books.**
+Restoring 154 lines that have never moved a token buys nothing; the recovery
+point is recorded in `extracted-files.tsv`. If bridging is wanted, it is a
+separate change that fixes account loading, requires an explicit RPC rather than
+synthesising one, defaults to dry-run, and confirms before broadcast. That is
+new work with a real blast radius, which is why it does not belong in a cleanup.
+### Deployment re-run posture — owner decision (2026-08-12)
+
+Extending a deployed history is **allowed**. Redeploying one by accident is
+**not**, and they are the same command: `--start-timestamp` defaults to `0`, and
+the runner selects every migration with a timestamp `>= 0` — all 13 for
+`robinhood-mainnet`, all 66 for `base-mainnet`. A bare
+`migrate --chain <chain>` is therefore a full redeploy, not a resume.
+
+Nothing corrects for that on its own. The numbered step manifests are pruned by
+the policy above, `end()` deletes the transaction log on success, and
+`current-manifest.json` records contracts with no step attribution, so nothing
+says which migration ran last. `_latest_manifest_timestamp()` cannot help
+either: with only a current manifest present it yields `"current"`, and
+`int("current")` raises.
+
+What does survive is `current-manifest.json` itself, written by
+`_append_manifest` on the first successful step. So that is the signal:
+
+- History has a `current-manifest.json` → refuse, unless the caller passes an
+  explicit `--start-timestamp`. `--force-replay` is **not** a bypass: after
+  merging rh it maps to `ignore_logs=is_retry`, so it ignores the transaction
+  journal and rebroadcasts -- the more dangerous mode, not the safer one. The
+  default already resumes from the journal and skips recorded receipts, so
+  resuming needs no flag at all.
+- No current manifest → first deployment, nothing to protect, runs as before.
+
+`MigrationRunner` enforces it and `Migration` fails closed for any other caller.
+This replaces an earlier version that hard-coded the two Robinhood v1 paths; the
+manifest check needs no list and covers Base, whose 66-migration redeploy was
+the larger exposure.
+
+    python -m scripts.migrate --chain robinhood-mainnet --start-timestamp 2026081200
+    # resuming needs no flag: the default consumes the journal
+    python -m scripts.migrate --chain robinhood-mainnet --start-timestamp 2026081300
+
+**Owner decision (2026-08-12): deprecated, not to be rebuilt.** The script was
+scaffolding for exercising a lane before it was live, not an operator tool. The
+lanes are now deployed and wired — `config/Ccip.py` declares both mainnet and
+both testnet lanes with their routers and chain selectors, and the eight
+`CcipPool`/`CcipWire` migrations deploy the token pools on each side and hand
+ownership to the Safe.
+
+**`rh` rewrote the file after we deleted it; it is still removed.** Two commits
+on `rh` -- `98155a8` "reconcile and harden live CCIP topology" and `cc01d02`
+"finalize PR67 deployment and CCIP hardening" -- grew it from 154 to 471 lines
+and fixed every defect listed above: the one-argument `get_account` call is
+gone, and so is the `.../v2/None` RPC default.
+
+That version is **not** a working bridge, and the distinction matters for anyone
+reading this later. Its own docstring: *"This tool currently supports fork
+simulation/preflight only. It deliberately has no live signer or Safe
+transaction backend and therefore cannot broadcast."* It contains zero
+references to private keys, Ledger or Safe, and `--as-address` is required in
+fork mode because "private keys are never loaded". It is a dry-run simulator for
+rehearsing a lane, not a way to move tokens.
+
+So it does not reopen the question it appears to. Owner decision stands and was
+reaffirmed against this version specifically: **remove it; it will never be
+used.** When the `rh` merge re-presents `scripts/ccip_send.py` as a
+modify/delete conflict, the resolution is delete. Those 471 lines are dropped
+deliberately, not missed -- recoverable from `origin/rh` at `cc01d02`.
+
+That closes the gap recorded above rather than leaving it outstanding. It was a
+real gap in repository terms and not an operational one: with pools wired and
+Safe-owned, moving RIPE or GREEN across a lane is a Safe transaction against the
+live router, not a laptop script holding a raw `<NAME>_PRIVATE_KEY` and
+broadcasting by default. The three defects listed above are moot; the recovery
+point stays in `extracted-files.tsv` for reference only.
 
 ### Why removing step manifests does not break a deployment
 
@@ -80,7 +264,23 @@ these paths. Those citations were accurate on the dates they were written and ar
 deliberately left intact; the affected documents carry a removal overlay at the
 top pointing here.
 
-**171 files removed.**
+**118 files removed.**
+
+The two `Deployment tooling` sections below are this PR's removals — the unused
+H-02/H-06/H-08 deployment machinery. Everything above and below them predates it.
+Recovery metadata for the 18 (git mode, blob id, byte length, sha256, and a
+commit each is retrievable from) is in `extracted-files.tsv` under the
+`deployment-tooling` and `deployment-tooling-test` categories.
+
+Each row records **the version that was actually deleted**, which is not always
+the version at the merge base. `rh` kept developing four of these files after
+`3c4b06b`, and the merge (`a2d515d`) brought its work in before the conflicts
+were resolved as deletions — so what left the tree was `rh`'s version, not ours.
+Those rows are anchored to `bb84a17`, the merge's `rh`-side parent, rather than
+to `3c4b06b`: recovering from the older blob would silently hand back a copy
+missing `rh`'s later changes, which is the failure this column exists to prevent.
+`bb84a17` is a parent of a commit on this branch, so it stays reachable
+regardless of where `origin/rh` moves next.
 
 ## Block-clock inventory (4)
 
@@ -89,87 +289,40 @@ top pointing here.
 - `scripts/check_block_clock_inventory.py`
 - `tests/inventory/test_block_clock_inventory.py`
 
-## Deployment manifests (79)
+## Deployment manifests (8)
 
-- `migration_history/base-mainnet/v1/0000-manifest.json`
-- `migration_history/base-mainnet/v1/1004-manifest.json`
-- `migration_history/base-mainnet/v1/1005-manifest.json`
-- `migration_history/base-mainnet/v1/1006-manifest.json`
-- `migration_history/base-mainnet/v1/1007-manifest.json`
-- `migration_history/base-mainnet/v1/1008-manifest.json`
-- `migration_history/base-mainnet/v1/1009-manifest.json`
-- `migration_history/base-mainnet/v1/1010-manifest.json`
-- `migration_history/base-mainnet/v1/1011-manifest.json`
-- `migration_history/base-mainnet/v1/1012-manifest.json`
-- `migration_history/base-mainnet/v1/1013-manifest.json`
-- `migration_history/base-mainnet/v1/1014-manifest.json`
-- `migration_history/base-mainnet/v1/1015-manifest.json`
-- `migration_history/base-mainnet/v1/1016-manifest.json`
-- `migration_history/base-mainnet/v1/1017-manifest.json`
-- `migration_history/base-mainnet/v1/2001-manifest.json`
-- `migration_history/base-mainnet/v1/2025071501-manifest.json`
-- `migration_history/base-mainnet/v1/2025071502-manifest.json`
-- `migration_history/base-mainnet/v1/2025071503-manifest.json`
-- `migration_history/base-mainnet/v1/2025071504-manifest.json`
-- `migration_history/base-mainnet/v1/2025071505-manifest.json`
-- `migration_history/base-mainnet/v1/2025071506-manifest.json`
-- `migration_history/base-mainnet/v1/2025071601-manifest.json`
-- `migration_history/base-mainnet/v1/2025071602-manifest.json`
-- `migration_history/base-mainnet/v1/2025071801-manifest.json`
-- `migration_history/base-mainnet/v1/2025072001-manifest.json`
-- `migration_history/base-mainnet/v1/2025072201-manifest.json`
-- `migration_history/base-mainnet/v1/2025072301-manifest.json`
-- `migration_history/base-mainnet/v1/2025072701-manifest.json`
-- `migration_history/base-mainnet/v1/2025072901-manifest.json`
-- `migration_history/base-mainnet/v1/2025080401-manifest.json`
-- `migration_history/base-mainnet/v1/2025080800-manifest.json`
-- `migration_history/base-mainnet/v1/2025080900-manifest.json`
-- `migration_history/base-mainnet/v1/2025080901-manifest.json`
-- `migration_history/base-mainnet/v1/2025081200-manifest.json`
-- `migration_history/base-mainnet/v1/2025081800-manifest.json`
-- `migration_history/base-mainnet/v1/2025082000-manifest.json`
-- `migration_history/base-mainnet/v1/2025090300-manifest.json`
-- `migration_history/base-mainnet/v1/2025090400-manifest.json`
-- `migration_history/base-mainnet/v1/2025102000-manifest.json`
-- `migration_history/base-mainnet/v1/2025102200-manifest.json`
-- `migration_history/base-mainnet/v1/2025111100-manifest.json`
-- `migration_history/base-mainnet/v1/2025112400-manifest.json`
-- `migration_history/base-mainnet/v1/2025112500-manifest.json`
-- `migration_history/base-mainnet/v1/2025120200-manifest.json`
-- `migration_history/base-mainnet/v1/2025120400-manifest.json`
-- `migration_history/base-mainnet/v1/2025120700-manifest.json`
-- `migration_history/base-mainnet/v1/2025120900-manifest.json`
-- `migration_history/base-mainnet/v1/2026010900-manifest.json`
-- `migration_history/base-mainnet/v1/2026011400-manifest.json`
-- `migration_history/base-mainnet/v1/2026021300-manifest.json`
-- `migration_history/base-mainnet/v1/2026021900-manifest.json`
-- `migration_history/base-mainnet/v1/2026022000-manifest.json`
-- `migration_history/base-mainnet/v1/2026030500-manifest.json`
-- `migration_history/base-mainnet/v1/2026043000-manifest.json`
-- `migration_history/base-mainnet/v1/2026072800-manifest.json`
-- `migration_history/base-mainnet/v1/2026072801-manifest.json`
-- `migration_history/base-mainnet/v1/2026080700-manifest.json`
-- `migration_history/base-mainnet/v1/3001-manifest.json`
-- `migration_history/base-mainnet/v1/3002-manifest.json`
 - `migration_history/base-sepolia/v1/0000-manifest.json`
 - `migration_history/base-sepolia/v1/0002-manifest.json`
 - `migration_history/base-sepolia/v1/0003-manifest.json`
 - `migration_history/base-sepolia/v2/0000-manifest.json`
 - `migration_history/base-sepolia/v2/0001-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0000-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0001-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0002-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0003-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0004-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0005-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0006-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0008-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0009-manifest.json`
-- `migration_history/robinhood-mainnet/v1/0010-manifest.json`
-- `migration_history/robinhood-mainnet/v1/2026080700-manifest.json`
 - `migration_history/robinhood-testnet/v1/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0000-manifest.json`
 - `migration_history/robinhood-testnet/v2/0001-manifest.json`
+
+## Deployment tooling (11)
+
+- `scripts/ccip_send.py`
+- `scripts/check_deployment.py`
+- `scripts/params/validate_robinhood_reward_launch_plan.py`
+- `scripts/proposals/__init__.py`
+- `scripts/proposals/build_ledger_artifact_bundle.py`
+- `scripts/proposals/ledger-robinhood-profile.json`
+- `scripts/proposals/ledger_robinhood_profile.py`
+- `scripts/proposals/lootbox-deployment-profiles.json`
+- `scripts/proposals/lootbox_deployment_profiles.py`
+- `scripts/utils/deployment_assertions.py`
+- `scripts/utils/manifest_schema.py`
+
+## Deployment tooling tests (7)
+
+- `tests/deployment/test_current_manifest_promotion.py`
+- `tests/deployment/test_manifest_schema.py`
+- `tests/deployment/test_post_deployment_assertions.py`
+- `tests/deployment_profiles/conftest.py`
+- `tests/deployment_profiles/test_ledger_artifact_bundle.py`
+- `tests/deployment_profiles/test_ledger_robinhood_profile.py`
+- `tests/deployment_profiles/test_lootbox_deployment_profiles.py`
 
 ## Evidence records (13)
 

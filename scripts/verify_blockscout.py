@@ -1,7 +1,7 @@
 """Verify deployed Robinhood contracts on Blockscout.
 
-scripts/verify.py only validates manifest assertions locally -- it has no
-submission path -- so this does the actual explorer verification.
+scripts/verify.py submits to Etherscan-family explorers, which Robinhood
+chains don't have -- this does the equivalent submission against Blockscout.
 
 Uses `vyper -f solc_json` to produce the standard JSON input, which resolves
 the module imports (addys, deptBasics, gov, timeLock, ...) that single-file

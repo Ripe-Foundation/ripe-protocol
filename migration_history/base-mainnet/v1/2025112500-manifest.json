@@ -1,0 +1,193 @@
+{
+  "contracts": {
+    "GreenToken": {
+      "address": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+      "file": "contracts/tokens/GreenToken.vy"
+    },
+    "RipeToken": {
+      "address": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+      "file": "contracts/tokens/RipeToken.vy"
+    },
+    "SavingsGreen": {
+      "address": "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",
+      "file": "contracts/tokens/SavingsGreen.vy"
+    },
+    "RipeHq": {
+      "address": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "file": "contracts/registries/RipeHq.vy"
+    },
+    "Contributor": {
+      "address": "0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1",
+      "file": "contracts/modules/Contributor.vy"
+    },
+    "TrainingWheels": {
+      "address": "0x2255b0006A3DA38AA184E0F9d5e056C2d0448065",
+      "file": "contracts/config/TrainingWheels.vy"
+    },
+    "DefaultsBase": {
+      "address": "0x0B421AEf6a960EeD867EBc609B91aa3501115085",
+      "file": "contracts/config/DefaultsBase.vy"
+    },
+    "Ledger": {
+      "address": "0x365256e322a47Aa2015F6724783F326e9B24fA47",
+      "file": "contracts/data/Ledger.vy"
+    },
+    "MissionControl": {
+      "address": "0xB59b84B526547b6dcb86CCF4004d48E619156CF3",
+      "file": "contracts/data/MissionControl.vy"
+    },
+    "Switchboard": {
+      "address": "0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9",
+      "file": "contracts/registries/Switchboard.vy"
+    },
+    "SwitchboardAlpha": {
+      "address": "0x73Cd87A047eb16E22f8afA21e0980C07Bb26CA83",
+      "file": "contracts/config/SwitchboardAlpha.vy"
+    },
+    "SwitchboardBravo": {
+      "address": "0xD18AC028cBe1AbebDb118E9C7A60018d58C846e7",
+      "file": "contracts/config/SwitchboardBravo.vy"
+    },
+    "SwitchboardCharlie": {
+      "address": "0x6D798bD44b1591571c9d95b6D51c9c34a5534008",
+      "file": "contracts/config/SwitchboardCharlie.vy"
+    },
+    "SwitchboardDelta": {
+      "address": "0x50e815AC356798E42EB35De538a0376459ce11cb",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    },
+    "PriceDesk": {
+      "address": "0x68564c6035e8Dc21F0Ce6CB9592dC47B59dE2Ff6",
+      "file": "contracts/registries/PriceDesk.vy"
+    },
+    "ChainlinkPrices": {
+      "address": "0x253f55e455701fF0B835128f55668ed159aAB3D9",
+      "file": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    "CurvePrices": {
+      "address": "0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d",
+      "file": "contracts/priceSources/CurvePrices.vy"
+    },
+    "BlueChipYieldPrices": {
+      "address": "0x90C70ACfF302c8a7f00574EC3547B0221f39cD28",
+      "file": "contracts/priceSources/BlueChipYieldPrices.vy"
+    },
+    "PythPrices": {
+      "address": "0x89b6E13E4aD4036EAA586219DD73Ebb2b36d5968",
+      "file": "contracts/priceSources/PythPrices.vy"
+    },
+    "StorkPrices": {
+      "address": "0xCa13ACFB607B842DF5c1D0657C0865cC47bEfe14",
+      "file": "contracts/priceSources/StorkPrices.vy"
+    },
+    "VaultBook": {
+      "address": "0xB758e30C14825519b895Fd9928d5d8748A71a944",
+      "file": "contracts/registries/VaultBook.vy"
+    },
+    "StabilityPool": {
+      "address": "0x2a157096af6337b2b4bd47de435520572ed5a439",
+      "file": "contracts/vaults/StabilityPool.vy"
+    },
+    "RipeGov": {
+      "address": "0xe42b3dC546527EB70D741B185Dc57226cA01839D",
+      "file": "contracts/vaults/RipeGov.vy"
+    },
+    "SimpleErc20": {
+      "address": "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "RebaseErc20": {
+      "address": "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597",
+      "file": "contracts/vaults/RebaseErc20.vy"
+    },
+    "AuctionHouse": {
+      "address": "0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084",
+      "file": "contracts/core/AuctionHouse.vy"
+    },
+    "AuctionHouseNFT": {
+      "address": "0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A",
+      "file": "contracts/core/AuctionHouseNFT.vy"
+    },
+    "Boardroom": {
+      "address": "0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1",
+      "file": "contracts/core/Boardroom.vy"
+    },
+    "BondRoom": {
+      "address": "0x707f660A7834d00792DF9a28386Bb2cCC6446154",
+      "file": "contracts/core/BondRoom.vy"
+    },
+    "CreditEngine": {
+      "address": "0x30aa8eB041AcB3B22228516297C331B313b81462",
+      "file": "contracts/core/CreditEngine.vy"
+    },
+    "Endaoment": {
+      "address": "0x70fA85Aa99a39161A2623627377F1c791fd091f6",
+      "file": "contracts/core/Endaoment.vy"
+    },
+    "HumanResources": {
+      "address": "0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b",
+      "file": "contracts/core/HumanResources.vy"
+    },
+    "Lootbox": {
+      "address": "0x1f90ef42Da9B41502d2311300E13FAcf70c64be7",
+      "file": "contracts/core/Lootbox.vy"
+    },
+    "Teller": {
+      "address": "0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13",
+      "file": "contracts/core/Teller.vy"
+    },
+    "GreenPool": {
+      "address": "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
+    },
+    "RipePoolCurve": {
+      "address": "0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526"
+    },
+    "RipePoolAero": {
+      "address": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9"
+    },
+    "BondBooster": {
+      "address": "0xA1872467AC4fb442aeA341163A65263915ce178a",
+      "file": "contracts/config/BondBooster.vy"
+    },
+    "wsuperOETHbPrices": {
+      "address": "0x2606Ce36b62a77562DF664E7a0009805BB254F3f",
+      "file": "contracts/priceSources/wsuperOETHbPrices.vy"
+    },
+    "RedStone": {
+      "address": "0x4Ef9450f11058fad3456f4461db24b461420A8C8",
+      "file": "contracts/priceSources/RedStone.vy"
+    },
+    "UndyVaultPrices": {
+      "address": "0x2210a9b994CC0F13689043A34F2E11d17DB2099C",
+      "file": "contracts/priceSources/UndyVaultPrices.vy"
+    },
+    "Underscore Vault": {
+      "address": "0x4549A368c00f803862d457C4C0c659a293F26C66",
+      "file": "contracts/vaults/SimpleErc20.vy"
+    },
+    "CreditRedeem": {
+      "address": "0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB",
+      "file": "contracts/core/CreditRedeem.vy"
+    },
+    "Deleverage": {
+      "address": "0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27",
+      "file": "contracts/core/Deleverage.vy"
+    },
+    "TellerUtils": {
+      "address": "0x57f071AB96D1798C6bB3e314D2D283502DEDDcdD",
+      "file": "contracts/core/TellerUtils.vy"
+    },
+    "SwitchboardEcho": {
+      "address": "0xdF99a86e4450163e8DbA47C928131e75D2995dbb",
+      "file": "contracts/config/SwitchboardEcho.vy"
+    },
+    "EndaomentFunds": {
+      "address": "0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873",
+      "file": "contracts/core/EndaomentFunds.vy"
+    },
+    "EndaomentPSM": {
+      "address": "0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7",
+      "file": "contracts/core/EndaomentPSM.vy"
+    }
+  }
+}

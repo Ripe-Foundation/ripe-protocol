@@ -1,0 +1,12 @@
+{
+  "contracts": {
+    "DefaultsBase": {
+      "address": "0x26b8733836aEeb3aa3B8Acee09dBa8E231299A87",
+      "file": "contracts/config/DefaultsBase.vy"
+    },
+    "MissionControl": {
+      "address": "0x559E53F42b68b4995732Dba4aF300796761DBC19",
+      "file": "contracts/data/MissionControl.vy"
+    }
+  }
+}

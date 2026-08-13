@@ -1,0 +1,8 @@
+{
+  "contracts": {
+    "PriceDesk": {
+      "address": "0x2F7901BE53cC94AEF174f1a0764430840360Ef53",
+      "file": "contracts/registries/PriceDesk.vy"
+    }
+  }
+}

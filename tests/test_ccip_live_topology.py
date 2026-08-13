@@ -25,7 +25,7 @@ from config.Ccip import (
     require_ccip_wiring_gates,
 )
 from config.robinhood_blueprint import Disposition, get_component, get_promotion
-from scripts.utils.deployment_assertions import blueprint_policy
+from utils.blueprint_policy import blueprint_policy
 
 
 ROOT = Path(__file__).resolve().parents[1]

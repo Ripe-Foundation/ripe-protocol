@@ -1,0 +1,20 @@
+{
+  "contracts": {
+    "Ledger": {
+      "address": "0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d",
+      "file": "contracts/data/Ledger.vy"
+    },
+    "Lootbox": {
+      "address": "0x33311571B17608158E4Ff70016c866F32B46dc34",
+      "file": "contracts/core/Lootbox.vy"
+    },
+    "Teller": {
+      "address": "0x12C7dE89aB9015883267320194aBBA9337dDcf2F",
+      "file": "contracts/core/Teller.vy"
+    },
+    "RipeGov": {
+      "address": "0xD4C2cAd56A3d719d87c8B7370C94Ee399877ED82",
+      "file": "contracts/vaults/RipeGov.vy"
+    }
+  }
+}

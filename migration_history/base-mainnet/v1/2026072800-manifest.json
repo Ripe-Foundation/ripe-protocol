@@ -1,0 +1,12 @@
+{
+  "contracts": {
+    "AuctionHouse": {
+      "address": "0xe9Dc24Ab1dC4746C7A43FAce3f895D9176D4C235",
+      "file": "contracts/core/AuctionHouse.vy"
+    },
+    "Deleverage": {
+      "address": "0x9451dd9DF778d8f1227C506A807AF0Cf2559aa6C",
+      "file": "contracts/core/Deleverage.vy"
+    }
+  }
+}
