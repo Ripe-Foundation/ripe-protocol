@@ -890,8 +890,13 @@ def price_desk(
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 6
 
-    # register aero ripe prices
-    assert price_desk_deploy.startAddNewAddressToRegistry(aero_ripe_prices, "Aero Ripe Prices", sender=deploy3r)
+    # Test-only inert registration preserves the established source IDs used by
+    # the shared bootstrap. Production must not register the Aero monitor.
+    assert price_desk_deploy.startAddNewAddressToRegistry(
+        aero_ripe_prices,
+        "Aero Monitor (test only)",
+        sender=deploy3r,
+    )
     assert price_desk_deploy.confirmNewAddressToRegistry(aero_ripe_prices, sender=deploy3r) == 7
 
     # register wsuper oethb prices
@@ -1051,21 +1056,36 @@ def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
 
 
 @pytest.fixture(scope="session")
-def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
-    ripe_weth_pool = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_WETH_POOL"]
-    ripe_token = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_TOKEN"]
+def aero_ripe_prices(ripe_hq_deploy, ripe_token):
+    weth = boa.load(
+        "contracts/mock/MockUniswapV2Token.vy",
+        18,
+        name="aero_monitor_weth",
+    )
+    ripe_weth_pool = boa.load(
+        "contracts/mock/MockAeroRipePool.vy",
+        ripe_token,
+        weth,
+        name="aero_monitor_pool",
+    )
+    # Plausible nonzero reserves keep the test-only monitor self-consistent;
+    # bootstrap consumers still see it only through the inert PriceSource API.
+    ripe_weth_pool.configureState(
+        100 * EIGHTEEN_DECIMALS,
+        10 * EIGHTEEN_DECIMALS,
+        1_700_000_000,
+    )
 
     c = boa.load(
         "contracts/priceSources/AeroRipePrices.vy",
         ripe_hq_deploy,
-        ZERO_ADDRESS,
         ripe_weth_pool,
         ripe_token,
-        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
-        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        weth,
         name="aero_ripe_prices",
     )
-    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert c.isMonitoringOnly()
+    assert c.getPriceAndHasFeed(ripe_token) == (0, False)
     return c
 
 
