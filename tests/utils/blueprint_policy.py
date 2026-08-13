@@ -41,6 +41,7 @@ class BlueprintPolicy:
     canonical_registries: Mapping[tuple[str, int], str]
     required_registries: frozenset[tuple[str, int]]
     reserved_registries: frozenset[tuple[str, int]]
+    required_components: frozenset[str]
     unavailable_components: Mapping[str, Disposition]
 
 
@@ -71,9 +72,11 @@ def blueprint_policy(
             + ", ".join(sorted(value.value for value in unsupported))
         )
 
+    required_components: set[str] = set()
     unavailable_components: dict[str, Disposition] = {}
     for component in blueprint.components:
         if component.deployment in REQUIRED_DISPOSITIONS:
+            required_components.add(component.component_id)
             continue
         if component.deployment in UNAVAILABLE_DISPOSITIONS:
             unavailable_components[component.component_id] = component.deployment
@@ -103,5 +106,6 @@ def blueprint_policy(
         canonical_registries=canonical,
         required_registries=frozenset(required),
         reserved_registries=frozenset(reserved),
+        required_components=frozenset(required_components),
         unavailable_components=unavailable_components,
     )
