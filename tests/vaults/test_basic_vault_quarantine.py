@@ -625,7 +625,7 @@ def test_zero_ltv_shortfall_is_not_quarantined_or_reward_suppressed(
     ((0, 20), (10, 20)),
     ids=("general-and-voter", "staker-and-voter"),
 )
-def test_next_reward_update_zeroes_quarantined_allocations_without_erasing_points(
+def test_reward_updates_keep_configured_allocations_during_quarantine(
     stakers_alloc,
     voter_alloc,
     stock_token,
@@ -688,13 +688,21 @@ def test_next_reward_update_zeroes_quarantined_allocations_without_erasing_point
     )
     quarantined = ledger.assetDepositPoints(3, stock_token)
     global_quarantined = ledger.globalDepositPoints()
-    assert quarantined.ripeStakerPoints == before.ripeStakerPoints
-    assert quarantined.ripeVotePoints == before.ripeVotePoints
-    assert quarantined.ripeGenPoints == before.ripeGenPoints
+    if stakers_alloc == 0:
+        assert quarantined.ripeStakerPoints == before.ripeStakerPoints
+        assert global_quarantined.ripeStakerPoints >= global_before.ripeStakerPoints
+        # Legacy general rewards book the stale pre-incident USD value through
+        # this first asset-specific update, then refresh it to zero.
+        assert quarantined.ripeGenPoints > before.ripeGenPoints
+        assert global_quarantined.ripeGenPoints > global_before.ripeGenPoints
+    else:
+        assert quarantined.ripeStakerPoints > before.ripeStakerPoints
+        assert global_quarantined.ripeStakerPoints > global_before.ripeStakerPoints
+        assert quarantined.ripeGenPoints == before.ripeGenPoints
+        assert global_quarantined.ripeGenPoints == global_before.ripeGenPoints
+    assert quarantined.ripeVotePoints > before.ripeVotePoints
     assert quarantined.lastUsdValue == 0
-    assert global_quarantined.ripeStakerPoints == global_before.ripeStakerPoints
-    assert global_quarantined.ripeVotePoints == global_before.ripeVotePoints
-    assert global_quarantined.ripeGenPoints == global_before.ripeGenPoints
+    assert global_quarantined.ripeVotePoints > global_before.ripeVotePoints
     assert mission_control.getDepositPointsConfig(stock_token) == configured_before
 
     stock_token.mint(simple_erc20_vault, 1, sender=deploy3r)
@@ -722,7 +730,7 @@ def test_next_reward_update_zeroes_quarantined_allocations_without_erasing_point
         assert recovered.ripeStakerPoints > quarantined.ripeStakerPoints
 
 
-def test_quarantined_asset_reward_update_stays_zero_after_unrelated_update(
+def test_unrelated_update_does_not_change_legacy_quarantine_rewards(
     stock_token,
     simple_erc20_vault,
     alpha_token,
@@ -804,8 +812,8 @@ def test_quarantined_asset_reward_update_stays_zero_after_unrelated_update(
         alpha_token,
         sender=teller.address,
     )
-    # Updating an unrelated healthy asset does not mutate the quarantined
-    # asset's record. Its next own calculation must still accrue nothing.
+    # Updating an unrelated healthy asset does not mutate this asset's record.
+    # Its next own calculation keeps using the configured staker/voter allocs.
     assert ledger.assetDepositPoints(3, stock_token) == stock_before
 
     boa.env.time_travel(blocks=10)
@@ -817,8 +825,8 @@ def test_quarantined_asset_reward_update_stays_zero_after_unrelated_update(
         sender=teller.address,
     )
     stock_after = ledger.assetDepositPoints(3, stock_token)
-    assert stock_after.ripeStakerPoints == stock_before.ripeStakerPoints
-    assert stock_after.ripeVotePoints == stock_before.ripeVotePoints
+    assert stock_after.ripeStakerPoints > stock_before.ripeStakerPoints
+    assert stock_after.ripeVotePoints > stock_before.ripeVotePoints
     assert stock_after.ripeGenPoints == stock_before.ripeGenPoints
     assert stock_after.lastUsdValue == 0
     assert mission_control.getDepositPointsConfig(stock_token) == configured_before

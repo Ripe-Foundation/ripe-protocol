@@ -758,8 +758,8 @@ does not continue this approval.
 
 ### RH-D028 — BasicVault custody-shortfall quarantine is account-scoped
 
-**Status:** Owner-accepted on 12 August 2026 for the exact uncommitted candidate
-on `codex/rh-basic-vault-quarantine`, based at
+**Status:** Owner-accepted on 12 August 2026 for the exact candidate on
+`codex/rh-basic-vault-quarantine`, based at
 `bb84a178bf17b2b4546ce0a642eaf95dfc6fe945`.
 
 The quarantine remains dynamically derived and has no stored quarantine state.
@@ -778,11 +778,18 @@ Repayment, healthy deposits into other assets, and the governance-controlled
 `swapCollateral` path remain available. Ordinary behavior resumes automatically
 when custody is restored.
 
-The next normal reward calculation gives the quarantined asset zero general,
-staker, and voter allocation without deleting prior points or changing configured
-allocations. Type-1 health and threshold views remain truthful mathematical
-reports even while the corresponding forced-action eligibility views return
-false.
+**Rewards remain outside quarantine.** Lootbox stays byte-for-byte identical to
+the base commit. Staker and voter points continue at their configured rates.
+General points retain the existing behavior: the last recorded USD value accrues
+through the first asset-specific update after the shortfall, that update refreshes
+the value to zero while usable custody remains zero, and ordinary accrual resumes
+after custody restoration. Governance may use the existing timelocked asset
+configuration path if incident-specific allocation suppression is desired. This
+explicitly replaces the candidate's earlier automatic reward-suppression policy;
+quarantine does not modify configured allocations or previously earned points.
+
+Type-1 health and threshold views remain truthful mathematical reports even while
+the corresponding forced-action eligibility views return false.
 
 This bounded owner decision supersedes RH-D020's parked zero-backing instruction
 only for the exact custody-shortfall candidate above. It does not authorize a

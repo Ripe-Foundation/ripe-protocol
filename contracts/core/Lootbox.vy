@@ -33,7 +33,6 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
-import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
@@ -54,7 +53,6 @@ interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
-    def getDebtTerms(_asset: address) -> cs.DebtTerms: view
     def coreRipeGovVaultId() -> uint256: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def underscoreRegistry() -> address: view
@@ -863,40 +861,19 @@ def _getLatestDepositPoints(
     assert staticcall MissionControl(_a.missionControl).coreRipeGovVaultId() != 0 # dev: invalid vault id
     p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
 
-    # Apply the same complete quarantine test used by CreditEngine. Requiring a
-    # positive-LTV position, zero user and vault-wide usable amounts, and a
-    # nonzero reward share avoids treating ordinary empty assets or share dust
-    # as quarantined.
-    assetAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-    isQuarantined: bool = False
-    if _user != empty(address) and assetAmount == 0 and staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset) != 0 and staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset) == 0:
-        debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(_asset)
-        isQuarantined = debtTerms.ltv != 0
-    if isQuarantined and p.assetPoints.lastUsdValue != 0:
-        p.globalPoints.lastUsdValue -= min(p.assetPoints.lastUsdValue, p.globalPoints.lastUsdValue)
-        p.assetPoints.lastUsdValue = 0
-
-    assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset)
-    stakersTotalAlloc: uint256 = _c.stakersPointsAllocTotal
-    voterTotalAlloc: uint256 = _c.voterPointsAllocTotal
-    if isQuarantined:
-        stakersTotalAlloc -= min(assetConfig.stakersPointsAlloc, stakersTotalAlloc)
-        voterTotalAlloc -= min(assetConfig.voterPointsAlloc, voterTotalAlloc)
-        assetConfig.stakersPointsAlloc = 0
-        assetConfig.voterPointsAlloc = 0
-
     # latest global points
-    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, stakersTotalAlloc, voterTotalAlloc)
+    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
+    assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset) 
     assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
     # latest asset value (staked assets not eligible for gen deposit rewards)
     newAssetUsdValue: uint256 = 0
-    if assetConfig.stakersPointsAlloc == 0 and assetAmount != 0:
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
+    if assetConfig.stakersPointsAlloc == 0:
+        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
 
     # update `lastUsdValue` for global + asset
     if newAssetUsdValue != assetPoints.lastUsdValue:
@@ -931,8 +908,11 @@ def _getLatestDepositPoints(
 
 @view
 @internal
-def _refreshAssetUsdValue(_asset: address, _assetAmount: uint256, _priceDesk: address) -> uint256:
-    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _assetAmount)
+def _refreshAssetUsdValue(_asset: address, _vaultAddr: address, _priceDesk: address) -> uint256:
+    assetAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+    if assetAmount == 0:
+        return 0
+    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, assetAmount)
     if newUsdValue != 0:
         newUsdValue = newUsdValue // EIGHTEEN_DECIMALS # reduce risk of integer overflow
     return newUsdValue
