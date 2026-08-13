@@ -75,6 +75,20 @@ def _ripe_bond_config_with_epoch_length(config, epoch_length):
     )
 
 
+def _ripe_bond_config_with_amount_per_epoch(config, amount_per_epoch):
+    return (
+        config.asset,
+        amount_per_epoch,
+        config.canBond,
+        config.minRipePerUnit,
+        config.maxRipePerUnit,
+        config.maxRipePerUnitLockBonus,
+        config.epochLength,
+        config.shouldAutoRestart,
+        config.restartDelayBlocks,
+    )
+
+
 def test_initial_epoch_blocks(
     ledger, setupRipeBonds
 ):
@@ -1124,6 +1138,61 @@ def test_purchase_ripe_bond_zero_amount_fails(
         )
 
 
+def test_purchase_ripe_bond_rejects_zero_stored_amount_atomically(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+    teller,
+):
+    setupRipeBonds(_amountPerEpoch=10 * EIGHTEEN_DECIMALS)
+    payment_amount = 1 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+        alpha_token.balanceOf(bob),
+        alpha_token.allowance(bob, teller),
+        alpha_token.balanceOf(bond_room),
+    )
+    assert config.epochLength != 0
+    assert config.amountPerEpoch == state_before[2] != 0
+    assert state_before[1] > state_before[0]
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_amount_per_epoch(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        with boa.reverts("invalid amount per epoch"):
+            teller.purchaseRipeBond(
+                alpha_token,
+                payment_amount,
+                sender=bob,
+            )
+
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+            alpha_token.balanceOf(bob),
+            alpha_token.allowance(bob, teller),
+            alpha_token.balanceOf(bond_room),
+        ) == state_before
+
+    assert mission_control.ripeBondConfig().amountPerEpoch == config.amountPerEpoch
+
+
 def test_purchase_ripe_bond_auto_restart_epoch(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger
 ):
@@ -1642,6 +1711,238 @@ def test_start_bond_epoch_at_block_comprehensive(
         bond_room.startBondEpochAtBlock(future_block + 100, sender=bob)
 
 
+def test_start_bond_epoch_rejects_zero_stored_length_without_state_changes(
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds(_epochLength=100)
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+    )
+    assert state_before[1] > state_before[0]
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_epoch_length(config, 0),
+            sender=switchboard_delta.address,
+        )
+        assert mission_control.ripeBondConfig().epochLength == 0
+
+        with boa.reverts("invalid epoch length"):
+            bond_room.startBondEpochAtBlock(
+                boa.env.evm.patch.block_number,
+                sender=switchboard_delta.address,
+            )
+
+        state_after = (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+        )
+        assert state_after == state_before
+        assert state_after[1] > state_after[0]
+
+    assert mission_control.ripeBondConfig().epochLength == config.epochLength
+
+
+def test_start_bond_epoch_rejects_zero_stored_amount_without_state_changes(
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds(_amountPerEpoch=100 * EIGHTEEN_DECIMALS)
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+    )
+    assert config.epochLength != 0
+    assert config.amountPerEpoch == state_before[2] != 0
+    assert state_before[1] > state_before[0]
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_amount_per_epoch(config, 0),
+            sender=switchboard_delta.address,
+        )
+        assert mission_control.ripeBondConfig().amountPerEpoch == 0
+
+        with boa.reverts("invalid amount per epoch"):
+            bond_room.startBondEpochAtBlock(
+                boa.env.evm.patch.block_number,
+                sender=switchboard_delta.address,
+            )
+
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+        ) == state_before
+
+    assert mission_control.ripeBondConfig().amountPerEpoch == config.amountPerEpoch
+
+
+def test_zero_epoch_length_precedes_zero_stored_amount_validation(
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds()
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+    )
+    config_with_both_zero = (
+        config.asset,
+        0,
+        config.canBond,
+        config.minRipePerUnit,
+        config.maxRipePerUnit,
+        config.maxRipePerUnitLockBonus,
+        0,
+        config.shouldAutoRestart,
+        config.restartDelayBlocks,
+    )
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            config_with_both_zero,
+            sender=switchboard_delta.address,
+        )
+        invalid_config = mission_control.ripeBondConfig()
+        assert invalid_config.epochLength == 0
+        assert invalid_config.amountPerEpoch == 0
+
+        with boa.reverts("invalid epoch length"):
+            bond_room.startBondEpochAtBlock(
+                boa.env.evm.patch.block_number,
+                sender=switchboard_delta.address,
+            )
+        with boa.reverts("invalid epoch length"):
+            bond_room.refreshBondEpoch(sender=switchboard_delta.address)
+
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+        ) == state_before
+
+    restored_config = mission_control.ripeBondConfig()
+    assert restored_config.epochLength == config.epochLength
+    assert restored_config.amountPerEpoch == config.amountPerEpoch
+
+
+def test_start_bond_epoch_recovers_after_zero_epoch_length_corrected(
+    bond_room,
+    governance,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds(_epochLength=100)
+    config = mission_control.ripeBondConfig()
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_epoch_length(config, 0),
+            sender=switchboard_delta.address,
+        )
+        with boa.reverts("invalid epoch length"):
+            bond_room.startBondEpochAtBlock(
+                boa.env.evm.patch.block_number,
+                sender=switchboard_delta.address,
+            )
+
+        aid = switchboard_delta.setRipeBondEpochLength(
+            1,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+        assert switchboard_delta.executePendingAction(
+            aid,
+            sender=governance.address,
+        )
+        assert mission_control.ripeBondConfig().epochLength == 1
+
+        bond_room.startBondEpochAtBlock(
+            boa.env.evm.patch.block_number,
+            sender=switchboard_delta.address,
+        )
+        assert ledger.epochEnd() == ledger.epochStart() + 1
+
+    assert mission_control.ripeBondConfig().epochLength == config.epochLength
+
+
+def test_start_bond_epoch_recovers_after_zero_amount_corrected(
+    bond_room,
+    governance,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    setupRipeBonds(_amountPerEpoch=100 * EIGHTEEN_DECIMALS)
+    config = mission_control.ripeBondConfig()
+    corrected_amount = 1 * EIGHTEEN_DECIMALS
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_amount_per_epoch(config, 0),
+            sender=switchboard_delta.address,
+        )
+        with boa.reverts("invalid amount per epoch"):
+            bond_room.startBondEpochAtBlock(
+                boa.env.evm.patch.block_number,
+                sender=switchboard_delta.address,
+            )
+
+        aid = switchboard_delta.setRipeBondConfig(
+            config.asset,
+            corrected_amount,
+            config.minRipePerUnit,
+            config.maxRipePerUnit,
+            config.maxRipePerUnitLockBonus,
+            config.shouldAutoRestart,
+            config.restartDelayBlocks,
+            sender=governance.address,
+        )
+        boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+        assert switchboard_delta.executePendingAction(
+            aid,
+            sender=governance.address,
+        )
+        assert mission_control.ripeBondConfig().amountPerEpoch == corrected_amount
+
+        bond_room.startBondEpochAtBlock(
+            boa.env.evm.patch.block_number,
+            sender=switchboard_delta.address,
+        )
+        assert ledger.epochEnd() > ledger.epochStart()
+        assert ledger.paymentAmountAvailInEpoch() == corrected_amount
+
+    assert mission_control.ripeBondConfig().amountPerEpoch == config.amountPerEpoch
+
+
 def test_refresh_bond_epoch_comprehensive(
     bond_room, setupRipeBonds, switchboard_delta, bob
 ):
@@ -1816,6 +2117,9 @@ def test_refresh_bond_epoch_rejects_zero_stored_length_without_state_changes(
         ledger.ripeAvailForBonds(),
     )
     assert state_before[0:2] == (start, end)
+    assert config.epochLength != 0
+    assert config.amountPerEpoch == state_before[2] != 0
+    assert state_before[1] > state_before[0]
 
     with boa.env.anchor():
         mission_control.setRipeBondConfig(
@@ -1834,6 +2138,46 @@ def test_refresh_bond_epoch_rejects_zero_stored_length_without_state_changes(
         ) == state_before
 
     assert mission_control.ripeBondConfig().epochLength == config.epochLength
+
+
+def test_refresh_bond_epoch_rejects_zero_stored_amount_without_state_changes(
+    bond_room,
+    ledger,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+):
+    start, end = setupRipeBonds(_amountPerEpoch=100 * EIGHTEEN_DECIMALS)
+    boa.env.time_travel(blocks=end - boa.env.evm.patch.block_number)
+    config = mission_control.ripeBondConfig()
+    state_before = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        ledger.ripeAvailForBonds(),
+    )
+    assert state_before[0:2] == (start, end)
+    assert config.epochLength != 0
+    assert config.amountPerEpoch == state_before[2] != 0
+    assert state_before[1] > state_before[0]
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_amount_per_epoch(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        with boa.reverts("invalid amount per epoch"):
+            bond_room.refreshBondEpoch(sender=switchboard_delta.address)
+
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            ledger.ripeAvailForBonds(),
+        ) == state_before
+
+    assert mission_control.ripeBondConfig().amountPerEpoch == config.amountPerEpoch
 
 
 def test_bond_epoch_previews_rejects_zero_stored_length(
@@ -3536,24 +3880,55 @@ def test_set_bond_booster_permissions(
 
 
 def test_start_bond_epoch_permissions_and_paused(
-    bond_room, alice, switchboard_delta, switchboard_alpha
+    bond_room,
+    alice,
+    mission_control,
+    setupRipeBonds,
+    switchboard_delta,
+    switchboard_alpha,
 ):
     """Test startBondEpochAtBlock permissions and paused state"""
-    # Non-switchboard cannot call
-    with boa.reverts("no perms"):
-        bond_room.startBondEpochAtBlock(1000, sender=alice)
-    
-    # Pause contract
-    bond_room.pause(True, sender=switchboard_alpha.address)
-    
-    # Switchboard cannot call when paused
-    with boa.reverts("contract paused"):
-        bond_room.startBondEpochAtBlock(1000, sender=switchboard_delta.address)
-    
-    # Unpause
-    bond_room.pause(False, sender=switchboard_alpha.address)
-    
-    # Now it should work
+    setupRipeBonds(_epochLength=100)
+    config = mission_control.ripeBondConfig()
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_epoch_length(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        # Caller validation still precedes the stored epoch-length check.
+        with boa.reverts("no perms"):
+            bond_room.startBondEpochAtBlock(1000, sender=alice)
+
+        bond_room.pause(True, sender=switchboard_alpha.address)
+
+        # Pause validation still precedes the stored epoch-length check.
+        with boa.reverts("contract paused"):
+            bond_room.startBondEpochAtBlock(
+                1000,
+                sender=switchboard_delta.address,
+            )
+
+    with boa.env.anchor():
+        mission_control.setRipeBondConfig(
+            _ripe_bond_config_with_amount_per_epoch(config, 0),
+            sender=switchboard_delta.address,
+        )
+
+        # Caller and pause validation also precede zero amount validation.
+        with boa.reverts("no perms"):
+            bond_room.startBondEpochAtBlock(1000, sender=alice)
+
+        bond_room.pause(True, sender=switchboard_alpha.address)
+        with boa.reverts("contract paused"):
+            bond_room.startBondEpochAtBlock(
+                1000,
+                sender=switchboard_delta.address,
+            )
+
+    assert mission_control.ripeBondConfig().epochLength == config.epochLength
+    assert mission_control.ripeBondConfig().amountPerEpoch == config.amountPerEpoch
     bond_room.startBondEpochAtBlock(1000, sender=switchboard_delta.address)
 
 

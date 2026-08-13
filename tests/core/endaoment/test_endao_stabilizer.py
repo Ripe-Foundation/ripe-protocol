@@ -94,6 +94,112 @@ CURVE_STABLE_POOL_ABI = """
 """
 
 
+STABILIZER_LP_TOKEN_SOURCE = """
+# @version 0.4.3
+
+BALANCE: immutable(uint256)
+TOTAL_SUPPLY: immutable(uint256)
+
+@deploy
+def __init__(_balance: uint256, _totalSupply: uint256):
+    BALANCE = _balance
+    TOTAL_SUPPLY = _totalSupply
+
+@view
+@external
+def balanceOf(_owner: address) -> uint256:
+    return BALANCE
+
+@view
+@external
+def totalSupply() -> uint256:
+    return TOTAL_SUPPLY
+"""
+
+
+STABILIZER_CURVE_PRICES_SOURCE = """
+# @version 0.4.3
+
+struct StabilizerConfig:
+    pool: address
+    lpToken: address
+    greenBalance: uint256
+    greenRatio: uint256
+    greenIndex: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
+
+POOL: immutable(address)
+LP_TOKEN: immutable(address)
+GREEN_BALANCE: immutable(uint256)
+GREEN_RATIO: immutable(uint256)
+GREEN_INDEX: immutable(uint256)
+STABILIZER_ADJUST_WEIGHT: immutable(uint256)
+STABILIZER_MAX_POOL_DEBT: immutable(uint256)
+
+@deploy
+def __init__(
+    _pool: address,
+    _lpToken: address,
+    _greenBalance: uint256,
+    _greenRatio: uint256,
+    _greenIndex: uint256,
+    _stabilizerAdjustWeight: uint256,
+    _stabilizerMaxPoolDebt: uint256,
+):
+    POOL = _pool
+    LP_TOKEN = _lpToken
+    GREEN_BALANCE = _greenBalance
+    GREEN_RATIO = _greenRatio
+    GREEN_INDEX = _greenIndex
+    STABILIZER_ADJUST_WEIGHT = _stabilizerAdjustWeight
+    STABILIZER_MAX_POOL_DEBT = _stabilizerMaxPoolDebt
+
+@view
+@external
+def getGreenStabilizerConfig() -> StabilizerConfig:
+    return StabilizerConfig(
+        pool=POOL,
+        lpToken=LP_TOKEN,
+        greenBalance=GREEN_BALANCE,
+        greenRatio=GREEN_RATIO,
+        greenIndex=GREEN_INDEX,
+        stabilizerAdjustWeight=STABILIZER_ADJUST_WEIGHT,
+        stabilizerMaxPoolDebt=STABILIZER_MAX_POOL_DEBT,
+    )
+"""
+
+
+def _install_stabilizer_view_mocks(curve_prices, lp_total_supply):
+    lp_balance = 200 * EIGHTEEN_DECIMALS
+    green_balance = 15_000 * EIGHTEEN_DECIMALS
+    green_ratio = 75_00
+    stabilizer_adjust_weight = 50_00
+    pool = boa.env.generate_address()
+    lp_token = boa.loads(
+        STABILIZER_LP_TOKEN_SOURCE,
+        lp_balance,
+        lp_total_supply,
+        name="stabilizer lp supply mock",
+    )
+    mock_curve_prices = boa.loads(
+        STABILIZER_CURVE_PRICES_SOURCE,
+        pool,
+        lp_token.address,
+        green_balance,
+        green_ratio,
+        1,
+        stabilizer_adjust_weight,
+        1_000_000 * EIGHTEEN_DECIMALS,
+        name="stabilizer config mock",
+    )
+    boa.env.set_code(
+        curve_prices.address,
+        boa.env.get_code(mock_curve_prices.address),
+    )
+    return pool, lp_token, lp_balance
+
+
 @pytest.fixture(scope="module")
 def usdc_token(fork, chainlink, governance):
     usdc = boa.load_abi("scripts/abis/Erc20Token.json", name="usdc").at(
@@ -235,6 +341,73 @@ def setup_mock_undy_v2(mock_undy_v2):
 ####################
 # Green Stabilizer #
 ####################
+
+
+def test_green_amount_to_remove_zero_lp_supply_returns_zero(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+):
+    with boa.env.anchor():
+        pool, lp_token, lp_balance = _install_stabilizer_view_mocks(
+            curve_prices,
+            0,
+        )
+        data = curve_prices.getGreenStabilizerConfig()
+        total_pool_balance = (
+            data.greenBalance * HUNDRED_PERCENT // data.greenRatio
+        )
+        target_balance = total_pool_balance // 2
+
+        assert data.pool == pool != ZERO_ADDRESS
+        assert data.greenBalance != 0
+        assert data.greenRatio > HUNDRED_PERCENT // 2
+        assert data.greenBalance > target_balance
+        assert data.stabilizerAdjustWeight > 0
+        assert lp_token.balanceOf(endaoment_funds) == lp_balance != 0
+        assert lp_token.totalSupply() == 0
+        assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
+
+
+def test_green_amount_to_remove_nonzero_lp_supply_preserves_formula(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+):
+    lp_total_supply = 1_000 * EIGHTEEN_DECIMALS
+    with boa.env.anchor():
+        pool, lp_token, lp_balance = _install_stabilizer_view_mocks(
+            curve_prices,
+            lp_total_supply,
+        )
+        data = curve_prices.getGreenStabilizerConfig()
+        pool_debt = ledger.greenPoolDebt(pool)
+        total_pool_balance = (
+            data.greenBalance * HUNDRED_PERCENT // data.greenRatio
+        )
+        target_balance = total_pool_balance // 2
+        green_adjust_full = (data.greenBalance - target_balance) * 2
+        green_adjust_weighted = (
+            green_adjust_full
+            * data.stabilizerAdjustWeight
+            // HUNDRED_PERCENT
+        )
+        max_green_to_remove = max(
+            pool_debt,
+            data.greenBalance * lp_balance // lp_total_supply,
+        )
+        expected = min(green_adjust_weighted, max_green_to_remove)
+
+        assert data.pool == pool != ZERO_ADDRESS
+        assert data.greenBalance != 0
+        assert data.greenRatio > HUNDRED_PERCENT // 2
+        assert data.greenBalance > target_balance
+        assert data.stabilizerAdjustWeight > 0
+        assert lp_token.balanceOf(endaoment_funds) == lp_balance != 0
+        assert lp_token.totalSupply() == lp_total_supply != 0
+        assert expected == 3_000 * EIGHTEEN_DECIMALS
+        assert endaoment.getGreenAmountToRemoveInStabilizer() == expected
 
 
 # These boundary regressions intentionally use the real Base Curve factory and
