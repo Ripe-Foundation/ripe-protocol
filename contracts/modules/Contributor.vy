@@ -300,6 +300,7 @@ def changeOwnership(_newOwner: address):
     currentOwner: address = self.owner
     assert msg.sender == currentOwner # dev: no perms
     assert _newOwner not in [empty(address), currentOwner] # dev: invalid new owner
+    assert not self._hasPendingRipeTransfer() # dev: cannot do with pending ripe transfer
 
     confirmBlock: uint256 = block.number + self.keyActionDelay
     self.pendingOwner = PendingOwnerChange(
