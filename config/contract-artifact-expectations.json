@@ -1732,21 +1732,21 @@
         "committed_path": "scripts/abis/StabilityPool.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "4197c796e2d13622b6ca654b366a068117a5114bbc3ed059806ca44ab1dfb6ba",
-        "creation_executable_prefix_size": 23767,
-        "creation_metadata_sha256": "301027df5a552298639666ec8ed85adc42331d896060db1e7421a708bcefe45b",
+        "creation_executable_prefix_sha256": "cb15c314fdaa070ed650bde3ac9bd26acd50dc2e73276f6fb01202670506803a",
+        "creation_executable_prefix_size": 24015,
+        "creation_metadata_sha256": "ee4406bf9905cba1bed03939ccc84027b892a947894ee4986e4c7dda328a32b5",
         "creation_metadata_size": 66,
-        "creation_sha256": "797884da26ff9134ecd882af2570c46f10c49d53ff6b5531f22f5ae945097b8f",
-        "creation_size": 23833,
-        "deployed_eip170_headroom": 1032,
+        "creation_sha256": "e7ec595fd821b825d6d0ab2173e82cbe1c018b6dcf4b8c7380796845681367cf",
+        "creation_size": 24081,
+        "deployed_eip170_headroom": 784,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940000000000000000000000000355bb7f0f6c730e4460d620420a300fa08ff82f3000000000000000000000000290a52380a88f743813b8c3e9f6b0e61db5fdf73",
         "deployed_runtime_immutable_data_sha256": "a439092a6586624248787ebe865e59ce27dc444f8081833174946f103ca07741",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "cad1ec10ea61c53222bf548b8943130c2a662b67f083076e0d34c87afc63269e",
-        "deployed_runtime_size": 23544,
-        "eip170_headroom": 1128,
-        "runtime_template_sha256": "c79c884c0cfad56123d4c1e4e2e3949a8934b592b6a59f6ae356d39d887ec715",
-        "runtime_template_size": 23448
+        "deployed_runtime_sha256": "4087651467421ab46547fe1e0506749cf8018c679d8f270da8409f53ce2fce26",
+        "deployed_runtime_size": 23792,
+        "eip170_headroom": 880,
+        "runtime_template_sha256": "1e9dbf5f03e1408ceea0588c9e5823c073080eba821ca88577a93f2c3f4da7e8",
+        "runtime_template_size": 23696
       },
       "code_layout": {
         "addys": {
@@ -1882,7 +1882,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "ac81797676a97eec909a39d7ec76114f384020a5747ea172e6b191d42125724c"
+      "transitive_compiler_input_integrity": "073baaa96a0ea2c01009bacc0be15ec5d2f26e65bdd4fe15be188d5a222d38c3"
     },
     "SwitchboardAlpha": {
       "abi": {
