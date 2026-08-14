@@ -1464,9 +1464,9 @@
       "artifacts": {
         "creation_executable_prefix_sha256": "2c85861dac983f3d210143df8de592dba0fc41eb24492a96f6b25862c6105e03",
         "creation_executable_prefix_size": 23651,
-        "creation_metadata_sha256": "20bba039db4ba96d01b2726748435764bd8505762f4527a0bcb9aade462944f8",
+        "creation_metadata_sha256": "0fcd746dd2add11a4e83f6bea2f4b9deede8dccfe35bcbe647b683da4fc96547",
         "creation_metadata_size": 70,
-        "creation_sha256": "bb38834de1cc85bd72194cce5ed45b0eed19e3ffa79722b6c7e1380d565fc8b6",
+        "creation_sha256": "fabe92183aae65306d3b0c4e4755335b8532e2039f1e9735647fe0bd30af785f",
         "creation_size": 23721,
         "deployed_eip170_headroom": 1004,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
@@ -1514,9 +1514,9 @@
         "canonical_sha256": "23c4d5f465b9913b6d55f4ad7d6d60b301ef3a51a66af988eba984fbe00b4b46",
         "count": 64
       },
-      "source_git_blob": "b76d613d2ea799f95bd9a4b2f041b935be56c65b",
+      "source_git_blob": "023dee06fda236db89fa21a557f0baa9062928a6",
       "source_path": "contracts/vaults/RipeGov.vy",
-      "source_sha256": "972b00a340768ea3728477aff7572584a4e4c2d8feef470f9f3be8120d5cadfc",
+      "source_sha256": "e69bb5596511805b5db77c01c026d46b3e8a572a0d68b85b0bcb660101020078",
       "storage_layout": {
         "govPointAccrualDisabledBlock": {
           "n_slots": 1,
@@ -1603,7 +1603,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "312bd99f518237b1cb64ff6720380d9d72e5df90154107e2394f857f55551674"
+      "transitive_compiler_input_integrity": "bbc70fb64a1039f4b97cf894b8f27c253aec050d98802f8e28650f75fc7eda1f"
     },
     "SimpleErc20": {
       "abi": {
@@ -1734,9 +1734,9 @@
       "artifacts": {
         "creation_executable_prefix_sha256": "5f3537a65b95376345df67005448e347029dfa249d9b107ea5b8fe3de021eae6",
         "creation_executable_prefix_size": 24225,
-        "creation_metadata_sha256": "dbbf4c711044a0d10dbc4d8dc41579e8702e5006ba9cc43a3de407583c2440c6",
+        "creation_metadata_sha256": "18a470b6482da17cb0e546e74429a81e94bffb71c1b54cf84daca2bbafa73219",
         "creation_metadata_size": 66,
-        "creation_sha256": "01368a2508ddc26f6006cf0609ebbc50d30a8730ea0f5881638c89f1da1aeb63",
+        "creation_sha256": "b8778d7a34b705aba36231609ee2f950acab5723a6277c60da67226590b3580b",
         "creation_size": 24291,
         "deployed_eip170_headroom": 574,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940000000000000000000000000355bb7f0f6c730e4460d620420a300fa08ff82f3000000000000000000000000290a52380a88f743813b8c3e9f6b0e61db5fdf73",
@@ -1882,7 +1882,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "5024d5dd12c1267813e16cceb734bdee1aee15f0e4ba5ab9fbab4ca2ab2b951f"
+      "transitive_compiler_input_integrity": "a21c75a1dea78453c7a979cf41dfc358a043c6c2ccb1457d73ce6fb1ea3dd848"
     },
     "SwitchboardAlpha": {
       "abi": {
@@ -1893,9 +1893,9 @@
       "artifacts": {
         "creation_executable_prefix_sha256": "844a03e23ecf8530ec0e2d73440c1c0e8eb1d57c9f5b40adcdbaf4baf3800be9",
         "creation_executable_prefix_size": 25518,
-        "creation_metadata_sha256": "1ed785efa5009488fde94e7ca961e8ea5e04a3d5b5cfcc6d59effc2d067c583c",
+        "creation_metadata_sha256": "ec68b5ca3ddb89c04709c3fa413aeaf67694ef9ffc0804d566925741fb4326bc",
         "creation_metadata_size": 82,
-        "creation_sha256": "edb6ce4f7fe6639eed0f83a0b09408bbabbd26b90a8ba163e046fce0ed2d3a6d",
+        "creation_sha256": "e4f0eaaef4335d77949b46a88c5b7c5087e33736dd73cf46dc23b12f916399d5",
         "creation_size": 25600,
         "deployed_eip170_headroom": 108,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e00000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000000000000000000000000000000000000000012c0000000000000000000000000000000000000000000000000000000000093a80",
@@ -1995,9 +1995,9 @@
         "canonical_sha256": "a8984bb3c721d4a15e024955c13c853f9704cd4cf7a37f0375d2cde1a6b97560",
         "count": 113
       },
-      "source_git_blob": "4a06054af64293e29d2c521b990026fad45d310b",
+      "source_git_blob": "3270f75ab8a4c0de2bf0413dbbffc7cb550787d9",
       "source_path": "contracts/config/SwitchboardAlpha.vy",
-      "source_sha256": "0d4ac147a0d36b8e13fd079d2c2ebc5702bda9f03096914087eb301d78d1ae13",
+      "source_sha256": "51aab6ff276c9fe85f323899356f6bf7e722782cd969e30d3719612677fa24d5",
       "storage_layout": {
         "actionType": {
           "n_slots": 1,
@@ -2116,7 +2116,7 @@
           "type": "HashMap[uint256, HashMap[address, bool]]"
         }
       },
-      "transitive_compiler_input_integrity": "9e11758882b70702e88674f89d500e361ddd0e3eb1b38e3207d6d41384854961"
+      "transitive_compiler_input_integrity": "443e9534839aeafd7f04507f59c3c23533c7f5dd6a7778ee69565a7d00413eef"
     },
     "SwitchboardBravo": {
       "abi": {
