@@ -990,7 +990,7 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "isValidPriorityVault",
+    "name": "getVaultConfigFlags",
     "inputs": [
       {
         "name": "_vaultId",
@@ -999,16 +999,12 @@
       {
         "name": "_asset",
         "type": "address"
-      },
-      {
-        "name": "_allowSpecialVault",
-        "type": "bool"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "bool"
+        "type": "uint256"
       }
     ]
   },
