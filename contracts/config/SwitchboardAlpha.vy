@@ -29,7 +29,7 @@ interface MissionControl:
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
-    def isValidPriorityVault(_vaultId: uint256, _asset: address, _allowSpecialVault: bool) -> bool: view
+    def getVaultConfigFlags(_vaultId: uint256, _asset: address) -> uint256: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
     def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
@@ -1220,7 +1220,7 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
-    assert len(self._sanitizePriorityVaults(_priorityLiqAssetVaults, mc, False)) == len(_priorityLiqAssetVaults) # dev: invalid priority vaults
+    assert self._areValidPriorityVaults(_priorityLiqAssetVaults, mc, 1) # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
@@ -1243,7 +1243,7 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
-    assert len(self._sanitizePriorityVaults(_priorityStabVaults, mc, True)) == len(_priorityStabVaults) # dev: invalid priority vaults
+    assert self._areValidPriorityVaults(_priorityStabVaults, mc, 2) # dev: invalid priority vaults
     assert self._areValidPriorityStabVaults(_priorityStabVaults, mc) # dev: invalid priority stab vaults
 
     aid: uint256 = timeLock._initiateAction()
@@ -1259,27 +1259,33 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
     return aid
 
 
-# sanitize
+# validate
 
 
 @internal
-def _sanitizePriorityVaults(
+def _areValidPriorityVaults(
     _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
     _missionControl: address,
-    _allowSpecialVault: bool,
-) -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
-    sanitizedVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = []
+    _validationMode: uint256,
+) -> bool:
     vaultBook: address = self._getVaultBookAddr()
     for vault: cs.VaultLite in _priorityVaults:
-        if self.vaultDedupe[vault.vaultId][vault.asset]:
-            continue
+        # mode 0 revalidates immutable pending entries, mode 1 validates an
+        # ordinary proposal, and mode 2 validates a special-vault proposal.
+        if _validationMode != 0 and self.vaultDedupe[vault.vaultId][vault.asset]:
+            return False
         if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
-            continue
-        if not staticcall MissionControl(_missionControl).isValidPriorityVault(vault.vaultId, vault.asset, _allowSpecialVault):
-            continue
-        sanitizedVaults.append(vault)
-        self.vaultDedupe[vault.vaultId][vault.asset] = True
-    return sanitizedVaults
+            return False
+        # MissionControl reports raw facts: stab=bit 0, RIPE governance=bit 1,
+        # supported=bit 2. All validity policy remains here.
+        flags: uint256 = staticcall MissionControl(_missionControl).getVaultConfigFlags(vault.vaultId, vault.asset)
+        # Four is supported and ordinary; lower values are unsupported, while
+        # higher values are supported special vaults allowed only in mode 2.
+        if flags != 4 and (flags < 4 or _validationMode != 2):
+            return False
+        if _validationMode != 0:
+            self.vaultDedupe[vault.vaultId][vault.asset] = True
+    return True
 
 
 @view
@@ -1616,6 +1622,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
+        assert self._areValidPriorityVaults(priorityVaults, mc, 0) # dev: invalid priority vaults
         extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)
         log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))
 
