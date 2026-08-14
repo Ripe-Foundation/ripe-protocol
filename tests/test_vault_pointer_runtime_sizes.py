@@ -20,7 +20,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     # ID/getters to Addys also changes the runtime of Addys consumers.
     "SwitchboardEcho": 23_104,
     "VaultMigrator": 12_042,
-    "Teller": 24_218,
+    "Teller": 24_556,
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     "Lootbox": 22_993,
@@ -47,20 +47,22 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # passed. The default is now the ratified value.
 DEFAULT_MIN_HEADROOM = 200
 
-# Measured headroom against the 24,576 limit after the custody-shortfall and
-# standard-repayment refund, and partner-liquidity changes: Teller 358,
+# Measured headroom against the 24,576 limit after the custody-shortfall,
+# standard-repayment refund, partner-liquidity, and Teller third-party-touch
+# changes: Teller 20,
 # CreditEngine 4, StabilityPool 263,
 # SwitchboardCharlie 819, SwitchboardAlpha 339, Lootbox 1,583, RipeGov 1,271,
 # SwitchboardBravo 1,073, SwitchboardEcho 1,472, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
 # granted replacement RH-D029 for this exact 4-byte-headroom combined
-# reward-suppression and payer-refund artifact. Removing Teller's singular
-# deleverage API moved it above the floor, so RH-D027 and its exact identity
-# self-retire in this candidate. See the decision register.
+# reward-suppression and payer-refund artifact. RH-D030 separately waives the
+# exact 20-byte-headroom Teller third-party-touch artifact. See the decision
+# register.
 #
 MIN_HEADROOM_OVERRIDES = {
     "CreditEngine": 4,  # RH-D029; exact combined artifact, zero growth
+    "Teller": 20,  # RH-D030; exact third-party-touch artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -143,6 +145,27 @@ WAIVED_CONTRACT_IDENTITIES = {
         ),
         "deployed_sha256": (
             "22d73db8db9ca7bc877cedf189f135d6a4ebfac3cf3e522424a9be130049524f"
+        ),
+    },
+    "Teller": {
+        "decision": "RH-D030",
+        "fixture": "teller",
+        "source": "contracts/core/Teller.vy",
+        "source_sha256": (
+            "5cb7d059299cacfde30a3e45ee860a6f150bc7f37d361d363f946a662e9945ac"
+        ),
+        "runtime_sha256": (
+            "2bc9b992027b3432dc16c0e2d33f7a1df83df3f863b46dac8ff610e155e10859"
+        ),
+        "runtime_template_bytes": 24_460,
+        "deployed_runtime_bytes": 24_556,
+        "pinned_hq": "0x00000000000000000000000000000000000000A2",
+        "constructor_args": (
+            "0x00000000000000000000000000000000000000A2",
+            False,
+        ),
+        "deployed_sha256": (
+            "6afe50f0f67f0a8c5ae7319ae12d02b280259b78ed29a615578777be7c0fc7a2"
         ),
     },
 }

@@ -850,6 +850,66 @@ owner waiver; refreshing these values merely to make a test pass is prohibited.
 `tests/test_vault_pointer_runtime_sizes.py`, and
 `config/contract-artifact-expectations.json`.
 
+### RH-D030 — Teller carries an exact third-party-touch waiver at 20 bytes
+
+**Status:** Owner-granted on 13 August 2026 for the exact Teller
+third-party-touch remediation on
+`codex/rh-teller-third-party-touch-remediation`, contract commit
+`bc515be8400697cceb19be35704e3cfe3822b8c8`, published as draft PR #133.
+
+The ratified 200-byte minimum remains controlling for non-waived contracts.
+This remediation prevents authorized third-party low-risk actions from writing
+the beneficiary's `Ledger.lastTouch`, preserves the Ledger pause and account-lock
+checks on the suppressed-touch branch, and changes the external Teller user
+configuration defaults to fail closed. The exact candidate deploys at 24,556
+bytes including immutable data, leaving **20 bytes** before EIP-170. The owner
+accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One contract version and one complete deployed-byte
+identity at declared constructor inputs:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/Teller.vy` SHA-256 | `5cb7d059299cacfde30a3e45ee860a6f150bc7f37d361d363f946a662e9945ac` |
+| Runtime-template SHA-256 (immutable-free) | `2bc9b992027b3432dc16c0e2d33f7a1df83df3f863b46dac8ff610e155e10859` |
+| Runtime-template bytes | 24,460 |
+| Deployed runtime bytes, including immutables | 24,556 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A2`, `_shouldPause = false` | `6afe50f0f67f0a8c5ae7319ae12d02b280259b78ed29a615578777be7c0fc7a2` |
+
+The declared HQ and pause input are deterministic test inputs, not production
+deployment configuration. The governed artifact ledger separately binds the
+production-capture inputs declared by `scripts/capture_contract_runtimes.py`
+(RH HQ `0xD4e8…0940`, `_shouldPause = true`), whose complete deployed-runtime
+SHA-256 is
+`bf163ebd0c2af936213a6ecb54711c5fd0331eedef252aff147d907012bcd5b1`.
+
+**Baseline and delta recipe.** The authoritative pre-change measurement is the
+compiler-backed artifact-ledger record at the exact parent
+`fc809bf4fb9469afe13de85b40d847f87897cef6`: source SHA-256
+`663a23c8d45155507af738199b5ab7e289f47dffc0a2fc961cd82b97440bdcd5`,
+24,140 runtime-template bytes plus the exact 96-byte immutable suffix, for a
+24,236-byte deployed runtime under the declared production-capture inputs.
+The candidate therefore grows the complete deployed runtime by **320 bytes**
+(`24,556 - 24,236`). The former `24,218` entry in
+`EXPECTED_DEPLOYED_RUNTIME_BYTES` was a non-enforced review aid inherited from
+the candidate-local RH-D028 retirement record; the test explicitly did not
+assert equality against it, and it had drifted from the exact parent artifact
+ledger. It is not used as the delta baseline and is refreshed here to the
+current 24,556-byte candidate.
+
+**Residual risk accepted.** Only 20 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any Teller source or compiler-output change,
+including a same-size change, invalidates the pinned identity and reopens this
+decision. A future change must restore at least 200 bytes or receive a new exact
+owner waiver; refreshing these values merely to make a test pass is prohibited.
+
+This decision accepts deployability of the exact artifact. It does not by
+itself authorize deployment, configuration, activation, or release.
+
+**Source:** `tests/test_vault_pointer_runtime_sizes.py`,
+`config/contract-artifact-expectations.json`, and the focused remediation tests
+under `tests/core/teller/`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

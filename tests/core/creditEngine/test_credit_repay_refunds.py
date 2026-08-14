@@ -665,8 +665,9 @@ def test_third_party_green_repayment_refunds_only_the_payer(
         teller=teller,
     )
 
-    # Calling the convenience function with defaults opens third-party repayment.
-    assert teller.setUserConfig(sender=bob)
+    # This flow needs only third-party repayment; keep unrelated permissions
+    # fail-closed.
+    assert teller.setUserConfig(bob, False, True, False, sender=bob)
     payment = debt + surplus
     green_token.transfer(sally, payment, sender=whale)
     green_token.approve(teller, MAX_UINT256, sender=sally)
@@ -728,7 +729,7 @@ def test_third_party_sgreen_payment_refunds_green_to_the_payer(
         mock_price_source=mock_price_source,
         teller=teller,
     )
-    teller.setUserConfig(sender=bob)
+    teller.setUserConfig(bob, False, True, False, sender=bob)
 
     payment_assets = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(sally, payment_assets, sender=whale)
@@ -786,7 +787,7 @@ def test_third_party_green_overpayment_refunds_sgreen_to_the_payer(
         mock_price_source=mock_price_source,
         teller=teller,
     )
-    teller.setUserConfig(sender=bob)
+    teller.setUserConfig(bob, False, True, False, sender=bob)
 
     payment = debt + surplus
     green_token.transfer(sally, payment, sender=whale)
@@ -853,7 +854,7 @@ def test_third_party_interest_overpayment_refunds_only_true_surplus(
         teller=teller,
         debt_terms=debt_terms,
     )
-    teller.setUserConfig(sender=bob)
+    teller.setUserConfig(bob, False, True, False, sender=bob)
 
     boa.env.time_travel(seconds=31_536_000)
     current_debt, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -878,7 +879,7 @@ def test_third_party_interest_overpayment_refunds_only_true_surplus(
     assert repay_log.refundAmount == surplus
 
 
-def test_third_party_repay_permissions_remain_closed_or_default_open(
+def test_third_party_repay_permissions_remain_closed_until_explicitly_opened(
     alpha_token,
     alpha_token_whale,
     bob,
@@ -928,9 +929,22 @@ def test_third_party_repay_permissions_remain_closed_or_default_open(
         green_token.allowance(sally, teller),
     ) == closed_state
 
-    # The convenience call's defaults explicitly make third-party repay open.
+    # A no-argument convenience call is fail-closed and cannot silently open
+    # third-party repayment.
     assert teller.setUserConfig(sender=bob)
-    assert mission_control.getRepayConfig(bob).canAnyoneRepayDebt
+    config = mission_control.userConfig(bob)
+    assert not config.canAnyoneDeposit
+    assert not config.canAnyoneRepayDebt
+    assert not config.canAnyoneBondForUser
+    with boa.reverts("not allowed to repay for user"):
+        teller.repay(payment, bob, False, False, sender=sally)
+
+    # Explicitly enabling only repayment opens only the intended capability.
+    assert teller.setUserConfig(bob, False, True, False, sender=bob)
+    config = mission_control.userConfig(bob)
+    assert not config.canAnyoneDeposit
+    assert config.canAnyoneRepayDebt
+    assert not config.canAnyoneBondForUser
     debtor_green_before = green_token.balanceOf(bob)
     debtor_sgreen_before = savings_green.balanceOf(bob)
     assert teller.repay(payment, bob, False, False, sender=sally)
@@ -1060,7 +1074,7 @@ def test_sgreen_refund_failure_rolls_back_complete_third_party_repayment(
         mock_price_source=mock_price_source,
         teller=teller,
     )
-    teller.setUserConfig(sender=bob)
+    teller.setUserConfig(bob, False, True, False, sender=bob)
     green_token.transfer(sally, payment, sender=whale)
     green_token.approve(teller, payment, sender=sally)
 
