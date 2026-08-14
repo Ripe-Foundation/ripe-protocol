@@ -956,31 +956,6 @@ def test_mission_control_set_priority_liq_asset_vaults(
     assert stored_vaults[0].asset == alpha_token.address
 
 
-@pytest.mark.parametrize(
-    ("vault_id", "expected_flags"),
-    [
-        (1, 5),  # supported + Stability Pool
-        (2, 6),  # supported + RIPE governance
-        (3, 4),  # supported ordinary vault
-        (4, 0),  # unsupported ordinary vault
-    ],
-)
-def test_mission_control_get_vault_config_flags(
-    mission_control,
-    switchboard_alpha,
-    alpha_token,
-    sample_asset_config,
-    vault_id,
-    expected_flags,
-):
-    mission_control.setAssetConfig(
-        alpha_token.address,
-        _with_vault_ids(sample_asset_config, [1, 2, 3]),
-        sender=switchboard_alpha.address,
-    )
-    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == expected_flags
-
-
 def test_mission_control_set_priority_liq_asset_vaults_unauthorized(mission_control, alice, alpha_token):
     """Test that only Switchboard can set priority liq asset vaults."""
     priority_vaults = [(1, alpha_token.address)]

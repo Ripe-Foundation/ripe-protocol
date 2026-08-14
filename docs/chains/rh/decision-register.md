@@ -853,32 +853,33 @@ owner waiver; refreshing these values merely to make a test pass is prohibited.
 `tests/test_vault_pointer_runtime_sizes.py`, and
 `config/contract-artifact-expectations.json`.
 
-### RH-D030 — SwitchboardAlpha carries a replacement exact waiver at 2 bytes
+### RH-D030 — SwitchboardAlpha carries a replacement exact waiver at 108 bytes
 
 **Status:** Replacement owner waiver granted on 13 August 2026 for the exact
-aggregate audit-remediation artifact after the prior 40-byte identity reopened
-on a source change. The owner reviewed the aggregate CI failure and explicitly
-accepted the new remaining headroom.
+trimmed audit-remediation artifact after the prior 2-byte identity reopened on
+a source change. The owner explicitly accepted the new remaining headroom.
 
 The ratified 200-byte minimum remains controlling for every non-waived
 contract. The symmetric debt-configuration remediation makes both sides of the
 `minDebtAmount <= maxBorrowPerInterval` invariant validate against the live
-MissionControl target at proposal and execution. The aggregate artifact also
-moves priority-vault validity policy into SwitchboardAlpha and revalidates
-pending priority liquidation entries at execution. SwitchboardAlpha deploys at
-24,574 bytes including its seven immutable words, leaving **2 bytes** before
-EIP-170. The owner accepts that exact, technically deployable margin.
+MissionControl target at proposal and execution. The replacement preserves
+priority-vault validity policy and execution-time revalidation while removing
+the single-consumer `MissionControl.getVaultConfigFlags()` helper, reading the
+three existing vault predicates directly, and validating each list in one pass.
+SwitchboardAlpha deploys at 24,468 bytes including its seven immutable words,
+leaving **108 bytes** before EIP-170. The owner accepts that exact, technically
+deployable margin.
 
 **What exactly is waived.** One contract version and one complete deployed-byte
 identity at declared deterministic constructor inputs:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/config/SwitchboardAlpha.vy` SHA-256 | `a967459ca6711cb67f66af6bbdb8c7a7af517a1587b7ca0aa5146ad318efcfa9` |
-| Runtime-template SHA-256 (immutable-free) | `e378970cbf4ea05049dfcb45e2d542f05720fddfd133482418c47590afe7f4b0` |
-| Runtime-template bytes | 24,350 |
-| Deployed runtime bytes, including immutables | 24,574 |
-| Complete deployed-runtime SHA-256 at declared deterministic inputs | `32787aab311b5535e57492437a0c51e31f8c5226f8c205dc953d6111c05ba6c4` |
+| `contracts/config/SwitchboardAlpha.vy` SHA-256 | `0d4ac147a0d36b8e13fd079d2c2ebc5702bda9f03096914087eb301d78d1ae13` |
+| Runtime-template SHA-256 (immutable-free) | `eec69265f4cfa7157bcf97b16ab05ec8cd3721a04d2659ea0d25bf16f5dce7c9` |
+| Runtime-template bytes | 24,244 |
+| Deployed runtime bytes, including immutables | 24,468 |
+| Complete deployed-runtime SHA-256 at declared deterministic inputs | `475d777c48ab2671e6f19967db1ebb8304de590a3e71413da2fec84acff59055` |
 
 The deterministic RipeHq used by the identity test returns governance
 `0x…00A3` and governance timelock bounds 1 and 2; the constructor additionally
@@ -886,7 +887,7 @@ uses temporary governance `0x…00A2`, stale-block bounds 1 and 2, and config
 timelock bounds 1 and 2. These are reproducibility inputs, not production
 addresses or parameter authority.
 
-**Residual risk accepted.** Only 2 bytes remain before EIP-170, and this waiver
+**Residual risk accepted.** Only 108 bytes remain before EIP-170, and this waiver
 permits **0 bytes of growth**. Any SwitchboardAlpha source or compiler-output
 change, including a same-size change, invalidates the pinned identity and
 reopens this decision. A future change must restore at least 200 bytes or

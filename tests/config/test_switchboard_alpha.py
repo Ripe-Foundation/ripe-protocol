@@ -705,13 +705,7 @@ def test_priority_liq_asset_vaults_reject_invalid_entries(switchboard_alpha, gov
         switchboard_alpha.setPriorityLiqAssetVaults(duplicate_vaults, sender=governance.address)
 
 
-@pytest.mark.parametrize(
-    ("vault_id", "expected_flags"),
-    [
-        (1, 5),  # supported + Stability Pool
-        (2, 6),  # supported + RIPE governance
-    ],
-)
+@pytest.mark.parametrize("vault_id", [1, 2])
 def test_priority_liq_asset_vaults_reject_special_vaults(
     switchboard_alpha,
     switchboard_bravo,
@@ -719,7 +713,6 @@ def test_priority_liq_asset_vaults_reject_special_vaults(
     governance,
     alpha_token,
     vault_id,
-    expected_flags,
 ):
     _support_asset(
         mission_control,
@@ -732,7 +725,7 @@ def test_priority_liq_asset_vaults_reject_special_vaults(
         assert mission_control.isStabVaultId(vault_id)
     else:
         assert mission_control.isRipeGovVaultId(vault_id)
-    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == expected_flags
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
 
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(
@@ -757,7 +750,7 @@ def test_priority_liq_asset_vaults_accept_ordinary_vault(
     )
     assert not mission_control.isStabVaultId(vault_id)
     assert not mission_control.isRipeGovVaultId(vault_id)
-    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == 4
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
 
     action_id = switchboard_alpha.setPriorityLiqAssetVaults(
         [(vault_id, alpha_token.address)],
@@ -809,7 +802,11 @@ def test_priority_liq_asset_vaults_revalidate_special_classification_at_confirma
             vault_id,
             sender=switchboard_alpha.address,
         )
-    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) in (5, 6)
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+    if classification == "stab":
+        assert mission_control.isStabVaultId(vault_id)
+    else:
+        assert mission_control.isRipeGovVaultId(vault_id)
 
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     with boa.reverts("invalid priority vaults"):
@@ -853,7 +850,7 @@ def test_priority_liq_asset_vaults_revalidate_support_at_confirmation(
         alpha_token.address,
         [4],
     )
-    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == 0
+    assert not mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
 
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     with boa.reverts("invalid priority vaults"):

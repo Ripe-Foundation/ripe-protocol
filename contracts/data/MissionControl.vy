@@ -588,20 +588,6 @@ def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
 
 @view
 @external
-def getVaultConfigFlags(_vaultId: uint256, _asset: address) -> uint256:
-    # Raw config facts only: stab=bit 0, RIPE governance=bit 1, supported=bit 2.
-    flags: uint256 = 0
-    if _vaultId in self.assetConfig[_asset].vaultIds:
-        flags |= 4
-    if self.isStabVaultId[_vaultId]:
-        flags |= 1
-    if self.isRipeGovVaultId[_vaultId]:
-        flags |= 2
-    return flags
-
-
-@view
-@external
 def getNumAssets() -> uint256:
     return self._getNumAssets()
 

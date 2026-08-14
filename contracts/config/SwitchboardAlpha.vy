@@ -29,40 +29,41 @@ interface MissionControl:
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
-    def getVaultConfigFlags(_vaultId: uint256, _asset: address) -> uint256: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
     def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
     def setGeneralConfig(_genConfig: cs.GenConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def rewardsConfig() -> cs.RipeRewardsConfig: view
     def genDebtConfig() -> cs.GenDebtConfig: view
     def coreRipeGovVaultId() -> uint256: view
     def genConfig() -> cs.GenConfig: view
 
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_regId: uint256) -> address: view
-
 interface StabilityPool:
-    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
     def isPaused() -> bool: view
 
 interface CreditEngine:
     def setUnderscoreVaultDiscount(_discount: uint256): nonpayable
     def setBuybackRatio(_ratio: uint256): nonpayable
 
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
-interface PriceSource:
-    def addPriceSnapshot(_asset: address) -> bool: nonpayable
-
 interface PythPrices:
     def setMaxConfidenceRatio(_newRatio: uint256) -> bool: nonpayable
+
+interface PriceSource:
+    def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -405,6 +406,10 @@ MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
+PRIORITY_LIQ_EXECUTION: constant(uint256) = 0
+PRIORITY_LIQ_PROPOSAL: constant(uint256) = 1
+PRIORITY_STAB_EXECUTION: constant(uint256) = 2
+PRIORITY_STAB_PROPOSAL: constant(uint256) = 3
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
@@ -1220,7 +1225,7 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
-    assert self._areValidPriorityVaults(_priorityLiqAssetVaults, mc, 1) # dev: invalid priority vaults
+    assert self._validatePriorityVaults(_priorityLiqAssetVaults, mc, PRIORITY_LIQ_PROPOSAL) == 0 # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
@@ -1243,8 +1248,9 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
     assert gov._canGovern(msg.sender) # dev: no perms
 
     mc: address = self._resolveMissionControl(_missionControl)
-    assert self._areValidPriorityVaults(_priorityStabVaults, mc, 2) # dev: invalid priority vaults
-    assert self._areValidPriorityStabVaults(_priorityStabVaults, mc) # dev: invalid priority stab vaults
+    validation: uint256 = self._validatePriorityVaults(_priorityStabVaults, mc, PRIORITY_STAB_PROPOSAL)
+    assert validation != 1 # dev: invalid priority vaults
+    assert validation == 0 # dev: invalid priority stab vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
@@ -1263,55 +1269,40 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
 
 
 @internal
-def _areValidPriorityVaults(
+def _validatePriorityVaults(
     _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
     _missionControl: address,
     _validationMode: uint256,
-) -> bool:
+) -> uint256:
     vaultBook: address = self._getVaultBookAddr()
+    isProposal: bool = (_validationMode & 1) != 0
     for vault: cs.VaultLite in _priorityVaults:
-        # mode 0 revalidates immutable pending entries, mode 1 validates an
-        # ordinary proposal, and mode 2 validates a special-vault proposal.
-        if _validationMode != 0 and self.vaultDedupe[vault.vaultId][vault.asset]:
-            return False
+        if isProposal and self.vaultDedupe[vault.vaultId][vault.asset]:
+            return 1
         if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
-            return False
-        # MissionControl reports raw facts: stab=bit 0, RIPE governance=bit 1,
-        # supported=bit 2. All validity policy remains here.
-        flags: uint256 = staticcall MissionControl(_missionControl).getVaultConfigFlags(vault.vaultId, vault.asset)
-        # Four is supported and ordinary; lower values are unsupported, while
-        # higher values are supported special vaults allowed only in mode 2.
-        if flags != 4 and (flags < 4 or _validationMode != 2):
-            return False
-        if _validationMode != 0:
-            self.vaultDedupe[vault.vaultId][vault.asset] = True
-    return True
-
-
-@view
-@internal
-def _areValidPriorityStabVaults(
-    _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
-    _missionControl: address,
-) -> bool:
-    vaultBook: address = self._getVaultBookAddr()
-    for vault: cs.VaultLite in _priorityVaults:
-        if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
-            return False
-        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vault.vaultId)
-        if vaultAddr == empty(address) or not vaultAddr.is_contract:
-            return False
+            return 1
         if not staticcall MissionControl(_missionControl).isSupportedAssetInVault(vault.vaultId, vault.asset):
-            return False
+            return 1
+        if _validationMode < PRIORITY_STAB_EXECUTION:
+            if staticcall MissionControl(_missionControl).isStabVaultId(vault.vaultId):
+                return 1
+            if staticcall MissionControl(_missionControl).isRipeGovVaultId(vault.vaultId):
+                return 1
+        else:
+            vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(vault.vaultId)
+            if not vaultAddr.is_contract:
+                return 2
 
-        # Capability probes only: zero is deliberately not asserted as a live
-        # claim asset. AuctionHouse calls both selectors before either pool
-        # mutation, so a legacy/partial implementation must fail here instead.
-        naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
-        naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
-        if staticcall StabilityPool(vaultAddr).isPaused():
-            return False
-    return True
+            # Capability probes only: zero is deliberately not asserted as a live
+            # claim asset. AuctionHouse calls both selectors before either pool
+            # mutation, so a legacy/partial implementation must fail here instead.
+            naPair: uint256 = staticcall StabilityPool(vaultAddr).claimableBalances(vault.asset, empty(address))
+            naCanAccept: bool = staticcall StabilityPool(vaultAddr).canAcceptLiquidationAsset(vault.asset, empty(address))
+            if staticcall StabilityPool(vaultAddr).isPaused():
+                return 2
+        if isProposal:
+            self.vaultDedupe[vault.vaultId][vault.asset] = True
+    return 0
 
 
 #############################
@@ -1622,13 +1613,13 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
-        assert self._areValidPriorityVaults(priorityVaults, mc, 0) # dev: invalid priority vaults
+        assert self._validatePriorityVaults(priorityVaults, mc, PRIORITY_LIQ_EXECUTION) == 0 # dev: invalid priority vaults
         extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)
         log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))
 
     elif actionType == ActionType.OTHER_PRIORITY_STAB_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityStabVaults[_aid]
-        assert self._areValidPriorityStabVaults(priorityVaults, mc) # dev: invalid priority stab vaults
+        assert self._validatePriorityVaults(priorityVaults, mc, PRIORITY_STAB_EXECUTION) == 0 # dev: invalid priority stab vaults
         extcall MissionControl(mc).setPriorityStabVaults(priorityVaults)
         log PriorityStabVaultsSet(numVaults=len(priorityVaults))
 
