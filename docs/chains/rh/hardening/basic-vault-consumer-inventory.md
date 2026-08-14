@@ -56,7 +56,7 @@ source review and test update.
     "contracts/core/Deleverage.vy": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
     "contracts/core/HumanResources.vy": "3a08959aea7ca59dda77b6aebcf1a1653239b4114a6b1390dc087e56ecf5c70d",
     "contracts/core/Lootbox.vy": "18ad4dbe47920da1d50d5dd0c9ef93344335f56c863aa3486b0f8e54e980f535",
-    "contracts/core/Teller.vy": "663a23c8d45155507af738199b5ab7e289f47dffc0a2fc961cd82b97440bdcd5",
+    "contracts/core/Teller.vy": "5cb7d059299cacfde30a3e45ee860a6f150bc7f37d361d363f946a662e9945ac",
     "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
   },
   "getter_scope": [
@@ -344,7 +344,7 @@ source review and test update.
     {
       "id": "TL-408",
       "path": "contracts/core/Teller.vy",
-      "line": 408,
+      "line": 410,
       "function": "_withdraw",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",

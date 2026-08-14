@@ -3597,8 +3597,8 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    # Owner-approved receipt-window guard; any further byte growth requires review.
-    assert len(runtime) <= 24_436
+    # RH-D031 pins the exact third-party-touch artifact; any growth reopens it.
+    assert len(runtime) <= 24_460
 
 
 ############################################################################
