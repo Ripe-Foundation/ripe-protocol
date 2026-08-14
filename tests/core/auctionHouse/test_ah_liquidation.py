@@ -9,7 +9,7 @@ from conf_utils import filter_logs, get_boa_dev_reasons
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "2df2c80609a9a5edbd350c06305043f97737fd2cd334ee89b7aa90e30e9a03f0"
+    "fb1bb3ea0be43b901432bf75688e7adb97e82c2eebc6e4b085836b77bc60853f"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -274,7 +274,9 @@ def test_ah_liquidation_stab_pool_swap(
 
     # expected values
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
-    target_collateral_val = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - liq_fee)
+    target_collateral_val = (
+        target_repay_amount * HUNDRED_PERCENT - 1
+    ) // (HUNDRED_PERCENT - liq_fee) + 1
     exp_liq_fees = debt_amount * liq_fee // HUNDRED_PERCENT
 
     # liquidate user

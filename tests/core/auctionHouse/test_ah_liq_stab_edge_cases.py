@@ -13,6 +13,24 @@ def test_auction_house_deployed_runtime_fits_eip170(auction_house):
     assert len(boa.env.get_code(auction_house.address)) <= 24_576
 
 
+def test_payment_close_enough_accepts_exact_one_percent_boundary(auction_house):
+    target = 100 * EIGHTEEN_DECIMALS
+    one_percent = target // 100
+
+    assert auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target - one_percent})"
+    )
+    assert auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target + one_percent})"
+    )
+    assert not auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target - one_percent - 1})"
+    )
+    assert not auction_house.eval(
+        f"self._isPaymentCloseEnough({target}, {target + one_percent + 1})"
+    )
+
+
 # green lp token fixture
 @pytest.fixture(scope="session")
 def green_lp_token(governance):
@@ -156,6 +174,7 @@ def test_ah_liquidation_high_fees(
 
 def test_ah_liquidation_multiple_stab_pools(
     setupStabAssetConfig,
+    setGeneralDebtConfig,
     setAssetConfig,
     green_lp_token,
     green_lp_token_whale,
@@ -172,12 +191,24 @@ def test_ah_liquidation_multiple_stab_pools(
     performDeposit,
     green_token,
     whale,
+    auction_house,
+    ledger,
 ):
-    """Test liquidation uses both configured stab assets in priority order"""
+    """A binding repayment ceiling is conserved across two Stability pools."""
     setupStabAssetConfig()
+    setGeneralDebtConfig(
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _ltvPaybackBuffer=0,
+    )
     
     # Setup alpha token for liquidation
-    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
     setAssetConfig(
         alpha_token,
         _debtTerms=debt_terms,
@@ -186,7 +217,7 @@ def test_ah_liquidation_multiple_stab_pools(
         _shouldSwapInStabPools=True,
         _shouldAuctionInstantly=True,
     )
-    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
     
     # Deposit small amounts in stability pool to force use of both assets
     # First deposit green_lp_token (priority 1)
@@ -203,9 +234,10 @@ def test_ah_liquidation_multiple_stab_pools(
     savings_green.approve(teller, sally_sgreen_shares, sender=sally)
     teller.deposit(savings_green, sally_sgreen_shares, sally, stability_pool, 0, sender=sally)
     
-    # Setup large borrower position that needs both assets
-    collateral_amount = 200 * EIGHTEEN_DECIMALS
-    debt_amount = 100 * EIGHTEEN_DECIMALS
+    # This is the depleted-collateral shape: the risk target is 95 GREEN, but
+    # CreditEngine can credit only the 90 debt plus the 1 GREEN keeper fee.
+    collateral_amount = 105 * EIGHTEEN_DECIMALS
+    debt_amount = 90 * EIGHTEEN_DECIMALS
     performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
     teller.borrow(debt_amount, bob, False, sender=bob)
     
@@ -215,8 +247,12 @@ def test_ah_liquidation_multiple_stab_pools(
     green_token.transfer(whale, bob_green, sender=bob)
     
     # Trigger liquidation
-    mock_price_source.setPrice(alpha_token, 125 * EIGHTEEN_DECIMALS // 200)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     assert credit_engine.canLiquidateUser(bob)
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
+        95 * EIGHTEEN_DECIMALS
+    )
+    debt_before = ledger.userDebt(bob).amount
     
     # Liquidate - should use both pools in priority order
     teller.liquidateUser(bob, False, sender=sally)
@@ -228,6 +264,13 @@ def test_ah_liquidation_multiple_stab_pools(
     assert logs[0].stabAsset == green_lp_token.address
     # Second should be savings_green (priority 2)
     assert logs[1].stabAsset == savings_green.address
+
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+    creditable_repayment = debt_before + liq_log.keeperFee
+    assert liq_log.keeperFee == EIGHTEEN_DECIMALS
+    assert liq_log.repayAmount == creditable_repayment
+    assert sum(log.valueSwapped for log in logs) == creditable_repayment
+    assert ledger.userDebt(bob).amount == 0
 
 
 def test_ah_liquidation_skips_full_pair_and_uses_next_stab_asset(

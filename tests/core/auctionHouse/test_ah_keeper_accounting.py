@@ -443,7 +443,7 @@ def test_mixed_stability_and_auction_books_keeper_and_unpaid_base_fee(
     assert green_token.totalSupply() - supply_before == log.keeperFee
 
 
-def test_pure_auction_books_all_fees_and_pays_keeper(
+def test_expired_pure_auction_retry_does_not_repeat_first_pass_fees(
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -456,6 +456,7 @@ def test_pure_auction_books_all_fees_and_pays_keeper(
     teller,
     credit_engine,
     ledger,
+    auction_house,
     vault_book,
     bob,
     sally,
@@ -498,9 +499,34 @@ def test_pure_auction_books_all_fees_and_pays_keeper(
     assert log.repayAmount == 0
     assert log.collateralValueOut == 0
     assert log.numAuctionsStarted == 1
+    assert log.totalLiqFees > 0
     assert log.liqFeesUnpaid == log.totalLiqFees
-    assert ledger.userDebt(bob).amount == debt_before + log.totalLiqFees
-    assert green_token.totalSupply() - supply_before == log.keeperFee
+    assert log.keeperFee > 0
+    debt_after_first_pass = ledger.userDebt(bob).amount
+    supply_after_first_pass = green_token.totalSupply()
+    assert debt_after_first_pass == debt_before + log.totalLiqFees
+    assert supply_after_first_pass == supply_before + log.keeperFee
+
+    auction = filter_logs(teller, "FungibleAuctionUpdated")[0]
+    boa.env.time_travel(blocks=auction.endBlock - boa.env.evm.patch.block_number)
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        auction.vaultId,
+        alpha_token,
+        sender=sally,
+    )
+    assert not ledger.hasFungibleAuctions(bob)
+
+    _clear_transient()
+    teller.liquidateUser(bob, False, sender=sally)
+    retry_log = filter_logs(teller, "LiquidateUser")[0]
+    assert retry_log.repayAmount == 0
+    assert retry_log.numAuctionsStarted == 1
+    assert retry_log.totalLiqFees == 0
+    assert retry_log.liqFeesUnpaid == 0
+    assert retry_log.keeperFee == 0
+    assert ledger.userDebt(bob).amount == debt_after_first_pass
+    assert green_token.totalSupply() == supply_after_first_pass
 
 
 def test_deeply_underwater_min_keeper_fee_produces_zero_spread_and_zero_mint(
