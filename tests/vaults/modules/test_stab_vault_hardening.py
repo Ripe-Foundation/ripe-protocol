@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import boa
 import pytest
 from eth_abi import encode
@@ -18,12 +20,13 @@ DEACTIVATION_ZERO = 1
 DECIMAL_OFFSET = 10**8
 MAX_ACTIVE_CLAIM_ASSETS = 20
 MAX_CLAIM_ASSET_MAINTENANCE = 15
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_313
-    assert 24_576 - len(runtime) == 263
+    assert len(runtime) == 24_002
+    assert 24_576 - len(runtime) == 574
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -128,6 +131,16 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert deposit_gas[-1] < 520_000
     assert withdrawal_gas[-1] < 450_000
 
+    gas_before = boa.env.get_gas_used()
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, claim_tokens[0])
+    liquidation_preflight_gas = boa.env.get_gas_used() - gas_before
+
+    gas_before = boa.env.get_gas_used()
+    asset, amount = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
+    liquidation_iterator_gas = boa.env.get_gas_used() - gas_before
+    assert asset == alpha_token.address
+    assert amount == stability_pool.getTotalAmountForUser(bob, alpha_token)
+
     with boa.env.anchor():
         claim_tokens[0].transfer(stability_pool, 1, sender=alice)
         gas_before = boa.env.get_gas_used()
@@ -177,11 +190,9 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
 
     with boa.env.anchor():
         gas_before = boa.env.get_gas_used()
-        assert stability_pool.claimFromStabilityPool(
+        assert stability_pool.claimManyFromStabilityPool(
             bob,
-            alpha_token,
-            claim_tokens[0],
-            10**15,
+            [(alpha_token.address, claim_tokens[0].address, 10**15)],
             bob,
             False,
             sender=teller.address,
@@ -210,6 +221,11 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert activation_gas < 1_200_000
     assert single_claim_gas < 500_000
     assert claim_many_gas < 7_000_000
+    # Preflight and iteration each traverse the bounded claim set once. The
+    # iterator must not repeat the strict NAV traversal after readiness passes.
+    assert liquidation_preflight_gas < 600_000
+    assert liquidation_iterator_gas < 600_000
+    assert liquidation_iterator_gas < liquidation_preflight_gas + 100_000
 
 
 def _seed_stability_asset(
@@ -2226,11 +2242,9 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
     )
 
     balance_before = claim.balanceOf(bob)
-    claimed_usd_value = stability_pool.claimFromStabilityPool(
+    claimed_usd_value = stability_pool.claimManyFromStabilityPool(
         bob,
-        alpha_token,
-        claim,
-        partial_claim,
+        [(alpha_token.address, claim.address, partial_claim)],
         bob,
         False,
         sender=teller.address,
@@ -2284,11 +2298,9 @@ def test_claim_data_model_tracks_dust_claim_reactivation_and_zero_removal(
         (charlie_token, charlie_address),
     ):
         balance_before = claim.balanceOf(bob)
-        stability_pool.claimFromStabilityPool(
+        stability_pool.claimManyFromStabilityPool(
             bob,
-            stab_asset,
-            claim,
-            MAX_UINT256,
+            [(stab_asset.address, claim.address, MAX_UINT256)],
             bob,
             False,
             sender=teller.address,
@@ -2885,6 +2897,13 @@ def test_active_claim_custody_deficit_is_repaired_by_replenishment(
         stability_pool.address
     )
     assert missing > 0
+    with boa.reverts("claim custody deficit"):
+        stability_pool.getTotalValue(alpha_token)
+    assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
     liability_before = stability_pool.totalClaimableBalances(bravo_token)
     pair_before = stability_pool.claimableBalances(alpha_token, bravo_token)
     bob_shares_before = stability_pool.userBalances(bob, alpha_token)
@@ -2895,6 +2914,8 @@ def test_active_claim_custody_deficit_is_repaired_by_replenishment(
     assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
     assert stability_pool.claimableBalances(alpha_token, bravo_token) == pair_before
     assert stability_pool.userBalances(bob, alpha_token) == bob_shares_before
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
 
     alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     assert stability_pool.depositTokensInVault(
@@ -3355,6 +3376,11 @@ def _apply_price_state(mock_price_source, asset, state):
         raise AssertionError(state)
 
 
+def _restore_price_state(mock_price_source, asset):
+    mock_price_source.setShouldRevert(asset, False)
+    mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+
+
 @pytest.fixture
 def priced_claim_pool(
     stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
@@ -3379,21 +3405,282 @@ def priced_claim_pool(
 
 @pytest.mark.parametrize("state", PRICE_STATES)
 def test_claim_asset_price_state_nav_outcome(
-    state, stability_pool, alpha_token, bravo_token, mock_price_source,
+    state, stability_pool, alpha_token, bravo_token, bob, mock_price_source,
     priced_claim_pool,
 ):
     """Every unavailable-price state fails closed while a claim is active."""
     priced_nav = stability_pool.getTotalValue(alpha_token)
     stab_custody = alpha_token.balanceOf(stability_pool.address)
     assert priced_nav == stab_custody + priced_claim_pool
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    healthy_position = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
+    assert healthy_position[0] == alpha_token.address
+    assert healthy_position[1] == stability_pool.getTotalAmountForUser(
+        bob,
+        alpha_token,
+    )
+    state_before = (
+        stability_pool.userBalances(bob, alpha_token),
+        stability_pool.totalBalances(alpha_token),
+        stability_pool.claimableBalances(alpha_token, bravo_token),
+        stability_pool.totalClaimableBalances(bravo_token),
+        alpha_token.balanceOf(stability_pool),
+        bravo_token.balanceOf(stability_pool),
+    )
 
     _apply_price_state(mock_price_source, bravo_token, state)
 
     if state == "valid":
         assert stability_pool.getTotalValue(alpha_token) == priced_nav
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+        assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == healthy_position
     else:
         with boa.reverts():
             stability_pool.getTotalValue(alpha_token)
+        assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+        assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+            alpha_token.address,
+            0,
+        )
+
+    assert (
+        stability_pool.userBalances(bob, alpha_token),
+        stability_pool.totalBalances(alpha_token),
+        stability_pool.claimableBalances(alpha_token, bravo_token),
+        stability_pool.totalClaimableBalances(bravo_token),
+        alpha_token.balanceOf(stability_pool),
+        bravo_token.balanceOf(stability_pool),
+    ) == state_before
+
+    if state != "valid":
+        _restore_price_state(mock_price_source, bravo_token)
+        assert stability_pool.getTotalValue(alpha_token) == priced_nav
+        assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+        assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == healthy_position
+
+
+def test_paused_cohort_is_skipped_without_hiding_nominal_position(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    bob,
+    switchboard_alpha,
+    priced_claim_pool,
+):
+    healthy_position = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
+    assert healthy_position[0] == alpha_token.address
+    assert healthy_position[1] != 0
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+        alpha_token.address,
+        True,
+    )
+
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
+    assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+        alpha_token.address,
+        True,
+    )
+
+    stability_pool.pause(False, sender=switchboard_alpha.address)
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == healthy_position
+
+
+def test_empty_registered_cohort_accepts_first_liquidation(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+):
+    amount = 100 * EIGHTEEN_DECIMALS
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        amount,
+    )
+    assert stability_pool.withdrawTokensFromVault(
+        bob,
+        alpha_token,
+        amount,
+        bob,
+        sender=teller.address,
+    )[0] == amount
+    assert stability_pool.isSupportedVaultAsset(alpha_token)
+    assert stability_pool.totalBalances(alpha_token) == 0
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+
+    # The empty-cohort exception must not expose raw custody reserved for a
+    # different cohort to AuctionHouse sizing.
+    alpha_token.transfer(stability_pool, 1, sender=alpha_token_whale)
+    stability_pool.eval(
+        f"stabVault.totalClaimableBalances[{alpha_token.address}] = 1"
+    )
+    assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    stability_pool.eval(
+        f"stabVault.totalClaimableBalances[{alpha_token.address}] = 0"
+    )
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+
+
+def test_claim_only_cohort_with_unpriceable_stab_asset_is_skipped_and_recovers(
+    stability_pool,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    governance,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    stab_amount = 10 * EIGHTEEN_DECIMALS
+    claim_amount = 2 * EIGHTEEN_DECIMALS
+    stab_token = _deploy_claim_token(
+        governance,
+        alpha_token_whale,
+        9_901,
+        stab_amount + 1,
+    )
+    setGeneralConfig()
+    setAssetConfig(stab_token)
+    setAssetConfig(bravo_token)
+    _seed_stability_asset(
+        stability_pool,
+        stab_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        stab_amount,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    assert _record_claim(
+        stability_pool,
+        stab_token,
+        bravo_token,
+        bravo_token_whale,
+        claim_amount,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+        stab_amount=stab_amount,
+    ) == stab_amount
+    assert stab_token.balanceOf(stability_pool) == 0
+
+    # getTotalValue does not need the stabilization-asset price when there is
+    # no unreserved custody, while the phase-2 amount conversion does. This is
+    # the exact residual path identified in review.
+    mock_price_source.setPrice(stab_token, 0)
+    assert stability_pool.getTotalValue(stab_token) == claim_amount
+    with boa.reverts():
+        stability_pool.getTotalAmountForUser(bob, stab_token)
+    assert not stability_pool.canAcceptLiquidationAsset(stab_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        stab_token.address,
+        0,
+    )
+
+    # Restoring both priceability and transferable custody makes the cohort
+    # usable without changing claim/share accounting.
+    _restore_price_state(mock_price_source, stab_token)
+    stab_token.transfer(stability_pool, 1, sender=alpha_token_whale)
+    assert stability_pool.canAcceptLiquidationAsset(stab_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
+
+
+def test_fully_reserved_stab_custody_is_skipped_before_collateral_can_move(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+        10 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    claim_amount = 2 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        claim_amount,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    # Current deposits forbid this overlap, but migrated/legacy state can carry
+    # cross-cohort liabilities in the same token. Model that state directly:
+    # raw balanceOf is nonzero, yet every unit is reserved elsewhere.
+    reserved = alpha_token.balanceOf(stability_pool)
+    stability_pool.eval(
+        f"stabVault.totalClaimableBalances[{alpha_token.address}] = {reserved}"
+    )
+    assert stability_pool.getTotalValue(alpha_token) == claim_amount
+    assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
+
+    stability_pool.eval(
+        f"stabVault.totalClaimableBalances[{alpha_token.address}] = 0"
+    )
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
+
+
+def test_production_liquidation_preflight_uses_typed_pricedesk_boundary():
+    source = (ROOT / "contracts/vaults/modules/StabVault.vy").read_text()
+    start = source.index("def _getCohortLiquidationAmount")
+    end = source.index("def _getUserAssetAndAmountAtIndex", start)
+    helper = source[start:end]
+
+    assert "raw_call(" not in helper
+    assert "staticcall IERC20(" in helper
+    assert "self._getUsdValue(" in helper
+    assert "custody <= reserved" in helper
+    assert "claimableValue += claimValue" in helper
+
+    start = source.index("def _getUserAssetAndAmountAtIndex")
+    end = source.index("def _getUserAssetAtIndexAndHasBalance", start)
+    iterator = source[start:end]
+    assert "self._getCohortLiquidationAmount(asset)" in iterator
+    assert "self._getTotalAmountForUser(" not in iterator
 
 
 @pytest.mark.parametrize(

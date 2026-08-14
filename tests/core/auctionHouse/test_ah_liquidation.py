@@ -109,7 +109,7 @@ def setupStabPoolLiquidation(
             _shouldBurnAsPayment=False, 
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True, # testing this!
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
         # stab pool config
@@ -474,7 +474,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
         _shouldBurnAsPayment=False, 
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup multiple stability pool assets
@@ -694,7 +694,7 @@ def test_ah_liquidation_multiple_collateral_assets(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Bravo: Endaoment transfer
@@ -845,7 +845,7 @@ def test_ah_liquidation_priority_asset_order(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -1000,7 +1000,7 @@ def test_ah_liquidation_iterate_thru_all_user_vaults(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,  # Use stability pools
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -1151,7 +1151,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Bravo: Will be handled in Phase 3 (natural order)
@@ -1161,7 +1161,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Charlie: Will be handled in Phase 3 (natural order)
@@ -1171,7 +1171,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Configure stability pools for swapping
@@ -1318,7 +1318,7 @@ def test_ah_liquidation_caching_batch_liquidation(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -1565,7 +1565,7 @@ def test_ah_liquidation_keeper_fee_ratio(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -1708,7 +1708,7 @@ def test_ah_liquidation_keeper_minimum_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -1850,7 +1850,7 @@ def test_ah_liquidation_keeper_maximum_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -2277,7 +2277,7 @@ def test_ah_liquidation_special_stab_pool(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
         _specialStabPoolId=stab_pool_id,  # Special: use bravo_token in stability pool
     )
 
@@ -2727,7 +2727,7 @@ def test_ah_liquidation_dust_position_zero_keeper_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool
@@ -2840,7 +2840,7 @@ def test_ah_liquidation_dust_position_reduced_keeper_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool
@@ -2939,7 +2939,7 @@ def test_ah_liquidation_normal_position_unaffected(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool

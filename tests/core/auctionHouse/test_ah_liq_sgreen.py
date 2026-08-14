@@ -93,6 +93,15 @@ def test_ah_liquidation_stab_pool_with_sgreen(
     post_user_debt, post_bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     post_green_bal = green_token.balanceOf(savings_green)
     user_stab_value = stability_pool.getTotalUserValue(alice, savings_green)
+    iterator_asset, iterator_amount = stability_pool.getUserAssetAndAmountAtIndex(
+        alice,
+        1,
+    )
+    assert iterator_asset == savings_green.address
+    assert iterator_amount == stability_pool.getTotalAmountForUser(
+        alice,
+        savings_green,
+    )
     
     # OPINIONATED ASSERTIONS:
 

@@ -1,3 +1,4 @@
+import boa
 import pytest
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs, redeem_from_stability_pool
@@ -28,6 +29,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     vault_book,
     switchboard_alpha,
     mission_control,
+    ledger,
     _test,
 ):
     """Test basic liquidation using claimable green from stability pool
@@ -50,7 +52,7 @@ def test_ah_liquidation_with_claimable_green_basic(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,  # Enable stability pool swaps
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Setup stability pool with bravo token (NOT green token)
@@ -150,6 +152,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     expected_remaining_debt = 2 * EIGHTEEN_DECIMALS
     _test(expected_remaining_debt, user_debt.amount)
     assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
+    assert not ledger.hasFungibleAuctions(bob)
 
 
 def test_ah_liquidation_claimable_green_insufficient(
@@ -198,7 +201,7 @@ def test_ah_liquidation_claimable_green_insufficient(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
@@ -297,6 +300,181 @@ def test_ah_liquidation_claimable_green_insufficient(
     assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
 
 
+@pytest.mark.parametrize(
+    "health_failure",
+    ("unpriced_claim", "fully_reserved_stab"),
+)
+def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
+    health_failure,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    green_token,
+    savings_green,
+    bob,
+    sally,
+    teller,
+    whale,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    auction_house,
+    stability_pool,
+    simple_erc20_vault,
+    vault_book,
+    switchboard_alpha,
+    mission_control,
+    ledger,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=0,
+        _minKeeperFee=0,
+    )
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    stab_id = vault_book.getRegId(stability_pool)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=createDebtTerms(
+            _ltv=50_00,
+            _liqThreshold=80_00,
+            _liqFee=10_00,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=True,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[stab_id],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+        _canRedeemCollateral=False,
+    )
+    setAssetConfig(
+        charlie_token,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    mission_control.setPriorityStabVaults(
+        [(stab_id, bravo_token)],
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+
+    bob_pool_amount = 50 * EIGHTEEN_DECIMALS
+    sally_pool_amount = 150 * EIGHTEEN_DECIMALS
+    for depositor, amount in ((bob, bob_pool_amount), (sally, sally_pool_amount)):
+        bravo_token.transfer(depositor, amount, sender=bravo_token_whale)
+        bravo_token.approve(teller, amount, sender=depositor)
+        assert teller.deposit(
+            bravo_token,
+            amount,
+            depositor,
+            stability_pool,
+            sender=depositor,
+        ) == amount
+
+    stab_swap_amount = 20 * EIGHTEEN_DECIMALS
+    claim_amount = 20 * (10 ** charlie_token.decimals())
+    charlie_token.transfer(
+        stability_pool,
+        claim_amount,
+        sender=charlie_token_whale,
+    )
+    assert stability_pool.swapForLiquidatedCollateral(
+        bravo_token,
+        stab_swap_amount,
+        charlie_token,
+        claim_amount,
+        whale,
+        green_token,
+        savings_green,
+        sender=auction_house.address,
+    ) == stab_swap_amount
+
+    collateral_amount = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    teller.borrow(80 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    terms_before = credit_engine.getUserBorrowTerms(bob, False)
+    assert terms_before.collateralVal == collateral_amount
+    assert stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
+    shares_before = stability_pool.userBalances(bob, bravo_token)
+    assert shares_before != 0
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
+
+    if health_failure == "unpriced_claim":
+        mock_price_source.disablePriceFeed(charlie_token)
+        with boa.reverts():
+            stability_pool.getTotalValue(bravo_token)
+    else:
+        # Current deposits prevent this overlap, but migrated/legacy state can
+        # reserve the raw stabilization-asset custody for another cohort.
+        reserved = bravo_token.balanceOf(stability_pool)
+        stability_pool.eval(
+            f"stabVault.totalClaimableBalances[{bravo_token.address}] = {reserved}"
+        )
+        assert stability_pool.getTotalValue(bravo_token) == 20 * EIGHTEEN_DECIMALS
+    assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
+        bravo_token.address,
+        0,
+    )
+    assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+        bravo_token.address,
+        True,
+    )
+    terms_during_outage = credit_engine.getUserBorrowTerms(bob, False)
+    assert terms_during_outage.collateralVal == terms_before.collateralVal
+    assert terms_during_outage.totalMaxDebt == terms_before.totalMaxDebt
+    assert terms_during_outage.lowestLtv == terms_before.lowestLtv
+
+    pool_alpha_before = alpha_token.balanceOf(stability_pool)
+    claimable_alpha_before = stability_pool.claimableBalances(
+        bravo_token,
+        alpha_token,
+    )
+    mock_price_source.setPrice(alpha_token, 49 * EIGHTEEN_DECIMALS // 100)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+    assert alpha_token.balanceOf(stability_pool) == pool_alpha_before
+    assert stability_pool.claimableBalances(
+        bravo_token,
+        alpha_token,
+    ) == claimable_alpha_before
+    assert stability_pool.userBalances(bob, bravo_token) == shares_before
+    assert stability_pool.getUserAssetAtIndexAndHasBalance(bob, 1) == (
+        bravo_token.address,
+        True,
+    )
+    assert ledger.hasFungibleAuction(bob, simple_id, alpha_token)
+    assert ledger.userDebt(bob).inLiquidation
+
+    if health_failure == "unpriced_claim":
+        mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+    else:
+        stability_pool.eval(
+            f"stabVault.totalClaimableBalances[{bravo_token.address}] = 0"
+        )
+    assert stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
+    assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
+
+
 def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     setGeneralConfig,
     setAssetConfig,
@@ -343,7 +521,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Setup stability pool assets (not green)
@@ -487,7 +665,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
@@ -631,7 +809,7 @@ def test_ah_liquidation_no_claimable_green_fallback(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Setup stability pool with charlie (NOT green)
@@ -740,7 +918,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
@@ -872,7 +1050,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)

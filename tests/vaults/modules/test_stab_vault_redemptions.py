@@ -254,17 +254,41 @@ def test_stab_vault_redemptions_validation(
     # Test redemption when paused
     stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, teller.address, False, False, sender=teller.address)
+        stability_pool.redeemManyFromStabilityPool(
+            [(bravo_token.address, MAX_UINT256)],
+            100 * EIGHTEEN_DECIMALS,
+            bob,
+            teller.address,
+            False,
+            False,
+            sender=teller.address,
+        )
     stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test redemption with no green tokens
     with boa.reverts("no green to redeem"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, teller.address, False, False, sender=teller.address)
+        stability_pool.redeemManyFromStabilityPool(
+            [(bravo_token.address, MAX_UINT256)],
+            100 * EIGHTEEN_DECIMALS,
+            bob,
+            teller.address,
+            False,
+            False,
+            sender=teller.address,
+        )
 
     # Test unauthorized caller
     green_token.transfer(stability_pool, 100 * EIGHTEEN_DECIMALS, sender=whale)
     with boa.reverts("only Teller allowed"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, alice, False, False, sender=alice)
+        stability_pool.redeemManyFromStabilityPool(
+            [(bravo_token.address, MAX_UINT256)],
+            100 * EIGHTEEN_DECIMALS,
+            bob,
+            alice,
+            False,
+            False,
+            sender=alice,
+        )
 
 
 def test_stab_vault_redemptions_no_claimable_assets(
