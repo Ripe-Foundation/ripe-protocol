@@ -1,67 +1,10 @@
 import boa
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS
-from tests.core.humanResources.test_hr_contributor import (
-    contributor_contract,
-    deployedContributor,
-    owner_address,
-    setupHrConfig,
-    setupLedgerBalance,
-    setupRipeGovVaultConfig,
-    valid_contributor_terms,
+from tests.core.humanResources.contributor_test_utils import (
+    initiate_transfer,
+    prepare_transferable_position,
 )
-
-
-TRANSFER_AMOUNT = 1_000 * EIGHTEEN_DECIMALS
-
-
-def _prepare_transferable_position(
-    contributor_contract,
-    setupRipeGovVaultConfig,
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    teller,
-    valid_contributor_terms,
-):
-    setupRipeGovVaultConfig()
-    ripe_token.transfer(ripe_gov_vault, TRANSFER_AMOUNT, sender=whale)
-    ripe_gov_vault.depositTokensInVault(
-        contributor_contract.address,
-        ripe_token,
-        TRANSFER_AMOUNT,
-        sender=teller.address,
-    )
-    boa.env.time_travel(
-        seconds=(
-            valid_contributor_terms["startDelay"]
-            + valid_contributor_terms["unlockLength"]
-            + 1
-        )
-    )
-
-
-def _initiate_transfer(
-    contributor_contract,
-    setupRipeGovVaultConfig,
-    ripe_gov_vault,
-    ripe_token,
-    whale,
-    teller,
-    owner_address,
-    valid_contributor_terms,
-):
-    _prepare_transferable_position(
-        contributor_contract,
-        setupRipeGovVaultConfig,
-        ripe_gov_vault,
-        ripe_token,
-        whale,
-        teller,
-        valid_contributor_terms,
-    )
-    contributor_contract.initiateRipeTransfer(sender=owner_address)
 
 
 def test_pending_ripe_transfer_blocks_ownership_change(
@@ -75,7 +18,7 @@ def test_pending_ripe_transfer_blocks_ownership_change(
     alice,
     valid_contributor_terms,
 ):
-    _initiate_transfer(
+    initiate_transfer(
         contributor_contract,
         setupRipeGovVaultConfig,
         ripe_gov_vault,
@@ -106,7 +49,7 @@ def test_cancelled_ripe_transfer_restores_ownership_change(
     alice,
     valid_contributor_terms,
 ):
-    _initiate_transfer(
+    initiate_transfer(
         contributor_contract,
         setupRipeGovVaultConfig,
         ripe_gov_vault,
@@ -139,7 +82,7 @@ def test_confirmed_ripe_transfer_restores_ownership_change(
     alice,
     valid_contributor_terms,
 ):
-    _initiate_transfer(
+    initiate_transfer(
         contributor_contract,
         setupRipeGovVaultConfig,
         ripe_gov_vault,
@@ -174,7 +117,7 @@ def test_pending_ownership_change_still_blocks_ripe_transfer(
     alice,
     valid_contributor_terms,
 ):
-    _prepare_transferable_position(
+    prepare_transferable_position(
         contributor_contract,
         setupRipeGovVaultConfig,
         ripe_gov_vault,
@@ -222,7 +165,7 @@ def test_normal_ripe_transfer_still_works(
     owner_balance_before = ripe_gov_vault.getTotalAmountForUser(
         owner_address, ripe_token
     )
-    _initiate_transfer(
+    initiate_transfer(
         contributor_contract,
         setupRipeGovVaultConfig,
         ripe_gov_vault,
