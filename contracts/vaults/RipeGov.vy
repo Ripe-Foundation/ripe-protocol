@@ -431,6 +431,7 @@ def _handleGovDataOnTransfer(
     boardroom: address = _boardroom
     if self._isGovPointAccrualDisabled(_fromUser):
         boardroom = empty(address)
+
     self._updateUserGovPoints(_fromUser, _asset, _missionControl, boardroom)
     self._updateUserGovPoints(_toUser, _asset, _missionControl, boardroom)
 
@@ -878,11 +879,7 @@ def _getLatestGovPoints(
     _terms: cs.LockTerms,
     _weight: uint256,
 ) -> uint256:
-    if (
-        _lastShares == 0
-        or _lastPointsUpdate == 0
-        or block.number <= _lastPointsUpdate
-    ):
+    if (_lastShares == 0 or _lastPointsUpdate == 0 or block.number <= _lastPointsUpdate):
         return 0
 
     # base points (shares + time deposited)

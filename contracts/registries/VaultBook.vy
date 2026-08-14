@@ -41,14 +41,14 @@ from interfaces import Vault
 from interfaces import Department
 
 interface Ledger:
-    def ripeAvailForRewards() -> uint256: view
     def didGetRewardsFromStabClaims(_amount: uint256): nonpayable
-
-interface MissionControl:
-    def isStabVaultId(_vaultId: uint256) -> bool: view
+    def ripeAvailForRewards() -> uint256: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
+
+interface MissionControl:
+    def isStabVaultId(_vaultId: uint256) -> bool: view
 
 @deploy
 def __init__(

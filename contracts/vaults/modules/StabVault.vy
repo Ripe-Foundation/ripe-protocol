@@ -287,14 +287,7 @@ def _getCohortLiquidationAmount(_stabAsset: address) -> uint256:
 
     stabAssetBalance: uint256 = custody - reserved
     priceDesk: address = addys._getPriceDeskAddr()
-    totalStabValue: uint256 = self._getUsdValue(
-        _stabAsset,
-        stabAssetBalance,
-        GREEN_TOKEN,
-        SAVINGS_GREEN,
-        priceDesk,
-        False,
-    )
+    totalStabValue: uint256 = self._getUsdValue(_stabAsset, stabAssetBalance, GREEN_TOKEN, SAVINGS_GREEN, priceDesk, False)
     if totalStabValue == 0:
         return 0
 
@@ -312,29 +305,17 @@ def _getCohortLiquidationAmount(_stabAsset: address) -> uint256:
             # raising. Any zero result makes this cohort unavailable for now.
             if staticcall IERC20(claimAsset).balanceOf(self) < self.totalClaimableBalances[claimAsset]:
                 return 0
-            claimValue: uint256 = self._getUsdValue(
-                claimAsset,
-                claimBalance,
-                GREEN_TOKEN,
-                SAVINGS_GREEN,
-                priceDesk,
-                False,
-            )
+
+            claimValue: uint256 = self._getUsdValue(claimAsset, claimBalance, GREEN_TOKEN, SAVINGS_GREEN, priceDesk, False)
             if claimValue == 0:
                 return 0
+
             claimableValue += claimValue
 
     if claimableValue == 0:
         return stabAssetBalance
 
-    return self._getAssetAmount(
-        _stabAsset,
-        totalStabValue + claimableValue,
-        GREEN_TOKEN,
-        SAVINGS_GREEN,
-        priceDesk,
-        False,
-    )
+    return self._getAssetAmount(_stabAsset, totalStabValue + claimableValue, GREEN_TOKEN, SAVINGS_GREEN, priceDesk, False)
 
 
 @view
@@ -1259,11 +1240,7 @@ def _getClaimAssetActivationData(
 
 
 @internal
-def _maintainClaimableAssets(
-    _stabAsset: address,
-    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
-    _shouldActivate: bool,
-):
+def _maintainClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE], _shouldActivate: bool):
     greenToken: address = empty(address)
     savingsGreen: address = empty(address)
     priceDesk: address = empty(address)
@@ -1303,18 +1280,12 @@ def _maintainClaimableAssets(
 
 
 @external
-def pruneClaimableAssets(
-    _stabAsset: address,
-    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
-):
+def pruneClaimableAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE]):
     self._maintainClaimableAssets(_stabAsset, _claimAssets, False)
 
 
 @external
-def activateClaimAssets(
-    _stabAsset: address,
-    _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE],
-):
+def activateClaimAssets(_stabAsset: address, _claimAssets: DynArray[address, MAX_CLAIM_ASSET_MAINTENANCE]):
     assert vaultData.isPaused # dev: contract not paused
     self._maintainClaimableAssets(_stabAsset, _claimAssets, True)
 
