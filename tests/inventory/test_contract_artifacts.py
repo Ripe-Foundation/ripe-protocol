@@ -75,7 +75,7 @@ NEW_CONTRACT_SOURCES = {
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_440, "headroom": 136},
-    "CreditEngine": {"size": 24_572, "headroom": 4},
+    "CreditEngine": {"size": 24_566, "headroom": 10},
     "Deleverage": {"size": 23_241, "headroom": 1_335},
 }
 CURVE_LAUNCH_ARTIFACTS = {

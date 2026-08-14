@@ -3004,7 +3004,12 @@ def test_receipt_measurement_mutex_allows_normal_sequential_operations(
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
 
     sequential_token = _m1_token()
-    setAssetConfig(sequential_token)
+    # This token only exercises the receipt mutex; it is not borrower
+    # collateral and must not affect redemption eligibility.
+    setAssetConfig(
+        sequential_token,
+        _debtTerms=createDebtTerms(_ltv=0),
+    )
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     sequential_token.mint(credit_engine, deposit_amount)
     sequential_token.approve(teller, deposit_amount, sender=credit_engine.address)

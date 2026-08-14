@@ -13,6 +13,11 @@ def _deleverage_one(teller, user, target_repay_amount, *, sender):
     )
 
 
+def _set_debt_bearing_asset_price(mock_price_source, asset):
+    """Keep positive-LTV fixture assets out of price quarantine."""
+    mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+
+
 @pytest.fixture(autouse=True)
 def setup(
     setGeneralConfig,
@@ -1887,6 +1892,7 @@ def test_phase2_underscore_earn_vault_credit_uses_convertToAssets_when_spread_is
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(25)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
 
     debt_terms = createDebtTerms(
         _ltv=80_00,
@@ -1977,6 +1983,7 @@ def test_phase2_underscore_earn_vault_clamps_credit_and_sizing_when_safe_spread_
     # Exceeds Deleverage MAX_UNDERSCORE_SAFE_SPREAD_BPS (100 bps).
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
 
     debt_terms = createDebtTerms(
         _ltv=80_00,
@@ -2075,6 +2082,7 @@ def test_phase2_underscore_earn_vault_no_sizing_adjustment_at_99bps_gap(
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(99)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
     debt_terms = createDebtTerms(
         _ltv=80_00,
         _redemptionThreshold=85_00,
@@ -2155,6 +2163,7 @@ def test_phase2_underscore_earn_vault_applies_sizing_adjustment_at_100bps_gap(
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(100)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
     debt_terms = createDebtTerms(
         _ltv=80_00,
         _redemptionThreshold=85_00,
@@ -2333,6 +2342,7 @@ def test_phase2_underscore_earn_vault_dust_amount_safe_zero_skips_before_withdra
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(9999)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
     debt_terms = createDebtTerms(
         _ltv=80_00,
         _redemptionThreshold=85_00,
@@ -2562,6 +2572,7 @@ def test_phase2_underscore_earn_vault_post_withdraw_safe_zero_reverts_atomically
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
 
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
     debt_terms = createDebtTerms(
         _ltv=80_00,
         _redemptionThreshold=85_00,
@@ -2770,6 +2781,7 @@ def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
     debt_terms = createDebtTerms(
         _ltv=80_00,
         _redemptionThreshold=85_00,
@@ -3766,6 +3778,7 @@ def test_full_payoff_buffer_applies_to_admin_with_basic_underscore_collateral(
         overage_bps=100,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    _set_debt_bearing_asset_price(mock_price_source, alpha_token_vault_with_safe_gap)
 
     debt_terms = createDebtTerms(
         _ltv=80_00,
