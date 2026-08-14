@@ -270,62 +270,71 @@ def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 
 @view
 @internal
-def _isCohortLiquidationReady(_stabAsset: address) -> bool:
+def _getCohortLiquidationAmount(_stabAsset: address) -> uint256:
     if vaultData.isPaused:
-        return False
-
-    if vaultData.totalBalances[_stabAsset] == 0 and self._getNumActiveClaimAssets(_stabAsset) == 0:
-        # A configured empty cohort may receive its first liquidation, but any
-        # legacy cross-cohort reservation makes AuctionHouse's raw-custody
-        # sizing unsafe because it cannot distinguish the reserved amount.
-        return self.totalClaimableBalances[_stabAsset] == 0
+        return 0
 
     # Liquidation readiness consumes PriceDesk's non-raising zero-price
     # boundary. Strict accounting paths retain their existing fail-closed NAV
-    # calls; this preflight only decides whether AuctionHouse should skip the
-    # cohort and use its mandatory ordinary-auction fallback.
+    # calls; this path returns zero so AuctionHouse skips the cohort and uses
+    # its mandatory ordinary-auction fallback. Keep this mirror aligned with
+    # both _getTotalAmountForVault and
+    # _getValueOfClaimableAssets when their custody or valuation inputs change.
     custody: uint256 = staticcall IERC20(_stabAsset).balanceOf(self)
     reserved: uint256 = self.totalClaimableBalances[_stabAsset]
     if custody <= reserved:
-        return False
+        return 0
 
+    stabAssetBalance: uint256 = custody - reserved
     priceDesk: address = addys._getPriceDeskAddr()
-    if self._getUsdValue(
+    totalStabValue: uint256 = self._getUsdValue(
         _stabAsset,
-        custody - reserved,
+        stabAssetBalance,
         GREEN_TOKEN,
         SAVINGS_GREEN,
         priceDesk,
         False,
-    ) == 0:
-        return False
+    )
+    if totalStabValue == 0:
+        return 0
 
+    claimableValue: uint256 = 0
     numClaimableAssets: uint256 = self.numClaimableAssets[_stabAsset]
-    if numClaimableAssets == 0:
-        return True
+    if numClaimableAssets != 0:
+        for i: uint256 in range(1, numClaimableAssets, bound=max_value(uint256)):
+            claimAsset: address = self.claimableAssets[_stabAsset][i]
+            claimBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
+            if claimBalance == 0:
+                continue
 
-    for i: uint256 in range(1, numClaimableAssets, bound=max_value(uint256)):
-        claimAsset: address = self.claimableAssets[_stabAsset][i]
-        claimBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
-        if claimBalance == 0:
-            continue
+            # A claim is usable only when aggregate custody covers every cohort's
+            # liability and PriceDesk can establish a non-zero value without
+            # raising. Any zero result makes this cohort unavailable for now.
+            if staticcall IERC20(claimAsset).balanceOf(self) < self.totalClaimableBalances[claimAsset]:
+                return 0
+            claimValue: uint256 = self._getUsdValue(
+                claimAsset,
+                claimBalance,
+                GREEN_TOKEN,
+                SAVINGS_GREEN,
+                priceDesk,
+                False,
+            )
+            if claimValue == 0:
+                return 0
+            claimableValue += claimValue
 
-        # A claim is usable only when aggregate custody covers every cohort's
-        # liability and PriceDesk can establish a non-zero value without
-        # raising. Any zero result makes this cohort unavailable for now.
-        if staticcall IERC20(claimAsset).balanceOf(self) < self.totalClaimableBalances[claimAsset]:
-            return False
-        if self._getUsdValue(
-            claimAsset,
-            claimBalance,
-            GREEN_TOKEN,
-            SAVINGS_GREEN,
-            priceDesk,
-            False,
-        ) == 0:
-            return False
+    if claimableValue == 0:
+        return stabAssetBalance
 
-    return True
+    return self._getAssetAmount(
+        _stabAsset,
+        totalStabValue + claimableValue,
+        GREEN_TOKEN,
+        SAVINGS_GREEN,
+        priceDesk,
+        False,
+    )
 
 
 @view
@@ -338,9 +347,10 @@ def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, 
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
         return empty(address), 0
-    if not self._isCohortLiquidationReady(asset):
+    totalAmount: uint256 = self._getCohortLiquidationAmount(asset)
+    if totalAmount == 0:
         return asset, 0
-    return asset, self._getTotalAmountForUser(_user, asset)
+    return asset, self._getTotalAmountForUserWithTotalBal(_user, asset, totalAmount)
 
 
 @view
@@ -379,6 +389,8 @@ def _getTotalAmountForUserWithTotalBal(_user: address, _asset: address, _totalAm
 @internal
 def _getTotalAmountForVault(_asset: address) -> uint256:
     # NOTE: converting usd value to amount, even though vault may not actually have this asset balance!!
+    # Liquidation-safe mirror: _getCohortLiquidationAmount. Keep its custody and
+    # valuation inputs aligned while preserving this strict accounting path.
 
     # addys
     greenToken: address = empty(address)
@@ -393,7 +405,7 @@ def _getTotalAmountForVault(_asset: address) -> uint256:
 
     # return amount if there is claimable value
     if claimableValue != 0:
-        return self._getAssetAmount(_asset, totalStabValue + claimableValue, greenToken, savingsGreen, priceDesk)
+        return self._getAssetAmount(_asset, totalStabValue + claimableValue, greenToken, savingsGreen, priceDesk, True)
 
     return stabAssetBalance
 
@@ -406,12 +418,13 @@ def _getAssetAmount(
     _greenToken: address,
     _savingsGreen: address,
     _priceDesk: address,
+    _shouldRaise: bool,
 ) -> uint256:
     if _asset == _greenToken:
         return _targetUsdValue
     if _asset == _savingsGreen:
         return staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    return staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    return staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, _shouldRaise)
 
 
 @view
@@ -674,6 +687,8 @@ def _getValueOfClaimableAssets(
     _savingsGreen: address,
     _priceDesk: address,
 ) -> uint256:
+    # Liquidation-safe mirror: _getCohortLiquidationAmount. Keep its aggregate
+    # custody and per-claim valuation inputs aligned with this strict path.
     totalValue: uint256 = 0
     numClaimableAssets: uint256 = self.numClaimableAssets[_stabAsset]
     if numClaimableAssets == 0:
@@ -840,7 +855,7 @@ def _calcClaimSharesAndAmount(
 
     # max claim values for user
     maxClaimUsdValue: uint256 = self._sharesToValue(maxUserShares, totalShares, totalValue, False)
-    maxClaimAmount: uint256 = self._getAssetAmount(_claimAsset, maxClaimUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    maxClaimAmount: uint256 = self._getAssetAmount(_claimAsset, maxClaimUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk, True)
     if maxClaimAmount == 0:
         return 0, 0, 0 # not getting price for claim asset
 
@@ -1002,7 +1017,7 @@ def _redeemFromStabilityPool(
         return 0
 
     # max claimable amount
-    maxClaimableAmount: uint256 = self._getAssetAmount(_asset, maxRedeemValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    maxClaimableAmount: uint256 = self._getAssetAmount(_asset, maxRedeemValue, _a.greenToken, _a.savingsGreen, _a.priceDesk, True)
     if maxClaimableAmount == 0:
         return 0
 
@@ -1185,15 +1200,22 @@ def getClaimAssetState(_stabAsset: address, _claimAsset: address) -> uint256:
 @view
 @external
 def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool:
-    return (
-        vaultData.indexOfAsset[_stabAsset] != 0
-        and vaultData.indexOfAsset[_claimAsset] == 0
-        and (
-            self.indexOfClaimableAsset[_stabAsset][_claimAsset] != 0
-            or self._getNumActiveClaimAssets(_stabAsset) < MAX_ACTIVE_CLAIM_ASSETS
-        )
-        and self._isCohortLiquidationReady(_stabAsset)
-    )
+    if vaultData.indexOfAsset[_stabAsset] == 0 or vaultData.indexOfAsset[_claimAsset] != 0:
+        return False
+
+    activeCount: uint256 = self._getNumActiveClaimAssets(_stabAsset)
+    if self.indexOfClaimableAsset[_stabAsset][_claimAsset] == 0 and activeCount >= MAX_ACTIVE_CLAIM_ASSETS:
+        return False
+    if vaultData.isPaused:
+        return False
+
+    if vaultData.totalBalances[_stabAsset] == 0 and activeCount == 0:
+        # A configured empty cohort may receive its first liquidation, but any
+        # legacy cross-cohort reservation makes AuctionHouse's raw-custody
+        # sizing unsafe because it cannot distinguish the reserved amount.
+        return self.totalClaimableBalances[_stabAsset] == 0
+
+    return self._getCohortLiquidationAmount(_stabAsset) != 0
 
 
 @view

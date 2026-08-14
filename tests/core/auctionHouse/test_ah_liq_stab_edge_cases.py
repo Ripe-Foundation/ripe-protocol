@@ -441,24 +441,25 @@ def test_stability_routing_prices_or_falls_back_before_collateral_transfer(
     assert stability_pool.totalClaimableBalances(alpha_token) == 0
     assert alpha_token.balanceOf(stability_pool) == 0
 
-    # A configured-but-zero feed fails closed and rolls back before collateral
-    # or claim accounting moves.
+    # A configured-but-zero feed makes this Stability Pool cohort unavailable.
+    # Liquidation must continue through the configured ordinary-auction path.
     with boa.env.anchor():
         mock_price_source.setPrice(green_lp_token, 0)
-        with boa.reverts("has price config, no price"):
-            teller.liquidateUser(bob, False, sender=sally)
-        assert not ledger.isUserInLiquidation(bob)
+        teller.liquidateUser(bob, False, sender=sally)
+        assert filter_logs(teller, "CollateralSwappedWithStabPool") == []
+        liquidation = filter_logs(teller, "LiquidateUser")
+        assert len(liquidation) == 1
+        assert liquidation[0].numAuctionsStarted == 1
+        assert ledger.isUserInLiquidation(bob)
         assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == borrower_collateral
         assert stability_pool.claimableBalances(green_lp_token, alpha_token) == 0
         assert stability_pool.totalClaimableBalances(alpha_token) == 0
         assert alpha_token.balanceOf(stability_pool) == 0
         assert green_lp_token.balanceOf(stability_pool) == pool_liquidity
 
-    # Removing the feed entirely is a non-raising no-price result. AuctionHouse
-    # must skip the Stability Pool and start the configured auction without a
-    # duplicate price gate in canAcceptLiquidationAsset.
+    # Removing the feed entirely follows the same non-raising no-price path.
     mock_price_source.disablePriceFeed(green_lp_token)
-    assert stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
+    assert not stability_pool.canAcceptLiquidationAsset(green_lp_token, alpha_token)
     teller.liquidateUser(bob, False, sender=sally)
 
     assert filter_logs(teller, "CollateralSwappedWithStabPool") == []

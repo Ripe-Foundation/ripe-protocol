@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 23_544
-    assert 24_576 - len(runtime) == 1_032
+    assert len(runtime) == 24_002
+    assert 24_576 - len(runtime) == 574
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -221,8 +221,11 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert activation_gas < 1_200_000
     assert single_claim_gas < 500_000
     assert claim_many_gas < 7_000_000
+    # Preflight and iteration each traverse the bounded claim set once. The
+    # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000
-    assert liquidation_iterator_gas < 1_000_000
+    assert liquidation_iterator_gas < 600_000
+    assert liquidation_iterator_gas < liquidation_preflight_gas + 100_000
 
 
 def _seed_stability_asset(
@@ -3660,7 +3663,7 @@ def test_fully_reserved_stab_custody_is_skipped_before_collateral_can_move(
 
 def test_production_liquidation_preflight_uses_typed_pricedesk_boundary():
     source = (ROOT / "contracts/vaults/modules/StabVault.vy").read_text()
-    start = source.index("def _isCohortLiquidationReady")
+    start = source.index("def _getCohortLiquidationAmount")
     end = source.index("def _getUserAssetAndAmountAtIndex", start)
     helper = source[start:end]
 
@@ -3668,6 +3671,13 @@ def test_production_liquidation_preflight_uses_typed_pricedesk_boundary():
     assert "staticcall IERC20(" in helper
     assert "self._getUsdValue(" in helper
     assert "custody <= reserved" in helper
+    assert "claimableValue += claimValue" in helper
+
+    start = source.index("def _getUserAssetAndAmountAtIndex")
+    end = source.index("def _getUserAssetAtIndexAndHasBalance", start)
+    iterator = source[start:end]
+    assert "self._getCohortLiquidationAmount(asset)" in iterator
+    assert "self._getTotalAmountForUser(" not in iterator
 
 
 @pytest.mark.parametrize(
