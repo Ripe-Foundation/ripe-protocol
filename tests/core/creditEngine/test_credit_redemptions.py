@@ -680,7 +680,7 @@ def test_credit_redeem_many_basic(
     createDebtTerms,
     _test,
 ):
-    """Healthy entries prove the handwritten CreditEngine selector is live."""
+    """Healthy entries preserve typed borrower-term and redemption behavior."""
     setGeneralConfig()
     
     debt_terms = createDebtTerms(
@@ -777,20 +777,32 @@ def test_credit_redeem_many_basic(
     assert logs[1].caller == alice
     assert logs[1].repayValue == 40 * EIGHTEEN_DECIMALS
 
+    repay_logs = filter_logs(teller, "RepayDebt")
+    assert len(repay_logs) == 2
+    assert [log.user for log in repay_logs] == [bob, sally]
+    assert [log.repayValue for log in repay_logs] == [
+        30 * EIGHTEEN_DECIMALS,
+        40 * EIGHTEEN_DECIMALS,
+    ]
+    assert all(log.repayType == 8 for log in repay_logs)
+
 
 @pytest.mark.parametrize(
     "price_failure",
     (
         pytest.param("zero", id="existing-feed-zero-price"),
         pytest.param("revert", id="reverting-source-no-fallback"),
+        pytest.param("no-feed", id="no-price-config"),
     ),
 )
-def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
+def test_credit_redeem_many_skips_borrower_with_any_unpriceable_collateral(
     price_failure,
     alpha_token,
     alpha_token_whale,
     bravo_token,
     bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
     bob,
     sally,
     alice,
@@ -810,7 +822,7 @@ def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
     vault_book,
     createDebtTerms,
 ):
-    """One failed strict valuation skips only that borrower."""
+    """One missing portfolio price skips only that borrower."""
     setGeneralConfig()
     debt_terms = createDebtTerms(
         _ltv=50_00,
@@ -818,31 +830,57 @@ def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
         _liqThreshold=80_00,
         _borrowRate=0,
     )
-    for token in (alpha_token, bravo_token):
+    for token in (alpha_token, bravo_token, charlie_token):
         setAssetConfig(token, _debtTerms=debt_terms)
         mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
 
     collateral = 200 * EIGHTEEN_DECIMALS
-    debt = 100 * EIGHTEEN_DECIMALS
     performDeposit(bob, collateral, alpha_token, alpha_token_whale)
-    teller.borrow(debt, bob, False, sender=bob)
-    performDeposit(sally, collateral, bravo_token, bravo_token_whale)
-    teller.borrow(debt, sally, False, sender=sally)
+    performDeposit(bob, collateral, bravo_token, bravo_token_whale)
+    bob_debt = 200 * EIGHTEEN_DECIMALS
+    teller.borrow(bob_debt, bob, False, sender=bob)
+    performDeposit(
+        sally,
+        200 * 10 ** charlie_token.decimals(),
+        charlie_token,
+        charlie_token_whale,
+    )
+    sally_debt = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(sally_debt, sally, False, sender=sally)
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
     mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(charlie_token, 70 * EIGHTEEN_DECIMALS // 100)
 
     if price_failure == "zero":
-        mock_price_source.setPrice(alpha_token, 0)
+        mock_price_source.setPrice(bravo_token, 0)
+    elif price_failure == "revert":
+        mock_price_source.setShouldRevert(bravo_token, True)
     else:
-        mock_price_source.setShouldRevert(alpha_token, True)
+        mock_price_source.disablePriceFeed(bravo_token)
 
-    with boa.reverts("has price config, no price"):
-        credit_engine.getUserBorrowTermsWithNumVaults(
+    borrower_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        False,
+    )
+    assert borrower_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert borrower_terms.hasQuarantinedAsset
+    if price_failure == "no-feed":
+        strict_terms = credit_engine.getUserBorrowTermsWithNumVaults(
             bob,
             ledger.numUserVaults(bob),
             True,
         )
+        assert strict_terms.hasQuarantinedAsset
+    else:
+        with boa.reverts("has price config, no price"):
+            credit_engine.getUserBorrowTermsWithNumVaults(
+                bob,
+                ledger.numUserVaults(bob),
+                True,
+            )
+    assert not credit_engine.canRedeemUserCollateral(bob)
     assert credit_engine.canRedeemUserCollateral(sally)
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
@@ -850,23 +888,28 @@ def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
     healthy_max = 40 * EIGHTEEN_DECIMALS
     redemptions = [
         (bob, vault_id, alpha_token.address, bad_max),
-        (sally, vault_id, bravo_token.address, healthy_max),
+        (sally, vault_id, charlie_token.address, healthy_max),
     ]
     payment = 80 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, payment, sender=whale)
     green_token.approve(teller, payment, sender=alice)
 
-    expected_bravo = price_desk.getAssetAmount(bravo_token, healthy_max, True)
+    expected_charlie = price_desk.getAssetAmount(
+        charlie_token, healthy_max, True
+    )
     bob_debt_before = credit_engine.getUserDebtAmount(bob)
-    bob_collateral_before = simple_erc20_vault.getTotalAmountForUser(
+    bob_alpha_before = simple_erc20_vault.getTotalAmountForUser(
         bob, alpha_token
     )
-    sally_collateral_before = simple_erc20_vault.getTotalAmountForUser(
-        sally, bravo_token
+    bob_bravo_before = simple_erc20_vault.getTotalAmountForUser(
+        bob, bravo_token
+    )
+    sally_charlie_before = simple_erc20_vault.getTotalAmountForUser(
+        sally, charlie_token
     )
     alice_green_before = green_token.balanceOf(alice)
     alice_alpha_before = alpha_token.balanceOf(alice)
-    alice_bravo_before = bravo_token.balanceOf(alice)
+    alice_charlie_before = charlie_token.balanceOf(alice)
 
     spent = teller.redeemCollateralFromMany(
         redemptions,
@@ -881,20 +924,26 @@ def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
     assert credit_engine.getUserDebtAmount(bob) == bob_debt_before
     assert simple_erc20_vault.getTotalAmountForUser(
         bob, alpha_token
-    ) == bob_collateral_before
-    assert alpha_token.balanceOf(alice) == alice_alpha_before
-    assert credit_engine.getUserDebtAmount(sally) == debt - healthy_max
+    ) == bob_alpha_before
     assert simple_erc20_vault.getTotalAmountForUser(
-        sally, bravo_token
-    ) == sally_collateral_before - expected_bravo
-    assert bravo_token.balanceOf(alice) == alice_bravo_before + expected_bravo
+        bob, bravo_token
+    ) == bob_bravo_before
+    assert alpha_token.balanceOf(alice) == alice_alpha_before
+    assert credit_engine.getUserDebtAmount(sally) == sally_debt - healthy_max
+    assert simple_erc20_vault.getTotalAmountForUser(
+        sally, charlie_token
+    ) == sally_charlie_before - expected_charlie
+    assert (
+        charlie_token.balanceOf(alice)
+        == alice_charlie_before + expected_charlie
+    )
     assert green_token.balanceOf(alice) == alice_green_before - healthy_max
     assert green_token.balanceOf(credit_redeem) == 0
 
     logs = filter_logs(teller, "CollateralRedeemed")
     assert len(logs) == 1
     assert logs[0].user == sally
-    assert logs[0].asset == bravo_token.address
+    assert logs[0].asset == charlie_token.address
     assert logs[0].repayValue == healthy_max
 
 
@@ -907,7 +956,7 @@ def test_credit_redeem_many_skips_failed_strict_borrower_valuation(
         pytest.param("no-feed", id="no-price-config"),
     ),
 )
-def test_credit_redeem_many_skips_unpriceable_zero_ltv_asset_after_strict_preflight(
+def test_credit_redeem_many_skips_unpriceable_zero_ltv_asset_after_borrower_preflight(
     price_failure,
     alpha_token,
     alpha_token_whale,
@@ -975,12 +1024,13 @@ def test_credit_redeem_many_skips_unpriceable_zero_ltv_asset_after_strict_prefli
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
     mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
 
-    strict_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+    borrower_terms = credit_engine.getUserBorrowTermsWithNumVaults(
         bob,
         ledger.numUserVaults(bob),
-        True,
+        False,
     )
-    assert strict_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert borrower_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert not borrower_terms.hasQuarantinedAsset
     assert credit_engine.canRedeemUserCollateral(bob)
     assert price_desk.getAssetAmount(
         charlie_token, 30 * EIGHTEEN_DECIMALS, False
@@ -1114,6 +1164,12 @@ def test_credit_redeem_many_all_unpriceable_entries_revert_with_complete_rollbac
             ledger.numUserVaults(bob),
             True,
         )
+    bob_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        False,
+    )
+    assert bob_terms.hasQuarantinedAsset
     sally_terms = credit_engine.getUserBorrowTermsWithNumVaults(
         sally,
         ledger.numUserVaults(sally),
@@ -1834,13 +1890,14 @@ def test_utility_functions_edge_cases(
     user_debt = ledger.userDebt(bob)
     debt_amount = user_debt[0]  # Get the debt amount
 
-    # When price is 0, collateral value becomes 0
-    # With debt > 0 and collateral = 0, the user is technically underwater
-    # canRedeemUserCollateral returns True because collateral (0) <= redemptionThreshold
-    assert credit_engine.canRedeemUserCollateral(bob)
+    # A positive debt-bearing balance with no usable price is quarantined, so
+    # redemption eligibility cannot be inferred from a zero collateral value.
+    terms = credit_engine.getUserBorrowTerms(bob, False)
+    assert terms.collateralVal == 0
+    assert terms.hasQuarantinedAsset
+    assert not credit_engine.canRedeemUserCollateral(bob)
     
-    # getMaxRedeemValue returns 0 because even though user is redeemable,
-    # there's no collateral value to actually redeem
+    # getMaxRedeemValue also rejects the quarantined borrower terms.
     assert credit_redeem.getMaxRedeemValue(bob) == 0
     
     # getRedemptionThreshold calculation:
