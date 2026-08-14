@@ -173,14 +173,14 @@ WAIVED_CONTRACT_IDENTITIES = {
         ),
     },
     "Teller": {
-        "decision": "RH-D031",
+        "decision": "RH-D032",
         "fixture": "teller",
         "source": "contracts/core/Teller.vy",
         "source_sha256": (
-            "5cb7d059299cacfde30a3e45ee860a6f150bc7f37d361d363f946a662e9945ac"
+            "1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049"
         ),
         "runtime_sha256": (
-            "2bc9b992027b3432dc16c0e2d33f7a1df83df3f863b46dac8ff610e155e10859"
+            "9fd5e961f9f94593694b9fc0cef33ea5ec875e837132c34eeda8b14c0360e1c1"
         ),
         "runtime_template_bytes": 24_460,
         "deployed_runtime_bytes": 24_556,
@@ -190,7 +190,7 @@ WAIVED_CONTRACT_IDENTITIES = {
             False,
         ),
         "deployed_sha256": (
-            "6afe50f0f67f0a8c5ae7319ae12d02b280259b78ed29a615578777be7c0fc7a2"
+            "ea228bd7c41c3b1cc60dcbc29fde55c1fa21718b67aea6dcb0afc30e5da6daa3"
         ),
     },
 }
