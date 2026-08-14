@@ -4,6 +4,10 @@ import boa
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
+def _with_vault_ids(asset_config, vault_ids):
+    return (vault_ids, *asset_config[1:])
+
+
 ############
 # Fixtures #
 ############
@@ -933,8 +937,12 @@ def test_mission_control_set_stab_claim_rewards_config_unauthorized(mission_cont
     with boa.reverts("no perms"):
         mission_control.setRipeRewardsConfig((True, 10, 25_00, 25_00, 25_00, 25_00, 0, 0, 100 * EIGHTEEN_DECIMALS), sender=alice)
 
-def test_mission_control_set_priority_liq_asset_vaults(mission_control, switchboard_alpha, alpha_token):
-    """Test setting priority liquidation asset vaults."""
+def test_mission_control_set_priority_liq_asset_vaults(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+):
+    """The authorized setter stores data without applying policy."""
     priority_vaults = [
         (1, alpha_token.address),  # (vaultId, asset)
         (2, alpha_token.address),
@@ -946,6 +954,32 @@ def test_mission_control_set_priority_liq_asset_vaults(mission_control, switchbo
     assert len(stored_vaults) == 2
     assert stored_vaults[0].vaultId == 1
     assert stored_vaults[0].asset == alpha_token.address
+
+
+@pytest.mark.parametrize(
+    ("vault_id", "expected_flags"),
+    [
+        (1, 5),  # supported + Stability Pool
+        (2, 6),  # supported + RIPE governance
+        (3, 4),  # supported ordinary vault
+        (4, 0),  # unsupported ordinary vault
+    ],
+)
+def test_mission_control_get_vault_config_flags(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    sample_asset_config,
+    vault_id,
+    expected_flags,
+):
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        _with_vault_ids(sample_asset_config, [1, 2, 3]),
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == expected_flags
+
 
 def test_mission_control_set_priority_liq_asset_vaults_unauthorized(mission_control, alice, alpha_token):
     """Test that only Switchboard can set priority liq asset vaults."""
@@ -1189,14 +1223,19 @@ def test_mission_control_set_priority_price_source_ids_unauthorized(mission_cont
 # Complex View Functions #
 ###########################
 
-def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, sample_gen_config, sample_gen_debt_config, alpha_token):
+def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, sample_gen_config, sample_gen_debt_config, alpha_token, sample_asset_config):
     """Test getting general liquidation configuration."""
     # Set up configs
     mission_control.setGeneralConfig(sample_gen_config, sender=switchboard_alpha.address)
     mission_control.setGeneralDebtConfig(sample_gen_debt_config, sender=switchboard_alpha.address)
+    mission_control.setAssetConfig(
+        alpha_token.address,
+        _with_vault_ids(sample_asset_config, [3]),
+        sender=switchboard_alpha.address,
+    )
     
     # Set priority vaults
-    priority_liq_vaults = [(1, alpha_token.address)]
+    priority_liq_vaults = [(3, alpha_token.address)]
     priority_stab_vaults = [(2, alpha_token.address)]
     mission_control.setPriorityLiqAssetVaults(priority_liq_vaults, sender=switchboard_alpha.address)
     mission_control.setPriorityStabVaults(priority_stab_vaults, sender=switchboard_alpha.address)
@@ -1457,10 +1496,14 @@ def test_mission_control_max_priority_price_sources(mission_control, switchboard
     stored_ids = mission_control.getPriorityPriceSourceIds()
     assert len(stored_ids) == 10
 
-def test_mission_control_max_priority_vaults(mission_control, switchboard_alpha, alpha_token):
+def test_mission_control_max_priority_vaults(
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+):
     """Test maximum priority vaults limit."""
     # Create max allowed priority vaults (20)
-    max_vaults = [(i, alpha_token.address) for i in range(1, 21)]
+    max_vaults = [(vault_id, alpha_token.address) for vault_id in range(3, 23)]
     mission_control.setPriorityLiqAssetVaults(max_vaults, sender=switchboard_alpha.address)
     
     stored_vaults = mission_control.getPriorityLiqAssetVaults()

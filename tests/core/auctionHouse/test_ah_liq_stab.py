@@ -220,7 +220,7 @@ def test_quarantine_suppresses_direct_settlement_until_custody_recovers(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     setAssetConfig(
         bravo_token,
@@ -352,7 +352,7 @@ def test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     setAssetConfig(
         savings_green,
@@ -1772,7 +1772,7 @@ def test_ah_liquidation_user_with_stab_pool_position(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     
@@ -2100,7 +2100,7 @@ def test_ah_liquidation_with_stab_pool_both_assets(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,  # Will swap with stab pool
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     

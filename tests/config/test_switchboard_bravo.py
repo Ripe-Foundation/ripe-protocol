@@ -83,6 +83,36 @@ def _support_asset_with_debt_terms(
     )
 
 
+def _propose_asset_with_special_stab_pool(
+    switchboard_bravo,
+    governance,
+    asset,
+    special_stab_pool_id=1,
+):
+    return switchboard_bravo.addAsset(
+        asset,
+        [1],
+        50_00,
+        30_00,
+        1_000,
+        10_000,
+        0,
+        (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+        False,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        special_stab_pool_id,
+        sender=governance.address,
+    )
+
+
 def _propose_debt_terms(
     switchboard_bravo,
     governance,
@@ -1102,6 +1132,78 @@ def test_asset_liq_config_validation(switchboard_bravo, governance, alpha_token)
     assert action_id > 0
 
 
+def test_stability_pool_swap_requires_ordinary_auction_fallback_at_proposal(
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    _support_asset_with_debt_terms(
+        mission_control,
+        switchboard_bravo,
+        alpha_token,
+    )
+
+    with boa.reverts("invalid asset liq config"):
+        switchboard_bravo.setAssetLiqConfig(
+            alpha_token,
+            False,
+            False,
+            True,
+            False,
+            0,
+            sender=governance.address,
+        )
+
+    for should_swap, should_auction in ((True, True), (False, False), (False, True)):
+        assert switchboard_bravo.setAssetLiqConfig(
+            alpha_token,
+            False,
+            False,
+            should_swap,
+            should_auction,
+            0,
+            sender=governance.address,
+        ) > 0
+
+
+def test_stability_pool_auction_fallback_is_revalidated_at_execution(
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    _support_asset_with_debt_terms(
+        mission_control,
+        switchboard_bravo,
+        alpha_token,
+    )
+    action_id = switchboard_bravo.setWhitelistForAsset(
+        alpha_token,
+        ZERO_ADDRESS,
+        sender=governance.address,
+    )
+
+    invalid = list(_asset_config_with_debt_terms())
+    invalid[9] = True
+    invalid[10] = False
+    mission_control.setAssetConfig(
+        alpha_token,
+        tuple(invalid),
+        sender=switchboard_bravo.address,
+    )
+
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    pending_before = switchboard_bravo.pendingAssetConfig(action_id)
+    with boa.reverts("invalid asset config"):
+        switchboard_bravo.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_bravo.hasPendingAction(action_id)
+    assert switchboard_bravo.pendingAssetConfig(action_id) == pending_before
+
+
 def test_asset_liq_config_with_auction_params(
     switchboard_bravo,
     mission_control,
@@ -1395,7 +1497,7 @@ def test_complex_asset_configuration(switchboard_bravo, governance, alpha_token)
         False,      # shouldBurnAsPayment (not green token)
         False,      # shouldTransferToEndaoment
         True,       # shouldSwapInStabPools (we have LTV)
-        False,      # shouldAuctionInstantly
+        True,       # shouldAuctionInstantly
         True,       # canDeposit
         True,       # canWithdraw
         True,       # canRedeemCollateral (we have LTV)
@@ -2011,7 +2113,7 @@ def test_special_stab_pool_rejects_legacy_partial_interface(
     savings_green,
     vault_book,
 ):
-    """A pool exposing the pre-canAccept read surface is not activatable."""
+    """A pool missing the structural/capacity read surface is not activatable."""
     legacy_pool = boa.loads(
         """
 asset: immutable(address)
@@ -2071,6 +2173,107 @@ def test_special_stab_pool_rejects_paused_pool(
             False, False, True, True, True, True, True, True, True, True, 1,
             sender=governance.address,
         )
+
+
+@pytest.mark.parametrize("outage_phase", ("proposal", "execution"))
+def test_special_stab_pool_config_ignores_transient_liquidation_health(
+    outage_phase,
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bob,
+    teller,
+    stability_pool,
+    mock_price_source,
+    mission_control,
+):
+    amount = 10 * 10**18
+    mock_price_source.setPrice(alpha_token, 10**18)
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    assert stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        amount,
+        sender=teller.address,
+    ) == amount
+    assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+
+    if outage_phase == "execution":
+        action_id = _propose_asset_with_special_stab_pool(
+            switchboard_bravo,
+            governance,
+            bravo_token,
+        )
+
+    # Model a transient/legacy state in which raw custody is wholly reserved.
+    # Runtime liquidation acceptance must fail, while structural governance
+    # validation remains available.
+    stability_pool.eval(
+        f"stabVault.totalClaimableBalances[{alpha_token.address}] = {amount}"
+    )
+    assert not stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
+
+    if outage_phase == "proposal":
+        action_id = _propose_asset_with_special_stab_pool(
+            switchboard_bravo,
+            governance,
+            bravo_token,
+        )
+        assert action_id > 0
+    else:
+        boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+        assert switchboard_bravo.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+        assert mission_control.assetConfig(bravo_token).specialStabPoolId == 1
+
+
+def test_special_stab_pool_config_preserves_claim_capacity_validation(
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bob,
+    teller,
+    stability_pool,
+    mock_price_source,
+):
+    amount = 10 * 10**18
+    mock_price_source.setPrice(alpha_token, 10**18)
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    assert stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        amount,
+        sender=teller.address,
+    ) == amount
+
+    # numClaimableAssets includes the unused zero slot, so 21 represents the
+    # production cap of 20 active claim assets.
+    stability_pool.eval(
+        f"stabVault.numClaimableAssets[{alpha_token.address}] = 21"
+    )
+    with boa.reverts("invalid asset"):
+        _propose_asset_with_special_stab_pool(
+            switchboard_bravo,
+            governance,
+            bravo_token,
+        )
+
+    # An already-active claim asset remains structurally acceptable at the cap.
+    stability_pool.eval(
+        "stabVault.indexOfClaimableAsset"
+        f"[{alpha_token.address}][{bravo_token.address}] = 1"
+    )
+    assert _propose_asset_with_special_stab_pool(
+        switchboard_bravo,
+        governance,
+        bravo_token,
+    ) > 0
 
 
 def test_special_stab_pool_accepts_reusable_pool_with_stale_removed_slot(
@@ -2415,7 +2618,7 @@ def test_cannot_set_zero_thresholds_with_positive_ltv(
         False,  # shouldBurnAsPayment
         False,  # shouldTransferToEndaoment
         True,   # shouldSwapInStabPools
-        False,  # shouldAuctionInstantly
+        True,   # shouldAuctionInstantly
         True,   # canDeposit
         True,   # canWithdraw
         True,   # canRedeemCollateral

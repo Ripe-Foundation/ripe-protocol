@@ -685,21 +685,17 @@ def test_rewards_points_enable_disable(switchboard_alpha, mission_control, gover
     assert logs[0].arePointsEnabled
 
 
-def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
-    # Create sample vault data that will be filtered out due to invalid vault/asset
-    # With the new assertion, these will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+def test_priority_liq_asset_vaults_reject_invalid_entries(switchboard_alpha, governance):
+    # Invalid vault/asset pairs fail the composed validator.
     vaults = [
         (1, ZERO_ADDRESS),  # Will be filtered out due to invalid vault/asset
         (2, ZERO_ADDRESS),
     ]
     
-    # The function should revert because invalid vaults get filtered,
-    # making sanitized length != input length
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
-    # Test with duplicate invalid vaults - duplicates get filtered, causing length mismatch
+    # Duplicate invalid entries fail the same validator.
     duplicate_vaults = [
         (1, ZERO_ADDRESS),
         (1, ZERO_ADDRESS),  # Exact duplicate - will be filtered
@@ -709,14 +705,175 @@ def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
         switchboard_alpha.setPriorityLiqAssetVaults(duplicate_vaults, sender=governance.address)
 
 
-def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
-    # Invalid vaults will be filtered during sanitization, causing length mismatch
+@pytest.mark.parametrize(
+    ("vault_id", "expected_flags"),
+    [
+        (1, 5),  # supported + Stability Pool
+        (2, 6),  # supported + RIPE governance
+    ],
+)
+def test_priority_liq_asset_vaults_reject_special_vaults(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    vault_id,
+    expected_flags,
+):
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [1, 2, 3],
+    )
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+    if vault_id == 1:
+        assert mission_control.isStabVaultId(vault_id)
+    else:
+        assert mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == expected_flags
+
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.setPriorityLiqAssetVaults(
+            [(vault_id, alpha_token.address)],
+            sender=governance.address,
+        )
+
+
+def test_priority_liq_asset_vaults_accept_ordinary_vault(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    assert not mission_control.isStabVaultId(vault_id)
+    assert not mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == 4
+
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    stored_vaults = mission_control.getPriorityLiqAssetVaults()
+    assert [(vault.vaultId, vault.asset) for vault in stored_vaults] == [
+        (vault_id, alpha_token.address),
+    ]
+
+
+@pytest.mark.parametrize("classification", ["stab", "ripe_gov"])
+def test_priority_liq_asset_vaults_revalidate_special_classification_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    classification,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    previous_vaults = [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ]
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+
+    if classification == "stab":
+        mission_control.setPreferredStabVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    else:
+        mission_control.setCoreRipeGovVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) in (5, 6)
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ] == previous_vaults
+
+
+def test_priority_liq_asset_vaults_revalidate_support_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    previous_vaults = [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ]
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [4],
+    )
+    assert mission_control.getVaultConfigFlags(vault_id, alpha_token.address) == 0
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ] == previous_vaults
+
+
+def test_priority_stab_vaults_reject_invalid_entries(switchboard_alpha, governance):
     vaults = [(1, ZERO_ADDRESS)]
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityStabVaults(vaults, sender=governance.address)
     
-    # Test with multiple invalid vaults including duplicates
-    # Both invalid vaults and duplicates will be filtered, causing length mismatch
+    # Multiple invalid entries, including duplicates, also fail.
     multiple_vaults = [
         (1, ZERO_ADDRESS),
         (2, ZERO_ADDRESS),
@@ -808,14 +965,12 @@ def test_priority_stab_vault_revalidates_interface_at_confirmation(
 
 
 def test_invalid_priority_vaults(switchboard_alpha, governance):
-    # With the new assertion requiring exact length match, empty arrays are now valid
-    # since len([]) == len([]) after sanitization
-    # Test that empty arrays now succeed
+    # Empty arrays contain no invalid entry and remain valid.
     action_id = switchboard_alpha.setPriorityLiqAssetVaults([], sender=governance.address)
     assert action_id > 0
     
-    # Test that arrays with invalid vaults still fail due to length mismatch
-    invalid_vaults = [(999, ZERO_ADDRESS)]  # Invalid vault that will be filtered
+    # Arrays with invalid vaults still fail.
+    invalid_vaults = [(999, ZERO_ADDRESS)]
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(invalid_vaults, sender=governance.address)
 
@@ -1085,8 +1240,8 @@ def test_has_perms_to_enable_complex_scenarios(switchboard_alpha, governance, bo
         switchboard_alpha.setCanDeposit(False, sender=bob)
 
 
-def test_sanitize_priority_vaults_deduplication(switchboard_alpha, governance, alpha_token):
-    """Test the deduplication logic in _sanitizePriorityVaults"""
+def test_validate_priority_vaults_deduplication(switchboard_alpha, governance, alpha_token):
+    """Test the transient deduplication in the priority-vault validator."""
     
     # Test with duplicate vault ID + asset combinations
     vaults = [
@@ -1096,8 +1251,7 @@ def test_sanitize_priority_vaults_deduplication(switchboard_alpha, governance, a
         (2, alpha_token),  # different vault, same asset
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
@@ -1447,8 +1601,7 @@ def test_transient_storage_behavior(switchboard_alpha, governance, alpha_token, 
         (1, alpha_token),  # duplicate of first - will be filtered
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
@@ -1521,8 +1674,7 @@ def test_priority_vault_deduplication_complex(switchboard_alpha, governance, alp
         (3, charlie_token),  # Duplicate - will be filtered
     ]
     
-    # With the new length assertion, duplicates will be filtered during sanitization,
-    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
+    # Any duplicate makes the complete proposed list invalid.
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 

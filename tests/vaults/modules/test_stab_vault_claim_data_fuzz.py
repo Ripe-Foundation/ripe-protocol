@@ -602,11 +602,9 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
         }
 
         balance_before = claim.balanceOf(bob)
-        claim_usd_value = stability_pool.claimFromStabilityPool(
+        claim_usd_value = stability_pool.claimManyFromStabilityPool(
             bob,
-            alpha_token,
-            claim,
-            max_claim_value,
+            [(alpha_token.address, claim.address, max_claim_value)],
             bob,
             False,
             sender=teller.address,
@@ -642,11 +640,9 @@ def test_fuzz_claim_data_reductions_preserve_shared_liability_model(
 
         if remaining_balance != 0:
             balance_before = claim.balanceOf(bob)
-            stability_pool.claimFromStabilityPool(
+            stability_pool.claimManyFromStabilityPool(
                 bob,
-                alpha_token,
-                claim,
-                MAX_UINT256,
+                [(alpha_token.address, claim.address, MAX_UINT256)],
                 bob,
                 False,
                 sender=teller.address,
