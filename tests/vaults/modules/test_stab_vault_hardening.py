@@ -139,7 +139,7 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     asset, amount = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
     liquidation_iterator_gas = boa.env.get_gas_used() - gas_before
     assert asset == alpha_token.address
-    assert amount != 0
+    assert amount == stability_pool.getTotalAmountForUser(bob, alpha_token)
 
     with boa.env.anchor():
         claim_tokens[0].transfer(stability_pool, 1, sender=alice)
@@ -3415,7 +3415,10 @@ def test_claim_asset_price_state_nav_outcome(
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, bravo_token)
     healthy_position = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)
     assert healthy_position[0] == alpha_token.address
-    assert healthy_position[1] != 0
+    assert healthy_position[1] == stability_pool.getTotalAmountForUser(
+        bob,
+        alpha_token,
+    )
     state_before = (
         stability_pool.userBalances(bob, alpha_token),
         stability_pool.totalBalances(alpha_token),
