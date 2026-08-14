@@ -1661,6 +1661,60 @@ def test_set_single_bond_booster_execute_success(
     assert switchboard_delta.actionType(aid) == 0
 
 
+def test_bond_booster_replacement_uses_expiry_state_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    assert bond_booster.unitsUsed(alice) == 30
+
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number == old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
+
+def test_bond_booster_replacement_preserves_usage_when_active_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock + 1000
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 30
+    assert bond_booster.getBoostRatio(alice, 45) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 46) == 0
+
+
 def test_remove_single_bond_booster_permissions(switchboard_delta, governance, alice, bob, mission_control):
     """Test removeBondBooster permissions: requires governance or lite action with enable"""
     # Non-governance without lite access cannot remove

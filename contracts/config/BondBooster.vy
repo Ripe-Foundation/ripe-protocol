@@ -121,6 +121,11 @@ def _setBondBooster(_config: BoosterConfig) -> bool:
     if not self._isValidBooster(_config):
         return False
 
+    # Active edits continue the existing grant. Absent or expired configs
+    # begin a fresh grant and reset historical consumption.
+    if self.config[_config.user].expireBlock <= block.number:
+        self.unitsUsed[_config.user] = 0
+
     self.config[_config.user] = _config
     log BondBoostModified(
         user=_config.user,
