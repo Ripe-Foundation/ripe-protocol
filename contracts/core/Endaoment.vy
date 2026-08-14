@@ -756,11 +756,13 @@ def stabilizeGreenRefPool() -> bool:
     self._prepareEndaomentFunds(data.lpToken, max_value(uint256), endaoFunds)
     self._prepareEndaomentFunds(a.greenToken, max_value(uint256), endaoFunds)
 
-    # current profits
+    # current position
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(self)
     leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
     poolDebt: uint256 = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
-    initialProfit: uint256 = self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
+    initialIsDeficit: bool = False
+    initialPosition: uint256 = 0
+    initialIsDeficit, initialPosition = self._calcNetPositionForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
 
     # add/remove Green to pool (50% ratio is fully balanced)
     didAdjust: bool = False
@@ -769,12 +771,20 @@ def stabilizeGreenRefPool() -> bool:
     else:
         didAdjust = self._removeStabilizerGreenLiquidity(lpBalance, poolDebt, data, a.greenToken, a.ledger)
 
-    # calc new profits
+    # calc new position
     lpBalance = staticcall IERC20(data.lpToken).balanceOf(self)
     leftoverGreen = staticcall IERC20(a.greenToken).balanceOf(self)
     poolDebt = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
-    newProfit: uint256 = self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
-    assert newProfit >= initialProfit # dev: stabilizer was not profitable
+    newIsDeficit: bool = False
+    newPosition: uint256 = 0
+    newIsDeficit, newPosition = self._calcNetPositionForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
+
+    isPositionNotWorse: bool = False
+    if initialIsDeficit:
+        isPositionNotWorse = not newIsDeficit or newPosition <= initialPosition
+    elif not newIsDeficit:
+        isPositionNotWorse = newPosition >= initialPosition
+    assert isPositionNotWorse # dev: stabilizer was not profitable
 
     # transfer LP and Green back to vault
     self._transferToEndaomentFunds(data.lpToken, endaoFunds)
@@ -945,31 +955,40 @@ def calcProfitForStabilizer() -> uint256:
 
 @view
 @internal
+def _calcNetPositionForStabilizer(
+    _pool: address,
+    _lpBalance: uint256,
+    _greenBalance: uint256,
+    _poolDebt: uint256,
+) -> (bool, uint256):
+    virtualPrice: uint256 = staticcall CurvePool(_pool).get_virtual_price()
+
+    if _poolDebt > _greenBalance:
+        lpDebt: uint256 = (_poolDebt - _greenBalance) * EIGHTEEN_DECIMALS // virtualPrice
+        if lpDebt > _lpBalance:
+            return True, lpDebt - _lpBalance
+        return False, _lpBalance - lpDebt
+
+    netGreenBalInLp: uint256 = (_greenBalance - _poolDebt) * EIGHTEEN_DECIMALS // virtualPrice
+    return False, _lpBalance + netGreenBalInLp
+
+
+@view
+@internal
 def _calcProfitForStabilizer(
     _pool: address,
     _lpBalance: uint256,
     _greenBalance: uint256,
     _poolDebt: uint256,
 ) -> uint256:
-    netGreenBal: uint256 = 0
-    netGreenDebt: uint256 = 0
-    if _poolDebt > _greenBalance:
-        netGreenDebt = _poolDebt - _greenBalance
-        netGreenBal = 0
-    else:
-        netGreenBal = _greenBalance - _poolDebt
+    isDeficit: bool = False
+    position: uint256 = 0
+    isDeficit, position = self._calcNetPositionForStabilizer(_pool, _lpBalance, _greenBalance, _poolDebt)
 
-    virtualPrice: uint256 = staticcall CurvePool(_pool).get_virtual_price()
-
-    lpDebt: uint256 = 0
-    if netGreenDebt != 0:
-        lpDebt = netGreenDebt * EIGHTEEN_DECIMALS // virtualPrice
-
-    if _lpBalance <= lpDebt:
+    if isDeficit or _lpBalance == 0:
         return 0
-    else:
-        netGreenBalInLp: uint256 = netGreenBal * EIGHTEEN_DECIMALS // virtualPrice
-        return (_lpBalance - lpDebt) + netGreenBalInLp
+
+    return position
 
 
 #####################

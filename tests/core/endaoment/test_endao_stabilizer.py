@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 import boa
 
@@ -168,6 +171,171 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
         stabilizerMaxPoolDebt=STABILIZER_MAX_POOL_DEBT,
     )
 """
+
+
+STABILIZER_POOL_SOURCE = """
+# @version 0.4.3
+
+interface IERC20:
+    def transferFrom(_from: address, _to: address, _amount: uint256) -> bool: nonpayable
+
+GREEN: immutable(address)
+
+balances: HashMap[address, uint256]
+allowances: HashMap[address, HashMap[address, uint256]]
+lpTotalSupply: uint256
+virtualPrice: uint256
+lpMintedPerAdd: uint256
+nextVirtualPrice: uint256
+addCallCount: public(uint256)
+lastGreenAdded: public(uint256)
+
+@deploy
+def __init__(
+    _green: address,
+    _virtualPrice: uint256,
+    _lpMintedPerAdd: uint256,
+    _nextVirtualPrice: uint256,
+):
+    GREEN = _green
+    self.virtualPrice = _virtualPrice
+    self.lpMintedPerAdd = _lpMintedPerAdd
+    self.nextVirtualPrice = _nextVirtualPrice
+
+@external
+def seedLp(_holder: address, _amount: uint256):
+    self.balances[_holder] += _amount
+    self.lpTotalSupply += _amount
+
+@view
+@external
+def balanceOf(_holder: address) -> uint256:
+    return self.balances[_holder]
+
+@view
+@external
+def totalSupply() -> uint256:
+    return self.lpTotalSupply
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowances[msg.sender][_spender] = _amount
+    return True
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self.balances[msg.sender] -= _amount
+    self.balances[_to] += _amount
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
+    if msg.sender != _from:
+        self.allowances[_from][msg.sender] -= _amount
+    self.balances[_from] -= _amount
+    self.balances[_to] += _amount
+    return True
+
+@view
+@external
+def get_virtual_price() -> uint256:
+    return self.virtualPrice
+
+@external
+def add_liquidity(
+    _amounts: DynArray[uint256, 2],
+    _minLpAmountOut: uint256,
+    _recipient: address = msg.sender,
+) -> uint256:
+    greenAmount: uint256 = _amounts[0]
+    assert extcall IERC20(GREEN).transferFrom(msg.sender, self, greenAmount)
+    self.balances[_recipient] += self.lpMintedPerAdd
+    self.lpTotalSupply += self.lpMintedPerAdd
+    self.addCallCount += 1
+    self.lastGreenAdded = greenAmount
+    if self.nextVirtualPrice != 0:
+        self.virtualPrice = self.nextVirtualPrice
+    return self.lpMintedPerAdd
+"""
+
+
+def _signed_lp_position(lp_balance, green_balance, pool_debt, virtual_price):
+    if pool_debt > green_balance:
+        lp_debt = (pool_debt - green_balance) * EIGHTEEN_DECIMALS // virtual_price
+        if lp_debt > lp_balance:
+            return True, lp_debt - lp_balance
+        return False, lp_balance - lp_debt
+
+    lp_surplus = (green_balance - pool_debt) * EIGHTEEN_DECIMALS // virtual_price
+    return False, lp_balance + lp_surplus
+
+
+def _install_stabilizer_transition_harness(
+    curve_prices,
+    green_token,
+    lp_minted,
+    initial_virtual_price=EIGHTEEN_DECIMALS,
+    next_virtual_price=0,
+):
+    pool = boa.loads(
+        STABILIZER_POOL_SOURCE,
+        green_token.address,
+        initial_virtual_price,
+        lp_minted,
+        next_virtual_price,
+        name="stabilizer transition pool",
+    )
+    mock_curve_prices = boa.loads(
+        STABILIZER_CURVE_PRICES_SOURCE,
+        pool.address,
+        pool.address,
+        40 * EIGHTEEN_DECIMALS,
+        40_00,
+        0,
+        HUNDRED_PERCENT,
+        1_000_000 * EIGHTEEN_DECIMALS,
+        name="stabilizer transition config",
+    )
+    boa.env.set_code(curve_prices.address, boa.env.get_code(mock_curve_prices.address))
+    return pool
+
+
+def _seed_stabilizer_transition(
+    curve_prices,
+    green_token,
+    ledger,
+    endaoment,
+    endaoment_funds,
+    initial_lp,
+    initial_debt,
+    lp_minted,
+    leftover_green=0,
+    initial_virtual_price=EIGHTEEN_DECIMALS,
+    next_virtual_price=0,
+):
+    pool = _install_stabilizer_transition_harness(
+        curve_prices,
+        green_token,
+        lp_minted,
+        initial_virtual_price,
+        next_virtual_price,
+    )
+    if initial_lp != 0:
+        pool.seedLp(endaoment_funds, initial_lp)
+    if leftover_green != 0:
+        green_token.mint(
+            endaoment_funds,
+            leftover_green,
+            sender=endaoment.address,
+        )
+    if initial_debt != 0:
+        ledger.updateGreenPoolDebt(
+            pool.address,
+            initial_debt,
+            True,
+            sender=endaoment.address,
+        )
+    return pool
 
 
 def _install_stabilizer_view_mocks(curve_prices, lp_total_supply):
@@ -1953,6 +2121,500 @@ def test_endao_add_partner_liquidity_self_insufficient_balance(
 ###################################
 # Profit Invariant Tests          #
 ###################################
+
+
+def test_green_stabilizer_underwater_worsening_reverts_atomically(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+):
+    initial_lp = 100 * EIGHTEEN_DECIMALS
+    initial_debt = 200 * EIGHTEEN_DECIMALS
+    green_added = 20 * EIGHTEEN_DECIMALS
+    lp_minted = 10 * EIGHTEEN_DECIMALS
+
+    with boa.env.anchor():
+        pool = _install_stabilizer_transition_harness(
+            curve_prices,
+            green_token,
+            lp_minted,
+        )
+        pool.seedLp(endaoment_funds, initial_lp)
+        ledger.updateGreenPoolDebt(
+            pool.address,
+            initial_debt,
+            True,
+            sender=endaoment.address,
+        )
+
+        # The public view measures EndaomentFunds before the action. The internal
+        # snapshot measures the same assets after _prepareEndaomentFunds pulls them.
+        assert pool.balanceOf(endaoment_funds) == initial_lp
+        assert pool.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(endaoment_funds) == 0
+        assert green_token.balanceOf(endaoment) == 0
+        initial_is_deficit, initial_position = _signed_lp_position(
+            pool.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment_funds),
+            ledger.greenPoolDebt(pool),
+            pool.get_virtual_price(),
+        )
+        assert initial_is_deficit
+        assert initial_position == 100 * EIGHTEEN_DECIMALS
+        assert endaoment.calcProfitForStabilizer() == 0
+        assert endaoment.getGreenAmountToAddInStabilizer() == green_added
+
+        pre_state = {
+            "pool_debt": ledger.greenPoolDebt(pool),
+            "green_supply": green_token.totalSupply(),
+            "funds_lp": pool.balanceOf(endaoment_funds),
+            "endaoment_lp": pool.balanceOf(endaoment),
+            "funds_green": green_token.balanceOf(endaoment_funds),
+            "endaoment_green": green_token.balanceOf(endaoment),
+            "pool_green": green_token.balanceOf(pool),
+            "lp_supply": pool.totalSupply(),
+            "add_calls": pool.addCallCount(),
+        }
+
+        with boa.reverts("stabilizer was not profitable"):
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        # Check the reverted computation's log surface before any later contract
+        # calls. State equality below remains the independent atomicity evidence.
+        assert not filter_logs(endaoment, "StabilizerPoolLiqAdded")
+        assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
+
+        # Reversion must roll back debt, minting, Curve state, and both custody moves.
+        assert ledger.greenPoolDebt(pool) == pre_state["pool_debt"]
+        assert green_token.totalSupply() == pre_state["green_supply"]
+        assert pool.balanceOf(endaoment_funds) == pre_state["funds_lp"]
+        assert pool.balanceOf(endaoment) == pre_state["endaoment_lp"] == 0
+        assert green_token.balanceOf(endaoment_funds) == pre_state["funds_green"]
+        assert green_token.balanceOf(endaoment) == pre_state["endaoment_green"] == 0
+        assert green_token.balanceOf(pool) == pre_state["pool_green"]
+        assert pool.totalSupply() == pre_state["lp_supply"]
+        assert pool.addCallCount() == pre_state["add_calls"]
+
+
+@pytest.mark.parametrize(
+    "initial_lp,lp_minted,initial_is_deficit,initial_position,"
+    "final_is_deficit,final_position",
+    [
+        (
+            100 * EIGHTEEN_DECIMALS,
+            20 * EIGHTEEN_DECIMALS,
+            True,
+            100 * EIGHTEEN_DECIMALS,
+            True,
+            100 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            100 * EIGHTEEN_DECIMALS,
+            30 * EIGHTEEN_DECIMALS,
+            True,
+            100 * EIGHTEEN_DECIMALS,
+            True,
+            90 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            100 * EIGHTEEN_DECIMALS,
+            120 * EIGHTEEN_DECIMALS,
+            True,
+            100 * EIGHTEEN_DECIMALS,
+            False,
+            0,
+        ),
+        (
+            100 * EIGHTEEN_DECIMALS,
+            130 * EIGHTEEN_DECIMALS,
+            True,
+            100 * EIGHTEEN_DECIMALS,
+            False,
+            10 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            300 * EIGHTEEN_DECIMALS,
+            20 * EIGHTEEN_DECIMALS,
+            False,
+            100 * EIGHTEEN_DECIMALS,
+            False,
+            100 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            300 * EIGHTEEN_DECIMALS,
+            30 * EIGHTEEN_DECIMALS,
+            False,
+            100 * EIGHTEEN_DECIMALS,
+            False,
+            110 * EIGHTEEN_DECIMALS,
+        ),
+    ],
+    ids=[
+        "same-deficit",
+        "smaller-deficit",
+        "deficit-to-break-even",
+        "deficit-to-surplus",
+        "same-surplus",
+        "larger-surplus",
+    ],
+)
+def test_green_stabilizer_allows_nonworsening_signed_positions(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+    initial_lp,
+    lp_minted,
+    initial_is_deficit,
+    initial_position,
+    final_is_deficit,
+    final_position,
+):
+    initial_debt = 200 * EIGHTEEN_DECIMALS
+    green_added = 20 * EIGHTEEN_DECIMALS
+    final_debt = initial_debt + green_added
+    final_lp = initial_lp + lp_minted
+
+    with boa.env.anchor():
+        pool = _seed_stabilizer_transition(
+            curve_prices,
+            green_token,
+            ledger,
+            endaoment,
+            endaoment_funds,
+            initial_lp,
+            initial_debt,
+            lp_minted,
+        )
+
+        # The pre-call public view reads nonempty EndaomentFunds custody. The
+        # internal pre-action snapshot will read the same LP after it is pulled.
+        assert pool.balanceOf(endaoment_funds) == initial_lp != 0
+        assert pool.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(endaoment_funds) == 0
+        assert green_token.balanceOf(endaoment) == 0
+        derived_initial = _signed_lp_position(
+            pool.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment_funds),
+            ledger.greenPoolDebt(pool),
+            pool.get_virtual_price(),
+        )
+        assert derived_initial == (initial_is_deficit, initial_position)
+        expected_initial_profit = 0 if initial_is_deficit else initial_position
+        assert endaoment.calcProfitForStabilizer() == expected_initial_profit
+        assert endaoment.getGreenAmountToAddInStabilizer() == green_added
+        initial_green_supply = green_token.totalSupply()
+
+        assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        assert pool.addCallCount() == 1
+        assert pool.lastGreenAdded() == green_added
+        assert ledger.greenPoolDebt(pool) == final_debt
+        assert pool.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(endaoment) == 0
+        assert pool.balanceOf(endaoment_funds) == final_lp
+        assert green_token.balanceOf(endaoment_funds) == 0
+        assert green_token.balanceOf(pool) == green_added
+        assert green_token.totalSupply() == initial_green_supply + green_added
+        derived_final = _signed_lp_position(
+            pool.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment_funds),
+            ledger.greenPoolDebt(pool),
+            pool.get_virtual_price(),
+        )
+        assert derived_final == (final_is_deficit, final_position)
+        expected_final_profit = 0 if final_is_deficit else final_position
+        # After success, the public view reads the returned EndaomentFunds custody.
+        assert endaoment.calcProfitForStabilizer() == expected_final_profit
+
+
+@pytest.mark.parametrize(
+    "initial_lp,expected_initial,expected_final_is_deficit,expected_final",
+    [
+        (
+            300 * EIGHTEEN_DECIMALS,
+            100 * EIGHTEEN_DECIMALS,
+            False,
+            90 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            205 * EIGHTEEN_DECIMALS,
+            5 * EIGHTEEN_DECIMALS,
+            True,
+            5 * EIGHTEEN_DECIMALS,
+        ),
+    ],
+    ids=["smaller-solvent-position", "solvent-to-deficit"],
+)
+def test_green_stabilizer_rejects_worsening_solvent_positions(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+    initial_lp,
+    expected_initial,
+    expected_final_is_deficit,
+    expected_final,
+):
+    initial_debt = 200 * EIGHTEEN_DECIMALS
+    green_added = 20 * EIGHTEEN_DECIMALS
+    lp_minted = 10 * EIGHTEEN_DECIMALS
+
+    with boa.env.anchor():
+        pool = _seed_stabilizer_transition(
+            curve_prices,
+            green_token,
+            ledger,
+            endaoment,
+            endaoment_funds,
+            initial_lp,
+            initial_debt,
+            lp_minted,
+        )
+        assert pool.balanceOf(endaoment_funds) == initial_lp
+        assert pool.balanceOf(endaoment) == 0
+        assert _signed_lp_position(
+            pool.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment_funds),
+            ledger.greenPoolDebt(pool),
+            pool.get_virtual_price(),
+        ) == (False, expected_initial)
+        assert endaoment.calcProfitForStabilizer() == expected_initial
+        assert endaoment.getGreenAmountToAddInStabilizer() == green_added
+
+        hypothetical_final = _signed_lp_position(
+            initial_lp + lp_minted,
+            0,
+            initial_debt + green_added,
+            pool.get_virtual_price(),
+        )
+        assert hypothetical_final == (
+            expected_final_is_deficit,
+            expected_final,
+        )
+
+        with boa.reverts("stabilizer was not profitable"):
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        # Query the reverted computation's logs before subsequent state reads.
+        assert not filter_logs(endaoment, "StabilizerPoolLiqAdded")
+
+        assert ledger.greenPoolDebt(pool) == initial_debt
+        assert pool.balanceOf(endaoment_funds) == initial_lp
+        assert pool.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(endaoment_funds) == 0
+        assert green_token.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(pool) == 0
+        assert pool.totalSupply() == initial_lp
+        assert pool.addCallCount() == 0
+
+
+def test_calc_profit_for_stabilizer_preserves_public_view_semantics(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+):
+    abi = endaoment.abi
+    assert abi == json.loads(Path("scripts/abis/Endaoment.json").read_text())
+    assert next(
+        entry for entry in abi if entry.get("name") == "calcProfitForStabilizer"
+    ) == {
+        "stateMutability": "view",
+        "type": "function",
+        "name": "calcProfitForStabilizer",
+        "inputs": [],
+        "outputs": [{"name": "", "type": "uint256"}],
+    }
+
+    cases = [
+        # label, LP in EndaomentFunds, GREEN in EndaomentFunds, debt, result,
+        # expected signed position
+        (
+            "underwater",
+            100 * EIGHTEEN_DECIMALS,
+            0,
+            200 * EIGHTEEN_DECIMALS,
+            0,
+            (True, 100 * EIGHTEEN_DECIMALS),
+        ),
+        (
+            "ordinary-profit",
+            300 * EIGHTEEN_DECIMALS,
+            0,
+            200 * EIGHTEEN_DECIMALS,
+            100 * EIGHTEEN_DECIMALS,
+            (False, 100 * EIGHTEEN_DECIMALS),
+        ),
+        (
+            "break-even",
+            200 * EIGHTEEN_DECIMALS,
+            0,
+            200 * EIGHTEEN_DECIMALS,
+            0,
+            (False, 0),
+        ),
+        (
+            "zero-lp-green-surplus",
+            0,
+            20 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            0,
+            (False, 10 * EIGHTEEN_DECIMALS),
+        ),
+    ]
+
+    for label, lp_balance, green_balance, pool_debt, expected, position in cases:
+        with boa.env.anchor():
+            pool = _seed_stabilizer_transition(
+                curve_prices,
+                green_token,
+                ledger,
+                endaoment,
+                endaoment_funds,
+                lp_balance,
+                pool_debt,
+                EIGHTEEN_DECIMALS,
+                leftover_green=green_balance,
+            )
+            assert pool.balanceOf(endaoment_funds) == lp_balance, label
+            assert green_token.balanceOf(endaoment_funds) == green_balance, label
+            assert pool.balanceOf(endaoment) == 0, label
+            assert green_token.balanceOf(endaoment) == 0, label
+            assert _signed_lp_position(
+                pool.balanceOf(endaoment_funds),
+                green_token.balanceOf(endaoment_funds),
+                ledger.greenPoolDebt(pool),
+                pool.get_virtual_price(),
+            ) == position, label
+            assert endaoment.calcProfitForStabilizer() == expected, label
+
+
+def test_stabilizer_zero_virtual_price_fails_closed_in_view_and_internal_path(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+):
+    leftover_green = 20 * EIGHTEEN_DECIMALS
+    pool_debt = 10 * EIGHTEEN_DECIMALS
+
+    with boa.env.anchor():
+        pool = _seed_stabilizer_transition(
+            curve_prices,
+            green_token,
+            ledger,
+            endaoment,
+            endaoment_funds,
+            0,
+            pool_debt,
+            20 * EIGHTEEN_DECIMALS,
+            leftover_green=leftover_green,
+            initial_virtual_price=0,
+        )
+        assert pool.balanceOf(endaoment_funds) == 0
+        assert green_token.balanceOf(endaoment_funds) == leftover_green
+        assert pool.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(endaoment) == 0
+
+        # The refactor intentionally makes the old zero-LP surplus corner fail
+        # closed in both the external report and the internal safety snapshot.
+        # Vyper 0.4.3 implements the nonzero division denominator as this
+        # compiler clamp, so pin it instead of accepting an arbitrary revert.
+        with boa.reverts(compiler="clamp gt 0"):
+            endaoment.calcProfitForStabilizer()
+        with boa.reverts(compiler="clamp gt 0"):
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        assert ledger.greenPoolDebt(pool) == pool_debt
+        assert green_token.balanceOf(endaoment_funds) == leftover_green
+        assert green_token.balanceOf(endaoment) == 0
+        assert green_token.balanceOf(pool) == 0
+        assert pool.addCallCount() == 0
+
+
+def test_green_stabilizer_uses_each_snapshots_current_virtual_price(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+):
+    initial_virtual_price = EIGHTEEN_DECIMALS
+    final_virtual_price = 11 * EIGHTEEN_DECIMALS // 10
+    initial_lp = 100 * EIGHTEEN_DECIMALS
+    initial_debt = 200 * EIGHTEEN_DECIMALS
+    green_added = 20 * EIGHTEEN_DECIMALS
+    lp_minted = 5 * EIGHTEEN_DECIMALS
+    final_lp = initial_lp + lp_minted
+    final_debt = initial_debt + green_added
+
+    with boa.env.anchor():
+        pool = _seed_stabilizer_transition(
+            curve_prices,
+            green_token,
+            ledger,
+            endaoment,
+            endaoment_funds,
+            initial_lp,
+            initial_debt,
+            lp_minted,
+            initial_virtual_price=initial_virtual_price,
+            next_virtual_price=final_virtual_price,
+        )
+        assert pool.balanceOf(endaoment_funds) == initial_lp
+        assert pool.balanceOf(endaoment) == 0
+        assert _signed_lp_position(
+            initial_lp,
+            0,
+            initial_debt,
+            initial_virtual_price,
+        ) == (True, 100 * EIGHTEEN_DECIMALS)
+        assert endaoment.calcProfitForStabilizer() == 0
+        assert endaoment.getGreenAmountToAddInStabilizer() == green_added
+
+        # At a constant 1e18 virtual price, this action would worsen the deficit.
+        assert _signed_lp_position(
+            final_lp,
+            0,
+            final_debt,
+            initial_virtual_price,
+        ) == (True, 115 * EIGHTEEN_DECIMALS)
+
+        assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        assert pool.get_virtual_price() == final_virtual_price
+        assert pool.addCallCount() == 1
+        assert pool.lastGreenAdded() == green_added
+        assert pool.balanceOf(endaoment) == 0
+        assert pool.balanceOf(endaoment_funds) == final_lp
+        assert _signed_lp_position(
+            final_lp,
+            0,
+            final_debt,
+            final_virtual_price,
+        ) == (True, 95 * EIGHTEEN_DECIMALS)
+
+        initial_green_value = (
+            initial_lp * initial_virtual_price // EIGHTEEN_DECIMALS
+        ) - initial_debt
+        final_green_value = (
+            final_lp * final_virtual_price // EIGHTEEN_DECIMALS
+        ) - final_debt
+        assert initial_green_value == -100 * EIGHTEEN_DECIMALS
+        assert final_green_value == -(1045 * EIGHTEEN_DECIMALS // 10)
+        assert final_green_value < initial_green_value
 
 
 @pytest.base
