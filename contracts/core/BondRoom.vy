@@ -308,8 +308,20 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
 
     totalRipePayout: uint256 = baseRipePayout
 
-    # bonus for lock duration
+    # lock duration
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
+
+    # bonus from bond booster (if applicable)
+    bondBooster: address = self.bondBooster
+    if bondBooster != empty(address):
+        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check
+        ripeBoostBonus: uint256 = baseRipePayout * boostRatio // HUNDRED_PERCENT
+        totalRipePayout += ripeBoostBonus
+        if ripeBoostBonus != 0:
+            lockDuration = max(lockDuration, staticcall BondBooster(bondBooster).minLockDuration())
+            lockDuration = min(lockDuration, config.maxLockDuration)
+
+    # bonus for lock duration
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
         lockBonusRatio: uint256 = 0
@@ -318,12 +330,6 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
         else:
             lockBonusRatio = maxLockBonusRatio # when min and max are equal, give full bonus
         totalRipePayout += baseRipePayout * lockBonusRatio // HUNDRED_PERCENT
-
-    # bonus from bond booster (if applicable)
-    bondBooster: address = self.bondBooster
-    if bondBooster != empty(address):
-        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check 
-        totalRipePayout += baseRipePayout * boostRatio // HUNDRED_PERCENT
 
     return totalRipePayout
 
