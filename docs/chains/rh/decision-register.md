@@ -957,6 +957,75 @@ itself authorize deployment, configuration, activation, or release.
 `config/contract-artifact-expectations.json`, and the focused remediation tests
 under `tests/core/teller/`.
 
+### RH-D032 — Teller bond minimum-payout protection exact waiver at 20 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact caller-specified
+minimum RIPE payout candidate on
+`codex/rh-bond-minimum-payout-assessment`, based on BondRoom preview/execution
+parity commit `5a6656e40b52b1e28293587435e409634f3b1548`.
+
+This candidate adds an optional `_minRipePayout` postcondition immediately
+after BondRoom returns and before Teller housekeeping. A transaction therefore
+reverts atomically when the realized RIPE payout is below the caller's bound.
+To remain below EIP-170, `_paymentAmount` becomes required and the generated
+one-argument `purchaseRipeBond(address)` selector is removed. Arity 2 through 4
+remain available and arity 5 carries the new minimum.
+
+**What exactly is waived.** One source and compiler-output identity under the
+repository's pinned Vyper toolchain:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/Teller.vy` SHA-256 | `1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049` |
+| Source Git blob | `973d2148da448b67815f79dfce481c3b25d3dc57` |
+| Runtime-template SHA-256 | `9fd5e961f9f94593694b9fc0cef33ea5ec875e837132c34eeda8b14c0360e1c1` |
+| Runtime-template bytes | 24,460 |
+| Deployed runtime bytes, including immutables | 24,556 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A2`, `_shouldPause = false` | `ea228bd7c41c3b1cc60dcbc29fde55c1fa21718b67aea6dcb0afc30e5da6daa3` |
+| Complete deployed-runtime SHA-256 at production-capture inputs | `379e6934d931e6608746d99c518efdb5ca4fe4dbe02df918ece3ec06ea6cf8d5` |
+| Creation bytecode SHA-256 | `f81149abb9532466f4ac8032bae9742433d9bba1299877a563041d9e7d78b372` |
+| Creation executable-prefix SHA-256 | `3865ac2fcbe3b298d66ebccfab2664045eb82d252eb2eac4dd0f190fcd5dda67` |
+| Creation metadata SHA-256 | `9b02fb49ce418a79034de83f16e9f8f0b6ec32bd34ef2024ece3e6515c127d3d` |
+| Selector-set canonical SHA-256 | `89b86fbe6f1c3ff96b1b0afee8772d053c6bed96896eaa5fd6c3ed0ccc02f255` |
+| Transitive compiler-input integrity | `1dbd69122307fb1a07b298baf544ec7be0d3850b776e6e1780414fbd4404fc9f` |
+| Canonical ABI SHA-256 | `1ea5d8c2bef929262303b547c26aa68fe165b10080cb64b3d1b8ae5980f70eea` |
+| Committed ABI file SHA-256 | `d0b6a629488d3ff7ee51ac58228976247e9ddd26d596d356eec391bc17014866` |
+
+RH-D031 remains the historical authority for its exact prior Teller artifact;
+it does not authorize this source or compiler output. RH-D032 is the controlling
+waiver for the candidate above and permits **0 bytes of further growth**. Any
+source, compiler-input, ABI, selector, creation-bytecode, runtime-template, or
+deployed-runtime identity change reopens this decision. The exact identities
+must be recomputed with `scripts/check_contract_artifacts.py` and
+`tests/test_vault_pointer_runtime_sizes.py` after final merge; they must never be
+updated merely to make those checks pass.
+
+**Rejected nonbreaking shapes.** Keeping all four prior selectors and adding a
+five-argument overload produces a 24,619-byte deployed runtime before adding
+the 13-byte minimum-payout assertion, already 43 bytes above EIP-170. Measured
+shared and duplicated dedicated-selector candidates deploy at 24,728 and
+25,027 bytes. A nonbreaking route therefore requires additional Teller
+compression and is not part of this decision.
+
+**Release conditions and residual risk.** The protection is opt-in because a
+zero minimum preserves current behavior. Before the Teller registry pointer is
+updated, the published SDK must remove the unsupported one-argument call,
+expose `_minRipePayout`, be republished, and be adopted by downstream UI code
+that supplies a nonzero bound. Teller documentation must be updated in the same
+release sequence. The `# dev: minimum payout not met` annotation is Boa
+source-map metadata; the on-chain revert carries empty returndata, so callers
+cannot distinguish it from another empty-data revert without local context.
+
+This owner decision accepts the exact artifact, the selector removal, and the
+stated release conditions. It does not itself authorize deployment, registry
+mutation, activation, or release.
+
+**Source:** `contracts/core/Teller.vy`,
+`tests/core/bondRoom/test_ripe_bonds.py`,
+`tests/inventory/test_teller_bond_minimum_payout_abi.py`,
+`tests/test_vault_pointer_runtime_sizes.py`, and
+`config/contract-artifact-expectations.json`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

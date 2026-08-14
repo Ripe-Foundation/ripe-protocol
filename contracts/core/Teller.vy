@@ -818,15 +818,17 @@ def releaseLock(_asset: address, _user: address = msg.sender):
 @external
 def purchaseRipeBond(
     _paymentAsset: address,
-    _paymentAmount: uint256 = max_value(uint256),
+    _paymentAmount: uint256,
     _lockDuration: uint256 = 0,
     _recipient: address = msg.sender,
+    _minRipePayout: uint256 = 0,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     paymentAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(msg.sender))
     assert extcall IERC20(_paymentAsset).transferFrom(msg.sender, a.bondRoom, paymentAmount, default_return_value=True) # dev: token transfer failed
     ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_recipient, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
+    assert ripePayout >= _minRipePayout # dev: minimum payout not met
     self._performHousekeeping(False, _recipient, True, _recipient == msg.sender, a)
     return ripePayout
 

@@ -1,9 +1,14 @@
+from pathlib import Path
+
 import pytest
 import boa
 from boa.contracts.base_evm_contract import BoaError
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
-from conf_utils import assert_reverted_call, filter_logs
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
+from conf_utils import assert_reverted_call, filter_logs, get_boa_dev_reasons
+
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(scope="module")
@@ -926,6 +931,9 @@ def test_purchase_ripe_bond_payment_unavailable(
         teller.purchaseRipeBond(
             alpha_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -948,6 +956,9 @@ def test_purchase_ripe_bond_ripe_unavailable(
         teller.purchaseRipeBond(
             alpha_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -1004,6 +1015,9 @@ def test_purchase_ripe_bond_bonds_disabled(
         teller.purchaseRipeBond(
             alpha_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -1023,6 +1037,9 @@ def test_purchase_ripe_bond_asset_mismatch(
         teller.purchaseRipeBond(
             bravo_token,  # trying to use bravo instead of alpha
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -1140,6 +1157,9 @@ def test_purchase_ripe_bond_zero_amount_fails(
         teller.purchaseRipeBond(
             alpha_token,
             0,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -3815,6 +3835,9 @@ def test_purchase_ripe_bond_contract_paused(
         teller.purchaseRipeBond(
             alpha_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
     
@@ -3852,6 +3875,9 @@ def test_purchase_ripe_bond_user_not_whitelisted(
         teller.purchaseRipeBond(
             alpha_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
     
@@ -4157,6 +4183,9 @@ def test_purchase_ripe_bond_zero_base_payout_fails(
         teller.purchaseRipeBond(
             charlie_token,
             payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
             sender=bob
         )
 
@@ -5029,3 +5058,834 @@ def test_purchase_ripe_bond_rounding_errors(
     # Verify no tokens are stuck due to rounding
     bond_balance = alpha_token.balanceOf(bond_room.address)
     assert bond_balance == 0  # Whole units are forwarded; the fractional remainder is refunded
+
+
+#######################################
+# Caller-Specified Minimum RIPE Payout #
+#######################################
+
+
+def _minimum_assertion_mutant_source():
+    source = (ROOT / "contracts/core/Teller.vy").read_text()
+    assertion = (
+        "    assert ripePayout >= _minRipePayout"
+        " # dev: minimum payout not met\n"
+    )
+    assert source.count(assertion) == 1
+    source = source.replace(assertion, "", 1)
+    assert assertion not in source
+    return source
+
+
+def _minimum_payout_state(
+    payment_token,
+    payer,
+    recipient,
+    teller,
+    bond_room,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+):
+    return {
+        "payerBalance": payment_token.balanceOf(payer),
+        "payerAllowance": payment_token.allowance(payer, teller.address),
+        "bondRoomPaymentBalance": payment_token.balanceOf(bond_room.address),
+        "endaomentFundsPaymentBalance": payment_token.balanceOf(endaoment_funds.address),
+        # Ledger's complete bond-specific state surface.
+        "epochStart": ledger.epochStart(),
+        "epochEnd": ledger.epochEnd(),
+        "paymentAmountAvailInEpoch": ledger.paymentAmountAvailInEpoch(),
+        "ripeAvailForBonds": ledger.ripeAvailForBonds(),
+        "badDebt": ledger.badDebt(),
+        "ripePaidOutForBadDebt": ledger.ripePaidOutForBadDebt(),
+        "ripeTotalSupply": ripe_token.totalSupply(),
+        "recipientRipeBalance": ripe_token.balanceOf(recipient),
+        "recipientGovAmount": ripe_gov_vault.getTotalAmountForUser(recipient, ripe_token),
+        "recipientGovShares": ripe_gov_vault.userBalances(recipient, ripe_token),
+        "recipientGovData": ripe_gov_vault.userGovData(recipient, ripe_token),
+        "recipientBoosterUnitsUsed": bond_booster.unitsUsed(recipient),
+        "recipientLastTouch": ledger.lastTouch(recipient),
+    }
+
+
+@pytest.mark.parametrize(
+    "minimum_delta, should_revert",
+    [(-1, False), (0, False), (1, True)],
+    ids=["below", "equal", "above"],
+)
+def test_purchase_ripe_bond_minimum_exact_boundary(
+    minimum_delta,
+    should_revert,
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+):
+    setupRipeBonds(
+        _minRipePerUnit=2 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=2 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    payment_amount = 3 * EIGHTEEN_DECIMALS
+    payout = 6 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    if should_revert:
+        with boa.reverts("minimum payout not met"):
+            teller.purchaseRipeBond(
+                alpha_token,
+                payment_amount,
+                0,
+                bob,
+                payout + minimum_delta,
+                sender=bob,
+            )
+    else:
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout + minimum_delta,
+            sender=bob,
+        ) == payout
+
+
+def test_minimum_payout_assertion_mutant_is_unprotected(
+    ripe_hq,
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+):
+    setupRipeBonds(
+        _minRipePerUnit=2 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=2 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    payment_amount = 3 * EIGHTEEN_DECIMALS
+    payout = 6 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    with boa.env.anchor():
+        mutant = boa.loads(
+            _minimum_assertion_mutant_source(),
+            ripe_hq,
+            False,
+            name="teller_without_minimum_payout_assertion",
+        )
+        teller_code = boa.env.get_code(teller.address)
+        mutant_code = boa.env.get_code(mutant.address)
+        assert len(teller_code) - len(mutant_code) == 13
+        assert teller_code[-96:] == mutant_code[-96:]
+        boa.env.set_code(teller.address, mutant_code)
+
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout + 1,
+            sender=bob,
+        ) == payout
+
+
+def test_bond_room_purchase_effects_are_teller_only(
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token,
+):
+    setupRipeBonds()
+    with boa.reverts("only Teller allowed"):
+        bond_room.purchaseRipeBond(
+            bob,
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            0,
+            bob,
+            sender=bob,
+        )
+
+
+@pytest.mark.parametrize("arity", [2, 3, 4], ids=["two", "three", "four"])
+def test_purchase_ripe_bond_retained_arity_compatibility(
+    arity,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alice,
+    alpha_token_whale,
+    alpha_token,
+    ripe_token,
+    ripe_gov_vault,
+    setUserConfig,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    lock_duration = 100 if arity == 3 else 0
+    recipient = alice if arity == 4 else bob
+    if recipient == alice:
+        setUserConfig(alice, _canAnyoneBondForUser=True)
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    preview = bond_room.previewRipeBondPayout(
+        recipient,
+        lock_duration,
+        payment_amount,
+    )
+
+    if arity == 2:
+        actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    elif arity == 3:
+        actual = teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            lock_duration,
+            sender=bob,
+        )
+    else:
+        actual = teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            lock_duration,
+            recipient,
+            sender=bob,
+        )
+
+    assert actual == preview == 2 * EIGHTEEN_DECIMALS
+    if lock_duration == 0:
+        assert ripe_token.balanceOf(recipient) == actual
+        assert ripe_gov_vault.getTotalAmountForUser(recipient, ripe_token) == 0
+    else:
+        assert ripe_token.balanceOf(recipient) == 0
+        assert ripe_gov_vault.getTotalAmountForUser(recipient, ripe_token) == actual
+
+
+@pytest.mark.parametrize("lock_duration", [0, 100], ids=["unlocked", "locked"])
+def test_minimum_payout_cross_epoch_stale_quote_and_atomic_rollback(
+    lock_duration,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+):
+    start, end = setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=10 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _epochLength=10,
+        _shouldAutoRestart=True,
+        _restartDelayBlocks=0,
+    )
+    payment_amount = 5 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    boa.env.time_travel(blocks=end - boa.env.evm.patch.block_number - 1)
+    assert boa.env.evm.patch.block_number == end - 1
+
+    preview = bond_room.previewRipeBondPayout(
+        bob,
+        lock_duration,
+        payment_amount,
+    )
+    preview_rate = 91 * EIGHTEEN_DECIMALS // 10
+    expected_preview = preview_rate * 5
+    expected_actual = 5 * EIGHTEEN_DECIMALS
+    assert preview == expected_preview == 45_500_000_000_000_000_000
+
+    with boa.env.anchor():
+        boa.env.time_travel(blocks=1)
+        actual = teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            lock_duration,
+            bob,
+            0,
+            sender=bob,
+        )
+        event = filter_logs(teller, "RipeBondPurchased")[0]
+        assert event.epochStart == end
+        assert event.epochEnd == end + (end - start)
+        assert event.epochProgress == 0
+        assert event.ripePerUnit == EIGHTEEN_DECIMALS
+        assert event.paymentAmount == payment_amount
+        assert actual == event.totalRipePayout == expected_actual
+        assert preview > actual
+
+    boa.env.time_travel(blocks=1)
+    assert boa.env.evm.patch.block_number == end
+    state_before = _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    )
+    assert (state_before["epochStart"], state_before["epochEnd"]) == (start, end)
+
+    with boa.reverts("minimum payout not met"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            lock_duration,
+            bob,
+            preview,
+            sender=bob,
+        )
+
+    assert _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    ) == state_before
+    # The matching min=0 anchor above proves this exact execution state reaches
+    # and commits BondRoom's effects. The state comparison proves the later
+    # Teller postcondition rolls those effects back; this event check covers logs.
+    assert filter_logs(teller, "RipeBondPurchased") == []
+
+    actual = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        lock_duration,
+        bob,
+        expected_actual,
+        sender=bob,
+    )
+    assert actual == expected_actual < preview
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["partial_epoch_capacity", "caller_balance_cap", "payment_unit_rounding"],
+)
+def test_minimum_payout_uses_final_charged_whole_unit_amount(
+    case,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    charlie_token_whale,
+    charlie_token,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+):
+    if case == "caller_balance_cap":
+        payment_token = alpha_token
+        whale = alpha_token_whale
+        one_unit = EIGHTEEN_DECIMALS
+        requested = 4 * one_unit
+        funded = 2 * one_unit
+        charged = 2 * one_unit
+        epoch_capacity = 10 * one_unit
+        expected_refund = 0
+    else:
+        payment_token = charlie_token
+        whale = charlie_token_whale
+        one_unit = 10 ** charlie_token.decimals()
+        if case == "partial_epoch_capacity":
+            requested = 4 * one_unit
+            funded = requested
+            charged = 2 * one_unit
+            epoch_capacity = charged
+            expected_refund = requested - charged
+        else:
+            requested = 2 * one_unit - 1
+            funded = requested
+            charged = one_unit
+            epoch_capacity = 10 * one_unit
+            expected_refund = requested - charged
+
+    setupRipeBonds(
+        _asset=payment_token,
+        _amountPerEpoch=epoch_capacity,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldAutoRestart=False,
+    )
+    units = charged // one_unit
+    payout = units * EIGHTEEN_DECIMALS
+    payment_token.transfer(bob, funded, sender=whale)
+    payment_token.approve(teller, requested, sender=bob)
+    payer_before = payment_token.balanceOf(bob)
+
+    with boa.env.anchor():
+        actual = teller.purchaseRipeBond(
+            payment_token,
+            requested,
+            0,
+            bob,
+            payout,
+            sender=bob,
+        )
+        event = filter_logs(teller, "RipeBondPurchased")[0]
+        assert actual == payout
+        assert event.paymentAmount == charged
+        assert event.refundAmount == expected_refund
+        assert payment_token.balanceOf(bob) == payer_before - charged
+
+    state_before = _minimum_payout_state(
+        payment_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    )
+    with boa.reverts("minimum payout not met"):
+        teller.purchaseRipeBond(
+            payment_token,
+            requested,
+            0,
+            bob,
+            payout + 1,
+            sender=bob,
+        )
+    assert _minimum_payout_state(
+        payment_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    ) == state_before
+
+
+def test_minimum_payout_booster_uses_execution_payout_and_rolls_back_units(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    bond_booster.setBondBooster(
+        (bob, HUNDRED_PERCENT, 10, boa.env.evm.patch.block_number + 1000),
+        sender=switchboard_delta.address,
+    )
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    payout = 4 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert bond_room.previewRipeBondPayout(bob, 0, payment_amount) == payout
+
+    with boa.env.anchor():
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout,
+            sender=bob,
+        ) == payout
+        assert bond_booster.unitsUsed(bob) == 2
+
+    state_before = _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    )
+    with boa.reverts("minimum payout not met"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout + 1,
+            sender=bob,
+        )
+    assert _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    ) == state_before
+    assert bond_booster.unitsUsed(bob) == 0
+
+
+@pytest.mark.parametrize("booster_state", ["exhausted", "expired"])
+def test_minimum_payout_booster_exhausted_or_expired_uses_unboosted_payout(
+    booster_state,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    bond_booster,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    if booster_state == "exhausted":
+        bond_booster.setBondBooster(
+            (bob, HUNDRED_PERCENT, 1, boa.env.evm.patch.block_number + 1000),
+            sender=switchboard_delta.address,
+        )
+        alpha_token.transfer(bob, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+        alpha_token.approve(teller, EIGHTEEN_DECIMALS, sender=bob)
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            sender=bob,
+        ) == 2 * EIGHTEEN_DECIMALS
+        assert bond_booster.unitsUsed(bob) == 1
+    else:
+        bond_booster.setBondBooster(
+            (bob, HUNDRED_PERCENT, 10, boa.env.evm.patch.block_number + 1),
+            sender=switchboard_delta.address,
+        )
+        boa.env.time_travel(blocks=2)
+
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    payout = 2 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert bond_room.previewRipeBondPayout(bob, 0, payment_amount) == payout
+    assert teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        0,
+        bob,
+        payout,
+        sender=bob,
+    ) == payout
+
+
+@pytest.mark.parametrize(
+    "requested_lock, effective_lock, payout",
+    [
+        (0, 0, 2 * EIGHTEEN_DECIMALS),
+        (100, 100, 2 * EIGHTEEN_DECIMALS),
+        (550, 550, 3 * EIGHTEEN_DECIMALS),
+        (1000, 1000, 4 * EIGHTEEN_DECIMALS),
+        (2000, 1000, 4 * EIGHTEEN_DECIMALS),
+    ],
+)
+def test_minimum_payout_uses_final_lock_bonus(
+    requested_lock,
+    effective_lock,
+    payout,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ripe_token,
+    ripe_gov_vault,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=HUNDRED_PERCENT,
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+    )
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert bond_room.previewRipeBondPayout(
+        bob,
+        requested_lock,
+        payment_amount,
+    ) == payout
+    assert teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        requested_lock,
+        bob,
+        payout,
+        sender=bob,
+    ) == payout
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+    assert event.lockDuration == effective_lock
+    if effective_lock == 0:
+        assert ripe_token.balanceOf(bob) == payout
+    else:
+        assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == payout
+
+
+def test_minimum_payout_third_party_recipient_is_atomic(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alice,
+    alpha_token_whale,
+    alpha_token,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+    setUserConfig,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    setUserConfig(alice, _canAnyoneBondForUser=True)
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    payout = 2 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert bond_room.previewRipeBondPayout(alice, 0, payment_amount) == payout
+
+    with boa.env.anchor():
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            alice,
+            payout,
+            sender=bob,
+        ) == payout
+        event = filter_logs(teller, "RipeBondPurchased")[0]
+        assert event.caller == bob
+        assert event.recipient == alice
+        assert ripe_token.balanceOf(alice) == payout
+
+    state_before = _minimum_payout_state(
+        alpha_token,
+        bob,
+        alice,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    )
+    with boa.reverts("minimum payout not met"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            alice,
+            payout + 1,
+            sender=bob,
+        )
+    assert _minimum_payout_state(
+        alpha_token,
+        bob,
+        alice,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    ) == state_before
+
+
+def test_minimum_payout_bad_debt_accounting_is_atomic(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    endaoment_funds,
+    ledger,
+    ripe_token,
+    ripe_gov_vault,
+    bond_booster,
+    switchboard_alpha,
+    mock_price_source,
+):
+    setupRipeBonds(
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    ledger.setBadDebt(3 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    payment_amount = 2 * EIGHTEEN_DECIMALS
+    payout = 2 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    with boa.env.anchor():
+        assert teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout,
+            sender=bob,
+        ) == payout
+        event = filter_logs(teller, "RipeBondPurchased")[0]
+        assert event.ripeForBadDebt == payout
+        assert ledger.badDebt() == EIGHTEEN_DECIMALS
+
+    state_before = _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    )
+    with boa.reverts("minimum payout not met"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            payout + 1,
+            sender=bob,
+        )
+    assert _minimum_payout_state(
+        alpha_token,
+        bob,
+        bob,
+        teller,
+        bond_room,
+        endaoment_funds,
+        ledger,
+        ripe_token,
+        ripe_gov_vault,
+        bond_booster,
+    ) == state_before
+
+
+def test_minimum_payout_does_not_override_teller_pause(
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    switchboard_alpha,
+):
+    setupRipeBonds()
+    payment_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    teller.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
+            sender=bob,
+        )
+
+
+def test_minimum_payout_does_not_override_payment_transfer_failure(
+    teller,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+):
+    setupRipeBonds()
+    payment_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount - 1, sender=bob)
+
+    with pytest.raises(BoaError) as exc_info:
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            0,
+            bob,
+            MAX_UINT256,
+            sender=bob,
+        )
+
+    error = exc_info.value
+    assert error.call_trace.computation.is_error
+    transfer_call = error.call_trace.children[-1]
+    assert transfer_call.computation.is_error
+    assert transfer_call.computation.msg.code_address == bytes.fromhex(
+        str(alpha_token.address).removeprefix("0x")
+    )
+    assert transfer_call.computation.msg.data[:4] == bytes.fromhex("23b872dd")
+    assert [frame.error_detail for frame in error.stack_trace] == [
+        "safesub",
+        "external call failed",
+    ]
+    assert "minimum payout not met" not in get_boa_dev_reasons(error)
