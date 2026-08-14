@@ -280,36 +280,52 @@ def _isCohortLiquidationReady(_stabAsset: address) -> bool:
         # sizing unsafe because it cannot distinguish the reserved amount.
         return self.totalClaimableBalances[_stabAsset] == 0
 
-    success: bool = False
-    response: Bytes[32] = b""
-    success, response = raw_call(
-        self,
-        abi_encode(_stabAsset, method_id=method_id("getTotalValue(address)")),
-        max_outsize=32,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if not success or len(response) != 32 or convert(response, uint256) == 0:
+    # Liquidation readiness consumes PriceDesk's non-raising zero-price
+    # boundary. Strict accounting paths retain their existing fail-closed NAV
+    # calls; this preflight only decides whether AuctionHouse should skip the
+    # cohort and use its mandatory ordinary-auction fallback.
+    custody: uint256 = staticcall IERC20(_stabAsset).balanceOf(self)
+    reserved: uint256 = self.totalClaimableBalances[_stabAsset]
+    if custody <= reserved:
         return False
 
-    # This is the fail-soft identity enforced strictly by
-    # _getUnreservedBalance: raw custody minus liabilities reserved for every
-    # cohort. AuctionHouse sizes normal swaps from raw custody before the pool
-    # subtracts those liabilities, so require a positive transferable balance
-    # before any collateral moves. This conservatively skips claimable-GREEN-
-    # only liquidity when no stabilization asset is transferable.
-    success, response = raw_call(
+    priceDesk: address = addys._getPriceDeskAddr()
+    if self._getUsdValue(
         _stabAsset,
-        abi_encode(self, method_id=method_id("balanceOf(address)")),
-        max_outsize=32,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    return (
-        success
-        and len(response) == 32
-        and convert(response, uint256) > self.totalClaimableBalances[_stabAsset]
-    )
+        custody - reserved,
+        GREEN_TOKEN,
+        SAVINGS_GREEN,
+        priceDesk,
+        False,
+    ) == 0:
+        return False
+
+    numClaimableAssets: uint256 = self.numClaimableAssets[_stabAsset]
+    if numClaimableAssets == 0:
+        return True
+
+    for i: uint256 in range(1, numClaimableAssets, bound=max_value(uint256)):
+        claimAsset: address = self.claimableAssets[_stabAsset][i]
+        claimBalance: uint256 = self.claimableBalances[_stabAsset][claimAsset]
+        if claimBalance == 0:
+            continue
+
+        # A claim is usable only when aggregate custody covers every cohort's
+        # liability and PriceDesk can establish a non-zero value without
+        # raising. Any zero result makes this cohort unavailable for now.
+        if staticcall IERC20(claimAsset).balanceOf(self) < self.totalClaimableBalances[claimAsset]:
+            return False
+        if self._getUsdValue(
+            claimAsset,
+            claimBalance,
+            GREEN_TOKEN,
+            SAVINGS_GREEN,
+            priceDesk,
+            False,
+        ) == 0:
+            return False
+
+    return True
 
 
 @view

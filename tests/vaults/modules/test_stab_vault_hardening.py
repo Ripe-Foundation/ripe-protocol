@@ -3658,47 +3658,16 @@ def test_fully_reserved_stab_custody_is_skipped_before_collateral_can_move(
     assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
 
 
-def test_malformed_liquidation_preflight_response_returns_false(env):
-    probe = boa.loads(
-        """# @version 0.4.3
-
-@view
-@external
-def isReady(_target: address) -> bool:
-    success: bool = False
-    response: Bytes[32] = b""
-    success, response = raw_call(
-        _target,
-        method_id("getTotalValue(address)"),
-        max_outsize=32,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    return success and len(response) == 32 and convert(response, uint256) != 0
-""",
-        name="malformed_cohort_preflight_probe",
-    )
-    malformed = env.generate_address("malformed_cohort_response")
-    # Return one successful byte instead of one ABI word.
-    env.set_code(malformed, bytes.fromhex("600160005360016000f3"))
-    assert not probe.isReady(malformed)
-
-
-def test_production_liquidation_preflight_checks_raw_call_response_shape():
+def test_production_liquidation_preflight_uses_typed_pricedesk_boundary():
     source = (ROOT / "contracts/vaults/modules/StabVault.vy").read_text()
     start = source.index("def _isCohortLiquidationReady")
     end = source.index("def _getUserAssetAndAmountAtIndex", start)
     helper = source[start:end]
 
-    assert 'method_id("getTotalValue(address)")' in helper
-    assert "revert_on_failure=False" in helper
-    assert "len(response) != 32" in helper
-    assert 'method_id("balanceOf(address)")' in helper
-    assert "and len(response) == 32" in helper
-    assert (
-        "convert(response, uint256) > self.totalClaimableBalances[_stabAsset]"
-        in helper
-    )
+    assert "raw_call(" not in helper
+    assert "staticcall IERC20(" in helper
+    assert "self._getUsdValue(" in helper
+    assert "custody <= reserved" in helper
 
 
 @pytest.mark.parametrize(
