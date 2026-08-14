@@ -214,8 +214,31 @@ def _redeemCollateral(
     if userDebt.amount == 0 or userDebt.inLiquidation:
         return 0
 
-    # get latest debt terms
-    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, True, 0, empty(address), _a)
+    # get latest debt terms (strict, but fail this entry softly)
+    # Manual ABI boundary: update this selector and 352-byte decoder in the same
+    # change as any CreditEngine UserBorrowTerms return-shape change.
+    # The required three-input overload also makes CreditEngine resolve Addys
+    # for each preflight; that per-entry gas cost is an accepted trade-off.
+    success: bool = False
+    response: Bytes[384] = b""
+    success, response = raw_call(
+        _a.creditEngine,
+        abi_encode(
+            _user,
+            d.numUserVaults,
+            True,
+            method_id=method_id(
+                "getUserBorrowTermsWithNumVaults(address,uint256,bool)"
+            ),
+        ),
+        max_outsize=384,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 352:
+        return 0
+
+    bt: UserBorrowTerms = abi_decode(response, UserBorrowTerms)
     if bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
@@ -237,7 +260,7 @@ def _redeemCollateral(
         return 0
 
     # max asset amount to take from user
-    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
+    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
     if maxAssetAmount == 0:
         return 0
 

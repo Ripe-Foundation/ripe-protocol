@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from conf_utils import redeem_collateral
+from conf_utils import filter_logs, redeem_collateral
 from constants import EIGHTEEN_DECIMALS
 
 
@@ -344,6 +344,97 @@ def test_healthy_fallback_restores_strict_credit_engine_repay(
     assert ledger.userDebt(bob).amount == borrowed - repay_amount
 
 
+@pytest.mark.parametrize(
+    "primary_failure",
+    (
+        pytest.param("zero", id="zero-primary"),
+        pytest.param("revert", id="reverting-primary"),
+    ),
+)
+def test_healthy_fallback_permits_strict_credit_redemption(
+    primary_failure,
+    price_desk,
+    governance,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    mission_control,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    credit_engine,
+    ledger,
+    simple_erc20_vault,
+    vault_book,
+):
+    """A bad primary does not fail the strict preflight when fallback is healthy."""
+    if primary_failure == "zero":
+        failed = _raw_source(has_feed=True)
+    else:
+        failed = _raw_source(has_feed=True, price_mode=1)
+    failed_id = _register_sources(price_desk, governance, [failed])[0]
+    healthy_id = price_desk.getRegId(mock_price_source)
+    assert healthy_id != 0
+    _set_priorities(mission_control, switchboard_alpha, [failed_id, healthy_id])
+
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+        _liqThreshold=80_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        200 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    debt = teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    strict_terms = credit_engine.getUserBorrowTermsWithNumVaults(
+        bob,
+        ledger.numUserVaults(bob),
+        True,
+    )
+    assert strict_terms.collateralVal == 140 * EIGHTEEN_DECIMALS
+    assert credit_engine.canRedeemUserCollateral(bob)
+
+    payment = 30 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    spent = redeem_collateral(
+        teller,
+        bob,
+        vault_id,
+        alpha_token,
+        payment,
+        sender=alice,
+    )
+
+    assert spent == payment
+    assert credit_engine.getUserDebtAmount(bob) == debt - payment
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert logs[0].asset == alpha_token.address
+    assert logs[0].repayValue == payment
+
+
 # These two cross-module characterizations stay beside the PriceDesk isolation
 # matrix because source-failure policy is their trigger. CreditEngine and
 # CreditRedeem modules retain their ordinary health/redemption coverage.
@@ -397,7 +488,7 @@ def test_full_source_outage_marks_healthy_borrower_liquidatable_but_execution_fa
     assert ledger.userDebt(bob) == debt_before
 
 
-def test_partial_source_outage_misclassifies_redemption_views_but_execution_fails_closed(
+def test_partial_source_outage_views_misclassify_but_empty_redemption_batch_rolls_back(
     price_desk,
     alpha_token,
     alpha_token_whale,
@@ -421,7 +512,7 @@ def test_partial_source_outage_misclassifies_redemption_views_but_execution_fail
     simple_erc20_vault,
     vault_book,
 ):
-    """B-AUD-004 residual: views misclassify, but redemption is strict."""
+    """Views may misclassify; execution skips unsafe valuation and rolls back."""
     source_id = price_desk.getRegId(mock_price_source)
     assert source_id != 0
     _set_priorities(mission_control, switchboard_alpha, [source_id])
@@ -468,12 +559,16 @@ def test_partial_source_outage_misclassifies_redemption_views_but_execution_fail
     vault_id = vault_book.getRegId(simple_erc20_vault)
     before = (
         green_token.balanceOf(alice),
+        green_token.allowance(alice, teller),
         green_token.balanceOf(credit_redeem),
         credit_engine.getUserDebtAmount(bob),
         alpha_token.balanceOf(alice),
         simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
     )
-    with boa.reverts("has price config, no price"):
+    assert filter_logs(teller, "CollateralRedeemed") == []
+    with boa.reverts("no redemptions occurred"):
         redeem_collateral(
             teller,
             bob,
@@ -484,8 +579,12 @@ def test_partial_source_outage_misclassifies_redemption_views_but_execution_fail
         )
     assert (
         green_token.balanceOf(alice),
+        green_token.allowance(alice, teller),
         green_token.balanceOf(credit_redeem),
         credit_engine.getUserDebtAmount(bob),
         alpha_token.balanceOf(alice),
         simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        bravo_token.balanceOf(alice),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
     ) == before
+    assert filter_logs(teller, "CollateralRedeemed") == []
