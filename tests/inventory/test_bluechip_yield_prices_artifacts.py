@@ -19,14 +19,14 @@ ACCEPTED_RUNTIME_CEILING = 22_500
 MIN_EIP_170_HEADROOM = 2_000
 
 EXPECTED = {
-    "source_sha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be",
-    "source_git_blob": "cafd177ef601186b0a6a30863ba5b8973d8dd92e",
-    "integrity": "c7a4026d8c3f698d73521a927d083915f23768093d6eee63397fd467b6a63c9e",
-    "creation_size": 23_736,
-    "creation_sha256": "299f9bc849436bb776b83f4f07508a2066cbd099a2b2f15380b9b22e8f3a7861",
-    "runtime_size": 22_142,
-    "runtime_sha256": "cbcfc54ec127d75830f8eed1c6da7e70f07ca1cd39eb605667b51b0833cad799",
-    "eip_170_headroom": 2_434,
+    "source_sha256": "feb3715a079fe7643c2441b1f0842f8f5ffc4ef3f33a073b3d451b128e1a802c",
+    "source_git_blob": "d0b92d02ed51e8be1b2c21e452e700a32f44c937",
+    "integrity": "50ff8372993c058f761016ed29b2491cf354ab351e35a686119f55cbbb90dd60",
+    "creation_size": 23_818,
+    "creation_sha256": "8cdf21f4d0cbcb5340b377aff2f90388a68cd091731ea723b16d464bc1dbc031",
+    "runtime_size": 22_224,
+    "runtime_sha256": "16385e92b4be7ae5fd12f6f89d83cf6056c12ce433d2d9559dcfa10b745fda7a",
+    "eip_170_headroom": 2_352,
     "abi_sha256": "d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73",
     "abi_file_sha256": "b4c17cf9a87cd3325fba306cc9e4a9595c2e0689c18fb4fc2da2aed5622e91f7",
     "selector_count": 84,

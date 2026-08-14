@@ -24,8 +24,8 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     "Lootbox": 22_993,
-    "RipeGov": 23_257,
-    "CreditEngine": 24_572,
+    "RipeGov": 23_572,
+    "CreditEngine": 24_566,
     "StabilityPool": 24_371,
 }
 
@@ -47,20 +47,21 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 # passed. The default is now the ratified value.
 DEFAULT_MIN_HEADROOM = 200
 
-# Measured headroom against the 24,576 limit after the custody-shortfall and
-# standard-repayment refund, and partner-liquidity changes: Teller 358,
-# CreditEngine 4, StabilityPool 263,
-# SwitchboardCharlie 819, SwitchboardAlpha 339, Lootbox 1,583, RipeGov 1,271,
-# SwitchboardBravo 1,073, SwitchboardEcho 1,472, and the rest far larger.
+# Measured headroom against the 24,576 limit in this integration candidate:
+# Teller 340, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
+# SwitchboardAlpha 40, Lootbox 1,231, RipeGov 1,004, SwitchboardBravo 373,
+# SwitchboardEcho 1,384, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
-# granted replacement RH-D029 for this exact 4-byte-headroom combined
-# reward-suppression and payer-refund artifact. Removing Teller's singular
+# granted replacement RH-D029 for this exact 10-byte-headroom combined
+# reward-suppression, payer-refund, and redemption-isolation artifact. Removing
+# Teller's singular
 # deleverage API moved it above the floor, so RH-D027 and its exact identity
 # self-retire in this candidate. See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
-    "CreditEngine": 4,  # RH-D029; exact combined artifact, zero growth
+    "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
+    "SwitchboardAlpha": 40,  # RH-D030; exact symmetric debt-config artifact
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -130,19 +131,44 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "credit_engine",
         "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
-            "8c1255de86fe776bb8999dec603d3de43c2c07c0551c2d6eb7fed93f5f17f447"
+            "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f"
         ),
         "runtime_sha256": (
-            "1d98babadc2a30d2d3bc46bee6aa3f6941f8209aeb0b33c83c91201ebf1fcdc2"
+            "0cf18bd4121836b960abff777f3bca468c7fbaaad7b18e5601c9d5e5af870d91"
         ),
-        "runtime_template_bytes": 24_476,
-        "deployed_runtime_bytes": 24_572,
+        "runtime_template_bytes": 24_470,
+        "deployed_runtime_bytes": 24_566,
         "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
             "0x00000000000000000000000000000000000000A1",
         ),
         "deployed_sha256": (
-            "22d73db8db9ca7bc877cedf189f135d6a4ebfac3cf3e522424a9be130049524f"
+            "4f410105098b45e93a418afbbc6f49b4154528cdc8253543f37b271b6ba03820"
+        ),
+    },
+    "SwitchboardAlpha": {
+        "decision": "RH-D030",
+        "fixture": "switchboard_alpha",
+        "source": "contracts/config/SwitchboardAlpha.vy",
+        "source_sha256": (
+            "15b1e727a4235ac2f16dd93c6fb0cc991d4ee96a3ac8d4cf4ac41d71e0e7f19d"
+        ),
+        "runtime_sha256": (
+            "7e117940f163fc2205fa43beeedb4b71cfea70e9d0bc9304eb909cce76e65dab"
+        ),
+        "runtime_template_bytes": 24_312,
+        "deployed_runtime_bytes": 24_536,
+        "pinned_hq": "0x00000000000000000000000000000000000000A1",
+        "constructor_args": (
+            "0x00000000000000000000000000000000000000A1",
+            "0x00000000000000000000000000000000000000A2",
+            1,
+            2,
+            1,
+            2,
+        ),
+        "deployed_sha256": (
+            "450ac384bf51aa63e882f51dd042803dff8390739c98eaac2d421a208bb3dbac"
         ),
     },
 }
@@ -317,6 +343,33 @@ def test_waived_contract_is_exactly_the_artifact_the_owner_waived(name, request)
     # constructor input. The four checks above all pass when only an immutable
     # changes -- a review demonstrated that -- so without this the waiver does
     # not bind what it says it binds.
+    if name == "SwitchboardAlpha":
+        # LocalGov resolves three immutable inputs from RipeHq during
+        # construction. Bind those reads to deterministic values so the waiver
+        # covers the complete deployed byte string, not only its length.
+        boa.loads(
+            """
+# pragma version 0.4.3
+
+@view
+@external
+def governance() -> address:
+    return 0x00000000000000000000000000000000000000A3
+
+@view
+@external
+def minGovChangeTimeLock() -> uint256:
+    return 1
+
+@view
+@external
+def maxGovChangeTimeLock() -> uint256:
+    return 2
+""",
+            name="switchboard_alpha_waiver_hq",
+            override_address=pinned["pinned_hq"],
+        )
+
     fixed = boa.load(
         str(source_path),
         *pinned["constructor_args"],

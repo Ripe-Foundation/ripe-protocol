@@ -74,10 +74,8 @@ def _withdrawTokensFromVault(
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
     # check post withdrawal values
-    vaultAfter: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    recipientAfter: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
-    assert vaultBefore - vaultAfter == withdrawalAmount # dev: invalid vault outflow
-    assert recipientAfter - recipientBefore == withdrawalAmount # dev: invalid recipient delivery
+    assert vaultBefore - staticcall IERC20(_asset).balanceOf(self) == withdrawalAmount # dev: invalid vault outflow
+    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == withdrawalAmount # dev: invalid recipient delivery
 
     return withdrawalAmount, withdrawalShares, isDepleted
 

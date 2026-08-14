@@ -130,21 +130,21 @@
         "committed_path": "scripts/abis/BlueChipYieldPrices.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "b313108fe8492444be3d3b869facfa8aff733a9635c39490d3e14c84e7350eed",
-        "creation_executable_prefix_size": 23679,
-        "creation_metadata_sha256": "f425719ff221f28e76626f60879a6413de1eb35a763f512963137f2171ffb597",
+        "creation_executable_prefix_sha256": "bc873729f1b7a2c3a0bb2cf4e804f6d8760dd830452afac2346264333e2df943",
+        "creation_executable_prefix_size": 23761,
+        "creation_metadata_sha256": "0fe906889b37a7b17b57e10755a255ae9fe80c7db6d8e5070d1bf84c6b419d6a",
         "creation_metadata_size": 57,
-        "creation_sha256": "299f9bc849436bb776b83f4f07508a2066cbd099a2b2f15380b9b22e8f3a7861",
-        "creation_size": 23736,
-        "deployed_eip170_headroom": 1954,
+        "creation_sha256": "8cdf21f4d0cbcb5340b377aff2f90388a68cd091731ea723b16d464bc1dbc031",
+        "creation_size": 23818,
+        "deployed_eip170_headroom": 1872,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fbad98595b0186da120e41f77c102beb49f803c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "f0be32f46b1125183efd7a4f035cd637f515a944b80cf5f7dcebea3b049fdb87",
         "deployed_runtime_immutable_data_size": 480,
-        "deployed_runtime_sha256": "600be66f403af2a9cf5c32cf1cf06b170d1069476372a172c1afecc9a054aec6",
-        "deployed_runtime_size": 22622,
-        "eip170_headroom": 2434,
-        "runtime_template_sha256": "cbcfc54ec127d75830f8eed1c6da7e70f07ca1cd39eb605667b51b0833cad799",
-        "runtime_template_size": 22142
+        "deployed_runtime_sha256": "6a73ad1367c74e0d77f50852a893f03987c6aae8c1c818c50ab8ca406f866751",
+        "deployed_runtime_size": 22704,
+        "eip170_headroom": 2352,
+        "runtime_template_sha256": "16385e92b4be7ae5fd12f6f89d83cf6056c12ce433d2d9559dcfa10b745fda7a",
+        "runtime_template_size": 22224
       },
       "code_layout": {
         "AAVE_V3_ADDR": {
@@ -286,9 +286,9 @@
         "canonical_sha256": "c78a129a79302150f7ebb8e79d5331ee78a84da3818170425eb123e545a0d1fb",
         "count": 84
       },
-      "source_git_blob": "cafd177ef601186b0a6a30863ba5b8973d8dd92e",
+      "source_git_blob": "d0b92d02ed51e8be1b2c21e452e700a32f44c937",
       "source_path": "contracts/priceSources/BlueChipYieldPrices.vy",
-      "source_sha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be",
+      "source_sha256": "feb3715a079fe7643c2441b1f0842f8f5ffc4ef3f33a073b3d451b128e1a802c",
       "storage_layout": {
         "gov": {
           "govChangeTimeLock": {
@@ -373,7 +373,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "c7a4026d8c3f698d73521a927d083915f23768093d6eee63397fd467b6a63c9e"
+      "transitive_compiler_input_integrity": "50ff8372993c058f761016ed29b2491cf354ab351e35a686119f55cbbb90dd60"
     },
     "CreditEngine": {
       "abi": {
@@ -1462,21 +1462,21 @@
         "committed_path": "scripts/abis/RipeGov.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "cbec4c9338fc5ee4be39cfffd8722669508ea5f59a86fc4f9ea01efbff85bcfc",
-        "creation_executable_prefix_size": 23705,
-        "creation_metadata_sha256": "affdfad5e37c39d61eaf48a4b7a86f2d21092e3bd548e13e207db00548bf380b",
+        "creation_executable_prefix_sha256": "2c85861dac983f3d210143df8de592dba0fc41eb24492a96f6b25862c6105e03",
+        "creation_executable_prefix_size": 23651,
+        "creation_metadata_sha256": "20bba039db4ba96d01b2726748435764bd8505762f4527a0bcb9aade462944f8",
         "creation_metadata_size": 70,
-        "creation_sha256": "cfe6a77d7c7d37671ac27ce45d2e524538f918ba3a7d9cf2f5627b898a38bf0a",
-        "creation_size": 23775,
-        "deployed_eip170_headroom": 950,
+        "creation_sha256": "bb38834de1cc85bd72194cce5ed45b0eed19e3ffa79722b6c7e1380d565fc8b6",
+        "creation_size": 23721,
+        "deployed_eip170_headroom": 1004,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae6630940",
         "deployed_runtime_immutable_data_sha256": "ed83a2128f485fcbc1398a96a19ee7ca74d961970458483ec5d3c6457210d7c1",
         "deployed_runtime_immutable_data_size": 32,
-        "deployed_runtime_sha256": "060ed6e22e744ede0c68f1685fcbf295f7f57341934207afc4127f9513cf6a79",
-        "deployed_runtime_size": 23626,
-        "eip170_headroom": 982,
-        "runtime_template_sha256": "7bdc7ef8827395f50d21bdc58933f51d8a49d2ccdfc47d9ff4a48e997055ba7a",
-        "runtime_template_size": 23594
+        "deployed_runtime_sha256": "456b6e2364aa4694733869381c33db1f93d4a36acc5db38452a75b4037ccf6b2",
+        "deployed_runtime_size": 23572,
+        "eip170_headroom": 1036,
+        "runtime_template_sha256": "5c37facfe232e9951bc37ca9b6964c87b7895d64d764332e7514120d552e5f43",
+        "runtime_template_size": 23540
       },
       "code_layout": {
         "addys": {
@@ -1514,9 +1514,9 @@
         "canonical_sha256": "23c4d5f465b9913b6d55f4ad7d6d60b301ef3a51a66af988eba984fbe00b4b46",
         "count": 64
       },
-      "source_git_blob": "b9115c4b764b4f2c2eadea0fadc9e28e786c2658",
+      "source_git_blob": "b76d613d2ea799f95bd9a4b2f041b935be56c65b",
       "source_path": "contracts/vaults/RipeGov.vy",
-      "source_sha256": "b6e0058eb6dd7e94a4539182ef3512198c686a0c236b2fb7f3a36f316dbae02a",
+      "source_sha256": "972b00a340768ea3728477aff7572584a4e4c2d8feef470f9f3be8120d5cadfc",
       "storage_layout": {
         "govPointAccrualDisabledBlock": {
           "n_slots": 1,
@@ -1603,7 +1603,7 @@
           "type": "nonreentrant lock"
         }
       },
-      "transitive_compiler_input_integrity": "ec5a2d58287d2713907dd057cce9c96068d6f656e74bff1f8cc54163bb0b8f99"
+      "transitive_compiler_input_integrity": "312bd99f518237b1cb64ff6720380d9d72e5df90154107e2394f857f55551674"
     },
     "SimpleErc20": {
       "abi": {

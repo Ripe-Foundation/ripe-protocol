@@ -3399,10 +3399,10 @@ def test_predeployment_withdrawal_responsibility_matrix(
             True,
         )
 
-    exact_delivery_vault_rejects_short_delivery = (
-        vault_kind in ("simple", "stability")
-        and transfer_mode in (1, 3, 4)
-    )
+    # BasicVault and the shared SharesVault module both require exact sender
+    # outflow and recipient delivery. That policy covers every vault family in
+    # this matrix, including RebaseErc20 and RipeGov.
+    exact_delivery_vault_rejects_short_delivery = transfer_mode in (1, 3, 4)
     universally_rejected = transfer_mode in (6, 7, 10)
     should_revert = (
         exact_delivery_vault_rejects_short_delivery or universally_rejected

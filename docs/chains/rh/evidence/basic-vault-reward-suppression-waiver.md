@@ -1,11 +1,11 @@
-# BasicVault reward-suppression correction and replacement exact CreditEngine waiver
+# BasicVault reward suppression and replacement exact CreditEngine waiver
 
-**Decision:** owner accepted B-AUD-008 on 13 August 2026 and granted a
-replacement exact RH-D029 waiver on 13 August 2026 for the combined
-B-AUD-008 plus B-OBS-045 / AUD-010 CreditEngine.
+**Decision:** owner accepted B-AUD-008 on 13 August 2026 and granted the latest
+replacement exact RH-D029 waiver on 13 August 2026 for the combined B-AUD-008,
+B-OBS-045 / AUD-010, and CreditRedeem price-isolation CreditEngine artifact.
 
-**Scope:** exact combined candidate on `codex/rh-third-party-repay-refund`,
-rebased onto `f937cbae239913e448c61abfdb0e8f561cdd9ee8`.
+**Scope:** exact current CreditEngine artifact after integration of PR #131 at
+`778cf2a5b3f59199971f0a5b60527af42150894e`.
 
 **Original review base:** `f9152f27ab8b14ede0ce562974430d57168960b0`
 
@@ -14,10 +14,9 @@ rebased onto `f937cbae239913e448c61abfdb0e8f561cdd9ee8`.
 
 **Replacement composition base:** `f937cbae239913e448c61abfdb0e8f561cdd9ee8`
 
-**Lifecycle authority:** the owner's 13 August 2026 instruction to merge pull
-request 115, followed by the express grant of the replacement four-byte waiver,
-authorizes the governing-record updates, branch update, and integration of this
-exact package into `rh-audit-remediation`. It does not authorize deployment,
+**Lifecycle authority:** the owner's 13 August 2026 express grant of the latest
+replacement ten-byte waiver authorizes these governing-record updates and the
+branch push for this exact artifact. It does not authorize deployment,
 configuration, activation, or release.
 
 ## Accepted behavior
@@ -40,27 +39,33 @@ surplus returns to the payer. Self-repayment, auction repayment, department
 repayment, permission checks, refund-token selection, event ABI, ordering, and
 atomic rollback remain unchanged.
 
+CreditRedeem requests non-strict borrower terms so one unpriceable entry does
+not abort the full batch. CreditEngine marks a positive debt-bearing collateral
+position with no usable price as quarantined, causing CreditRedeem to skip that
+entry while preserving strict final debt-health recalculation and all-skipped
+rollback.
+
 ## Exact production-source identities
 
 | Source | SHA-256 |
 | --- | --- |
 | `contracts/vaults/modules/BasicVault.vy` | `414d4565a07d0b4042c356a6f383d4c5ba968781e6202a262b28a9017c7e38c0` |
-| `contracts/core/CreditEngine.vy` | `8c1255de86fe776bb8999dec603d3de43c2c07c0551c2d6eb7fed93f5f17f447` |
+| `contracts/core/CreditEngine.vy` | `98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f` |
 
 ## Exact CreditEngine size waiver
 
 The standard 200-byte headroom policy remains unchanged. The owner accepted a
 replacement exception for this exact combined CreditEngine version. It
-supersedes the prior eight-byte B-AUD-008 identity and is not cumulative:
+supersedes the prior four-byte identity and is not cumulative:
 
 | Identity | Value |
 | --- | --- |
 | EIP-170 limit | 24,576 bytes |
-| Runtime template | 24,476 bytes |
-| Runtime-template SHA-256 | `1d98babadc2a30d2d3bc46bee6aa3f6941f8209aeb0b33c83c91201ebf1fcdc2` |
-| Deployed runtime, including 96 immutable bytes | 24,572 bytes |
-| Remaining headroom | **4 bytes** |
-| Complete deployed-runtime SHA-256 at deterministic HQ `0x00000000000000000000000000000000000000A1` | `22d73db8db9ca7bc877cedf189f135d6a4ebfac3cf3e522424a9be130049524f` |
+| Runtime template | 24,470 bytes |
+| Runtime-template SHA-256 | `0cf18bd4121836b960abff777f3bca468c7fbaaad7b18e5601c9d5e5af870d91` |
+| Deployed runtime, including 96 immutable bytes | 24,566 bytes |
+| Remaining headroom | **10 bytes** |
+| Complete deployed-runtime SHA-256 at deterministic HQ `0x00000000000000000000000000000000000000A1` | `4f410105098b45e93a418afbbc6f49b4154528cdc8253543f37b271b6ba03820` |
 
 The deterministic HQ is a reproducibility input, not a production address. The
 waiver permits zero growth. Any source, compiler-output, runtime-template,
@@ -70,10 +75,10 @@ of headroom or another express owner decision.
 
 ## Governed artifact refresh
 
-The combined candidate was captured from its clean rebased source using the
+The current integration artifact was captured from its clean rebased source using the
 repository's deterministic 18-contract Boa deployment graph. The targeted
 artifact updater regenerated the CreditEngine record from that captured runtime;
-the combined governed-ledger diff changes only the CreditEngine record. The
+the governed-ledger CreditEngine record binds that captured runtime. The
 ledger's captured CreditEngine deployed hash uses its declared
 production-capture HQ; the waiver hash above uses the separate deterministic
 `0x…00A1` HQ required by the exact-waiver test.

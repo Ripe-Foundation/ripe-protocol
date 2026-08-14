@@ -1084,11 +1084,36 @@ def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, g
     assert aid > 0
 
 
-def test_switchboard_delta_set_start_epoch_at_block(switchboard_delta, bond_room, governance, alice):
+def test_switchboard_delta_set_start_epoch_at_block(
+    switchboard_delta,
+    bond_room,
+    mission_control,
+    governance,
+    alice,
+    ripe_token,
+):
     """Test setStartEpochAtBlock is instant and requires governance permissions"""
     # Non-governance cannot set start epoch
     with boa.reverts("no perms"):
         switchboard_delta.setStartEpochAtBlock(sender=alice)
+
+    # A zero epoch length is deliberately rejected by BondRoom. Install a valid
+    # config through the authorized Switchboard before exercising the instant
+    # start-block control.
+    mission_control.setRipeBondConfig(
+        (
+            ripe_token.address,
+            1_000 * EIGHTEEN_DECIMALS,
+            False,
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            100_00,
+            100,
+            True,
+            0,
+        ),
+        sender=switchboard_delta.address,
+    )
     
     # Governance can set start epoch at block immediately (no timelock)
     current_block = boa.env.evm.patch.block_number

@@ -50,11 +50,11 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "b575591d3d796d9a9ac6b9a07d1828ecf45a0b219442df13b4eb1fc6902541e3",
+    "contracts/core/AuctionHouse.vy": "2e46101cac996dc8fe17a37420f23057887a751cf7039ad14565fd80d791f949",
     "contracts/core/CreditEngine.vy": "8c1255de86fe776bb8999dec603d3de43c2c07c0551c2d6eb7fed93f5f17f447",
     "contracts/core/CreditRedeem.vy": "af05327acae0002b005fccd5ff319aef911947542e36ae11bddcab79e0f46711",
     "contracts/core/Deleverage.vy": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
-    "contracts/core/HumanResources.vy": "d3d16ed31349cae16e901e02b48719922e891a23139a51b71f3845a652115942",
+    "contracts/core/HumanResources.vy": "3a08959aea7ca59dda77b6aebcf1a1653239b4114a6b1390dc087e56ecf5c70d",
     "contracts/core/Lootbox.vy": "18ad4dbe47920da1d50d5dd0c9ef93344335f56c863aa3486b0f8e54e980f535",
     "contracts/core/Teller.vy": "663a23c8d45155507af738199b5ab7e289f47dffc0a2fc961cd82b97440bdcd5",
     "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
@@ -72,9 +72,9 @@ source review and test update.
   ],
   "rows": [
     {
-      "id": "AH-431",
+      "id": "AH-436",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 431,
+      "line": 436,
       "function": "_performLiquidationPhases",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -82,9 +82,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-513",
+      "id": "AH-518",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 513,
+      "line": 518,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -92,9 +92,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-527",
+      "id": "AH-532",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 527,
+      "line": 532,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -102,9 +102,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-902",
+      "id": "AH-907",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 902,
+      "line": 907,
       "function": "_canStartAuction",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -112,9 +112,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-1215",
+      "id": "AH-1253",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1215,
+      "line": 1253,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -122,9 +122,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-1243",
+      "id": "AH-1281",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1243,
+      "line": 1281,
       "function": "_transferCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -262,9 +262,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "HR-390",
+      "id": "HR-391",
       "path": "contracts/core/HumanResources.vy",
-      "line": 390,
+      "line": 391,
       "function": "hasRipeBalance",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",

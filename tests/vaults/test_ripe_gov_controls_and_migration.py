@@ -45,6 +45,28 @@ def _register_ripe_gov_vault(ripe_hq, vault_book, governance, label):
     return vault, vault_id
 
 
+def _classify_ripe_gov_vault(mission_control, switchboard_alpha, vault_id):
+    """Model the governed pointer move that grants Boardroom callback authority."""
+    mission_control.setCoreRipeGovVaultId(
+        vault_id,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.isRipeGovVaultId(vault_id)
+
+
+def _replace_hq_address(ripe_hq, governance, reg_id, new_address):
+    assert ripe_hq.startAddressUpdateToRegistry(
+        reg_id,
+        new_address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        reg_id,
+        sender=governance.address,
+    )
+
+
 @pytest.fixture
 def target_ripe_gov_vault(ripe_hq, vault_book, governance):
     return _register_ripe_gov_vault(
@@ -1299,8 +1321,10 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     bob,
     teller,
     switchboard_alpha,
+    mission_control,
 ):
-    target, _ = target_ripe_gov_vault
+    target, target_id = target_ripe_gov_vault
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     existing = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, existing, teller)
     existing_shares = target.userBalances(bob, ripe_token)
@@ -1333,8 +1357,10 @@ def test_direct_import_rejects_position_already_migrated_out(
     bob,
     teller,
     switchboard_alpha,
+    mission_control,
 ):
-    target, _ = target_ripe_gov_vault
+    target, target_id = target_ripe_gov_vault
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, amount, teller)
     target.pause(True, sender=switchboard_alpha.address)
@@ -2214,6 +2240,7 @@ def test_existing_target_position_makes_entire_migration_atomic(
         ripe_token,
         [SOURCE_VAULT_ID, target_id],
     )
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     source_amount = 30 * EIGHTEEN_DECIMALS
     target_amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, source_amount, teller)
@@ -2352,6 +2379,7 @@ def test_only_historical_core_ripe_gov_vault_can_be_the_migration_source(
     ripe_hq,
     vault_book,
     governance,
+    boardroom,
     ripe_token,
     whale,
     bob,
@@ -2381,10 +2409,30 @@ def test_only_historical_core_ripe_gov_vault_can_be_the_migration_source(
         ripe_token,
         [SOURCE_VAULT_ID, source_id, target_id],
     )
+
+    # Seed the deliberately non-core source without weakening the production
+    # Boardroom gate. The permissive callback exists only while constructing the
+    # fixture; the canonical Boardroom is restored before the migration check.
+    permissive_boardroom = boa.loads(
+        """
+# pragma version 0.4.3
+
+@external
+def govPowerDidChangeForUser(
+    _user: address,
+    _userGovPoints: uint256,
+    _totalGovPoints: uint256,
+):
+    pass
+""",
+        name="permissive_boardroom_for_non_core_source_setup",
+    )
+    _replace_hq_address(ripe_hq, governance, 11, permissive_boardroom)
     amount = 25 * EIGHTEEN_DECIMALS
     _direct_deposit(source, ripe_token, whale, bob, amount, teller)
     ledger.addVaultToUser(bob, source_id, sender=teller.address)
     _save_points(source, bob, ripe_token, switchboard_alpha)
+    _replace_hq_address(ripe_hq, governance, 11, boardroom)
     _pause_pair(source, target, switchboard_alpha)
 
     # RipeGov bytecode alone is not authority to use the privileged exporter

@@ -808,12 +808,12 @@ does not open a broader bad-debt or settlement redesign.
 `tests/vaults/test_basic_vault_quarantine.py`, and the exact candidate diff
 against `f9152f27ab8b14ede0ce562974430d57168960b0`.
 
-### RH-D029 — CreditEngine carries an exact combined waiver at 4 bytes
+### RH-D029 — CreditEngine carries an exact combined waiver at 10 bytes
 
-**Status:** Owner-granted on 13 August 2026 for the exact combined B-AUD-008 plus
-B-OBS-045 / AUD-010 candidate. This replaces the prior eight-byte RH-D029
-identity, which itself replaced the earlier 21-byte identity; the waivers are
-not cumulative.
+**Status:** Owner-granted on 13 August 2026 for the exact combined B-AUD-008,
+B-OBS-045 / AUD-010, and CreditRedeem price-isolation artifact. This replaces
+the prior four-byte RH-D029 identity, which itself replaced earlier RH-D029
+identities; the waivers are not cumulative.
 
 The ratified 200-byte minimum remains controlling for non-waived contracts. The
 B-AUD-008 correction makes BasicVault's current Lootbox share zero while its
@@ -821,26 +821,29 @@ custody is below nominal liabilities. CreditEngine therefore detects a nominal
 position through `doesUserHaveBalance` rather than using that now-suppressed
 reward share as a collateral/quarantine oracle. B-OBS-045 / AUD-010 additionally
 returns capped standard-repayment surplus to the payer rather than the debtor.
-The combined CreditEngine deployed runtime is 24,572 bytes including immutable
-data, leaving **4 bytes** before EIP-170. The owner accepts that exact,
-technically deployable margin.
+The redemption-isolation change makes non-strict borrower terms quarantine
+positive debt-bearing collateral without a usable price, allowing CreditRedeem
+to skip unsafe entries without weakening the final strict debt-health
+recalculation. The combined CreditEngine deployed runtime is 24,566 bytes
+including immutable data, leaving **10 bytes** before EIP-170. The owner accepts
+that exact, technically deployable margin.
 
 **What exactly is waived.** One contract version and one complete deployed-byte
 identity at a declared constructor input:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/CreditEngine.vy` SHA-256 | `8c1255de86fe776bb8999dec603d3de43c2c07c0551c2d6eb7fed93f5f17f447` |
-| Runtime-template SHA-256 (immutable-free) | `1d98babadc2a30d2d3bc46bee6aa3f6941f8209aeb0b33c83c91201ebf1fcdc2` |
-| Runtime-template bytes | 24,476 |
-| Deployed runtime bytes, including immutables | 24,572 |
-| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `22d73db8db9ca7bc877cedf189f135d6a4ebfac3cf3e522424a9be130049524f` |
+| `contracts/core/CreditEngine.vy` SHA-256 | `98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f` |
+| Runtime-template SHA-256 (immutable-free) | `0cf18bd4121836b960abff777f3bca468c7fbaaad7b18e5601c9d5e5af870d91` |
+| Runtime-template bytes | 24,470 |
+| Deployed runtime bytes, including immutables | 24,566 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `4f410105098b45e93a418afbbc6f49b4154528cdc8253543f37b271b6ba03820` |
 
 The declared HQ is a deterministic test input, not a production address. Actual
 constructor binding remains a separate deployment concern. The governed artifact
 ledger separately binds its declared production-capture inputs.
 
-**Residual risk accepted.** Only 4 bytes remain before EIP-170, and this waiver
+**Residual risk accepted.** Only 10 bytes remain before EIP-170, and this waiver
 permits **0 bytes of growth**. Any CreditEngine source or compiler-output change,
 including a same-size change, invalidates the pinned identity and reopens this
 decision. A future change must restore at least 200 bytes or receive a new exact
@@ -849,6 +852,46 @@ owner waiver; refreshing these values merely to make a test pass is prohibited.
 **Source:** [`evidence/basic-vault-reward-suppression-waiver.md`](evidence/basic-vault-reward-suppression-waiver.md),
 `tests/test_vault_pointer_runtime_sizes.py`, and
 `config/contract-artifact-expectations.json`.
+
+### RH-D030 — SwitchboardAlpha carries an exact symmetric debt-config waiver at 40 bytes
+
+**Status:** Owner-granted on 13 August 2026 for the exact audit-remediation
+artifact after reviewing the CI failure and explicitly waiving the remaining
+headroom.
+
+The ratified 200-byte minimum remains controlling for every non-waived
+contract. The symmetric debt-configuration remediation makes both sides of the
+`minDebtAmount <= maxBorrowPerInterval` invariant validate against the live
+MissionControl target at proposal and execution. SwitchboardAlpha deploys at
+24,536 bytes including its seven immutable words, leaving **40 bytes** before
+EIP-170. The owner accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One contract version and one complete deployed-byte
+identity at declared deterministic constructor inputs:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/config/SwitchboardAlpha.vy` SHA-256 | `15b1e727a4235ac2f16dd93c6fb0cc991d4ee96a3ac8d4cf4ac41d71e0e7f19d` |
+| Runtime-template SHA-256 (immutable-free) | `7e117940f163fc2205fa43beeedb4b71cfea70e9d0bc9304eb909cce76e65dab` |
+| Runtime-template bytes | 24,312 |
+| Deployed runtime bytes, including immutables | 24,536 |
+| Complete deployed-runtime SHA-256 at declared deterministic inputs | `450ac384bf51aa63e882f51dd042803dff8390739c98eaac2d421a208bb3dbac` |
+
+The deterministic RipeHq used by the identity test returns governance
+`0x…00A3` and governance timelock bounds 1 and 2; the constructor additionally
+uses temporary governance `0x…00A2`, stale-block bounds 1 and 2, and config
+timelock bounds 1 and 2. These are reproducibility inputs, not production
+addresses or parameter authority.
+
+**Residual risk accepted.** Only 40 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any SwitchboardAlpha source or compiler-output
+change, including a same-size change, invalidates the pinned identity and
+reopens this decision. A future change must restore at least 200 bytes or
+receive a new exact owner waiver; refreshing these values merely to make a test
+pass is prohibited.
+
+**Source:** [`evidence/switchboard-alpha-headroom-waiver.md`](evidence/switchboard-alpha-headroom-waiver.md)
+and `tests/test_vault_pointer_runtime_sizes.py`.
 
 ## Maintenance rule
 

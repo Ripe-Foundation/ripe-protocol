@@ -300,6 +300,7 @@ def test_every_configured_defaults_profile_has_nonzero_bond_epoch_length():
 
     assert set(configured_profiles) == {
         "DefaultsBase.vy",
+        "DefaultsBaseLive.vy",
         "DefaultsRobinhood.vy",
         "DefaultsRobinhoodLive.vy",
     }
