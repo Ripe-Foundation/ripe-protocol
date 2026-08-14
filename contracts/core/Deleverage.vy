@@ -3,8 +3,8 @@
 
 # @version 0.4.3
 #pragma optimize codesize
-# At this source revision, the deployed runtime is 24,569 bytes including
-# Vyper's 96-byte immutables section: 7 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 23,261 bytes including
+# Vyper's 96-byte immutables section: 1,315 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
@@ -541,8 +541,10 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
-    if not addys._isValidRipeAddr(msg.sender):
+    isTrustedCaller: bool = addys._isValidRipeAddr(msg.sender)
+    if not isTrustedCaller:
         assert self._getUnderscoreAddrType(msg.sender, a.missionControl, False) != 0 # dev: no perms
+        isTrustedCaller = msg.sender == _user
 
     # get current user state
     userDebt: UserDebt = empty(UserDebt)
@@ -638,7 +640,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
     psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
-    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, isTrustedCaller, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
     if repaidAmount != 0:
         self.lastDeleverageBlock[_user] = block.number
     return repaidAmount != 0

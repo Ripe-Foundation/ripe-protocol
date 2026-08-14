@@ -2067,16 +2067,16 @@ def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
+def test_production_shaped_leveraged_underscore_vault_self_call_stays_trusted(
     switchboard_alpha,
     deleverage,
     credit_engine,
     simple_erc20_vault,
+    endaoment_funds,
     alpha_token,
     alpha_token_whale,
     charlie_token,
     charlie_token_whale,
-    bob,
     alice,
     teller,
     performDeposit,
@@ -2088,17 +2088,17 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
     setAssetConfig,
     createDebtTerms,
     mock_price_source,
+    ripe_hq,
 ):
     """
-    End-to-end regression test: a leveraged underscore earn vault
-    (isEarnVault=True, isBasicEarnVault=False) can call
-    deleverageForWithdrawal() and actually execute a deleverage.
+    Pin the production call shape: msg.sender == _user == leverage vault.
 
-    Before the fix, this would revert with "no perms" because the
-    isBasicEarnVault() check returned False for leveraged vaults.
+    Production VaultRegistry.isEarnVault classifies a configured leveraged
+    vault through hasConfig even if it is not otherwise registry-valid. The
+    mock's explicit earn-vault bit represents that resolved classification.
     """
     setGeneralConfig()
-    setGeneralDebtConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
 
     # Configure alpha_token as main collateral (not deleveragable)
     alpha_terms = createDebtTerms(
@@ -2135,10 +2135,20 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
 
-    # Set up bob's position: $1000 alpha + $700 USDC collateral, $500 debt
-    performDeposit(bob, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
-    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
-    teller.borrow(500 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    deleverage.setDeleverageBuffer(2_00, sender=switchboard_alpha.address)
+    set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
+    # The leverage vault owns its own Ripe position, exactly as in production.
+    performDeposit(alice, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(alice, 710 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    teller.borrow(700 * EIGHTEEN_DECIMALS, alice, False, sender=alice)
 
     # Configure USDC as priority liquidation asset for Phase 2
     setup_priority_configs(
@@ -2146,25 +2156,53 @@ def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
         priority_liq_assets=[(simple_erc20_vault, charlie_token)],
     )
 
-    # Set up underscore registry with alice as a leveraged vault
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    assert pre_debt == 500 * EIGHTEEN_DECIMALS
-
-    # alice (leveraged vault) calls deleverageForWithdrawal
-    withdraw_amount = 200 * EIGHTEEN_DECIMALS
-    result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, withdraw_amount, sender=alice
+    pre_debt, terms, _ = credit_engine.getLatestUserDebtAndTerms(alice, True)
+    max_deleveragable, effective_ltv = deleverage.getDeleverageInfo(alice)
+    lost_capacity = 1000 * EIGHTEEN_DECIMALS * 70_00 // HUNDRED_PERCENT
+    denominator = (
+        terms.totalMaxDebt
+        - pre_debt.amount * effective_ltv // HUNDRED_PERCENT
     )
-    assert result == True, "Leveraged vault should trigger deleverage"
+    expected_target = pre_debt.amount * lost_capacity // denominator
+    expected_target = (
+        expected_target
+        * (HUNDRED_PERCENT + deleverage.deleverageBuffer())
+        // HUNDRED_PERCENT
+    )
+    expected_target = min(expected_target, max_deleveragable, pre_debt.amount)
+    pre_collateral = simple_erc20_vault.getTotalAmountForUser(alice, charlie_token)
+    pre_endaoment = charlie_token.balanceOf(endaoment_funds)
 
-    # Verify debt was reduced
-    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    assert post_debt < pre_debt, "Debt should be reduced after deleverage"
+    assert ripe_hq.isValidAddr(alice) is False
+    assert mock_undy_v2.isEarnVault(alice) is True
+    assert mock_undy_v2.isBasicEarnVault(alice) is False
+    assert deleverage.getMaxDeleverageAmount(alice) == 0
+    assert pre_debt.amount == 700 * EIGHTEEN_DECIMALS
+    assert expected_target == pre_debt.amount
+
+    withdraw_amount = 1000 * EIGHTEEN_DECIMALS
+    result = deleverage.deleverageForWithdrawal(
+        alice, 3, alpha_token, withdraw_amount, sender=alice
+    )
+    event = filter_logs(deleverage, "DeleverageUser")[-1]
+    post_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    post_collateral = simple_erc20_vault.getTotalAmountForUser(alice, charlie_token)
+    post_endaoment = charlie_token.balanceOf(endaoment_funds)
+
+    assert result is True
+    assert event.user == event.caller == alice
+    assert event.targetRepayAmount == expected_target
+    # The nonzero payoff buffer remains disabled for an earn-vault owner.
+    assert event.targetRepayAmountWithBuffer == event.targetRepayAmount
+    assert event.collateralValueRepaid == event.debtToClear == pre_debt.amount
+    assert pre_collateral - post_collateral == 700 * SIX_DECIMALS
+    assert post_endaoment - pre_endaoment == 700 * SIX_DECIMALS
+    assert post_debt == 0
 
     # Restore default mock behavior
     mock_undy_v2.setAllAddressesAreVaults(True)
