@@ -878,15 +878,15 @@ def _getLatestGovPoints(
     _terms: cs.LockTerms,
     _weight: uint256,
 ) -> uint256:
-    if _lastShares == 0:
+    if (
+        _lastShares == 0
+        or _lastPointsUpdate == 0
+        or block.number <= _lastPointsUpdate
+    ):
         return 0
 
     # base points (shares + time deposited)
-    newPoints: uint256 = 0
-    if _lastPointsUpdate != 0 and block.number > _lastPointsUpdate:
-        shares: uint256 = _lastShares // PRECISION
-        newPoints = shares * (block.number - _lastPointsUpdate)
-
+    newPoints: uint256 = (_lastShares // PRECISION) * (block.number - _lastPointsUpdate)
     if newPoints == 0:
         return 0
 
@@ -990,23 +990,12 @@ def areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
 @view
 @internal
 def _areKeyTermsSame(_newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> bool:
-    # can no longer exit!!
-    if _prevTerms.canExit and not _newTerms.canExit:
-        return False
-
-    # boost got worse
-    if _newTerms.maxLockBoost < _prevTerms.maxLockBoost:
-        return False
-   
-    # min lock duration improved
-    if _newTerms.minLockDuration < _prevTerms.minLockDuration:
-        return False
-    
-    # exit fees got worse
-    if _newTerms.exitFee > _prevTerms.exitFee:
-        return False
-
-    return True
+    return (
+        (not _prevTerms.canExit or _newTerms.canExit)
+        and _newTerms.maxLockBoost >= _prevTerms.maxLockBoost
+        and _newTerms.minLockDuration >= _prevTerms.minLockDuration
+        and _newTerms.exitFee <= _prevTerms.exitFee
+    )
 
 
 # refresh unlock
@@ -1021,8 +1010,8 @@ def refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.
 @view
 @internal
 def _refreshUnlock(_prevUnlock: uint256, _newTerms: cs.LockTerms, _prevTerms: cs.LockTerms) -> uint256:
-    unlock: uint256 = _prevUnlock
-    if not self._areKeyTermsSame(_newTerms, _prevTerms):
-        unlock = 0
-    # will auto-adjust down if max duration improved
-    return min(unlock, block.number + _newTerms.maxLockDuration)
+    return (
+        min(_prevUnlock, block.number + _newTerms.maxLockDuration)
+        if self._areKeyTermsSame(_newTerms, _prevTerms)
+        else 0
+    )

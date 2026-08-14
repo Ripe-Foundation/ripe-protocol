@@ -693,6 +693,7 @@ def test_real_gov_vault_shared_deposit_self_vs_authorized_helper(
         setAssetConfig,
         ripe_token,
     )
+    mock_price_source.setPrice(ripe_token, EIGHTEEN_DECIMALS)
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
         sender=switchboard_alpha.address,
@@ -722,13 +723,7 @@ def test_real_gov_vault_shared_deposit_self_vs_authorized_helper(
         ) == amount
         assert ledger.lastTouch(bob) == action_block
         with boa.reverts("one action per block"):
-            _higher_risk_control(
-                teller,
-                bob,
-                alpha_token,
-                simple_erc20_vault,
-                vault_id,
-            )
+            teller.borrow(DEBT, bob, False, False, sender=bob)
 
     ripe_token.transfer(mock_undy_v2, amount, sender=whale)
     ripe_token.approve(teller, amount, sender=mock_undy_v2.address)
@@ -743,13 +738,7 @@ def test_real_gov_vault_shared_deposit_self_vs_authorized_helper(
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == amount
     assert ledger.lastTouch(bob) == touch_before
     assert ledger.lastTouch(bob) != action_block
-    assert _higher_risk_control(
-        teller,
-        bob,
-        alpha_token,
-        simple_erc20_vault,
-        vault_id,
-    ) == CONTROL_WITHDRAWAL
+    assert teller.borrow(DEBT, bob, False, False, sender=bob) == DEBT
 
 
 def test_adjust_lock_real_path_remains_always_touch(

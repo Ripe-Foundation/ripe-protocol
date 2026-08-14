@@ -367,6 +367,8 @@ def startBondEpochAtBlock(_block: uint256):
     a: addys.Addys = addys._getAddys()
 
     config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(empty(address))
+    assert config.epochLength != 0 # dev: invalid epoch length
+    assert config.amountPerEpoch != 0 # dev: invalid amount per epoch
     startBlock: uint256 = max(_block, block.number)
     extcall Ledger(a.ledger).setEpochData(startBlock, startBlock + config.epochLength, config.amountPerEpoch)
 
@@ -396,6 +398,7 @@ def _refreshBondEpoch(
 
     didChange: bool = False
     startBlock, endBlock, didChange = self._getLatestEpochBlockTimes(startBlock, endBlock, _epochLength)
+    assert _amountPerEpoch != 0 # dev: invalid amount per epoch
     if didChange:
         extcall Ledger(_ledger).setEpochData(startBlock, endBlock, _amountPerEpoch)
 

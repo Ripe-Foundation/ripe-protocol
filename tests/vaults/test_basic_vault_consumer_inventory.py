@@ -149,14 +149,14 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
         in {"value_backing_required", "quarantine_status_backing_required"}
     }
     assert backing_aware_paths == {
-        ("contracts/core/AuctionHouse.vy", 431),
-        ("contracts/core/AuctionHouse.vy", 527),
-        ("contracts/core/AuctionHouse.vy", 902),
-        ("contracts/core/AuctionHouse.vy", 1215),
-        ("contracts/core/AuctionHouse.vy", 1243),
-        ("contracts/core/CreditEngine.vy", 738),
-        ("contracts/core/CreditEngine.vy", 755),
-        ("contracts/core/CreditEngine.vy", 1254),
+        ("contracts/core/AuctionHouse.vy", 436),
+        ("contracts/core/AuctionHouse.vy", 532),
+        ("contracts/core/AuctionHouse.vy", 907),
+        ("contracts/core/AuctionHouse.vy", 1253),
+        ("contracts/core/AuctionHouse.vy", 1281),
+        ("contracts/core/CreditEngine.vy", 736),
+        ("contracts/core/CreditEngine.vy", 753),
+        ("contracts/core/CreditEngine.vy", 1256),
         ("contracts/core/CreditRedeem.vy", 191),
         ("contracts/core/Deleverage.vy", 561),
         ("contracts/core/Deleverage.vy", 1068),
