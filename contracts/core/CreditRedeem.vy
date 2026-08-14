@@ -214,8 +214,10 @@ def _redeemCollateral(
     if userDebt.amount == 0 or userDebt.inLiquidation:
         return 0
 
-    # get latest debt terms
-    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, True, 0, empty(address), _a)
+    # get latest debt terms without propagating price-source failures
+    # CreditEngine marks the terms quarantined if any debt-bearing collateral
+    # has a positive balance but no usable price.
+    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, False, 0, empty(address), _a)
     if bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
@@ -237,7 +239,7 @@ def _redeemCollateral(
         return 0
 
     # max asset amount to take from user
-    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
+    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
     if maxAssetAmount == 0:
         return 0
 

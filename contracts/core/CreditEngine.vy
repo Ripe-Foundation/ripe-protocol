@@ -526,13 +526,11 @@ def repayFromDept(
     assert msg.sender in [deleverage, auctionHouse, creditRedeem] # dev: not allowed
     assert not deptBasics.isPaused # dev: contract paused
 
-    repayType: RepayType = empty(RepayType)
+    repayType: RepayType = RepayType.REDEMPTION
     if msg.sender == deleverage:
         repayType = RepayType.DELEVERAGE
     elif msg.sender == auctionHouse:
         repayType = RepayType.LIQUIDATION
-    elif msg.sender == creditRedeem:
-        repayType = RepayType.REDEMPTION
 
     a: addys.Addys = addys._getAddys(_a)
     numUserVaults: uint256 = _numUserVaults
@@ -757,6 +755,10 @@ def _getUserBorrowTerms(
                         bt.hasQuarantinedAsset = True
             else:
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
+                # A positive debt-bearing balance without a usable price
+                # cannot safely contribute to account health decisions.
+                if collateralVal == 0:
+                    bt.hasQuarantinedAsset = True
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # need to return some debt terms, even if not getting any price
