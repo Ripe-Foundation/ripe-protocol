@@ -3239,6 +3239,89 @@ def test_purchase_ripe_bond_with_expired_bond_booster(
     assert bond_booster.unitsUsed(bob) == 0  # No units used since expired
 
 
+def test_purchase_ripe_bond_after_expired_booster_replacement_uses_fresh_allowance(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token,
+    bond_booster, switchboard_delta
+):
+    setupRipeBonds()
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 10
+    old_config = (bob, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+
+    first_payment = 40 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, first_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, first_payment, sender=bob)
+    teller.purchaseRipeBond(alpha_token, first_payment, sender=bob)
+    assert bond_booster.config(bob)[0] == bob
+    assert bond_booster.unitsUsed(bob) == 40
+
+    boa.env.evm.patch.block_number = old_expiry
+    assert bond_booster.getBoostRatio(bob, 1) == 0
+
+    new_config = (bob, 2 * HUNDRED_PERCENT, 50, old_expiry + 1000)
+    assert bond_booster.isValidBooster(new_config)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+    assert bond_booster.unitsUsed(bob) == 0
+    assert bond_booster.getBoostRatio(bob, 50) == 2 * HUNDRED_PERCENT
+
+    second_payment = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, second_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, second_payment, sender=bob)
+    second_payout = teller.purchaseRipeBond(alpha_token, second_payment, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert event.ripeBoostBonus == event.baseRipePayout * 2
+    assert second_payout == event.baseRipePayout + event.ripeBoostBonus
+    assert bond_booster.unitsUsed(bob) == 50
+
+
+def test_purchase_ripe_bond_after_active_booster_edit_preserves_cumulative_usage(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token,
+    bond_booster, switchboard_delta
+):
+    setupRipeBonds()
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 100
+    old_config = (bob, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+
+    first_payment = 40 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, first_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, first_payment, sender=bob)
+    teller.purchaseRipeBond(alpha_token, first_payment, sender=bob)
+    assert bond_booster.unitsUsed(bob) == 40
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    active_update = (bob, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    bond_booster.setBondBooster(active_update, sender=switchboard_delta.address)
+    assert bond_booster.unitsUsed(bob) == 40
+    assert bond_booster.getBoostRatio(bob, 35) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(bob, 36) == 0
+
+    second_payment = 35 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, second_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, second_payment, sender=bob)
+    second_payout = teller.purchaseRipeBond(alpha_token, second_payment, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    # Alpha uses 18 decimals, so the accepted 35-token payment consumes 35 units.
+    assert event.paymentAmount == second_payment
+    assert event.ripeBoostBonus == event.baseRipePayout * 2
+    assert second_payout == event.baseRipePayout + event.ripeBoostBonus
+    assert bond_booster.unitsUsed(bob) == 40 + event.paymentAmount // EIGHTEEN_DECIMALS
+
+    final_payment = EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, final_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, final_payment, sender=bob)
+    final_payout = teller.purchaseRipeBond(alpha_token, final_payment, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    assert event.ripeBoostBonus == 0
+    assert final_payout == event.baseRipePayout
+    assert bond_booster.unitsUsed(bob) == 75
+
+
 def test_purchase_ripe_bond_without_bond_booster(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test
 ):
