@@ -7,6 +7,32 @@ from conf_utils import assert_reverted_call
 
 
 DECIMAL_OFFSET = 10 ** 8
+HUNDRED_PERCENT = 100_00
+
+
+def _claim(shares, total_shares, total_balance):
+    return shares * (total_balance + 1) // (total_shares + DECIMAL_OFFSET)
+
+
+def _assert_exact_exit_claim(
+    user_shares_before,
+    total_shares_before,
+    total_balance,
+    exit_fee,
+    user_shares_after,
+    total_shares_after,
+):
+    claim_before = _claim(user_shares_before, total_shares_before, total_balance)
+    target = claim_before * (HUNDRED_PERCENT - exit_fee) // HUNDRED_PERCENT
+    claim_after = _claim(user_shares_after, total_shares_after, total_balance)
+    assert claim_after <= target
+    assert target - claim_after <= 1
+    assert total_shares_before - total_shares_after == user_shares_before - user_shares_after
+
+
+def _add_remaining_holder(vault, token, funder, holder, amount, teller):
+    token.transfer(vault, amount, sender=funder)
+    vault.depositTokensInVault(holder, token, amount, sender=teller.address)
 
 
 @pytest.fixture(scope="module")
@@ -1032,7 +1058,7 @@ def test_ripe_gov_vault_release_lock_when_no_unlock_needed(
 
 
 def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig,
+    ripe_gov_vault, ripe_token, whale, bob, alice, switchboard_alpha, setupRipeGovVaultConfig,
     teller,
 ):
     """Test that release lock works successfully and charges exit fee"""
@@ -1046,11 +1072,14 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
     ripe_gov_vault.depositTokensWithLockDuration(
         bob, ripe_token, deposit_amount, 500, sender=teller.address  # 500 block lock
     )
+    _add_remaining_holder(ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller)
     
     # Verify initial state - should be locked
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     vault_balance_before = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     shares_before = userData_before.lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
     unlock_before = userData_before.unlock
     current_block = boa.env.evm.patch.block_number
     
@@ -1065,26 +1094,32 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
     vault_balance_after = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     shares_after = userData_after.lastShares
+    total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     unlock_after = userData_after.unlock
     
     # 1. Unlock should be reset to 0 (no longer locked)
     assert unlock_after == 0
     
-    # 2. Shares should be reduced by exit fee (10%)
-    expected_shares_after = shares_before * 90 // 100  # 90% remaining after 10% fee
-    _test(shares_after, expected_shares_after)
+    # 2. The exact post-state claim must charge the economic 10% fee
+    _assert_exact_exit_claim(
+        shares_before,
+        total_shares_before,
+        custody_before,
+        10_00,
+        shares_after,
+        total_shares_after,
+    )
     
     # 3. Vault balance should be reduced (exact amount may vary due to exchange rates)
     assert vault_balance_after < vault_balance_before
     
     # 4. Verify exit fee was charged from shares
     shares_fee_charged = shares_before - shares_after
-    expected_shares_fee = shares_before * 10 // 100  # 10% fee
-    _test(shares_fee_charged, expected_shares_fee)
+    assert shares_fee_charged > shares_before * 10_00 // HUNDRED_PERCENT
 
 
 def test_ripe_gov_vault_release_lock_state_changes(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig,
+    ripe_gov_vault, ripe_token, whale, bob, alice, switchboard_alpha, setupRipeGovVaultConfig,
     teller,
 ):
     """Test that release lock properly updates all state variables"""
@@ -1098,6 +1133,7 @@ def test_ripe_gov_vault_release_lock_state_changes(
     ripe_gov_vault.depositTokensWithLockDuration(
         bob, ripe_token, deposit_amount, 600, sender=teller.address  # 600 block lock
     )
+    _add_remaining_holder(ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller)
     
     # Advance some time to accumulate governance points while locked
     boa.env.time_travel(blocks=50)
@@ -1107,6 +1143,8 @@ def test_ripe_gov_vault_release_lock_state_changes(
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     vault_balance_before = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     shares_before = userData_before.lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
     
     assert userData_before.unlock > boa.env.evm.patch.block_number  # Still locked
     assert vault_balance_before > 0  # Has vault balance
@@ -1119,24 +1157,30 @@ def test_ripe_gov_vault_release_lock_state_changes(
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
     vault_balance_after = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     shares_after = userData_after.lastShares
+    total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     
     # 1. Unlock should be reset to 0
     assert userData_after.unlock == 0
     
-    # 2. Shares should be reduced by exactly 5% exit fee
-    expected_shares_after = shares_before * 95 // 100  # 95% remaining after 5% fee
-    _test(shares_after, expected_shares_after)
+    # 2. The exact post-state claim must charge the economic 5% fee
+    _assert_exact_exit_claim(
+        shares_before,
+        total_shares_before,
+        custody_before,
+        5_00,
+        shares_after,
+        total_shares_after,
+    )
     
     # 3. Vault balance should be reduced (but exact amount may vary)
     assert vault_balance_after < vault_balance_before
     
     # 4. Verify the shares fee amount is correct
     shares_fee_charged = shares_before - shares_after
-    expected_shares_fee = shares_before * 5 // 100  # 5% fee
-    _test(shares_fee_charged, expected_shares_fee)
+    assert shares_fee_charged > shares_before * 5_00 // HUNDRED_PERCENT
     
-    # 5. User should retain 95% of their original shares
-    _test(shares_after, shares_before * 95 // 100)
+    # 5. User retains a nonzero post-fee position
+    assert shares_after != 0
 
 
 def test_ripe_gov_vault_complex_points_scenario(
@@ -2481,7 +2525,7 @@ def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
 
 
 def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
-    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig,
+    ripe_gov_vault, ripe_token, whale, bob, alice, ledger, switchboard_alpha, setupRipeGovVaultConfig,
     teller,
 ):
     """Test that releaseLock() works when bad debt exists but shouldFreezeWhenBadDebt=False"""
@@ -2501,6 +2545,7 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     ripe_gov_vault.depositTokensWithLockDuration(
         bob, ripe_token, deposit_amount, 400, sender=teller.address
     )
+    _add_remaining_holder(ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller)
     
     # Verify user is locked
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -2509,6 +2554,8 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     assert userData_before.lastTerms.canExit       # Exit is allowed
     assert userData_before.lastTerms.exitFee == 8_00      # Has exit fee
     initial_shares = userData_before.lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
     
     # Create bad debt
     bad_debt_amount = 30 * EIGHTEEN_DECIMALS
@@ -2523,19 +2570,25 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     # Verify lock was released and exit fee was charged
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
     assert userData_after.unlock == 0  # Lock released
+    total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     
-    # Verify exit fee was charged (8% of shares should be removed)
-    expected_shares_after = initial_shares * 92 // 100  # 92% remaining after 8% fee
-    assert userData_after.lastShares == expected_shares_after
+    # Verify the exact economic 8% claim reduction
+    _assert_exact_exit_claim(
+        initial_shares,
+        total_shares_before,
+        custody_before,
+        8_00,
+        userData_after.lastShares,
+        total_shares_after,
+    )
     
     # Verify the shares fee was charged correctly
     shares_fee_charged = initial_shares - userData_after.lastShares
-    expected_shares_fee = initial_shares * 8 // 100  # 8% fee
-    assert shares_fee_charged == expected_shares_fee
+    assert shares_fee_charged > initial_shares * 8_00 // HUNDRED_PERCENT
 
 
 def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze_setting(
-    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig,
+    ripe_gov_vault, ripe_token, whale, bob, alice, ledger, switchboard_alpha, setupRipeGovVaultConfig,
     teller,
 ):
     """Test that releaseLock() works normally when there's no bad debt, regardless of shouldFreezeWhenBadDebt setting"""
@@ -2555,12 +2608,15 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     ripe_gov_vault.depositTokensWithLockDuration(
         bob, ripe_token, deposit_amount, 600, sender=teller.address
     )
+    _add_remaining_holder(ripe_gov_vault, ripe_token, whale, alice, deposit_amount, teller)
     
     # Verify user is locked
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     current_block = boa.env.evm.patch.block_number
     assert userData_before.unlock == current_block + 600  # Still locked
     initial_shares = userData_before.lastShares
+    total_shares_before = ripe_gov_vault.totalBalances(ripe_token)
+    custody_before = ripe_token.balanceOf(ripe_gov_vault)
     
     # Verify no bad debt exists
     assert ledger.badDebt() == 0
@@ -2571,10 +2627,17 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     # Verify lock was released and exit fee was charged
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
     assert userData_after.unlock == 0  # Lock released
+    total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     
-    # Verify exit fee was charged (12% of shares should be removed)
-    expected_shares_after = initial_shares * 88 // 100  # 88% remaining after 12% fee
-    assert userData_after.lastShares == expected_shares_after
+    # Verify the exact economic 12% claim reduction
+    _assert_exact_exit_claim(
+        initial_shares,
+        total_shares_before,
+        custody_before,
+        12_00,
+        userData_after.lastShares,
+        total_shares_after,
+    )
 
 
 def test_depositIntoGovVault_basic_no_lock(
@@ -2871,6 +2934,7 @@ def test_teller_governance_routes_follow_core_vault_pointer(
     switchboard_alpha,
     ripe_token,
     whale,
+    bob,
     setupRipeGovVaultConfig,
     setGeneralConfig,
     setAssetConfig,
@@ -2892,6 +2956,15 @@ def test_teller_governance_routes_follow_core_vault_pointer(
     ) == deposit_amount
     assert alternate_ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == deposit_amount
     assert ripe_gov_vault.getTotalAmountForUser(whale, ripe_token) == 0
+
+    _add_remaining_holder(
+        alternate_ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        deposit_amount,
+        teller,
+    )
 
     teller.adjustLock(ripe_token, 800, whale, sender=whale)
     adjusted = alternate_ripe_gov_vault.userGovData(whale, ripe_token)

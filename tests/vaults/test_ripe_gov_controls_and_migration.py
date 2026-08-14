@@ -853,6 +853,7 @@ def test_disabled_points_leave_lock_adjustment_and_release_operational(
     ripe_token,
     whale,
     bob,
+    alice,
     teller,
     switchboard_alpha,
     switchboard_echo,
@@ -875,6 +876,14 @@ def test_disabled_points_leave_lock_adjustment_and_release_operational(
         teller,
         400,
         switchboard_alpha,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        alice,
+        100 * EIGHTEEN_DECIMALS,
+        teller,
     )
     before = _save_points(ripe_gov_vault, bob, ripe_token, switchboard_alpha)
     ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
@@ -3530,6 +3539,15 @@ def test_ripe_gov_pause_matrix_while_unpaused(
     locked_gov_position,
 ):
     """Section 9.4 control half: no method is pause-blocked while unpaused."""
+    if method == "releaseLock":
+        _direct_deposit(
+            ripe_gov_vault,
+            ripe_token,
+            whale,
+            alice,
+            EIGHTEEN_DECIMALS,
+            teller,
+        )
     boa.env.time_travel(blocks=10)
     assert not ripe_gov_vault.isPaused()
     try:
@@ -3542,6 +3560,8 @@ def test_ripe_gov_pause_matrix_while_unpaused(
         # A method may still revert for an unrelated reason (for example a
         # locked withdrawal); it must never revert because of the pause flag.
         assert not _reverted_with_pause(exc), method
+    if method == "releaseLock":
+        assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
 
 
 @pytest.mark.parametrize("method", ("adjustLock", "releaseLock"))
