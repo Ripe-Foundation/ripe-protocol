@@ -52,9 +52,9 @@ interface Ledger:
 interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
     def coreRipeGovVaultId() -> uint256: view
-    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def underscoreRegistry() -> address: view
 
 interface Teller:
@@ -208,6 +208,7 @@ def __init__(
     # underscore rewards
     assert _minUnderscoreSendInterval != 0 and _minUnderscoreSendInterval != max_value(uint256) # dev: invalid floor
     MIN_UNDERSCORE_SEND_INTERVAL = _minUnderscoreSendInterval
+
     if _underscoreSendInterval != 0:
         assert _underscoreSendInterval >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
         self.underscoreSendInterval = _underscoreSendInterval
@@ -1066,54 +1067,6 @@ def _getLatestBorrowPoints(
 ##########################
 
 
-@pure
-@internal
-def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
-    assert _d != 0 # dev: zero denominator
-
-    lo: uint256 = unsafe_mul(_x, _y)
-    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
-    hi: uint256 = unsafe_sub(
-        unsafe_sub(mm, lo),
-        convert(mm < lo, uint256),
-    )
-
-    # Fast path: the product fits in 256 bits.
-    if hi == 0:
-        return lo // _d
-
-    # The full-precision result must fit in uint256.
-    assert _d > hi # dev: result overflows
-
-    # Make the 512-bit product exactly divisible by the denominator.
-    rem: uint256 = uint256_mulmod(_x, _y, _d)
-    hi = unsafe_sub(hi, convert(rem > lo, uint256))
-    lo = unsafe_sub(lo, rem)
-
-    # Factor powers of two out of the denominator and shift the
-    # high product bits into the low product word.
-    tz: uint256 = unsafe_sub(0, _d) & _d
-    d2: uint256 = _d // tz
-    lo = lo // tz
-    lo |= unsafe_mul(
-        hi,
-        unsafe_add(
-            unsafe_div(unsafe_sub(0, tz), tz),
-            1,
-        ),
-    )
-
-    # Compute the modular inverse of the now-odd denominator.
-    inv: uint256 = unsafe_mul(3, d2) ^ 2
-    for i: uint256 in range(6):
-        inv = unsafe_mul(
-            inv,
-            unsafe_sub(2, unsafe_mul(d2, inv)),
-        )
-
-    return unsafe_mul(lo, inv)
-
-
 @external
 def claimBorrowLoot(_user: address) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
@@ -1161,11 +1114,7 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
         if cappedPoints == gp.points:
             userRipeRewards = globalRewards.borrowers
         else:
-            userRipeRewards = self._mulDivFloor(
-                globalRewards.borrowers,
-                cappedPoints,
-                gp.points,
-            )
+            userRipeRewards = self._mulDivFloor(globalRewards.borrowers, cappedPoints, gp.points)
 
     # update structs
     if userRipeRewards != 0:
@@ -1343,6 +1292,57 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
     assert vaultId != 0 # dev: invalid vault id
     return vaultId
+
+
+# math
+
+
+@pure
+@internal
+def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    # Fast path: the product fits in 256 bits.
+    if hi == 0:
+        return lo // _d
+
+    # The full-precision result must fit in uint256.
+    assert _d > hi # dev: result overflows
+
+    # Make the 512-bit product exactly divisible by the denominator.
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    # Factor powers of two out of the denominator and shift the
+    # high product bits into the low product word.
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    # Compute the modular inverse of the now-odd denominator.
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)
 
 
 ###############################
