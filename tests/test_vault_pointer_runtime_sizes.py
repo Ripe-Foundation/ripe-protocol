@@ -49,19 +49,19 @@ DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit in this integration candidate:
 # Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
-# SwitchboardAlpha 40, Lootbox 1,231, RipeGov 1,004, SwitchboardBravo 373,
+# SwitchboardAlpha 2, Lootbox 1,231, RipeGov 1,004, SwitchboardBravo 373,
 # SwitchboardEcho 1,384, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
 # granted replacement RH-D029 for this exact 10-byte-headroom combined
 # reward-suppression, payer-refund, and redemption-isolation artifact. RH-D030
-# separately waives the exact 40-byte-headroom SwitchboardAlpha artifact, and
+# separately waives the exact 2-byte-headroom SwitchboardAlpha artifact, and
 # RH-D031 waives the exact 20-byte-headroom Teller third-party-touch artifact.
 # See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
     "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
-    "SwitchboardAlpha": 40,  # RH-D030; exact symmetric debt-config artifact
+    "SwitchboardAlpha": 2,  # RH-D030; exact debt-config and priority-vault artifact
     "Teller": 20,  # RH-D031; exact third-party-touch artifact, zero growth
 }
 
@@ -152,13 +152,13 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "switchboard_alpha",
         "source": "contracts/config/SwitchboardAlpha.vy",
         "source_sha256": (
-            "15b1e727a4235ac2f16dd93c6fb0cc991d4ee96a3ac8d4cf4ac41d71e0e7f19d"
+            "a967459ca6711cb67f66af6bbdb8c7a7af517a1587b7ca0aa5146ad318efcfa9"
         ),
         "runtime_sha256": (
-            "7e117940f163fc2205fa43beeedb4b71cfea70e9d0bc9304eb909cce76e65dab"
+            "e378970cbf4ea05049dfcb45e2d542f05720fddfd133482418c47590afe7f4b0"
         ),
-        "runtime_template_bytes": 24_312,
-        "deployed_runtime_bytes": 24_536,
+        "runtime_template_bytes": 24_350,
+        "deployed_runtime_bytes": 24_574,
         "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
             "0x00000000000000000000000000000000000000A1",
@@ -169,7 +169,7 @@ WAIVED_CONTRACT_IDENTITIES = {
             2,
         ),
         "deployed_sha256": (
-            "450ac384bf51aa63e882f51dd042803dff8390739c98eaac2d421a208bb3dbac"
+            "32787aab311b5535e57492437a0c51e31f8c5226f8c205dc953d6111c05ba6c4"
         ),
     },
     "Teller": {

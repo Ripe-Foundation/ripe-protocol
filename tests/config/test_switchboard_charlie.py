@@ -2882,7 +2882,7 @@ def test_deregister_asset_two_step_retry_and_reregistration(
         False,
         False,
         True,
-        False,
+        True,
         True,
         False,
         True,

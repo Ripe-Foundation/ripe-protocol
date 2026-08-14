@@ -1,14 +1,16 @@
 # SwitchboardAlpha exact headroom waiver
 
 **Decision:** RH-D030
-**Owner disposition:** accepted on 13 August 2026
-**Scope:** exact audit-remediation SwitchboardAlpha artifact only
+**Owner disposition:** replacement accepted on 13 August 2026
+**Scope:** exact aggregate audit-remediation SwitchboardAlpha artifact only
 
 ## Decision
 
 The normal production-contract rule requires at least 200 bytes of deployed
-EIP-170 headroom. The owner explicitly accepts the exact SwitchboardAlpha
-artifact below at 24,536 deployed bytes, leaving 40 bytes.
+EIP-170 headroom. The prior 40-byte RH-D030 identity reopened when
+SwitchboardAlpha changed. After reviewing the aggregate CI result, the owner
+explicitly accepts the replacement exact artifact below at 24,574 deployed
+bytes, leaving 2 bytes.
 
 This artifact completes the symmetric cross-field debt-config invariant:
 `setBorrowIntervalConfig` and `setGlobalDebtLimits` both enforce
@@ -16,17 +18,21 @@ This artifact completes the symmetric cross-field debt-config invariant:
 target at proposal time and revalidate the invariant at execution time. Removing
 either validation to recover size is not accepted.
 
+The aggregate artifact also keeps priority-vault validity policy in
+SwitchboardAlpha and revalidates pending priority liquidation entries at
+execution. Removing that validation to recover size is likewise not accepted.
+
 ## Exact identity
 
 | Identity | Value |
 | --- | --- |
-| Source SHA-256 | `15b1e727a4235ac2f16dd93c6fb0cc991d4ee96a3ac8d4cf4ac41d71e0e7f19d` |
-| Runtime-template SHA-256 | `7e117940f163fc2205fa43beeedb4b71cfea70e9d0bc9304eb909cce76e65dab` |
-| Runtime-template bytes | 24,312 |
+| Source SHA-256 | `a967459ca6711cb67f66af6bbdb8c7a7af517a1587b7ca0aa5146ad318efcfa9` |
+| Runtime-template SHA-256 | `e378970cbf4ea05049dfcb45e2d542f05720fddfd133482418c47590afe7f4b0` |
+| Runtime-template bytes | 24,350 |
 | Immutable bytes | 224 (seven words) |
-| Deployed runtime bytes | 24,536 |
-| EIP-170 headroom | 40 bytes |
-| Deterministic deployed-runtime SHA-256 | `450ac384bf51aa63e882f51dd042803dff8390739c98eaac2d421a208bb3dbac` |
+| Deployed runtime bytes | 24,574 |
+| EIP-170 headroom | 2 bytes |
+| Deterministic deployed-runtime SHA-256 | `32787aab311b5535e57492437a0c51e31f8c5226f8c205dc953d6111c05ba6c4` |
 
 The deterministic identity deployment uses RipeHq
 `0x00000000000000000000000000000000000000A1`, temporary governance
@@ -42,7 +48,7 @@ authority.
 - This waiver permits zero bytes of SwitchboardAlpha growth.
 - Any source change, runtime-template change, complete deployed-byte change, or
   size change invalidates this waiver, even when the remaining headroom is still
-  40 bytes.
+  2 bytes.
 - A later SwitchboardAlpha change must first recover at least 200 bytes or obtain
   a new exact owner waiver.
 - Updating the pinned hashes solely to make CI pass is prohibited.
