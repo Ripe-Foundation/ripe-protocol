@@ -990,6 +990,31 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "isValidPriorityVault",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_allowSpecialVault",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "getNumAssets",
     "inputs": [],
     "outputs": [
