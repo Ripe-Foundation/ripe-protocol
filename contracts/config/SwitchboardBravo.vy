@@ -23,6 +23,16 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import interfaces.ConfigStructs as cs
 
+interface StabilityPool:
+    def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def getNumActiveClaimAssets(_stabAsset: address) -> uint256: view
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def indexOfAsset(_asset: address) -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def getNumVaultAssets() -> uint256: view
+    def isPaused() -> bool: view
+
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
@@ -33,30 +43,20 @@ interface MissionControl:
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
 
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
+interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
-
-interface StabilityPool:
-    def getNumVaultAssets() -> uint256: view
-    def vaultAssets(_index: uint256) -> address: view
-    def indexOfAsset(_asset: address) -> uint256: view
-    def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
-    def getNumActiveClaimAssets(_stabAsset: address) -> uint256: view
-    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
-    def totalClaimableBalances(_asset: address) -> uint256: view
-    def isPaused() -> bool: view
 
 interface RipeHq:
-    def getAddr(_regId: uint256) -> address: view
-
-interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
