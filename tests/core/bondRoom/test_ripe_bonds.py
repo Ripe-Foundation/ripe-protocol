@@ -21,6 +21,7 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
         _minLockDuration = 100,
         _maxLockDuration = 1000,
         _shouldFreezeWhenBadDebt = False,
+        _shouldStartEpoch = True,
     ):
         # enable general deposits (required for governance vault deposits)
         setGeneralConfig()
@@ -54,6 +55,9 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
             sender=switchboard_alpha.address
         )
         setAssetConfig(ripe_token, _vaultIds=[2])
+
+        if not _shouldStartEpoch:
+            return 0, 0
 
         # start epoch
         return bond_room.refreshBondEpoch(sender=switchboard_delta.address)
@@ -686,6 +690,7 @@ def test_fractional_payment_is_rounded_down_and_refunded(
     )
 
     assert bond_room.previewRipeBondPayout(bob, 0, requested) == expected_payout
+    assert bond_room.previewRipeBondPayout(bob, 0, charged) == expected_payout
 
     charlie_token.transfer(bob, requested, sender=charlie_token_whale)
     charlie_token.approve(teller, requested, sender=bob)
@@ -735,6 +740,7 @@ def test_fractional_payment_partial_epoch_capacity(
     )
 
     assert bond_room.previewRipeBondPayout(bob, 0, requested) == EIGHTEEN_DECIMALS
+    assert bond_room.previewRipeBondPayout(bob, 0, charged) == EIGHTEEN_DECIMALS
 
     charlie_token.transfer(bob, requested, sender=charlie_token_whale)
     charlie_token.approve(teller, requested, sender=bob)
@@ -4207,6 +4213,782 @@ def test_preview_consistency_with_purchase(
     
     # Should match exactly
     assert preview == actual
+
+
+###############################################
+# Preview / Execution Same-State Parity Proof #
+###############################################
+
+
+def test_preview_parity_boosted_lock_at_booster_minimum_control(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    ripe_gov_vault,
+    ripe_token,
+    bond_booster,
+    switchboard_delta,
+):
+    """Control: the booster minimum is a no-op when the request already meets it."""
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=HUNDRED_PERCENT,
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+    )
+    booster_minimum = 600
+    bond_booster.setMinLockDuration(
+        booster_minimum,
+        sender=switchboard_delta.address,
+    )
+    bond_booster.setBondBooster(
+        (
+            bob,
+            HUNDRED_PERCENT,
+            100,
+            boa.env.evm.patch.block_number + 1000,
+        ),
+        sender=switchboard_delta.address,
+    )
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    units = payment_amount // EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert alpha_token.balanceOf(bob) >= payment_amount
+    assert alpha_token.allowance(bob, teller.address) >= payment_amount
+    assert ledger.paymentAmountAvailInEpoch() > payment_amount
+
+    proof_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(
+        bob,
+        booster_minimum,
+        payment_amount,
+    )
+    actual = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        booster_minimum,
+        sender=bob,
+    )
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    expected_base = units * EIGHTEEN_DECIMALS
+    expected_lock_ratio = (
+        HUNDRED_PERCENT * (booster_minimum - 100) // (1000 - 100)
+    )
+    expected_lock_bonus = expected_base * expected_lock_ratio // HUNDRED_PERCENT
+    expected_boost_bonus = expected_base
+    expected_total = expected_base + expected_boost_bonus + expected_lock_bonus
+
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == proof_block
+    assert event.epochEnd == proof_block + 100
+    assert event.epochProgress == 0
+    assert event.baseRipePayout == expected_base
+    assert event.ripeBoostBonus == expected_boost_bonus
+    assert event.ripeLockBonus == expected_lock_bonus
+    assert event.lockDuration == booster_minimum
+    assert event.totalRipePayout == expected_total
+    assert actual == expected_total
+    assert preview == actual
+    assert bond_booster.unitsUsed(bob) == units
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == actual
+
+
+def test_preview_parity_boosted_short_lock_matches_execution(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    ripe_gov_vault,
+    ripe_token,
+    bond_booster,
+    switchboard_delta,
+):
+    """Preview includes the lock bonus created by the booster minimum."""
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=HUNDRED_PERCENT,
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+    )
+    booster_minimum = 600
+    bond_booster.setMinLockDuration(
+        booster_minimum,
+        sender=switchboard_delta.address,
+    )
+    bond_booster.setBondBooster(
+        (
+            bob,
+            HUNDRED_PERCENT,
+            100,
+            boa.env.evm.patch.block_number + 1000,
+        ),
+        sender=switchboard_delta.address,
+    )
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    units = payment_amount // EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert alpha_token.balanceOf(bob) >= payment_amount
+    assert alpha_token.allowance(bob, teller.address) >= payment_amount
+    assert ledger.paymentAmountAvailInEpoch() > payment_amount
+
+    proof_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        0,
+        sender=bob,
+    )
+    event = filter_logs(teller, "RipeBondPurchased")[0]
+
+    expected_base = units * EIGHTEEN_DECIMALS
+    expected_lock_ratio = (
+        HUNDRED_PERCENT * (booster_minimum - 100) // (1000 - 100)
+    )
+    expected_lock_bonus = expected_base * expected_lock_ratio // HUNDRED_PERCENT
+    expected_boost_bonus = expected_base
+
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == proof_block
+    assert event.epochEnd == proof_block + 100
+    assert event.epochProgress == 0
+    assert event.baseRipePayout == expected_base
+    assert event.ripeBoostBonus == expected_boost_bonus
+    assert event.ripeLockBonus == expected_lock_bonus
+    assert event.lockDuration == booster_minimum
+    assert event.totalRipePayout == actual
+    assert preview == expected_base + expected_boost_bonus + expected_lock_bonus
+    assert preview == actual
+    assert bond_booster.unitsUsed(bob) == units
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == actual
+
+
+def test_preview_parity_nonzero_boost_ratio_with_zero_rounded_bonus(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ripe_gov_vault,
+    ripe_token,
+    bond_booster,
+    switchboard_delta,
+):
+    """A nonzero ratio that rounds to no bonus must not enforce a lock."""
+    setupRipeBonds(
+        _amountPerEpoch=10 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=1,
+        _maxRipePerUnit=1,
+        _maxRipePerUnitLockBonus=10 * HUNDRED_PERCENT,
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+    )
+    bond_booster.setMinLockDuration(600, sender=switchboard_delta.address)
+    bond_booster.setBondBooster(
+        (
+            bob,
+            1,
+            100,
+            boa.env.evm.patch.block_number + 1000,
+        ),
+        sender=switchboard_delta.address,
+    )
+
+    payment_amount = EIGHTEEN_DECIMALS
+    units = payment_amount // EIGHTEEN_DECIMALS
+    assert bond_booster.getBoostRatio(bob, units) == 1
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    direct_ripe_before = ripe_token.balanceOf(bob)
+    locked_ripe_before = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    proof_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, 0, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.baseRipePayout == 1
+    assert event.ripeBoostBonus == 0
+    assert event.ripeLockBonus == 0
+    assert event.lockDuration == 0
+    assert preview == actual == event.totalRipePayout == 1
+    assert bond_booster.unitsUsed(bob) == 0
+    assert ripe_token.balanceOf(bob) == direct_ripe_before + actual
+    assert ripe_gov_vault.getTotalAmountForUser(
+        bob,
+        ripe_token,
+    ) == locked_ripe_before
+
+
+@pytest.mark.parametrize(
+    "block_offset",
+    [0, 1, 50, 99],
+    ids=["epoch_start", "early", "midpoint", "final_active_block"],
+)
+def test_preview_parity_active_epoch_blocks(
+    block_offset,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    switchboard_delta,
+):
+    start, end = setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    if block_offset:
+        boa.env.time_travel(blocks=block_offset)
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    assert ledger.paymentAmountAvailInEpoch() > payment_amount
+
+    proof_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    expected_progress = block_offset * HUNDRED_PERCENT // (end - start)
+    assert proof_block == start + block_offset
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == start
+    assert event.epochEnd == end
+    assert event.epochProgress == expected_progress
+    assert preview == actual == event.totalRipePayout
+
+
+def test_preview_parity_exact_epoch_end_refreshes_capacity_once(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    switchboard_delta,
+):
+    amount_per_epoch = 50 * EIGHTEEN_DECIMALS
+    start, end = setupRipeBonds(
+        _amountPerEpoch=amount_per_epoch,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldAutoRestart=False,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+
+    old_epoch_payment = 40 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, old_epoch_payment, sender=alpha_token_whale)
+    alpha_token.approve(teller, old_epoch_payment, sender=bob)
+    teller.purchaseRipeBond(alpha_token, old_epoch_payment, sender=bob)
+    assert ledger.paymentAmountAvailInEpoch() == 10 * EIGHTEEN_DECIMALS
+
+    boa.env.time_travel(blocks=end - boa.env.evm.patch.block_number)
+    payment_amount = 20 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    proof_block = boa.env.evm.patch.block_number
+    next_epoch = bond_room.previewNextEpoch()
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert proof_block == end
+    assert next_epoch == (end, end + (end - start))
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == next_epoch[0]
+    assert event.epochEnd == next_epoch[1]
+    assert event.epochProgress == 0
+    assert preview == actual == event.totalRipePayout
+    assert ledger.epochStart() == next_epoch[0]
+    assert ledger.epochEnd() == next_epoch[1]
+    assert ledger.paymentAmountAvailInEpoch() == amount_per_epoch - payment_amount
+
+
+@pytest.mark.parametrize(
+    ("blocks_after_end", "expected_epochs_ahead", "expected_remainder"),
+    [
+        (1, 0, 1),
+        (99, 0, 99),
+        (100, 1, 0),
+        (300, 3, 0),
+        (325, 3, 25),
+    ],
+    ids=[
+        "one_block_past",
+        "one_before_next_boundary",
+        "one_epoch_length",
+        "several_exact_lengths",
+        "several_lengths_plus_remainder",
+    ],
+)
+def test_preview_parity_multi_epoch_jumps(
+    blocks_after_end,
+    expected_epochs_ahead,
+    expected_remainder,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    switchboard_delta,
+):
+    start, end = setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldAutoRestart=False,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    epoch_length = end - start
+    destination = end + blocks_after_end
+    boa.env.time_travel(blocks=destination - boa.env.evm.patch.block_number)
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    expected_start = end + expected_epochs_ahead * epoch_length
+    expected_end = expected_start + epoch_length
+
+    next_epoch = bond_room.previewNextEpoch()
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    proof_block = boa.env.evm.patch.block_number
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert next_epoch == (expected_start, expected_end)
+    assert proof_block == expected_start + expected_remainder
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == expected_start
+    assert event.epochEnd == expected_end
+    assert event.epochProgress == expected_remainder * HUNDRED_PERCENT // epoch_length
+    assert preview == actual == event.totalRipePayout
+
+
+def test_preview_parity_without_prior_epoch(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldStartEpoch=False,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    assert ledger.epochStart() == 0
+    assert ledger.epochEnd() == 0
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    proof_block = boa.env.evm.patch.block_number
+
+    next_epoch = bond_room.previewNextEpoch()
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert next_epoch == (proof_block, proof_block + 100)
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.epochStart == next_epoch[0]
+    assert event.epochEnd == next_epoch[1]
+    assert event.epochProgress == 0
+    assert preview == actual == event.totalRipePayout
+    assert ledger.paymentAmountAvailInEpoch() == 90 * EIGHTEEN_DECIMALS
+
+
+def test_preview_and_purchase_across_future_scheduled_epoch(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    future_start = boa.env.evm.patch.block_number + 10
+    bond_room.startBondEpochAtBlock(future_start, sender=switchboard_delta.address)
+    future_end = future_start + 100
+
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, 3 * payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, 3 * payment_amount, sender=bob)
+    scheduled_state = (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        alpha_token.balanceOf(bob),
+        alpha_token.allowance(bob, teller.address),
+    )
+
+    assert bond_room.previewNextEpoch() == (future_start, future_end)
+    # The helper preserves the future epoch, so payout progress underflows before start.
+    with boa.reverts():
+        bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    with boa.reverts("not within epoch window"):
+        teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    assert (
+        ledger.epochStart(),
+        ledger.epochEnd(),
+        ledger.paymentAmountAvailInEpoch(),
+        alpha_token.balanceOf(bob),
+        alpha_token.allowance(bob, teller.address),
+    ) == scheduled_state
+
+    for block_offset in (0, 1):
+        destination = future_start + block_offset
+        boa.env.time_travel(blocks=destination - boa.env.evm.patch.block_number)
+        preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+        proof_block = boa.env.evm.patch.block_number
+        actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+        event = filter_logs(teller, "RipeBondPurchased")[-1]
+        assert boa.env.evm.patch.block_number == proof_block
+        assert event.paymentAmount == payment_amount
+        assert event.epochStart == future_start
+        assert event.epochEnd == future_end
+        assert event.epochProgress == block_offset * HUNDRED_PERCENT // 100
+        assert preview == actual == event.totalRipePayout
+
+
+def test_preview_and_purchase_across_auto_restart_delay_gap(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ledger,
+    switchboard_delta,
+):
+    amount_per_epoch = 2 * EIGHTEEN_DECIMALS
+    restart_delay = 20
+    _, old_end = setupRipeBonds(
+        _amountPerEpoch=amount_per_epoch,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldAutoRestart=True,
+        _restartDelayBlocks=restart_delay,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    new_start = old_end + restart_delay
+    new_end = new_start + 100
+
+    alpha_token.transfer(bob, 5 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(teller, 5 * EIGHTEEN_DECIMALS, sender=bob)
+    teller.purchaseRipeBond(alpha_token, amount_per_epoch, sender=bob)
+    assert (ledger.epochStart(), ledger.epochEnd()) == (new_start, new_end)
+
+    for destination in (boa.env.evm.patch.block_number, new_start - 1):
+        if destination > boa.env.evm.patch.block_number:
+            boa.env.time_travel(blocks=destination - boa.env.evm.patch.block_number)
+        gap_state = (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            alpha_token.balanceOf(bob),
+            alpha_token.allowance(bob, teller.address),
+        )
+        assert bond_room.previewNextEpoch() == (new_start, new_end)
+        # The helper preserves the future epoch, so payout progress underflows in the gap.
+        with boa.reverts():
+            bond_room.previewRipeBondPayout(bob, 0, EIGHTEEN_DECIMALS)
+        with boa.reverts("not within epoch window"):
+            teller.purchaseRipeBond(alpha_token, EIGHTEEN_DECIMALS, sender=bob)
+        assert (
+            ledger.epochStart(),
+            ledger.epochEnd(),
+            ledger.paymentAmountAvailInEpoch(),
+            alpha_token.balanceOf(bob),
+            alpha_token.allowance(bob, teller.address),
+        ) == gap_state
+
+    for block_offset in (0, 1):
+        destination = new_start + block_offset
+        boa.env.time_travel(blocks=destination - boa.env.evm.patch.block_number)
+        preview = bond_room.previewRipeBondPayout(
+            bob,
+            0,
+            EIGHTEEN_DECIMALS,
+        )
+        proof_block = boa.env.evm.patch.block_number
+        actual = teller.purchaseRipeBond(
+            alpha_token,
+            EIGHTEEN_DECIMALS,
+            sender=bob,
+        )
+        event = filter_logs(teller, "RipeBondPurchased")[-1]
+        assert boa.env.evm.patch.block_number == proof_block
+        assert event.paymentAmount == EIGHTEEN_DECIMALS
+        assert event.epochStart == new_start
+        assert event.epochEnd == new_end
+        assert event.epochProgress == block_offset * HUNDRED_PERCENT // 100
+        assert preview == actual == event.totalRipePayout
+
+
+@pytest.mark.parametrize(
+    "drift_case",
+    ["inside_active_epoch", "across_epoch_boundary", "large_jump"],
+)
+def test_preview_cross_block_drift_is_quantified(
+    drift_case,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    switchboard_delta,
+):
+    start, end = setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=101 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+        _shouldAutoRestart=False,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    if drift_case == "across_epoch_boundary":
+        boa.env.time_travel(blocks=(end - 1) - boa.env.evm.patch.block_number)
+
+    preview_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+
+    if drift_case == "inside_active_epoch":
+        boa.env.time_travel(blocks=1)
+    elif drift_case == "across_epoch_boundary":
+        boa.env.time_travel(blocks=1)
+    else:
+        destination = end + 325
+        boa.env.time_travel(blocks=destination - boa.env.evm.patch.block_number)
+
+    execution_block = boa.env.evm.patch.block_number
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert execution_block > preview_block
+    assert event.paymentAmount == payment_amount
+    assert actual == event.totalRipePayout
+    if drift_case == "inside_active_epoch":
+        assert preview == 10 * EIGHTEEN_DECIMALS
+        assert actual == 20 * EIGHTEEN_DECIMALS
+        assert actual - preview == 10 * EIGHTEEN_DECIMALS
+        assert (actual - preview) * HUNDRED_PERCENT // preview == HUNDRED_PERCENT
+    elif drift_case == "across_epoch_boundary":
+        assert preview == 1000 * EIGHTEEN_DECIMALS
+        assert actual == 10 * EIGHTEEN_DECIMALS
+        assert preview - actual == 990 * EIGHTEEN_DECIMALS
+        assert (preview - actual) * HUNDRED_PERCENT // preview == 9900
+        assert event.epochStart == end
+        assert event.epochProgress == 0
+    else:
+        assert preview == 10 * EIGHTEEN_DECIMALS
+        assert actual == 260 * EIGHTEEN_DECIMALS
+        assert actual - preview == 250 * EIGHTEEN_DECIMALS
+        assert event.epochStart == end + 300
+        assert event.epochProgress == 2500
+
+
+@pytest.mark.parametrize(
+    (
+        "booster_case",
+        "booster_minimum",
+        "requested_duration",
+        "expected_duration",
+        "expected_boosted",
+    ),
+    [
+        ("units_exceed_allowance", 600, 0, 0, False),
+        ("exact_expiry", 600, 0, 0, False),
+        ("no_booster", 600, 0, 0, False),
+        ("request_above_booster_minimum", 600, 700, 700, True),
+        ("booster_minimum_above_bond_maximum", 1200, 0, 1000, True),
+        ("booster_minimum_below_bond_minimum", 50, 0, 0, True),
+        ("request_below_bond_minimum_without_boost", 600, 50, 0, False),
+    ],
+)
+def test_preview_parity_booster_duration_controls(
+    booster_case,
+    booster_minimum,
+    requested_duration,
+    expected_duration,
+    expected_boosted,
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    ripe_gov_vault,
+    ripe_token,
+    bond_booster,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=HUNDRED_PERCENT,
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+    )
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    units = payment_amount // EIGHTEEN_DECIMALS
+    bond_booster.setMinLockDuration(
+        booster_minimum,
+        sender=switchboard_delta.address,
+    )
+
+    if booster_case == "no_booster":
+        bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    elif booster_case != "request_below_bond_minimum_without_boost":
+        max_units = 5 if booster_case == "units_exceed_allowance" else 100
+        expire_block = boa.env.evm.patch.block_number + 1000
+        if booster_case == "exact_expiry":
+            expire_block = boa.env.evm.patch.block_number + 1
+        bond_booster.setBondBooster(
+            (bob, HUNDRED_PERCENT, max_units, expire_block),
+            sender=switchboard_delta.address,
+        )
+        if booster_case == "exact_expiry":
+            boa.env.time_travel(blocks=1)
+
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    direct_ripe_before = ripe_token.balanceOf(bob)
+    locked_ripe_before = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    proof_block = boa.env.evm.patch.block_number
+    preview = bond_room.previewRipeBondPayout(
+        bob,
+        requested_duration,
+        payment_amount,
+    )
+    actual = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        requested_duration,
+        sender=bob,
+    )
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    expected_base = units * EIGHTEEN_DECIMALS
+    expected_boost_bonus = expected_base if expected_boosted else 0
+    expected_lock_bonus = 0
+    if expected_duration >= 100:
+        expected_lock_ratio = (
+            HUNDRED_PERCENT * (expected_duration - 100) // (1000 - 100)
+        )
+        expected_lock_bonus = (
+            expected_base * expected_lock_ratio // HUNDRED_PERCENT
+        )
+    expected_total = expected_base + expected_boost_bonus + expected_lock_bonus
+
+    assert boa.env.evm.patch.block_number == proof_block
+    assert event.paymentAmount == payment_amount
+    assert event.baseRipePayout == expected_base
+    assert event.ripeBoostBonus == expected_boost_bonus
+    assert event.ripeLockBonus == expected_lock_bonus
+    assert event.lockDuration == expected_duration
+    assert preview == actual == event.totalRipePayout == expected_total
+    assert bond_booster.unitsUsed(bob) == (units if expected_boosted else 0)
+    if expected_duration == 0:
+        assert ripe_token.balanceOf(bob) == direct_ripe_before + actual
+        assert ripe_gov_vault.getTotalAmountForUser(
+            bob,
+            ripe_token,
+        ) == locked_ripe_before
+    else:
+        assert ripe_token.balanceOf(bob) == direct_ripe_before
+        assert ripe_gov_vault.getTotalAmountForUser(
+            bob,
+            ripe_token,
+        ) == locked_ripe_before + actual
+
+
+def test_preview_default_payment_is_not_an_execution_quote(
+    teller,
+    bond_room,
+    setupRipeBonds,
+    bob,
+    alpha_token_whale,
+    alpha_token,
+    switchboard_delta,
+):
+    setupRipeBonds(
+        _amountPerEpoch=100 * EIGHTEEN_DECIMALS,
+        _minRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=0,
+    )
+    bond_room.setBondBooster(ZERO_ADDRESS, sender=switchboard_delta.address)
+    payment_amount = 10 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+
+    default_preview = bond_room.previewRipeBondPayout(bob)
+    explicit_preview = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    actual = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    event = filter_logs(teller, "RipeBondPurchased")[-1]
+
+    assert event.paymentAmount == payment_amount
+    assert explicit_preview == actual == event.totalRipePayout
+    assert default_preview == 100 * EIGHTEEN_DECIMALS
+    assert default_preview > actual
 
 
 def test_purchase_ripe_bond_rounding_errors(
