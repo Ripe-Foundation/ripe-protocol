@@ -19,14 +19,14 @@ ACCEPTED_RUNTIME_CEILING = 22_500
 MIN_EIP_170_HEADROOM = 2_000
 
 EXPECTED = {
-    "source_sha256": "feb3715a079fe7643c2441b1f0842f8f5ffc4ef3f33a073b3d451b128e1a802c",
-    "source_git_blob": "d0b92d02ed51e8be1b2c21e452e700a32f44c937",
-    "integrity": "50ff8372993c058f761016ed29b2491cf354ab351e35a686119f55cbbb90dd60",
-    "creation_size": 23_818,
-    "creation_sha256": "8cdf21f4d0cbcb5340b377aff2f90388a68cd091731ea723b16d464bc1dbc031",
-    "runtime_size": 22_224,
-    "runtime_sha256": "16385e92b4be7ae5fd12f6f89d83cf6056c12ce433d2d9559dcfa10b745fda7a",
-    "eip_170_headroom": 2_352,
+    "source_sha256": "8fc427fcbb9dcde255bc9315fc4d0da2a29ae8727ae06085b42394c6e4c531c6",
+    "source_git_blob": "ebce2b295d5aa39200b68437eab4b9c0c7498f5b",
+    "integrity": "7ba16ef6e2efb6b8041ca96be970b875804a30dcc93df1d7554a3760b95dd715",
+    "creation_size": 23_871,
+    "creation_sha256": "bccaa7e659e56ad12979a869f5bc4e81f20b4b0485e45e081f8f23b5efedf669",
+    "runtime_size": 22_259,
+    "runtime_sha256": "afd1c6c61a2da3f5a172f24917e1bc10377270924edc1c1aa7dc4cc4b585d74b",
+    "eip_170_headroom": 2_317,
     "abi_sha256": "d1a7f8491d5b1ba59da03ef3e0920a6bbf7682dfc2f0b471d4a5a8a1cb8f5c73",
     "abi_file_sha256": "b4c17cf9a87cd3325fba306cc9e4a9595c2e0689c18fb4fc2da2aed5622e91f7",
     "selector_count": 84,
@@ -58,10 +58,10 @@ def test_exact_source_and_compiler_identity(compiled):
     assert compiled.source_sha256 == EXPECTED["source_sha256"]
     assert compiled.source_git_blob == EXPECTED["source_git_blob"]
     assert compiled.integrity == EXPECTED["integrity"]
-    assert compiled.effective_optimization == "gas"
+    assert compiled.effective_optimization == "codesize"
     assert compiled.settings == {
         "experimental_codegen": False,
-        "optimize": "gas",
+        "optimize": "codesize",
     }
 
 

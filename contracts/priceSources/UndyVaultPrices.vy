@@ -131,6 +131,7 @@ pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pen
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
+MAX_SNAPSHOTS: constant(uint256) = 25
 
 
 @deploy
@@ -144,6 +145,29 @@ def __init__(
     addys.__init__(_ripeHq)
     priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)
 
 
 ###############
@@ -256,20 +280,19 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingPriceConfig = self.pendingPriceConfigs[_asset]
     assert d.config.underlyingAsset != empty(address) # dev: no pending config
-    if not self._isValidNewPriceConfig(_asset, d.config):
+    if not self._isValidNewPriceConfig(_asset, d.config, False):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
     # check time lock
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
+    config: PriceConfig = self._resetSnapshots(_asset, d.config)
+
     # save new feed config
-    self.priceConfigs[_asset] = d.config
+    self.priceConfigs[_asset] = config
     self.pendingPriceConfigs[_asset] = empty(PendingPriceConfig)
     priceData._addPricedAsset(_asset)
-
-    # add snapshot
-    self._addPriceSnapshot(_asset, d.config)
 
     log NewPriceConfigAdded(
         asset=_asset,
@@ -323,15 +346,15 @@ def isValidNewFeed(
 
 @view
 @internal
-def _isValidNewPriceConfig(_asset: address, _config: PriceConfig) -> bool:
+def _isValidNewPriceConfig(_asset: address, _config: PriceConfig, _requireValidSnapshot: bool = True) -> bool:
     if priceData.indexOfAsset[_asset] != 0 or self.priceConfigs[_asset].underlyingAsset != empty(address): # use the `updatePriceConfig` function instead
         return False
-    return self._isValidFeedConfig(_asset, _config)
+    return self._isValidFeedConfig(_asset, _config, _requireValidSnapshot)
 
 
 @view
 @internal
-def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
+def _isValidFeedConfig(_asset: address, _config: PriceConfig, _requireValidSnapshot: bool = True) -> bool:
     if empty(address) in [_asset, _config.underlyingAsset]:
         return False
 
@@ -345,7 +368,7 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
 
     if _config.minSnapshotDelay > (60 * 60 * 24 * 7): # 1 week
         return False
-    if _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > 25:
+    if _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > MAX_SNAPSHOTS:
         return False
     if _config.maxUpsideDeviation > HUNDRED_PERCENT:
         return False
@@ -355,6 +378,9 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
     # verify underlying asset has a price feed
     if staticcall PriceDesk(addys._getPriceDeskAddr()).getPrice(_config.underlyingAsset, False) == 0:
         return False
+
+    if not _requireValidSnapshot:
+        return True
 
     # verify the vault implements convertToAssets and returns a valid price
     pricePerShare: uint256 = staticcall UnderscoreVault(_asset).convertToAssets(10 ** _config.vaultTokenDecimals)
@@ -447,7 +473,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     # validate again
     d: PendingPriceConfig = self.pendingPriceConfigs[_asset]
     assert d.config.underlyingAsset != empty(address) # dev: no pending config
-    if not self._isValidUpdateConfig(_asset, d.config):
+    currentConfig: PriceConfig = self.priceConfigs[_asset]
+    requireValidSnapshot: bool = d.config.maxNumSnapshots == currentConfig.maxNumSnapshots
+    if not self._isValidUpdateConfig(_asset, d.config, requireValidSnapshot):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -455,16 +483,15 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # preserve snapshot progress made while the config update was pending
-    currentConfig: PriceConfig = self.priceConfigs[_asset]
     d.config.lastSnapshot = currentConfig.lastSnapshot
-    d.config.nextIndex = currentConfig.nextIndex % d.config.maxNumSnapshots
+    if d.config.maxNumSnapshots == currentConfig.maxNumSnapshots:
+        d.config.nextIndex = currentConfig.nextIndex
+    else:
+        d.config = self._resetSnapshots(_asset, d.config)
 
     # save new feed config
     self.priceConfigs[_asset] = d.config
     self.pendingPriceConfigs[_asset] = empty(PendingPriceConfig)
-
-    # add snapshot
-    self._addPriceSnapshot(_asset, d.config)
 
     log PriceConfigUpdated(
         asset=_asset,
@@ -514,10 +541,10 @@ def isValidUpdateConfig(_asset: address, _maxNumSnapshots: uint256, _staleTime: 
 
 @view
 @internal
-def _isValidUpdateConfig(_asset: address, _config: PriceConfig) -> bool:
+def _isValidUpdateConfig(_asset: address, _config: PriceConfig, _requireValidSnapshot: bool = True) -> bool:
     if priceData.indexOfAsset[_asset] == 0 or _config.underlyingAsset == empty(address): # must add new feed first
         return False
-    return self._isValidFeedConfig(_asset, _config)
+    return self._isValidFeedConfig(_asset, _config, _requireValidSnapshot)
 
 
 ################
@@ -626,6 +653,34 @@ def _isValidDisablePriceFeed(_asset: address, _underlyingAsset: address) -> bool
 ###################
 
 
+@internal
+def _clearSnapshots(_asset: address):
+    for i: uint256 in range(MAX_SNAPSHOTS):
+        self.snapShots[_asset][i] = empty(PriceSnapshot)
+
+
+@internal
+def _resetSnapshots(_asset: address, _config: PriceConfig) -> PriceConfig:
+    config: PriceConfig = _config
+    newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
+    assert newSnapshot.pricePerShare != 0 # dev: invalid snapshot
+
+    self._clearSnapshots(_asset)
+    self.snapShots[_asset][0] = newSnapshot
+    config.lastSnapshot = newSnapshot
+    config.nextIndex = 1
+    if config.maxNumSnapshots == 1:
+        config.nextIndex = 0
+
+    log PricePerShareSnapshotAdded(
+        asset=_asset,
+        underlyingAsset=config.underlyingAsset,
+        totalSupply=newSnapshot.totalSupply,
+        pricePerShare=newSnapshot.pricePerShare,
+    )
+    return config
+
+
 # get weighted price
 
 
@@ -639,33 +694,87 @@ def getWeightedPrice(_asset: address) -> uint256:
 @view
 @internal
 def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
-    if _config.underlyingAsset == empty(address) or _config.maxNumSnapshots == 0:
+    if _config.underlyingAsset == empty(address) or _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > MAX_SNAPSHOTS:
+        return 0
+    if _config.nextIndex >= _config.maxNumSnapshots:
         return 0
 
-    # calculate weighted average price using all valid snapshots
+    # Traverse the circular ring from its next write position, which is the
+    # oldest slot once full and precedes empty slots while partially filled.
     numerator: uint256 = 0
     denominator: uint256 = 0
-    for i: uint256 in range(_config.maxNumSnapshots, bound=max_value(uint256)):
+    previous: PriceSnapshot = empty(PriceSnapshot)
+    hasPrevious: bool = False
+    for offset: uint256 in range(_config.maxNumSnapshots, bound=MAX_SNAPSHOTS):
+        index: uint256 = _config.nextIndex + offset
+        if index >= _config.maxNumSnapshots:
+            index -= _config.maxNumSnapshots
 
-        snapShot: PriceSnapshot = self.snapShots[_asset][i]
+        snapShot: PriceSnapshot = self.snapShots[_asset][index]
         if snapShot.pricePerShare == 0 or snapShot.totalSupply == 0 or snapShot.lastUpdate == 0:
             continue
 
         # too stale, skip
-        if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:
-            continue
+        if _config.staleTime != 0:
+            didAdd: bool = False
+            staleAt: uint256 = 0
+            didAdd, staleAt = self._tryAdd(snapShot.lastUpdate, _config.staleTime)
+            if not didAdd:
+                return 0
+            if block.timestamp > staleAt:
+                continue
 
-        numerator += (snapShot.totalSupply * snapShot.pricePerShare)
-        denominator += snapShot.totalSupply
+        if hasPrevious:
+            if snapShot.lastUpdate <= previous.lastUpdate:
+                return 0
+            duration: uint256 = unsafe_sub(snapShot.lastUpdate, previous.lastUpdate)
+            didCalculate: bool = False
+            weightedValue: uint256 = 0
+            didCalculate, weightedValue = self._tryMul(previous.pricePerShare, duration)
+            if not didCalculate:
+                return 0
+            didCalculate, numerator = self._tryAdd(numerator, weightedValue)
+            if not didCalculate:
+                return 0
+            didCalculate, denominator = self._tryAdd(denominator, duration)
+            if not didCalculate:
+                return 0
+        previous = snapShot
+        hasPrevious = True
 
-    # weighted price per share
-    weightedPricePerShare: uint256 = 0
-    if numerator != 0:
-        weightedPricePerShare = numerator // denominator
-    else:
-        weightedPricePerShare = _config.lastSnapshot.pricePerShare
+    if hasPrevious:
+        if previous.lastUpdate > block.timestamp:
+            return 0
+        duration: uint256 = unsafe_sub(block.timestamp, previous.lastUpdate)
+        if duration != 0:
+            didCalculate: bool = False
+            weightedValue: uint256 = 0
+            didCalculate, weightedValue = self._tryMul(previous.pricePerShare, duration)
+            if not didCalculate:
+                return 0
+            didCalculate, numerator = self._tryAdd(numerator, weightedValue)
+            if not didCalculate:
+                return 0
+            didCalculate, denominator = self._tryAdd(denominator, duration)
+            if not didCalculate:
+                return 0
 
-    return weightedPricePerShare
+    if denominator != 0:
+        return numerator // denominator
+
+    # A lone observation in its creation block has no duration yet. Fall back
+    # only while the latest valid snapshot remains fresh.
+    lastSnapshot: PriceSnapshot = _config.lastSnapshot
+    if lastSnapshot.pricePerShare == 0 or lastSnapshot.lastUpdate == 0:
+        return 0
+    if _config.staleTime != 0:
+        didAdd: bool = False
+        staleAt: uint256 = 0
+        didAdd, staleAt = self._tryAdd(lastSnapshot.lastUpdate, _config.staleTime)
+        if not didAdd or block.timestamp > staleAt:
+            return 0
+
+    return lastSnapshot.pricePerShare
 
 
 # add price snapshot
@@ -697,6 +806,8 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 
     # create and store new snapshot
     newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
+    if newSnapshot.pricePerShare == 0:
+        return False
     config.lastSnapshot = newSnapshot
     self.snapShots[_asset][config.nextIndex] = newSnapshot
 
