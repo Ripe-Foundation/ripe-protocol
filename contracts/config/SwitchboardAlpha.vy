@@ -29,6 +29,7 @@ interface MissionControl:
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
+    def isValidPriorityVault(_vaultId: uint256, _asset: address, _allowSpecialVault: bool) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
     def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
@@ -1218,16 +1219,16 @@ def setRewardsPointsEnabled(_shouldEnable: bool, _missionControl: address = empt
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)
-    assert len(priorityVaults) == len(_priorityLiqAssetVaults) # dev: invalid priority vaults
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert len(self._sanitizePriorityVaults(_priorityLiqAssetVaults, mc, False)) == len(_priorityLiqAssetVaults) # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
-    self.pendingPriorityLiqAssetVaults[aid] = priorityVaults
-    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    self.pendingPriorityLiqAssetVaults[aid] = _priorityLiqAssetVaults
+    self.pendingMissionControl[aid] = mc
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityLiqAssetVaultsChange(
-        numPriorityLiqAssetVaults=len(priorityVaults),
+        numPriorityLiqAssetVaults=len(_priorityLiqAssetVaults),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1241,18 +1242,17 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
 def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA], _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
-    assert len(priorityVaults) == len(_priorityStabVaults) # dev: invalid priority vaults
     mc: address = self._resolveMissionControl(_missionControl)
-    assert self._areValidPriorityStabVaults(priorityVaults, mc) # dev: invalid priority stab vaults
+    assert len(self._sanitizePriorityVaults(_priorityStabVaults, mc, True)) == len(_priorityStabVaults) # dev: invalid priority vaults
+    assert self._areValidPriorityStabVaults(_priorityStabVaults, mc) # dev: invalid priority stab vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
-    self.pendingPriorityStabVaults[aid] = priorityVaults
+    self.pendingPriorityStabVaults[aid] = _priorityStabVaults
     self.pendingMissionControl[aid] = mc
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingPriorityStabVaultsChange(
-        numPriorityStabVaults=len(priorityVaults),
+        numPriorityStabVaults=len(_priorityStabVaults),
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1265,16 +1265,17 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
 @internal
 def _sanitizePriorityVaults(
     _priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA],
+    _missionControl: address,
+    _allowSpecialVault: bool,
 ) -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
     sanitizedVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = []
     vaultBook: address = self._getVaultBookAddr()
-    mc: address = self._getMissionControlAddr()
     for vault: cs.VaultLite in _priorityVaults:
         if self.vaultDedupe[vault.vaultId][vault.asset]:
             continue
         if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
             continue
-        if not staticcall MissionControl(mc).isSupportedAssetInVault(vault.vaultId, vault.asset):
+        if not staticcall MissionControl(_missionControl).isValidPriorityVault(vault.vaultId, vault.asset, _allowSpecialVault):
             continue
         sanitizedVaults.append(vault)
         self.vaultDedupe[vault.vaultId][vault.asset] = True

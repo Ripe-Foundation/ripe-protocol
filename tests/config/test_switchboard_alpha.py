@@ -709,6 +709,126 @@ def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
         switchboard_alpha.setPriorityLiqAssetVaults(duplicate_vaults, sender=governance.address)
 
 
+@pytest.mark.parametrize(
+    ("vault_id", "classification"),
+    [
+        (1, "stability pool"),
+        (2, "RIPE governance"),
+    ],
+)
+def test_priority_liq_asset_vaults_reject_special_vaults(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    vault_id,
+    classification,
+):
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [1, 2, 3],
+    )
+    assert mission_control.isSupportedAssetInVault(vault_id, alpha_token.address)
+    if classification == "stability pool":
+        assert mission_control.isStabVaultId(vault_id)
+    else:
+        assert mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.isValidPriorityVault(vault_id, alpha_token.address, True)
+    assert not mission_control.isValidPriorityVault(vault_id, alpha_token.address, False)
+
+    with boa.reverts("invalid priority vaults"):
+        switchboard_alpha.setPriorityLiqAssetVaults(
+            [(vault_id, alpha_token.address)],
+            sender=governance.address,
+        )
+
+
+def test_priority_liq_asset_vaults_accept_ordinary_vault(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    assert not mission_control.isStabVaultId(vault_id)
+    assert not mission_control.isRipeGovVaultId(vault_id)
+    assert mission_control.isValidPriorityVault(vault_id, alpha_token.address, False)
+
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(
+        action_id,
+        sender=governance.address,
+    )
+    stored_vaults = mission_control.getPriorityLiqAssetVaults()
+    assert [(vault.vaultId, vault.asset) for vault in stored_vaults] == [
+        (vault_id, alpha_token.address),
+    ]
+
+
+@pytest.mark.parametrize("classification", ["stab", "ripe_gov"])
+def test_priority_liq_asset_vaults_revalidate_special_classification_at_confirmation(
+    switchboard_alpha,
+    switchboard_bravo,
+    mission_control,
+    governance,
+    alpha_token,
+    classification,
+):
+    vault_id = 3
+    _support_asset(
+        mission_control,
+        switchboard_bravo,
+        alpha_token.address,
+        [vault_id],
+    )
+    previous_vaults = [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ]
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token.address)],
+        sender=governance.address,
+    )
+
+    if classification == "stab":
+        mission_control.setPreferredStabVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    else:
+        mission_control.setCoreRipeGovVaultId(
+            vault_id,
+            sender=switchboard_alpha.address,
+        )
+    assert not mission_control.isValidPriorityVault(vault_id, alpha_token.address, False)
+
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    with boa.reverts("invalid priority liq vault"):
+        switchboard_alpha.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert [
+        (vault.vaultId, vault.asset)
+        for vault in mission_control.getPriorityLiqAssetVaults()
+    ] == previous_vaults
+
+
 def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
     # Invalid vaults will be filtered during sanitization, causing length mismatch
     vaults = [(1, ZERO_ADDRESS)]

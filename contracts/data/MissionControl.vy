@@ -455,6 +455,8 @@ def setRipeGovVaultConfig(
 @external
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    for vault: cs.VaultLite in _priorityLiqAssetVaults:
+        assert self._isValidPriorityVault(vault.vaultId, vault.asset, False) # dev: invalid priority liq vault
     self.priorityLiqAssetVaults = _priorityLiqAssetVaults
 
 
@@ -584,6 +586,24 @@ def isSupportedAsset(_asset: address) -> bool:
 @external
 def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
     return _vaultId in self.assetConfig[_asset].vaultIds
+
+
+@view
+@external
+def isValidPriorityVault(_vaultId: uint256, _asset: address, _allowSpecialVault: bool) -> bool:
+    return self._isValidPriorityVault(_vaultId, _asset, _allowSpecialVault)
+
+
+@view
+@internal
+def _isValidPriorityVault(_vaultId: uint256, _asset: address, _allowSpecialVault: bool) -> bool:
+    return (
+        (
+            _allowSpecialVault
+            or (not self.isStabVaultId[_vaultId] and not self.isRipeGovVaultId[_vaultId])
+        )
+        and _vaultId in self.assetConfig[_asset].vaultIds
+    )
 
 
 @view
