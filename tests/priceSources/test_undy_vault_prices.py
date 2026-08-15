@@ -2426,7 +2426,7 @@ def test_undy_delay_freshness_boundary_and_zero_stale_policy(
     switchboard_alpha,
     teller,
 ):
-    """staleTime < minSnapshotDelay is allowed and intentionally fail-closed."""
+    """The overlap predicate avoids a stale-and-snapshot-ineligible interval."""
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
         sender=switchboard_alpha.address,
@@ -2453,12 +2453,17 @@ def test_undy_delay_freshness_boundary_and_zero_stale_policy(
         bravo_token_vault,
         min_delay=10,
         max_snapshots=3,
-        stale_time=9,
+        stale_time=8,
     )
-    boa.env.time_travel(seconds=9)
+    boa.env.time_travel(seconds=8)
     assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
     boa.env.time_travel(seconds=1)
     assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == 0
+    assert not undy_vault_prices.addPriceSnapshot(
+        bravo_token_vault,
+        sender=teller.address,
+    )
+    boa.env.time_travel(seconds=1)
     assert undy_vault_prices.addPriceSnapshot(bravo_token_vault, sender=teller.address)
     assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
 
@@ -2512,14 +2517,37 @@ def test_undy_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
         alpha_token_whale,
         100 * EIGHTEEN_DECIMALS,
     )
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {80 * EIGHTEEN_DECIMALS}"
+    )
     boa.env.time_travel(seconds=1)
     assert undy_vault_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    eligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    first_eligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
     # Snapshot supply is normalized by the vault-token decimal scale.
-    assert eligible.totalSupply == 100
-    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    assert first_eligible.totalSupply == 100
+    assert first_eligible.pricePerShare == 8 * EIGHTEEN_DECIMALS // 10
+    assert (
+        undy_vault_prices.getWeightedPrice(alpha_token_vault)
+        == first_eligible.pricePerShare
+    )
     boa.env.time_travel(seconds=7)
-    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {60 * EIGHTEEN_DECIMALS}"
+    )
+    assert undy_vault_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    second_eligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    assert second_eligible.totalSupply == 100
+    assert second_eligible.pricePerShare == 6 * EIGHTEEN_DECIMALS // 10
+
+    boa.env.time_travel(seconds=11)
+    # Bootstrap 1e18 is supply-ineligible. The nonzero-supply ring computes
+    # (0.8e18 * 7 + 0.6e18 * 11) / 18, not the 0.6e18 fallback.
+    expected = (
+        first_eligible.pricePerShare * 7
+        + second_eligible.pricePerShare * 11
+    ) // 18
+    assert expected != second_eligible.pricePerShare
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == expected
 
 
 def test_undy_sc17_capacity_one_and_malformed_chronology_fail_soft(

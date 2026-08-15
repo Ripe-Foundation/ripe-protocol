@@ -2714,7 +2714,7 @@ def test_sc23_delay_freshness_boundary_and_zero_stale_policy(
     mock_price_source,
     teller,
 ):
-    """staleTime < minSnapshotDelay is allowed and intentionally fail-closed."""
+    """The overlap predicate avoids a stale-and-snapshot-ineligible interval."""
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     # Equality is the no-gap boundary: the old observation remains fresh at
     # the exact instant a replacement first becomes eligible.
@@ -2746,14 +2746,20 @@ def test_sc23_delay_freshness_boundary_and_zero_stale_policy(
         bravo_token_vault,
         min_delay=10,
         max_snapshots=3,
-        stale_time=9,
+        stale_time=8,
     )
-    boa.env.time_travel(seconds=9)
+    boa.env.time_travel(seconds=8)
     assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
-    # One second over the inclusive freshness boundary is fail-closed. A new
-    # snapshot is eligible at this same instant and restores price.
+    # At t=9 the t=0 seed is one second beyond its inclusive freshness
+    # deadline, while the ten-second minimum delay still rejects replacement.
     boa.env.time_travel(seconds=1)
     assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == 0
+    assert not blue_chip_prices.addPriceSnapshot(
+        bravo_token_vault,
+        sender=teller.address,
+    )
+    # At t=10 replacement first becomes eligible and restores pricing.
+    boa.env.time_travel(seconds=1)
     assert blue_chip_prices.addPriceSnapshot(bravo_token_vault, sender=teller.address)
     assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
 
@@ -2800,18 +2806,42 @@ def test_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
         alpha_token_whale,
         100 * EIGHTEEN_DECIMALS,
     )
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {80 * EIGHTEEN_DECIMALS}"
+    )
     boa.env.time_travel(seconds=1)
     assert blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    eligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    first_eligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
     # Snapshot supply is normalized by the vault-token decimal scale.
-    assert eligible.totalSupply == 100
+    assert first_eligible.totalSupply == 100
+    assert first_eligible.pricePerShare == 8 * EIGHTEEN_DECIMALS // 10
 
     # Same-block pricing is the fresh fallback because the newly eligible
-    # observation has zero duration. After time advances, the ring itself is
-    # the source of the same value.
-    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    # observation has zero duration.
+    assert (
+        blue_chip_prices.getWeightedPrice(alpha_token_vault)
+        == first_eligible.pricePerShare
+    )
     boa.env.time_travel(seconds=7)
-    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {60 * EIGHTEEN_DECIMALS}"
+    )
+    assert blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    second_eligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    assert second_eligible.totalSupply == 100
+    assert second_eligible.pricePerShare == 6 * EIGHTEEN_DECIMALS // 10
+
+    boa.env.time_travel(seconds=11)
+    # The zero-supply 1e18 bootstrap is excluded. Ring chronology gives the
+    # first nonzero-supply PPS seven seconds and the second eleven seconds:
+    # (0.8e18 * 7 + 0.6e18 * 11) / 18. This differs from lastSnapshot (0.6e18),
+    # proving the nonzero-supply ring, rather than fallback, now supplies PPS.
+    expected = (
+        first_eligible.pricePerShare * 7
+        + second_eligible.pricePerShare * 11
+    ) // 18
+    assert expected != second_eligible.pricePerShare
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == expected
 
 
 @pytest.mark.parametrize(

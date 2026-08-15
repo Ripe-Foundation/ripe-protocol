@@ -74,11 +74,14 @@ resulting interval is fail-closed: this source returns zero after the inclusive
 freshness deadline and before the next snapshot is eligible; PriceDesk may use
 a later healthy source or leave the asset unpriced.
 
-The no-gap predicate is `staleTime == 0 or minSnapshotDelay <= staleTime`.
-Equality is safe because the old observation is fresh and a replacement is
-eligible at the same timestamp. Focused tests pin equality, one second beyond
-the freshness boundary, and the intentional no-expiration behavior when
-`staleTime == 0`.
+The pre-expiry-refresh predicate is
+`staleTime == 0 or minSnapshotDelay <= staleTime`. For a finite freshness
+window, it guarantees that a replacement is eligible no later than the last
+timestamp at which the old observation remains fresh. Equality is safe because
+the old observation is fresh and a replacement is eligible at the same
+timestamp. Focused tests pin equality, a true stale-and-replacement-ineligible
+timestamp when `staleTime=8` and `minSnapshotDelay=10`, eligibility one second
+later, and the intentional no-expiration behavior when `staleTime == 0`.
 
 ## Zero-supply bootstrap invariant
 
@@ -86,9 +89,10 @@ A fresh zero-supply ERC-4626 snapshot may supply a bootstrap PPS through
 `lastSnapshot`, even though zero-supply observations are excluded from the ring
 TWAP. This is the pre-existing empty-vault policy retained by SC-17. It remains
 bounded by SC-23 freshness and by the normal live-PPS minimum composition, so
-it cannot bypass the current-vault PPS clamp. Transition tests prove that the
-first later nonzero-supply snapshot becomes ring-eligible and takes over after
-positive elapsed time.
+it cannot bypass the current-vault PPS clamp. Transition tests use two distinct
+nonzero-supply PPS observations and independently derive an interval-weighted
+output different from the latest fallback, proving that the supply-ineligible
+bootstrap is excluded and the nonzero-supply ring takes over.
 
 ## RH-D034 owner decision: conditional acceptance of SC-17 timing residual
 

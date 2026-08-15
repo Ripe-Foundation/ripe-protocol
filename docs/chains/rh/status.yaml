@@ -39,6 +39,7 @@ snapshot:
 
 counts:
   workstreams: 28
+  # Counts decisions not fully retired; RH-D026 is excluded from 34 entries.
   rh_d_decisions: 33
   h03_blockers: 28
   h04_rows: 22
