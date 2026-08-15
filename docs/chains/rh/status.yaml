@@ -310,7 +310,7 @@ decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
   mirror_contract: Every RH-D identifier and title in decisions must match this register exactly and cannot be silently closed.
   update_rule: Every future RH-D addition or rename must update the canonical register, this exact mirror, and rh_d_decisions in the same change.
-  live_parallel_pr_allocation: { PR-142: [RH-D033, RH-D034], PR-144: [RH-D035], PR-143: [RH-D036], PR-146: [RH-D037], PR-145: [RH-D038], PR-147: [RH-D039, RH-D040, RH-D041] }
+  live_parallel_pr_allocation: { PR-142: [RH-D033, RH-D034], PR-144: [RH-D035], PR-143: [RH-D036], PR-146: [RH-D037], PR-145: [RH-D038], PR-147: [RH-D039, RH-D040, RH-D041], PR-152: [RH-D042] }
   merge_gate: Re-sweep live sibling heads immediately before rebase or merge and preserve unique IDs, exact title parity, and actual-entry count.
 
 document_roles:

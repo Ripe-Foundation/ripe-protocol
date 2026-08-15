@@ -19,10 +19,10 @@ deployment, configuration, or activation authority.
 On 15 August 2026, the owner serialized the identifiers being introduced by
 the simultaneously open remediation PRs: PR #142 owns RH-D033 and RH-D034,
 PR #144 owns RH-D035, PR #143 owns RH-D036, PR #146 owns RH-D037, PR #145 owns
-RH-D038, and PR #147 owns RH-D039 through RH-D041. PRs #152 and #157 inherit
-the PR #142 entries in their current stacked histories and introduced no new
-RH-D heading at this sweep. These are merge-order reservations, not authority
-for the other PRs' source or decisions. The live sibling heads must be swept
+RH-D038, PR #147 owns RH-D039 through RH-D041, and PR #152 owns RH-D042. PR
+#157 inherits the PR #142 entries in its current stacked history and introduced
+no new RH-D heading at this sweep. These are merge-order reservations, not
+authority for the other PRs' source or decisions. The live sibling heads must be swept
 again immediately before rebase or merge; every affected branch must preserve
 unique headings, exact status-mirror title parity, and an actual-entry count
 rather than inferring the next ID from a stale branch tail.
