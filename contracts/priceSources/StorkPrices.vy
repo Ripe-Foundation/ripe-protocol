@@ -109,6 +109,16 @@ STORK: public(immutable(address))
 MAX_PRICE_UPDATES: constant(uint256) = 20
 
 
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
+
+
 @deploy
 def __init__(
     _ripeHq: address,
@@ -140,7 +150,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
     return self._getPrice(config.feedId, staleTime)
 
 
@@ -150,7 +160,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: StorkFeedConfig = self.feedConfig[_asset]
     if config.feedId == empty(bytes32):
         return 0, False
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
     return self._getPrice(config.feedId, staleTime), True
 
 
@@ -165,6 +175,8 @@ def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
 
     # price is too stale
     publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
+    if publishTime > block.timestamp:
+        return 0
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0
 

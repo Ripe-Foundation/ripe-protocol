@@ -46,7 +46,7 @@ def test_stork_local_update_prices(
     assert stork_prices.getPrice(alpha_token) != 0
 
     # get payload
-    publish_time = boa.env.evm.patch.timestamp + 1
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_stork.createPriceFeedUpdateData(
         data_feed_id,
         998888888000000000,
@@ -144,7 +144,7 @@ def test_stork_get_price(
     addStorkFeed(alpha_token, data_feed_id)
 
     # get payload
-    publish_time = boa.env.evm.patch.timestamp + 1
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_stork.createPriceFeedUpdateData(
         data_feed_id,
         quantized_value,
@@ -838,3 +838,122 @@ def test_set_stork_feed_cbtc(
 
     assert stork_prices.feedConfig(cbtc).feedId == data_feed_id
     assert 99_000 * EIGHTEEN_DECIMALS > stork_prices.getPrice(cbtc) > 97_000 * EIGHTEEN_DECIMALS
+
+
+SC20_STORK_FEED_ID = bytes.fromhex(
+    "7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c"
+)
+SC20_STORK_PRICE = 998_000_000_000_000_000
+
+
+def _set_sc20_stork_price(mock_stork, publish_time):
+    payload = mock_stork.createPriceFeedUpdateData(
+        SC20_STORK_FEED_ID,
+        SC20_STORK_PRICE,
+        publish_time,
+    )
+    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)
+    mock_stork.updateTemporalNumericValuesV1(payload, value=len(payload))
+
+
+def _add_sc20_stork_feed(
+    stork_prices,
+    mock_stork,
+    asset,
+    governance,
+    stale_time,
+):
+    _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+    assert stork_prices.addNewPriceFeed(
+        asset,
+        SC20_STORK_FEED_ID,
+        stale_time,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
+    _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+    assert stork_prices.confirmNewPriceFeed(asset, sender=governance.address)
+
+
+@pytest.mark.parametrize(
+    "caller_bound,feed_bound,age,expected_valid",
+    [
+        (0, 0, 100_000, True),
+        (20, 0, 21, False),
+        (0, 20, 21, False),
+        (10, 20, 11, False),
+        (20, 10, 11, False),
+        (10, 10, 5, True),
+        (10, 20, 10, True),
+        (10, 20, 11, False),
+    ],
+)
+def test_sc20_stork_stale_resolver_matrix(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    bravo_token,
+    governance,
+    caller_bound,
+    feed_bound,
+    age,
+    expected_valid,
+):
+    assert stork_prices.getPriceAndHasFeed(bravo_token) == (0, False)
+    _add_sc20_stork_feed(
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        feed_bound,
+    )
+    boa.env.time_travel(seconds=age)
+
+    expected_price = SC20_STORK_PRICE if expected_valid else 0
+    assert stork_prices.getPrice(alpha_token, caller_bound) == expected_price
+    assert stork_prices.getPriceAndHasFeed(alpha_token, caller_bound) == (
+        expected_price,
+        True,
+    )
+
+
+@pytest.mark.parametrize("stale_bound", [0, 1_000])
+def test_sc21_stork_future_timestamp_is_fail_soft_and_recovers(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+    stale_bound,
+):
+    _add_sc20_stork_feed(
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        0,
+    )
+    future_time = boa.env.timestamp + 100
+    _set_sc20_stork_price(mock_stork, future_time)
+
+    assert stork_prices.getPrice(alpha_token, stale_bound) == 0
+    assert stork_prices.getPriceAndHasFeed(alpha_token, stale_bound) == (0, True)
+
+    boa.env.time_travel(seconds=100)
+    assert stork_prices.getPrice(alpha_token, stale_bound) == SC20_STORK_PRICE
+
+
+def test_sc21_stork_current_timestamp_is_valid(
+    stork_prices,
+    mock_stork,
+    alpha_token,
+    governance,
+):
+    _add_sc20_stork_feed(
+        stork_prices,
+        mock_stork,
+        alpha_token,
+        governance,
+        0,
+    )
+    _set_sc20_stork_price(mock_stork, boa.env.timestamp)
+    assert stork_prices.getPrice(alpha_token, 1) == SC20_STORK_PRICE
