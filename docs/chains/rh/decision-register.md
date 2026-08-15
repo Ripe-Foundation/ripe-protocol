@@ -1284,6 +1284,52 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 
 **Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
+### RH-D043 — Curve snapshot remediation uses confirmation-anchored continuity
+
+**Status:** Candidate policy recorded 15 August 2026; exact-head owner
+ratification remains required before review readiness or integration.
+
+The candidate selects chronological block-duration weighting and accepts its
+rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
+recommended live `maxNumSnapshots` is 10, matching the existing Base setting
+and the S=10 PriceDesk composition envelope. At most one successful write is
+allowed per block; the actual ten-observation time horizon therefore depends
+on qualifying Teller activity and must be monitored rather than presented as
+a fixed wall-clock window.
+
+For any `dangerTrigger` or `staleBlocks` change, the ring and accumulated
+`numBlocksInDanger` survive, all three continuity anchors are cleared, and the
+retained ring is evaluated under the confirmed policy. A nonzero dangerous
+result anchors danger at confirmation; a nonzero safe result with historical
+danger anchors recovery at confirmation; an unavailable result leaves all
+anchors cleared. Freshness expansion may make retained observations available
+again for current classification, but no elapsed time across the old
+unavailable gap is credited. A still-fresh shrink may shorten the remaining
+recovery window only from the confirmation anchor. Neither transition erases
+the accumulated counter.
+
+Classification remains inclusive (`weightedRatio >= dangerTrigger`). Operators
+must keep the trigger above the expected resting ratio and must not configure
+it at equilibrium. The existing proposal-before-liquidity workflow is retained:
+a fully empty pool can be proposed, but confirmation revalidates and reverts
+atomically if it cannot seed a nonzero snapshot. The duplicate internal
+validator arguments are retained to minimize unrelated bytecode churn.
+
+Activation requires exact-head owner ratification, a finite operating cadence,
+the selected S=10 bound, cold maximum-ring and PriceDesk composition evidence,
+snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
+Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
+sustained fallback, near-budget gas, threshold/equilibrium change, or new
+consumer/topology reopens qualification. The inherited pinned-Base
+`test_curve_prices.py` freshness defect remains recorded test-harness debt and
+grants no production exception. This decision grants no deployment,
+registration, configuration, activation, or release authority.
+
+**Source:**
+[`evidence/curve-snapshot-remediation.md`](evidence/curve-snapshot-remediation.md),
+`config/contract-artifact-expectations.json`, and
+`tests/priceSources/curve/test_green_ref_pool.py`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

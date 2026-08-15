@@ -159,6 +159,11 @@ def _record(
         entry for entry in compiled.abi if entry.get("type") == "constructor"
     ]
     return {
+        **(
+            {"qualification": prior["qualification"]}
+            if "qualification" in prior
+            else {}
+        ),
         "abi": {
             "canonical_sha256": checker._json_sha256(compiled.abi),
             "committed_file_sha256": checker._sha256(abi_bytes),
