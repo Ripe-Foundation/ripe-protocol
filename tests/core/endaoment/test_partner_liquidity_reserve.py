@@ -78,6 +78,70 @@ def addLiquidity(
 """
 
 
+CONTROLLED_DELTA_TOKEN_SOURCE = """
+# @version 0.4.3
+
+name: public(constant(String[32])) = "Controlled Delta"
+symbol: public(constant(String[8])) = "DELTA"
+decimals: public(constant(uint8)) = 6
+
+TARGET: immutable(address)
+MODE: immutable(uint256)
+DELTA: immutable(uint256)
+
+balances: HashMap[address, uint256]
+allowances: HashMap[address, HashMap[address, uint256]]
+totalSupply: public(uint256)
+
+@deploy
+def __init__(_target: address, _mode: uint256, _delta: uint256):
+    TARGET = _target
+    MODE = _mode
+    DELTA = _delta
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balances[_to] += _amount
+    self.totalSupply += _amount
+
+@view
+@external
+def balanceOf(_owner: address) -> uint256:
+    return self.balances[_owner]
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowances[msg.sender][_spender] = _amount
+    return True
+
+@internal
+def _move(_from: address, _to: address, _amount: uint256):
+    self.balances[_from] -= _amount
+    if _to != TARGET or MODE == 0:
+        self.balances[_to] += _amount
+    elif MODE == 1:  # controlled underdelivery
+        self.balances[_to] += _amount - DELTA
+    elif MODE == 2:  # success with zero delivery
+        pass
+    elif MODE == 3:  # malicious recipient-balance decrease
+        self.balances[_to] -= DELTA
+    else:  # controlled overdelivery
+        self.balances[_to] += _amount + DELTA
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self._move(msg.sender, _to, _amount)
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
+    if msg.sender != _from:
+        self.allowances[_from][msg.sender] -= _amount
+    self._move(_from, _to, _amount)
+    return True
+"""
+
+
 ONE_ASSET = 10**6
 ONE_GREEN = EIGHTEEN_DECIMALS
 LEGO_ID = 1
@@ -186,6 +250,7 @@ def partner_liquidity_env(
         lego_book=lego_book,
         ledger=ledger,
         governance=governance,
+        price_source=mock_price_source,
     )
 
 
@@ -205,6 +270,211 @@ def _add_partner_liquidity(ctx, partner, amount=ONE_ASSET):
         ctx.lp.address,
         sender=ctx.switchboard_delta.address,
     )
+
+
+def _controlled_delta_token(ctx, mode, delta):
+    token = boa.loads(
+        CONTROLLED_DELTA_TOKEN_SOURCE,
+        ctx.endaoment_funds.address,
+        mode,
+        delta,
+        name=f"controlled_delta_mode_{mode}",
+    )
+    ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+    return token
+
+
+def test_sc18_mint_partner_liquidity_values_actual_received_amount(
+    partner_liquidity_env,
+    alice,
+    whale,
+):
+    ctx = partner_liquidity_env
+    nominal_amount = 100 * EIGHTEEN_DECIMALS
+    fee_bps = 1_000
+    expected_received = nominal_amount * (10_000 - fee_bps) // 10_000
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        ctx.governance.address,
+        0,
+        name="sc18_fee_on_transfer_asset",
+    )
+    fee_token.transfer(alice, nominal_amount, sender=ctx.governance.address)
+    fee_token.setTransferFee(fee_bps, sender=ctx.governance.address)
+    fee_token.approve(ctx.endaoment.address, nominal_amount, sender=alice)
+    ctx.price_source.setPrice(fee_token.address, EIGHTEEN_DECIMALS)
+    reserve = 30 * EIGHTEEN_DECIMALS
+    ctx.green.transfer(ctx.endaoment_funds.address, reserve, sender=whale)
+
+    partner_before = fee_token.balanceOf(alice)
+    funds_before = fee_token.balanceOf(ctx.endaoment_funds.address)
+    supply_before = ctx.green.totalSupply()
+
+    green_minted = ctx.endaoment.mintPartnerLiquidity(
+        alice,
+        fee_token.address,
+        nominal_amount,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    received = fee_token.balanceOf(ctx.endaoment_funds.address) - funds_before
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityMinted")[0]
+    assert partner_before - fee_token.balanceOf(alice) == nominal_amount
+    assert received == expected_received < nominal_amount
+    expected_minted = received - reserve
+    assert green_minted == expected_minted
+    assert ctx.green.totalSupply() - supply_before == expected_minted
+    assert log.partnerAmount == received
+    assert log.usdValue == received
+    assert log.greenMinted == expected_minted
+
+
+@pytest.mark.parametrize(
+    "reserve",
+    [0, ONE_GREEN // 2, ONE_GREEN, ONE_GREEN * 2],
+    ids=["none", "partial", "equal", "greater"],
+)
+def test_sc18_exact_transfer_preserves_green_reserve_shortfall(
+    partner_liquidity_env,
+    alice,
+    whale,
+    reserve,
+):
+    ctx = partner_liquidity_env
+    if reserve:
+        ctx.green.transfer(ctx.endaoment_funds.address, reserve, sender=whale)
+    _fund_partner(ctx, alice)
+    supply_before = ctx.green.totalSupply()
+
+    minted = ctx.endaoment.mintPartnerLiquidity(
+        alice,
+        ctx.asset.address,
+        ONE_ASSET,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    expected = max(ONE_GREEN - reserve, 0)
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityMinted")[0]
+    assert minted == expected
+    assert ctx.green.totalSupply() - supply_before == expected
+    assert log.partnerAmount == ONE_ASSET
+    assert log.usdValue == ONE_GREEN
+    assert log.greenMinted == expected
+
+
+@pytest.mark.parametrize("mode", [2, 3], ids=["zero-delivery", "recipient-decrease"])
+def test_sc18_nonpositive_recipient_delta_reverts_atomically(
+    partner_liquidity_env,
+    alice,
+    mode,
+):
+    ctx = partner_liquidity_env
+    token = _controlled_delta_token(ctx, mode, 1)
+    nominal = 100 * ONE_ASSET
+    token.mint(alice, nominal)
+    token.mint(ctx.endaoment_funds.address, 10)
+    token.approve(ctx.endaoment.address, nominal, sender=alice)
+    before = (
+        token.balanceOf(alice),
+        token.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    )
+
+    with boa.reverts("no asset received"):
+        ctx.endaoment.mintPartnerLiquidity(
+            alice,
+            token.address,
+            nominal,
+            sender=ctx.switchboard_delta.address,
+        )
+
+    assert (
+        token.balanceOf(alice),
+        token.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    ) == before
+
+
+def test_sc18_positive_overdelivery_is_valued_consistently(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    bonus = 7 * ONE_ASSET
+    nominal = 100 * ONE_ASSET
+    token = _controlled_delta_token(ctx, 4, bonus)
+    token.mint(alice, nominal)
+    token.approve(ctx.endaoment.address, nominal, sender=alice)
+
+    minted = ctx.endaoment.mintPartnerLiquidity(
+        alice,
+        token.address,
+        nominal,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    actual = nominal + bonus
+    expected_value = actual * 10**12
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityMinted")[0]
+    assert token.balanceOf(ctx.endaoment_funds.address) == actual
+    assert minted == expected_value
+    assert log.partnerAmount == actual
+    assert log.usdValue == expected_value
+    assert log.greenMinted == expected_value
+
+
+def test_sc18_self_partner_uses_only_endaoment_controlled_balance(
+    partner_liquidity_env,
+):
+    ctx = partner_liquidity_env
+    controlled = ONE_ASSET
+    ctx.asset.mint(ctx.endaoment.address, controlled, sender=ctx.governance.address)
+
+    minted = ctx.endaoment.mintPartnerLiquidity(
+        ctx.endaoment.address,
+        ctx.asset.address,
+        controlled * 2,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityMinted")[0]
+    assert minted == ONE_GREEN
+    assert log.partnerAmount == controlled
+    assert ctx.asset.balanceOf(ctx.endaoment.address) == controlled
+    assert ctx.asset.balanceOf(ctx.endaoment_funds.address) == 0
+
+
+def test_sc18_add_partner_liquidity_composes_with_received_delta(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    nominal = ONE_ASSET
+    shortfall = ONE_ASSET // 5
+    received = nominal - shortfall
+    token = _controlled_delta_token(ctx, 1, shortfall)
+    token.mint(alice, nominal)
+    token.approve(ctx.endaoment.address, nominal, sender=alice)
+    supply_before = ctx.green.totalSupply()
+
+    lp_received, amount_a, amount_b = ctx.endaoment.addPartnerLiquidity(
+        LEGO_ID,
+        ctx.lp.address,
+        alice,
+        token.address,
+        nominal,
+        0,
+        ctx.lp.address,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    expected_green = received * 10**12
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityAdded")[0]
+    assert (lp_received, amount_a, amount_b) == (2, received, expected_green)
+    assert ctx.green.totalSupply() - supply_before == expected_green
+    assert ctx.ledger.greenPoolDebt(ctx.lp.address) == expected_green
+    assert log.partnerAmount == received
+    assert log.greenAmount == expected_green
 
 
 def test_partner_receives_only_current_action_share(
