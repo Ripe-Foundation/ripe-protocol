@@ -220,7 +220,10 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     assert prune_gas < 500_000
     assert activation_gas < 1_200_000
     assert single_claim_gas < 500_000
-    assert claim_many_gas < 7_000_000
+    # The SC-05/17/23 source-dispatch changes raise repeated PriceDesk no-feed
+    # probes in this 15-claim path from 6,974,789 to 7,013,069 gas. Preserve
+    # ~2.7% local-EVM regression headroom without weakening the bounded cap.
+    assert claim_many_gas < 7_200_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000
