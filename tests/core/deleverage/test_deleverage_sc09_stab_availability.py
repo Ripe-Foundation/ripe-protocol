@@ -407,6 +407,117 @@ def test_sc09_custody_deficit_skips_broad_but_strict_reverts(
         teller.withdraw(savings_green, 10 * EIGHTEEN_DECIMALS, bob, stability_pool, sender=bob)
 
 
+def test_sc09_explicit_requested_unavailable_stab_asset_reverts_atomically(
+    sc09_setup,
+    deleverage,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    stability_pool,
+    savings_green,
+    alpha_token,
+    claim_token,
+    claim_token_whale,
+    mock_price_source,
+    green_token,
+    auction_house,
+    governance,
+    bob,
+    switchboard_alpha,
+):
+    """An explicitly requested unavailable cohort is strict and atomic."""
+    sc09_setup()
+    _seed_custody_deficit(
+        stability_pool,
+        auction_house,
+        savings_green,
+        claim_token,
+        claim_token_whale,
+        mock_price_source,
+        green_token,
+        savings_green,
+        governance,
+    )
+
+    stab_vault_id = vault_book.getRegId(stability_pool)
+    before_stab = _stab_snapshot(
+        stability_pool,
+        savings_green,
+        claim_token,
+        bob,
+        ledger,
+        stab_vault_id,
+    )
+    before_debt = _debt(credit_engine, bob)
+    before_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    before_green_supply = green_token.totalSupply()
+    before_sgreen_supply = savings_green.totalSupply()
+    before_deleverage_green = green_token.balanceOf(deleverage)
+    before_deleverage_sgreen = savings_green.balanceOf(deleverage)
+
+    target = 100 * EIGHTEEN_DECIMALS
+    assets = [(stab_vault_id, savings_green.address, target)]
+
+    # Unlike broad traversal, the caller-selected route does not availability-
+    # probe and skip. Strict Stability Pool accounting sees the custody deficit
+    # and unwinds every debt, collateral, custody, supply, reward, and event write.
+    with boa.reverts("claim custody deficit"):
+        teller.deleverageWithSpecificAssets(
+            assets,
+            bob,
+            sender=switchboard_alpha.address,
+        )
+
+    assert _debt(credit_engine, bob) == before_debt
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == before_alpha
+    assert _stab_snapshot(
+        stability_pool,
+        savings_green,
+        claim_token,
+        bob,
+        ledger,
+        stab_vault_id,
+    ) == before_stab
+    assert green_token.totalSupply() == before_green_supply
+    assert savings_green.totalSupply() == before_sgreen_supply
+    assert green_token.balanceOf(deleverage) == before_deleverage_green
+    assert savings_green.balanceOf(deleverage) == before_deleverage_sgreen
+    assert len(filter_logs(teller, "DeleverageUser")) == 0
+    assert len(filter_logs(teller, "StabAssetBurntDuringDeleverage")) == 0
+    assert len(filter_logs(teller, "EndaomentTransferDuringDeleverage")) == 0
+
+    # Restoring only claim custody makes the identical explicit request succeed,
+    # proving that the unavailable cohort caused the strict failure.
+    deficit = (
+        stability_pool.totalClaimableBalances(claim_token)
+        - claim_token.balanceOf(stability_pool)
+    )
+    claim_token.mint(stability_pool, deficit, sender=governance.address)
+    repaid = teller.deleverageWithSpecificAssets(
+        assets,
+        bob,
+        sender=switchboard_alpha.address,
+    )
+
+    assert repaid == target
+    assert _debt(credit_engine, bob) == before_debt - target
+    assert stability_pool.userBalances(bob, savings_green) < before_stab["user_shares"]
+    burns = filter_logs(teller, "StabAssetBurntDuringDeleverage")
+    assert len(burns) == 1
+    assert burns[0].user == bob
+    assert burns[0].vaultId == stab_vault_id
+    assert burns[0].stabAsset == savings_green.address
+    assert burns[0].usdValue == target
+    logs = filter_logs(teller, "DeleverageUser")
+    assert len(logs) == 1
+    assert logs[0].targetRepayAmount == target
+    assert logs[0].targetRepayAmountWithBuffer == target
+    assert logs[0].collateralValueRepaid == target
+    assert logs[0].debtToClear == target
+
+
 @pytest.mark.parametrize("unavailable", ["price", "pause", "custody"])
 def test_sc09_withdrawal_preflight_skips_unavailable_stab_cohort(
     unavailable,

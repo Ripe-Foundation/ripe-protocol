@@ -2,6 +2,9 @@
 
 **Decision date:** 14 August 2026
 
+**Integration allocation confirmed:** 15 August 2026 as RH-D038 by the
+canonical decision-register owner after rechecking the open remediation set
+
 **Status:** owner-authorized bounded remediation implemented in draft PR #145;
 independent review, integration, deployment, configuration, activation, and
 release remain separate gates
@@ -53,11 +56,13 @@ record are supporting evidence rather than additional production scope.
 
 ## Deployability and chain compatibility
 
-The reviewed candidate compiles to a 24,436-byte runtime template plus 96 bytes
-of immutable data: 24,532 deployed bytes, 44 bytes below the EIP-170 limit. The
-task's controlling size rule is strictly less than 24,576 bytes; no historical
-minimum-headroom target is imported into this bounded decision. Any further
-production growth requires a fresh measurement and review.
+The final candidate compiles to a 24,191-byte runtime template plus 96 bytes of
+immutable data: 24,287 deployed bytes, 289 bytes below the EIP-170 limit. It
+therefore satisfies the repository's ordinary 200-byte minimum-headroom policy;
+no Deleverage override, exact-identity waiver, or residual-risk exception is
+used. Any later source, compiler, dependency, constructor, runtime identity, or
+size change requires a fresh measurement and must continue to satisfy the
+ordinary floor unless a separate owner-authorized waiver is added.
 
 The candidate is compatible with the recorded Robinhood MissionControl, where
 the Stability Pool classifier is present and populated. Before changing the
@@ -68,6 +73,21 @@ The recorded Base MissionControl predates this classifier. This Deleverage must
 not replace Base Deleverage unless Base MissionControl is first upgraded to
 expose and correctly populate `isStabVaultId`. This record grants no such Base
 upgrade authority.
+
+## Public view integration note
+
+`getDeleverageInfo` keeps the same ABI but now reports only collateral currently
+available to optional broad deleveraging. An unavailable Stability Pool cohort
+is omitted from both the maximum amount and weighted LTV until its price,
+pause, or aggregate claim-custody condition recovers. Consumers must not treat
+the tuple as an inventory of every nominal user position.
+
+A repository-wide consumer search on 15 August 2026 found no SDK, frontend,
+indexer, keeper, or other off-chain caller. The only non-test references are the
+contract's internal withdrawal-assist call, the unchanged ABI entry in
+`scripts/abis/Deleverage.json`, and ABI/source copies in the immutable Robinhood
+migration-history manifest. Any consumer maintained outside this repository
+must adopt the availability semantics above before a release using these bytes.
 
 ## Evidence and lifecycle boundary
 

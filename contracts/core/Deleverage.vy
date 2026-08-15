@@ -3,8 +3,8 @@
 
 # @version 0.4.3
 #pragma optimize codesize
-# At this source revision, the deployed runtime is 24,532 bytes including
-# Vyper's 96-byte immutables section: 44 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 24,287 bytes including
+# Vyper's 96-byte immutables section: 289 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
@@ -375,14 +375,12 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     # (targetRepayAmount, buffer, budget) stays keyed to the pre-interaction
     # snapshot; the refreshed amount is required to equal it, so the full-payoff
     # and dust semantics are preserved.
-    settleDebt: UserDebt = empty(UserDebt)
-    settleInterest: uint256 = 0
-    settleDebt, settleInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
+    userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
 
     # Repay debt. This repeats the full-payoff check from the buffer branch above;
     # it relies on targetRepayAmount only moving up toward userDebt.amount in the loop.
-    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, totalRepaidAmount, settleDebt.amount)
-    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, settleDebt, debtToClear, settleInterest, 0, a)
+    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, totalRepaidAmount, userDebt.amount)
+    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, a)
 
     log DeleverageUser(
         user=_user,
@@ -455,12 +453,10 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
 
     # SC-07: refresh live debt after collateral interactions; revert if the
     # amount changed. Settlement uses the refreshed struct + interest.
-    settleDebt: UserDebt = empty(UserDebt)
-    settleInterest: uint256 = 0
-    settleDebt, settleInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
+    userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
 
     # repay debt
-    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, settleDebt, min(totalRepaidAmount, settleDebt.amount), settleInterest, 0, a)
+    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, min(totalRepaidAmount, userDebt.amount), newInterest, 0, a)
 
     log DeleverageUserWithVolatileAssets(
         user=_user,
@@ -744,14 +740,12 @@ def _deleverageUser(
     # SC-07: refresh live debt after collateral interactions; revert if the
     # amount changed. Planning quantities above stay keyed to the pre-interaction
     # snapshot; settlement uses the refreshed struct + interest.
-    settleDebt: UserDebt = empty(UserDebt)
-    settleInterest: uint256 = 0
-    settleDebt, settleInterest = self._refreshSettlementDebt(_user, userDebt.amount, _a)
+    userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, _a)
 
     # repay debt
-    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, collateralValueRepaid, settleDebt.amount)
+    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, collateralValueRepaid, userDebt.amount)
 
-    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, settleDebt, debtToClear, settleInterest, 0, _a)
+    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, _a)
 
     log DeleverageUser(
         user=_user,
@@ -841,7 +835,7 @@ def _performDeleveragePhases(
 
             # Phase 1 vaults are Stability Pool cohorts by construction, so apply
             # the SC-09 fail-soft availability gate.
-            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
             if self.vaultAddrs[stabPool.vaultId] == empty(address):
                 self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
@@ -914,8 +908,7 @@ def _iterateThruAllUserVaults(
         # same fail-soft availability gate applies here. The didHandleVaultId
         # transient guard inside _iterateThruAssetsWithinVault prevents a second
         # probe of a cohort already handled in phase 1.
-        isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId)
-        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, isStabVault, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
 
     return remainingToRepay
 
@@ -929,7 +922,6 @@ def _iterateThruAssetsWithinVault(
     _vaultId: uint256,
     _vaultAddr: address,
     _remainingToRepay: uint256,
-    _isStabVault: bool,
     _endaoFunds: address,
     _endaomentPsm: address,
     _psmYieldPositionToken: address,
@@ -946,6 +938,8 @@ def _iterateThruAssetsWithinVault(
     if numUserAssets == 0:
         return _remainingToRepay
 
+    isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(_vaultId)
+
     # totals
     remainingToRepay: uint256 = _remainingToRepay
     for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
@@ -953,36 +947,28 @@ def _iterateThruAssetsWithinVault(
             break
 
         asset: address = empty(address)
-        if _isStabVault:
-            # SC-09: broad Deleverage optionally participates in a Stability Pool
-            # cohort. Gate on the pool's own fail-soft availability view
-            # (getUserAssetAndAmountAtIndex -> _getCohortLiquidationAmount) -- the
-            # SAME classifier AuctionHouse liquidation uses (see StabVault:
-            # "an unhealthy cohort deliberately reports zero so liquidation can
-            # continue"). A zero amount means the cohort is unavailable right now
-            # -- whether from an unpriceable claim, a paused vault, or an
-            # aggregate claim-custody deficit -- so skip it and continue to
-            # healthy ordinary collateral, exactly as liquidation does. This ONLY
-            # decides participation; it mutates no claim/reward/share/custody
-            # state, and once we hand off to _handleSpecificAsset the strict
-            # accounting/custody/transfer paths are unchanged, so any failure
-            # after real processing begins still reverts. Direct Stability Pool
-            # claims/withdrawals/deposits remain strictly fail-closed.
-            failSoftAmount: uint256 = 0
-            asset, failSoftAmount = staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
-            if asset == empty(address) or failSoftAmount == 0:
-                continue
-        else:
-            # check if user still has balance in this asset
-            hasBalance: bool = False
-            asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
-            if asset == empty(address) or not hasBalance:
-                continue
+        availableAmount: uint256 = 0
+        asset, availableAmount = self._getBroadTraversalAsset(_user, _vaultAddr, y, isStabVault)
+        if asset == empty(address) or availableAmount == 0:
+            continue
 
         # handle specific liq asset
         remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, False, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
 
     return remainingToRepay
+
+
+@view
+@internal
+def _getBroadTraversalAsset(_user: address, _vaultAddr: address, _index: uint256, _isStabVault: bool) -> (address, uint256):
+    if _isStabVault:
+        # Stability Pool cohorts expose their fail-soft liquidation amount.
+        return staticcall Vault(_vaultAddr).getUserAssetAndAmountAtIndex(_user, _index)
+
+    asset: address = empty(address)
+    hasBalance: bool = False
+    asset, hasBalance = staticcall Vault(_vaultAddr).getUserAssetAtIndexAndHasBalance(_user, _index)
+    return asset, 1 if hasBalance else 0
 
 
 # specific asset
@@ -1147,17 +1133,14 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
             amount: uint256 = 0
-            if isStabVault:
-                # Match broad liquidation/deleverage participation semantics:
-                # unavailable Stability Pool cohorts report zero and are skipped.
-                asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
-            else:
-                hasBalance: bool = False
-                asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
-                if hasBalance:
-                    amount = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, asset)
+            asset, amount = self._getBroadTraversalAsset(_user, vaultAddr, y, isStabVault)
             if asset == empty(address) or amount == 0:
                 continue
+
+            if not isStabVault:
+                amount = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, asset)
+                if amount == 0:
+                    continue
 
             # check if asset is deleveragable
             assetLiqConfig: AssetLiqConfig = staticcall MissionControl(_a.missionControl).getAssetLiqConfig(asset)

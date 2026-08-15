@@ -119,10 +119,10 @@ The integrated M2/M3 source and regression behavior remain unchanged.
 ### 3. Deleverage remains parked outside the exact SC-07/SC-09 remediation
 
 Preserve the historical S4 zero-cooldown decision, integrated PR #61 bytes, and
-the four zero-valued controls. RH-D033 records the owner's bounded reopening for
+the four zero-valued controls. RH-D038 records the owner's bounded reopening for
 the SC-07/SC-09 remediation in draft PR #145.
 
-- Within RH-D033 only, complete and independently review the exact Deleverage
+- Within RH-D038 only, complete and independently review the exact Deleverage
   source fix, focused tests, artifact/inventory refresh, and decision records.
 - Do not expand that candidate into another Deleverage contract, interface,
   parameter, configuration, fork, deployment, or operational task.

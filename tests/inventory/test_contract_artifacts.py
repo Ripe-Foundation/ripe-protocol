@@ -76,7 +76,7 @@ NEW_CONTRACT_SOURCES = {
 DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_554, "headroom": 22},
     "CreditEngine": {"size": 24_566, "headroom": 10},
-    "Deleverage": {"size": 24_532, "headroom": 44},
+    "Deleverage": {"size": 24_287, "headroom": 289},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (

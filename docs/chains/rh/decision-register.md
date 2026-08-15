@@ -25,9 +25,10 @@ the GREEN/RIPE CCIP topology is confirmed live as recorded in
 transaction or release action. The four corrected-PR controls remain zero and
 deferred and lack Robinhood machine-facing parameter/planning representation.
 RH-D028 is a bounded candidate-only exception to the historical CreditEngine
-zero-backing and Deleverage parked instructions; it does not reopen cooldown,
-Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
-candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing and Deleverage parked instructions. RH-D038 separately reopens only
+the exact SC-07/SC-09 Deleverage remediation in draft PR #145; neither decision
+reopens cooldown, Underscore, broader settlement, or bad-debt work. Outside
+those exact candidates, the five broader lanes remain parked and nonblocking: CreditEngine
 zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
 Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
 closed.
@@ -188,6 +189,10 @@ removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
 adds quarantine suppression without changing zero cooldown, enabling
 Underscore, or reopening the four deferred controls.
 
+RH-D038 is a separate narrow exception for draft PR #145's exact SC-07/SC-09
+remediation and review evidence. It likewise leaves zero cooldown, omitted
+Underscore, and the four deferred controls unchanged.
+
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
@@ -256,8 +261,8 @@ binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
 remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
-preserved, but every Deleverage task is parked and no implementation track is
-open until explicit owner reopening.
+preserved. RH-D038 is the explicit bounded reopening for draft PR #145 only;
+every other Deleverage task remains parked.
 
 Source:
 `track-6-s6-track-7-h4-defaults-parameters.md`.
@@ -410,8 +415,8 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
-every Deleverage task including size/headroom work, UniswapV2Prices admission
+Except for the exact RH-D028 and RH-D038 candidates, CreditEngine zero-backing
+reassessment, every Deleverage task including size/headroom work, UniswapV2Prices admission
 and deployment, Sites recovery, and non-CCIP live deployment are deferred or
 separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
