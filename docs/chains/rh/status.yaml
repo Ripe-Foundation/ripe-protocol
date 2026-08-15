@@ -60,8 +60,8 @@ snapshot:
 counts:
   scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 36 entries.
-  rh_d_decisions: 35
+  # Counts decisions not fully retired; RH-D026 is excluded from 37 entries.
+  rh_d_decisions: 36
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -334,12 +334,12 @@ decision_namespace:
   in_flight_coordination:
     checked_on: 2026-08-15
     sc12_reserved_id: RH-D035
-    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035] }
-    open_pr_allocations: { PR_143: [RH-D036], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042] }
-    qualified_coordination_intent: { PR_145: { intended: RH-D038, actual_head_adds: RH-D033, state: collides_with_integrated_pr_142_allocation } }
+    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036] }
+    open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
+    open_prs_with_no_new_decision: [PR_163]
     inherited_not_new: { PR_152: [RH-D033, RH-D034] }
-    external_collision: PR 145 intends RH-D038 but its current head still adds RH-D033, which is integrated from PR 142. RH-D035 remains PR 144's uncollided SC-12 allocation. PR 152 now introduces RH-D042 in addition to inheriting RH-D033 and RH-D034.
-    scope: PR 144 records the claims observed immediately before its 2026-08-15 rebase and does not edit or renumber another branch.
+    external_collision: none_detected_by_fail_closed_integration_allocator
+    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch.
 
 sc12_activation_state:
   source: docs/chains/rh/smart-contract-changes/ripe-gov.md
@@ -456,15 +456,16 @@ owner_priority_overlay:
       reopen_condition: RH-D028 for its exact candidate; otherwise explicit owner instruction.
     - id: PARK-DELEVERAGE
       subject: every Deleverage task
-      state: parked_nonblocking_except_exact_rh_d028_candidate
+      state: parked_nonblocking_except_exact_rh_d028_and_rh_d038_candidates
       blocker_effect: nonblocking
       instruction: >
-        RH-D028 reopens only the exact candidate's singular-API removal and
-        quarantine suppression. Preserve zero cooldown, omitted Underscore,
-        and the four zero-valued controls; do not perform broader Deleverage,
-        fork, deployment, configuration, or operational work or implement the
-        provisional H-09 path.
-      reopen_condition: RH-D028 for its exact candidate; otherwise explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
+        RH-D028 reopens only its exact singular-API and quarantine candidate.
+        RH-D038 separately reopens only draft PR #145's SC-07/SC-09 source,
+        focused evidence, artifact/inventory refresh, and decision records.
+        Preserve zero cooldown, omitted Underscore, and the four zero-valued
+        controls; do not perform broader Deleverage, fork, deployment,
+        configuration, or operational work or implement the provisional H-09 path.
+      reopen_condition: RH-D028 or RH-D038 for their exact candidates; otherwise explicit owner instruction plus H-09 ceiling reseal for any fork-suite work.
     - id: PARK-UNISWAP-TWAP
       subject: Uniswap V2 price-source admission and activation
       state: parked_nonblocking
@@ -1179,7 +1180,7 @@ decisions:
   - { id: RH-D008, title: "CCIP complete or disabled", status: "superseded_by_confirmed_live_state", summary: "The historical disabled posture was overtaken by live activation. Current topology is confirmed; explicit rate policy, destination-gas evidence, exact source/compiler/constructor identity, license and transaction provenance, live-send backend, further transaction authority, and release gates remain open.", source: "docs/chains/rh/ccip-live-state.md"}
   - { id: RH-D009, title: "USDG price path", status: "price_path_approved_activation_gated", summary: "Use the shared official feed path; PSM deployment and activation remain separate gates.", source: "docs/chains/rh/usdg-psm-decision.md"}
   - { id: RH-D010, title: "Lootbox immutable floor", status: "approved_reviewed_integrated", summary: "Base uses 43,200 and Robinhood 7,200 with strict greater-than behavior.", source: "docs/chains/rh/lootbox-floor-implementation-record.md"}
-  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_rh_d028_exact_candidate_exception", summary: "Zero cooldown, omitted Underscore, and four deferred controls remain closed. RH-D028 narrowly reopens only the exact custody-shortfall candidate's singular-API removal and quarantine suppression; all broader Deleverage work stays parked.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
+  - { id: RH-D011, title: "Deleverage initial no-code posture", status: "zero_cooldown_closed_bounded_rh_d028_and_rh_d038_exceptions", summary: "Zero cooldown, omitted Underscore, and four deferred controls remain closed. RH-D028 narrowly reopens its custody-shortfall candidate and RH-D038 separately reopens only draft PR #145's SC-07/SC-09 remediation; all broader Deleverage work stays parked.", source: "docs/chains/rh/deleverage-cooldown-security-decision.md"}
   - { id: RH-D012, title: "Portable Ledger child-block identity", status: "implementation_integrated", summary: "Ledger implementation is integrated; downstream binding, deployment proof, and release remain open.", source: "docs/chains/rh/ledger-guard-implementation-record.md"}
   - { id: RH-D013, title: "Typed network profiles", status: "approved_reviewed_integrated", summary: "Use the immutable identity-first profile registry with secret-safe fail-closed behavior.", source: "docs/chains/rh/track-7-h2-network-profiles-cli.md"}
   - { id: RH-D014, title: "Symbolic blueprint before concrete values", status: "implementation_integrated_blockers_open", summary: "H-03 implementation is integrated; all 28 canonical H-03 blockers, including nine Curve launch inputs, remain open and grant no deployment authority.", source: "docs/chains/rh/evidence/robinhood-blueprint-phase-a.md"}
@@ -1205,6 +1206,7 @@ decisions:
   - { id: RH-D034, title: "SC-17 timing residual is conditionally accepted", status: "owner_conditionally_accepted_candidate_residual", summary: "The owner accepted retaining observation-interval TWAP with its documented snapshot-timing residual. Every snapshot-backed feed remains inactive until it has finite nonzero freshness, minSnapshotDelay no greater than staleTime, vault-specific downward-PPS manipulation qualification, monitored honest refresh before expiry, and tested alert/pause/disable procedures. Undy and all deployment, registration, activation, release, vault, and exact-parameter decisions remain separately gated.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
   - { id: RH-D035, title: "RipeGov early-release redistribution and governance-point lifecycle", status: "owner_accepted_sc12_candidate_complete_underscore_activation_blocked", summary: "SC-12 keeps the fee in-pool and retains the maximal indivisible share balance under the exact post-state claim bound. Address-level common-owner recapture and the governance-point lifecycle remain accepted policy. The pre-existing registered Underscore or Lego caller path is not user-bound and is not accepted: issue #161 blocks any nonzero Underscore registry until user-bound authorization is proven or exact owner/security acceptance is recorded. RipeGov-local nonreentrancy is reviewed with no action because exact-Teller access is protected by Teller's nonreentrant routes. Base rebind issue #150, integration, deployment, activation, governance-power use, migration, and release remain separate gates.", source: "docs/chains/rh/smart-contract-changes/ripe-gov.md"}
   - { id: RH-D036, title: "AuctionHouse conservation exact waiver at 22 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact SC-01, SC-02, and SC-08 conservation artifact, AuctionHouse deploys at 24,554 bytes including 96 immutable bytes, leaving 22 bytes. The owner accepted that technically deployable margin and the explicit SC-08 policy: the Stability spread is a legacy discount rate, an empty first pass permanently waives episode fees, and fee-free retry liveness depends on a bound protocol-operated monitor or keeper. Source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source, compiler, dependency, constructor-input, or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D038, title: "SC-07/SC-09 Deleverage remediation is reopened and bounded", status: "owner_authorized_draft_pr_145_candidate", summary: "The owner reopened only the exact SC-07 stale-settlement and SC-09 optional Stability Pool availability remediation in draft PR #145. Broad and withdrawal-assist probes skip unavailable cohorts while direct and processing-time paths remain fail-closed. The final 24,309-byte deployed runtime leaves 267 bytes and uses the ordinary 200-byte floor without a waiver; all cooldown, Underscore, deferred-control, fork, deployment, configuration, activation, and release work remains parked.", source: "docs/chains/rh/deleverage-sc07-sc09-security-decision.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
@@ -1214,7 +1216,7 @@ hard_gates:
   - { id: G-M5, label: "Freeze Stock configuration without activation", plain_language_scope: "Bind AAPL identity, oracle, vault, caps, routes, assertions, monitoring, and a disabled configuration package.", why_it_matters: "Integrated M1-M4 proof does not choose production values or make Stock reachable safely.", state: "open", effect: "Blocks Stock reachability, deployment, activation, and release; parked policy work remains nonblocking."}
   - { id: G-H04-BINDING, label: "Resolve deployment binding readiness", plain_language_scope: "Verify external facts and bind deployment-produced identities, TrainingWheels, and required non-Deleverage machine inputs before any deployment use.", why_it_matters: "A compiling, synchronized configuration does not make unresolved inputs deployable.", state: "open", effect: "Blocks H-05 release-candidate planning, deployment configuration, deployment, activation, and release; it does not block local source/ledger consistency checks."}
   - { id: G-CURVE-INPUTS, label: "Close bounded Curve launch inputs", plain_language_scope: "Verify five official provider and binding identities; bind the deployment-produced pool address, slippage limit, minimum retained liquidity, and production observation before ID-2 deployment use.", why_it_matters: "Repository candidates and official source provenance are not target-chain verification, pool deployment, or an operating observation.", state: "open", effect: "Blocks Curve deployment, ID-2 registration, GREEN feed activation, migration readiness, and release; it does not block offline source, generator, or test validation."}
-  - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero without opening representation, configuration, test, fork, documentation, or size/headroom work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred every Deleverage task rather than authorizing a machine implementation.", state: "parked_nonblocking", effect: "Does not block current non-Deleverage launch preparation; explicit owner reopening is required before any Deleverage work."}
+  - { id: G-DELEVERAGE-PARAMS, label: "Preserve deferred Deleverage controls", plain_language_scope: "Keep fullPayoffBuffer, overageBps, dustThreshold, and dustBps at zero; RH-D038 reopens only the exact SC-07/SC-09 source and evidence work, not representation, configuration, fork, deployment, or operational work.", why_it_matters: "The integrated contracts expose the controls, but the owner has deferred their configuration and every broader Deleverage task.", state: "parked_nonblocking_except_exact_rh_d038_candidate", effect: "Does not block current non-Deleverage launch preparation or RH-D038's bounded candidate; further reopening requires explicit owner instruction."}
   - { id: G-H05-READINESS, label: "Promote deterministic planning after bindings", plain_language_scope: "Rebuild the integrated deterministic reports only after required bindings exist, preserving typed blocked and non-executable rows.", why_it_matters: "Planning code must not turn missing inputs or reservations into transactions.", state: "open", effect: "Blocks an executable release-candidate plan and later deployment evidence; migration execution remains separately unauthorized."}
   - { id: G-H06-OPS, label: "Qualify intended manifest operator and storage", plain_language_scope: "Repeat exact macOS/APFS qualification for the intended operator, device, filesystem, and runbook.", why_it_matters: "Integrated implementation evidence is not operational publication or release qualification.", state: "open", effect: "Blocks operational publication, deployment evidence, and release."}
   - { id: G-T1-CCIP, label: "CCIP live operational disposition", plain_language_scope: "Preserve the confirmed live topology while the owner selects rate-limit and rateLimitAdmin policy, accepted full OffRamp destination-gas evidence is produced, and exact live identity, license, and transaction provenance gaps are closed or explicitly accepted.", why_it_matters: "Live mint authority and cross-chain routing require explicit operating controls; current state must not be mistaken for policy, source-equivalence, or legal approval.", state: "open", effect: "Blocks an operational-readiness or release claim and any inferred policy, source equivalence, license conclusion, or tooling backend; it does not authorize or apply a live change."}

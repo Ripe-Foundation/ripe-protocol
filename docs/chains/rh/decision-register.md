@@ -25,9 +25,10 @@ the GREEN/RIPE CCIP topology is confirmed live as recorded in
 transaction or release action. The four corrected-PR controls remain zero and
 deferred and lack Robinhood machine-facing parameter/planning representation.
 RH-D028 is a bounded candidate-only exception to the historical CreditEngine
-zero-backing and Deleverage parked instructions; it does not reopen cooldown,
-Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
-candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing and Deleverage parked instructions. RH-D038 separately reopens only
+the exact SC-07/SC-09 Deleverage remediation in draft PR #145; neither decision
+reopens cooldown, Underscore, broader settlement, or bad-debt work. Outside
+those exact candidates, the five broader lanes remain parked and nonblocking: CreditEngine
 zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
 Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
 closed.
@@ -188,6 +189,10 @@ removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
 adds quarantine suppression without changing zero cooldown, enabling
 Underscore, or reopening the four deferred controls.
 
+RH-D038 is a separate narrow exception for draft PR #145's exact SC-07/SC-09
+remediation and review evidence. It likewise leaves zero cooldown, omitted
+Underscore, and the four deferred controls unchanged.
+
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
@@ -256,8 +261,8 @@ binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
 remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
-preserved, but every Deleverage task is parked and no implementation track is
-open until explicit owner reopening.
+preserved. RH-D038 is the explicit bounded reopening for draft PR #145 only;
+every other Deleverage task remains parked.
 
 Source:
 `track-6-s6-track-7-h4-defaults-parameters.md`.
@@ -410,8 +415,8 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
-every Deleverage task including size/headroom work, UniswapV2Prices admission
+Except for the exact RH-D028 and RH-D038 candidates, CreditEngine zero-backing
+reassessment, every Deleverage task including size/headroom work, UniswapV2Prices admission
 and deployment, Sites recovery, and non-CCIP live deployment are deferred or
 separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
@@ -1087,20 +1092,17 @@ because it could conceal a genuine vault loss.
 
 ## Namespace coordination note — 15 August 2026
 
-A read-only live check immediately before PR #144's rebase found that merged PR
-#142 owns the integrated `RH-D033` and `RH-D034` entries, while PR #144 uniquely
-adds `RH-D035`. Open PR #143 adds `RH-D036`, PR #146 adds `RH-D037`, and PR #147
-adds `RH-D039` through `RH-D041`. PR #145's coordination intent is `RH-D038`,
-but its current head still actually adds a conflicting `RH-D033`; it must not be
-described as cleanly occupying `RH-D038` until that source is corrected. PR
-#152 inherits integrated `RH-D033`/`RH-D034` and, at its current head, also
-introduces `RH-D042`. This supersedes an earlier snapshot in which PR #152 had
-not yet allocated a decision.
+A read-only live check after PR #143 merged found that the target owns
+`RH-D033` through `RH-D036`. The intended open integration set then adds unique
+claims: PR #146 adds `RH-D037`, PR #145 adds `RH-D038`, PR #147 adds `RH-D039`
+through `RH-D041`, PR #152 adds `RH-D042`, and PR #157 adds `RH-D043`. PR #163
+adds no decision. The fail-closed integration allocator passed across these six
+open PR heads and the live target; no duplicate or base-conflicting claim
+remains.
 
-`RH-D035` remains uncollided. PR #144 records this namespace state read-only and
-does not edit, renumber, approve, or reject another branch's decision. The
-integration owner must resolve PR #145's actual `RH-D033` collision before that
-branch is combined with the integrated register.
+This snapshot records allocation only. It does not edit, renumber, approve, or
+reject another branch's decision, and it does not grant integration,
+deployment, configuration, activation, or release authority.
 
 ### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 
@@ -1246,6 +1248,36 @@ authorize deployment, registry mutation, configuration, activation, or release.
 `tests/test_vault_pointer_runtime_sizes.py`,
 `tests/core/deleverage/test_deleverage_phase2.py`, and
 `config/contract-artifact-expectations.json`.
+### RH-D038 — SC-07/SC-09 Deleverage remediation is reopened and bounded
+
+**Status:** Owner-authorized on 14 August 2026 for the exact remediation and
+review follow-through in draft PR #145. Integration, deployment,
+configuration, activation, and release remain unauthorized.
+
+SC-07 refreshes the complete live debt and current interest after collateral
+interactions, rejects a changed debt amount atomically, and uses one shared
+Deleverage reentrancy domain across the four debt-writing routes and
+`swapCollateral`.
+
+SC-09 treats a Stability Pool cohort as unavailable for optional broad
+Deleverage and withdrawal-assist preflight when the pool's existing fail-soft
+probe reports zero because of a price outage, pause, or aggregate claim-custody
+deficit. Healthy ordinary collateral remains usable. Ordinary-vault failures
+and all failures after real processing starts still propagate; direct claims,
+withdrawals, deposits, explicit redemptions, and strict requested handling
+remain fail-closed.
+
+The final deployed candidate is 24,309 bytes with 267 bytes of EIP-170
+headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
+headroom override or exact-identity waiver.
+
+This decision reopens no cooldown, Underscore, deferred control, fork,
+deployment, configuration, activation, or release work. Robinhood deployment
+verification must establish `MissionControl.isStabVaultId(1) == true`. The
+recorded Base MissionControl is incompatible until separately upgraded and
+populated, so this Deleverage must not replace Base Deleverage as-is.
+
+**Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
 ## Maintenance rule
 
