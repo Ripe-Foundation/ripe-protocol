@@ -1104,9 +1104,9 @@ branch is combined with the integrated register.
 ### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 
 **Status:** Owner-accepted SC-12 policy recorded on 14 August 2026; source and
-focused evidence are candidate-complete, while integration, deployment,
-activation, governance-power consumption, migration, and release remain
-separately gated.
+focused evidence are candidate-complete. A nonzero Underscore registry is
+blocked on issue #161, while integration, deployment, activation,
+governance-power consumption, migration, and release remain separately gated.
 
 RipeGov keeps an early-release fee inside the same asset pool and burns enough
 of the exiting address's shares to retain the largest indivisible post-release
@@ -1139,6 +1139,26 @@ complete ordinary withdrawal clears them from the asset, user, and global
 totals. Boardroom and any future governance-power consumer must treat this
 zero-share point stock as live.
 
+The Teller authorization used by the public release route has a separate,
+unaccepted activation blocker. `isUnderscoreOwnerOrLego` accepts any registered
+Underscore address or Lego without binding that registered caller to the target
+user. If `underscoreRegistry` is nonzero and such a contract exposes or makes
+the call, it can force an unrelated user's release; a caller holding pool shares
+can receive part of the victim's redistributed fee. The initial Robinhood
+default keeps this path dormant by returning the zero address. A nonzero
+registry must not be configured until issue #161 either binds authorization to
+the actual wallet/user relationship with negative unrelated-Lego tests, or
+records explicit owner and security-reviewer acceptance covering exact
+contracts, callable surfaces, monitoring, and incident controls. RH-D035 does
+not accept the broad authorization and PR #144 does not redesign Teller.
+
+RipeGov's `adjustLock` and `releaseLock` lack local `@nonreentrant` decorators,
+but both accept only the exact Teller and their Teller entry points are already
+`@nonreentrant`; Boardroom and Lootbox callbacks cannot impersonate Teller.
+This is reviewed with no action under the existing registered-component trust
+model. Any defense-in-depth decorator is a separate authorized bytecode change
+requiring size, artifact, callback, and full-regression review.
+
 The Base migration candidate has an independent source/artifact identity. Its
 pre-SC-12 RipeGov size evidence is stale; issue #150 must rebase and remeasure
 that exact candidate before it relies on the SC-12 source. This decision grants
@@ -1146,6 +1166,7 @@ no deployment, configuration, migration, activation, or release authority.
 
 **Source:**
 [`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md),
+[`issue #161`](https://github.com/Ripe-Foundation/ripe-protocol/issues/161),
 `contracts/vaults/RipeGov.vy`,
 `tests/vaults/ripe_gov_exit_fee_model.py`,
 `tests/vaults/test_ripe_gov_exit_fee.py`, and

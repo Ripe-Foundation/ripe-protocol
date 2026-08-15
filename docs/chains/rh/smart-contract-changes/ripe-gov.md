@@ -59,6 +59,48 @@ This interim point stock becomes immediately material if Boardroom or another
 governance-power consumer is active. Rollout review must inventory those
 consumers and must not treat zero shares as proof of zero governance power.
 
+## Underscore forced-release activation blocker
+
+`Teller.releaseLock` permits a non-self caller when
+`TellerUtils.isUnderscoreOwnerOrLego(user, caller, missionControl)` succeeds.
+The predicate accepts either the owner of the specific Underscore wallet or any
+address registered in the configured Underscore registry/LegoBook. The latter
+branch is not bound to the target user. With a nonzero `underscoreRegistry`, a
+malicious, compromised, or overly permissive registered address can therefore
+invoke an exposed Teller release route for an unrelated user. SC-12 does not
+create that pre-existing authorization, but an attacker holding shares in the
+same pool can receive part of a victim's forced-release fee through the
+documented redistribution rule.
+
+The affected branch is dormant in the initial Robinhood configuration because
+`DefaultsRobinhoodLive.underscoreRegistry()` returns the zero address. A
+nonzero registry is a **blocked activation state**, not an accepted risk.
+[Issue #161](https://github.com/Ripe-Foundation/ripe-protocol/issues/161) must
+remain open until one of these separately authorized dispositions is complete:
+
+1. bind each registered Lego/address to a wallet/user relationship it is
+   actually authorized to control, including negative tests proving an
+   unrelated registered caller cannot release the victim's lock and a complete
+   Teller/TellerUtils caller and compatibility review; or
+2. obtain explicit owner and security-reviewer acceptance of the broad
+   authorization, binding the exact registered contracts, callable surfaces,
+   monitoring, and incident controls.
+
+No deployment or activation package may configure a nonzero Underscore
+registry before one of those dispositions is recorded. PR #144 does not
+redesign Teller or grant authority to accept this risk.
+
+## Reviewed reentrancy boundary
+
+`RipeGov.adjustLock` and `RipeGov.releaseLock` do not carry local
+`@nonreentrant` decorators. This is reviewed with no production change: both
+methods accept only the exact Teller, both Teller entry points are already
+`@nonreentrant`, and a Boardroom or Lootbox callback cannot call RipeGov as
+Teller. The external dependencies remain protocol-registered components within
+the existing trust model. A defense-in-depth RipeGov decorator, if desired,
+requires a separate authorized change with runtime-size, artifact-identity,
+callback, and full-regression validation.
+
 ## Verification and rollout consequences
 
 Focused tests must keep the production formula independent from its oracle.

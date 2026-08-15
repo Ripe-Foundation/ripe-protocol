@@ -1963,7 +1963,7 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
     assert userData.lastTerms.exitFee == 0          # But exit fee is zero
     
     # Try to release lock - vault should defensively reject this
-    with boa.reverts():  # Should revert with "no exit fee" - vault's defensive validation
+    with boa.reverts("no exit fee"):
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # This demonstrates the vault's defensive programming:

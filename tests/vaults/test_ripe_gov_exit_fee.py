@@ -1,6 +1,7 @@
 import boa
 import pytest
 
+from conf_utils import filter_logs
 from constants import EIGHTEEN_DECIMALS
 from tests.vaults.ripe_gov_exit_fee_model import (
     DECIMAL_OFFSET,
@@ -57,6 +58,7 @@ def _point_tuple(points):
 
 
 def _atomic_snapshot(vault, token, user, ledger):
+    rewards = ledger.getRipeRewardsBundle()
     return (
         token.balanceOf(vault),
         vault.userBalances(user, token),
@@ -66,6 +68,9 @@ def _atomic_snapshot(vault, token, user, ledger):
         vault.totalGovPoints(),
         _point_tuple(ledger.userDepositPoints(user, VAULT_ID, token)),
         _point_tuple(ledger.assetDepositPoints(VAULT_ID, token)),
+        _point_tuple(ledger.globalDepositPoints()),
+        _point_tuple(rewards.ripeRewards),
+        rewards.ripeAvailForRewards,
     )
 
 
@@ -178,7 +183,9 @@ def test_early_exit_fee_benefits_multiple_remaining_holders_pro_rata(
     )
 
 
+@pytest.mark.parametrize("exit_fee", (10_00, 100_00))
 def test_sole_actual_holder_early_exit_reverts_atomically(
+    exit_fee,
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -190,7 +197,13 @@ def test_sole_actual_holder_early_exit_reverts_atomically(
     setAssetConfig,
     switchboard_alpha,
 ):
-    _configure_asset(mission_control, setAssetConfig, switchboard_alpha, ripe_token)
+    _configure_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        exit_fee=exit_fee,
+    )
     _deposit(ripe_gov_vault, ripe_token, whale, bob, 100 * EIGHTEEN_DECIMALS, teller)
     lootbox.updateDepositPoints(
         bob,
@@ -206,6 +219,78 @@ def test_sole_actual_holder_early_exit_reverts_atomically(
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     assert _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger) == before
+    assert filter_logs(ripe_gov_vault, "LockReleased") == []
+
+
+@pytest.mark.parametrize("exit_fee", (10_00, 100_00))
+def test_paused_lootbox_rolls_back_complete_teller_release_atomically(
+    exit_fee,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    lootbox,
+    ledger,
+    mission_control,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    switchboard_alpha,
+):
+    _configure_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        exit_fee=exit_fee,
+    )
+    setRipeRewardsConfig(True)
+    _deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        60 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+    _deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        alice,
+        40 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        VAULT_ID,
+        ripe_gov_vault,
+        ripe_token,
+        sender=teller.address,
+    )
+    boa.env.time_travel(blocks=17)
+
+    lootbox.pause(True, sender=switchboard_alpha.address)
+    before = _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger)
+
+    with boa.reverts("contract paused"):
+        teller.releaseLock(ripe_token, sender=bob)
+
+    assert _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger) == before
+    assert filter_logs(teller, "LockReleased") == []
+
+    lootbox.pause(False, sender=switchboard_alpha.address)
+    teller.releaseLock(ripe_token, sender=bob)
+
+    # Decode the vault's nested event from the top-level Teller computation.
+    events = filter_logs(teller, "LockReleased")
+    assert len(events) == 1
+    assert events[0].user == bob
+    assert events[0].asset == ripe_token.address
+    # `exitFee` is the configured basis-point rate, not an asset amount or the
+    # realized fee after indivisible-share rounding.
+    assert events[0].exitFee == exit_fee
 
 
 def test_remaining_holder_guard_is_address_level_not_beneficial_owner_level(
