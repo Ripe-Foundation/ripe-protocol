@@ -203,6 +203,43 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
     )
 
 
+def test_green_config_transition_with_normal_block_and_timestamp_progression(
+    robinhood_curve_launch_route,
+):
+    route = robinhood_curve_launch_route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action_id = route.curve.setGreenRefPoolConfig(
+        route.curve_system,
+        10,
+        60_00,
+        7_200,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=route.governance.address,
+    )
+    start_block = boa.env.evm.patch.block_number
+    start_timestamp = boa.env.timestamp
+
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert boa.env.evm.patch.block_number > start_block
+    assert boa.env.timestamp > start_timestamp
+    route.feed.setMockData(
+        100_000_000,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert route.curve.confirmGreenRefPoolConfig(
+        action_id,
+        sender=route.governance.address,
+    )
+
+    assert route.curve.getCurrentGreenPoolStatus().weightedRatio == 50_00
+    assert route.price_desk.getPrice(route.usdg, True) == EIGHTEEN_DECIMALS
+    assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
+
+
 @pytest.mark.gas
 def test_final_curve_nested_price_desk_route_gas(robinhood_curve_launch_route):
     route = robinhood_curve_launch_route

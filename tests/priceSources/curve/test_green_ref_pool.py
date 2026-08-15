@@ -1604,6 +1604,55 @@ def test_future_and_non_monotonic_snapshot_updates_fail_safe(local_curve_ref_sys
 
 
 @pytest.mark.fork("local", "base")
+def test_weighted_ratio_product_overflow_returns_unavailable(local_curve_ref_system):
+    curve, pool, _, governance, _ = local_curve_ref_system
+    _confirm_local_ref_config(curve, pool, governance, capacity=3)
+
+    # Corrupt the otherwise valid seed ratio to exercise the defensive checked
+    # multiplication branch without changing production validation bounds.
+    curve.eval(f"self.snapShots[0].ratio = {2**256 - 1}")
+    boa.env.time_travel(blocks=2)
+
+    assert curve.getCurrentGreenPoolStatus().weightedRatio == 0
+
+
+@pytest.mark.fork("local", "base")
+def test_weighted_ratio_sum_overflow_returns_unavailable(local_curve_ref_system):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _confirm_local_ref_config(curve, pool, governance, capacity=3)
+
+    # Each interval product fits independently: (MAX // 2) * 2 == MAX - 1,
+    # then 2 * 1 == 2. Their numerator sum does not fit and must fail closed.
+    boa.env.time_travel(blocks=2)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    curve.eval(f"self.snapShots[0].ratio = {(2**256 - 1) // 2}")
+    curve.eval("self.snapShots[1].ratio = 2")
+    boa.env.time_travel(blocks=1)
+
+    assert curve.getCurrentGreenPoolStatus().weightedRatio == 0
+
+
+@pytest.mark.fork("local", "base")
+def test_danger_counter_overflow_guard_preserves_state(local_curve_ref_system):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _confirm_local_ref_config(curve, pool, governance, capacity=2)
+    _set_local_green_ratio(pool, 80)
+    boa.env.time_travel(blocks=1)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+
+    current = boa.env.evm.patch.block_number
+    preserved = 2**256 - 2
+    curve.eval(f"self.greenRefPoolData.numBlocksInDanger = {preserved}")
+    curve.eval(f"self.greenDangerLastBlock = {current}")
+    boa.env.time_travel(blocks=2)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+
+    data = curve.greenRefPoolData()
+    assert data.numBlocksInDanger == preserved
+    assert data.lastSnapshot.update == current + 2
+
+
+@pytest.mark.fork("local", "base")
 def test_capacity_reset_preserves_counter_restarts_recovery_and_seeds_once(local_curve_ref_system):
     curve, pool, _, governance, snapshotter = local_curve_ref_system
     _establish_local_rolling_danger(
