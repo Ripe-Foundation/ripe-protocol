@@ -130,21 +130,21 @@
         "committed_path": "scripts/abis/BlueChipYieldPrices.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "bc873729f1b7a2c3a0bb2cf4e804f6d8760dd830452afac2346264333e2df943",
-        "creation_executable_prefix_size": 23761,
-        "creation_metadata_sha256": "0fe906889b37a7b17b57e10755a255ae9fe80c7db6d8e5070d1bf84c6b419d6a",
-        "creation_metadata_size": 57,
-        "creation_sha256": "8cdf21f4d0cbcb5340b377aff2f90388a68cd091731ea723b16d464bc1dbc031",
-        "creation_size": 23818,
-        "deployed_eip170_headroom": 1872,
+        "creation_executable_prefix_sha256": "eb5f1dc7f75eac7f7c10314b450fa0f11dbc5cf4a698a1dacf00814977fff614",
+        "creation_executable_prefix_size": 23796,
+        "creation_metadata_sha256": "d77f60076ed11f560f759dbabe1fc15301e1a16644340ffb25d12d0a9a4ed35c",
+        "creation_metadata_size": 75,
+        "creation_sha256": "b38f0668830875bb42fd93df3a56395e93ede1ff7e3545dfb42b33d2a021529e",
+        "creation_size": 23871,
+        "deployed_eip170_headroom": 1837,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fbad98595b0186da120e41f77c102beb49f803c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "f0be32f46b1125183efd7a4f035cd637f515a944b80cf5f7dcebea3b049fdb87",
         "deployed_runtime_immutable_data_size": 480,
-        "deployed_runtime_sha256": "6a73ad1367c74e0d77f50852a893f03987c6aae8c1c818c50ab8ca406f866751",
-        "deployed_runtime_size": 22704,
-        "eip170_headroom": 2352,
-        "runtime_template_sha256": "16385e92b4be7ae5fd12f6f89d83cf6056c12ce433d2d9559dcfa10b745fda7a",
-        "runtime_template_size": 22224
+        "deployed_runtime_sha256": "649c0c2c7303e8fcb2bb5d86764a00bae5f62cdb1251b1018cde862ba00761a4",
+        "deployed_runtime_size": 22739,
+        "eip170_headroom": 2317,
+        "runtime_template_sha256": "afd1c6c61a2da3f5a172f24917e1bc10377270924edc1c1aa7dc4cc4b585d74b",
+        "runtime_template_size": 22259
       },
       "code_layout": {
         "AAVE_V3_ADDR": {
@@ -221,7 +221,7 @@
       },
       "compiler_settings": {
         "experimental_codegen": false,
-        "optimize": "gas"
+        "optimize": "codesize"
       },
       "constructor": [
         {
@@ -277,7 +277,7 @@
         }
       ],
       "constructor_bound_runtime_template": true,
-      "effective_optimization": "gas",
+      "effective_optimization": "codesize",
       "events": {
         "canonical_sha256": "56a06017c846e4bb852a90e7d1c83089b9a82e2d383522b1446d57bef34f47b5",
         "count": 20
@@ -286,9 +286,9 @@
         "canonical_sha256": "c78a129a79302150f7ebb8e79d5331ee78a84da3818170425eb123e545a0d1fb",
         "count": 84
       },
-      "source_git_blob": "d0b92d02ed51e8be1b2c21e452e700a32f44c937",
+      "source_git_blob": "ecf043a614838802c50b24187fa0556ee6466fea",
       "source_path": "contracts/priceSources/BlueChipYieldPrices.vy",
-      "source_sha256": "feb3715a079fe7643c2441b1f0842f8f5ffc4ef3f33a073b3d451b128e1a802c",
+      "source_sha256": "f73a608e2f61a97dc57526011c82840b79e4228d3925375abe6d46e8931c57b0",
       "storage_layout": {
         "gov": {
           "govChangeTimeLock": {
@@ -373,7 +373,7 @@
         }
       },
       "transient_storage_layout": {},
-      "transitive_compiler_input_integrity": "50ff8372993c058f761016ed29b2491cf354ab351e35a686119f55cbbb90dd60"
+      "transitive_compiler_input_integrity": "00fbbc1aaba3103468d83b29f41fd258a9751e7c7c0213f16fc3149d318d3775"
     },
     "CreditEngine": {
       "abi": {
