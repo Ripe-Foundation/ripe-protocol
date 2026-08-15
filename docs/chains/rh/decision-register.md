@@ -1039,13 +1039,46 @@ at 22,739 bytes with 1,837 bytes of EIP-170 headroom.
 This is not a below-floor waiver. The ordinary 200-byte headroom policy remains
 controlling. A change to the optimizer, a material change to the accepted
 trade, or a later artifact below the normal floor reopens this decision. The
-decision does not accept SC-17's liquidation-relevant timing residual and does
-not authorize deployment, configuration, activation, or release.
+decision does not itself accept SC-17's liquidation-relevant timing residual;
+that separate conditional acceptance is recorded by RH-D034. RH-D033 does not
+authorize deployment, configuration, activation, or release.
 
 **Source:**
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `config/contract-artifact-expectations.json`, and
 `tests/priceSources/blueChip/test_bluechip_local.py`.
+
+### RH-D034 — SC-17 timing residual is conditionally accepted
+
+**Status:** Owner conditionally accepted the candidate residual on 14 August
+2026 after reviewing the executable attacker analysis and prerequisites.
+
+The owner accepted retaining SC-17's observation-interval TWAP because it
+removes total-supply inflation as a snapshot influence multiplier. The owner
+also accepted that an ordinary allowed Teller action can time an eligible
+snapshot while PPS is temporarily depressed, after which the observation gains
+duration weight until an honest refresh or expiry. The final live-PPS minimum
+caps the applicable upward case but does not neutralize a depressed TWAP.
+
+This acceptance is conditional. Before activating any snapshot-backed feed,
+the activation package must bind a finite nonzero `staleTime`, prove
+`minSnapshotDelay <= staleTime`, qualify the selected vault against practical
+temporary downward PPS manipulation, establish monitored honest refresh before
+expiry, and establish abnormal-PPS and missed-refresh alerts plus tested
+pause/disable procedures. Undy remains disabled until a separate activation
+package binds its exact artifact, configuration, refresh operation, and
+protocol-specific risk.
+
+RH-D034 approves no exact parameter value, vault, deployment, registration,
+activation, or release. A feed that cannot satisfy every applicable condition
+must not activate the SC-17 path and instead requires a separately reviewed
+sampling or lower-bound design. A symmetric downside clamp is not approved
+because it could conceal a genuine vault loss.
+
+**Source:**
+`docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
+`tests/priceSources/blueChip/test_bluechip_local.py`, and
+`tests/priceSources/test_undy_vault_prices.py`.
 
 ## Maintenance rule
 

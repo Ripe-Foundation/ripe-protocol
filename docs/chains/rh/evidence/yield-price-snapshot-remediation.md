@@ -90,7 +90,32 @@ it cannot bypass the current-vault PPS clamp. Transition tests prove that the
 first later nonzero-supply snapshot becomes ring-eligible and takes over after
 positive elapsed time.
 
-## Timing-manipulation residual: acceptance still required
+## RH-D034 owner decision: conditional acceptance of SC-17 timing residual
+
+On 14 August 2026, after reviewing the executable timing analysis and the
+attacker prerequisites, the owner accepted retaining SC-17's
+observation-interval TWAP in this candidate. The acceptance is conditional on
+feed-level operating controls; it is not a claim that duration weighting makes
+snapshot timing intrinsically safe.
+
+Before any snapshot-backed feed is activated, the activation package must:
+
+1. configure a finite, nonzero `staleTime`;
+2. prove `minSnapshotDelay <= staleTime`;
+3. qualify the selected vault's PPS against temporary downward manipulation,
+   and withhold activation if a value-increasing depression is practical;
+4. bind a monitored honest-refresh SLA shorter than the freshness window;
+5. bind alerts for abnormal PPS changes and missed refreshes plus tested
+   pause/disable incident procedures; and
+6. keep Undy disabled until a separate activation package binds its exact
+   artifact, configuration, refresh operation, and protocol-specific risk.
+
+No exact parameter values, vault, deployment, registration, activation, or
+release are approved by RH-D034. A feed that cannot satisfy every applicable
+condition must leave SC-17 inactive for that feed and pursue a separately
+reviewed sampling or lower-bound design.
+
+### Accepted residual behavior
 
 Duration weighting removes total-supply inflation as an influence multiplier,
 but snapshot timing remains a control surface. Ordinary allowed Teller deposits
@@ -115,13 +140,11 @@ therefore the configured nonzero `staleTime`; `staleTime == 0` has no expiry and
 is unbounded. `minSnapshotDelay` sets the earliest honest refresh cadence, not
 an automatic refresh.
 
-PR #142 must not be represented as accepting this residual until the owner
-does so explicitly. If accepted, activation should separately require a
-nonzero freshness bound, `minSnapshotDelay <= staleTime`, a monitored honest
-refresh SLA shorter than the freshness window, and incident pause/disable
-procedures. Otherwise SC-17 must be removed or a separately scoped sampling or
-lower-bound design must be approved. A symmetric downside clamp is not assumed
-safe because it could conceal a genuine vault loss.
+RH-D034 accepts this residual for the source candidate subject to the activation
+conditions above. It does not permit those conditions to be replaced by a
+claim that the final live-PPS minimum protects the downward case. A symmetric
+downside clamp is not assumed safe because it could conceal a genuine vault
+loss.
 
 ## Arithmetic and artifact scope
 
