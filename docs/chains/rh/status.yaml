@@ -13,7 +13,7 @@ snapshot:
   later_scoped_evidence:
     sc12_policy_recorded_on: 2026-08-14
     namespace_rechecked_on: 2026-08-15
-    scope: canonical_decision_mirror_parity_through_rh_d036_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
+    scope: historical_decision_snapshot_through_rh_d036_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
     broad_program_snapshot_refreshed: false
   observed_live_rh:
     checked_on: 2026-08-15
@@ -36,7 +36,7 @@ snapshot:
     The broad program snapshot remains bound to the exact subject and candidate
     identities above as of 2026-08-11. It has not been reconciled to the live rh
     observation from 2026-08-15 and is not current authority for later repository
-    state. The later RH-D032 through RH-D036 mirror entries and SC-12 namespace
+    state. The later RH-D032 through RH-D036 snapshot entries and SC-12 namespace
     evidence are a scoped overlay only; they do not refresh any other count, row,
     blocker, residual, deadline, narrative, or lifecycle statement.
   terminology_scope: >
@@ -52,16 +52,14 @@ snapshot:
   live_action_counting_unit: externally_completed_packages_not_transactions
   status_owner: Robinhood deployment owner
   freshness_rule: >
-    Reconcile this file in the same commit whenever an integrated change closes,
-    reopens, or materially changes a row, decision, blocker, residual, deadline,
-    next action, or authorization boundary. A scoped decision or namespace
-    overlay does not satisfy that broad-program reconciliation requirement.
+    Refresh this historical snapshot intentionally when program status needs a
+    new published view and reconcile it once during final release preparation.
+    Ordinary contract bug fixes and RH-D additions do not require same-PR mirror
+    maintenance here.
 
 counts:
-  scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
+  scope: broad_program_snapshot_as_of_2026_08_11
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 37 entries.
-  rh_d_decisions: 36
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -330,7 +328,7 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: Every integrated entry in this file must match the canonical register's identifier and title exactly and cannot be silently closed.
+  snapshot_contract: This list is a historical or intentionally refreshed snapshot; the canonical register controls, exact per-PR parity is not required, and final release preparation reconciles the snapshot once.
   in_flight_coordination:
     checked_on: 2026-08-15
     sc12_reserved_id: RH-D035
