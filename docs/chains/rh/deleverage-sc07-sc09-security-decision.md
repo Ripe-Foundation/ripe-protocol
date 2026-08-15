@@ -67,9 +67,9 @@ ordinary floor unless a separate owner-authorized waiver is added.
 The final artifact identities are source SHA-256
 `b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1`,
 runtime-template SHA-256
-`d5aee8fefddc488dc2325f4bb384f72af6e059d7eb8521543f1f254bb4c7c49e`,
+`25f605c232750990f9a0a66a14143a529d4303e79ce02d0a8d8f0c18329094e2`,
 and immutable-bound deployed-runtime SHA-256
-`ee69abbd02494ce3b64f7e1e9e8bb9c8b43ccee04541c4286679280810aa88ce`.
+`2fb68a6f9c9a6b8789c5c7f4ba986b38281002834e9ca7d9fd8c21d4b232df5d`.
 They use Vyper `0.4.3+commit.bff19ea2`, the source `codesize` pragma, and the
 constructor/immutable values frozen by `capture_contract_runtimes.py` and
 `config/contract-artifact-expectations.json`.
