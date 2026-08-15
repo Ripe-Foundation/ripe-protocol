@@ -25,15 +25,10 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Teller": 24_556,
     "TellerUtils": 8_976,
     "Ledger": 13_306,
-    # The base artifact ledger measured 23,345 bytes even though this explicitly
-    # non-enforced review aid still said 22,993. The initial SC-15 implementation
-    # added 67 bytes; preserving zero-asset Ledger registrations recovers 49,
-    # producing a final 23,363 (352 bytes of pre-existing reference drift plus
-    # 18 bytes of growth owned by this batch).
-    "Lootbox": 23_363,
+    "Lootbox": 22_993,
     "RipeGov": 23_152,
     "AuctionHouse": 24_554,
-    "CreditEngine": 24_555,
+    "CreditEngine": 24_566,
     "StabilityPool": 24_371,
 }
 
@@ -56,20 +51,20 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit in this integration candidate:
-# AuctionHouse 22, Teller 20, CreditEngine 21, StabilityPool 263,
-# SwitchboardCharlie 703,
-# SwitchboardAlpha 108, Lootbox 1,213, RipeGov 1,424, SwitchboardBravo 373,
+# AuctionHouse 22, Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
+# SwitchboardAlpha 108, Lootbox 1,231, RipeGov 1,424, SwitchboardBravo 373,
 # SwitchboardEcho 1,384, and the rest far larger.
 #
-# RH-D029 covered the prior exact CreditEngine artifact and reopened with this
-# source change. RH-D037 replaces it for the exact 21-byte-headroom SC-11/SC-15
-# artifact and permits zero further growth. RH-D030 separately waives the exact
-# 108-byte-headroom SwitchboardAlpha artifact; RH-D032 covers the exact
-# 20-byte-headroom Teller artifact, and RH-D036 covers AuctionHouse.
+# CreditEngine reopened and retired RH-D026 when this source changed. The owner
+# granted replacement RH-D029 for this exact 10-byte-headroom combined
+# reward-suppression, payer-refund, and redemption-isolation artifact. RH-D030
+# separately waives the exact 108-byte-headroom SwitchboardAlpha artifact, and
+# RH-D032 controls the exact 20-byte-headroom current Teller artifact.
+# See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
     "AuctionHouse": 22,  # RH-D036; exact conservation artifact, zero growth
-    "CreditEngine": 21,  # RH-D037; exact SC-11/SC-15 artifact, zero growth
+    "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
     "SwitchboardAlpha": 108,  # RH-D030; exact priority-vault validation artifact
     "Teller": 20,  # RH-D032; exact minimum-payout artifact, zero growth
 }
@@ -157,23 +152,23 @@ WAIVED_CONTRACT_IDENTITIES = {
         ),
     },
     "CreditEngine": {
-        "decision": "RH-D037",
+        "decision": "RH-D029",
         "fixture": "credit_engine",
         "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
-            "506efeaa9e6c4ac16b5462b044ce3c0033099fbdc1f608a1e76c945b85bb48cb"
+            "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f"
         ),
         "runtime_sha256": (
-            "2897887d02772092a9211cb548bcc05d310f700cfca54f0abb08192588340d6e"
+            "0cf18bd4121836b960abff777f3bca468c7fbaaad7b18e5601c9d5e5af870d91"
         ),
-        "runtime_template_bytes": 24_459,
-        "deployed_runtime_bytes": 24_555,
+        "runtime_template_bytes": 24_470,
+        "deployed_runtime_bytes": 24_566,
         "pinned_hq": "0x00000000000000000000000000000000000000A1",
         "constructor_args": (
             "0x00000000000000000000000000000000000000A1",
         ),
         "deployed_sha256": (
-            "fad9a048b57869a34844508914675e4fbd0e5107e3767e8e17c324e59b7fc759"
+            "4f410105098b45e93a418afbbc6f49b4154528cdc8253543f37b271b6ba03820"
         ),
     },
     "SwitchboardAlpha": {
