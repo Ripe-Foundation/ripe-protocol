@@ -1084,7 +1084,79 @@ because it could conceal a genuine vault loss.
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
+### RH-D036 — AuctionHouse conservation exact waiver at 22 bytes
 
+**Status:** Owner-granted on 14 August 2026 for the exact SC-01, SC-02, and
+SC-08 AuctionHouse conservation artifact on draft PR #143. The owner separately
+authorized this waiver record and the test-only Deleverage size-pin refresh
+after review reopened the below-floor decision.
+
+The ratified 200-byte minimum remains controlling for every non-waived
+contract. The final artifact caps Stability GREEN before collateral moves,
+caps every fungible-auction iteration at current live debt, makes retry fee
+eligibility precede irreversible execution, and replaces the downstream
+repayment clamp with a fail-closed invariant. It deploys at 24,554 bytes,
+including 96 bytes of immutable data, leaving **22 bytes** before EIP-170.
+The owner accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One source and compiler-output identity under
+CPython 3.12.0, Vyper `0.4.3+commit.bff19ea2`, and titanoboa 0.2.7:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/AuctionHouse.vy` SHA-256 | `964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e` |
+| Runtime-template SHA-256 (immutable-free) | `0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2` |
+| Runtime-template bytes | 24,458 |
+| Immutable data bytes | 96 |
+| Deployed runtime bytes | 24,554 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A4` | `d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6` |
+| Complete deployed-runtime SHA-256 at production-capture HQ `0xD4e8…0940` | `dec131999301b49ed3c85c7f53f9d785cb01a9b2204eeccdf05fb2e247c98965` |
+
+The declared `0x…00A4` HQ is a deterministic waiver-test input, not a
+production address. The production-capture identity uses the constructor input
+declared by the governed artifact ledger. Any constructor-input change produces
+a different complete deployed byte string and reopens exact deployment-capture
+review even when the source and length do not move.
+
+**Measured progression.** The authoritative baseline deployed runtime was
+24,440 bytes with 136 bytes of headroom. SC-01 measured 24,501/75; SC-02
+measured 24,566/10; the first SC-08 candidate measured 24,571/5. Review then
+removed a behaviorally redundant fee local and replaced a masking repayment
+clamp with a fail-closed assertion, yielding the final 24,554/22 artifact
+without removing the Stability exact-receipt check, the AuctionHouse GREEN
+balance cap, or a public ABI entry.
+
+**Residual risk accepted.** Only 22 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any AuctionHouse source, compiler, transitive
+dependency, constructor input, runtime-template, or complete deployed-runtime
+identity change invalidates the exact record and reopens this decision. A
+future change must restore at least 200 bytes or receive a new exact owner
+waiver; refreshing the constants merely to make a test pass is prohibited.
+
+**SC-08 economic and liveness policy.** The owner accepts all three semantics
+below for this exact artifact:
+
+- `liqFee` remains the legacy Stability Pool discount rate. Its gross-up
+  collateral spread can exceed the nominal base liquidation fee; settlement
+  credits no more than the nominal base fee, and keeper fees are never
+  spread-paid.
+- If an economically empty first pass freezes the account without repayment or
+  an auction, that episode permanently waives base and keeper fees. A later
+  retry may complete liquidation, but it does so fee-free and cannot recover
+  the waived compensation.
+- Fee-free retries deliberately carry no onchain keeper reward or liveness
+  guarantee. Activation therefore depends on a protocol-operated monitor or
+  keeper to retry eligible accounts, with auction buyers supplying progress
+  where an auction exists. That operational actor and alert path must be bound
+  before activation.
+
+This decision accepts deployability of the exact artifact. It does not
+authorize deployment, registry mutation, configuration, activation, or release.
+
+**Source:** `contracts/core/AuctionHouse.vy`,
+`tests/test_vault_pointer_runtime_sizes.py`,
+`tests/core/deleverage/test_deleverage_phase2.py`, and
+`config/contract-artifact-expectations.json`.
 ## Maintenance rule
 
 When an owner decision changes, update:

@@ -25,6 +25,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "Ledger": 13_306,
     "Lootbox": 22_993,
     "RipeGov": 23_572,
+    "AuctionHouse": 24_554,
     "CreditEngine": 24_566,
     "StabilityPool": 24_371,
 }
@@ -48,7 +49,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit in this integration candidate:
-# Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
+# AuctionHouse 22, Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
 # SwitchboardAlpha 108, Lootbox 1,231, RipeGov 1,004, SwitchboardBravo 373,
 # SwitchboardEcho 1,384, and the rest far larger.
 #
@@ -60,6 +61,7 @@ DEFAULT_MIN_HEADROOM = 200
 # See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
+    "AuctionHouse": 22,  # RH-D036; exact conservation artifact, zero growth
     "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
     "SwitchboardAlpha": 108,  # RH-D030; exact priority-vault validation artifact
     "Teller": 20,  # RH-D031; exact third-party-touch artifact, zero growth
@@ -127,6 +129,26 @@ MIN_RIPE_GOV_MARGIN = 1_000
 # headroom, its override and identity entry are both removed, and it goes back to
 # being governed by the floor like everything else.
 WAIVED_CONTRACT_IDENTITIES = {
+    "AuctionHouse": {
+        "decision": "RH-D036",
+        "fixture": "auction_house",
+        "source": "contracts/core/AuctionHouse.vy",
+        "source_sha256": (
+            "964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e"
+        ),
+        "runtime_sha256": (
+            "0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2"
+        ),
+        "runtime_template_bytes": 24_458,
+        "deployed_runtime_bytes": 24_554,
+        "pinned_hq": "0x00000000000000000000000000000000000000A4",
+        "constructor_args": (
+            "0x00000000000000000000000000000000000000A4",
+        ),
+        "deployed_sha256": (
+            "d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6"
+        ),
+    },
     "CreditEngine": {
         "decision": "RH-D029",
         "fixture": "credit_engine",
@@ -210,6 +232,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     lootbox,
     ripe_gov_vault,
     human_resources,
+    auction_house,
     credit_engine,
     credit_redeem,
     stability_pool,
@@ -228,6 +251,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
         "RipeGov": len(ripe_gov_vault.env.get_code(ripe_gov_vault.address)),
         "HumanResources": len(human_resources.env.get_code(human_resources.address)),
+        "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),

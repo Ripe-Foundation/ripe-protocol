@@ -2,7 +2,7 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import clear_transient_storage, filter_logs
 
 
 DUST = 10**6
@@ -30,10 +30,6 @@ def keeper_accounting_glp_whale(env, keeper_accounting_glp, governance):
         sender=governance.address,
     )
     return holder
-
-
-def _clear_transient():
-    boa.env.evm.vm.state.clear_transient_storage()
 
 
 def _configure_collateral(
@@ -211,7 +207,7 @@ def test_keeper_green_is_backed_when_glp_stability_covers_liquidation(
     keeper_before = green_token.balanceOf(sally)
     backing_before = debt_before + reserve_before - supply_before
 
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 
@@ -319,7 +315,7 @@ def test_keeper_green_is_backed_when_sgreen_stability_burns_payment(
     keeper_green_before = green_token.balanceOf(sally)
     keeper_sgreen_before = savings_green.balanceOf(sally)
 
-    _clear_transient()
+    clear_transient_storage()
     keeper_rewards = teller.liquidateUser(alice, True, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 
@@ -426,7 +422,7 @@ def test_mixed_stability_and_auction_books_keeper_and_unpaid_base_fee(
 
     supply_before = green_token.totalSupply()
     debt_before = ledger.userDebt(bob).amount
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 
@@ -492,7 +488,7 @@ def test_expired_pure_auction_retry_does_not_repeat_first_pass_fees(
 
     supply_before = green_token.totalSupply()
     debt_before = ledger.userDebt(bob).amount
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 
@@ -517,7 +513,7 @@ def test_expired_pure_auction_retry_does_not_repeat_first_pass_fees(
     )
     assert not ledger.hasFungibleAuctions(bob)
 
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     retry_log = filter_logs(teller, "LiquidateUser")[0]
     assert retry_log.repayAmount == 0
@@ -602,7 +598,7 @@ def test_deeply_underwater_min_keeper_fee_produces_zero_spread_and_zero_mint(
 
     supply_before = green_token.totalSupply()
     keeper_before = green_token.balanceOf(sally)
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 
@@ -687,7 +683,7 @@ def test_reduced_base_fee_controls_stability_spread_ratio(
     mock_price_source.setPrice(alpha_token, reduced_fee_price)
     assert credit_engine.canLiquidateUser(bob)
 
-    _clear_transient()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     log = filter_logs(teller, "LiquidateUser")[0]
 

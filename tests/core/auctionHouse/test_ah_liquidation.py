@@ -9,7 +9,7 @@ from conf_utils import filter_logs, get_boa_dev_reasons
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "fb1bb3ea0be43b901432bf75688e7adb97e82c2eebc6e4b085836b77bc60853f"
+    "bf6db61d02115869d8a1591f4b4f008956f56b5bf6aa3f122fb4b5b41156ed36"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose

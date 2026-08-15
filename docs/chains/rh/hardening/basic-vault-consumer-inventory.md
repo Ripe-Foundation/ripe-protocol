@@ -1,9 +1,11 @@
 # BasicVault consumer inventory
 
-> **13 August 2026 candidate currentness:** this inventory is refreshed against
+> **14 August 2026 candidate currentness:** this inventory is refreshed against
 > the exact local B-AUD-008 source candidate, originally reviewed at
 > `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
-> remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`. The package does not modify an
+> remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`, with the
+> AuctionHouse consumer rows refreshed for the SC-01/SC-02/SC-08 conservation
+> candidate on draft PR #143. The package does not modify an
 > immutable deployed vault, configure an asset, or activate a launch route.
 >
 > **15 August 2026 base reconciliation:** source pins and line locators were
@@ -55,7 +57,7 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "2e46101cac996dc8fe17a37420f23057887a751cf7039ad14565fd80d791f949",
+    "contracts/core/AuctionHouse.vy": "964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e",
     "contracts/core/CreditEngine.vy": "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f",
     "contracts/core/CreditRedeem.vy": "c8c7f5f8c3323fbe56d6307840a44ca1aa7ddb775438a9a1b31794af2a9b3017",
     "contracts/core/Deleverage.vy": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
@@ -77,9 +79,9 @@ source review and test update.
   ],
   "rows": [
     {
-      "id": "AH-436",
+      "id": "AH-439",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 436,
+      "line": 439,
       "function": "_performLiquidationPhases",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -87,9 +89,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-518",
+      "id": "AH-521",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 518,
+      "line": 521,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -97,9 +99,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-532",
+      "id": "AH-535",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 532,
+      "line": 535,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAndAmountAtIndex",
       "classification": "value_backing_required",
@@ -107,9 +109,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-907",
+      "id": "AH-912",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 907,
+      "line": 912,
       "function": "_canStartAuction",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -117,9 +119,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-1253",
+      "id": "AH-1263",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1253,
+      "line": 1263,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -127,9 +129,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-1281",
+      "id": "AH-1291",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1281,
+      "line": 1291,
       "function": "_transferCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
