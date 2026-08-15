@@ -917,12 +917,56 @@ def _getGreenAmountToRemove(
     
     greenAdjustFull: uint256 = (_data.greenBalance - targetBalance) * 2
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
+    if _lpBalance == 0 or _data.greenIndex >= 2:
+        return 0
+
     lpTotalSupply: uint256 = staticcall IERC20(_data.lpToken).totalSupply()
     if lpTotalSupply == 0:
         return 0
 
     maxGreenToRemove: uint256 = max(_poolDebt, _data.greenBalance * _lpBalance // lpTotalSupply)
-    return min(greenAdjustWeighted, maxGreenToRemove)
+    requestedGreen: uint256 = min(greenAdjustWeighted, maxGreenToRemove)
+    if requestedGreen == 0:
+        return 0
+
+    # StableSwap-NG burns calc_token_amount(amounts, False) + 1 LP token for
+    # remove_liquidity_imbalance. Find the largest executable Green amount.
+    low: uint256 = 0
+    high: uint256 = requestedGreen
+    for _i: uint256 in range(256):
+        if low >= high:
+            break
+        midpoint: uint256 = high - (high - low) // 2
+        didQuote: bool = False
+        lpQuote: uint256 = 0
+        didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
+        if didQuote and lpQuote < _lpBalance:
+            low = midpoint
+        else:
+            high = midpoint - 1
+
+    return low
+
+
+@view
+@internal
+def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> (bool, uint256):
+    amounts: DynArray[uint256, 2] = [0, 0]
+    amounts[_greenIndex] = _greenAmount
+    success: bool = False
+    response: Bytes[32] = b""
+    # The supported StableSwap-NG pool must expose this exact selector.
+    # Missing, reverting, or malformed quote surfaces fail closed to zero.
+    success, response = raw_call(
+        _pool,
+        abi_encode(amounts, False, method_id=method_id("calc_token_amount(uint256[],bool)")),
+        max_outsize=32,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+    return True, abi_decode(response, uint256)
 
 
 @view
@@ -1080,7 +1124,11 @@ def _mintPartnerLiquidity(
     assert partnerAmount != 0 # dev: no asset to add
 
     if _partner != self:
+        balanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(_endaoFunds)
         assert extcall IERC20(_asset).transferFrom(_partner, _endaoFunds, partnerAmount, default_return_value=True) # dev: transfer failed
+        balanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(_endaoFunds)
+        assert balanceAfter > balanceBefore # dev: no asset received
+        partnerAmount = balanceAfter - balanceBefore
 
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, partnerAmount, True)
     assert usdValue != 0 # dev: invalid asset
