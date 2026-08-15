@@ -524,6 +524,9 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig, _requireValidSnaps
             return False
 
         if _requireValidSnapshot:
+            # Compatibility probes: later pricing multiplies both of these
+            # pairs. The products are intentionally discarded here; only the
+            # fail-closed representability checks are needed at validation.
             compatible: bool = False
             product: uint256 = 0
             compatible, product = self._tryMul(normalizedSupply, pricePerShare)
