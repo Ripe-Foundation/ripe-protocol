@@ -1292,10 +1292,23 @@ ratification remains required before review readiness or integration.
 The candidate selects chronological block-duration weighting and accepts its
 rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
 recommended live `maxNumSnapshots` is 10, matching the existing Base setting
-and the S=10 PriceDesk composition envelope. At most one successful write is
-allowed per block; the actual ten-observation time horizon therefore depends
-on qualifying Teller activity and must be monitored rather than presented as
-a fixed wall-clock window.
+and now supported by direct capacity-ten gas evidence. PriceDesk S=10 is a
+source-count measurement and is not used as ring-capacity evidence. At most one
+successful write is allowed per selected clock unit; the actual ten-observation
+time horizon therefore depends on qualifying Teller activity and must be
+monitored rather than presented as a fixed wall-clock window.
+
+Exact-head owner ratification must additionally select the Robinhood Curve
+clock domain. The unchanged candidate uses EVM `block.number`, which Robinhood
+exposes as the repeating/jumping ancestor/L1-number domain. A pinned 16-child
+block packet observed one contract `NUMBER` while ArbSys tracked every child.
+If the owner accepts ancestor semantics, the candidate calibration is
+`staleBlocks=7,200`, the same 7,200-unit recovery duration, capacity 10, and a
+target successful write at least every 720 ancestor numbers. If child semantics
+are required, `RB-CLOCK-CURVE` stops before production edits and returns a
+shared immutable native/ArbSys-source design packet. In either case,
+`GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain inactive pending
+the decision and separate activation authority.
 
 For any `dangerTrigger` or `staleBlocks` change, the ring and accumulated
 `numBlocksInDanger` survive, all three continuity anchors are cleared, and the
@@ -1315,18 +1328,38 @@ a fully empty pool can be proposed, but confirmation revalidates and reverts
 atomically if it cannot seed a nonzero snapshot. The duplicate internal
 validator arguments are retained to minimize unrelated bytecode churn.
 
-Activation requires exact-head owner ratification, a finite operating cadence,
-the selected S=10 bound, cold maximum-ring and PriceDesk composition evidence,
+Activation requires exact-head owner ratification, a selected clock domain, a
+finite operating cadence, the selected capacity-ten bound, direct
+capacity-ten, cold maximum-ring, and PriceDesk composition evidence,
 snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
 The remediated Curve source SHA-256 is recorded in the Robinhood launch-input
 ledger as an owner-selected candidate. It remains an explicit fail-closed
 deployment-readiness blocker until that exact-head ratification occurs.
 Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
 sustained fallback, near-budget gas, threshold/equilibrium change, or new
-consumer/topology reopens qualification. The inherited pinned-Base
-`test_curve_prices.py` freshness defect remains recorded test-harness debt and
-grants no production exception. This decision grants no deployment,
+consumer/topology or clock-domain change reopens qualification. The pinned-Base
+`test_curve_prices.py` harness now advances governance NUMBER independently of
+oracle timestamp: the final candidate passes 32/32 while the exact target
+retains the historical 24-failed/8-passed fail-first result. No production
+freshness check was weakened. This decision grants no deployment,
 registration, configuration, activation, or release authority.
+
+Exact-final-head owner checklist (all remain unchecked):
+
+- [ ] select ancestor semantics with the recorded 7,200/720 calibration, or
+  select child semantics and stop `RB-CLOCK-CURVE` for a design packet;
+- [ ] accept rolling danger-entry lag and `maxNumSnapshots=10` with its
+  cadence-dependent horizon;
+- [ ] accept still-fresh `staleBlocks` shrink, expired-history revival only for
+  current classification without gap credit, and confirmation-anchored
+  post-trigger danger/recovery continuity;
+- [ ] accept inclusive `>=` danger classification and equilibrium guidance;
+- [ ] accept capacity-ten, fixed-100-slot reset, maximum-ring, Teller, and
+  PriceDesk gas methodology and margins;
+- [ ] verify the Base green 72/72 and asset/LP 32/32 evidence, including the
+  exact target's retained 24-failed/8-passed harness fail-first artifact; and
+- [ ] accept the monitoring, pause/disable, reopen, and feature-inactivity
+  controls without treating merge approval as deployment or activation.
 
 **Source:**
 [`evidence/curve-snapshot-remediation.md`](evidence/curve-snapshot-remediation.md),

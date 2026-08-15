@@ -26,18 +26,18 @@ E    +      where contracts/priceSources/CurvePrices.vy.getCurrentGreenPoolStatu
 tests/priceSources/curve/test_green_ref_pool.py:1403: in test_extreme_stale_blocks_rejected_without_poisoning_view
     assert curve.getCurrentGreenPoolStatus().weightedRatio == 50_00
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E   boa.contracts.base_evm_contract.BoaError: 
+E   boa.contracts.base_evm_contract.BoaError:
 E   ========================================================================
 E   [E] [3182] CurvePrices.getCurrentGreenPoolStatus:986() &lt;0x&gt;
 E   ========================================================================
-E   
+E
 E   Revert(b'')
-E   
+E
 E   &lt;contracts/priceSources/CurvePrices.vy at 0x9FF44f4Aaa0Ba7cEe662F6d166b9F9215F880C10, compiled with vyper-0.4.3+bff19ea2&gt;
 E   &lt;storage: curveConfig={}, pendingUpdates={}, greenRefPoolConfig=GreenRefPoolConfig({'pool': '0xCEa1d80317214D835e2f351b8F22e7cBc19E65BA', 'lpToken': '0xCEa1d80317214D835e2f351b8F22e7cBc19E65BA', 'greenIndex': 1, 'altAsset': '0xbe3b199E24C9AE8A8C419125e957c100CbbF02d6', 'altAssetDecimals': 18, 'maxNumSnapshots': 10, 'dangerTrigger': 6000, 'staleBlocks': 115792089237316195423570985008687907853269984665640564039457584007913129639935, 'stabilizerAdjustWeight': 1000, 'stabilizerMaxPoolDebt': 100000000000000000000000}), greenRefPoolData=GreenRefPoolData({'lastSnapshot': RefPoolSnapshot({'greenBalance': 10000000000000000000000, 'ratio': 5000, 'update': 2, 'inDanger': False}), 'numBlocksInDanger': 0, 'nextIndex': 1}), snapShots={3: RefPoolSnapshot({'greenBalance': 0, 'ratio': 0, 'update': 0, 'inDanger': False}), 2: RefPoolSnapshot({'greenBalance': 0, 'ratio': 0, 'update': 0, 'inDanger': False}), 0: RefPoolSnapshot({'greenBalance': 10000000000000000000000, 'ratio': 5000, 'update': 2, 'inDanger': False}), 1: RefPoolSnapshot({'greenBalance': 0, 'ratio': 0, 'update': 0, 'inDanger': False})}, pendingGreenRefPoolConfig={1: GreenRefPoolConfig({'pool': '0x0000000000000000000000000000000000000000', 'lpToken': '0x0000000000000000000000000000000000000000', 'greenIndex': 0, 'altAsset': '0x0000000000000000000000000000000000000000', 'altAssetDecimals': 0, 'maxNumSnapshots': 0, 'dangerTrigger': 0, 'staleBlocks': 0, 'stabilizerAdjustWeight': 0, 'stabilizerMaxPoolDebt': 0}), 3: GreenRefPoolConfig({'pool': '0x0000000000000000000000000000000000000000', 'lpToken': '0x0000000000000000000000000000000000000000', 'greenIndex': 0, 'altAsset': '0x0000000000000000000000000000000000000000', 'altAssetDecimals': 0, 'maxNumSnapshots': 0, 'dangerTrigger': 0, 'staleBlocks': 0, 'stabilizerAdjustWeight': 0, 'stabilizerMaxPoolDebt': 0}), 2: GreenRefPoolConfig({'pool': '0x0000000000000000000000000000000000000000', 'lpToken': '0x0000000000000000000000000000000000000000', 'greenIndex': 0, 'altAsset': '0x0000000000000000000000000000000000000000', 'altAssetDecimals': 0, 'maxNumSnapshots': 0, 'dangerTrigger': 0, 'staleBlocks': 0, 'stabilizerAdjustWeight': 0, 'stabilizerMaxPoolDebt': 0})}&gt;
 E    &lt;compiler: safeadd&gt;
-E   
-E     contract "contracts/priceSources/CurvePrices.vy:986", function "getCurrentGreenPoolStatus", line 986:54 
+E
+E     contract "contracts/priceSources/CurvePrices.vy:986", function "getCurrentGreenPoolStatus", line 986:54
 E          985         # too stale, skip
 E     ---&gt; 986         if config.staleBlocks != 0 and block.number &gt; snapShot.update + config.staleBlocks:
 E     ---------------------------------------------------------------^

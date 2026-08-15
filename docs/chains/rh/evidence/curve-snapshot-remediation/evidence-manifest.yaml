@@ -8,21 +8,23 @@ lifecycle:
     release, merge, or owner-policy authority is granted.
 
 source_binding:
-  remediation_base_commit: e7b6eeab768a009469a38a7ce8a35bb7e8d8f4bc
-  remediation_base_tree: 50703ae71089909e767d5654ba3b29a4ff1dd8f5
-  candidate_test_commit: 937b491a01f005bd1a65edb9ad81ddf1668596e2
-  candidate_test_tree: c7cd7d5104545f271741e83578725f86aad9dd9e
+  remediation_base_commit: 400d6ebefebc9a51f1544f4c59ad7c8d31b8168b
+  remediation_base_tree: fb0d56a777ab4989389adbf7f84a63cbdf1a1f73
+  candidate_test_commit: 4ed1afddcb67253011a48270407ade3f5528e9e9
+  candidate_test_tree: f6ce53a0ca4946a92693011df214f04e5f02346e
   curve_source_sha256: 8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050
   unfixed_commit: 4a72a1f
   unfixed_curve_source_sha256: f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c
-  fail_first_overlay_sha256: 0563887b4e3778cb5579bc269e858a577a00604a2fe7c81b973d50b0deee3e79
+  fail_first_overlay_sha256: fcd4e9dd5080a57ae13cae6d4465a78a2bc9c9414458609dec5a51f023e3539a
+  clock_capture_script_sha256: 38eddce9f176e9612dbd096a8ebe1666730102f535657c873f3cd273217a970e
   price_desk_pr: 152
-  price_desk_commit: 3752d5d0c220cbb5491c232b859adf50d64c0841
+  price_desk_commit: 11af6c8de5a5a70fd6efa1572adf9331ad1610e5
   price_desk_source_sha256: 7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c
   note: >-
-    The retained test commit precedes only the generated evidence artifacts
-    and their manifest. Final PR head/tree and synthetic merge identity are
-    recorded in the PR description after the last target refresh.
+    The retained test commit contains the final Curve behavior, clock, gas, and
+    Base-harness tests and precedes only generated evidence and decision text.
+    Final PR head/tree and synthetic merge identity are recorded in the PR
+    description after the last target refresh.
 
 environment:
   python: 3.12.0
@@ -35,10 +37,10 @@ environment:
   pinned_block: 34471929
   rpc: Alchemy Base mainnet through local Anvil
   credentials: >-
-    Existing interactive-shell credentials were loaded locally. Secret values
-    were neither printed intentionally nor committed. Every retained XML file
-    passed a scan for provider URLs, credential variable names, Anvil private
-    keys, and mnemonic output.
+    Existing interactive-shell credentials were loaded locally through
+    <credential-loader>. Secret values were neither retained nor committed.
+    Every retained evidence file passed a scan for provider URLs, credential
+    variable names, local user paths, Anvil private keys, and mnemonic output.
   cache_isolation: >-
     Each run used distinct PYTHONPYCACHEPREFIX, XDG_CACHE_HOME,
     HYPOTHESIS_STORAGE_DIRECTORY, RIPE_BOA_CACHE_DIR, and pytest basetemp paths
@@ -68,19 +70,21 @@ chainlink_freshness_diagnostic:
 
 commands:
   base_green_ref_pool: >-
-    /bin/zsh -ic 'source /Users/wigglez/.zshrc.bak.1784848044 >/dev/null
+    /bin/zsh -ic 'source <credential-loader> >/dev/null
     2>&1; exec env PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0
     PYTHONPYCACHEPREFIX=<private-temp> XDG_CACHE_HOME=<private-temp>
     HYPOTHESIS_STORAGE_DIRECTORY=<private-temp>
     RIPE_BOA_CACHE_DIR=<private-temp>
-    /Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python
+    <python-env>/bin/python
     -m pytest -q -p no:cacheprovider --basetemp=<private-temp> --fork base
     --anvil --junitxml=<evidence>/base-green-ref-pool-junit.xml
     tests/priceSources/curve/test_green_ref_pool.py'
   candidate_asset_lp: >-
     Same credential and isolated-cache wrapper, with --fork base --anvil
     --junitxml=<evidence>/base-curve-prices-candidate-junit.xml
-    tests/priceSources/curve/test_curve_prices.py at candidate_test_commit.
+    tests/priceSources/curve/test_curve_prices.py at candidate_test_commit. The
+    test-only harness advances governance NUMBER while holding fork timestamp
+    fixed so historical oracle age and timelock progress are independent.
   target_asset_lp: >-
     Same credential and isolated-cache wrapper, with --fork base --anvil
     --junitxml=<evidence>/base-curve-prices-target-junit.xml
@@ -92,6 +96,10 @@ commands:
     --junitxml=<evidence>/pricedesk-curve-composition-junit.xml
     tests/priceSources/curve/test_robinhood_launch_route.py, in a detached
     candidate worktree whose PriceDesk.vy is restored from price_desk_commit.
+  robinhood_clock_capture: >-
+    python scripts/capture_robinhood_curve_clock.py
+    --rpc-url https://rpc.mainnet.chain.robinhood.com --sample-size 16
+    --end-block 37417709
   fail_first_prepare: >-
     Create a detached worktree at unfixed_commit; restore
     tests/priceSources/curve/test_green_ref_pool.py,
@@ -110,35 +118,35 @@ commands:
 
 artifacts:
   - file: base-green-ref-pool-junit.xml
-    sha256: 3ebfb0d95ecd37fbfa0422c8def0a3b77cbf189a3c3b95e0eb975515a531a09a
-    bytes: 8261
-    tests: 59
-    passed: 59
+    sha256: b7086f8163792f6fa96b6974a12d465d9dfa0c002b1da2911c1199d7ffa4ccd8
+    bytes: 10344
+    tests: 72
+    passed: 72
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 195.93
+    duration_seconds: 218.38
   - file: base-curve-prices-candidate-junit.xml
-    sha256: c40277d18661d12ac3079127fa61ed9589ae56de7d47fb3a5cc7658fff52cf33
-    bytes: 42269
+    sha256: b06e1c8929d20d9b5ca4c7f456c09dfaec3361919d536a0bd2c173eaf24566de
+    bytes: 3990
     tests: 32
-    passed: 8
-    failed: 24
+    passed: 32
+    failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 142.50
+    duration_seconds: 129.11
   - file: base-curve-prices-target-junit.xml
-    sha256: 79ba335948cf9027cfd4c30ba10b041801e3c28809e7fbfd6e6780196c9f52e8
-    bytes: 42269
+    sha256: 9162cdeb88063219c2689fce0c875dd7c946ebb6ca091c4e80faa6d20f4bf170
+    bytes: 76334
     tests: 32
     passed: 8
     failed: 24
     skipped: 0
     deselected: 0
-    duration_seconds: 139.55
+    duration_seconds: 47.73
   - file: fail-first-4a72a1f-junit.xml
-    sha256: e087d993545237ce5b636dc2eea42b035c118b21bfb2d84c5130f6c47765bb1a
-    bytes: 14428
+    sha256: 0dcc4e8eba5d9072d67ffff6e8d150df763fc142a340e66a2f3b1e6ee5f40a26
+    bytes: 14417
     tests: 4
     passed: 0
     failed: 4
@@ -151,22 +159,24 @@ artifacts:
       - capacity regrowth returned 8046 instead of the fresh 8500 seed
       - extreme staleBlocks overflowed the view at safeadd
   - file: pricedesk-curve-composition-junit.xml
-    sha256: 70940f5421ceefee57f452e3bf0b5d46c96891b18c485b8b13c956f7c8028b44
-    bytes: 1763
-    tests: 9
-    passed: 9
+    sha256: d7ac96c3c985f86ac321573fdb89a1297ae23a14c14a556f799cbe9c6fefbaf7
+    bytes: 1919
+    tests: 10
+    passed: 10
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 137.56
+    duration_seconds: 141.76
     measurements:
       nested_green_route_gas: 25700
       worst_honest_route_gas: 127922
+      full_capacity_ten_teller_housekeeping_gas: 86602
       nested_green_route_ceiling: 50000
       worst_honest_route_ceiling: 200000
+      full_capacity_ten_teller_housekeeping_ceiling: 150000
 
-candidate_target_failure_sets_equal: true
-asset_lp_failed_nodes:
+candidate_asset_lp_harness_fixed: true
+target_asset_lp_failed_nodes:
   - test_add_curve_price_green_lp
   - test_add_curve_price_green_single_asset
   - test_add_curve_price_ripe_lp
@@ -191,3 +201,31 @@ asset_lp_failed_nodes:
   - test_ripe_pool_imbalanced
   - test_savings_green_price
   - test_update_price_feed_same_pool
+
+clock_packet:
+  file: robinhood-clock-packet.json
+  sha256: b21b27289d2136efc004a78c29253d94d8e74abc03ee304b9889f317c310f6fe
+  bytes: 5309
+  chain_id: 4663
+  pinned_child_start: 37417694
+  pinned_child_end: 37417709
+  sample_size: 16
+  contract_number: 25762964
+  all_l1_numbers_match_contract_number: true
+  all_arbsys_values_match_rpc_child: true
+
+cold_access_gas:
+  methodology: >-
+    Fresh isolated Boa deployments with py-evm access counters reset immediately
+    before each measured call. This private hook is confined to the standalone
+    script and is not used by pytest.
+  measurements:
+    view_capacity_100_with_10_entries_all_fresh: 915409
+    view_full_10_all_fresh: 132089
+    add_snapshot_full_10: 178331
+    confirm_capacity_10_to_9_clear_and_reseed: 1177148
+    view_full_100_all_fresh: 1011839
+    view_full_100_mostly_stale: 940492
+    view_wrapped_100_all_fresh: 1013019
+    add_snapshot_full_100: 1058081
+    confirm_clear_100_and_reseed: 1302608

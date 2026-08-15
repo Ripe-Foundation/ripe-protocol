@@ -58,19 +58,58 @@ deployed runtimes plus its sealed manifest.
 
 ## RH-D043 candidate decision
 
+### Robinhood clock domain: owner decision still required
+
+The selected `CurvePrices` bytes use EVM `block.number` for freshness,
+same-number suppression, duration weighting, danger accumulation, and recovery.
+On Robinhood this is the first non-Arbitrum ancestor/L1-number domain, not the
+child height. A pinned public-RPC packet sampled child blocks 37,417,694 through
+37,417,709. Every block had a distinct RPC and
+`ArbSys(0x64).arbBlockNumber()` value, but all 16 exposed contract `NUMBER` and
+provider `l1BlockNumber` 25,762,964. Timestamps moved only from 1,786,827,288 to
+1,786,827,289. The exact hashes, selectors, fields, and reproduction command
+are retained in `robinhood-clock-packet.json` and
+`scripts/capture_robinhood_curve_clock.py`.
+
+`GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain explicit inactive
+Robinhood capabilities. RH-D043 must not be ratified and neither capability may
+be configured until the owner chooses one of these mutually exclusive paths:
+
+1. **Accept ancestor-block semantics.** Every configured "block" means contract
+   `NUMBER`; many child blocks may be suppressed as one snapshot block. The
+   candidate operating calibration is `staleBlocks=7,200`, which is also the
+   recovery duration, using the existing approximately 12-second planning
+   cadence. With `maxNumSnapshots=10`, target at least one successful write per
+   720 ancestor blocks (about 2.4 hours), producing a nominal approximately
+   21.6-to-24-hour ten-observation horizon when activity is regular. This is an
+   alerting/operating target, not a protocol guarantee: quiet periods shorten
+   observation density and ancestor jumps consume multiple units at once.
+2. **Require child-block semantics.** Stop `RB-CLOCK-CURVE`; do not activate or
+   edit production code under this decision. Return an owner design packet for
+   the smallest shared-source immutable native/ArbSys selection analogous to
+   Ledger, then regenerate constructor bindings, artifacts, runtime identities,
+   ABI if affected, gas, migrations, SC-06 composition, and all fork evidence.
+
+The current PR qualifies the first path's actual unchanged bytes but does not
+self-select it. `R-REP128`, `R-PLUS1`, `R-J2-J4`, `BOUNDARY-OPEN`,
+`BOUNDARY-WINDOW`, and `R-STRESS60` regressions pin repeated suppression, exact
++1/+2/+4/+60 duration arithmetic, inclusive freshness crossing, stale recovery
+restart, and the real Teller housekeeping route.
+
 The candidate uses chronological block-duration weighting and accepts the
 resulting rolling danger-entry lag. A new ratio receives weight only after a
 later observation establishes its duration. That lag resists manipulation of
 weight by balance inflation, but it means an abrupt dangerous observation is
 not retroactively credited for time before it was observed.
 
-The recommended live `maxNumSnapshots` is 10. It matches the existing Base
-configuration and the S=10 PriceDesk composition measurement. Because the
-contract accepts at most one successful write per block and depends on
-qualifying activity, ten entries do not imply a fixed wall-clock horizon.
-Operations must bind and monitor an honest snapshot cadence rather than infer
-one from capacity alone. Increasing capacity above 10 reopens runtime and
-composition-gas qualification.
+The recommended live `maxNumSnapshots` is 10, matching the existing Base
+configuration. It is supported by direct capacity-ten ring measurements below;
+the PriceDesk "S=10" measurement is a different dimension (ten price sources
+after misses) and is not evidence for ring capacity. Because the contract
+accepts at most one successful write per selected clock unit and depends on
+qualifying activity, ten entries do not imply a guaranteed wall-clock horizon.
+Operations must bind and monitor an honest snapshot cadence. Increasing
+capacity above 10 reopens runtime and composition-gas qualification.
 
 Classification is inclusive: `weightedRatio >= dangerTrigger` is dangerous.
 The trigger must remain above the pool's expected resting ratio and must not be
@@ -136,11 +175,11 @@ the only current in-repository production caller, through
 write indirectly. A real-Teller regression exercises that route through
 PriceDesk registry ID 2.
 
-Same-block suppression permits only one successful write per block. The first
-qualifying Teller action in a new block can bear the full O(`maxNumSnapshots`)
-traversal and write cost. Later same-block attempts do not add another
-observation. Operator capacity selection and transaction-gas guidance must
-account for that first-caller cost.
+Same-`NUMBER` suppression permits only one successful write per selected clock
+unit. The first qualifying Teller action at a new `NUMBER` can bear the full
+O(`maxNumSnapshots`) traversal and write cost. Later attempts while `NUMBER`
+repeats do not add another observation. Operator capacity selection and
+transaction-gas guidance must account for that first-caller cost.
 
 ### Enforced PriceDesk composition budgets
 
@@ -151,21 +190,24 @@ exclusion. It enforces:
 | --- | ---: | ---: |
 | Robinhood GREEN -> Curve -> PriceDesk -> Chainlink USDG | 25,558 | 50,000 |
 | Worst honest four-coin path after eight misses | 126,181 | 200,000 |
+| Teller housekeeping with active full capacity-ten GREEN ring | 86,602 | 150,000 |
 
-The first ceiling leaves approximately 96% margin and the second approximately
-58%. These are top-level deterministic Boa measurements, not raw-call stipends.
-The CI workflow-health regression fails if either the BlueChip or Curve gas
-file is removed from the snapshot-gas job.
+The ceilings leave approximately 96%, 58%, and 73% margin respectively. These
+are top-level deterministic Boa measurements, not raw-call stipends. The CI
+workflow-health regression fails if either the BlueChip or Curve gas file is
+removed from the snapshot-gas job.
 
 The downstream SC-06 requalification replaced PriceDesk with exact PR #152
-commit `3752d5d0c220cbb5491c232b859adf50d64c0841` and source SHA-256
+commit `11af6c8de5a5a70fd6efa1572adf9331ad1610e5` and source SHA-256
 `7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c`
-while retaining this exact Curve source. All nine route nodes passed. The
+while retaining this exact Curve source. All ten route nodes passed. The
 bounded PriceDesk added 142 gas to the normal route (25,700 total) and 1,741
 gas to the worst honest route (127,922 total); both remain below the same
-50,000 and 200,000 ceilings. The retained JUnit binds those two exact sources.
+50,000 and 200,000 ceilings. The active, full capacity-ten GREEN ring's real
+Teller housekeeping route used 86,602 gas and is bounded at 150,000. The
+retained JUnit binds those two exact sources.
 
-### Maximum-ring cold-access measurements
+### Capacity-ten and maximum-ring cold-access measurements
 
 `scripts/measure_curve_snapshot_gas.py` deploys an isolated system per path and
 uses Boa's py-evm access-counter reset immediately before the measured call.
@@ -175,17 +217,24 @@ Curve source above:
 
 | Path | Gas |
 | --- | ---: |
-| Partial 10-entry all-fresh view | 915,409 |
+| Capacity 10, full all-fresh view | 132,089 |
+| Capacity 10, full wrapping write | 178,331 |
+| Confirm capacity 10-to-9, clear, and reseed | 1,177,148 |
+| Capacity 100 with only 10 entries, all-fresh view | 915,409 |
 | Full 100-entry all-fresh view | 1,011,839 |
 | Full 100-entry mostly-stale view | 940,492 |
 | Wrapped 100-entry all-fresh view | 1,013,019 |
 | Add snapshot to a full 100-entry ring | 1,058,081 |
 | Confirm capacity 100-to-99, clear, and reseed | 1,302,608 |
 
-These are cold-access operational measurements, not ordinary CI assertions.
-They justify the recommended live S=10 bound and require a documented margin
-in transaction construction. The exact 100-entry values must not be treated as
-stable warm-process budgets.
+The 10-to-9 reset remains expensive because `_clearGreenRefPoolSnapshots`
+deliberately clears all 100 physical slots regardless of active capacity. These
+are cold-access operational measurements, not ordinary CI assertions. They
+support the capacity-ten recommendation and require a documented margin in
+transaction construction. The capacity-100 values are separate maximum-bound
+evidence and must not be treated as stable warm-process budgets. Dynamic-rate
+activation is out of scope and remains inactive, so no CreditEngine active-ring
+gas claim is made.
 
 ## Test provenance and reproducible recipes
 
@@ -277,12 +326,12 @@ values are logged or committed. Retained JUnit must bind the exact final head
 and merge candidate, command, selected nodes, and all pass/fail/skip/deselect
 counts.
 
-The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 59
-green-ring nodes in 195.93 seconds. The existing `test_curve_prices.py`
-asset/LP lane has inherited harness debt, not a Curve-pool math divergence:
-target `e7b6eeab768a009469a38a7ce8a35bb7e8d8f4bc` and candidate test commit
-`937b491a01f005bd1a65edb9ad81ddf1668596e2` each produced the same 24 failed /
-8 passed set, and the parsed failed-node sets are identical.
+The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 72
+green-ring nodes in 218.38 seconds. The refreshed live target
+`400d6ebefebc9a51f1544f4c59ad7c8d31b8168b` reproduced the inherited
+`test_curve_prices.py` result of 24 failed / 8 passed. Candidate test commit
+`4ed1afddcb67253011a48270407ade3f5528e9e9` repairs the harness and passes all
+32 nodes in 129.11 seconds.
 
 At the pinned block, timestamp 1,755,733,205, the USDC Chainlink round was
 updated at 1,755,702,597. Its initial age was 30,608 seconds. The Chainlink
@@ -292,20 +341,25 @@ to timestamp 1,755,819,629 and age 117,032 seconds, beyond MissionControl's
 86,400-second global freshness value. The fixture's direct Chainlink source
 uses per-feed `staleTime=0` and remains nonzero, while PriceDesk correctly
 supplies the global bound. That causes 23 confirmation failures and one
-cascading missing-event assertion on both revisions.
+cascading missing-event assertion on the unmodified target. The candidate
+harness advances governance `NUMBER` without advancing the pinned fork
+timestamp, controlling timelock progress independently from historical oracle
+age without changing or weakening any production stale-price check.
 
 The repository retains all five JUnit documents, not only their digests, plus
 the complete failure set, exact commands, versions, sanitized environment,
 timestamps, counts, hashes, fail-first outputs, and PR #152 composition
 measurement in
 [`curve-snapshot-remediation/evidence-manifest.yaml`](curve-snapshot-remediation/evidence-manifest.yaml).
-The evidence grants no production exception for the inherited harness debt.
+The candidate therefore carries no accepted red-lane exception; the target
+JUnit remains as fail-first evidence for the harness correction.
 
 ## Monitoring, pause, disable, and reopen conditions
 
 Before activation, operators must bind:
 
-1. a finite honest snapshot cadence and an alert before observations expire;
+1. the owner-selected clock domain, its finite honest snapshot cadence, and an
+   alert before observations expire;
 2. rolling ratio, spot ratio, availability, danger counter, recovery state,
    last successful block, and fallback/failure alerts;
 3. first-caller and worst-path gas monitoring against transaction and source
@@ -319,5 +373,6 @@ registry, or immutable change; capacity above 10; missed refresh or sustained
 unavailable/fallback state; gas approaching the selected margin; a threshold
 or pool-equilibrium change; a new caller, consumer, or registry topology; any
 change to freshness-revival or post-confirmation anchoring semantics; or drift
-in the pinned Base failure set. Owner ratification of RH-D043 must name the
-exact final head and does not waive any of these controls.
+in the selected clock domain or pinned Base results. Owner ratification of
+RH-D043 must name the exact final head, choose ancestor or child semantics, and
+does not waive any of these controls.
