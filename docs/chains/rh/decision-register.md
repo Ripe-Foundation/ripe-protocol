@@ -815,10 +815,11 @@ against `f9152f27ab8b14ede0ce562974430d57168960b0`.
 
 ### RH-D029 — CreditEngine carries an exact combined waiver at 10 bytes
 
-**Status:** Owner-granted on 13 August 2026 for the exact combined B-AUD-008,
-B-OBS-045 / AUD-010, and CreditRedeem price-isolation artifact. This replaces
-the prior four-byte RH-D029 identity, which itself replaced earlier RH-D029
-identities; the waivers are not cumulative.
+**Status:** Historical — superseded by RH-D037 on 14 August 2026; the waivers
+are not cumulative. This decision was owner-granted on 13 August 2026 for the
+exact combined B-AUD-008, B-OBS-045 / AUD-010, and CreditRedeem price-isolation
+artifact. It replaced the prior four-byte RH-D029 identity, which itself
+replaced earlier RH-D029 identities.
 
 The ratified 200-byte minimum remains controlling for non-waived contracts. The
 B-AUD-008 correction makes BasicVault's current Lootbox share zero while its
@@ -1292,8 +1293,9 @@ partial standard repayment uses conservative non-strict valuation, retains
 healthy collateral value and capacity, and preserves prior debt terms when a
 positive-amount position lacks a usable price. Other partial repayment types
 remain strict. CreditEngine and Lootbox additionally skip zero-asset live vault
-replacements; Lootbox routes stale vault IDs through its existing bounded
-Ledger cleanup. The external quarantine model, custody-shortfall policy,
+replacements; Lootbox leaves the stale Ledger registration and any stored point
+records intact for pointer rollback or conditional department recovery. The
+external quarantine model, custody-shortfall policy,
 CreditRedeem borrower-wide price isolation, ABI, selectors, events,
 constructors, and storage layouts remain unchanged.
 

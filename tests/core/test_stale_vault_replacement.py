@@ -286,7 +286,7 @@ def test_claimable_loot_skips_stale_repointed_zero_asset_vault(
     assert lootbox.getClaimableLoot(bob) == 0
 
 
-def test_claim_loot_removes_stale_vault_without_asset_deregistration(
+def test_claim_loot_preserves_stale_vault_registration(
     bob,
     alpha_token,
     alpha_token_whale,
@@ -315,7 +315,7 @@ def test_claim_loot_removes_stale_vault_without_asset_deregistration(
 
     assert teller.claimLoot(bob, False, sender=bob) == 0
     assert replacement.numUserAssets(bob) == 0
-    assert not ledger.isParticipatingInVault(bob, vault_id)
+    assert ledger.isParticipatingInVault(bob, vault_id)
 
 
 def test_claim_loot_preserves_borrow_rewards_and_healthy_vault(
@@ -375,7 +375,7 @@ def test_claim_loot_preserves_borrow_rewards_and_healthy_vault(
     assert claimable_borrow > 0
     assert lootbox.getClaimableLoot(bob) == claimable_borrow
     assert teller.claimLoot(bob, False, sender=bob) == claimable_borrow
-    assert not ledger.isParticipatingInVault(bob, stale_vault_id)
+    assert ledger.isParticipatingInVault(bob, stale_vault_id)
     assert ledger.isParticipatingInVault(bob, healthy_vault_id)
 
 
@@ -439,11 +439,11 @@ def test_claim_loot_preserves_healthy_deposit_rewards_beside_stale_vault(
     claimable = lootbox.getClaimableLoot(bob)
     assert claimable > 0
     assert teller.claimLoot(bob, False, sender=bob) == claimable
-    assert not ledger.isParticipatingInVault(bob, stale_vault_id)
+    assert ledger.isParticipatingInVault(bob, stale_vault_id)
     assert ledger.isParticipatingInVault(bob, healthy_vault_id)
 
 
-def test_stale_vault_cleanup_capacity_defers_excess_without_revert(
+def test_stale_vault_skip_preserves_all_registrations_without_revert(
     bob,
     setGeneralConfig,
     teller,
@@ -472,13 +472,121 @@ def test_stale_vault_cleanup_capacity_defers_excess_without_revert(
             sender=teller.address,
         )
 
+    num_vaults_before = ledger.numUserVaults(bob)
     assert teller.claimLoot(bob, False, sender=bob) == 0
-    assert ledger.numUserVaults(bob) == 2
-    assert not any(
+    assert ledger.numUserVaults(bob) == num_vaults_before
+    assert all(
         ledger.isParticipatingInVault(bob, vault_id)
-        for vault_id in vault_ids[:10]
+        for vault_id in vault_ids
     )
-    assert ledger.isParticipatingInVault(bob, vault_ids[10])
+
+
+def test_claiming_healthy_peer_preserves_stale_points_and_registration(
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    teller,
+    ledger,
+    lootbox,
+    ripe_token,
+    simple_erc20_vault,
+    vault_book,
+    governance,
+):
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=100,
+        _voterPointsAlloc=0,
+    )
+    setRipeRewardsConfig(
+        _arePointsEnabled=True,
+        _ripePerBlock=10 * EIGHTEEN_DECIMALS,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+    )
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+    )
+    stale_vault_id = vault_book.getRegId(simple_erc20_vault)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        stale_vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    assert teller.withdraw(
+        alpha_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+
+    stale_bundle_before = ledger.getDepositPointsBundle(
+        bob,
+        stale_vault_id,
+        alpha_token,
+    )
+    assert stale_bundle_before.userPoints.balancePoints > 0
+    _install_zero_asset_replacement(
+        vault_book,
+        stale_vault_id,
+        governance,
+    )
+
+    healthy_vault_id = _register_vault(
+        vault_book,
+        governance,
+        simple_erc20_vault,
+        "healthy reward peer beside stored stale points",
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[healthy_vault_id],
+        _stakersPointsAlloc=100,
+        _voterPointsAlloc=0,
+    )
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+        simple_erc20_vault,
+    )
+    boa.env.time_travel(blocks=20)
+
+    num_vaults_before = ledger.numUserVaults(bob)
+    claimable = lootbox.getClaimableLoot(bob)
+    assert claimable > 0
+    assert teller.claimLoot(bob, False, sender=bob) == claimable
+    assert ripe_token.balanceOf(bob) == claimable
+
+    stale_bundle_after = ledger.getDepositPointsBundle(
+        bob,
+        stale_vault_id,
+        alpha_token,
+    )
+    # The returned global aggregate legitimately changes when the healthy peer
+    # settles. The stale vault's user- and asset-local point records must not.
+    assert stale_bundle_after.userPoints == stale_bundle_before.userPoints
+    assert stale_bundle_after.assetPoints == stale_bundle_before.assetPoints
+    assert ledger.numUserVaults(bob) == num_vaults_before
+    assert ledger.isParticipatingInVault(bob, stale_vault_id)
+    assert ledger.isParticipatingInVault(bob, healthy_vault_id)
 
 
 def test_empty_vault_book_entry_keeps_existing_skip_and_no_cleanup_behavior(

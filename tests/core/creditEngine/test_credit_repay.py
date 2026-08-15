@@ -55,6 +55,46 @@ def _make_price_unavailable(mock_price_source, asset, failure_kind):
         mock_price_source.disablePriceFeed(asset)
 
 
+def _open_single_collateral_debt(
+    *,
+    user,
+    asset,
+    asset_whale,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+):
+    setGeneralConfig()
+    setAssetConfig(asset)
+    setGeneralDebtConfig()
+    mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    performDeposit(
+        user,
+        100 * EIGHTEEN_DECIMALS,
+        asset,
+        asset_whale,
+    )
+    debt = 50 * EIGHTEEN_DECIMALS
+    assert teller.borrow(debt, user, False, sender=user) == debt
+    return debt
+
+
+def _mark_debt_in_liquidation(user, ledger, credit_engine):
+    debt = list(ledger.userDebt(user))
+    debt[4] = True
+    ledger.setUserDebt(
+        user,
+        tuple(debt),
+        0,
+        (0, 0),
+        sender=credit_engine.address,
+    )
+    return ledger.userDebt(user)
+
+
 @pytest.mark.parametrize("price_failure", ["revert", "zero", "no-feed"])
 def test_partial_standard_repay_survives_one_unavailable_collateral_price(
     price_failure,
@@ -231,6 +271,59 @@ def test_partial_outage_keeps_liquidation_when_conservative_capacity_is_short(
     repay_log = filter_logs(teller, "RepayDebt")[0]
     assert repay_log.userCollateralVal == 100 * EIGHTEEN_DECIMALS
     assert repay_log.maxUserDebt == 50 * EIGHTEEN_DECIMALS
+    assert not repay_log.hasGoodDebtHealth
+
+
+@pytest.mark.parametrize("price_failure", ["revert", "zero", "no-feed"])
+def test_partial_standard_repay_with_all_prices_unavailable_stays_live_and_liquidating(
+    price_failure,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+):
+    debt = _open_multi_collateral_debt(
+        user=bob,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        bravo_token=bravo_token,
+        bravo_token_whale=bravo_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        createDebtTerms=createDebtTerms,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    debt_before = _mark_debt_in_liquidation(bob, ledger, credit_engine)
+    _make_price_unavailable(mock_price_source, alpha_token, price_failure)
+    _make_price_unavailable(mock_price_source, bravo_token, price_failure)
+
+    repay_amount = 10 * EIGHTEEN_DECIMALS
+    supply_before = green_token.totalSupply()
+    green_token.approve(teller, repay_amount, sender=bob)
+    assert not teller.repay(repay_amount, bob, False, False, sender=bob)
+
+    debt_after = ledger.userDebt(bob)
+    assert debt_after.amount == debt - repay_amount
+    assert debt_after.debtTerms == debt_before.debtTerms
+    assert debt_after.inLiquidation
+    assert green_token.totalSupply() == supply_before - repay_amount
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.userCollateralVal == 0
+    assert repay_log.maxUserDebt == 0
     assert not repay_log.hasGoodDebtHealth
 
 
@@ -1027,6 +1120,251 @@ def test_repay_from_department_keeps_zero_recipient_no_burn_no_refund_behavior(
     assert green_token.balanceOf(bob) == debtor_green_before
     assert green_token.balanceOf(credit_engine) == engine_green_before
     assert green_token.balanceOf(ZERO_ADDRESS) == zero_green_before
+
+
+@pytest.mark.parametrize("price_failure", ["revert", "zero"])
+def test_partial_auction_repay_remains_strict_and_atomic_during_price_outage(
+    price_failure,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+    auction_house,
+    whale,
+):
+    debt = _open_single_collateral_debt(
+        user=bob,
+        asset=alpha_token,
+        asset_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    debt_before = _mark_debt_in_liquidation(bob, ledger, credit_engine)
+    repay_amount = debt // 2
+    green_token.transfer(credit_engine, repay_amount, sender=whale)
+    _make_price_unavailable(mock_price_source, alpha_token, price_failure)
+
+    supply_before = green_token.totalSupply()
+    engine_green_before = green_token.balanceOf(credit_engine)
+    with boa.reverts():
+        credit_engine.repayDuringAuctionPurchase(
+            bob,
+            repay_amount,
+            sender=auction_house.address,
+        )
+
+    assert tuple(ledger.userDebt(bob)) == tuple(debt_before)
+    assert green_token.totalSupply() == supply_before
+    assert green_token.balanceOf(credit_engine) == engine_green_before
+    assert not filter_logs(credit_engine, "RepayDebt")
+
+
+@pytest.mark.parametrize(
+    "department_fixture",
+    ["auction_house", "deleverage", "credit_redeem"],
+)
+@pytest.mark.parametrize("price_failure", ["revert", "zero"])
+def test_partial_department_repay_remains_strict_and_atomic_during_price_outage(
+    department_fixture,
+    price_failure,
+    request,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+):
+    debt = _open_single_collateral_debt(
+        user=bob,
+        asset=alpha_token,
+        asset_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    debt_before = _mark_debt_in_liquidation(bob, ledger, credit_engine)
+    caller = request.getfixturevalue(department_fixture)
+    _make_price_unavailable(mock_price_source, alpha_token, price_failure)
+
+    supply_before = green_token.totalSupply()
+    debtor_green_before = green_token.balanceOf(bob)
+    engine_green_before = green_token.balanceOf(credit_engine)
+    with boa.reverts():
+        credit_engine.repayFromDept(
+            bob,
+            debt_before,
+            debt // 2,
+            0,
+            ledger.numUserVaults(bob),
+            sender=caller.address,
+        )
+
+    assert tuple(ledger.userDebt(bob)) == tuple(debt_before)
+    assert green_token.totalSupply() == supply_before
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert green_token.balanceOf(credit_engine) == engine_green_before
+    assert not filter_logs(credit_engine, "RepayDebt")
+
+
+@pytest.mark.parametrize("price_failure", ["revert", "zero", "no-feed"])
+def test_full_auction_payoff_skips_prices_burns_debt_and_refunds_overage(
+    price_failure,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    auction_house,
+    whale,
+):
+    debt = _open_single_collateral_debt(
+        user=bob,
+        asset=alpha_token,
+        asset_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    debt_before = _mark_debt_in_liquidation(bob, ledger, credit_engine)
+    overage = 7 * EIGHTEEN_DECIMALS
+    payment = debt + overage
+    green_token.transfer(credit_engine, payment, sender=whale)
+    _make_price_unavailable(mock_price_source, alpha_token, price_failure)
+
+    supply_before = green_token.totalSupply()
+    savings_assets_before = green_token.balanceOf(savings_green)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    assert credit_engine.repayDuringAuctionPurchase(
+        bob,
+        payment,
+        sender=auction_house.address,
+    )
+
+    debt_after = ledger.userDebt(bob)
+    assert debt_after.amount == 0
+    assert debt_after.debtTerms == debt_before.debtTerms
+    assert not debt_after.inLiquidation
+    assert green_token.totalSupply() == supply_before - debt
+    assert green_token.balanceOf(credit_engine) == 0
+    assert green_token.balanceOf(savings_green) - savings_assets_before == overage
+    assert savings_green.balanceOf(bob) > debtor_sgreen_before
+    repay_log = filter_logs(credit_engine, "RepayDebt")[0]
+    assert repay_log.repayType == 4
+    assert repay_log.repayValue == debt
+    assert repay_log.refundAmount == overage
+    assert repay_log.refundWasSavingsGreen
+    assert repay_log.outstandingUserDebt == 0
+    assert repay_log.userCollateralVal == 0
+    assert repay_log.maxUserDebt == 0
+    assert repay_log.hasGoodDebtHealth
+
+
+@pytest.mark.parametrize(
+    "department_fixture,expected_repay_type",
+    [
+        ("auction_house", 2),
+        ("deleverage", 16),
+        ("credit_redeem", 8),
+    ],
+)
+@pytest.mark.parametrize("price_failure", ["revert", "zero", "no-feed"])
+def test_full_department_payoff_skips_prices_without_burn_or_refund(
+    department_fixture,
+    expected_repay_type,
+    price_failure,
+    request,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+):
+    debt = _open_single_collateral_debt(
+        user=bob,
+        asset=alpha_token,
+        asset_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    debt_before = _mark_debt_in_liquidation(bob, ledger, credit_engine)
+    caller = request.getfixturevalue(department_fixture)
+    _make_price_unavailable(mock_price_source, alpha_token, price_failure)
+
+    supply_before = green_token.totalSupply()
+    debtor_green_before = green_token.balanceOf(bob)
+    engine_green_before = green_token.balanceOf(credit_engine)
+    zero_green_before = green_token.balanceOf(ZERO_ADDRESS)
+    assert credit_engine.repayFromDept(
+        bob,
+        debt_before,
+        debt,
+        0,
+        ledger.numUserVaults(bob),
+        sender=caller.address,
+    )
+
+    debt_after = ledger.userDebt(bob)
+    assert debt_after.amount == 0
+    assert debt_after.debtTerms == debt_before.debtTerms
+    assert not debt_after.inLiquidation
+    assert green_token.totalSupply() == supply_before
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert green_token.balanceOf(credit_engine) == engine_green_before
+    assert green_token.balanceOf(ZERO_ADDRESS) == zero_green_before
+    assert not filter_logs(credit_engine, "Transfer")
+    repay_log = filter_logs(credit_engine, "RepayDebt")[0]
+    assert repay_log.repayType == expected_repay_type
+    assert repay_log.repayValue == debt
+    assert repay_log.refundAmount == 0
+    assert not repay_log.refundWasSavingsGreen
+    assert repay_log.outstandingUserDebt == 0
+    assert repay_log.userCollateralVal == 0
+    assert repay_log.maxUserDebt == 0
+    assert repay_log.hasGoodDebtHealth
 
 
 def test_repay_during_auction_purchase(

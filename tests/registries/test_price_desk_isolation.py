@@ -303,7 +303,7 @@ def test_failed_snapshot_source_no_longer_blocks_teller_deposit(
     assert healthy.snapshotCount() == 1
 
 
-def test_healthy_fallback_restores_strict_credit_engine_repay(
+def test_healthy_fallback_restores_standard_credit_engine_repay(
     price_desk,
     governance,
     alpha_token,

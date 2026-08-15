@@ -26,10 +26,11 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     # The base artifact ledger measured 23,345 bytes even though this explicitly
-    # non-enforced review aid still said 22,993. SC-15 adds 67 bytes, producing
-    # the final 23,412; this refresh therefore includes 352 bytes of pre-existing
-    # reference drift plus the 67-byte change owned by this batch.
-    "Lootbox": 23_412,
+    # non-enforced review aid still said 22,993. The initial SC-15 implementation
+    # added 67 bytes; preserving zero-asset Ledger registrations recovers 49,
+    # producing a final 23,363 (352 bytes of pre-existing reference drift plus
+    # 18 bytes of growth owned by this batch).
+    "Lootbox": 23_363,
     "RipeGov": 23_152,
     "AuctionHouse": 24_554,
     "CreditEngine": 24_555,
@@ -57,7 +58,7 @@ DEFAULT_MIN_HEADROOM = 200
 # Measured headroom against the 24,576 limit in this integration candidate:
 # AuctionHouse 22, Teller 20, CreditEngine 21, StabilityPool 263,
 # SwitchboardCharlie 703,
-# SwitchboardAlpha 108, Lootbox 1,164, RipeGov 1,424, SwitchboardBravo 373,
+# SwitchboardAlpha 108, Lootbox 1,213, RipeGov 1,424, SwitchboardBravo 373,
 # SwitchboardEcho 1,384, and the rest far larger.
 #
 # RH-D029 covered the prior exact CreditEngine artifact and reopened with this
@@ -156,7 +157,7 @@ WAIVED_CONTRACT_IDENTITIES = {
         ),
     },
     "CreditEngine": {
-        "decision": "RH-D033",
+        "decision": "RH-D037",
         "fixture": "credit_engine",
         "source": "contracts/core/CreditEngine.vy",
         "source_sha256": (
