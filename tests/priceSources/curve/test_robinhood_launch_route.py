@@ -209,7 +209,10 @@ def test_final_curve_nested_price_desk_route_gas(robinhood_curve_launch_route):
     assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
     gas_used = route.price_desk._computation.get_gas_used()
     print(f"CURVE_NESTED_PRICEDESK_GAS={gas_used}")
-    assert gas_used > 0
+    # The final-route baseline is 25,558 gas. The 50k ceiling leaves about
+    # 96% headroom for deterministic compiler/runtime drift while remaining a
+    # meaningful regression budget.
+    assert gas_used <= 50_000
 
 
 @pytest.mark.gas
@@ -281,7 +284,9 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
     assert desk.getPrice(curve_system, True, gas=2_000_000) == EIGHTEEN_DECIMALS
     gas_used = desk._computation.get_gas_used()
     print(f"CURVE_WORST_HONEST_NESTED_PRICEDESK_GAS={gas_used}")
-    assert gas_used < 2_000_000
+    # The final worst-honest baseline is 126,181 gas. The 200k ceiling leaves
+    # about 58% headroom and is intentionally independent of the call stipend.
+    assert gas_used <= 200_000
 
 
 @pytest.mark.parametrize("failure", ("zero_pool", "zero_chainlink", "stale_chainlink"))

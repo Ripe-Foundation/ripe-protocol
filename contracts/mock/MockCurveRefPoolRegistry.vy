@@ -15,6 +15,8 @@ RIPE_TOKEN_ID: constant(uint256) = 3
 SWITCHBOARD_ID: constant(uint256) = 6
 PRICE_DESK_ID: constant(uint256) = 7
 
+# The setters below are intentionally permissionless test controls. They are
+# not evidence for production registry or governance authorization behavior.
 
 @deploy
 def __init__(

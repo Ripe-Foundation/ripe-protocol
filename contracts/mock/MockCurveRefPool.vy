@@ -2,6 +2,8 @@
 
 poolBalances: uint256[2]
 
+# Intentionally permissionless test control. Production authorization behavior
+# must be proven through the real CurvePrices and registry graph, not this mock.
 
 @external
 def setBalances(_altBalance: uint256, _greenBalance: uint256):

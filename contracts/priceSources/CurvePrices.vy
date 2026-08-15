@@ -926,6 +926,10 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
         or prev.altAssetDecimals != d.altAssetDecimals
     )
     capacityChanged: bool = prev.maxNumSnapshots != d.maxNumSnapshots
+    classificationChanged: bool = (
+        prev.dangerTrigger != d.dangerTrigger
+        or prev.staleBlocks != d.staleBlocks
+    )
     preservedDangerBlocks: uint256 = self.greenRefPoolData.numBlocksInDanger
 
     # Meaning and capacity changes invalidate the physical ring. Persist the
@@ -959,10 +963,23 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
                     self.greenRecoveryStartBlock = block.number
                     self.greenRecoveryLastSafeBlock = block.number
 
-    # A new threshold must not credit elapsed time classified under the old
-    # threshold. The historical counter and recovery state remain preserved.
-    elif prev.dangerTrigger != d.dangerTrigger:
+    # A classification/freshness change preserves the ring and accumulated
+    # counter, but continuity must restart under the new policy. Reclassify at
+    # confirmation so pre-confirmation time is never credited and valid
+    # post-confirmation danger or recovery time is not discarded.
+    elif classificationChanged:
         self.greenDangerLastBlock = 0
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+
+        categoryData: GreenRefPoolData = self.greenRefPoolData
+        categoryRatio: uint256 = self._getWeightedGreenRatio(d, categoryData)
+        if categoryRatio != 0:
+            if categoryRatio >= d.dangerTrigger:
+                self.greenDangerLastBlock = block.number
+            elif categoryData.numBlocksInDanger != 0:
+                self.greenRecoveryStartBlock = block.number
+                self.greenRecoveryLastSafeBlock = block.number
 
     return True
 

@@ -33,6 +33,7 @@ REQUIRED_CONTRACTS = frozenset(
         "AuctionHouse",
         "BlueChipYieldPrices",
         "CreditEngine",
+        "CurvePrices",
         "Deleverage",
         "DefaultsRobinhood",
         "DefaultsRobinhoodLive",
@@ -56,6 +57,7 @@ NEW_CONTRACT_SOURCES = {
     "BlueChipYieldPrices": (
         ROOT / "contracts" / "priceSources" / "BlueChipYieldPrices.vy"
     ),
+    "CurvePrices": ROOT / "contracts" / "priceSources" / "CurvePrices.vy",
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
     "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": (
