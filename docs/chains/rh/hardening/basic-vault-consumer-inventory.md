@@ -1,9 +1,10 @@
 # BasicVault consumer inventory
 
-> **15 August 2026 PR #143 scope note:** only AuctionHouse's source identity and
-> call-site rows are refreshed here. The complete frozen inventory is not
-> current: Deleverage, Lootbox, and Teller still carry stale source identities,
-> tracked in [issue #154](https://github.com/Ripe-Foundation/ripe-protocol/issues/154).
+> **15 August 2026 PR #143 scope note:** PR #143 refreshes only AuctionHouse's
+> source identity and call-site rows. After rebasing onto remediation commit
+> `348f8c1ed5b95be7d44b8458ab499c61c5b65660`, the inherited Deleverage,
+> Lootbox, and Teller identities are also current and the complete enforcement
+> test passes. PR #143 does not claim to have re-reviewed those upstream deltas.
 > The underlying B-AUD-008 candidate was originally reviewed at
 > `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
 > remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`, with the
