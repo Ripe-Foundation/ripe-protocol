@@ -929,6 +929,12 @@ def _getGreenAmountToRemove(
     if requestedGreen == 0:
         return 0
 
+    didQuote: bool = False
+    lpQuote: uint256 = 0
+    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
+    if didQuote and lpQuote < _lpBalance:
+        return requestedGreen
+
     # StableSwap-NG burns calc_token_amount(amounts, False) + 1 LP token for
     # remove_liquidity_imbalance. Find the largest executable Green amount.
     low: uint256 = 0
@@ -937,8 +943,8 @@ def _getGreenAmountToRemove(
         if low >= high:
             break
         midpoint: uint256 = high - (high - low) // 2
-        didQuote: bool = False
-        lpQuote: uint256 = 0
+        didQuote = False
+        lpQuote = 0
         didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
         if didQuote and lpQuote < _lpBalance:
             low = midpoint
