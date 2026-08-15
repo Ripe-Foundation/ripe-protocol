@@ -1,8 +1,10 @@
 import hashlib
 from pathlib import Path
+import re
 
 import boa
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,14 +59,14 @@ DEFAULT_MIN_HEADROOM = 200
 # granted replacement RH-D029 for this exact 10-byte-headroom combined
 # reward-suppression, payer-refund, and redemption-isolation artifact. RH-D030
 # separately waives the exact 108-byte-headroom SwitchboardAlpha artifact, and
-# RH-D031 waives the exact 20-byte-headroom Teller third-party-touch artifact.
+# RH-D032 controls the exact 20-byte-headroom current Teller artifact.
 # See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
     "AuctionHouse": 22,  # RH-D036; exact conservation artifact, zero growth
     "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
     "SwitchboardAlpha": 108,  # RH-D030; exact priority-vault validation artifact
-    "Teller": 20,  # RH-D031; exact third-party-touch artifact, zero growth
+    "Teller": 20,  # RH-D032; exact minimum-payout artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -134,7 +136,7 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "auction_house",
         "source": "contracts/core/AuctionHouse.vy",
         "source_sha256": (
-            "964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e"
+            "83a8ab12a2355ef7055e753597b96e86b6a8de607a9f7ba19c19242300a36089"
         ),
         "runtime_sha256": (
             "0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2"
@@ -339,6 +341,33 @@ def test_every_below_floor_waiver_declares_an_exact_identity():
             f"{EIP170_LIMIT - pinned['deployed_runtime_bytes']} bytes of headroom, "
             f"but its recorded floor is {floor}"
         )
+
+
+def test_rh_decision_register_status_and_waiver_ids_have_exact_parity():
+    register_text = (ROOT / "docs/chains/rh/decision-register.md").read_text()
+    register_rows = re.findall(
+        r"^### (RH-D\d{3}) — (.+)$",
+        register_text,
+        flags=re.MULTILINE,
+    )
+    register = dict(register_rows)
+    assert len(register) == len(register_rows), "duplicate RH decision ID"
+
+    status = yaml.safe_load((ROOT / "docs/chains/rh/status.yaml").read_text())
+    status_rows = [
+        (row["id"], row["title"])
+        for row in status["decisions"]
+        if row["id"].startswith("RH-D")
+    ]
+    status_decisions = dict(status_rows)
+    assert len(status_decisions) == len(status_rows), "duplicate status RH decision ID"
+    assert status["counts"]["rh_d_decisions"] == len(status_rows)
+    assert status_decisions == register
+
+    waiver_decisions = {
+        pinned["decision"] for pinned in WAIVED_CONTRACT_IDENTITIES.values()
+    }
+    assert waiver_decisions <= set(register)
 
 
 @pytest.mark.parametrize("name", sorted(WAIVED_CONTRACT_IDENTITIES))

@@ -174,9 +174,9 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
     assert backing_aware_paths == {
         ("contracts/core/AuctionHouse.vy", 439),
         ("contracts/core/AuctionHouse.vy", 535),
-        ("contracts/core/AuctionHouse.vy", 912),
-        ("contracts/core/AuctionHouse.vy", 1263),
-        ("contracts/core/AuctionHouse.vy", 1291),
+        ("contracts/core/AuctionHouse.vy", 913),
+        ("contracts/core/AuctionHouse.vy", 1265),
+        ("contracts/core/AuctionHouse.vy", 1293),
         ("contracts/core/CreditEngine.vy", 736),
         ("contracts/core/CreditEngine.vy", 753),
         ("contracts/core/CreditEngine.vy", 1256),

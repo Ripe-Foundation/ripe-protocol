@@ -750,7 +750,8 @@ def _swapAssetsWithStabPool(
     collateralValueOut: uint256 = _collateralValueOut
 
     # Callers enter only with both min inputs positive. Keep the size-sensitive
-    # n-1 ceiling form: the textbook n+d-1 form makes this contract undeployable.
+    # n-1 form: textbook ceiling deploys at 24,575/1 and violates RH-D036's
+    # exact zero-growth waiver.
     # It lets the spread's floor reach, but not exceed, creditable repayment.
     maxCollateralUsdValue: uint256 = (min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT - 1) // (HUNDRED_PERCENT - _liqFeeRatio) + 1
     if maxCollateralUsdValue <= ONE_CENT:
@@ -1178,7 +1179,8 @@ def _buyFungibleAuction(
 
     # CreditEngine cannot recover discounted collateral after refunding excess
     # GREEN, so this per-iteration live-debt cap is the conservation boundary.
-    # Keep the nested min: flattening it exceeds this contract's runtime limit.
+    # Intermediate locals deploy at 24,570/6 and violate RH-D036's exact
+    # zero-growth waiver, so keep the nested expression.
     greenAmount: uint256 = min(
         min(_maxGreenForAsset, min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))),
         staticcall CreditEngine(_a.creditEngine).getUserDebtAmount(_liqUser),

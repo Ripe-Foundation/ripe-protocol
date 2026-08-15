@@ -6,7 +6,12 @@ import pytest
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ONE_YEAR, ZERO_ADDRESS
-from conf_utils import buy_fungible_auction, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    buy_fungible_auction,
+    clear_transient_storage,
+    filter_logs,
+)
 
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
@@ -17,7 +22,7 @@ def test_auction_house_source_abi_and_vault_interface_are_frozen():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/AuctionHouse.vy": (
-            "964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e"
+            "83a8ab12a2355ef7055e753597b96e86b6a8de607a9f7ba19c19242300a36089"
         ),
         "scripts/abis/AuctionHouse.json": (
             "5fd8e740cee561933a74fc64136ad2a3e42867b9754c38ae596a85b83460d9e7"
@@ -420,7 +425,7 @@ def test_ah_liquidation_auction_position_depletion(
 
     mock_price_source.setPrice(bravo_token, 10 * EIGHTEEN_DECIMALS // 100)
     assert credit_engine.canLiquidateUser(bob)
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     debt_after_purchase = ledger.userDebt(bob).amount
     keeper_before = green_token.balanceOf(sally)
     assert teller.liquidateUser(bob, False, sender=sally) == 0
@@ -1861,6 +1866,26 @@ def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
         ),
     ]
 
+    # Prove the first entry is a valid, state-changing purchase on its own.
+    with boa.env.anchor():
+        valid_payer_before = green_token.balanceOf(alice)
+        valid_debt_before = ledger.userDebt(bob).amount
+        valid_collateral_before = alpha_token.balanceOf(alice)
+        assert teller.buyManyFungibleAuctions(
+            [purchases[0]],
+            10 * EIGHTEEN_DECIMALS,
+            False,
+            False,
+            False,
+            alice,
+            sender=alice,
+        ) == 10 * EIGHTEEN_DECIMALS
+        assert valid_payer_before - green_token.balanceOf(alice) == (
+            10 * EIGHTEEN_DECIMALS
+        )
+        assert ledger.userDebt(bob).amount < valid_debt_before
+        assert alpha_token.balanceOf(alice) > valid_collateral_before
+
     with pytest.raises(BoaError) as exc_info:
         teller.buyManyFungibleAuctions(
             purchases,
@@ -1871,8 +1896,8 @@ def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
             alice,
             sender=alice,
         )
-    assert exc_info.value
-    assert teller._computation.is_error
+    # GREEN rejects the zero transfer before CreditEngine can receive the call.
+    assert_reverted_call(exc_info.value, "cannot transfer 0 amount", teller)
 
     assert green_token.balanceOf(alice) == payer_before
     assert ledger.userDebt(bob).amount == debt_before
@@ -1882,11 +1907,11 @@ def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
 
 
 @pytest.mark.parametrize(
-    "purchase_amounts",
+    ("purchase_amounts", "regression_ceiling"),
     [
-        [1],
-        [100, 1],
-        [1] * 20,
+        ([1], 325_000),
+        ([100, 1], 360_000),
+        ([1] * 20, 3_425_000),
     ],
     ids=["single-success", "clear-then-skip", "twenty-successes"],
 )
@@ -1908,6 +1933,7 @@ def test_live_debt_cap_batch_gas_bounds(
     createDebtTerms,
     createAuctionParams,
     purchase_amounts,
+    regression_ceiling,
 ):
     setGeneralConfig()
     setGeneralDebtConfig(_ltvPaybackBuffer=0)
@@ -1976,6 +2002,8 @@ def test_live_debt_cap_batch_gas_bounds(
     assert total_spent == expected_spent
     assert len(filter_logs(teller, "FungAuctionPurchased")) == expected_successes
     assert ledger.userDebt(bob).amount == 100 * EIGHTEEN_DECIMALS - expected_spent
+    # About 20% above the pinned 269,080 / 298,314 / 2,850,477 measurements.
+    assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000
 
 

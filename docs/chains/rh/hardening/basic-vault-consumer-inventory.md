@@ -1,7 +1,10 @@
 # BasicVault consumer inventory
 
-> **14 August 2026 candidate currentness:** this inventory is refreshed against
-> the exact local B-AUD-008 source candidate, originally reviewed at
+> **15 August 2026 PR #143 scope note:** only AuctionHouse's source identity and
+> call-site rows are refreshed here. The complete frozen inventory is not
+> current: Deleverage, Lootbox, and Teller still carry stale source identities,
+> tracked in [issue #154](https://github.com/Ripe-Foundation/ripe-protocol/issues/154).
+> The underlying B-AUD-008 candidate was originally reviewed at
 > `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
 > remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`, with the
 > AuctionHouse consumer rows refreshed for the SC-01/SC-02/SC-08 conservation
@@ -57,7 +60,7 @@ source review and test update.
   "schema": 1,
   "baseline": "1e36c0c3dd168dbf292456eb5760b02d1f1e4a80",
   "sources": {
-    "contracts/core/AuctionHouse.vy": "964b6eb21cc995c2fa88f4a52eac3474efd4e659549ebc6cb83d62fd509e4f4e",
+    "contracts/core/AuctionHouse.vy": "83a8ab12a2355ef7055e753597b96e86b6a8de607a9f7ba19c19242300a36089",
     "contracts/core/CreditEngine.vy": "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f",
     "contracts/core/CreditRedeem.vy": "c8c7f5f8c3323fbe56d6307840a44ca1aa7ddb775438a9a1b31794af2a9b3017",
     "contracts/core/Deleverage.vy": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
@@ -109,9 +112,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-912",
+      "id": "AH-913",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 912,
+      "line": 913,
       "function": "_canStartAuction",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -119,9 +122,9 @@ source review and test update.
       "evidence_test": "test_quarantine_suppresses_new_liquidation_redemption_and_forced_deleverage"
     },
     {
-      "id": "AH-1263",
+      "id": "AH-1265",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1263,
+      "line": 1265,
       "function": "withdrawTokensFromVault",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -129,9 +132,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "AH-1291",
+      "id": "AH-1293",
       "path": "contracts/core/AuctionHouse.vy",
-      "line": 1291,
+      "line": 1293,
       "function": "_transferCollateral",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",

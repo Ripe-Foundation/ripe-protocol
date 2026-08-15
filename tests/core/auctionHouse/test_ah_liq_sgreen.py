@@ -2,6 +2,64 @@ from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import clear_transient_storage, filter_logs
 
 
+def _setup_105_collateral_90_debt_case(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    setAssetConfig,
+    alpha_token,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+    performDeposit,
+    bob,
+    alpha_token_whale,
+    teller,
+    should_auction_instantly,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _ltvPaybackBuffer=0,
+    )
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=should_auction_instantly,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[1],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mission_control.setPriorityStabVaults(
+        [(1, savings_green)],
+        sender=switchboard_alpha.address,
+    )
+
+    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        105 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(90 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+
 def test_ah_liquidation_stab_pool_with_sgreen(
     setGeneralConfig,
     setAssetConfig,
@@ -132,8 +190,16 @@ def test_ah_liquidation_stab_pool_with_sgreen(
     assert log.repayAmount == orig_debt_amount + expected_keeper_fee
     
     # 5. Only the 10% base fee controls the Stability Pool spread.
-    expected_collateral_out = log.repayAmount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 10_00)
-    _test(expected_collateral_out, log.collateralValueOut)  # default tolerance
+    net_rate = HUNDRED_PERCENT - 10_00
+    expected_collateral_out = (
+        log.repayAmount * HUNDRED_PERCENT - 1
+    ) // net_rate + 1
+    assert log.collateralValueOut == expected_collateral_out
+    assert log.collateralValueOut * net_rate // HUNDRED_PERCENT == log.repayAmount
+    assert (
+        (log.collateralValueOut - 1) * net_rate // HUNDRED_PERCENT
+        < log.repayAmount
+    )
     
     # 6. Debt reduction should equal original debt (all debt paid off)
     debt_reduction = orig_user_debt.amount - post_user_debt.amount
@@ -181,46 +247,22 @@ def test_depleted_collateral_burn_is_capped_by_creditable_debt(
     whale,
     ledger,
 ):
-    setGeneralConfig()
-    setGeneralDebtConfig(
-        _keeperFeeRatio=1_00,
-        _minKeeperFee=EIGHTEEN_DECIMALS,
-        _ltvPaybackBuffer=0,
-    )
-    debt_terms = createDebtTerms(
-        _ltv=50_00,
-        _redemptionThreshold=60_00,
-        _liqThreshold=80_00,
-        _liqFee=10_00,
-        _borrowRate=0,
-    )
-    setAssetConfig(
+    _setup_105_collateral_90_debt_case(
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        setAssetConfig,
         alpha_token,
-        _debtTerms=debt_terms,
-        _shouldBurnAsPayment=False,
-        _shouldTransferToEndaoment=False,
-        _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=True,
-    )
-    setAssetConfig(
         savings_green,
-        _vaultIds=[1],
-        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
-        _shouldBurnAsPayment=True,
-    )
-    mission_control.setPriorityStabVaults(
-        [(1, savings_green)],
-        sender=switchboard_alpha.address,
-    )
-
-    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
-    performDeposit(
+        mission_control,
+        switchboard_alpha,
+        mock_price_source,
+        performDeposit,
         bob,
-        105 * EIGHTEEN_DECIMALS,
-        alpha_token,
         alpha_token_whale,
+        teller,
+        True,
     )
-    teller.borrow(90 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
 
     pool_assets = 200 * EIGHTEEN_DECIMALS
     green_token.transfer(sally, pool_assets, sender=whale)
@@ -315,46 +357,22 @@ def test_retry_stability_burn_is_capped_by_fee_free_live_debt(
     whale,
     ledger,
 ):
-    setGeneralConfig()
-    setGeneralDebtConfig(
-        _keeperFeeRatio=1_00,
-        _minKeeperFee=EIGHTEEN_DECIMALS,
-        _ltvPaybackBuffer=0,
-    )
-    debt_terms = createDebtTerms(
-        _ltv=50_00,
-        _redemptionThreshold=60_00,
-        _liqThreshold=80_00,
-        _liqFee=10_00,
-        _borrowRate=0,
-    )
-    setAssetConfig(
+    _setup_105_collateral_90_debt_case(
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        setAssetConfig,
         alpha_token,
-        _debtTerms=debt_terms,
-        _shouldBurnAsPayment=False,
-        _shouldTransferToEndaoment=False,
-        _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
-    )
-    setAssetConfig(
         savings_green,
-        _vaultIds=[1],
-        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
-        _shouldBurnAsPayment=True,
-    )
-    mission_control.setPriorityStabVaults(
-        [(1, savings_green)],
-        sender=switchboard_alpha.address,
-    )
-
-    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
-    performDeposit(
+        mission_control,
+        switchboard_alpha,
+        mock_price_source,
+        performDeposit,
         bob,
-        105 * EIGHTEEN_DECIMALS,
-        alpha_token,
         alpha_token_whale,
+        teller,
+        False,
     )
-    teller.borrow(90 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
         95 * EIGHTEEN_DECIMALS
