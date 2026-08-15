@@ -474,6 +474,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
 
 
 @external
+@nonreentrant
 def swapCollateral(
     _user: address,
     _withdrawVaultId: uint256,
@@ -1140,17 +1141,22 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
         if numUserAssets == 0:
             continue
 
+        isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId)
+
         # iterate through assets
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
-            hasBalance: bool = False
-            asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
-            if asset == empty(address) or not hasBalance:
-                continue
-
-            # get actual amount from vault
-            amount: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, asset)
-            if amount == 0:
+            amount: uint256 = 0
+            if isStabVault:
+                # Match broad liquidation/deleverage participation semantics:
+                # unavailable Stability Pool cohorts report zero and are skipped.
+                asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
+            else:
+                hasBalance: bool = False
+                asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
+                if hasBalance:
+                    amount = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, asset)
+            if asset == empty(address) or amount == 0:
                 continue
 
             # check if asset is deleveragable
