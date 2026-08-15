@@ -3,8 +3,8 @@
 
 # @version 0.4.3
 #pragma optimize codesize
-# At this source revision, the deployed runtime is 24,276 bytes including
-# Vyper's 96-byte immutables section: 300 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 24,532 bytes including
+# Vyper's 96-byte immutables section: 44 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
