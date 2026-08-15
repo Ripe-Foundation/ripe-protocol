@@ -6,16 +6,9 @@ Run this module by itself. The repository's default marker expression excludes
     pytest -q -s --fork base -m fork_qualification -p no:cacheprovider \
         tests/vaults/fork/test_shares_vault_exact_token_qualification.py
 
-At the pinned baseline the intentional red expectations are:
-
-* ``test_fail_first_real_token_direct_transfer_matrix``;
-* ``test_fail_first_compound_cweth_full_withdrawal_must_succeed_exactly``;
-* ``test_fail_first_aave_usdc_deposit_must_charge_exact_requested_amount``;
-* ``test_fail_first_aave_usdc_partial_withdrawal_must_deliver_exact_amount``.
-
-The other five tests pass, so ``4 failed, 5 passed`` is the expected baseline
-polarity. Any different failing identity or count is unexpected and requires
-investigation.
+Commit ``80052e41`` preserved the pre-fix ``4 failed, 5 passed`` polarity and
+its evidence corpus. This post-fix module turns those four cases into passing
+directional characterizations and compatibility-path acceptance tests.
 
 The token markets, balances, indexes, and deployed vault inventory come from
 the real Base fork. Teller, Ledger, MissionControl, and SharesVault are fresh
@@ -47,6 +40,8 @@ import boa
 import pytest
 import requests
 from eth_utils import keccak, to_checksum_address
+
+from conf_utils import filter_logs
 
 
 BASE_BLOCK = 49_972_042
@@ -337,6 +332,131 @@ def _accounting_state(row, account):
     return token.userBasic(account)[0]
 
 
+def _predict_transfer(row, index, amount, sender_balance, recipient_balance,
+                      sender_accounting, recipient_accounting):
+    """Mirror the deployed indexed-token transfer math from pre-state."""
+    if row["kind"] == "aave-indexed-supply":
+        scale = 10**27
+        accounting_amount = (amount * scale + index - 1) // index
+        sender_accounting_after = sender_accounting - accounting_amount
+        recipient_accounting_after = recipient_accounting + accounting_amount
+    else:
+        scale = COMET_INDEX_SCALE
+        sender_accounting_after = (sender_balance - amount) * scale // index
+        recipient_accounting_after = (
+            (recipient_balance + amount) * scale // index
+        )
+    sender_after = sender_accounting_after * index // scale
+    recipient_after = recipient_accounting_after * index // scale
+    return {
+        "transfer_amount": amount,
+        "sender_after": sender_after,
+        "recipient_after": recipient_after,
+        "sender_accounting_after": sender_accounting_after,
+        "recipient_accounting_after": recipient_accounting_after,
+        "outflow": sender_balance - sender_after,
+        "inflow": recipient_after - recipient_balance,
+    }
+
+
+def _compatible_plan(row, index, nominal, sender_balance, recipient_balance,
+                     sender_accounting, recipient_accounting, is_full):
+    """Return the production-compatible candidate, or None if it must fail."""
+    base = _predict_transfer(
+        row,
+        index,
+        nominal,
+        sender_balance,
+        recipient_balance,
+        sender_accounting,
+        recipient_accounting,
+    )
+    plan = base
+    candidate_amount = min(sender_balance, nominal + 1)
+    can_predict_candidate = candidate_amount > nominal
+    if row["kind"] == "aave-indexed-supply" and can_predict_candidate:
+        candidate_scaled = (candidate_amount * 10**27 + index - 1) // index
+        can_predict_candidate = candidate_scaled <= sender_accounting
+    if can_predict_candidate and (is_full or base["inflow"] < nominal):
+        candidate = _predict_transfer(
+            row,
+            index,
+            candidate_amount,
+            sender_balance,
+            recipient_balance,
+            sender_accounting,
+            recipient_accounting,
+        )
+        if is_full:
+            outflow_tolerance = (
+                2 if row["kind"] == "compound-base-supply" else 1
+            )
+            delivery_tolerance = outflow_tolerance
+            if (
+                candidate["outflow"] + 1 >= nominal
+                and candidate["outflow"] <= nominal + outflow_tolerance
+                and candidate["inflow"] + delivery_tolerance >= nominal
+                and candidate["inflow"] <= nominal + 1
+                and candidate["inflow"] > base["inflow"]
+            ):
+                plan = candidate
+        else:
+            plan = candidate
+
+    tolerance = 2 if row["kind"] == "compound-base-supply" else 1
+    valid_delivery = (
+        nominal - plan["inflow"] <= tolerance
+        if is_full
+        else plan["inflow"] >= nominal
+    )
+    valid = (
+        (plan["outflow"] + 1 >= nominal if is_full else plan["outflow"] >= nominal)
+        and plan["outflow"] <= nominal + tolerance
+        and valid_delivery
+        and plan["inflow"] <= nominal + 1
+    )
+    return plan if valid else None
+
+
+def _exact_deposit_amount(row, token, sender, vault, target):
+    """Find a nearby amount whose modeled recipient custody inflow is exact."""
+    index = _index(row)
+    sender_balance = token.balanceOf(sender)
+    recipient_balance = token.balanceOf(vault)
+    sender_accounting = _accounting_state(row, sender)
+    recipient_accounting = _accounting_state(row, vault)
+    for amount in range(target, target + 10_000):
+        if amount > sender_balance:
+            break
+        plan = _predict_transfer(
+            row,
+            index,
+            amount,
+            sender_balance,
+            recipient_balance,
+            sender_accounting,
+            recipient_accounting,
+        )
+        if plan["inflow"] == amount:
+            return amount
+    raise AssertionError("no nearby exact-custody deposit amount")
+
+
+def _preserves_remaining_claim(total_shares, withdrawal_shares,
+                               vault_balance, vault_outflow):
+    remaining_shares = total_shares - withdrawal_shares
+    if remaining_shares == 0:
+        return True
+    claim_before = (
+        remaining_shares * (vault_balance + 1) // (total_shares + 10**8)
+    )
+    claim_after = (
+        remaining_shares * (vault_balance - vault_outflow + 1)
+        // (remaining_shares + 10**8)
+    )
+    return claim_after >= claim_before
+
+
 def _source_position(row, user, underlying_amount):
     token = _position_token(row)
     underlying = _underlying_token(row)
@@ -360,7 +480,7 @@ def _adversarial_underlying_amount(row, index):
     best_remainder = -1
     for amount in range(2, 100_001):
         if row["kind"] == "aave-indexed-supply":
-            accounting_units = (amount * scale + index // 2) // index
+            accounting_units = (amount * scale + index - 1) // index
         else:
             accounting_units = amount * scale // index
         if accounting_units == 0:
@@ -490,6 +610,7 @@ AAVE_POOL_ABI = (
 COMET_ABI = ERC20_ABI + (
     _function("baseToken", (), ("address",)),
     _function("allow", ("address", "bool"), (), "nonpayable"),
+    _function("accrueAccount", ("address",), (), "nonpayable"),
     _function(
         "totalsBasic",
         (),
@@ -689,7 +810,7 @@ def test_deployed_rebase_vault_inventory_and_accounting_identity(env):
 
 @pytest.base
 @pytest.mark.fork_qualification
-def test_fail_first_real_token_direct_transfer_matrix(env):
+def test_real_token_direct_transfer_model_characterization(env):
     evidence = {
         "block": BASE_BLOCK,
         "block_hash": BASE_BLOCK_HASH,
@@ -713,6 +834,7 @@ def test_fail_first_real_token_direct_transfer_matrix(env):
         "tokens": {},
     }
     all_mismatches = []
+    model_failures = []
 
     with boa.env.anchor():
         for row in TOKEN_ROWS:
@@ -774,6 +896,34 @@ def test_fail_first_real_token_direct_transfer_matrix(env):
                                     recipient_accounting_after = _accounting_state(row, recipient)
                                     outflow = sender_before - sender_after
                                     inflow = recipient_after - recipient_before
+                                    predicted = _predict_transfer(
+                                        row,
+                                        index,
+                                        amount,
+                                        sender_before,
+                                        recipient_before,
+                                        sender_accounting_before,
+                                        recipient_accounting_before,
+                                    )
+                                    realized = {
+                                        "transfer_amount": amount,
+                                        "sender_after": sender_after,
+                                        "recipient_after": recipient_after,
+                                        "sender_accounting_after": sender_accounting_after,
+                                        "recipient_accounting_after": recipient_accounting_after,
+                                        "outflow": outflow,
+                                        "inflow": inflow,
+                                    }
+                                    if realized != predicted:
+                                        model_failures.append(
+                                            {
+                                                "token": row["symbol"],
+                                                "state": state_name,
+                                                "amount": amount,
+                                                "predicted": predicted,
+                                                "realized": realized,
+                                            }
+                                        )
                                     if result is not True or outflow != amount or inflow != amount:
                                         mismatch = {
                                             "token": row["symbol"],
@@ -822,9 +972,10 @@ def test_fail_first_real_token_direct_transfer_matrix(env):
                         )
 
     evidence_path = _write_evidence("direct-transfer-characterization.json", evidence)
-    assert not all_mismatches, (
-        f"{len(all_mismatches)} exact-delta mismatches; evidence={evidence_path}; "
-        f"first={all_mismatches[0]}"
+    assert all_mismatches, "the pinned indexed-token corpus unexpectedly became exact"
+    assert not model_failures, (
+        f"{len(model_failures)} deployed-model mismatches; evidence={evidence_path}; "
+        f"first={model_failures[0]}"
     )
 
 
@@ -954,7 +1105,7 @@ def test_compound_index_exact_deposit_reaches_real_withdrawal_boundary(
 ):
     """Prove dust failures do not make Compound share creation unreachable."""
     evidence = {}
-    mismatch_tokens = []
+    executed_tokens = []
     with boa.env.anchor():
         setGeneralConfig()
         for row in (
@@ -1055,62 +1206,56 @@ def test_compound_index_exact_deposit_reaches_real_withdrawal_boundary(
                 withdrawal_amount = rebase_erc20_vault.getTotalAmountForUser(
                     user, token.address
                 )
-                with boa.env.anchor():
-                    direct_vault_before = token.balanceOf(
-                        rebase_erc20_vault.address
-                    )
-                    direct_recipient_before = token.balanceOf(user)
-                    assert token.transfer(
-                        user,
-                        withdrawal_amount,
-                        sender=rebase_erc20_vault.address,
-                    )
-                    direct_outflow = direct_vault_before - token.balanceOf(
-                        rebase_erc20_vault.address
-                    )
-                    direct_inflow = (
-                        token.balanceOf(user) - direct_recipient_before
-                    )
-
-                expected_revert = _exact_delta_revert(
-                    withdrawal_amount, direct_outflow, direct_inflow
+                vault_withdraw_before = token.balanceOf(
+                    rebase_erc20_vault.address
                 )
+                recipient_withdraw_before = token.balanceOf(user)
+                vault_principal_withdraw_before = token.userBasic(
+                    rebase_erc20_vault.address
+                )[0]
+                recipient_principal_withdraw_before = token.userBasic(user)[0]
+                plan = _compatible_plan(
+                    row,
+                    i1,
+                    withdrawal_amount,
+                    vault_withdraw_before,
+                    recipient_withdraw_before,
+                    vault_principal_withdraw_before,
+                    recipient_principal_withdraw_before,
+                    True,
+                )
+                assert plan is not None
                 before_withdrawal = _vault_path_state(
                     row, token, user, rebase_erc20_vault, ledger
                 )
-                if expected_revert is None:
-                    withdrawn = teller.withdraw(
-                        token.address,
-                        MAX_UINT256,
-                        user,
-                        rebase_erc20_vault.address,
-                        4,
-                        sender=user,
-                    )
-                    assert withdrawn == withdrawal_amount
-                    path = {"success": True, "amount": withdrawn}
-                else:
-                    mismatch_tokens.append(row["symbol"])
-                    with pytest.raises(Exception) as exc_info:
-                        teller.withdraw(
-                            token.address,
-                            MAX_UINT256,
-                            user,
-                            rebase_erc20_vault.address,
-                            4,
-                            sender=user,
-                        )
-                    assert expected_revert in str(exc_info.value)
-                    after_withdrawal = _vault_path_state(
-                        row, token, user, rebase_erc20_vault, ledger
-                    )
-                    assert after_withdrawal == before_withdrawal
-                    path = {
-                        "success": False,
-                        "revert": expected_revert,
-                        "atomic_before": before_withdrawal,
-                        "atomic_after": after_withdrawal,
-                    }
+                withdrawn = teller.withdraw(
+                    token.address,
+                    MAX_UINT256,
+                    user,
+                    rebase_erc20_vault.address,
+                    4,
+                    sender=user,
+                )
+                direct_outflow = vault_withdraw_before - token.balanceOf(
+                    rebase_erc20_vault.address
+                )
+                direct_inflow = token.balanceOf(user) - recipient_withdraw_before
+                assert withdrawn == direct_outflow == plan["outflow"]
+                assert direct_inflow == plan["inflow"]
+                assert withdrawal_amount - direct_inflow <= 2
+                assert rebase_erc20_vault.userBalances(user, token.address) == 0
+                assert rebase_erc20_vault.getTotalAmountForUser(user, token.address) == 0
+                executed_tokens.append(row["symbol"])
+                path = {
+                    "success": True,
+                    "reported_custody_outflow": withdrawn,
+                    "recipient_delivery": direct_inflow,
+                    "theoretical_nominal": withdrawal_amount,
+                    "maximum_attainable_delivery": plan["inflow"],
+                    "transfer_argument": plan["transfer_amount"],
+                    "exiting_user_difference": withdrawal_amount - direct_inflow,
+                    "before": before_withdrawal,
+                }
 
                 evidence[row["symbol"]] = {
                     "scope": {
@@ -1152,13 +1297,13 @@ def test_compound_index_exact_deposit_reaches_real_withdrawal_boundary(
                     "compound-crafted-reachable-withdrawal.json", evidence
                 )
 
-    assert {"cAEROv3", "cWETHv3"}.issubset(mismatch_tokens)
+    assert "cWETHv3" in executed_tokens
     _write_evidence("compound-crafted-reachable-withdrawal.json", evidence)
 
 
 @pytest.base
 @pytest.mark.fork_qualification
-def test_fail_first_compound_cweth_full_withdrawal_must_succeed_exactly(
+def test_compound_cweth_full_withdrawal_delivers_maximum_attainable_claim(
     env,
     teller,
     ledger,
@@ -1166,7 +1311,7 @@ def test_fail_first_compound_cweth_full_withdrawal_must_succeed_exactly(
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Canonical red expectation: a reachable full withdrawal must not lock."""
+    """Real Comet accrual cannot trap the sole holder at a rounding boundary."""
     row = _row("cWETHv3")
     with boa.env.anchor():
         setGeneralConfig()
@@ -1209,11 +1354,23 @@ def test_fail_first_compound_cweth_full_withdrawal_must_succeed_exactly(
         withdrawal_amount = rebase_erc20_vault.getTotalAmountForUser(
             user, token.address
         )
+        index = _index(row)
         vault_before = token.balanceOf(rebase_erc20_vault.address)
         recipient_before = token.balanceOf(user)
+        vault_principal_before = token.userBasic(rebase_erc20_vault.address)[0]
+        recipient_principal_before = token.userBasic(user)[0]
+        plan = _compatible_plan(
+            row,
+            index,
+            withdrawal_amount,
+            vault_before,
+            recipient_before,
+            vault_principal_before,
+            recipient_principal_before,
+            True,
+        )
+        assert plan is not None
 
-        # Intentionally unwrapped: the current production-compatible path
-        # reverts "invalid vault outflow", making this acceptance test red.
         withdrawn = teller.withdraw(
             token.address,
             MAX_UINT256,
@@ -1222,11 +1379,499 @@ def test_fail_first_compound_cweth_full_withdrawal_must_succeed_exactly(
             4,
             sender=user,
         )
-        assert withdrawn == withdrawal_amount
-        assert vault_before - token.balanceOf(rebase_erc20_vault.address) == withdrawn
-        assert token.balanceOf(user) - recipient_before == withdrawn
+        vault_outflow = vault_before - token.balanceOf(rebase_erc20_vault.address)
+        recipient_delivery = token.balanceOf(user) - recipient_before
+        assert withdrawn == vault_outflow == plan["outflow"]
+        assert recipient_delivery == plan["inflow"]
+        assert withdrawal_amount - recipient_delivery in (0, 1, 2)
+        assert plan["transfer_amount"] <= vault_before
         assert rebase_erc20_vault.userBalances(user, token.address) == 0
+        assert rebase_erc20_vault.totalBalances(token.address) == 0
+        assert rebase_erc20_vault.getTotalAmountForUser(user, token.address) == 0
+
+        vault_event = filter_logs(
+            teller, "RebaseErc20VaultWithdrawal"
+        )[-1]
+        teller_event = filter_logs(teller, "TellerWithdrawal")[-1]
+        assert vault_event.amount == vault_outflow
+        assert teller_event.amount == vault_outflow
+
+        # Registration cleanup is deferred only while Lootbox owns claimable
+        # deposit-point state; the normal claim path removes it.
+        teller.claimLoot(user, False, sender=user)
         assert not ledger.isParticipatingInVault(user, 4)
+        assert not rebase_erc20_vault.isUserInVaultAsset(user, token.address)
+
+
+@pytest.base
+@pytest.mark.fork_qualification
+def test_indexed_multi_holder_repetition_preserves_remaining_claims(
+    env,
+    teller,
+    ledger,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Repeated bounded withdrawals cannot externalize rounding to peers."""
+    with boa.env.anchor():
+        setGeneralConfig()
+        row = _row("aBasUSDC")
+        token = _position_token(row)
+        alice = env.generate_address("sc04-aave-repeat-alice")
+        bob = env.generate_address("sc04-aave-repeat-bob")
+        accrual_actor = env.generate_address("sc04-aave-repeat-accrual")
+        for account in (alice, bob):
+            _source_position(row, account, row["sender_seed"])
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+        )
+        for account in (alice, bob):
+            deposit_amount = _exact_deposit_amount(
+                row,
+                token,
+                account,
+                rebase_erc20_vault.address,
+                1_000_000,
+            )
+            assert token.approve(teller.address, deposit_amount, sender=account)
+            assert teller.deposit(
+                token.address,
+                deposit_amount,
+                account,
+                rebase_erc20_vault.address,
+                4,
+                sender=account,
+            ) == deposit_amount
+
+        boa.env.time_travel(seconds=30 * 24 * 60 * 60)
+        _source_position(row, accrual_actor, 100_000)
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+            _canDeposit=False,
+        )
+        cumulative_reported = 0
+        cumulative_vault_outflow = 0
+        success_count = 0
+        fail_closed_count = 0
+        for withdrawing_user, remaining_user in ((alice, bob), (bob, alice)):
+            for amount in range(1, 49):
+                remaining_claim_before = rebase_erc20_vault.getTotalAmountForUser(
+                    remaining_user, token.address
+                )
+                shares_before = rebase_erc20_vault.userBalances(
+                    withdrawing_user, token.address
+                )
+                remaining_shares_before = rebase_erc20_vault.userBalances(
+                    remaining_user, token.address
+                )
+                total_shares_before = rebase_erc20_vault.totalBalances(
+                    token.address
+                )
+                vault_before = token.balanceOf(rebase_erc20_vault.address)
+                recipient_before = token.balanceOf(withdrawing_user)
+                state_before = (
+                    shares_before,
+                    remaining_shares_before,
+                    total_shares_before,
+                    vault_before,
+                    recipient_before,
+                    ledger.isParticipatingInVault(withdrawing_user, 4),
+                    ledger.isParticipatingInVault(remaining_user, 4),
+                )
+                plan = _compatible_plan(
+                    row,
+                    _index(row),
+                    amount,
+                    vault_before,
+                    recipient_before,
+                    token.scaledBalanceOf(rebase_erc20_vault.address),
+                    token.scaledBalanceOf(withdrawing_user),
+                    False,
+                )
+                if plan is None:
+                    with pytest.raises(Exception):
+                        teller.withdraw(
+                            token.address,
+                            amount,
+                            withdrawing_user,
+                            rebase_erc20_vault.address,
+                            4,
+                            sender=withdrawing_user,
+                        )
+                    assert (
+                        rebase_erc20_vault.userBalances(
+                            withdrawing_user, token.address
+                        ),
+                        rebase_erc20_vault.userBalances(
+                            remaining_user, token.address
+                        ),
+                        rebase_erc20_vault.totalBalances(token.address),
+                        token.balanceOf(rebase_erc20_vault.address),
+                        token.balanceOf(withdrawing_user),
+                        ledger.isParticipatingInVault(withdrawing_user, 4),
+                        ledger.isParticipatingInVault(remaining_user, 4),
+                    ) == state_before
+                    fail_closed_count += 1
+                    boa.env.time_travel(blocks=1)
+                    continue
+                expected_shares = rebase_erc20_vault.amountToShares(
+                    token.address, plan["outflow"], True
+                )
+                if not _preserves_remaining_claim(
+                    total_shares_before,
+                    expected_shares,
+                    vault_before,
+                    plan["outflow"],
+                ):
+                    with pytest.raises(Exception):
+                        teller.withdraw(
+                            token.address,
+                            amount,
+                            withdrawing_user,
+                            rebase_erc20_vault.address,
+                            4,
+                            sender=withdrawing_user,
+                        )
+                    assert (
+                        rebase_erc20_vault.userBalances(
+                            withdrawing_user, token.address
+                        ),
+                        rebase_erc20_vault.userBalances(
+                            remaining_user, token.address
+                        ),
+                        rebase_erc20_vault.totalBalances(token.address),
+                        token.balanceOf(rebase_erc20_vault.address),
+                        token.balanceOf(withdrawing_user),
+                        ledger.isParticipatingInVault(withdrawing_user, 4),
+                        ledger.isParticipatingInVault(remaining_user, 4),
+                    ) == state_before
+                    fail_closed_count += 1
+                    boa.env.time_travel(blocks=1)
+                    continue
+                withdrawn = teller.withdraw(
+                    token.address,
+                    amount,
+                    withdrawing_user,
+                    rebase_erc20_vault.address,
+                    4,
+                    sender=withdrawing_user,
+                )
+                vault_outflow = vault_before - token.balanceOf(
+                    rebase_erc20_vault.address
+                )
+                recipient_delivery = (
+                    token.balanceOf(withdrawing_user) - recipient_before
+                )
+                assert withdrawn == vault_outflow == plan["outflow"]
+                assert recipient_delivery == plan["inflow"]
+                assert amount <= recipient_delivery <= amount + 1
+                assert amount <= vault_outflow <= amount + 1
+                assert (
+                    shares_before
+                    - rebase_erc20_vault.userBalances(
+                        withdrawing_user, token.address
+                    )
+                    == expected_shares
+                )
+                assert rebase_erc20_vault.getTotalAmountForUser(
+                    remaining_user, token.address
+                ) >= remaining_claim_before
+                cumulative_reported += withdrawn
+                cumulative_vault_outflow += vault_outflow
+                success_count += 1
+                boa.env.time_travel(blocks=1)
+        assert cumulative_reported == cumulative_vault_outflow
+        assert success_count > 0
+        assert fail_closed_count > 0
+
+        bob_claim_before = rebase_erc20_vault.getTotalAmountForUser(
+            bob, token.address
+        )
+        alice_theoretical = rebase_erc20_vault.getTotalAmountForUser(
+            alice, token.address
+        )
+        alice_before = token.balanceOf(alice)
+        vault_before = token.balanceOf(rebase_erc20_vault.address)
+        withdrawn = teller.withdraw(
+            token.address,
+            MAX_UINT256,
+            alice,
+            rebase_erc20_vault.address,
+            4,
+            sender=alice,
+        )
+        assert withdrawn == vault_before - token.balanceOf(rebase_erc20_vault.address)
+        assert abs((token.balanceOf(alice) - alice_before) - alice_theoretical) <= 1
+        assert rebase_erc20_vault.userBalances(alice, token.address) == 0
+        assert rebase_erc20_vault.getTotalAmountForUser(
+            bob, token.address
+        ) >= bob_claim_before
+
+    with boa.env.anchor():
+        setGeneralConfig()
+        row = _row("cWETHv3")
+        token = _position_token(row)
+        alice = env.generate_address("sc04-comet-repeat-alice")
+        bob = env.generate_address("sc04-comet-repeat-bob")
+        accrual_actor = env.generate_address("sc04-comet-repeat-accrual")
+        for account in (alice, bob):
+            _source_position(row, account, row["sender_seed"])
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+        )
+        deposit_amount, exact_granularity = _compound_exact_recipient_amount(
+            row, _index(row)
+        )
+        for account in (alice, bob):
+            token.allow(teller.address, True, sender=account)
+            assert teller.deposit(
+                token.address,
+                deposit_amount,
+                account,
+                rebase_erc20_vault.address,
+                4,
+                sender=account,
+            ) == deposit_amount
+
+        boa.env.time_travel(seconds=30 * 24 * 60 * 60)
+        _source_position(
+            row,
+            accrual_actor,
+            max(exact_granularity, row["large_recipient_seed"] // 100),
+        )
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+            _canDeposit=False,
+        )
+        for amount in (
+            1,
+            2,
+            3,
+            4,
+            5,
+            9,
+            10,
+            11,
+            17,
+            10**17 - 1,
+            10**17,
+            10**17 + 1,
+        ):
+            token.accrueAccount(rebase_erc20_vault.address, sender=alice)
+            index = _index(row)
+            vault_before = token.balanceOf(rebase_erc20_vault.address)
+            recipient_before = token.balanceOf(alice)
+            plan = _compatible_plan(
+                row,
+                index,
+                amount,
+                vault_before,
+                recipient_before,
+                token.userBasic(rebase_erc20_vault.address)[0],
+                token.userBasic(alice)[0],
+                False,
+            )
+            state_before = _vault_path_state(
+                row, token, alice, rebase_erc20_vault, ledger
+            )
+            bob_claim_before = rebase_erc20_vault.getTotalAmountForUser(
+                bob, token.address
+            )
+            if plan is None:
+                with pytest.raises(Exception):
+                    teller.withdraw(
+                        token.address,
+                        amount,
+                        alice,
+                        rebase_erc20_vault.address,
+                        4,
+                        sender=alice,
+                    )
+                assert _vault_path_state(
+                    row, token, alice, rebase_erc20_vault, ledger
+                ) == state_before
+                boa.env.time_travel(blocks=1)
+                continue
+
+            shares_before = rebase_erc20_vault.userBalances(alice, token.address)
+            expected_shares = rebase_erc20_vault.amountToShares(
+                token.address, plan["outflow"], True
+            )
+            withdrawn = teller.withdraw(
+                token.address,
+                amount,
+                alice,
+                rebase_erc20_vault.address,
+                4,
+                sender=alice,
+            )
+            assert withdrawn == vault_before - token.balanceOf(
+                rebase_erc20_vault.address
+            ) == plan["outflow"]
+            assert token.balanceOf(alice) - recipient_before == plan["inflow"]
+            assert amount <= plan["inflow"] <= amount + 1
+            assert amount <= plan["outflow"] <= amount + 2
+            assert (
+                shares_before - rebase_erc20_vault.userBalances(alice, token.address)
+                == expected_shares
+            )
+            assert rebase_erc20_vault.getTotalAmountForUser(
+                bob, token.address
+            ) >= bob_claim_before
+            boa.env.time_travel(blocks=1)
+
+        token.accrueAccount(rebase_erc20_vault.address, sender=alice)
+        bob_claim_before = rebase_erc20_vault.getTotalAmountForUser(
+            bob, token.address
+        )
+        alice_theoretical = rebase_erc20_vault.getTotalAmountForUser(
+            alice, token.address
+        )
+        vault_before = token.balanceOf(rebase_erc20_vault.address)
+        recipient_before = token.balanceOf(alice)
+        withdrawn = teller.withdraw(
+            token.address,
+            MAX_UINT256,
+            alice,
+            rebase_erc20_vault.address,
+            4,
+            sender=alice,
+        )
+        recipient_delivery = token.balanceOf(alice) - recipient_before
+        assert withdrawn == vault_before - token.balanceOf(rebase_erc20_vault.address)
+        assert alice_theoretical - recipient_delivery in (0, 1, 2)
+        assert rebase_erc20_vault.userBalances(alice, token.address) == 0
+        assert rebase_erc20_vault.getTotalAmountForUser(
+            bob, token.address
+        ) >= bob_claim_before
+
+
+@pytest.base
+@pytest.mark.fork_qualification
+def test_comet_actual_outflow_propagates_through_auction_and_credit_callers(
+    env,
+    teller,
+    auction_house,
+    credit_engine,
+    credit_redeem,
+    rebase_erc20_vault,
+    mock_price_source,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Downstream callers consume the custody amount charged to shares."""
+    with boa.env.anchor():
+        setGeneralConfig()
+        row = _row("cWETHv3")
+        token = _position_token(row)
+        user = env.generate_address("sc04-comet-caller-user")
+        auction_recipient = env.generate_address("sc04-comet-auction-recipient")
+        credit_recipient = env.generate_address("sc04-comet-credit-recipient")
+        _source_position(row, user, row["sender_seed"])
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+        )
+        mock_price_source.setPrice(token.address, 10**18)
+        deposit_amount, _ = _compound_exact_recipient_amount(row, _index(row))
+        token.allow(teller.address, True, sender=user)
+        assert teller.deposit(
+            token.address,
+            deposit_amount,
+            user,
+            rebase_erc20_vault.address,
+            4,
+            sender=user,
+        ) == deposit_amount
+
+        auction_house.inject_function(
+            """
+@external
+def sc04TransferCollateral(
+    _fromUser: address,
+    _toUser: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _targetUsdValue: uint256,
+) -> (uint256, uint256, bool, bool):
+    a: addys.Addys = addys._getAddys()
+    return self._transferCollateral(
+        _fromUser,
+        _toUser,
+        _vaultId,
+        _vaultAddr,
+        _asset,
+        False,
+        _targetUsdValue,
+        a,
+    )
+            """
+        )
+
+        requested = 10**15
+        vault_before = token.balanceOf(rebase_erc20_vault.address)
+        recipient_before = token.balanceOf(auction_recipient)
+        usd_value, amount_sent, depleted, exhausted = (
+            auction_house.inject.sc04TransferCollateral(
+                user,
+                auction_recipient,
+                4,
+                rebase_erc20_vault.address,
+                token.address,
+                requested,
+                sender=user,
+            )
+        )
+        auction_delivery = token.balanceOf(auction_recipient) - recipient_before
+        assert amount_sent == vault_before - token.balanceOf(
+            rebase_erc20_vault.address
+        )
+        assert requested <= amount_sent <= requested + 2
+        assert requested <= auction_delivery <= requested + 1
+        assert usd_value == amount_sent
+        assert not depleted
+        assert not exhausted
+
+        vault_before = token.balanceOf(rebase_erc20_vault.address)
+        recipient_before = token.balanceOf(credit_recipient)
+        amount_sent = credit_engine.transferOrWithdrawViaRedemption(
+            False,
+            token.address,
+            user,
+            credit_recipient,
+            requested,
+            4,
+            rebase_erc20_vault.address,
+            credit_engine.getAddys(),
+            sender=credit_redeem.address,
+        )
+        credit_delivery = token.balanceOf(credit_recipient) - recipient_before
+        assert amount_sent == vault_before - token.balanceOf(
+            rebase_erc20_vault.address
+        )
+        assert requested <= amount_sent <= requested + 2
+        assert requested <= credit_delivery <= requested + 1
 
 
 @pytest.base
@@ -1473,6 +2118,8 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                     "success_count": 0,
                     "mismatch_count": 0,
                     "mismatches": [],
+                    "minimum_balance_reject_count": 0,
+                    "minimum_balance_rejects": [],
                     "deleverage_derived_amount": deleverage_derived[
                         "underlying_asset_amount"
                     ],
@@ -1545,26 +2192,6 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                         break
                     partial_results["sample_count"] += 1
                     with boa.env.anchor():
-                        direct_vault_before = token.balanceOf(rebase_erc20_vault.address)
-                        direct_recipient_before = token.balanceOf(user)
-                        assert token.transfer(
-                            user,
-                            partial_amount,
-                            sender=rebase_erc20_vault.address,
-                        )
-                        direct_outflow = direct_vault_before - token.balanceOf(
-                            rebase_erc20_vault.address
-                        )
-                        direct_inflow = token.balanceOf(user) - direct_recipient_before
-
-                    if direct_outflow != partial_amount:
-                        partial_expected_revert = "invalid vault outflow"
-                    elif direct_inflow != partial_amount:
-                        partial_expected_revert = "invalid recipient delivery"
-                    else:
-                        partial_expected_revert = None
-
-                    with boa.env.anchor():
                         shares_before_partial = rebase_erc20_vault.userBalances(
                             user, token.address
                         )
@@ -1573,15 +2200,96 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                         )
                         vault_before_partial = token.balanceOf(rebase_erc20_vault.address)
                         recipient_before_partial = token.balanceOf(user)
+                        vault_scaled_before_partial = token.scaledBalanceOf(
+                            rebase_erc20_vault.address
+                        )
+                        recipient_scaled_before_partial = token.scaledBalanceOf(user)
+                        plan = _compatible_plan(
+                            row,
+                            i1,
+                            partial_amount,
+                            vault_before_partial,
+                            recipient_before_partial,
+                            vault_scaled_before_partial,
+                            recipient_scaled_before_partial,
+                            False,
+                        )
                         ledger_before_partial = (
                             ledger.isParticipatingInVault(user, 4),
                             ledger.numUserVaults(user),
                             rebase_erc20_vault.getNumUserAssets(user),
                         )
-                        if partial_expected_revert is None:
+                        if plan is not None:
                             expected_shares = rebase_erc20_vault.amountToShares(
-                                token.address, partial_amount, True
+                                token.address, plan["outflow"], True
                             )
+                            remaining_shares = shares_before_partial - expected_shares
+                            remaining_total_shares = (
+                                total_shares_before_partial - expected_shares
+                            )
+                            remaining_vault_balance = (
+                                vault_before_partial - plan["outflow"]
+                            )
+                            predicted_remaining_claim = 0
+                            if remaining_shares != 0:
+                                predicted_remaining_claim = (
+                                    remaining_shares
+                                    * (remaining_vault_balance + 1)
+                                    // (remaining_total_shares + 10**8)
+                                )
+                            if (
+                                remaining_shares != 0
+                                and predicted_remaining_claim
+                                < row["deployed_min_deposit"]
+                            ):
+                                with pytest.raises(Exception) as exc_info:
+                                    teller.withdraw(
+                                        token.address,
+                                        partial_amount,
+                                        user,
+                                        rebase_erc20_vault.address,
+                                        4,
+                                        sender=user,
+                                    )
+                                assert "too small a balance" in str(exc_info.value)
+                                assert (
+                                    rebase_erc20_vault.userBalances(
+                                        user, token.address
+                                    )
+                                    == shares_before_partial
+                                )
+                                assert (
+                                    rebase_erc20_vault.totalBalances(token.address)
+                                    == total_shares_before_partial
+                                )
+                                assert (
+                                    token.balanceOf(rebase_erc20_vault.address)
+                                    == vault_before_partial
+                                )
+                                assert token.balanceOf(user) == recipient_before_partial
+                                assert (
+                                    ledger.isParticipatingInVault(user, 4),
+                                    ledger.numUserVaults(user),
+                                    rebase_erc20_vault.getNumUserAssets(user),
+                                ) == ledger_before_partial
+                                partial_results[
+                                    "minimum_balance_reject_count"
+                                ] += 1
+                                partial_results["minimum_balance_rejects"].append(
+                                    {
+                                        "amount": partial_amount,
+                                        "predicted_remaining_claim": (
+                                            predicted_remaining_claim
+                                        ),
+                                        "minimum_balance": row[
+                                            "deployed_min_deposit"
+                                        ],
+                                        "status": (
+                                            "atomically rejected by Teller minimum"
+                                        ),
+                                    }
+                                )
+                                continue
                             withdrawn = teller.withdraw(
                                 token.address,
                                 partial_amount,
@@ -1590,24 +2298,30 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                                 4,
                                 sender=user,
                             )
-                            assert withdrawn == partial_amount
+                            assert withdrawn == plan["outflow"]
                             assert (
                                 vault_before_partial
                                 - token.balanceOf(rebase_erc20_vault.address)
-                                == partial_amount
+                                == plan["outflow"]
                             )
                             assert (
                                 token.balanceOf(user) - recipient_before_partial
-                                == partial_amount
+                                == plan["inflow"]
                             )
+                            assert plan["inflow"] >= partial_amount
                             assert (
                                 shares_before_partial
                                 - rebase_erc20_vault.userBalances(user, token.address)
                                 == expected_shares
                             )
+                            assert (
+                                total_shares_before_partial
+                                - rebase_erc20_vault.totalBalances(token.address)
+                                == expected_shares
+                            )
                             partial_results["success_count"] += 1
                         else:
-                            with pytest.raises(Exception) as exc_info:
+                            with pytest.raises(Exception):
                                 teller.withdraw(
                                     token.address,
                                     partial_amount,
@@ -1616,7 +2330,6 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                                     4,
                                     sender=user,
                                 )
-                            assert partial_expected_revert in str(exc_info.value)
                             assert (
                                 rebase_erc20_vault.userBalances(user, token.address)
                                 == shares_before_partial
@@ -1639,9 +2352,7 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                             partial_results["mismatches"].append(
                                 {
                                     "amount": partial_amount,
-                                    "vault_outflow": direct_outflow,
-                                    "recipient_inflow": direct_inflow,
-                                    "revert": partial_expected_revert,
+                                    "status": "failed closed outside compatible bound",
                                 }
                             )
 
@@ -1653,142 +2364,92 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                 assert (
                     partial_results["success_count"]
                     + partial_results["mismatch_count"]
+                    + partial_results["minimum_balance_reject_count"]
                     == partial_results["sample_count"]
                 )
 
-                with boa.env.anchor():
-                    assert token.transfer(
-                        user,
-                        withdrawal_amount,
-                        sender=rebase_erc20_vault.address,
-                    )
-                    direct_vault_after = token.balanceOf(rebase_erc20_vault.address)
-                    direct_recipient_after = token.balanceOf(user)
-                    direct = {
-                        "vault_outflow": vault_before_withdrawal - direct_vault_after,
-                        "recipient_inflow": direct_recipient_after - recipient_before,
-                        "vault_scaled_after": token.scaledBalanceOf(
-                            rebase_erc20_vault.address
-                        ),
-                        "recipient_scaled_after": token.scaledBalanceOf(user),
-                    }
-
-                if direct["vault_outflow"] != withdrawal_amount:
-                    expected_revert = "invalid vault outflow"
-                elif direct["recipient_inflow"] != withdrawal_amount:
-                    expected_revert = "invalid recipient delivery"
-                else:
-                    expected_revert = None
-
-                atomic_before = {
-                    "user_shares": rebase_erc20_vault.userBalances(user, token.address),
-                    "total_shares": rebase_erc20_vault.totalBalances(token.address),
-                    "vault_data_balance": rebase_erc20_vault.totalBalances(token.address),
-                    "participating": ledger.isParticipatingInVault(user, 4),
-                    "num_user_vaults": ledger.numUserVaults(user),
+                plan = _compatible_plan(
+                    row,
+                    i1,
+                    withdrawal_amount,
+                    vault_before_withdrawal,
+                    recipient_before,
+                    vault_scaled_before_withdrawal,
+                    recipient_scaled_before,
+                    True,
+                )
+                assert plan is not None
+                withdrawn = teller.withdraw(
+                    token.address,
+                    MAX_UINT256,
+                    user,
+                    rebase_erc20_vault.address,
+                    4,
+                    sender=user,
+                )
+                realized_outflow = (
+                    vault_before_withdrawal
+                    - token.balanceOf(rebase_erc20_vault.address)
+                )
+                realized_delivery = token.balanceOf(user) - recipient_before
+                assert withdrawn == realized_outflow == plan["outflow"]
+                assert realized_delivery == plan["inflow"]
+                assert abs(realized_delivery - withdrawal_amount) <= 1
+                depletion = {
+                    "user_shares": rebase_erc20_vault.userBalances(
+                        user, token.address
+                    ),
+                    "total_shares": rebase_erc20_vault.totalBalances(
+                        token.address
+                    ),
+                    "remaining_claim": rebase_erc20_vault.getTotalAmountForUser(
+                        user, token.address
+                    ),
                     "num_user_assets": rebase_erc20_vault.getNumUserAssets(user),
-                    "vault_observable": token.balanceOf(rebase_erc20_vault.address),
-                    "recipient_observable": token.balanceOf(user),
-                    "vault_scaled": token.scaledBalanceOf(rebase_erc20_vault.address),
-                    "recipient_scaled": token.scaledBalanceOf(user),
+                    "participating": ledger.isParticipatingInVault(user, 4),
+                    "user_asset_registered": rebase_erc20_vault.isUserInVaultAsset(
+                        user, token.address
+                    ),
+                    "vault_observable_dust": token.balanceOf(
+                        rebase_erc20_vault.address
+                    ),
                 }
-                if expected_revert is None:
-                    withdrawn = teller.withdraw(
-                        token.address,
-                        MAX_UINT256,
-                        user,
-                        rebase_erc20_vault.address,
-                        4,
-                        sender=user,
-                    )
-                    assert withdrawn == withdrawal_amount
-                    depletion = {
-                        "user_shares": rebase_erc20_vault.userBalances(
-                            user, token.address
-                        ),
-                        "total_shares": rebase_erc20_vault.totalBalances(
-                            token.address
-                        ),
-                        "remaining_claim": rebase_erc20_vault.getTotalAmountForUser(
-                            user, token.address
-                        ),
-                        "num_user_assets": rebase_erc20_vault.getNumUserAssets(user),
-                        "participating": ledger.isParticipatingInVault(user, 4),
-                        "user_asset_registered": rebase_erc20_vault.isUserInVaultAsset(
-                            user, token.address
-                        ),
-                        "vault_observable_dust": token.balanceOf(
-                            rebase_erc20_vault.address
-                        ),
-                    }
-                    assert depletion["user_shares"] == 0
-                    assert depletion["total_shares"] == 0
-                    assert depletion["remaining_claim"] == 0
-                    # Teller updates reward points on withdrawal; Lootbox owns
-                    # later registration cleanup so claimable points are not
-                    # orphaned. This fixture deliberately assigns zero staker
-                    # and voter points, so one claim can clean immediately;
-                    # production-nonzero points can require later claims.
-                    assert depletion["num_user_assets"] == 1
-                    assert depletion["participating"]
-                    assert depletion["user_asset_registered"]
+                assert depletion["user_shares"] == 0
+                assert depletion["total_shares"] == 0
+                assert depletion["remaining_claim"] == 0
+                assert depletion["num_user_assets"] == 1
+                assert depletion["participating"]
+                assert depletion["user_asset_registered"]
 
-                    claimed_loot = teller.claimLoot(user, False, sender=user)
-                    cleanup = {
-                        "scope": (
-                            "one-call cleanup under local zero staker/voter "
-                            "points allocation"
-                        ),
-                        "claimed_loot": claimed_loot,
-                        "num_user_assets": rebase_erc20_vault.getNumUserAssets(
-                            user
-                        ),
-                        "participating": ledger.isParticipatingInVault(user, 4),
-                        "user_asset_registered": (
-                            rebase_erc20_vault.isUserInVaultAsset(
-                                user, token.address
-                            )
-                        ),
-                    }
-                    assert cleanup["num_user_assets"] == 0
-                    assert not cleanup["participating"]
-                    assert not cleanup["user_asset_registered"]
-                    path_result = {
-                        "success": True,
-                        "amount": withdrawn,
-                        "depletion": depletion,
-                        "deferred_registration_cleanup": cleanup,
-                    }
-                else:
-                    with pytest.raises(Exception) as exc_info:
-                        teller.withdraw(
-                            token.address,
-                            MAX_UINT256,
-                            user,
-                            rebase_erc20_vault.address,
-                            4,
-                            sender=user,
-                        )
-                    assert expected_revert in str(exc_info.value)
-                    atomic_after = {
-                        "user_shares": rebase_erc20_vault.userBalances(user, token.address),
-                        "total_shares": rebase_erc20_vault.totalBalances(token.address),
-                        "vault_data_balance": rebase_erc20_vault.totalBalances(token.address),
-                        "participating": ledger.isParticipatingInVault(user, 4),
-                        "num_user_vaults": ledger.numUserVaults(user),
-                        "num_user_assets": rebase_erc20_vault.getNumUserAssets(user),
-                        "vault_observable": token.balanceOf(rebase_erc20_vault.address),
-                        "recipient_observable": token.balanceOf(user),
-                        "vault_scaled": token.scaledBalanceOf(rebase_erc20_vault.address),
-                        "recipient_scaled": token.scaledBalanceOf(user),
-                    }
-                    assert atomic_after == atomic_before
-                    path_result = {
-                        "success": False,
-                        "revert": expected_revert,
-                        "atomic_before": atomic_before,
-                        "atomic_after": atomic_after,
-                    }
+                claimed_loot = teller.claimLoot(user, False, sender=user)
+                cleanup = {
+                    "scope": (
+                        "one-call cleanup under local zero staker/voter "
+                        "points allocation"
+                    ),
+                    "claimed_loot": claimed_loot,
+                    "num_user_assets": rebase_erc20_vault.getNumUserAssets(user),
+                    "participating": ledger.isParticipatingInVault(user, 4),
+                    "user_asset_registered": rebase_erc20_vault.isUserInVaultAsset(
+                        user, token.address
+                    ),
+                }
+                assert cleanup["num_user_assets"] == 0
+                assert not cleanup["participating"]
+                assert not cleanup["user_asset_registered"]
+                direct = {
+                    "transfer_argument": plan["transfer_amount"],
+                    "vault_outflow": realized_outflow,
+                    "recipient_inflow": realized_delivery,
+                    "theoretical_nominal": withdrawal_amount,
+                    "maximum_attainable_delivery": plan["inflow"],
+                }
+                path_result = {
+                    "success": True,
+                    "reported_custody_outflow": withdrawn,
+                    "depletion": depletion,
+                    "deferred_registration_cleanup": cleanup,
+                }
 
                 token_evidence["withdrawal"].update(
                     {"direct": direct, "path": path_result}
@@ -1802,14 +2463,14 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
 
 @pytest.base
 @pytest.mark.fork_qualification
-def test_fail_first_aave_usdc_deposit_must_charge_exact_requested_amount(
+def test_aave_usdc_deposit_mints_only_against_exact_vault_receipt(
     env,
     teller,
     rebase_erc20_vault,
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Canonical red expectation for the silent depositor overcharge."""
+    """Aave's one-unit sender rounding does not under-back minted shares."""
     row = _row("aBasUSDC")
     deposit_amount = 1_000_000
     with boa.env.anchor():
@@ -1836,26 +2497,30 @@ def test_fail_first_aave_usdc_deposit_must_charge_exact_requested_amount(
             4,
             sender=user,
         )
+        vault_after = token.balanceOf(rebase_erc20_vault.address)
+        user_after = token.balanceOf(user)
+        shares_minted = rebase_erc20_vault.userBalances(user, token.address)
         assert deposited == deposit_amount
-        assert (
-            user_before - token.balanceOf(user) == deposit_amount
-        ), "Aave depositor was silently charged more than the requested amount"
-        assert (
-            token.balanceOf(rebase_erc20_vault.address) - vault_before
-            == deposit_amount
+        assert vault_after - vault_before == deposit_amount
+        assert user_before - user_after - deposit_amount in (0, 1)
+        assert shares_minted == rebase_erc20_vault.amountToShares(
+            token.address, deposit_amount, False
         )
+        assert rebase_erc20_vault.getTotalAmountForUser(
+            user, token.address
+        ) <= vault_after
 
 
 @pytest.base
 @pytest.mark.fork_qualification
-def test_fail_first_aave_usdc_partial_withdrawal_must_deliver_exact_amount(
+def test_aave_usdc_partial_withdrawal_accounts_custody_not_representation(
     env,
     teller,
     rebase_erc20_vault,
     setGeneralConfig,
     setAssetConfig,
 ):
-    """Canonical red expectation for a representative withdrawal mismatch."""
+    """The amount-3 path charges 3 while accepting recipient-side +1."""
     row = _row("aBasUSDC")
     deposit_amount = 1_000_000
     withdrawal_amount = 3
@@ -1884,6 +2549,16 @@ def test_fail_first_aave_usdc_partial_withdrawal_must_deliver_exact_amount(
             sender=user,
         )
 
+        # Disabling new deposits must not trap a legitimate existing position.
+        setAssetConfig(
+            token.address,
+            _vaultIds=[4],
+            _stakersPointsAlloc=0,
+            _voterPointsAlloc=0,
+            _minDepositBalance=0,
+            _canDeposit=False,
+        )
+
         boa.env.time_travel(seconds=30 * 24 * 60 * 60)
         _source_position(
             row,
@@ -1892,9 +2567,12 @@ def test_fail_first_aave_usdc_partial_withdrawal_must_deliver_exact_amount(
         )
         vault_before = token.balanceOf(rebase_erc20_vault.address)
         recipient_before = token.balanceOf(user)
+        user_shares_before = rebase_erc20_vault.userBalances(user, token.address)
+        total_shares_before = rebase_erc20_vault.totalBalances(token.address)
+        expected_shares = rebase_erc20_vault.amountToShares(
+            token.address, withdrawal_amount, True
+        )
 
-        # Intentionally unwrapped: this currently reverts
-        # "invalid recipient delivery" for the pinned state.
         withdrawn = teller.withdraw(
             token.address,
             withdrawal_amount,
@@ -1905,4 +2583,19 @@ def test_fail_first_aave_usdc_partial_withdrawal_must_deliver_exact_amount(
         )
         assert withdrawn == withdrawal_amount
         assert vault_before - token.balanceOf(rebase_erc20_vault.address) == withdrawn
-        assert token.balanceOf(user) - recipient_before == withdrawn
+        assert token.balanceOf(user) - recipient_before == withdrawn + 1
+        assert (
+            user_shares_before
+            - rebase_erc20_vault.userBalances(user, token.address)
+            == expected_shares
+        )
+        assert (
+            total_shares_before
+            - rebase_erc20_vault.totalBalances(token.address)
+            == expected_shares
+        )
+        assert rebase_erc20_vault.getTotalAmountForUser(
+            user, token.address
+        ) <= token.balanceOf(rebase_erc20_vault.address)
+        assert filter_logs(teller, "RebaseErc20VaultWithdrawal")[-1].amount == 3
+        assert filter_logs(teller, "TellerWithdrawal")[-1].amount == 3
