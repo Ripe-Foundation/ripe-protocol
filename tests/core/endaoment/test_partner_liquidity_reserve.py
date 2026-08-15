@@ -1159,6 +1159,66 @@ def test_sc18_green_cannot_alias_partner_asset_custody(
         )
 
 
+def test_sc18_direct_mint_rejects_green_for_external_partner_atomically(
+    partner_liquidity_env,
+    alice,
+    whale,
+):
+    ctx = partner_liquidity_env
+    ctx.green.transfer(alice, ONE_GREEN, sender=whale)
+    ctx.green.approve(ctx.endaoment.address, ONE_GREEN, sender=alice)
+    before = (
+        ctx.green.balanceOf(alice),
+        ctx.green.balanceOf(ctx.endaoment.address),
+        ctx.green.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.allowance(alice, ctx.endaoment.address),
+        ctx.green.totalSupply(),
+    )
+
+    with boa.reverts("invalid partner asset"):
+        ctx.endaoment.mintPartnerLiquidity(
+            alice,
+            ctx.green.address,
+            ONE_GREEN,
+            sender=ctx.switchboard_delta.address,
+        )
+
+    assert (
+        ctx.green.balanceOf(alice),
+        ctx.green.balanceOf(ctx.endaoment.address),
+        ctx.green.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.allowance(alice, ctx.endaoment.address),
+        ctx.green.totalSupply(),
+    ) == before
+
+
+def test_sc18_direct_mint_rejects_green_for_endaoment_partner_atomically(
+    partner_liquidity_env,
+    whale,
+):
+    ctx = partner_liquidity_env
+    ctx.green.transfer(ctx.endaoment.address, ONE_GREEN, sender=whale)
+    before = (
+        ctx.green.balanceOf(ctx.endaoment.address),
+        ctx.green.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    )
+
+    with boa.reverts("invalid partner asset"):
+        ctx.endaoment.mintPartnerLiquidity(
+            ctx.endaoment.address,
+            ctx.green.address,
+            ONE_GREEN,
+            sender=ctx.switchboard_delta.address,
+        )
+
+    assert (
+        ctx.green.balanceOf(ctx.endaoment.address),
+        ctx.green.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    ) == before
+
+
 def test_sc18_add_partner_liquidity_composes_with_received_delta(
     partner_liquidity_env,
     alice,

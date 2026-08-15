@@ -1122,7 +1122,6 @@ def addPartnerLiquidity(
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _expectedLpToken != empty(address) # dev: invalid lp token
     a: addys.Addys = addys._getAddys()
-    assert _asset != a.greenToken # dev: invalid partner asset
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # mint green
@@ -1212,6 +1211,7 @@ def _mintPartnerLiquidity(
     _greenToken: address,
     _endaoFunds: address,
 ) -> (uint256, uint256, uint256):
+    assert _asset != _greenToken # dev: invalid partner asset
     partnerAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_partner))
     assert partnerAmount != 0 # dev: no asset to add
 
