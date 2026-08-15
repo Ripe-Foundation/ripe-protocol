@@ -3,9 +3,6 @@
 
 # @version 0.4.3
 #pragma optimize codesize
-# At this source revision, the deployed runtime is 24,309 bytes including
-# Vyper's 96-byte immutables section: 267 bytes of EIP-170 headroom.
-# Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
 
@@ -371,7 +368,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     totalRepaidAmount: uint256 = unsafe_sub(unsafe_add(userDebt.amount, effectiveBuffer), maxTargetRepayAmount)
     assert totalRepaidAmount != 0 # dev: no assets processed
 
-    # SC-07: settle against the refreshed debt struct + interest. Planning above
+    # Settle against the refreshed debt struct and interest. Planning above
     # (targetRepayAmount, buffer, budget) stays keyed to the pre-interaction
     # snapshot; the refreshed amount is required to equal it, so the full-payoff
     # and dust semantics are preserved.
@@ -451,7 +448,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
     totalRepaidAmount: uint256 = userDebt.amount - maxTargetRepayAmount
     assert totalRepaidAmount != 0 # dev: no volatile assets processed
 
-    # SC-07: refresh live debt after collateral interactions; revert if the
+    # Refresh live debt after collateral interactions; revert if the
     # amount changed. Settlement uses the refreshed struct + interest.
     userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, a)
 
@@ -737,7 +734,7 @@ def _deleverageUser(
     if collateralValueRepaid == 0:
         return 0
 
-    # SC-07: refresh live debt after collateral interactions; revert if the
+    # Refresh live debt after collateral interactions; revert if the
     # amount changed. Planning quantities above stay keyed to the pre-interaction
     # snapshot; settlement uses the refreshed struct + interest.
     userDebt, newInterest = self._refreshSettlementDebt(_user, userDebt.amount, _a)
@@ -771,7 +768,7 @@ def _getFullPayoffBuffer(_debtAmount: uint256) -> uint256:
 @view
 @internal
 def _refreshSettlementDebt(_user: address, _planningDebtAmount: uint256, _a: addys.Addys) -> (UserDebt, uint256):
-    # SC-07: re-read live debt after all collateral interactions, immediately
+    # Re-read live debt after all collateral interactions, immediately
     # before settlement. block.timestamp is constant within a transaction, so
     # ordinary interest accrual cannot change the amount between the planning
     # read and this read; a changed amount means a debt-mutating route (e.g. a
@@ -834,7 +831,7 @@ def _performDeleveragePhases(
                 continue
 
             # Phase 1 vaults are Stability Pool cohorts by construction, so apply
-            # the SC-09 fail-soft availability gate.
+            # the fail-soft availability gate.
             remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
             if self.vaultAddrs[stabPool.vaultId] == empty(address):
                 self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
@@ -846,7 +843,7 @@ def _performDeleveragePhases(
             if remainingToRepay == 0:
                 break
 
-            # SC-09: Stability Pool cohorts must never be processed as ordinary
+            # Stability Pool cohorts must never be processed as ordinary
             # priority liq assets here -- that route would invoke the strict NAV
             # valuation and re-open the broad-Deleverage revert if governance ever
             # lists a stab vault in this set. Executable exclusion; the cohort is
@@ -903,7 +900,7 @@ def _iterateThruAllUserVaults(
         if not isVaultAddrCached:
             self.vaultAddrs[vaultId] = vaultAddr
 
-        # SC-09: the full user-vault sweep can re-encounter a Stability Pool
+        # The full user-vault sweep can re-encounter a Stability Pool
         # cohort (whether or not it was in the priority list). Classify it so the
         # same fail-soft availability gate applies here. The didHandleVaultId
         # transient guard inside _iterateThruAssetsWithinVault prevents a second
