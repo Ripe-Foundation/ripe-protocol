@@ -20,9 +20,9 @@ After this authority package is integrated into `rh`, the migration owner must:
 1. obtain the exact integrated `origin/rh` commit and tree from the owner;
 2. verify local `rh`, cached `origin/rh`, and credential-free live `origin/rh`
    all resolve to that commit/tree;
-3. verify the integrated tree contains the reviewed Curve authority patch and
-   unchanged `contracts/priceSources/CurvePrices.vy` hash
-   `f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c`;
+3. verify the integrated tree contains the reviewed Curve remediation and
+   `contracts/priceSources/CurvePrices.vy` hash
+   `8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050`;
 4. create a new isolated mode-0700 worktree from that exact integrated commit,
    or rebind the stopped worktree only under explicit owner authority; and
 5. regenerate the deterministic plan from `config/BluePrint.py`. Do not

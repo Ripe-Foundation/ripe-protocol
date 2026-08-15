@@ -1318,6 +1318,9 @@ validator arguments are retained to minimize unrelated bytecode churn.
 Activation requires exact-head owner ratification, a finite operating cadence,
 the selected S=10 bound, cold maximum-ring and PriceDesk composition evidence,
 snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
+The remediated Curve source SHA-256 is recorded in the Robinhood launch-input
+ledger as an owner-selected candidate. It remains an explicit fail-closed
+deployment-readiness blocker until that exact-head ratification occurs.
 Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
 sustained fallback, near-budget gas, threshold/equilibrium change, or new
 consumer/topology reopens qualification. The inherited pinned-Base

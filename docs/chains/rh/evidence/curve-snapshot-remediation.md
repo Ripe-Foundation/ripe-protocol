@@ -38,6 +38,14 @@ to be regenerated.
 | Event count / canonical SHA-256 | 23 / `68cf7e9dd23ef0d45fd35109bd1573cdcbb86086a6400ec6d2822615e737f411` |
 | Selector count / canonical SHA-256 | 86 / `6e82d509c91a02bef0aeaa755f99710a9b300dd56bc2a40124bd049a6cc954e0` |
 
+`config/BluePrint.py` binds the same candidate source SHA-256 as
+`owner_selected` with resolution state
+`research_candidate_owner_approval_unresolved`. That row deliberately adds
+`B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256`, making the scoped candidate 29
+H-03 blockers and 65 deployment-readiness blockers until the owner ratifies
+RH-D043 against the exact final head. The 28/64 values elsewhere in
+`status.yaml` remain an explicitly historical 11 August broad snapshot.
+
 The constructor-bound runtime uses the Robinhood RipeHQ, zero temporary
 governance as specified by migration `0003`, the selected Curve AddressProvider
 and registry IDs 7, 11, 12, and 13, GREEN and sGREEN, and constructor values

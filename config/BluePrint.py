@@ -1353,9 +1353,10 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
     ),
     RobinhoodCurveLaunchInput(
         "artifact.curve_prices_source_sha256",
-        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c",
-        "repository_approved", "oracle_owner", "contracts/priceSources/CurvePrices.vy",
-        "source_frozen",
+        "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050",
+        "owner_selected", "oracle_owner",
+        "docs/chains/rh/evidence/curve-snapshot-remediation.md",
+        "research_candidate_owner_approval_unresolved",
     ),
     RobinhoodCurveLaunchInput(
         "artifact.curve_prices_abi_sha256",

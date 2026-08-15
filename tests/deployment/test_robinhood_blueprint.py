@@ -490,7 +490,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.EXTERNAL_ARTIFACT: 2,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 50
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 29
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -683,7 +683,7 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
+def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
     expected_core = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
@@ -715,7 +715,7 @@ def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
         if row.resolution_state
         in blueprint_source.ROBINHOOD_CURVE_BLOCKING_STATES
     }
-    assert len(expected_curve) == 9
+    assert len(expected_curve) == 10
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
     assert set(blockers) == expected_core | expected_curve
     assert "B-H02-AUDIT" not in blockers
@@ -726,6 +726,24 @@ def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
     assert "Integrated shared Ledger source" in ledger.summary
     assert "final constructor binding" in ledger.summary
     assert get_component("CM-008").deployment is Disposition.BLOCKED
+
+
+def test_curve_remediated_source_remains_owner_ratification_blocked():
+    source_row = next(
+        row
+        for row in blueprint_source.ROBINHOOD_CURVE_LAUNCH_INPUTS
+        if row.input_id == "artifact.curve_prices_source_sha256"
+    )
+
+    assert source_row.value == (
+        "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
+    )
+    assert source_row.resolution_state == (
+        "research_candidate_owner_approval_unresolved"
+    )
+    assert "B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256" in {
+        blocker.blocker_id for blocker in ROBINHOOD_BLUEPRINT.blockers
+    }
 
 
 def test_relations_are_explicit_typed_oriented_and_proved():
