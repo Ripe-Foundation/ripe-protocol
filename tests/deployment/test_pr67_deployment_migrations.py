@@ -742,19 +742,29 @@ def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
     monkeypatch,
 ):
     selected_morpho_v2_factory = _addr(33)
+    selected_chainlink = _addr(35)
+    selected_curve = _addr(36)
     monkeypatch.setattr(
         BLUECHIP,
         "address",
         lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
     )
-    price_desk = _Registry(_addr(30), count=3)
+    price_desk = _Registry(
+        _addr(30),
+        slots={1: selected_chainlink, 2: selected_curve},
+        count=3,
+    )
     migration = _FakeMigration(
         contracts={
             "RipeHq": _Registry(_addr(31)),
             "VaultBook": _Registry(_addr(32)),
             "PriceDesk": price_desk,
         },
-        addresses={"DefaultsRobinhoodLive": _addr(34)},
+        addresses={
+            "DefaultsRobinhoodLive": _addr(34),
+            "ChainlinkPrices": selected_chainlink,
+            "CurvePrices": selected_curve,
+        },
     )
     messages = []
     monkeypatch.setattr(BLUECHIP.log, "info", messages.append)
@@ -783,7 +793,7 @@ def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
     assert args[-1] == selected_morpho_v2_factory
     assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
     assert candidate.governance() == ZERO_ADDRESS
-    assert price_desk.slots == {}
+    assert price_desk.slots == {1: selected_chainlink, 2: selected_curve}
     assert sum("[1] 0x" in message for message in messages) == 1
     assert sum("[2] 0x" in message for message in messages) == 1
 
