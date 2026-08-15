@@ -567,11 +567,12 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
             False,
             gas=6_000_000,
         ) == EIGHTEEN_DECIMALS
-    assert not boundary_results[80_000]
-    assert boundary_results[150_000]
     minimum_success = min(
         limit for limit, succeeded in boundary_results.items() if succeeded
     )
+    assert not boundary_results[90_000]
+    assert boundary_results[100_000]
+    assert minimum_success == 100_000
     print(
         "PRICEDESK_CURVE_GAS",
         f"four_coin_nested_final_position={curve_gas}",

@@ -1,11 +1,11 @@
-schema_version: 1
+schema_version: 2
 as_of: 2026-08-15
 integrated_target:
   branch: rh-audit-remediation
-  commit: 3f4f8a656ad901eda8db895f874aa3f59aeedbb6
-  highest_decision_id: RH-D032
-stacked_register_entries:
+  highest_decision_id: RH-D034
+recent_integrated_register_entries:
   - { pr: 142, ids: [RH-D033, RH-D034] }
+current_candidate_register_entries:
   - { pr: 152, ids: [RH-D042] }
 open_pr_reservations:
   - { pr: 144, id: RH-D035, title: "RipeGov early-release redistribution and governance-point lifecycle" }
@@ -15,8 +15,20 @@ open_pr_reservations:
   - { pr: 147, id: RH-D039, title: "Endaoment value conservation and StableSwap-NG boundary are exact" }
   - { pr: 147, id: RH-D040, title: "Endaoment stabilizer execution is quote-bound" }
   - { pr: 147, id: RH-D041, title: "Endaoment cap-binding keeper gas budget is five million" }
-maintenance: >-
-  A PR must remove its reservation and add the same identifier/title to the
-  decision register and status.yaml atomically when rebased for integration.
-  Any open PR whose current documents use a different identifier must rebase
-  and adopt this reservation before integration.
+lifecycle:
+  reserved: >-
+    An open PR owns only its reserved identifier and title. It must adopt that
+    reservation in its decision register, status row, evidence, and PR body
+    when rebased for integration.
+  current_candidate: >-
+    A PR that already carries its decision in the register and status moves
+    from open_pr_reservations to current_candidate_register_entries. Candidate
+    entries are not integrated authority.
+  on_merge: >-
+    After target integration, remove the PR from current-candidate state, add
+    it to recent_integrated_register_entries, and advance highest_decision_id
+    in the first target-bound ledger update.
+  stale_branch: >-
+    Any open PR whose documents use a different identifier must rebase and
+    adopt its reservation before integration. PR 145 currently must replace
+    RH-D033 with reserved RH-D038 when rebased.

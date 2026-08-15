@@ -5,6 +5,10 @@ admission
 
 **Candidate date:** 15 August 2026
 
+**Authority:** proposed and pending explicit owner approval. No stable approval
+provenance currently establishes acceptance of the policy-only enforcement
+boundary or its operating residuals.
+
 **Lifecycle:** source, test, artifact, and preflight candidate only; no
 deployment, registration, configuration, activation, or release authority
 
@@ -49,8 +53,11 @@ single PriceDesk allowance under test. The evidence covers:
   snapshot channels;
 - a four-underlying flat-source Curve route in registry position 10;
 - the final healthy source behind nine allowance-exhausting sources; and
-- the 5-vault by 15-asset, 75-position valuation envelope; and
 - the separate StabilityPool 20-active-claim / 15-maintenance-batch ceiling.
+
+The focused tests do not execute a 5-vault by 15-asset borrower scan. The
+75-position figures below are explicitly derived projections from committed
+per-lookup measurements and selected stipends.
 
 For the supported four-underlying flat Curve topology, a 10,000-gas-resolution
 sweep fails at 90,000 and first succeeds at 100,000 forwarded gas. The selected
@@ -67,13 +74,19 @@ the selected 250,000 allowance, still fails at 350,000, and first succeeds at
 400,000 in a 50,000-gas-resolution sweep. That is an admission boundary, not a
 reason to enlarge the general allowance.
 
-The affected StabilityPool node measured the exact PriceDesk parent and head
-under the same isolated environment:
+The affected StabilityPool node was rerun and instrumented on exact merged
+PR #142 parent `348f8c1ed5b95be7d44b8458ab499c61c5b65660` and on the
+PriceDesk head under isolated local-EVM environments:
 
-| Ceiling case | Parent `f563cbb` | PriceDesk head | Delta | New ceiling |
+| Ceiling case | Parent `348f8c1` | PriceDesk head | Delta | New ceiling |
 | --- | ---: | ---: | ---: | ---: |
 | Deposit | 508,587 | 513,480 | +4,893 | 530,000 |
 | Withdrawal | 446,932 | 451,825 | +4,893 | 470,000 |
+
+The current target `9a6d5d0` advances `348f8c1` only by the PR #158
+`yield-price-snapshot-remediation.md` evidence correction, which does not enter
+this execution. The earlier historical `f563cbb` measurement reference is
+superseded; no tree-equivalence claim is made for it.
 
 The repeated 4,893-gas delta is the guarded PriceDesk source-call path. Removing
 that work would remove the isolation behavior being remediated, and no cheaper
@@ -88,16 +101,24 @@ later `claimMany` assertion already measured 7,013,069 at the parent against a
 multi-claim path and baseline debt remain distinct from the 4,893-gas single
 deposit/withdrawal delta.
 
-The broader 5-vault by 15-asset scan remains a composition residual rather than
-a per-source stipend failure. The conservative 75-position measurements are
-approximately 9.59 million gas with honest sources, 21.23 million with one
-hostile source, and 51.57 million with two hostile sources. A separate
-one-hostile composition that charges the full hostile allowance plus the
-highest measured honest lookup is approximately 28.34 million before
-surrounding overhead. The two-hostile case exceeds a 32-million transaction
-ceiling. The manifest therefore freezes the selected vault/asset envelope and
-requires requalification; the stipend does not promise arbitrary composition
-executability.
+The broader 5-vault by 15-asset envelope remains a composition residual rather
+than a per-source stipend failure. No committed test executes that borrower-wide
+scan. The reproducible arithmetic projections are:
+
+- honest: `127,922 × 75 = 9,594,150` gas;
+- measured one-hostile lookup: `283,132 × 75 = 21,234,900` gas;
+- full selected hostile allowance plus the measured honest lookup:
+  `(250,000 + 127,922) × 75 = 28,344,150` gas; and
+- two full hostile allowances plus the measured honest lookup:
+  `(2 × 250,000 + 127,922) × 75 = 47,094,150` gas before additional
+  PriceDesk and borrower-loop overhead.
+
+The previously stated 51.57-million two-hostile value is removed because no
+committed harness or preserved formula reproduced it. These projections are not
+top-level transaction measurements; the two-hostile lower-bound projection
+already exceeds a 32-million transaction ceiling. The manifest therefore
+freezes the selected vault/asset envelope and requires requalification; the
+stipend does not promise arbitrary composition executability.
 
 ## Admitted topology and fail-closed preflight
 
@@ -114,16 +135,29 @@ The selected Robinhood activation plan is exact:
 the selected three-source state, the S=10 qualification maximum, four Curve
 underlyings, 25 snapshot observations, five vaults by 15 assets (75 valuation
 positions), 20 active claim assets, and a 15-asset maintenance batch. Migration
-0011 validates the manifest and exact graph before it produces Safe calldata.
-Negative tests reject source growth, priority reordering, envelope growth, and
-Curve-over-BlueChip, Curve-over-Undy, or generic Curve-over-snapshot graphs.
+0011 reads the live PriceDesk slots/count, MissionControl priorities and vault
+limits, GREEN Curve configuration/pool/underlyings, and USDG Chainlink feed and
+resolution. It validates those observations before any promotion or candidate
+deployment, then re-reads the topology and validates the finalized candidate's
+live USDG feed state while slot 3 remains empty before producing Safe calldata.
+Negative migration
+tests reject source count/address drift, priority reordering, wrong pool,
+changed/additional underlyings, missing USDG Chainlink resolution, envelope
+growth, and Curve-over-BlueChip, Curve-over-Undy, or generic
+Curve-over-snapshot graphs. Every initial-preflight negative proves no
+promotion, candidate deployment, finalization execution, or slot-3 calldata is
+produced. A separate post-deployment drift test proves the second live read
+blocks slot-3 calldata even after the candidate has been finalized.
 
-This remains deliberately policy-only under the minimum-production-change
-decision. There is no on-chain source-count or topology-aware admission guard.
-Governance can bypass the generator and create an availability-breaking graph.
-That residual is explicitly accepted only with the required manifest review,
-preflight, monitoring, and disable response. An on-chain guard is a separately
-scoped contract change and is not authorized by this record.
+This candidate proposes policy-only enforcement under the
+minimum-production-change direction. There is no on-chain source-count or
+topology-aware admission guard. Governance can bypass the generator and create
+an availability-breaking graph. That residual is not owner-approved on the
+current record. Before approval, an identified owner must explicitly accept the
+policy-only boundary, exact stipends, selected topology and envelope, bypass
+ability, monitoring/disable requirements, and composition residual, with stable
+approval provenance linked here. An on-chain guard is a separately scoped
+contract change and is not authorized by this record.
 
 ## Reopen conditions
 
@@ -172,4 +206,13 @@ separately with:
 ```sh
 python -m pytest -q \
   tests/vaults/modules/test_stab_vault_hardening.py::test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling
+```
+
+The manifest, live-observation validator, two-stage migration ordering, and all
+0011 drift/no-calldata negatives are reproduced with:
+
+```sh
+python -m pytest -q \
+  tests/config/test_price_source_admission.py \
+  tests/deployment/test_pr67_deployment_migrations.py
 ```

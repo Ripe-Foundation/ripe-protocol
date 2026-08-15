@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from web3 import Web3 as RealWeb3
 
+from config.price_source_admission import PriceSourceAdmissionError
 from scripts.utils import ledger_deployment
 from scripts.utils.migration import PromotionSpec
 
@@ -75,6 +78,71 @@ class _Registry(_Contract):
         return self.count
 
 
+class _MissionControlTopology(_Contract):
+    def __init__(
+        self,
+        address,
+        priorities=(1, 2),
+        max_vaults=5,
+        max_assets_per_vault=15,
+    ):
+        super().__init__(address)
+        self.priorities = tuple(priorities)
+        self.max_vaults = max_vaults
+        self.max_assets_per_vault = max_assets_per_vault
+
+    def getPriorityPriceSourceIds(self):
+        return self.priorities
+
+    def genConfig(self):
+        return SimpleNamespace(
+            perUserMaxVaults=self.max_vaults,
+            perUserMaxAssetsPerVault=self.max_assets_per_vault,
+        )
+
+
+class _ChainlinkTopology(_Contract):
+    def __init__(self, address, usdg, feed):
+        super().__init__(address)
+        self.usdg = usdg
+        self.feed = feed
+
+    def feedConfig(self, asset):
+        return SimpleNamespace(
+            feed=self.feed if asset == self.usdg else ZERO_ADDRESS,
+        )
+
+    def hasPriceFeed(self, asset):
+        return asset == self.usdg and self.feed != ZERO_ADDRESS
+
+
+class _CurveTopology(_Contract):
+    def __init__(self, address, green, usdg, pool):
+        super().__init__(address)
+        self.green = green
+        self.usdg = usdg
+        self.pool = pool
+        self.num_underlying = 2
+        self.underlying = (usdg, green, ZERO_ADDRESS, ZERO_ADDRESS)
+        self.usdg_has_feed = False
+
+    def curveConfig(self, asset):
+        if asset != self.green:
+            return SimpleNamespace(
+                pool=ZERO_ADDRESS,
+                numUnderlying=0,
+                underlying=(ZERO_ADDRESS,) * 4,
+            )
+        return SimpleNamespace(
+            pool=self.pool,
+            numUnderlying=self.num_underlying,
+            underlying=self.underlying,
+        )
+
+    def hasPriceFeed(self, asset):
+        return asset == self.usdg and self.usdg_has_feed
+
+
 class _GovernedCandidate(_Contract):
     def __init__(self, address, account, minimum):
         super().__init__(address)
@@ -82,6 +150,7 @@ class _GovernedCandidate(_Contract):
         self._minimum = minimum
         self._timelock = 0
         self._governance = account
+        self.has_price_feed = False
 
     def actionTimeLock(self):
         return self._timelock
@@ -101,6 +170,9 @@ class _GovernedCandidate(_Contract):
 
     def governance(self):
         return self._governance
+
+    def hasPriceFeed(self, _asset):
+        return self.has_price_feed
 
 
 class _VaultMigratorCandidate(_Contract):
@@ -168,6 +240,7 @@ class _FakeMigration:
         self.promotion_specs = []
         self.promotion_batch_sizes = []
         self._next_address = 1_000
+        self.bluechip_has_price_feed = False
 
     def get_contract(self, name):
         return self.contracts[name]
@@ -209,6 +282,8 @@ class _FakeMigration:
                 self._account,
                 minimum,
             )
+            if name == "BlueChipYieldPrices":
+                contract.has_price_feed = self.bluechip_has_price_feed
         else:
             contract = _Contract(address)
         self.deployments.append((name, label, args, contract))
@@ -738,36 +813,70 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
-    monkeypatch,
-):
+def _bluechip_topology_migration(monkeypatch):
     selected_morpho_v2_factory = _addr(33)
     selected_chainlink = _addr(35)
     selected_curve = _addr(36)
+    green = _addr(37)
+    usdg = _addr(38)
+    pool = _addr(39)
+    usdg_feed = _addr(40)
+    selected_addresses = {
+        "MORPHO_V2_FACTORY": selected_morpho_v2_factory,
+        "USDG": usdg,
+        "CHAINLINK_USDG_USD": usdg_feed,
+    }
     monkeypatch.setattr(
         BLUECHIP,
         "address",
-        lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
+        selected_addresses.__getitem__,
     )
     price_desk = _Registry(
         _addr(30),
         slots={1: selected_chainlink, 2: selected_curve},
         count=3,
     )
+    mission_control = _MissionControlTopology(_addr(41))
+    chainlink = _ChainlinkTopology(selected_chainlink, usdg, usdg_feed)
+    curve = _CurveTopology(selected_curve, green, usdg, pool)
     migration = _FakeMigration(
         contracts={
             "RipeHq": _Registry(_addr(31)),
             "VaultBook": _Registry(_addr(32)),
             "PriceDesk": price_desk,
+            "MissionControl": mission_control,
+            "ChainlinkPrices": chainlink,
+            "CurvePrices": curve,
         },
         addresses={
             "DefaultsRobinhoodLive": _addr(34),
             "ChainlinkPrices": selected_chainlink,
             "CurvePrices": selected_curve,
+            "GreenToken": green,
+            "GreenUsdgPool": pool,
         },
     )
     messages = []
     monkeypatch.setattr(BLUECHIP.log, "info", messages.append)
+    return SimpleNamespace(
+        migration=migration,
+        price_desk=price_desk,
+        mission_control=mission_control,
+        chainlink=chainlink,
+        curve=curve,
+        messages=messages,
+        usdg=usdg,
+        selected_chainlink=selected_chainlink,
+        selected_curve=selected_curve,
+        selected_morpho_v2_factory=selected_morpho_v2_factory,
+    )
+
+
+def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
+    monkeypatch,
+):
+    live = _bluechip_topology_migration(monkeypatch)
+    migration = live.migration
 
     BLUECHIP.migrate(migration)
 
@@ -790,12 +899,130 @@ def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
     name, label, args, candidate = migration.deployments[0]
     assert name == "BlueChipYieldPrices"
     assert label == BLUECHIP.BLUECHIP_CANDIDATE
-    assert args[-1] == selected_morpho_v2_factory
+    assert args[-1] == live.selected_morpho_v2_factory
     assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
     assert candidate.governance() == ZERO_ADDRESS
-    assert price_desk.slots == {1: selected_chainlink, 2: selected_curve}
-    assert sum("[1] 0x" in message for message in messages) == 1
-    assert sum("[2] 0x" in message for message in messages) == 1
+    assert live.price_desk.slots == {
+        1: live.selected_chainlink,
+        2: live.selected_curve,
+    }
+    assert sum("[1] 0x" in message for message in live.messages) == 1
+    assert sum("[2] 0x" in message for message in live.messages) == 1
+
+
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "reordered_priorities",
+        "unexpected_source_count",
+        "unexpected_source_address",
+        "wrong_green_pool",
+        "changed_curve_underlying",
+        "additional_curve_underlying",
+        "usdg_without_chainlink_feed",
+        "curve_over_undy",
+        "curve_over_snapshot_source",
+        "vault_asset_envelope",
+    ),
+)
+def test_0011_live_topology_drift_produces_no_candidate_or_safe_calldata(
+    monkeypatch,
+    drift,
+):
+    live = _bluechip_topology_migration(monkeypatch)
+    if drift == "reordered_priorities":
+        live.mission_control.priorities = (2, 1)
+    elif drift == "unexpected_source_count":
+        live.price_desk.count = 4
+    elif drift == "unexpected_source_address":
+        live.price_desk.slots[2] = _addr(998)
+    elif drift == "wrong_green_pool":
+        live.curve.pool = _addr(997)
+    elif drift == "changed_curve_underlying":
+        live.curve.underlying = (
+            live.usdg,
+            _addr(995),
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+        )
+    elif drift == "additional_curve_underlying":
+        live.curve.num_underlying = 3
+        live.curve.underlying = (
+            live.usdg,
+            live.curve.green,
+            _addr(996),
+            ZERO_ADDRESS,
+        )
+    elif drift == "usdg_without_chainlink_feed":
+        live.chainlink.feed = ZERO_ADDRESS
+    elif drift in {"curve_over_undy", "curve_over_snapshot_source"}:
+        live.price_desk.count = 4
+        live.price_desk.slots[3] = _addr(994)
+    elif drift == "vault_asset_envelope":
+        live.mission_control.max_assets_per_vault = 16
+    else:
+        raise AssertionError(f"unhandled drift: {drift}")
+
+    with pytest.raises(PriceSourceAdmissionError):
+        BLUECHIP.migrate(live.migration)
+
+    assert live.migration.promotions == []
+    assert live.migration.deployments == []
+    assert live.migration.executions == []
+    assert not any("[1] 0x" in message for message in live.messages)
+    assert not any("[2] 0x" in message for message in live.messages)
+
+
+def test_0011_live_bluechip_resolution_blocks_calldata_after_finalization(
+    monkeypatch,
+):
+    live = _bluechip_topology_migration(monkeypatch)
+    live.migration.bluechip_has_price_feed = True
+
+    with pytest.raises(
+        PriceSourceAdmissionError,
+        match="underlying resolution is not Chainlink-only",
+    ):
+        BLUECHIP.migrate(live.migration)
+
+    assert len(live.migration.deployments) == 1
+    candidate = live.migration.deployments[0][3]
+    assert candidate.hasPriceFeed(live.usdg)
+    assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
+    assert candidate.governance() == ZERO_ADDRESS
+    assert not any("[1] 0x" in message for message in live.messages)
+    assert not any("[2] 0x" in message for message in live.messages)
+
+
+def test_0011_second_stage_recheck_blocks_calldata_after_live_drift(monkeypatch):
+    live = _bluechip_topology_migration(monkeypatch)
+    original_observe = BLUECHIP._observe_live_topology
+    observations = 0
+
+    def observe_with_post_deployment_drift(migration, price_desk, candidate=None):
+        nonlocal observations
+        observations += 1
+        observed = original_observe(migration, price_desk, candidate)
+        if observations == 2:
+            return replace(observed, priority_source_ids=(2, 1))
+        return observed
+
+    monkeypatch.setattr(
+        BLUECHIP,
+        "_observe_live_topology",
+        observe_with_post_deployment_drift,
+    )
+
+    with pytest.raises(PriceSourceAdmissionError, match="priority source order"):
+        BLUECHIP.migrate(live.migration)
+
+    assert observations == 2
+    assert len(live.migration.deployments) == 1
+    candidate = live.migration.deployments[0][3]
+    assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
+    assert candidate.governance() == ZERO_ADDRESS
+    assert not any("[1] 0x" in message for message in live.messages)
+    assert not any("[2] 0x" in message for message in live.messages)
 
 
 def test_mock_governance_fixture_is_bound_to_the_session_environment():

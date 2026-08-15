@@ -18,7 +18,9 @@ from scripts.utils import log
 from scripts.utils.migration import Migration, PromotionSpec
 
 from config.price_source_admission import (
-    require_selected_bluechip_slot_3_plan,
+    LivePriceSourceTopology,
+    require_selected_bluechip_slot_3_candidate,
+    require_selected_live_topology,
 )
 from config.robinhood_launch import (
     BLUECHIP_AAVE_PROVIDER,
@@ -71,8 +73,65 @@ def _add_calldata(new_addr, description):
     return start.hex(), confirm.hex()
 
 
+def _observe_live_topology(migration: Migration, price_desk, candidate=None):
+    """Read the execution-time PriceDesk graph and consumer envelope."""
+    mission_control = migration.get_contract("MissionControl")
+    chainlink = migration.get_contract("ChainlinkPrices")
+    curve = migration.get_contract("CurvePrices")
+    green = migration.get_address("GreenToken")
+    usdg = address("USDG")
+    curve_config = curve.curveConfig(green)
+    chainlink_config = chainlink.feedConfig(usdg)
+    gen_config = mission_control.genConfig()
+    source_contracts = [(1, chainlink), (2, curve)]
+    if candidate is not None:
+        source_contracts.append((3, candidate))
+    usdg_source_ids = tuple(
+        source_id
+        for source_id, source in source_contracts
+        if bool(source.hasPriceFeed(usdg))
+    )
+    return LivePriceSourceTopology(
+        next_registry_id=int(price_desk.numAddrs()),
+        registry_addresses=tuple(price_desk.getAddr(i) for i in (1, 2, 3)),
+        priority_source_ids=tuple(
+            int(source_id)
+            for source_id in mission_control.getPriorityPriceSourceIds()
+        ),
+        curve_feed_asset=green,
+        curve_pool=curve_config.pool,
+        curve_num_underlying=int(curve_config.numUnderlying),
+        curve_underlyings=tuple(curve_config.underlying),
+        underlying_price_source_ids=((usdg, usdg_source_ids),),
+        chainlink_usdg_feed=chainlink_config.feed,
+        max_vaults_per_user=int(gen_config.perUserMaxVaults),
+        max_assets_per_vault=int(gen_config.perUserMaxAssetsPerVault),
+    )
+
+
+def _require_live_topology(migration: Migration, price_desk, candidate=None):
+    observed = _observe_live_topology(migration, price_desk, candidate)
+    require_selected_live_topology(
+        observed=observed,
+        selected_chainlink_address=migration.get_address("ChainlinkPrices"),
+        selected_curve_address=migration.get_address("CurvePrices"),
+        selected_green_address=migration.get_address("GreenToken"),
+        selected_usdg_address=address("USDG"),
+        selected_curve_pool_address=migration.get_address("GreenUsdgPool"),
+        selected_usdg_chainlink_feed=address("CHAINLINK_USDG_USD"),
+    )
+    return observed
+
+
 def migrate(migration: Migration):
     hq = migration.get_contract(RIPE_HQ)
+    price_desk = migration.get_contract("PriceDesk")
+
+    # Stage 1: fail before manifest promotion, deployment, or governance
+    # finalization if the existing on-chain graph or consumer envelope drifted.
+    log.h1("Validating live PriceDesk topology before candidate deployment")
+    _require_live_topology(migration, price_desk)
+
     registries = {
         RIPE_HQ: hq,
         VAULT_BOOK: migration.get_contract(VAULT_BOOK),
@@ -110,19 +169,6 @@ def migrate(migration: Migration):
         ]
     )
 
-    price_desk = migration.get_contract("PriceDesk")
-    # AddressRegistry.numAddrs is the next id, not the number of populated
-    # rows. Chainlink and Curve occupy ids 1 and 2, so the required pre-state
-    # is numAddrs == 3 with an empty readback at the next id.
-    assert int(price_desk.numAddrs()) == 3, "PriceDesk next id is not slot 3"
-    assert price_desk.getAddr(1) == migration.get_address("ChainlinkPrices"), (
-        "PriceDesk slot 1 is not the selected Chainlink source"
-    )
-    assert price_desk.getAddr(2) == migration.get_address("CurvePrices"), (
-        "PriceDesk slot 2 is not the selected Curve source"
-    )
-    assert price_desk.getAddr(3) == ZERO_ADDRESS, "PriceDesk slot 3 is occupied"
-
     # This selected external fact is not established merely by appearing in
     # BluePrint. The typed conversion must bind chain id, deployed code, code
     # identity, and the Morpho V2 membership selector before authorizing a
@@ -158,24 +204,15 @@ def migrate(migration: Migration):
     migration.execute(blue_chip.relinquishGov)
     assert blue_chip.governance() == ZERO_ADDRESS
 
-    # This is a required policy preflight, not an on-chain topology guard.
-    # Governance can still bypass the generator, so RH-D042 binds review,
-    # monitoring, and disable procedures around the exact admitted graph.
-    require_selected_bluechip_slot_3_plan(
-        registered_sources=(
-            "ChainlinkPrices",
-            "CurvePrices",
-            "BlueChipYieldPrices",
-        ),
-        priority_source_ids=(1, 2),
-        curve_routes=(
-            (
-                "GREEN",
-                "GREEN/USDG",
-                (("GREEN", "target_asset"), ("USDG", "ChainlinkPrices")),
-            ),
-        ),
+    # Stage 2: re-read the live graph after candidate finalization, then bind
+    # the actual deployed address while slot 3 is still empty. Governance can
+    # bypass this policy-only generator, so RH-D042 retains monitoring and
+    # disable requirements around the exact admitted graph.
+    log.h1("Revalidating live PriceDesk topology before Safe calldata")
+    final_observation = _require_live_topology(migration, price_desk, blue_chip)
+    require_selected_bluechip_slot_3_candidate(
         candidate_address=blue_chip.address,
+        observed_slot_3_address=final_observation.registry_addresses[2],
     )
     start, confirm = _add_calldata(
         blue_chip.address,
