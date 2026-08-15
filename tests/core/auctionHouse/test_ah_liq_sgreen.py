@@ -1,5 +1,63 @@
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
-from conf_utils import filter_logs
+from conf_utils import clear_transient_storage, filter_logs
+
+
+def _setup_105_collateral_90_debt_case(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    setAssetConfig,
+    alpha_token,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+    performDeposit,
+    bob,
+    alpha_token_whale,
+    teller,
+    should_auction_instantly,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _ltvPaybackBuffer=0,
+    )
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=should_auction_instantly,
+    )
+    setAssetConfig(
+        savings_green,
+        _vaultIds=[1],
+        _debtTerms=createDebtTerms(0, 0, 0, 0, 0, 0),
+        _shouldBurnAsPayment=True,
+    )
+    mission_control.setPriorityStabVaults(
+        [(1, savings_green)],
+        sender=switchboard_alpha.address,
+    )
+
+    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)
+    performDeposit(
+        bob,
+        105 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    teller.borrow(90 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
 
 
 def test_ah_liquidation_stab_pool_with_sgreen(
@@ -132,8 +190,16 @@ def test_ah_liquidation_stab_pool_with_sgreen(
     assert log.repayAmount == orig_debt_amount + expected_keeper_fee
     
     # 5. Only the 10% base fee controls the Stability Pool spread.
-    expected_collateral_out = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - 10_00)
-    _test(expected_collateral_out, log.collateralValueOut)  # default tolerance
+    net_rate = HUNDRED_PERCENT - 10_00
+    expected_collateral_out = (
+        log.repayAmount * HUNDRED_PERCENT - 1
+    ) // net_rate + 1
+    assert log.collateralValueOut == expected_collateral_out
+    assert log.collateralValueOut * net_rate // HUNDRED_PERCENT == log.repayAmount
+    assert (
+        (log.collateralValueOut - 1) * net_rate // HUNDRED_PERCENT
+        < log.repayAmount
+    )
     
     # 6. Debt reduction should equal original debt (all debt paid off)
     debt_reduction = orig_user_debt.amount - post_user_debt.amount
@@ -145,15 +211,223 @@ def test_ah_liquidation_stab_pool_with_sgreen(
     assert collateral_reduction == log.collateralValueOut, f"Collateral reduction {collateral_reduction} should equal collateral taken {log.collateralValueOut}"
     
     # 8. Stability pool mechanics should be correct
-    # GREEN used should match the conservative target repay.
+    # GREEN used must equal the repayment CreditEngine actually credits.
     green_used = pre_green_bal - post_green_bal
-    _test(target_repay_amount, green_used)  # default tolerance
+    _test(log.repayAmount, green_used)  # default tolerance
     
     # Alice should have received collateral value > GREEN given up (she profits from the liquidation)
     # Alice receives only the base-fee Stability spread.
-    alice_profit = log.collateralValueOut - target_repay_amount
+    alice_profit = log.collateralValueOut - log.repayAmount
     expected_alice_value = alice_amount + alice_profit
     _test(expected_alice_value, user_stab_value)  # default tolerance
     
     # 9. The base fee is covered by collateral; the keeper fee is borrower debt.
     assert log.liqFeesUnpaid == log.keeperFee
+
+
+def test_depleted_collateral_burn_is_capped_by_creditable_debt(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    savings_green,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    auction_house,
+    sally,
+    switchboard_alpha,
+    mission_control,
+    stability_pool,
+    green_token,
+    whale,
+    ledger,
+):
+    _setup_105_collateral_90_debt_case(
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        setAssetConfig,
+        alpha_token,
+        savings_green,
+        mission_control,
+        switchboard_alpha,
+        mock_price_source,
+        performDeposit,
+        bob,
+        alpha_token_whale,
+        teller,
+        True,
+    )
+
+    pool_assets = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_assets, sender=whale)
+    green_token.approve(savings_green, pool_assets, sender=sally)
+    pool_shares = savings_green.deposit(pool_assets, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green,
+        pool_shares,
+        sally,
+        stability_pool,
+        sender=sally,
+    )
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    debt_before, terms_before, _ = credit_engine.getLatestUserDebtAndTerms(
+        bob,
+        False,
+    )
+    assert debt_before.amount == 90 * EIGHTEEN_DECIMALS
+    assert terms_before.collateralVal == 105 * EIGHTEEN_DECIMALS
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
+        95 * EIGHTEEN_DECIMALS
+    )
+
+    supply_before = green_token.totalSupply()
+    pool_green_before = green_token.balanceOf(savings_green)
+    keeper_before = green_token.balanceOf(sally)
+    teller.liquidateUser(bob, False, sender=sally)
+
+    log = filter_logs(teller, "LiquidateUser")[0]
+    debt_after, terms_after, _ = credit_engine.getLatestUserDebtAndTerms(
+        bob,
+        False,
+    )
+    pool_green_after = green_token.balanceOf(savings_green)
+    gross_burn = pool_green_before - pool_green_after
+    keeper_mint = green_token.balanceOf(sally) - keeper_before
+    debt_reduction = debt_before.amount - debt_after.amount
+
+    assert log.totalLiqFees == 10 * EIGHTEEN_DECIMALS
+    assert log.keeperFee == EIGHTEEN_DECIMALS
+    assert log.liqFeesUnpaid == log.keeperFee
+    assert log.repayAmount == debt_before.amount + log.keeperFee
+    assert gross_burn == log.repayAmount
+    assert keeper_mint == log.keeperFee
+    assert supply_before - green_token.totalSupply() == debt_reduction
+    assert gross_burn == debt_reduction + keeper_mint
+    assert terms_before.collateralVal - terms_after.collateralVal == (
+        log.collateralValueOut
+    )
+    net_rate = HUNDRED_PERCENT - 10_00
+    expected_collateral_out = (
+        log.repayAmount * HUNDRED_PERCENT - 1
+    ) // net_rate + 1
+    assert log.collateralValueOut == expected_collateral_out
+    assert log.collateralValueOut * net_rate // HUNDRED_PERCENT == log.repayAmount
+    assert (
+        (log.collateralValueOut - 1) * net_rate // HUNDRED_PERCENT
+        < log.repayAmount
+    )
+    # liqFee is a discount rate. Its gross-up spread is intentionally larger
+    # than the nominal base fee, while fee accounting credits only the base fee.
+    assert log.collateralValueOut - log.repayAmount > (
+        log.totalLiqFees - log.keeperFee
+    )
+    assert debt_after.amount == 0
+    assert log.didRestoreDebtHealth
+    assert log.numAuctionsStarted == 0
+    assert not ledger.hasFungibleAuctions(bob)
+
+
+def test_retry_stability_burn_is_capped_by_fee_free_live_debt(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    savings_green,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    auction_house,
+    sally,
+    switchboard_alpha,
+    mission_control,
+    stability_pool,
+    green_token,
+    whale,
+    ledger,
+):
+    _setup_105_collateral_90_debt_case(
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        setAssetConfig,
+        alpha_token,
+        savings_green,
+        mission_control,
+        switchboard_alpha,
+        mock_price_source,
+        performDeposit,
+        bob,
+        alpha_token_whale,
+        teller,
+        False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
+        95 * EIGHTEEN_DECIMALS
+    )
+
+    # A borrower can permissionlessly start an economically empty episode.
+    teller.liquidateUser(bob, False, sender=bob)
+    first_log = filter_logs(teller, "LiquidateUser")[0]
+    assert first_log.repayAmount == 0
+    assert first_log.totalLiqFees == 0
+    assert first_log.keeperFee == 0
+    assert first_log.targetRepayAmount == 95 * EIGHTEEN_DECIMALS
+    assert ledger.userDebt(bob).amount == 90 * EIGHTEEN_DECIMALS
+    assert ledger.userDebt(bob).inLiquidation
+    # The public helper remains a hypothetical fee-bearing risk target rather
+    # than an executable retry quote.
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == (
+        95 * EIGHTEEN_DECIMALS
+    )
+
+    pool_assets = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, pool_assets, sender=whale)
+    green_token.approve(savings_green, pool_assets, sender=sally)
+    pool_shares = savings_green.deposit(pool_assets, sally, sender=sally)
+    savings_green.approve(teller, pool_shares, sender=sally)
+    teller.deposit(
+        savings_green,
+        pool_shares,
+        sally,
+        stability_pool,
+        sender=sally,
+    )
+
+    debt_before = ledger.userDebt(bob).amount
+    supply_before = green_token.totalSupply()
+    pool_green_before = green_token.balanceOf(savings_green)
+    keeper_before = green_token.balanceOf(sally)
+    # Clear immediately before the retry so intervening setup cannot populate
+    # transient state that would not survive a real transaction boundary.
+    clear_transient_storage()
+    teller.liquidateUser(bob, False, sender=sally)
+
+    retry_log = filter_logs(teller, "LiquidateUser")[0]
+    debt_after = ledger.userDebt(bob).amount
+    gross_burn = pool_green_before - green_token.balanceOf(savings_green)
+    debt_reduction = debt_before - debt_after
+
+    assert retry_log.totalLiqFees == 0
+    assert retry_log.liqFeesUnpaid == 0
+    assert retry_log.keeperFee == 0
+    assert retry_log.targetRepayAmount == 75 * EIGHTEEN_DECIMALS
+    assert green_token.balanceOf(sally) == keeper_before
+    assert gross_burn == retry_log.repayAmount
+    assert gross_burn == debt_reduction
+    assert retry_log.collateralValueOut == retry_log.repayAmount
+    assert supply_before - green_token.totalSupply() == debt_reduction
+    assert retry_log.didRestoreDebtHealth
+    assert debt_after > 0

@@ -13,7 +13,7 @@ snapshot:
   later_scoped_evidence:
     sc12_policy_recorded_on: 2026-08-14
     namespace_rechecked_on: 2026-08-15
-    scope: canonical_decision_mirror_parity_through_rh_d035_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
+    scope: canonical_decision_mirror_parity_through_rh_d036_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
     broad_program_snapshot_refreshed: false
   observed_live_rh:
     checked_on: 2026-08-15
@@ -36,7 +36,7 @@ snapshot:
     The broad program snapshot remains bound to the exact subject and candidate
     identities above as of 2026-08-11. It has not been reconciled to the live rh
     observation from 2026-08-15 and is not current authority for later repository
-    state. The later RH-D032 through RH-D035 mirror entries and SC-12 namespace
+    state. The later RH-D032 through RH-D036 mirror entries and SC-12 namespace
     evidence are a scoped overlay only; they do not refresh any other count, row,
     blocker, residual, deadline, narrative, or lifecycle statement.
   terminology_scope: >
@@ -60,8 +60,8 @@ snapshot:
 counts:
   scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 35 entries.
-  rh_d_decisions: 34
+  # Counts decisions not fully retired; RH-D026 is excluded from 36 entries.
+  rh_d_decisions: 35
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -334,8 +334,8 @@ decision_namespace:
   in_flight_coordination:
     checked_on: 2026-08-15
     sc12_reserved_id: RH-D035
-    integrated_allocations: { PR_142: [RH-D033, RH-D034] }
-    open_pr_allocations: { PR_144: [RH-D035], PR_143: [RH-D036], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042] }
+    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035] }
+    open_pr_allocations: { PR_143: [RH-D036], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042] }
     qualified_coordination_intent: { PR_145: { intended: RH-D038, actual_head_adds: RH-D033, state: collides_with_integrated_pr_142_allocation } }
     inherited_not_new: { PR_152: [RH-D033, RH-D034] }
     external_collision: PR 145 intends RH-D038 but its current head still adds RH-D033, which is integrated from PR 142. RH-D035 remains PR 144's uncollided SC-12 allocation. PR 152 now introduces RH-D042 in addition to inheriting RH-D033 and RH-D034.
@@ -359,7 +359,7 @@ sc12_activation_state:
 document_roles:
   # These roles are themselves part of the stale broad-program snapshot unless
   # a row explicitly identifies the later scoped overlay.
-  - { file: docs/chains/rh/status.yaml, role: "Historical broad-program machine-readable snapshot as of 2026-08-11 with a scoped RH-D032-through-RH-D035, SC-12 namespace, and Underscore activation-gate overlay; full live-rh reconciliation is pending."}
+  - { file: docs/chains/rh/status.yaml, role: "Historical broad-program machine-readable snapshot as of 2026-08-11 with a scoped RH-D032-through-RH-D036, SC-12 namespace, and Underscore activation-gate overlay; full live-rh reconciliation is pending."}
   - { file: docs/chains/rh/current-owner-priorities.md, role: "Dated owner-priority overlay for active, parked, and excluded work."}
   - { file: docs/chains/rh/deployment-owner-quickstart.md, role: "Sole canonical human handoff for the deployment owner and deployment agents."}
   - { file: docs/chains/rh/START-HERE.md, role: "Audience and phase router only."}
@@ -1199,11 +1199,12 @@ decisions:
   - { id: RH-D028, title: "BasicVault custody-shortfall quarantine is account-scoped", status: "owner_accepted_candidate_revised_by_b_aud_008", summary: "The exact B-AUD-008 candidate derives quarantine from positive LTV, zero backing-aware user amount, a nominal user-balance bit, and zero backing-aware vault total. Account-wide borrowing, positive-LTV withdrawal, liquidation, redemption, and forced-deleveraging suppression is accepted while repayment, unrelated healthy deposits, governance swapCollateral, truthful type-1 reporting, and automatic custody recovery remain. BasicVault suppresses each affected user's current Lootbox share without mutating nominal balances, configured fixed allocations, or prior points; future user balance-point accrual resumes without catch-up after custody restoration. No deployment or release authority is granted.", source: "docs/chains/rh/evidence/basic-vault-reward-suppression-waiver.md"}
   - { id: RH-D029, title: "CreditEngine carries an exact combined waiver at 10 bytes", status: "owner_granted_replacement_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact combined B-AUD-008, B-OBS-045 / AUD-010, and CreditRedeem price-isolation artifact, CreditEngine deploys at 24,566 bytes including immutables, leaving 10 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and a deterministic immutable-bound deployed hash are pinned, and the replacement waiver permits zero growth and reopens on any source or compiler-output change.", source: "docs/chains/rh/evidence/basic-vault-reward-suppression-waiver.md"}
   - { id: RH-D030, title: "SwitchboardAlpha carries a replacement exact waiver at 108 bytes", status: "owner_granted_replacement_exact_zero_growth_waiver", summary: "The prior 2-byte identity reopened when SwitchboardAlpha changed. The exact trimmed artifact preserves priority-vault validation while removing the single-consumer MissionControl flags getter and deploying at 24,468 bytes including seven immutable words, leaving 108 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and a deterministic immutable-bound deployed hash are pinned, and the replacement waiver permits zero growth and reopens on any source or compiler-output change.", source: "docs/chains/rh/evidence/switchboard-alpha-headroom-waiver.md"}
-  - { id: RH-D031, title: "Teller carries an exact third-party-touch waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact Teller third-party-touch remediation, Teller deploys at 24,556 bytes including immutables, leaving 20 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
-  - { id: RH-D032, title: "Teller bond minimum-payout protection exact waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The exact caller-specified minimum-payout candidate deploys at 24,556 bytes including immutables, leaving 20 bytes. It removes the one-argument purchase selector, requires the payment amount, and adds an opt-in realized-payout floor. The waiver permits zero growth and reopens on any source or compiler-output change; SDK, UI, deployment, activation, and release gates remain separate.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D031, title: "Teller carries an exact third-party-touch waiver at 20 bytes", status: "historical_exact_waiver_replaced_by_rh_d032", summary: "RH-D031 remains the historical authority for the exact Teller third-party-touch artifact identified in its register entry. The later minimum-payout source changed Teller and reopened that exact waiver; RH-D031 does not authorize the current source or compiler output.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D032, title: "Teller bond minimum-payout protection exact waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "RH-D032 controls the current Teller minimum-payout artifact at 24,556 deployed bytes and 20 bytes of headroom. It pins the exact source, ABI/selectors, creation artifacts, runtime template, constructor-bound deployed hashes, and zero-growth reopening conditions. The one-argument purchaseRipeBond selector is removed and release conditions remain binding; this decision does not authorize deployment, registry mutation, activation, or release.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D033, title: "BlueChip SC-05/SC-17/SC-23 uses the codesize optimizer", status: "owner_approved_candidate_compiler_profile", summary: "The owner selected Vyper codesize after independent comparison: +255 gas on each of three measured top-level paths saves 1,076 deployed bytes versus gas optimization. The candidate deploys at 22,739 bytes with 1,837 bytes of EIP-170 headroom, so the ordinary 200-byte floor applies and no waiver is granted. RH-D034 separately accepts the SC-17 residual; this compiler decision does not authorize deployment or activation.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
   - { id: RH-D034, title: "SC-17 timing residual is conditionally accepted", status: "owner_conditionally_accepted_candidate_residual", summary: "The owner accepted retaining observation-interval TWAP with its documented snapshot-timing residual. Every snapshot-backed feed remains inactive until it has finite nonzero freshness, minSnapshotDelay no greater than staleTime, vault-specific downward-PPS manipulation qualification, monitored honest refresh before expiry, and tested alert/pause/disable procedures. Undy and all deployment, registration, activation, release, vault, and exact-parameter decisions remain separately gated.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
   - { id: RH-D035, title: "RipeGov early-release redistribution and governance-point lifecycle", status: "owner_accepted_sc12_candidate_complete_underscore_activation_blocked", summary: "SC-12 keeps the fee in-pool and retains the maximal indivisible share balance under the exact post-state claim bound. Address-level common-owner recapture and the governance-point lifecycle remain accepted policy. The pre-existing registered Underscore or Lego caller path is not user-bound and is not accepted: issue #161 blocks any nonzero Underscore registry until user-bound authorization is proven or exact owner/security acceptance is recorded. RipeGov-local nonreentrancy is reviewed with no action because exact-Teller access is protected by Teller's nonreentrant routes. Base rebind issue #150, integration, deployment, activation, governance-power use, migration, and release remain separate gates.", source: "docs/chains/rh/smart-contract-changes/ripe-gov.md"}
+  - { id: RH-D036, title: "AuctionHouse conservation exact waiver at 22 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact SC-01, SC-02, and SC-08 conservation artifact, AuctionHouse deploys at 24,554 bytes including 96 immutable bytes, leaving 22 bytes. The owner accepted that technically deployable margin and the explicit SC-08 policy: the Stability spread is a legacy discount rate, an empty first pass permanently waives episode fees, and fee-free retry liveness depends on a bound protocol-operated monitor or keeper. Source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source, compiler, dependency, constructor-input, or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
