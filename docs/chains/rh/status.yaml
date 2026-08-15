@@ -309,18 +309,20 @@ repository_ci:
     execution: the merged branch reports 13 failed, 3392 passed, 25 errors both
     in CI and locally, with node-for-node identical failure sets.
   known_red: >
-    The lean lane is not green, and that condition is inherited rather than
-    introduced. All 13 failures and 25 errors reproduce on a pristine rh
-    checkout: BlueChip Morpho constructor arity, switchboard pointer lifecycle,
-    deleverage oracle cases, and the basic-vault consumer inventory. Two
-    artifact gates are separately red on rh - export_abis.py --check and the
-    manifest handoff test (the latter's H06 machinery and test are now
-    removed by this cleanup, not fixed). check_contract_artifacts.py
-    MissionControl source_sha256 is no longer one of them: all 53
-    tests/inventory/test_contract_artifacts.py nodes and all 7
-    test_bluechip_yield_prices_artifacts.py nodes pass against the current
-    tree (verified 2026-08-12), so this cleanup restores the checker as a
-    required check rather than reintroducing a known-red gate.
+    Separate from the historical default-lane counts above, the deferred manual
+    release-qualification lane has nine reported red nodes against the frozen
+    artifact baseline. Four are currently vacuous tamper
+    proofs, not independent evidence that the intended field is checked:
+    test_new_contract_tampered_expectation_fails_closed[Deleverage] and the
+    three test_deleverage_compiler_and_runtime_identity_drift_fails_closed
+    cases for transitive_compiler_input_integrity, compiler_settings, and
+    runtime_template_sha256. Each short-circuits on Deleverage source_sha256:
+    the frozen expectation is b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1,
+    while the current source is 3b47aef7fa02d46d15d1a74a95049e5b80f7361d89b3f3258c6725db3dac0a6f.
+    The checker therefore never evaluates the ABI or the three specifically
+    mutated compiler/runtime fields. These four proofs remain invalid until
+    final-release reconciliation regenerates and deliberately rebinds the
+    baseline; this ordinary remediation-policy PR must not refresh it.
   interpretation: >
     Enabling CI made an existing red state visible; it did not create it. A
     first green build requires the inherited failures to be addressed on their
