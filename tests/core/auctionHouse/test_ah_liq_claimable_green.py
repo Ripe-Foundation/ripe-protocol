@@ -6,6 +6,19 @@ from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs, redeem_from_stability_pool
 
 
+def _set_total_claimable_balance(stability_pool, asset, value):
+    """Write the compiler-pinned mapping slot without order-sensitive eval()."""
+    total_claimable_slot = int.from_bytes(
+        keccak(
+            (10).to_bytes(32, "big")
+            + int(asset.address, 16).to_bytes(32, "big")
+        ),
+        "big",
+    )
+    boa.env.set_storage(stability_pool.address, total_claimable_slot, value)
+    assert stability_pool.totalClaimableBalances(asset) == value
+
+
 def test_ah_liquidation_with_claimable_green_basic(
     setGeneralConfig,
     setAssetConfig,
@@ -428,19 +441,7 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
         # Write the compiler-pinned mapping slot directly: contract.eval() is
         # order-sensitive under the pinned Boa/Vyper toolchain in the full suite.
         reserved = bravo_token.balanceOf(stability_pool)
-        total_claimable_slot = int.from_bytes(
-            keccak(
-                (10).to_bytes(32, "big")
-                + int(bravo_token.address, 16).to_bytes(32, "big")
-            ),
-            "big",
-        )
-        boa.env.set_storage(
-            stability_pool.address,
-            total_claimable_slot,
-            reserved,
-        )
-        assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+        _set_total_claimable_balance(stability_pool, bravo_token, reserved)
         assert stability_pool.getTotalValue(bravo_token) == 20 * EIGHTEEN_DECIMALS
     assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
     assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (
@@ -482,9 +483,7 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
     if health_failure == "unpriced_claim":
         mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
     else:
-        stability_pool.eval(
-            f"stabVault.totalClaimableBalances[{bravo_token.address}] = 0"
-        )
+        _set_total_claimable_balance(stability_pool, bravo_token, 0)
     assert stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
     assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1] != 0
 
