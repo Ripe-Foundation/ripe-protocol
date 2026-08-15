@@ -40,7 +40,11 @@ def test_implemented_path_ledger_is_sorted_unique_and_within_ceiling(
 ):
     ledger = fork_framework.IMPLEMENTED_PATH_LEDGER
     assert ledger == tuple(sorted(set(ledger)))
-    assert len(ledger) == 31
+    # Deliberately no hardcoded file count here. The ledger is still checked for
+    # sortedness, uniqueness, prefix, and the ceiling, and
+    # test_implemented_path_ledger_matches_filesystem keeps it honest against
+    # what is actually on disk. Pinning an exact count only forced a ceremony
+    # every time a file was added or removed.
     assert len(ledger) <= fork_framework.PATH_CEILING
     assert all(
         path.startswith("tests/deployment/fork/") for path in ledger

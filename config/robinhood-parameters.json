@@ -365,32 +365,26 @@
       "reviewer_class": "rewards with security review"
     },
     {
-      "classification": "parked",
+      "classification": "confirmed_existing_state_with_operational_gates",
       "closure_artifacts": [
-        "cannot close under current authority",
-        "explicit CCIP reopening",
-        "supported release/toolchain",
-        "exact artifacts",
-        "roles",
-        "peers",
-        "limits",
-        "registration",
-        "security review",
-        "separate activation authority"
+        "2026-08-11 read-only live topology snapshot",
+        "owner disposition for inbound and outbound rate limits and rateLimitAdmin",
+        "accepted full real-token OffRamp automatic-execution gas evidence",
+        "exact live pool source, compiler, and constructor-bound identity",
+        "license conclusions and historical transaction provenance",
+        "reviewed live signer or Safe transaction backend",
+        "separate transaction and release authority"
       ],
       "id": "BS-H04-CCIP-PARKED",
       "invalidation": [
-        "CCIP release",
-        "toolchain",
-        "router",
-        "peer",
-        "role",
-        "limit",
-        "directive change"
+        "live topology or capability drift",
+        "CCIP release or toolchain change",
+        "router, peer, role, or limit change",
+        "new transaction or release directive"
       ],
-      "lifecycle_phase": "separately parked future work",
+      "lifecycle_phase": "externally completed live package; further transactions and release remain gated",
       "owner": "OWN-T1",
-      "prerequisite": "no deadline",
+      "prerequisite": "existing state requires no action; any further CCIP transaction or release requires separate authority and all open gates",
       "records": [
         "P-H04-403"
       ],
@@ -19083,102 +19077,114 @@
     },
     {
       "approval": {
-        "date": "2026-07-28",
-        "provenance": "H-04 Group 2 R2 and integrated Phase A authority",
-        "status": "approved"
+        "date": "2026-08-11",
+        "provenance": "Read-only 2026-08-11 live snapshot; historical D-H04-02 decision evidence remains review-archives/h04/h04-group2-proposal-R2.md at a86650b187c523f27c92f05bfe959d06840025a6; no mutation authorized",
+        "status": "confirmed_existing_state"
       },
       "base_comparison": {
-        "detail": "Robinhood authority is explicit; Base and local values are not inherited.",
-        "kind": "different_approved"
+        "detail": "The dated snapshot confirms reciprocal live Base and Robinhood topology; it is not an inheritance decision.",
+        "kind": "current_existing_state"
       },
-      "blockers": [],
+      "blockers": [
+        "B-T1-CCIP",
+        "B-T1-TOOLCHAIN"
+      ],
       "consumers": [
         "H-05 deployment planning"
       ],
       "conversion": {
         "kind": "identity"
       },
-      "description": "Canonical Robinhood value for Deployment.DP-16.ccip.greenEnabled.",
+      "description": "Verified current live external state for Robinhood GREEN CCIP enablement.",
       "destination": {
         "kind": "deployment_input",
         "path": "Deployment.DP-16.ccip.greenEnabled"
       },
-      "h03_ref": "CM-049",
+      "h03_ref": "CM-051",
       "id": "P-H04-400",
       "invalidation": [
-        "Any controlling H-04 decision or interface change"
+        "live topology or capability drift",
+        "evidence snapshot superseded",
+        "controlling owner or release decision change"
       ],
-      "launch_phase": "deployed initial value",
+      "launch_phase": "confirmed existing live state; further transactions and release gated",
       "owner": {
         "id": "D-H04-02",
         "kind": "decision"
       },
-      "reviewer_class": "protocol",
+      "reviewer_class": "protocol and security",
       "source": {
-        "citation": "review-archives/h04/h04-group2-proposal-R2.md",
-        "commit": "a86650b187c523f27c92f05bfe959d06840025a6"
+        "capture_commit": "98155a8402d3602318409454f3577325036569e2",
+        "citation": "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json",
+        "sha256": "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa"
       },
-      "status": "disabled",
+      "status": "external_fact",
       "unit": {
         "kind": "boolean"
       },
       "value": {
-        "kind": "concrete",
-        "raw": false
+        "kind": "external_fact",
+        "raw": true
       },
       "zero_semantics": {
-        "explanation": "Approved explicit false; absence and omission are distinct.",
-        "kind": "legitimate_false"
+        "explanation": "Observed enabled state is true; this records current state and authorizes no new action.",
+        "kind": "not_zero"
       }
     },
     {
       "approval": {
-        "date": "2026-07-28",
-        "provenance": "H-04 Group 2 R2 and integrated Phase A authority",
-        "status": "approved"
+        "date": "2026-08-11",
+        "provenance": "Read-only 2026-08-11 live snapshot; historical D-H04-02 decision evidence remains review-archives/h04/h04-group2-proposal-R2.md at a86650b187c523f27c92f05bfe959d06840025a6; no mutation authorized",
+        "status": "confirmed_existing_state"
       },
       "base_comparison": {
-        "detail": "Robinhood authority is explicit; Base and local values are not inherited.",
-        "kind": "different_approved"
+        "detail": "The dated snapshot confirms reciprocal live Base and Robinhood topology; it is not an inheritance decision.",
+        "kind": "current_existing_state"
       },
-      "blockers": [],
+      "blockers": [
+        "B-T1-CCIP",
+        "B-T1-TOOLCHAIN"
+      ],
       "consumers": [
         "H-05 deployment planning"
       ],
       "conversion": {
         "kind": "identity"
       },
-      "description": "Canonical Robinhood value for Deployment.DP-16.ccip.ripeEnabled.",
+      "description": "Verified current live external state for Robinhood RIPE CCIP enablement.",
       "destination": {
         "kind": "deployment_input",
         "path": "Deployment.DP-16.ccip.ripeEnabled"
       },
-      "h03_ref": "CM-049",
+      "h03_ref": "CM-052",
       "id": "P-H04-401",
       "invalidation": [
-        "Any controlling H-04 decision or interface change"
+        "live topology or capability drift",
+        "evidence snapshot superseded",
+        "controlling owner or release decision change"
       ],
-      "launch_phase": "deployed initial value",
+      "launch_phase": "confirmed existing live state; further transactions and release gated",
       "owner": {
         "id": "D-H04-02",
         "kind": "decision"
       },
-      "reviewer_class": "protocol",
+      "reviewer_class": "protocol and security",
       "source": {
-        "citation": "review-archives/h04/h04-group2-proposal-R2.md",
-        "commit": "a86650b187c523f27c92f05bfe959d06840025a6"
+        "capture_commit": "98155a8402d3602318409454f3577325036569e2",
+        "citation": "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json",
+        "sha256": "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa"
       },
-      "status": "disabled",
+      "status": "external_fact",
       "unit": {
         "kind": "boolean"
       },
       "value": {
-        "kind": "concrete",
-        "raw": false
+        "kind": "external_fact",
+        "raw": true
       },
       "zero_semantics": {
-        "explanation": "Approved explicit false; absence and omission are distinct.",
-        "kind": "legitimate_false"
+        "explanation": "Observed enabled state is true; this records current state and authorizes no new action.",
+        "kind": "not_zero"
       }
     },
     {
@@ -19233,15 +19239,18 @@
     },
     {
       "approval": {
+        "date": "2026-08-11",
+        "provenance": "Read-only 2026-08-11 live snapshot; historical D-H04-02 decision evidence remains review-archives/h04/h04-group2-proposal-R2.md at a86650b187c523f27c92f05bfe959d06840025a6; no mutation authorized",
         "schedule_id": "BS-H04-CCIP-PARKED",
-        "status": "pending_binding"
+        "status": "confirmed_existing_state"
       },
       "base_comparison": {
-        "detail": "Robinhood authority is explicit; Base and local values are not inherited.",
-        "kind": "blocked_no_inheritance"
+        "detail": "The evidence binds the reciprocal Base and Robinhood live package without authorizing another action.",
+        "kind": "current_existing_state"
       },
       "blockers": [
-        "B-H04-CCIP"
+        "B-T1-CCIP",
+        "B-T1-TOOLCHAIN"
       ],
       "consumers": [
         "H-05 deployment planning"
@@ -19249,36 +19258,39 @@
       "conversion": {
         "kind": "not_applicable"
       },
-      "description": "Canonical Robinhood value for Deployment.DP-16.ccip.promotion.",
+      "description": "Evidence reference for the externally completed GREEN and RIPE CCIP live package.",
       "destination": {
         "kind": "deployment_input",
         "path": "Deployment.DP-16.ccip.promotion"
       },
-      "h03_ref": "CM-049",
+      "h03_ref": "CM-053",
       "id": "P-H04-403",
       "invalidation": [
-        "Any controlling H-04 decision or interface change"
+        "live topology or capability drift",
+        "evidence snapshot superseded",
+        "controlling owner or release decision change"
       ],
-      "launch_phase": "within-seven-day separately reviewed CCIP promotion",
+      "launch_phase": "confirmed existing live package; no further transaction or release authorized",
       "owner": {
         "id": "D-H04-02",
         "kind": "decision"
       },
-      "reviewer_class": "protocol",
+      "reviewer_class": "protocol and security",
       "source": {
-        "citation": "review-archives/h04/h04-group2-proposal-R2.md",
-        "commit": "a86650b187c523f27c92f05bfe959d06840025a6"
+        "capture_commit": "98155a8402d3602318409454f3577325036569e2",
+        "citation": "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json",
+        "sha256": "41acd8763b41d45ecef8541d1a31b8ac58cc582cc0a333d3f5f2f31f9e7357fa"
       },
-      "status": "blocked",
+      "status": "external_fact",
       "unit": {
-        "kind": "hash"
+        "kind": "evidence_reference"
       },
       "value": {
-        "kind": "symbolic_binding",
-        "name": "DEPLOYMENT_DP_16_CCIP_PROMOTION"
+        "kind": "external_fact",
+        "raw": "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json"
       },
       "zero_semantics": {
-        "explanation": "No value exists until the cited blocker closes.",
+        "explanation": "The value is a dated evidence reference, not a zeroable deployment parameter.",
         "kind": "not_applicable"
       }
     },

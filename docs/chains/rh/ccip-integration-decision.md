@@ -1,5 +1,10 @@
 # Robinhood Chain CCIP integration decision
 
+> **Historical planning record.** CCIP is now deployed and activated. The
+> current topology, pools reporting version 1.5.1, and remaining operational
+> gates are recorded in [ccip-live-state.md](ccip-live-state.md). Statements
+> below that deployment or registration has not happened are superseded.
+
 Status: **Conditional draft — thin Solidity inheritance selected; external
 confirmation and production implementation approval still required**
 
@@ -77,7 +82,7 @@ contains both subclasses. It is an independently reviewed reference, not
 production deployment source. The review is bound to source SHA-256
 `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
 see the
-[`Round-3 review record`](evidence/ccip-solidity-reference-round-3-review.md).
+Round-3 review record.
 
 The reference was compiled on 2026-07-27 against:
 

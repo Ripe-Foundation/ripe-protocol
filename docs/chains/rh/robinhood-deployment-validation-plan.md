@@ -1,26 +1,36 @@
 # Robinhood deployment validation plan
 
+> **11 August 2026 CCIP supersession:** this plan's `1000`-deferred and
+> disabled/not-deployed CCIP statements are preserved historical validation
+> design. GREEN and RIPE CCIP topology is already live and is now an observed
+> external-state assertion, not a launch deployment stage. Further mutation and
+> release remain separately gated; see
+> [`ccip-live-state.md`](ccip-live-state.md).
+
 > **1 August 2026 currentness overlay:** Ready to continue bounded launch
-> preparation. The shared-migration final-review candidate is bound to exact
+> preparation. The retired shared-migration candidate was bound to exact
 > transaction-executor parent `25c0d58e1243449276e4ac4cae8d7abb8272f376`, tree
-> `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`. PR #61, Morpho V2 and
-> BlueChipYield support, H-04 source authority, and H-05 deterministic blocked
-> planning are integrated. `DefaultsRobinhood.vy` exists, compiles, and matches
-> the derived ledger. Source/configuration readiness reports exactly 66
+> `2dd9ddb30c1bc09cc82b8ed1ffd67949a20a4abf`; those identities are historical
+> evidence, not current plan authority. PR #61, Morpho V2 and BlueChipYield
+> support and H-04 source authority are integrated. `DefaultsRobinhood.vy`
+> exists, compiles, and matches
+> the derived ledger. Source/configuration readiness reports exactly 64
 > blockers with `configuration_consistent=true` and
-> `deployment_ready=false`. The executable migration plan separately reports
-> 86 blockers: 39 binding, 9 Curve, 5 external-address, 17 deployment-input,
-> 4 reservation, and 12 Stock keys. The 86-key plan adds migration-specific
-> bindings, reservations, and Stock inputs on top of source/configuration
-> readiness; neither count replaces the other. H-06 is a
-> class qualification only. Repository configuration is prepared and
+> `deployment_ready=false`. No executable migration plan is authorized or
+> currently censused. The former shared declarative source, runner,
+> transaction executor, 17-stage/action census, and 86-key plan census are
+> retired historical evidence. H-06 is a class qualification only. Repository configuration is prepared and
 > consistent; production/onchain configuration has not occurred. No Robinhood
 > migration, live execution, deployment, activation, RPC, account, key,
-> signer, or release action has occurred. The candidate implements 17 shared
-> stages through `0900`, 119 actions, and 33 registrations; `1000` remains
-> deferred without an executable source file. The current PriceDesk topology is
-> ID 1 Chainlink, ID 2 unchanged CurvePrices for GREEN only, ID 3
-> BlueChipYield, IDs 4/5 empty, with priorities `[1,3]`; see
+> signer, or release action has occurred for the non-CCIP launch candidate. The
+> current repository-review candidate contains eight imperative
+> `migrations/robinhood-mainnet/` files, `0000` through `0007`; they do not
+> constitute an executable plan. Historical reservation `1000` is represented
+> as confirmed external CCIP state, not as a deferred or executable launch mutation. The
+> current PriceDesk topology is
+> ID 1 Chainlink and ID 2 unchanged CurvePrices for GREEN only. ID 3
+> BlueChipYield remains blueprint-selected but is not deployed or finalized by
+> the current candidate; IDs 4/5 are empty and priorities are `[1,2]`; see
 > [`curve-launch-activation.md`](curve-launch-activation.md). Historical
 > future-path labels below remain narrow validation design, not current
 > lifecycle authority.
@@ -28,9 +38,10 @@
 - Status: Phase G completion draft; future tests and rehearsals are not implemented
 - Starting specification checkpoint: `1b2c755`
 - Completion commit: recorded in the Track 7 handoff after final validation
-- Canonical migration source: implemented final-review candidate
-  `migrations/robinhood/`; real profiles remain typed blocked with
-  `plan_hash=null` until actual inputs close
+- Current migration review surface: eight imperative files under
+  `migrations/robinhood-mainnet/`, `0000` through `0007`; the former
+  `migrations/robinhood/` declarative source is retired and no executable plan
+  is authorized or currently censused
 - Candidate identity: uncommitted validation uses explicit preview artifacts
   bound to the complete prospective tree. Preview and synthetic-proof
   artifacts are non-production, non-executable, history-ineligible, and

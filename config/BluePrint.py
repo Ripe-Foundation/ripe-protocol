@@ -76,7 +76,7 @@ PARAMS = {
         "PRICE_DESK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
         # vault book (blocks)
-        "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 12 hours on Base
+        "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
     },
     "local": {
@@ -477,14 +477,16 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
     RobinhoodComponentSelection("CM-048", "EndaomentPSM", "required", "selected"),
     RobinhoodComponentSelection("CM-049", "DefaultsRobinhood", "required", "selected"),
     RobinhoodComponentSelection("CM-050", "AeroRipePrices", "omitted", "omitted"),
+    # Verified already-live on Base and Robinhood mainnet. These rows describe
+    # current topology, not authority for another CCIP transaction or release.
     RobinhoodComponentSelection(
-        "CM-051", "GREEN CCIP BurnMint pool", "deferred", "deferred"
+        "CM-051", "GREEN CCIP BurnMint pool", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-052", "RIPE CCIP BurnMint pool", "deferred", "deferred"
+        "CM-052", "RIPE CCIP BurnMint pool", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-053", "CCIP token-admin registration", "deferred", "deferred"
+        "CM-053", "CCIP token-admin registration", "required", "selected"
     ),
     RobinhoodComponentSelection(
         "CM-054", "GREEN/RIPE local price adapter", "deferred", "deferred"
@@ -502,7 +504,7 @@ ROBINHOOD_COMPONENT_SELECTIONS = (
         "CM-057", "ABI export and explorer verification", "required", "selected"
     ),
     RobinhoodComponentSelection(
-        "CM-058", "Solidity build/test/deploy toolchain", "deferred", "deferred"
+        "CM-058", "Solidity build/test/deploy toolchain", "required", "selected"
     ),
     RobinhoodComponentSelection("CM-059", "Base/RH test profiles", "required", "selected"),
     RobinhoodComponentSelection("CM-060", "DefaultsLocal", "omitted", "omitted"),
@@ -543,10 +545,13 @@ ROBINHOOD_REGISTRY_TOPOLOGY = (
     RobinhoodRegistrySelection("ripe_hq", 21, "Endaoment Funds", "source_hard_coded",
                                "CM-047", "required", "selected"),
     RobinhoodRegistrySelection("ripe_hq", 22, "Endaoment PSM", "source_hard_coded", "CM-048", "required", "selected"),
-    RobinhoodRegistrySelection("ripe_hq", 23, "GREEN CCIP BurnMint pool",
-                               "provisional_reservation", "CM-051", "deferred", "reserved"),
-    RobinhoodRegistrySelection("ripe_hq", 24, "RIPE CCIP BurnMint pool",
-                               "provisional_reservation", "CM-052", "deferred", "reserved"),
+    # Confirmed on both Base and Robinhood mainnet: RIPE was registered first
+    # at 23, then GREEN at 24. These are active source-hard-coded identities,
+    # not empty reservations available to a future append.
+    RobinhoodRegistrySelection("ripe_hq", 23, "RIPE CCIP BurnMint pool",
+                               "source_hard_coded", "CM-052", "required", "selected"),
+    RobinhoodRegistrySelection("ripe_hq", 24, "GREEN CCIP BurnMint pool",
+                               "source_hard_coded", "CM-051", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 1, "Stability Pool",
                                "source_hard_coded", "CM-022", "required", "selected"),
     RobinhoodRegistrySelection("vault_book", 2, "Ripe Gov Vault",
@@ -625,7 +630,7 @@ ROBINHOOD_STOCK_ARTIFACT_BINDING = (
     ),
     (
         "creationSha256",
-        "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
+        "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
     ),
     (
         "runtimeTemplateSha256",
@@ -665,18 +670,18 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
     current_test_identities=(
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_ah_auctions.py",
-            "8d4c9a46c89bd8b98a135790e83d78fdbb094ce0",
-            "c3a33ecfea6a1d266bb3eab0eb8a35984c91c738c6d30519c4003ed08046f997",
+            "77f1222861917511bf5bd7adae7a1ff215b9afbc",
+            "f869490832929bf6d206d5a888831bad3f1fe32e98a5d9e009458a8ba9648f83",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            "398789cf7ed3513df39cb87fa953cc25e9227e8c",
-            "12d161d41eda9acf8cd61697b31b2870e360125e33dbd46f8e22dff4872864cb",
+            "c04a618f48c3e3e5e8b85b3e78f558db80f527e6",
+            "adfd4961288f1b3d8dfa6e40c8dc2987f95ae8c8c8417f6d26dd7380b8632306",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            "aba36f5e004ca6a7752118cf0f02d46c28cd5a54",
-            "f9b52e3f8854f87b6b614ef673ea9630a10daea518a411cab0550e4ae5bfe10e",
+            "fc8ff200e5eef7678a9da207d5c1723f1bc4afbe",
+            "68fabc844d43d5a0f5a1f119f698837549787e458194a595a710973c07948348",
         ),
         RobinhoodGitPathIdentity(
             "tests/core/deleverage/test_deleverage_swap_collateral.py",
@@ -688,10 +693,10 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
         RobinhoodArtifactApplicabilityIdentity(
             "AuctionHouse",
             "contracts/core/AuctionHouse.vy",
-            "d0a2d45cae0128cbb6ed5508238c817dfd963482",
-            "3fe2ae20b013ce3493daa272270ebf65324656561a807ea8df878e1bc87dfad3",
-            "0b58ea8c6aea0a7615315af80abcf5a06a03ba330e45e7334c4a5b168d0fe0b0",
-            "cd693fcf1554351a0a00185b5af63a9f45d2b4ea3d94d03e387ad5091b461b0f",
+            "73c2239ea9af646ec79ce2a8a59349a25f6a79df",
+            "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
+            "31b858e2b36a4210ecd23c94421303569b158721b30865dff8fc3cf7c86bcca6",
+            "6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa",
             "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
             "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
         ),
@@ -700,7 +705,7 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/core/Deleverage.vy",
             "b43d373039b352d6eab240be714134764901b947",
             "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
-            "cf8462f9489fda051d7e55bb1c52be38984538818ffd0d96338e5a4fade9638b",
+            "aab99ede7492d5f7f4769493c55ba04f28478caccbe9f32075dd9ef9b8c2acc7",
             "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
             "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
             "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
@@ -710,7 +715,7 @@ ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
             "contracts/vaults/SimpleErc20.vy",
             "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
             "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "cafe6aa7cf76416d18e021935d0ab65c7a9e81a8130aab811c000d04b20973ed",
+            "ec9daa8c14f70bacf1e83f0061e6865d27641a151090917f2d1f82ba2503ffe5",
             "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
             "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
             "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
@@ -838,7 +843,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "repository_fact_integrated",
         (
             ("source", "contracts/vaults/modules/BasicVault.vy"),
-            ("gitBlob", "9c8299accd5a65cbfbc96c4cdc1849bb125523b8"),
+            ("gitBlob", "a5a51ee20c598e9bf40908fc6c38f1c0634bf665"),
             ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
         ),
         ("shared nominal vault movement remains fail-closed and external delivery stays exact",),
@@ -849,7 +854,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "repository_fact_integrated",
         (
             ("source", "contracts/core/CreditEngine.vy"),
-            ("gitBlob", "a98d2522a16708e887a5a8aad78171843d413baf"),
+            ("gitBlob", "800cc44bcb13439f5007d79143e545b4c3357014"),
             ("integrationCommit", "4c26d7d73bb02f7eae2e5df02314db77a426aced"),
         ),
         ("preserve represented zero-amount terms with zero capacity",),
@@ -1011,11 +1016,13 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-15.rewards.arePointsEnabled': RobinhoodInput(SourceReference('Defaults.rewardsConfig.arePointsEnabled'), 'approved'),
     'Deployment.DP-15.rewards.ripePerBlock': RobinhoodInput(SourceReference('Defaults.rewardsConfig.ripePerBlock'), 'approved'),
     'Deployment.DP-15.rewards.promotion': RobinhoodInput('f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234', 'approved'),
-    # DP-16
-    'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(False, 'disabled'),
-    'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(False, 'disabled'),
+    # DP-16 -- verified current live facts. This does not prove exact deployed
+    # source/compiler/constructor identity or historical transaction provenance.
+    # Operational policy and any future mutation remain gated in config/Ccip.py.
+    'Deployment.DP-16.ccip.greenEnabled': RobinhoodInput(True, 'external_fact'),
+    'Deployment.DP-16.ccip.ripeEnabled': RobinhoodInput(True, 'external_fact'),
     'Deployment.DP-16.ccip.sgreenEnabled': RobinhoodInput(False, 'disabled'),
-    'Deployment.DP-16.ccip.promotion': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_16_CCIP_PROMOTION'), 'blocked'),
+    'Deployment.DP-16.ccip.promotion': RobinhoodInput(SourceReference('docs/chains/rh/evidence/ccip-live-snapshot-20260811.json'), 'external_fact'),
     # DP-17
     'Deployment.DP-17.staleWindows.alphaMinimum': RobinhoodInput(300, 'approved'),
     'Deployment.DP-17.staleWindows.alphaMaximum': RobinhoodInput(604800, 'approved'),

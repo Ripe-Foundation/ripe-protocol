@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-11T20:29:21Z",
+  "capture_method": "read-only public JSON-RPC and explorer API queries",
+  "scope": "Base mainnet and Robinhood mainnet GREEN/RIPE CCIP current state plus RipeHq registration and capability-confirmation events",
+  "authority_boundary": "Evidence only. This snapshot does not select rate policy, authorize transactions, prove automatic execution gas, establish exact live-pool creation provenance, or establish legal conclusions.",
+  "repository_pool_source": {
+    "path": "solidity/src/RipeCcipBurnMintTokenPools.sol",
+    "classification": "repository_candidate_reference_source",
+    "inherited_type_and_version": "BurnMintTokenPool 1.5.1",
+    "live_creation_identity_status": "unresolved",
+    "historical_non_live_reference": "docs/chains/rh/examples/RipeCcipBurnMintTokenPools.sol",
+    "license_note": "SPDX headers are preserved as source provenance; license interpretation and legal sufficiency are outside this technical snapshot."
+  },
+  "governance_safe": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+  "ripe_hq_registry_ids": {
+    "RIPE": 23,
+    "GREEN": 24
+  },
+  "chains": {
+    "base-mainnet": {
+      "chain_id": 8453,
+      "chain_selector": 15971525489660198786,
+      "snapshot_block": {
+        "number": 49845407,
+        "hash": "0x30923cf19a179dde27b1ffe4e98f894e3b09e4088148373f91bec4586274bb50",
+        "timestamp": "2026-08-11T20:29:21Z"
+      },
+      "ripe_hq": "0x6162df1b329E157479F8f1407E888260E0EC3d2b",
+      "router": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD",
+      "rmn_proxy": "0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8",
+      "token_admin_registry": "0x6f6C373d09C07425BaAE72317863d7F6bb731e37",
+      "remote_chain": "robinhood-mainnet",
+      "remote_chain_selector": 6180753054346818345,
+      "registration_event": {
+        "transaction_hash": "0xdf4642ff394b0ec791bb945a4f6d7d5aa5c127ed4cb1261d571e2d3758952c12",
+        "block_number": 49731901,
+        "block_hash": "0x82f7925ebc8e75246217b60fee3d0b922d2db509df202d6dfce970b3146b4c4f",
+        "timestamp": "2026-08-09T05:25:49Z",
+        "safe": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "registered_ids": {"RIPE": 23, "GREEN": 24}
+      },
+      "capability_confirmation_event": {
+        "transaction_hash": "0xdbd53556a3198e41fca656a718f4baeaf18a22e04f7e1c43c9a632d00be721ff",
+        "block_number": 49755501,
+        "block_hash": "0xabe3f4aa9463c7fd0c9dca09e23bee48a2f6a7c5e5bf037378daf5fa481dfe64",
+        "timestamp": "2026-08-09T18:32:29Z",
+        "safe": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "capabilities": {
+          "RIPE": {"can_mint_green": false, "can_mint_ripe": true},
+          "GREEN": {"can_mint_green": true, "can_mint_ripe": false}
+        }
+      },
+      "pools": {
+        "RIPE": {
+          "registry_id": 23,
+          "token": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "pool": "0x6E3f8465aF365a2C400C361783ea51ad44b3C836",
+          "token_administrator": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "pending_token_administrator": "0x0000000000000000000000000000000000000000",
+          "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "type_and_version": "BurnMintTokenPool 1.5.1",
+          "can_mint_green": false,
+          "can_mint_ripe": true,
+          "rate_limit_admin": "0x0000000000000000000000000000000000000000",
+          "outbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "inbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "remote_token": "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b",
+          "remote_pools": ["0xE51aF1311832818A6D366081Fc535CA56357a6EE"],
+          "runtime_bytes": 17374,
+          "runtime_keccak256": "0xd4f535ef0f70a869f39b3daac618e04fa3e5910eff62506f73f787e49d316621"
+        },
+        "GREEN": {
+          "registry_id": 24,
+          "token": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+          "pool": "0xEF56E5036728718Baa577257Ff4FA9259E9e895f",
+          "token_administrator": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "pending_token_administrator": "0x0000000000000000000000000000000000000000",
+          "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "type_and_version": "BurnMintTokenPool 1.5.1",
+          "can_mint_green": true,
+          "can_mint_ripe": false,
+          "rate_limit_admin": "0x0000000000000000000000000000000000000000",
+          "outbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "inbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "remote_token": "0x355bB7F0f6c730e4460d620420a300fa08FF82F3",
+          "remote_pools": ["0x4B19f165Bb1Ce3f19Bbe828D150706B9deeEeC95"],
+          "runtime_bytes": 17374,
+          "runtime_keccak256": "0xb03d4299ba0ed7149bafcb6faa1ea6751ad107b93628f49c78734d92f91dd662"
+        }
+      }
+    },
+    "robinhood-mainnet": {
+      "chain_id": 4663,
+      "chain_selector": 6180753054346818345,
+      "snapshot_block": {
+        "number": 33949391,
+        "hash": "0xb97ea6e842345461c21ceb93353a9b5695799cfc5af0b2d47f0298b920c80fd2",
+        "timestamp": "2026-08-11T20:27:22Z"
+      },
+      "ripe_hq": "0xD4e82AE1De673bba3B53386A2D2C630AE6630940",
+      "router": "0x06fC836cf9839B1cd891C440A0a45242DA6Ae1c9",
+      "rmn_proxy": "0xe8464c353210Cc398A45dB2454FBc5BCd25fFf20",
+      "token_admin_registry": "0x1912C3cFafE8A76A32a92861d815aC2837F237Ca",
+      "remote_chain": "base-mainnet",
+      "remote_chain_selector": 15971525489660198786,
+      "registration_event": {
+        "transaction_hash": "0x6853cadda60af8f7d5f5574459bc76b3abf7bbecc81c670e15c8e41529227582",
+        "block_number": 31247170,
+        "block_hash": "0x1e6ee1b5b167bab282c9857e023947c51c5c900f1abd86d0f4a1a081d103187e",
+        "timestamp": "2026-08-08T17:18:23Z",
+        "safe": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "registered_ids": {"RIPE": 23, "GREEN": 24}
+      },
+      "capability_confirmation_event": {
+        "transaction_hash": "0x45b232e0ef377c39e4cd391dd677409626bf16d7f159c99ffc02f2b863d98a3e",
+        "block_number": 31699086,
+        "block_hash": "0x2c6e0fe0bba4a6d11dfac125256c65ad196e937bc0dfc34af56d7b2d745a791f",
+        "timestamp": "2026-08-09T05:52:42Z",
+        "safe": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+        "capabilities": {
+          "RIPE": {"can_mint_green": false, "can_mint_ripe": true},
+          "GREEN": {"can_mint_green": true, "can_mint_ripe": false}
+        }
+      },
+      "pools": {
+        "RIPE": {
+          "registry_id": 23,
+          "token": "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b",
+          "pool": "0xE51aF1311832818A6D366081Fc535CA56357a6EE",
+          "token_administrator": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "pending_token_administrator": "0x0000000000000000000000000000000000000000",
+          "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "type_and_version": "BurnMintTokenPool 1.5.1",
+          "can_mint_green": false,
+          "can_mint_ripe": true,
+          "rate_limit_admin": "0x0000000000000000000000000000000000000000",
+          "outbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "inbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "remote_token": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+          "remote_pools": ["0x6E3f8465aF365a2C400C361783ea51ad44b3C836"],
+          "runtime_bytes": 17374,
+          "runtime_keccak256": "0x2f03282e47b4b9e67fa729b9582e9e0cc4cdf9889b339799c1c58291fbf73b12"
+        },
+        "GREEN": {
+          "registry_id": 24,
+          "token": "0x355bB7F0f6c730e4460d620420a300fa08FF82F3",
+          "pool": "0x4B19f165Bb1Ce3f19Bbe828D150706B9deeEeC95",
+          "token_administrator": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "pending_token_administrator": "0x0000000000000000000000000000000000000000",
+          "owner": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
+          "type_and_version": "BurnMintTokenPool 1.5.1",
+          "can_mint_green": true,
+          "can_mint_ripe": false,
+          "rate_limit_admin": "0x0000000000000000000000000000000000000000",
+          "outbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "inbound_rate_limit": {"is_enabled": false, "capacity": 0, "rate": 0},
+          "remote_token": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+          "remote_pools": ["0xEF56E5036728718Baa577257Ff4FA9259E9e895f"],
+          "runtime_bytes": 17374,
+          "runtime_keccak256": "0xc5b5394cff57f6700eb4f8ea00063ac37583de8b6613052c7b69ef72165bff22"
+        }
+      }
+    }
+  },
+  "current_state_assertions": {
+    "token_admin_registry_pool_matches": true,
+    "each_pool_supports_exactly_the_peer_selector": true,
+    "remote_token_and_pool_mappings_are_reciprocal": true,
+    "router_and_rmn_match_repository_config": true,
+    "pool_owners_match_governance_safe": true,
+    "token_administrators_match_governance_safe": true,
+    "all_pending_token_administrators_are_zero": true,
+    "all_rate_limit_admins_are_zero": true,
+    "all_inbound_and_outbound_rate_limits_are_disabled": true
+  },
+  "unresolved_evidence": [
+    "Exact historical TokenAdminRegistry setPool transaction hashes were not captured in this snapshot; current getPool values were read and matched.",
+    "Exact historical applyChainUpdates transaction hashes were not captured in this snapshot; current supported selectors and reciprocal remote mappings were read and matched.",
+    "Exact live pool source set, compiler version/settings, constructor arguments, and creation bytecode/artifact identity were not established; current topology, capabilities, reported type/version, and runtime hashes do not prove the relationship to the repository candidate/reference source.",
+    "No accepted full real-token OffRamp automatic-execution gas measurement is recorded.",
+    "No live ccipSend signer or Safe transaction backend is authorized or implemented in scripts/ccip_send.py.",
+    "This snapshot does not establish source-license legal conclusions."
+  ]
+}

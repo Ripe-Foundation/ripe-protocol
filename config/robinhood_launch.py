@@ -9,14 +9,44 @@ are therefore not importable packages -- the same reason Base's migrations
 import their values from config/ and scripts/.
 """
 
-from config.BluePrint import ROBINHOOD_ADDRESSES, ROBINHOOD_GOVERNANCE
+from config.BluePrint import (
+    ROBINHOOD_ADDRESSES,
+    ROBINHOOD_ADDRESS_STATUS,
+    ROBINHOOD_GOVERNANCE,
+    SymbolicBinding,
+)
 
 ZERO_ADDRESS = "0x" + "0" * 40
 
 
+def unresolved_external_address_keys():
+    return tuple(
+        sorted(
+            key
+            for key, status in ROBINHOOD_ADDRESS_STATUS.items()
+            if "unverified" in status
+        )
+    )
+
+
+def validate_deployment_external_facts():
+    """Fail before signer construction while any selected fact is unverified."""
+    unresolved = unresolved_external_address_keys()
+    if unresolved:
+        raise ValueError(
+            "RH_EXTERNAL_FACTS_UNVERIFIED:" + ",".join(unresolved)
+        )
+
+
 def address(key):
-    """Read a verified external address from the blueprint."""
-    return ROBINHOOD_ADDRESSES[key]
+    """Read a deployment input only after its authority marks it resolved."""
+    value = ROBINHOOD_ADDRESSES[key]
+    status = ROBINHOOD_ADDRESS_STATUS[key]
+    if isinstance(value, SymbolicBinding) or (
+        "unverified" in status or "unresolved" in status
+    ):
+        raise ValueError(f"RH_EXTERNAL_FACT_UNVERIFIED:{key}:{status}")
+    return value
 
 
 # --- block units ------------------------------------------------------------
@@ -60,6 +90,11 @@ SGREEN_INITIAL_SUPPLY = 0
 
 # --- misc -------------------------------------------------------------------
 TELLER_SHOULD_PAUSE = True  # Teller launches paused
+# The governance-only SwitchboardEcho route is the authorization boundary for
+# migration calls. VaultMigrator must be available during the controlled
+# window while Teller remains paused, so its initial department state is
+# deliberately unpaused.
+VAULT_MIGRATOR_SHOULD_PAUSE = False
 BOND_BOOSTER_MAX_BOOST_RATIO = 200_00  # 200%
 BOND_BOOSTER_MAX_UNITS = 25_000  # a count, not a ratio
 BOND_BOOSTER_MIN_LOCK_DURATION = DAY_IN_BLOCKS * 180
@@ -157,6 +192,15 @@ PSM_YIELD_VAULT_TOKEN = ZERO_ADDRESS
 # Chainlink band.
 PRICE_CHANGE_MIN_TIMELOCK = PRICE_MIN_TIMELOCK
 PRICE_CHANGE_MAX_TIMELOCK = PRICE_MAX_TIMELOCK
+
+# --- RIPE price (Uniswap V2) ------------------------------------------------
+# The RIPE/WETH v2 pool is observed by a separately deployed monitoring
+# component. It implements PriceSource only as an inert compatibility shell:
+# every protocol-pricing entrypoint reports no feed, while explicitly named
+# RIPE monitoring views expose the manipulable spot observation. It is never
+# registered in PriceDesk and is forbidden as collateral or any other
+# protocol-valuation authority.
+RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 
 # --- curve pool -------------------------------------------------------------
 # 100 USDG (6dp) + 100 GREEN (18dp), matching Base's GREEN pool seed.

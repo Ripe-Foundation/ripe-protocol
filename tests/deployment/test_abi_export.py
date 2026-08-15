@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -142,17 +143,19 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
 
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
-    assert len(report.exported) == 54
+    assert len(report.exported) == 57
     exported_names = {path.name for path in report.exported}
     assert exported_names >= {
         "Addys.json",
         "Contributor.json",
         "DefaultsRobinhood.json",
+        "DefaultsRobinhoodLive.json",
         "Erc20Token.json",
         "InstantBondLane.json",
         "LocalGov.json",
         "SwitchboardFoxtrot.json",
         "UniswapV2Prices.json",
+        "VaultMigrator.json",
     }
     assert "GuardedErc20.json" not in exported_names
     assert "DefaultsBaseSepolia.json" in {
@@ -183,3 +186,32 @@ def test_uniswap_v2_abi_is_independently_byte_current_and_old_abi_is_absent():
     assert not (
         ROOT / "scripts" / "abis" / "RobinhoodUniswapV2RipePrices.json"
     ).exists()
+
+    entries = json.loads(abi.read_text())
+    function_names = {
+        entry["name"]
+        for entry in entries
+        if entry.get("type") == "function"
+    }
+    assert {
+        "isMonitoringOnly",
+        "getRipePoolState",
+        "getRipeWethMonitoringPrice",
+        "getRipeUsdMonitoringPrice",
+    } <= function_names
+    assert {
+        "governance",
+        "pendingGov",
+        "startGovernanceChange",
+        "getAddys",
+        "getRipeHq",
+        "priceConfigs",
+        "snapShots",
+        "pendingPriceConfigs",
+        "getMonitoringPrice",
+        "getUniswapV2RipePrice",
+        "getWeightedPrice",
+        "getLatestSnapshot",
+        "updatePriceConfig",
+        "isValidPriceConfig",
+    }.isdisjoint(function_names)

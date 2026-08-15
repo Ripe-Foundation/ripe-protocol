@@ -2870,9 +2870,9 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     # Pin the deployed measurements, not only the legal ceiling. This catches
     # code-size creep before either contract silently consumes its final bytes.
     assert deleverage_size == 24_569
-    assert auction_house_size == 24_556
+    assert auction_house_size == 23_863
     assert EIP170_LIMIT - deleverage_size == 7
-    assert EIP170_LIMIT - auction_house_size == 20
+    assert EIP170_LIMIT - auction_house_size == 713
 
 
 @pytest.mark.parametrize(

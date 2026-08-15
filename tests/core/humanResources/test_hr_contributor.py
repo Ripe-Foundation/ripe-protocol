@@ -477,6 +477,49 @@ def test_contributor_confirm_ripe_transfer_success(
     assert not contributor_contract.hasPendingRipeTransfer()
 
 
+def test_contributor_final_transfer_honors_its_separate_deposit_lock_term(
+    deployedContributor,
+    valid_contributor_terms,
+    setupRipeGovVaultConfig,
+    ripe_gov_vault,
+    ripe_token,
+    alice,
+    bob,
+):
+    """The HR agreement's final-transfer term is not a general deposit bound."""
+    general_min_lock = 100
+    contributor_lock = 25
+    setupRipeGovVaultConfig(
+        _minLockDuration=general_min_lock,
+        _maxLockDuration=1_000,
+    )
+
+    terms = dict(valid_contributor_terms)
+    terms["owner"] = alice
+    terms["manager"] = bob
+    terms["depositLockDuration"] = contributor_lock
+    contributor = Contributor.at(deployedContributor(terms))
+
+    # The Contributor's own timestamp vesting/unlock governs when its position
+    # may leave. Cashing immediately before initiation still uses the ordinary
+    # RipeGov deposit path, so the position held by the Contributor is clamped
+    # to the current general minimum while it remains there.
+    boa.env.time_travel(seconds=terms["startDelay"] + terms["unlockLength"] + 1)
+    contributor.initiateRipeTransfer(sender=alice)
+    contributor_data = ripe_gov_vault.userGovData(contributor, ripe_token)
+    assert contributor_data.unlock == boa.env.evm.patch.block_number + general_min_lock
+
+    # Once the independently configured Contributor unlock and transfer delay
+    # have both elapsed, the final owner position receives the agreement's
+    # explicit block-based term, even though it is below the general minimum.
+    boa.env.time_travel(blocks=contributor.keyActionDelay())
+    contributor.confirmRipeTransfer(False, sender=alice)
+    owner_data = ripe_gov_vault.userGovData(alice, ripe_token)
+    assert owner_data.unlock == boa.env.evm.patch.block_number + contributor_lock
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) > 0
+    assert not ripe_gov_vault.doesUserHaveBalance(contributor, ripe_token)
+
+
 def test_contributor_confirm_ripe_transfer_too_early(
     contributor_contract,
     setupRipeGovVaultConfig,

@@ -46,15 +46,6 @@ interface TellerUtils:
     def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
     def isUnderscoreWalletOrVault(_addr: address, _mc: address = empty(address)) -> bool: view
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def preferredStabVaultId() -> uint256: view
-    def coreRipeGovVaultId() -> uint256: view
-    def shouldCheckLastTouch() -> bool: view
-
 interface RipeGovVault:
     def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def exportPositionForMigration(_user: address, _asset: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData: nonpayable
@@ -64,14 +55,23 @@ interface RipeGovVault:
     def getTotalAmountForUser(_user: address, _asset: address) -> uint256: view
     def doesUserHaveBalance(_user: address, _asset: address) -> bool: view
 
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def preferredStabVaultId() -> uint256: view
+    def coreRipeGovVaultId() -> uint256: view
+    def shouldCheckLastTouch() -> bool: view
+
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface StabVault:
-    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+interface Deleverage:
+    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -87,12 +87,14 @@ interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-    def removeVaultFromUserForMigration(_user: address, _vaultId: uint256): nonpayable
 
-interface Deleverage:
-    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+interface StabVault:
+    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldAutoDeposit: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface AddressRegistry:
+    def isValidAddr(_addr: address) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
 
 interface CreditRedeem:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -105,10 +107,6 @@ interface PriceDesk:
 
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
-
-interface AddressRegistry:
-    def isValidRegId(_regId: uint256) -> bool: view
-    def getAddr(_regId: uint256) -> address: view
 
 struct RipeGovMigrationData:
     amount: uint256
@@ -195,18 +193,6 @@ event TellerRebalance:
     withdrawAmount: uint256
     depositVaultId: uint256
     withdrawVaultId: uint256
-
-event RipeGovPositionMigrated:
-    user: indexed(address)
-    asset: indexed(address)
-    sourceVaultId: indexed(uint256)
-    targetVaultId: uint256
-    sourceVault: address
-    targetVault: address
-    amount: uint256
-    targetShares: uint256
-    govPoints: uint256
-    unlock: uint256
 
 event UserConfigSet:
     user: indexed(address)
@@ -310,6 +296,9 @@ def _deposit(
     vaultId: uint256 = 0
     utils: address = addys._getTellerUtilsAddr()
     vaultAddr, vaultId = staticcall TellerUtils(utils).getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
+
+    # one more validation -- TellerUtils repeats this check, but putting here as backup
+    assert staticcall AddressRegistry(_a.vaultBook).isValidAddr(vaultAddr) # dev: invalid vault
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
@@ -493,95 +482,67 @@ def rebalance(
     return withdrawnAmount, depositedAmount
 
 
-###############################
-# Ripe Gov Position Migration #
-###############################
+####################
+# Vault Migrations #
+####################
+
+
+# basic vault migration
 
 
 @nonreentrant
 @external
-def migrateRipeGovPosition(
+def withdrawOnVaultMigration(_user: address, _asset: address, _sourceVault: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool):
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    return extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), self, addys._getAddys(_a))
+
+
+@nonreentrant
+@external
+def depositOnVaultMigration(_user: address,_asset: address,_amount: uint256,_targetVaultId: uint256,_targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    return self._deposit(_asset, _amount, _user, _targetVault, _targetVaultId, msg.sender, 0, True, True, False, addys._getAddys(_a))
+
+
+# normal ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVault: address, _a: addys.Addys = empty(addys.Addys)) -> RipeGovMigrationData:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    return extcall RipeGovVault(_sourceVault).exportPositionForMigration(_user, _asset, _targetVault, addys._getAddys(_a))
+
+
+@nonreentrant
+@external
+def importPositionForMigration(_user: address, _asset: address, _sourceVault: address, _targetVaultId: uint256, _targetVault: address, _migration: RipeGovMigrationData, _ledger: address) -> uint256:
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    targetShares: uint256 = extcall RipeGovVault(_targetVault).importPositionForMigration(_user, _asset, _sourceVault, _migration)
+    extcall Ledger(_ledger).addVaultToUser(_user, _targetVaultId)
+    return targetShares
+
+
+# legacy ripe gov vault migration
+
+
+@nonreentrant
+@external
+def exportPositionForLegacyRipeGovMigration(
     _user: address,
     _asset: address,
-    _sourceVaultId: uint256,
-    _targetVaultId: uint256,
+    _sourceVault: address,
+    _targetVault: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    assert _sourceVaultId != 0 and _targetVaultId != 0 # dev: invalid vault id
-    assert _sourceVaultId != _targetVaultId # dev: same vault
-
-    # validation
-    a: addys.Addys = addys._getAddys()
-    vaultBook: AddressRegistry = AddressRegistry(a.vaultBook)
-    assert staticcall vaultBook.isValidRegId(_sourceVaultId) # dev: invalid source vault id
-    assert staticcall vaultBook.isValidRegId(_targetVaultId) # dev: invalid target vault id
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_sourceVaultId, _asset) # dev: unsupported source asset
-    assert staticcall MissionControl(a.missionControl).isSupportedAssetInVault(_targetVaultId, _asset) # dev: unsupported target asset
-
-    # get vault addresses
-    sourceVault: address = staticcall vaultBook.getAddr(_sourceVaultId)
-    targetVault: address = staticcall vaultBook.getAddr(_targetVaultId)
-    assert sourceVault != empty(address) and sourceVault.is_contract # dev: invalid source vault
-    assert targetVault != empty(address) and targetVault.is_contract # dev: invalid target vault
-    assert sourceVault != targetVault # dev: same vault
-    assert staticcall Vault(sourceVault).isPaused() # dev: source vault not paused
-    assert staticcall Vault(targetVault).isPaused() # dev: target vault not paused
-
-    sourceLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert sourceLedgerData.isParticipatingInVault # dev: source vault missing from Ledger
-
-    # export position
-    targetBalanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-    migration: RipeGovMigrationData = extcall RipeGovVault(sourceVault).exportPositionForMigration(
-        _user,
-        _asset,
-        targetVault,
-        a,
-    )
-    targetBalanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(targetVault)
-    assert targetBalanceAfter >= targetBalanceBefore # dev: invalid migration receipt
-    assert targetBalanceAfter - targetBalanceBefore == migration.amount # dev: inexact migration receipt
-
-    # import position
-    targetShares: uint256 = extcall RipeGovVault(targetVault).importPositionForMigration(
-        _user,
-        _asset,
-        sourceVault,
-        migration,
-    )
-
-    # Prove the exported source position is empty, then swap Ledger
-    # participation source-first so a user at the vault limit never exceeds it.
-    assert staticcall RipeGovVault(sourceVault).getTotalAmountForUser(_user, _asset) == 0 # dev: source balance remains
-    assert not staticcall RipeGovVault(sourceVault).doesUserHaveBalance(_user, _asset) # dev: source asset remains
-    extcall Ledger(a.ledger).removeVaultFromUserForMigration(_user, _sourceVaultId)
-    sourceLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _sourceVaultId)
-    assert not sourceLedgerData.isParticipatingInVault # dev: source Ledger cleanup failed
-
-    targetLedgerData: DepositLedgerData = staticcall Ledger(a.ledger).getDepositLedgerData(_user, _targetVaultId)
-    if not targetLedgerData.isParticipatingInVault:
-        extcall Ledger(a.ledger).addVaultToUser(_user, _targetVaultId)
-
-    # update lootbox points
-    # settle the source through this block and initialize the target at its intentionally
-    # non-core lootbox weight. Governance refreshes the target after switching the core pointer.
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _sourceVaultId, sourceVault, _asset, a)
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, _targetVaultId, targetVault, _asset, a)
-
-    log RipeGovPositionMigrated(
-        user=_user,
-        asset=_asset,
-        sourceVaultId=_sourceVaultId,
-        targetVaultId=_targetVaultId,
-        sourceVault=sourceVault,
-        targetVault=targetVault,
-        amount=migration.amount,
-        targetShares=targetShares,
-        govPoints=migration.govPoints,
-        unlock=migration.unlock,
-    )
-    return migration.amount
+    assert msg.sender == addys._getVaultMigratorAddr() # dev: only vault migrator allowed
+    assert deptBasics.isPaused # dev: teller not paused
+    amount: uint256 = 0
+    isDepleted: bool = False
+    amount, isDepleted = extcall Vault(_sourceVault).withdrawTokensFromVault(_user, _asset, max_value(uint256), _targetVault, addys._getAddys(_a))
+    return amount
 
 
 ########
@@ -719,7 +680,8 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    vaultId: uint256 = self._getPreferredStabVaultId(a.missionControl)
+    vaultId: uint256 = staticcall MissionControl(a.missionControl).preferredStabVaultId()
+    assert vaultId != 0 # dev: invalid vault id
     return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), vaultId, msg.sender, 0, False, True, True, a)
 
 
@@ -1015,14 +977,6 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     return vaultId
 
 
-@view
-@internal
-def _getPreferredStabVaultId(_missionControl: address) -> uint256:
-    vaultId: uint256 = staticcall MissionControl(_missionControl).preferredStabVaultId()
-    assert vaultId != 0 # dev: invalid vault id
-    return vaultId
-
-
 # housekeeping
 
 
@@ -1045,6 +999,8 @@ def _performHousekeeping(
     _shouldUpdateDebt: bool,
     _a: addys.Addys,
 ):
+    assert not self.receiptMeasurementActive # dev: receipt window active
+
     # one action per block
     shouldCheckLastTouch: bool = False
     if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():

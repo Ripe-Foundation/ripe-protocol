@@ -10,8 +10,25 @@
 Curve amendment
 
 **Lifecycle effect:** repository configuration, validation, tests, and handoff
-only; no deployment, migration execution, production configuration,
-activation, release, RPC, account, signer, Sites, or external-state action
+only; no launch-remediation-candidate deployment, migration execution,
+production configuration, activation, release, RPC, account, signer, Sites,
+or external-state action. Separately observed live CCIP and monitoring-only
+Uniswap state grants no such authority.
+
+**11 August 2026 owner amendment:** the original no-deployment Uniswap
+disposition is superseded only as follows: the owner confirms
+`UniswapV2Prices` is already deployed as a direct monitoring component. It
+remains permanently absent from PriceDesk. The replacement source preserves
+the PriceSource ABI only as inert stubs and exposes spot data solely through
+explicit RIPE monitoring views. Neither generation is collateral or other
+value-bearing authority. All LP-admission and manipulation limitations remain.
+
+**11 August 2026 CCIP supersession:** the synthesis's earlier instruction to
+keep CCIP disabled is historical and no longer current-state authority. GREEN
+and RIPE CCIP topology and token-specific mint capabilities are confirmed live;
+the open rate-policy, destination-gas, live-identity/provenance, license,
+transaction-backend, further-mutation, and release gates remain fail-closed.
+See [`ccip-live-state.md`](ccip-live-state.md).
 
 ## 1. Purpose and authority
 
@@ -25,21 +42,21 @@ The source reports are:
 
 ### Reassessment
 
-- [Ledger chain-abstraction reassessment](reassessment/ledger-chain-abstraction.md)
-- [Teller balance and receipt measurement reassessment](reassessment/teller-balance-measurement.md)
-- [GuardedErc20 vault architecture reassessment](reassessment/guarded-erc20-vault-architecture.md)
-- [Robinhood Uniswap price-source decision](reassessment/uniswap-price-source-decision.md)
+- Ledger chain-abstraction reassessment
+- Teller balance and receipt measurement reassessment
+- GuardedErc20 vault architecture reassessment
+- Robinhood Uniswap price-source decision
 
 ### Qualification
 
-- [Robinhood Curve and Profile 2 qualification](qualification/curve-profile2-qualification.md)
-- [Robinhood PSM, reserve, and launch-liquidity activation proposal](qualification/psm-liquidity-activation.md)
-- [Robinhood network, token, clock, and oracle qualification authority](qualification/network-token-oracle-authority.md)
-- [Robinhood fork-suite coverage census and implementation design](qualification/fork-suite-coverage-census.md)
+- Robinhood Curve and Profile 2 qualification
+- Robinhood PSM, reserve, and launch-liquidity activation proposal
+- Robinhood network, token, clock, and oracle qualification authority
+- Robinhood fork-suite coverage census and implementation design
 
 Subsequent decision/evidence record (does not rewrite the eight source reports):
 
-- [Robinhood PSM lite-permission split decision and evidence](reassessment/psm-lite-permission-split.md)
+- Robinhood PSM lite-permission split decision and evidence
 - [Robinhood Curve launch activation](curve-launch-activation.md)
 
 The Curve launch-activation record supersedes the earlier Profile 1/Profile 2
@@ -98,16 +115,18 @@ The copied-report byte identities are:
    deployment, activation, and release stay gated. Stock rewards remain
    disabled.
 6. Use the bounded launch-pricing profile. PriceDesk ID 1 has Chainlink
-   selected, ID 2 has unchanged `CurvePrices` selected, ID 3 has
-   BlueChipYield selected, and IDs 4 and 5 are empty. Priority price-source
-   IDs remain `[1, 3]`. ID 2 is used only for GREEN through the candidate
+   selected and ID 2 has unchanged `CurvePrices` selected. ID 3 BlueChipYield
+   remains blueprint-selected but is not deployed or finalized by the current
+   candidate, and IDs 4 and 5 are empty. Priority price-source IDs remain
+   `[1, 2]`. ID 2 is used only for GREEN through the candidate
    GREEN/USDG pool; USDG has no Curve feed. Dynamic rates, Teller reference
    snapshots, and the Curve stabilizer remain inactive.
 7. Keep Chainlink as the sole USDG and PSM price authority. The GREEN route is
    GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG, with no recursion.
-   BlueChipYield remains the selected yield-token route. Uniswap is not a
-   launch fallback.
-8. Do not build or register a Uniswap price-source contract at launch.
+   BlueChipYield remains a blueprint-selected follow-on at ID 3, not a deployed
+   or finalized current-candidate route. Uniswap is not a launch fallback.
+8. Deploy UniswapV2Prices only for direct monitoring; do not register it in
+   PriceDesk or use it as a standard price-source feed.
 9. RIPE/WETH V2 is at most an externally held launch-liquidity canary. It is
    not a protocol oracle and its LP token is not admitted at launch.
 10. Do not create a launch GREEN/USDG Uniswap pool. A GREEN/USDG Curve pool is a
@@ -132,7 +151,7 @@ The copied-report byte identities are:
 | Ledger | Preserve current contract and ABI | Deployment/profile binding, immutable readback, negative tests, authentic clock/receipt qualification, replay, monitoring |
 | Teller | Preserve current contract, strict read, mutex, and equality checks | Release-gate test matrix, current rationale update, exact token/proxy qualification |
 | GuardedErc20 | Preserve separate specialized contract and existing ABI | VaultBook/asset binding, deployment policy, composed-route tests, monitoring and incident procedures |
-| Uniswap launch oracle | No contract at launch | Off-chain monitoring and separately approved pool/custody operations only |
+| Uniswap monitoring | Monitoring-only contract may be deployed; no PriceDesk feed | Direct observation and separately approved pool/custody operations only |
 | Curve launch pricing | Unchanged `CurvePrices`, selected at ID 2 for GREEN only | Bind verified official identities and pool deployment/operations; prove exact route, fail-closed behavior, and inactive higher powers |
 | PSM architecture | Reuse shared contract | Later configuration, funding, qualification, and activation work under separate authority |
 | H-09 architecture | No production-contract change | Future test/evidence package after owner APIs and external inputs exist |
@@ -150,16 +169,18 @@ by accepting this synthesis.
 - Bounded launch-pricing profile only.
 - PriceDesk ID 1 has Chainlink selected.
 - PriceDesk ID 2 has unchanged `CurvePrices` selected.
-- PriceDesk ID 3 has BlueChipYield selected.
+- PriceDesk ID 3 has BlueChipYield structurally selected in the blueprint but
+  not deployed or finalized by the current candidate.
 - PriceDesk IDs 4 and 5 are empty.
-- Priority price-source IDs are `[1, 3]`.
+- Priority price-source IDs are `[1, 2]`.
 - Chainlink remains the sole USDG and PSM authority. GREEN alone uses
   GREEN -> Curve GREEN/USDG -> PriceDesk -> Chainlink USDG. USDG has no Curve
-  feed, so the route cannot recurse. BlueChipYield provides the selected
-  yield-token route.
+  feed, so the route cannot recurse. BlueChipYield has no current-candidate
+  deployment or registration action.
 - Deploy/register `CurvePrices` at ID 2 only after the typed address,
   constructor, pool, artifact, and operating blockers close.
-- No Uniswap price-source deployment or registration.
+- Monitoring-only Uniswap deployment is allowed; PriceDesk registration and
+  every value-bearing use remain prohibited.
 - The GREEN/USDG Curve venue is pricing-only. Its LP token is not admitted and
   its deployment, funding, custody, slippage, withdrawal, observation, and
   incident inputs remain blocked.
@@ -281,12 +302,15 @@ owner explicitly reopens it:
    representation, configuration, tests, fork scenarios, documentation
    refreshes, bytecode size or EIP-170 headroom work, deployment planning, and
    operational work. Preserve current zero values and historical evidence.
-3. **Uniswap V2 candidate admission.** The old cumulative-price design and
-   implementation are deleted. The smaller `UniswapV2Prices` spot/snapshot
-   candidate exists under separate owner instruction, but no PriceDesk row,
-   deployment, or security-relevant DEX price belongs in launch.
-4. **CCIP.** Keep disabled and preserve historical evidence without new
-   research, implementation, testing, packaging, testnet, or production work.
+3. **Uniswap V2 candidate admission.** The old cumulative-price and snapshot
+   designs are deleted. The stripped stateless `UniswapV2Prices` monitor may
+   be deployed under the 11 August monitoring-only amendment, but no PriceDesk
+   row or security-relevant DEX price belongs in launch.
+4. **CCIP (historical disposition, superseded 11 August 2026).** This was the
+   original keep-disabled instruction. Current authority is the confirmed live
+   topology plus the still-open operational and release gates in
+   [`ccip-live-state.md`](ccip-live-state.md); no further transaction follows
+   from the supersession.
 5. **Sites recovery and dashboard publication.** Preserve provenance; do not
    recover access, create a replacement project, save/deploy a version, publish,
    or change access.
@@ -342,8 +366,8 @@ result remains non-authoritative `LOCAL_FORK_QUALIFIED`.
 ### Package D — launch deployment-preparation and PSM canary
 
 One later configuration/operations package for exact launch bindings,
-Chainlink USDG authority, the bounded GREEN Curve route, the selected BlueChipYield route, disabled
-PSM preparation, reserve/custody decisions, redemption-first qualification,
+Chainlink USDG authority, the bounded GREEN Curve route, any separately
+approved BlueChipYield follow-on, disabled PSM preparation, reserve/custody decisions, redemption-first qualification,
 monitoring, incident controls, and a restricted activation packet. It begins
 only after exact machine, manifest, role, feed, token, and operator inputs exist.
 It does not combine preparation, qualification, and production activation into
@@ -356,8 +380,9 @@ covers additional Curve feeds or consumers, optional dynamic rates, optional
 Teller snapshots, optional stabilizer use, and later LP admissions. No stage is
 implied by acceptance of the previous stage.
 
-UniswapV2Prices hardening, admission, and deployment remain excluded while
-deferred.
+UniswapV2Prices PriceDesk admission, manipulation-defense redesign, and every
+value-bearing use remain excluded while monitoring-only deployment is allowed
+by the 11 August owner amendment.
 
 ### Package F — H-10 live rehearsal and operational release
 
@@ -377,10 +402,11 @@ The consolidated owner decisions no longer open for this program slice are:
 - use the bounded Curve pricing topology at launch and stage every higher power
   and LP admission as follow-on;
 - keep Chainlink as sole USDG and PSM authority, with PriceDesk ID 1 selected;
-- select BlueChipYield at PriceDesk ID 3 for the yield-token pricing route,
-  select unchanged `CurvePrices` at ID 2 for GREEN only, keep IDs 4 and 5
-  empty, and use priority price-source IDs `[1, 3]`;
-- deploy no Uniswap price-source contract at launch;
+- keep BlueChipYield structurally selected at PriceDesk ID 3 but undeployed and
+  unfinalized by the current candidate, select unchanged `CurvePrices` at ID 2
+  for GREEN only, keep IDs 4 and 5 empty, and use priority price-source IDs
+  `[1, 2]`;
+- deploy UniswapV2Prices only as a PriceDesk-inert monitoring component;
 - treat RIPE/WETH V2 only as an optional externally held liquidity canary;
 - create no launch GREEN/USDG Uniswap venue;
 - keep both LP admissions outside launch and separately gated;
@@ -400,7 +426,7 @@ by itself authorize implementation or a later lifecycle phase.
 
 The owner exercised that reopening authority for both LP launch admissions on
 1 August 2026. The independent qualification in
-[`qualification/lp-launch-admission.md`](qualification/lp-launch-admission.md)
+`qualification/lp-launch-admission.md`
 reaffirmed no LP-token protocol admission on fresh source-path evidence: the
 GREEN/USDG pool and bounded GREEN pricing route are selected launch work, but
 its LP token remains excluded; RIPE/WETH remains only a conditional externally

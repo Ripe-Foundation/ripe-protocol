@@ -535,7 +535,11 @@ def _t1_mutex_removal_mutant_source():
     )
     assert source.count(assertion) == 1
     source = source.replace(assertion, "", 1)
-    assert "assert not self.receiptMeasurementActive" not in source
+    assert assertion not in source
+    assert (
+        "    assert not self.receiptMeasurementActive"
+        " # dev: receipt window active\n"
+    ) in source
     return source
 
 
@@ -2875,14 +2879,9 @@ def test_m1_credit_redeem_surplus_route_remains_dormant_and_refunds_user(
     assert filter_logs(teller, "TellerDeposit") == []
 
 
-# Plan-substitution and deferred-risk record: the required nested batch-
-# redemption premise cannot be a receipt-mutex proof because
-# receiptMeasurementActive is checked only by _deposit. On the pinned tree,
-# depositFromTrusted also lacks @nonreentrant, so a callback may enter a
-# different custody-changing route while receipt measurement is active. The
-# test-only ceiling forbids repairing production Teller here. This replacement
-# binds the mutex's actual nested-deposit scope; the broader cross-route risk
-# remains production-hardening work and must not be inferred closed from it.
+# The deposit-local mutex and the central housekeeping guard jointly block a
+# nested deposit during receipt measurement. This regression separately pins
+# the deposit-local half and transient-state recovery.
 def test_receipt_measurement_mutex_blocks_nested_deposit(
     ripe_hq,
     governance,
@@ -3100,7 +3099,7 @@ def test_predeployment_valid_ripe_lock_route_preserves_direct_clamp_boundary(
         token,
         requested,
         500,
-        sender=switchboard_alpha.address,
+        sender=teller.address,
     )
 
     assert returned == available
@@ -3400,13 +3399,13 @@ def test_predeployment_withdrawal_responsibility_matrix(
             True,
         )
 
-    protected_simple_rejects_shape_or_delivery = (
-        vault_kind == "simple"
+    exact_delivery_vault_rejects_short_delivery = (
+        vault_kind in ("simple", "stability")
         and transfer_mode in (1, 3, 4)
     )
     universally_rejected = transfer_mode in (6, 7, 10)
     should_revert = (
-        protected_simple_rejects_shape_or_delivery or universally_rejected
+        exact_delivery_vault_rejects_short_delivery or universally_rejected
     )
 
     if should_revert:
@@ -3447,18 +3446,12 @@ def test_predeployment_withdrawal_responsibility_matrix(
 
 @pytest.mark.parametrize("outer_route", ("governance", "trusted"))
 @pytest.mark.parametrize(
-    ("nested_action", "nested_succeeds"),
-    (
-        pytest.param("protected-withdrawal", True, id="protected-withdrawal"),
-        pytest.param("rebalance", False, id="rebalance"),
-        pytest.param("redemption", False, id="redemption"),
-        pytest.param("liquidation", True, id="liquidation"),
-    ),
+    "nested_action",
+    ("protected-withdrawal", "rebalance", "redemption", "liquidation"),
 )
 def test_predeployment_undecorated_route_reentrancy_cross_product(
     outer_route,
     nested_action,
-    nested_succeeds,
     ripe_hq_deploy,
     governance,
     vault_book,
@@ -3570,19 +3563,12 @@ def test_predeployment_undecorated_route_reentrancy_cross_product(
         ) == amount
 
     assert token.callback_was_attempted()
-    assert token.callback_succeeded() is nested_succeeds
+    assert token.callback_succeeded() is False
     assert token.balanceValue(outer_vault) == amount
     assert outer_vault.getTotalAmountForUser(user, token) == amount
-    nested_withdrawal_succeeds = (
-        nested_action == "protected-withdrawal" and nested_succeeds
-    )
-    expected_protected = protected_position - int(nested_withdrawal_succeeds)
-    assert (
-        protected_vault.getTotalAmountForUser(user, token)
-        == expected_protected
-    )
-    assert token.balanceValue(protected_vault) == expected_protected
-    assert token.balanceValue(token) == 1 + int(nested_withdrawal_succeeds)
+    assert protected_vault.getTotalAmountForUser(user, token) == protected_position
+    assert token.balanceValue(protected_vault) == protected_position
+    assert token.balanceValue(token) == 1
 
 
 def test_m1_teller_runtime_size_dual_guard():
@@ -3606,4 +3592,335 @@ def test_m1_teller_runtime_size_dual_guard():
     runtime = bytes.fromhex(output[2:])
     assert len(runtime) > 0
     assert len(runtime) <= 24_576
-    assert len(runtime) <= 24_326
+    # Owner-approved receipt-window guard; any further byte growth requires review.
+    assert len(runtime) <= 24_436
+
+
+############################################################################
+# WP1 / WP6 (Section 8.4, Section 13): receipt-window interleaving checkpoint
+#
+# The full cross-product and the focused rows below pin the owner-approved
+# central guard: no custody-changing Teller route may complete during an active
+# receipt-measurement window.
+############################################################################
+
+
+@pytest.mark.parametrize("nested_action", ("protected-withdrawal", "liquidation"))
+def test_receipt_window_blocks_every_custody_changing_nested_route(
+    nested_action,
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    credit_engine,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """DV-10 hardening target (SV-6, Section 13).
+
+    While Teller measures an inbound custody delta, no callback may change the
+    measured destination's custody or create a dependent vault mutation through
+    any other Teller route.
+    """
+    setGeneralConfig()
+    token = _m1_token()
+    protected_vault = boa.load(
+        "contracts/vaults/SimpleErc20.vy",
+        ripe_hq_deploy,
+        name=f"receipt_window_guard_{nested_action}",
+        override_address=boa.env.generate_address(),
+    )
+    protected_id = _m1_register_vault(vault_book, governance, protected_vault)
+    outer_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[outer_id, protected_id])
+
+    user = token.address
+    protected_position = 10
+    token.mint(protected_vault, protected_position)
+    assert protected_vault.depositTokensInVault(
+        user, token, protected_position, sender=teller.address
+    ) == protected_position
+
+    if nested_action == "protected-withdrawal":
+        nested = teller.withdraw.prepare_calldata(
+            token, 1, user, protected_vault, protected_id
+        )
+    else:
+        nested = teller.liquidateUser.prepare_calldata(user, True)
+
+    token.configure_callback(teller, nested, True)
+    token.configure_callback_rejection_policy(True)
+    token.configure_transfer(0)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(token, 1)
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    assert teller.depositFromTrusted(
+        user, outer_id, token, amount, 0, sender=credit_engine.address
+    ) == amount
+
+    assert token.callback_was_attempted()
+    # No nested custody-changing route may have succeeded inside the window.
+    assert token.callback_succeeded() is False
+    assert protected_vault.getTotalAmountForUser(user, token) == protected_position
+    assert token.balanceValue(protected_vault) == protected_position
+
+
+############################################################################
+# WP1 / WP6 (Section 13): remaining callback-matrix rows
+#
+# The bound baseline already covers the before-credit callback placement
+# (test_predeployment_undecorated_route_reentrancy_cross_product) and mutex
+# clearing (test_m1_transfer_callback_reentrancy_reverts_and_mutex_recovers,
+# test_t3_failed_post_acquisition_call_rolls_back_transient_for_retry,
+# test_t5_post_clear_callback_starts_fresh_measurement_and_succeeds). These add
+# the two nested routes and the after-credit placement that were missing.
+############################################################################
+
+# transferFrom that credits the destination FIRST and only then fires the
+# callback, so the nested action observes a fully credited destination vault.
+# The bound repository has no token with this placement.
+AFTER_CREDIT_CALLBACK_TOKEN_SOURCE = """
+# @version 0.4.3
+
+event Transfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    value: uint256
+
+name: public(constant(String[32])) = "After Credit Token"
+symbol: public(constant(String[32])) = "ACRED"
+decimals: public(constant(uint8)) = 18
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+
+callback_target: public(address)
+callback_data: public(Bytes[1024])
+callback_enabled: public(bool)
+callback_was_attempted: public(bool)
+callback_succeeded: public(bool)
+
+@deploy
+def __init__():
+    pass
+
+@external
+def mint(_to: address, _value: uint256):
+    self.balanceOf[_to] += _value
+    self.totalSupply += _value
+
+@external
+def configure_callback(_target: address, _data: Bytes[1024]):
+    self.callback_target = _target
+    self.callback_data = _data
+    self.callback_enabled = True
+    self.callback_was_attempted = False
+    self.callback_succeeded = False
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+
+@internal
+def _move(_from: address, _to: address, _value: uint256):
+    self.balanceOf[_from] -= _value
+    # credit FIRST ...
+    self.balanceOf[_to] += _value
+    log Transfer(sender=_from, receiver=_to, value=_value)
+    # ... then hand control to the callback.
+    if self.callback_enabled:
+        self.callback_enabled = False
+        self.callback_was_attempted = True
+        success: bool = False
+        response: Bytes[1] = b""
+        success, response = raw_call(
+            self.callback_target,
+            self.callback_data,
+            max_outsize=1,
+            revert_on_failure=False,
+        )
+        self.callback_succeeded = success
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    self._move(msg.sender, _to, _value)
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    self.allowance[_from][msg.sender] -= _value
+    self._move(_from, _to, _value)
+    return True
+"""
+
+
+def _after_credit_token():
+    return boa.loads(
+        AFTER_CREDIT_CALLBACK_TOKEN_SOURCE,
+        name="after_credit_callback_token",
+        override_address=boa.env.generate_address(),
+    )
+
+
+@pytest.mark.parametrize("nested_action", ("same_route_deposit", "claim_loot", "deleverage"))
+def test_receipt_window_remaining_nested_routes(
+    nested_action,
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    credit_engine,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Section 13 rows the baseline cross-product did not cover.
+
+    Characterizes whether each nested route completes inside the receipt
+    measurement window of an undecorated outer `depositFromTrusted`.
+    """
+    setGeneralConfig()
+    token = _m1_token()
+    protected_vault = boa.load(
+        "contracts/vaults/SimpleErc20.vy",
+        ripe_hq_deploy,
+        name=f"receipt_window_extra_{nested_action}",
+        override_address=boa.env.generate_address(),
+    )
+    protected_id = _m1_register_vault(vault_book, governance, protected_vault)
+    outer_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[outer_id, protected_id])
+
+    user = token.address
+    token.mint(protected_vault, 10)
+    assert protected_vault.depositTokensInVault(
+        user, token, 10, sender=teller.address
+    ) == 10
+
+    if nested_action == "same_route_deposit":
+        nested = teller.depositFromTrusted.prepare_calldata(
+            user, protected_id, token.address, 1, 0
+        )
+    elif nested_action == "claim_loot":
+        nested = teller.claimLoot.prepare_calldata(user, False)
+    else:
+        nested = teller.deleverageUser.prepare_calldata(user, MAX_UINT256)
+
+    token.configure_callback(teller, nested, True)
+    token.configure_callback_rejection_policy(True)
+    token.configure_transfer(0)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(token, 1)
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    assert teller.depositFromTrusted(
+        user, outer_id, token, amount, 0, sender=credit_engine.address
+    ) == amount
+
+    assert token.callback_was_attempted()
+    assert token.callback_succeeded() is False
+    # The outer measurement still produced an exact receipt either way.
+    assert simple_erc20_vault.getTotalAmountForUser(user, token) == amount
+    assert protected_vault.getTotalAmountForUser(user, token) == 10
+
+
+def test_after_credit_callback_cannot_corrupt_the_measured_receipt(
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    credit_engine,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Section 13: callback placement AFTER the destination is credited.
+
+    The baseline matrix only exercises a callback fired between debiting the
+    depositor and crediting the vault. Here the vault is already credited when
+    control is handed over, so a nested withdrawal could remove exactly the
+    tokens Teller is about to measure.
+    """
+    setGeneralConfig()
+    token = _after_credit_token()
+    protected_vault = boa.load(
+        "contracts/vaults/SimpleErc20.vy",
+        ripe_hq_deploy,
+        name="receipt_window_after_credit_vault",
+        override_address=boa.env.generate_address(),
+    )
+    protected_id = _m1_register_vault(vault_book, governance, protected_vault)
+    outer_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[outer_id, protected_id])
+
+    user = token.address
+    token.mint(protected_vault, 10)
+    assert protected_vault.depositTokensInVault(
+        user, token, 10, sender=teller.address
+    ) == 10
+
+    nested = teller.withdraw.prepare_calldata(
+        token, 1, user, protected_vault, protected_id
+    )
+    token.configure_callback(teller, nested)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    deposited = teller.depositFromTrusted(
+        user, outer_id, token, amount, 0, sender=credit_engine.address
+    )
+
+    assert token.callback_was_attempted()
+    assert token.callback_succeeded() is False
+    assert deposited == amount
+    assert simple_erc20_vault.getTotalAmountForUser(user, token) == amount
+    assert protected_vault.getTotalAmountForUser(user, token) == 10
+
+
+def test_after_credit_callback_nested_withdrawal_is_blocked(
+    ripe_hq_deploy,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    credit_engine,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """DV-10 hardening target for the after-credit callback placement (SV-6)."""
+    setGeneralConfig()
+    token = _after_credit_token()
+    protected_vault = boa.load(
+        "contracts/vaults/SimpleErc20.vy",
+        ripe_hq_deploy,
+        name="receipt_window_after_credit_guard_vault",
+        override_address=boa.env.generate_address(),
+    )
+    protected_id = _m1_register_vault(vault_book, governance, protected_vault)
+    outer_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(token, _vaultIds=[outer_id, protected_id])
+
+    user = token.address
+    token.mint(protected_vault, 10)
+    protected_vault.depositTokensInVault(user, token, 10, sender=teller.address)
+
+    token.configure_callback(
+        teller,
+        teller.withdraw.prepare_calldata(token, 1, user, protected_vault, protected_id),
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    token.mint(credit_engine, amount)
+    token.approve(teller, amount, sender=credit_engine.address)
+    teller.depositFromTrusted(
+        user, outer_id, token, amount, 0, sender=credit_engine.address
+    )
+
+    assert token.callback_was_attempted()
+    assert token.callback_succeeded() is False
+    assert protected_vault.getTotalAmountForUser(user, token) == 10

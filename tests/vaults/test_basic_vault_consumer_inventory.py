@@ -5,6 +5,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = (
@@ -29,6 +31,11 @@ REWARD_GETTERS = {
     "getUserLootBoxShare",
 }
 CAPABILITY_GETTERS = {"isSupportedVaultAsset"}
+
+
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep source inventory checks independent of protocol deployment."""
 
 
 def _load_inventory():
@@ -142,15 +149,17 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
         if row["classification"] == "value_backing_required"
     }
     assert required_paths == {
-        ("contracts/core/AuctionHouse.vy", 421),
-        ("contracts/core/AuctionHouse.vy", 517),
-        ("contracts/core/AuctionHouse.vy", 893),
-        ("contracts/core/AuctionHouse.vy", 1201),
-        ("contracts/core/AuctionHouse.vy", 1229),
+        ("contracts/core/AuctionHouse.vy", 431),
+        ("contracts/core/AuctionHouse.vy", 527),
+        ("contracts/core/AuctionHouse.vy", 902),
+        ("contracts/core/AuctionHouse.vy", 1215),
+        ("contracts/core/AuctionHouse.vy", 1243),
         ("contracts/core/CreditEngine.vy", 729),
-        ("contracts/core/CreditEngine.vy", 1252),
+        ("contracts/core/CreditEngine.vy", 1249),
         ("contracts/core/CreditRedeem.vy", 190),
         ("contracts/core/Deleverage.vy", 579),
         ("contracts/core/Deleverage.vy", 1086),
-        ("contracts/core/Teller.vy", 381),
+        ("contracts/core/Teller.vy", 407),
+        ("contracts/core/VaultMigrator.vy", 472),
+        ("contracts/core/VaultMigrator.vy", 523),
     }

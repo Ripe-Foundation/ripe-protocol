@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 from collections import deque
+from pathlib import Path
+from typing import Mapping
 
 import pytest
 import requests
 
 from scripts.utils.verify_etherscan import (
+    _compiler_version,
     CHAIN_SPECS,
     PROVIDER_POLICIES,
     EtherscanVerifier,
@@ -219,3 +223,135 @@ def test_unsupported_language_or_format_fails_before_http(updates, message):
     with pytest.raises(VerifierConfigurationError, match=message):
         adapter.verify_manifest("Example", manifest(**updates))
     assert session.calls == []
+
+
+# --- the committed manifests must actually verify --------------------------
+#
+# Every test above builds a synthetic manifest carrying a record-level
+# "compiler_version". No manifest in this repository has one:
+# deployed_contracts_manifest emits address/abi/solc_json/args/file, here and on
+# master. So the adapter rejected every real manifest while its suite passed.
+# These tests use the committed manifests instead of a fixture.
+
+
+def _committed_manifest_records():
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    for path in sorted(root.glob("*/*/current-manifest.json")):
+        contracts = json.loads(path.read_text()).get("contracts", {})
+        for name, record in sorted(contracts.items()):
+            if isinstance(record.get("solc_json"), Mapping):
+                yield f"{path.parent.parent.name}/{path.parent.name}", name, record
+
+
+def test_no_committed_manifest_carries_a_record_level_compiler_version():
+    # Pins the premise: if this ever becomes false, the fallback is dead code.
+    records = list(_committed_manifest_records())
+    assert records, "expected committed manifests with solc_json"
+    assert all("compiler_version" not in rec for _, _, rec in records)
+
+
+def test_committed_manifests_resolve_a_compiler_version():
+    for where, name, record in _committed_manifest_records():
+        resolved = _compiler_version(record, record["solc_json"])
+        assert resolved == "vyper:0.4.3", f"{where}:{name} -> {resolved}"
+
+
+def test_a_committed_manifest_submits_successfully():
+    where, name, record = next(_committed_manifest_records())
+    session = FakeSession(
+        FakeResponse({"status": "0", "message": "NOTOK", "result": "not verified"}),
+        FakeResponse({"status": "1", "message": "OK", "result": "GUID"}),
+        FakeResponse({"status": "1", "message": "OK", "result": "Pass - Verified"}),
+    )
+    verifier = create_verifier(
+        chain="base-mainnet",
+        api_key="probe",
+        session=session,
+        sleep=lambda *_: None,
+    )
+
+    result = verifier.verify_manifest(name, record)
+
+    assert result.ok, f"{where}:{name} -> {result}"
+    submission = next(
+        kwargs for _method, _url, kwargs in session.calls
+        if (kwargs.get("data") or {}).get("action") == "verifysourcecode"
+    )
+    assert submission["data"]["compilerversion"] == "vyper:0.4.3"
+    assert submission["data"]["codeformat"] == "vyper-json"
+
+
+def test_current_manifests_remain_verifiable_in_bulk():
+    """Guards the premise that `solc_json` must stay in current manifests.
+
+    A step manifest carries address/file only, because nothing reads one for
+    anything else. That reasoning must not be extended to
+    `current-manifest.json`: `solc_json`
+    is what makes a contract verifiable. Contracts deployed with
+    `deploy_solidity` have no `solc_json` by design -- Foundry artifacts have no
+    Vyper compiler-output equivalent -- so they are counted, not required.
+    """
+    root = Path(__file__).resolve().parents[2] / "migration_history"
+    manifest = json.loads(
+        (root / "base-mainnet/v1/current-manifest.json").read_text()
+    )
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+
+    validated = unsupported = 0
+    for name, record in manifest["contracts"].items():
+        try:
+            verifier._validate_manifest(name, record)
+            validated += 1
+        except VerifierConfigurationError:
+            assert "solc_json" not in record, name
+            unsupported += 1
+
+    assert validated >= 45, f"only {validated} contracts would submit"
+    assert unsupported == sum(
+        1 for r in manifest["contracts"].values() if "solc_json" not in r
+    )
+
+
+def test_multi_source_contracts_submit_under_their_own_source():
+    """A multi-source contract must not be submitted as one of its imports.
+
+    Selection used to fall back to the lexicographically first key in
+    `solc_json.sources` when a record had no `source_path`. No committed record
+    has one, so that fallback was the path every record took, and for anything
+    importing a shared module it chose the module: `RipeHq` submitted as
+    `contracts/modules/LocalGov.vy`, `Switchboard`/`PriceDesk`/
+    `ChainlinkPrices` as `contracts/modules/Addys.vy`. 17 of the 50 records in
+    base-mainnet/v1 were affected.
+    """
+    root = Path(__file__).resolve().parents[2]
+    manifest = json.loads(
+        (root / "migration_history/base-mainnet/v1/current-manifest.json").read_text()
+    )
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+
+    multi_source = 0
+    for name, record in manifest["contracts"].items():
+        if not isinstance(record.get("solc_json"), Mapping):
+            continue
+        selected, _ = verifier._validate_manifest(name, record)
+        assert selected == record["file"], name
+        if len(record["solc_json"].get("sources", {})) > 1:
+            multi_source += 1
+
+    assert multi_source >= 17, "expected the multi-source records to be covered"
+
+
+def test_a_record_without_source_path_or_file_is_refused():
+    # No silent fallback: if neither is recorded there is nothing that
+    # identifies the contract, and guessing is what caused the bug above.
+    verifier = create_verifier(chain="base-mainnet", api_key="probe")
+    record = {
+        "address": "0x" + "1" * 40,
+        "solc_json": {
+            "sources": {"contracts/modules/Addys.vy": {"content": ""}},
+            "compiler_version": "v0.4.3+commit.bff19ea2",
+        },
+    }
+
+    with pytest.raises(VerifierConfigurationError, match="source_path or file"):
+        verifier._validate_manifest("VaultBook", record)

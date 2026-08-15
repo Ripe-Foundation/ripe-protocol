@@ -249,14 +249,25 @@ class EtherscanVerifier:
             raise VerifierConfigurationError(
                 "manifest solc_json.sources must be a nonempty object"
             )
-        source_path = manifest_data.get("source_path")
-        if source_path is None:
-            source_path = sorted(str(path) for path in sources)[0]
+        # The contract being verified, not whichever source sorts first.
+        # Falling back to sorted(sources)[0] picked an imported module for
+        # every multi-source contract -- 17 of the 50 records in
+        # base-mainnet/v1 would have submitted as contracts/modules/Addys.vy
+        # or LocalGov.vy. The record already names its own source in `file`;
+        # committed records carry no `source_path`, so that fallback was the
+        # path every one of them took.
+        source_path = manifest_data.get("source_path") or manifest_data.get("file")
+        if not source_path:
+            raise VerifierConfigurationError(
+                "manifest must record source_path or file to identify the "
+                "contract being verified"
+            )
+        source_path = str(source_path)
         if source_path not in sources:
             raise VerifierConfigurationError(
                 f"manifest source_path is not in solc_json.sources: {source_path}"
             )
-        compiler_version = manifest_data.get("compiler_version")
+        compiler_version = _compiler_version(manifest_data, standard_json)
         if (
             not isinstance(compiler_version, str)
             or not compiler_version.startswith("vyper:")
@@ -306,7 +317,9 @@ class EtherscanVerifier:
                 "contractaddress": address,
                 "codeformat": "vyper-json",
                 "contractname": f"{source_path}:{contract_name}",
-                "compilerversion": manifest_data["compiler_version"],
+                "compilerversion": _compiler_version(
+                    manifest_data, standard_json
+                ),
                 "constructorArguements": str(manifest_data.get("args", "")),
             },
         )
@@ -356,6 +369,30 @@ class EtherscanVerifier:
             "verification remained pending after polling budget",
             guid=guid,
         )
+
+
+def _compiler_version(manifest_data, standard_json):
+    """Resolve the vyper:<version> string Etherscan wants.
+
+    The manifest record has never carried a `compiler_version` key --
+    `deployed_contracts_manifest` emits address/abi/solc_json/args/file, on this
+    branch and on master alike -- so requiring one at the record level rejected
+    every manifest in the repository. The value is there, one level down, as
+    solc_json.compiler_version in the form `v0.4.3+commit.bff19ea2`.
+
+    A record-level value still wins if one is ever emitted. Otherwise this
+    derives it, which is what master did by hardcoding "vyper:0.4.3"; reading
+    the recorded version instead keeps a manifest verifiable after the pinned
+    compiler moves on.
+    """
+    explicit = manifest_data.get("compiler_version")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    recorded = standard_json.get("compiler_version")
+    if not isinstance(recorded, str) or not recorded:
+        return None
+    # "v0.4.3+commit.bff19ea2" -> "vyper:0.4.3"
+    return f"vyper:{recorded.lstrip('v').split('+')[0]}"
 
 
 def create_verifier(

@@ -70,6 +70,14 @@ LARGEST_ARTIFACTS = (
 )
 
 
+def _require_robinhood_chain_id(chain_id: int) -> None:
+    if chain_id != ROBINHOOD_CHAIN_ID:
+        raise SystemExit(
+            "LEDGER_SMOKE_CHAIN_MISMATCH "
+            f"expected={ROBINHOOD_CHAIN_ID} observed={chain_id}"
+        )
+
+
 def _largest_initcode_size() -> int:
     """Measure the biggest initcode the real deployment will sign."""
     import boa
@@ -163,12 +171,7 @@ def main() -> int:
             )
         chain_id = w3.eth.chain_id
         print(f"  anvil chain id           {chain_id}")
-        if chain_id != ROBINHOOD_CHAIN_ID:
-            print(
-                f"  WARNING: expected {ROBINHOOD_CHAIN_ID}. The device's response to "
-                "an unknown chain id is part of what this proves, so a mismatch "
-                "makes the result meaningless."
-            )
+        _require_robinhood_chain_id(chain_id)
 
         from scripts.utils.ledger_account import LedgerAccount
 

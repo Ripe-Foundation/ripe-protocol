@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -17,10 +19,46 @@ import cbor2
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from config.artifact_expectations import load_artifact_expectations  # noqa: E402
+
+
 DEFAULT_EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
 EIP_170_LIMIT = 24_576
 SCHEMA_VERSION = 1
 PRAGMA_OPTIMIZE_RE = re.compile(r"^# pragma optimize ([a-z]+)$", re.MULTILINE)
+COMPILER_ENVELOPE = {
+    "artifact_recipe": "vyper -p . -f bytecode,bytecode_runtime <file>",
+    "integrity_recipe": "vyper -p . -f integrity <file>",
+    "optimization_rule": (
+        "source pragma when present; Vyper default gas otherwise; no -O override"
+    ),
+}
+GOVERNED_SOURCES: Mapping[str, str] = {
+    "AuctionHouse": "contracts/core/AuctionHouse.vy",
+    "BlueChipYieldPrices": "contracts/priceSources/BlueChipYieldPrices.vy",
+    "CreditEngine": "contracts/core/CreditEngine.vy",
+    "DefaultsRobinhood": "contracts/config/DefaultsRobinhood.vy",
+    "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
+    "Deleverage": "contracts/core/Deleverage.vy",
+    "Ledger": "contracts/data/Ledger.vy",
+    "Lootbox": "contracts/core/Lootbox.vy",
+    "MissionControl": "contracts/data/MissionControl.vy",
+    "RipeGov": "contracts/vaults/RipeGov.vy",
+    "SimpleErc20": "contracts/vaults/SimpleErc20.vy",
+    "StabilityPool": "contracts/vaults/StabilityPool.vy",
+    "SwitchboardAlpha": "contracts/config/SwitchboardAlpha.vy",
+    "SwitchboardBravo": "contracts/config/SwitchboardBravo.vy",
+    "SwitchboardCharlie": "contracts/config/SwitchboardCharlie.vy",
+    "SwitchboardDelta": "contracts/config/SwitchboardDelta.vy",
+    "Teller": "contracts/core/Teller.vy",
+    "UniswapV2Prices": "contracts/priceSources/UniswapV2Prices.vy",
+    "VaultMigrator": "contracts/core/VaultMigrator.vy",
+}
+GOVERNED_CONTRACTS = frozenset(GOVERNED_SOURCES)
+DEPLOYED_RUNTIME_CONTRACTS = GOVERNED_CONTRACTS - {"DefaultsRobinhoodLive"}
 
 
 class ArtifactCheckError(RuntimeError):
@@ -49,6 +87,12 @@ class CreationBinding:
     compiler_metadata: bytes
 
 
+@dataclass(frozen=True)
+class DeployedRuntimeBinding:
+    immutable_data: bytes
+    runtime: bytes
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -66,12 +110,138 @@ def _json_sha256(value: Any) -> str:
     return _sha256(_canonical_json_bytes(value))
 
 
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Atomically replace one generated file and durably publish its rename."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _validate_compiler_envelope(expectations: Mapping[str, Any], vyper: Path) -> None:
+    _assert_equal(
+        "expectations",
+        "schema_version",
+        expectations.get("schema_version"),
+        SCHEMA_VERSION,
+    )
+    compiler = expectations.get("compiler")
+    if not isinstance(compiler, Mapping):
+        raise ArtifactCheckError("expectations compiler record is missing")
+
+    required_fields = {"version", *COMPILER_ENVELOPE}
+    actual_fields = set(compiler)
+    if actual_fields != required_fields:
+        missing = sorted(required_fields - actual_fields)
+        unexpected = sorted(actual_fields - required_fields)
+        details = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if unexpected:
+            details.append("unexpected " + ", ".join(unexpected))
+        raise ArtifactCheckError(
+            "compiler envelope fields mismatch: " + "; ".join(details)
+        )
+
+    version = _run([str(vyper), "--version"]).strip()
+    _assert_equal("compiler", "version", version, compiler["version"])
+    for field, expected in COMPILER_ENVELOPE.items():
+        _assert_equal("compiler", field, compiler[field], expected)
+
+
 def _iter_code_layout_entries(layout: Mapping[str, Any]):
     for value in layout.values():
         if isinstance(value, Mapping) and {"offset", "length", "type"} <= set(value):
             yield value
         elif isinstance(value, Mapping):
             yield from _iter_code_layout_entries(value)
+
+
+def _code_data_size(layout: Mapping[str, Any]) -> int:
+    entries = sorted(
+        (
+            int(item["offset"]),
+            int(item["length"]),
+        )
+        for item in _iter_code_layout_entries(layout)
+    )
+    cursor = 0
+    for offset, length in entries:
+        if length <= 0 or offset != cursor:
+            raise ArtifactCheckError(
+                "immutable/code layout is not positive and contiguous: "
+                f"expected offset {cursor}, got offset {offset}, length {length}"
+            )
+        cursor += length
+    return cursor
+
+
+def _deployed_runtime_binding(
+    compiled: CompiledContract,
+    immutable_data_hex: str,
+) -> DeployedRuntimeBinding:
+    """Bind a Vyper runtime template to exact constructor immutable bytes."""
+    if not isinstance(immutable_data_hex, str) or not re.fullmatch(
+        r"(?:[0-9a-f]{2})*",
+        immutable_data_hex,
+    ):
+        raise ArtifactCheckError(
+            "constructor immutable data must be canonical lowercase, "
+            "unprefixed hex"
+        )
+    immutable_data = bytes.fromhex(immutable_data_hex)
+
+    expected_size = _code_data_size(compiled.code_layout)
+    if len(immutable_data) != expected_size:
+        raise ArtifactCheckError(
+            "constructor immutable data size mismatch: "
+            f"expected {expected_size}, got {len(immutable_data)}"
+        )
+    return DeployedRuntimeBinding(
+        immutable_data=immutable_data,
+        runtime=compiled.runtime_template + immutable_data,
+    )
+
+
+def _extract_deployed_runtime_binding(
+    compiled: CompiledContract,
+    deployed_runtime: bytes,
+) -> DeployedRuntimeBinding:
+    """Validate measured deployed code and extract its immutable suffix."""
+    expected_size = len(compiled.runtime_template) + _code_data_size(
+        compiled.code_layout
+    )
+    if len(deployed_runtime) != expected_size:
+        raise ArtifactCheckError(
+            "measured deployed runtime size mismatch: "
+            f"expected {expected_size}, got {len(deployed_runtime)}"
+        )
+    if not deployed_runtime.startswith(compiled.runtime_template):
+        raise ArtifactCheckError(
+            "measured deployed runtime does not start with compiler template"
+        )
+    immutable_data = deployed_runtime[len(compiled.runtime_template):]
+    return DeployedRuntimeBinding(
+        immutable_data=immutable_data,
+        runtime=deployed_runtime,
+    )
 
 
 def _creation_binding(
@@ -236,7 +406,15 @@ def _check_contract(
     *,
     vyper: Path,
     source_override: Path | None,
+    require_deployed_runtime_binding: bool,
 ) -> str:
+    if name in GOVERNED_SOURCES:
+        _assert_equal(
+            name,
+            "canonical source path",
+            expected.get("source_path"),
+            GOVERNED_SOURCES[name],
+        )
     expected_source = ROOT / expected["source_path"]
     source_path = source_override or expected_source
     compiled = _compile(source_path, vyper)
@@ -307,11 +485,15 @@ def _check_contract(
     )
     headroom = EIP_170_LIMIT - len(compiled.runtime_template)
     _assert_equal(name, "eip170_headroom", headroom, artifacts["eip170_headroom"])
-    code_data_size = sum(
-        int(item["length"])
-        for item in _iter_code_layout_entries(compiled.code_layout)
+    code_data_size = _code_data_size(compiled.code_layout)
+    _assert_equal(
+        name,
+        "constructor-bound runtime-template classification",
+        expected.get("constructor_bound_runtime_template"),
+        bool(code_data_size),
     )
     deployed_runtime_size = len(compiled.runtime_template) + code_data_size
+    deployed_headroom = EIP_170_LIMIT - deployed_runtime_size
     _assert_equal(
         name,
         "constructor-bound deployed runtime size",
@@ -321,12 +503,65 @@ def _check_contract(
     _assert_equal(
         name,
         "constructor-bound deployed EIP-170 headroom",
-        EIP_170_LIMIT - deployed_runtime_size,
+        deployed_headroom,
         artifacts["deployed_eip170_headroom"],
     )
     if deployed_runtime_size >= EIP_170_LIMIT:
         raise ArtifactCheckError(
             f"{name}: deployed runtime {deployed_runtime_size} is not below EIP-170"
+        )
+
+    deployed_binding_fields = {
+        "deployed_runtime_immutable_data_hex",
+        "deployed_runtime_immutable_data_size",
+        "deployed_runtime_immutable_data_sha256",
+        "deployed_runtime_sha256",
+    }
+    present_binding_fields = deployed_binding_fields.intersection(artifacts)
+    if present_binding_fields and present_binding_fields != deployed_binding_fields:
+        missing = sorted(deployed_binding_fields - present_binding_fields)
+        raise ArtifactCheckError(
+            f"{name}: incomplete deployed runtime binding; missing "
+            + ", ".join(missing)
+        )
+
+    if require_deployed_runtime_binding and present_binding_fields != deployed_binding_fields:
+        missing = sorted(deployed_binding_fields - present_binding_fields)
+        raise ArtifactCheckError(
+            f"{name}: missing deployed runtime binding fields: "
+            + ", ".join(missing)
+        )
+
+    immutable_data_hex = artifacts.get("deployed_runtime_immutable_data_hex")
+    deployed_binding = None
+    if immutable_data_hex is not None:
+        deployed_binding = _deployed_runtime_binding(
+            compiled,
+            immutable_data_hex,
+        )
+        _assert_equal(
+            name,
+            "constructor immutable data size",
+            len(deployed_binding.immutable_data),
+            artifacts["deployed_runtime_immutable_data_size"],
+        )
+        _assert_equal(
+            name,
+            "constructor immutable data SHA-256",
+            _sha256(deployed_binding.immutable_data),
+            artifacts["deployed_runtime_immutable_data_sha256"],
+        )
+        _assert_equal(
+            name,
+            "constructor-bound deployed runtime SHA-256",
+            _sha256(deployed_binding.runtime),
+            artifacts["deployed_runtime_sha256"],
+        )
+        _assert_equal(
+            name,
+            "constructor-bound deployed runtime size",
+            len(deployed_binding.runtime),
+            artifacts["deployed_runtime_size"],
         )
     accepted_ceiling = artifacts.get("accepted_runtime_ceiling")
     if accepted_ceiling is not None and len(compiled.runtime_template) > accepted_ceiling:
@@ -404,7 +639,9 @@ def _check_contract(
     )
 
     runtime_label = "runtime template"
-    if expected.get("constructor_bound_runtime_template"):
+    if deployed_binding is not None:
+        runtime_label += " (full deployed-runtime identity bound)"
+    elif expected.get("constructor_bound_runtime_template"):
         runtime_label += " (not a deployed-runtime identity; constructor immutables)"
     return (
         f"{name}: creation={len(compiled.creation)} "
@@ -413,7 +650,9 @@ def _check_contract(
         f"compiler-metadata={len(creation_binding.compiler_metadata)}/"
         f"{_sha256(creation_binding.compiler_metadata)} "
         f"{runtime_label}={len(compiled.runtime_template)} "
-        f"headroom={headroom} optimize={compiled.effective_optimization} "
+        f"template-headroom={headroom} deployed-runtime={deployed_runtime_size} "
+        f"deployed-headroom={deployed_headroom} "
+        f"optimize={compiled.effective_optimization} "
         f"integrity={compiled.integrity}"
     )
 
@@ -426,6 +665,12 @@ def _parse_source_overrides(values: Sequence[str]) -> Mapping[str, Path]:
                 f"invalid --source-override {value!r}; expected Contract=path"
             )
         name, raw_path = value.split("=", 1)
+        if not name or not raw_path:
+            raise ArtifactCheckError(
+                f"invalid --source-override {value!r}; expected Contract=path"
+            )
+        if name in overrides:
+            raise ArtifactCheckError(f"duplicate source override: {name}")
         overrides[name] = Path(raw_path).resolve()
     return overrides
 
@@ -434,28 +679,54 @@ def check(
     expectations_path: Path,
     selected_contracts: Sequence[str],
     source_overrides: Mapping[str, Path],
+    require_deployed_runtime_bindings: bool = False,
 ) -> Sequence[str]:
-    expectations = json.loads(expectations_path.read_text())
+    expectations = load_artifact_expectations(expectations_path, root=ROOT)
     _assert_equal(
         "expectations", "schema_version", expectations.get("schema_version"), SCHEMA_VERSION
     )
     vyper = _vyper_path()
-    version = _run([str(vyper), "--version"]).strip()
-    _assert_equal(
-        "compiler", "version", version, expectations["compiler"]["version"]
-    )
-    _assert_equal(
-        "compiler",
-        "artifact_recipe",
-        expectations["compiler"]["artifact_recipe"],
-        "vyper -p . -f bytecode,bytecode_runtime <file>",
-    )
+    _validate_compiler_envelope(expectations, vyper)
 
     contracts = expectations["contracts"]
+    if not isinstance(contracts, Mapping):
+        raise ArtifactCheckError("expectations contracts record is missing")
+    if require_deployed_runtime_bindings:
+        actual_names = set(contracts)
+        missing = sorted(GOVERNED_CONTRACTS - actual_names)
+        unexpected = sorted(actual_names - GOVERNED_CONTRACTS)
+        if missing or unexpected:
+            details = []
+            if missing:
+                details.append("missing " + ", ".join(missing))
+            if unexpected:
+                details.append("unexpected " + ", ".join(unexpected))
+            raise ArtifactCheckError(
+                "strict governed contract set mismatch: " + "; ".join(details)
+            )
+
+        if selected_contracts:
+            raise ArtifactCheckError(
+                "strict artifact check forbids --contract filters"
+            )
+
     names = list(selected_contracts) if selected_contracts else list(contracts)
+    if len(names) != len(set(names)):
+        raise ArtifactCheckError("duplicate --contract selection")
     unknown = sorted(set(names) - set(contracts))
     if unknown:
         raise ArtifactCheckError(f"unknown contracts: {', '.join(unknown)}")
+    unknown_overrides = sorted(set(source_overrides) - set(contracts))
+    if unknown_overrides:
+        raise ArtifactCheckError(
+            "unknown source override contract(s): " + ", ".join(unknown_overrides)
+        )
+    unused_overrides = sorted(set(source_overrides) - set(names))
+    if unused_overrides:
+        raise ArtifactCheckError(
+            "source override supplied for an unselected contract: "
+            + ", ".join(unused_overrides)
+        )
 
     results = []
     for name in names:
@@ -465,6 +736,9 @@ def check(
                 contracts[name],
                 vyper=vyper,
                 source_override=source_overrides.get(name),
+                require_deployed_runtime_binding=(
+                    require_deployed_runtime_bindings
+                ),
             )
         )
     return results
@@ -490,6 +764,14 @@ def _parser() -> argparse.ArgumentParser:
         default=[],
         help="negative-test source override as Contract=path",
     )
+    parser.add_argument(
+        "--require-deployed-runtime-bindings",
+        action="store_true",
+        help=(
+            "check the exact governed set and fail if any record lacks a full "
+            "deployed-runtime binding"
+        ),
+    )
     return parser
 
 
@@ -497,12 +779,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         overrides = _parse_source_overrides(args.source_override)
+        expectations_path = Path.cwd() / args.expectations
         results = check(
-            args.expectations.resolve(),
+            expectations_path,
             args.contract,
             overrides,
+            require_deployed_runtime_bindings=(
+                args.require_deployed_runtime_bindings
+            ),
         )
-    except (ArtifactCheckError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (
+        ArtifactCheckError,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         print(f"CONTRACT_ARTIFACTS_FAILED: {exc}", file=sys.stderr)
         return 1
 

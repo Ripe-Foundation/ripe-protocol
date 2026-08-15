@@ -1,5 +1,9 @@
 # DefaultsRobinhood: configuration-source authority
 
+> **11 August 2026 CCIP currentness note:** the deferred-CCIP test description
+> below is dated evidence, not current topology. GREEN/RIPE CCIP is confirmed
+> live; see [`../ccip-live-state.md`](../ccip-live-state.md).
+
 > [!WARNING]
 > **Superseded current-state snapshot.** The identities, counts, constructor
 > matrix, and launch values below predate the 2026-08-06 production Vyper

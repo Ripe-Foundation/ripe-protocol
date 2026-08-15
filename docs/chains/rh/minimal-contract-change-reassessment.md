@@ -7,8 +7,10 @@
 > `ae0cb49…` for distinct
 > full-payoff, dust, safe-conversion, and governance boundaries; this did not
 > reopen S4. `fullPayoffBuffer`, `overageBps`, `dustThreshold`, and `dustBps`
-> remain zero and lack Robinhood machine-facing representation. Nothing is
-> deployed, configured, active, or released. The deployment owner owns final
+> remain zero and lack Robinhood machine-facing representation. No non-CCIP
+> launch candidate is deployed, configured, active, or released. GREEN/RIPE
+> CCIP topology is separately confirmed live; see
+> [`ccip-live-state.md`](ccip-live-state.md). The deployment owner owns final
 > disposition and binding; the missing machine representation is not fixed by
 > this documentation refresh.
 
@@ -418,6 +420,11 @@ work rather than broad core-protocol redesign.
 
 ## Owner decision queue
 
+This queue is preserved as the 24 July decision sequence. Its CCIP question is
+resolved for current-state classification by the separately confirmed live
+topology; only the operational, evidence, further-transaction, and release
+gates in [`ccip-live-state.md`](ccip-live-state.md) remain open.
+
 The next owner discussion should answer these in order:
 
 1. **Deleverage cooldown — resolved:** zero cooldown and its lost pacing are
@@ -429,8 +436,8 @@ The next owner discussion should answer these in order:
 3. **Stock Token containment:** which changes are indispensable for safe
    launch, and which loss-allocation, bad-debt, reward, and migration features
    can be deferred with explicit risk acceptance?
-4. **CCIP:** is bridging required at launch, or may it be deferred if assisted
-   registration is unavailable?
+4. **CCIP — historical question, now superseded:** was bridging required at
+   launch, or could it be deferred if assisted registration was unavailable?
 5. **PSM and SavingsGreen:** omit, deploy disabled, or reuse unchanged?
 
 No production implementation should be inferred from answering a scope

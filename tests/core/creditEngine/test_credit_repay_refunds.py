@@ -1,5 +1,6 @@
 import boa
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+from conf_utils import filter_logs
 
 
 def test_repay_overpayment_with_green_refund(
@@ -431,6 +432,98 @@ def test_no_refund_when_exact_payment(
     
     # credit engine should be empty
     assert green_token.balanceOf(credit_engine) == 0
+
+
+def test_repay_amount_is_capped_by_credit_engine_balance(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+):
+    """The declared amount cannot make CreditEngine burn tokens it did not receive."""
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt, bob, False, sender=bob)
+
+    received = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(credit_engine, received, sender=bob)
+    assert credit_engine.repayForUser(
+        bob,
+        debt,
+        False,
+        bob,
+        sender=teller.address,
+    )
+
+    log = filter_logs(credit_engine, "RepayDebt")[0]
+    assert log.repayValue == received
+    assert log.refundAmount == 0
+    assert ledger.userDebt(bob).amount == debt - received
+    assert green_token.balanceOf(credit_engine) == 0
+
+
+def test_repay_amount_is_capped_by_declared_amount(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    credit_engine,
+    whale,
+):
+    """Unrelated GREEN already held by CreditEngine is not consumed or refunded."""
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt, bob, False, sender=bob)
+
+    held = 20 * EIGHTEEN_DECIMALS
+    declared = 10 * EIGHTEEN_DECIMALS
+    green_token.transfer(credit_engine, held, sender=whale)
+    assert credit_engine.repayForUser(
+        bob,
+        declared,
+        False,
+        bob,
+        sender=teller.address,
+    )
+
+    log = filter_logs(credit_engine, "RepayDebt")[0]
+    assert log.repayValue == declared
+    assert log.refundAmount == 0
+    assert ledger.userDebt(bob).amount == debt - declared
+    assert green_token.balanceOf(credit_engine) == held - declared
 
 
 def test_paying_with_savings_green_overpayment(

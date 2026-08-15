@@ -1,11 +1,18 @@
 # CCIP pool references
 
+> **Historical 1.6.1 design reference.** This directory is not live-source
+> provenance. The deployed Base and Robinhood pools report
+> `BurnMintTokenPool 1.5.1`; `solidity/src/RipeCcipBurnMintTokenPools.sol` is the
+> current repository candidate/reference, not proof of their exact creation
+> source. Current state and gates are in
+> [`../ccip-live-state.md`](../ccip-live-state.md).
+
 Status: **Independently reviewed reference — not production-ready or
 deployment-authorized**
 
 Last reviewed: 2026-07-27
 
-## Active thin-inheritance reference
+## Historical thin-inheritance reference
 
 [`RipeCcipBurnMintTokenPools.sol`](RipeCcipBurnMintTokenPools.sol) contains the
 selected GREEN and RIPE reference subclasses. It is not production-ready or
@@ -13,7 +20,7 @@ deployment-authorized. The Round-3 independent review is bound to source
 SHA-256
 `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
 see the
-[`review record`](../evidence/ccip-solidity-reference-round-3-review.md).
+`review record`.
 
 Each contract inherits Chainlink contracts-CCIP v1.6.1's concrete
 `BurnMintTokenPool`, passes through the standard five constructor arguments,

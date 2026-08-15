@@ -1,5 +1,7 @@
 import json
 import os
+import stat
+import tempfile
 
 
 def _reject_duplicate_pairs(pairs):
@@ -75,15 +77,47 @@ def load(filename):
     return file
 
 
-def save(filename, content={}):
-    # saves the json content to a file
+def save(filename, content=None):
+    """Crash-atomically replace one JSON file in its existing directory."""
 
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with open(filename, "w") as outfile:
-        json.dump(
-            content,
-            outfile,
-            indent=2,
-        )
+    if content is None:
+        content = {}
+    directory = os.path.dirname(filename) or "."
+    os.makedirs(directory, exist_ok=True)
+    payload = json.dumps(content, indent=2).encode("utf-8")
+    target_mode = 0o644
+    try:
+        target_mode = stat.S_IMODE(os.stat(filename).st_mode)
+    except FileNotFoundError:
+        pass
 
-    return outfile
+    fd, temporary = tempfile.mkstemp(
+        prefix=f".{os.path.basename(filename)}.",
+        suffix=".tmp",
+        dir=directory,
+    )
+    descriptor_open = True
+    try:
+        os.fchmod(fd, target_mode)
+        write_all(fd, payload)
+        os.fsync(fd)
+        os.close(fd)
+        descriptor_open = False
+        os.replace(temporary, filename)
+        temporary = None
+
+        directory_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if descriptor_open:
+            os.close(fd)
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+    return filename

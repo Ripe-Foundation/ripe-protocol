@@ -1,4 +1,5 @@
 import boa
+import pytest
 from eth_abi import encode
 from eth_utils import keccak
 
@@ -21,8 +22,8 @@ MAX_CLAIM_ASSET_MAINTENANCE = 15
 
 def test_deployed_runtime_fits_eip170(stability_pool):
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_371
-    assert 24_576 - len(runtime) == 205
+    assert len(runtime) == 24_313
+    assert 24_576 - len(runtime) == 263
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
@@ -736,36 +737,37 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     assert active_index != 0
     assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ACTIVE
 
-    # A configured feed reporting zero excludes the claim collateral from NAV
-    # without removing it from the active claim-asset set.
+    # An active claim liability cannot silently disappear from NAV. A zero
+    # price therefore blocks valuation and share-changing operations while the
+    # active registration and all accounting remain intact.
     mock_price_source.setPrice(bravo_token, 0)
-    known_value = total_value_before - ACTIVATION_THRESHOLD
-    assert stability_pool.getTotalValue(alpha_token) == known_value
-    assert stability_pool.getTotalUserValue(bob, alpha_token) == known_value
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
+    with boa.reverts():
+        stability_pool.getTotalUserValue(bob, alpha_token)
 
-    # Deposits and withdrawals remain live while the unavailable claim asset is
-    # temporarily valued at zero.
     with boa.env.anchor():
         alpha_token.transfer(
             stability_pool,
             EIGHTEEN_DECIMALS,
             sender=alpha_token_whale,
         )
-        assert stability_pool.depositTokensInVault(
-            alice,
-            alpha_token,
-            EIGHTEEN_DECIMALS,
-            sender=teller.address,
-        ) == EIGHTEEN_DECIMALS
-        withdrawn, is_user_depleted = stability_pool.withdrawTokensFromVault(
-            alice,
-            alpha_token,
-            EIGHTEEN_DECIMALS,
-            alice,
-            sender=teller.address,
-        )
-        assert EIGHTEEN_DECIMALS - 1 <= withdrawn <= EIGHTEEN_DECIMALS
-        assert is_user_depleted
+        with boa.reverts():
+            stability_pool.depositTokensInVault(
+                alice,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                sender=teller.address,
+            )
+        with boa.reverts():
+            stability_pool.withdrawTokensFromVault(
+                bob,
+                alpha_token,
+                EIGHTEEN_DECIMALS,
+                bob,
+                sender=teller.address,
+            )
+        assert stability_pool.userBalances(bob, alpha_token) == shares_before
 
     # Maintenance never removes or reclassifies an unpriced active pair,
     # whether the pool is paused or unpaused.
@@ -785,11 +787,12 @@ def test_active_zero_price_stays_registered_and_recovers_after_price_restore(
     assert stability_pool.userBalances(bob, alpha_token) == shares_before
 
     # Unpause has no oracle-specific state machine. Removing the feed entirely
-    # has the same zero-NAV treatment as a configured feed reporting zero.
+    # retains the same fail-closed valuation behavior.
     stability_pool.pause(False, sender=switchboard_alpha.address)
     assert not stability_pool.isPaused()
     mock_price_source.disablePriceFeed(bravo_token)
-    assert stability_pool.getTotalValue(alpha_token) == known_value
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
 
     # Restoring the feed puts the collateral back into NAV immediately; no
     # activation call or persistent recovery bookkeeping is required.
@@ -2447,3 +2450,1272 @@ def test_claim_data_model_tracks_redemption_reduction_and_green_addition(
         expected_active,
         expected_num_assets,
     )
+
+
+############################################################################
+# WP1 (Section 8.3/8.4): StabilityPool custody and price characterization
+#
+# Written against the bound RH baseline before any owner disposition of
+# RH-CHANGE-01. Plain PASSING tests pin the exact behavior that exists today;
+# strict-xfail tests are the Section 6.1(B) preserved checkpoints stating the
+# invariant the plan wants (SP-1, SP-6).
+############################################################################
+
+
+def test_direct_stability_pool_primitive_relies_on_auctionhouse_receipt_delta(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """DV-08 composition boundary (SV-1, SP-6).
+
+    StabVault._addClaimableBalance validates a settlement receipt against the
+    *aggregate* free surplus `custody - totalClaimableBalances`, not against a
+    delta measured across this transaction. Donating D up front and then
+    settling a liquidation that declares Q while transferring only Q - D leaves
+    the free surplus at exactly Q, so the short receipt is accepted and the
+    donation is silently consumed as liquidation proceeds when this unit test
+    impersonates AuctionHouse and calls the pool primitive directly.
+
+    Production liquidation does not expose that sequence: the authenticated
+    AuctionHouse measures the pool's claim-token balance immediately before and
+    after its collateral transfer and reverts unless the exact declared amount
+    arrived.  The cross-contract regression lives in
+    test_ah_liq_stab.py::test_stability_swap_rejects_donation_masked_short_receipt_from_shares_vault.
+    """
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    declared = 10 * EIGHTEEN_DECIMALS
+    donation = 3 * EIGHTEEN_DECIMALS
+    actually_sent = declared - donation
+
+    # Step 1: an unrelated party donates directly to the pool.
+    bravo_token.transfer(stability_pool, donation, sender=bravo_token_whale)
+    assert stability_pool.totalClaimableBalances(bravo_token) == 0
+    assert bravo_token.balanceOf(stability_pool) == donation
+
+    # Step 2: the authenticated AuctionHouse settles short ...
+    bravo_token.transfer(stability_pool, actually_sent, sender=bravo_token_whale)
+    # Step 3: ... but declares the full amount.
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        1,
+        bravo_token,
+        declared,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    # The declared amount was recorded even though only `actually_sent` arrived
+    # for this settlement. Custody exactly equals the recorded liability, so no
+    # later check can tell that the donation was consumed.
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == declared
+    assert stability_pool.totalClaimableBalances(bravo_token) == declared
+    assert bravo_token.balanceOf(stability_pool) == declared
+
+
+def test_short_stability_receipt_without_donation_still_reverts(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """DV-08 boundary: the existing aggregate guard works without a donation."""
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    declared = 10 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, declared - 1, sender=bravo_token_whale)
+    before = _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob])
+
+    with boa.reverts("short claim receipt"):
+        stability_pool.swapForLiquidatedCollateral(
+            alpha_token,
+            1,
+            bravo_token,
+            declared,
+            ZERO_ADDRESS,
+            alpha_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+
+    # Section 8.4: full atomic rollback of custody, shares, indexes, cap usage,
+    # and claim data -- not just the two liability mappings.
+    assert _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob]) == before
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == 0
+
+
+def test_active_claim_custody_deficit_fails_closed_for_value_extracting_actions(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """An active aggregate custody deficit freezes every NAV-moving path."""
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    claim_amount = 10 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        claim_amount,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    value_before = stability_pool.getTotalValue(alpha_token)
+    assert stability_pool.totalClaimableBalances(bravo_token) == claim_amount
+    assert bravo_token.balanceOf(stability_pool) == claim_amount
+
+    # Half the claim custody disappears (rebase/burn class of event).
+    burned = claim_amount // 2
+    bravo_token.burn(burned, sender=stability_pool.address)
+
+    assert bravo_token.balanceOf(stability_pool) == claim_amount - burned
+    # The recorded liability is untouched, but NAV can no longer be trusted.
+    assert stability_pool.totalClaimableBalances(bravo_token) == claim_amount
+    with boa.reverts("claim custody deficit"):
+        stability_pool.getTotalValue(alpha_token)
+
+    # A new deposit has already arrived in Teller custody; the vault must reject
+    # minting shares against the overstated NAV.
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    shares_before = stability_pool.totalBalances(alpha_token)
+    with boa.reverts("claim custody deficit"):
+        stability_pool.depositTokensInVault(
+            alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+        )
+    assert stability_pool.totalBalances(alpha_token) == shares_before
+    assert stability_pool.userBalances(alice, alpha_token) == 0
+
+    with boa.reverts("claim custody deficit"):
+        stability_pool.withdrawTokensFromVault(
+            bob, alpha_token, EIGHTEEN_DECIMALS, bob, sender=teller.address
+        )
+    assert stability_pool.totalClaimableBalances(bravo_token) == claim_amount
+    assert bravo_token.balanceOf(stability_pool) < stability_pool.totalClaimableBalances(
+        bravo_token
+    )
+    assert value_before > 0
+
+
+@pytest.mark.parametrize(
+    ("reserved", "claim_state"),
+    (
+        (20 * EIGHTEEN_DECIMALS, CLAIM_ASSET_ACTIVE),
+        (ACTIVATION_THRESHOLD - 1, CLAIM_ASSET_DORMANT),
+    ),
+    ids=("active_claim", "dormant_claim"),
+)
+def test_claim_reserve_cannot_be_reclassified_as_stability_backing(
+    reserved,
+    claim_state,
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """A claim token cannot later be admitted as a stability asset.
+
+    Alpha's cohort owns either an active or a sub-threshold dormant BRAVO
+    claim. A later BRAVO deposit is also the vault's attempted admission of
+    BRAVO as a stability asset; it must fail before shares can classify any of
+    the claim-reserved custody as backing. The dormant row proves admission is
+    gated by aggregate liability rather than only by the active-claim index.
+    """
+    _seed_stability_asset(
+        stability_pool,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        teller,
+        mock_price_source,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool,
+        alpha_token,
+        bravo_token,
+        bravo_token_whale,
+        reserved,
+        bob,
+        auction_house,
+        green_token,
+        savings_green,
+    )
+
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+    assert bravo_token.balanceOf(stability_pool) == reserved
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == claim_state
+    assert not stability_pool.isSupportedVaultAsset(bravo_token)
+
+    attempted_deposit = 10 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(
+        stability_pool,
+        attempted_deposit,
+        sender=bravo_token_whale,
+    )
+    with boa.reverts("asset reserved for claims"):
+        stability_pool.depositTokensInVault(
+            alice,
+            bravo_token,
+            attempted_deposit,
+            sender=teller.address,
+        )
+
+    assert not stability_pool.isSupportedVaultAsset(bravo_token)
+    assert stability_pool.totalBalances(bravo_token) == 0
+    assert stability_pool.userBalances(alice, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+    assert bravo_token.balanceOf(stability_pool) == reserved + attempted_deposit
+
+    # Alice never receives BRAVO shares and therefore cannot withdraw Alpha's
+    # reserved claim custody (or the unallocated attempted deposit).
+    with boa.reverts("user has no shares"):
+        stability_pool.withdrawTokensFromVault(
+            alice,
+            bravo_token,
+            MAX_UINT256,
+            alice,
+            sender=teller.address,
+        )
+    assert bravo_token.balanceOf(stability_pool) == reserved + attempted_deposit
+    assert stability_pool.totalClaimableBalances(bravo_token) == reserved
+
+
+# --------------------------------------------------------------------------
+# DV-09 hardening checkpoints, one independently executing node per action
+# --------------------------------------------------------------------------
+
+
+def _stab_state_snapshot(pool, stab_asset, claim_assets, users, include_values=True):
+    """Complete observable StabilityPool state.
+
+    Covers everything Section 8.4 requires to be unchanged after a failed
+    operation: stab and claim custody, global and per-user shares, the
+    claim-asset registry (arrays, indexes, active count), recorded liabilities,
+    per-pair claim data, and reported value.
+    """
+    state = {
+        "stab_custody": stab_asset.balanceOf(pool.address),
+        "total_shares": pool.totalBalances(stab_asset),
+        "num_vault_assets": pool.numAssets(),
+        "num_claimable_assets": pool.numClaimableAssets(stab_asset),
+        "num_active_claim_assets": pool.getNumActiveClaimAssets(stab_asset),
+        "is_paused": pool.isPaused(),
+        "total_value": pool.getTotalValue(stab_asset) if include_values else None,
+    }
+    for claim in claim_assets:
+        state[("claim", _asset_address(claim))] = (
+            claim.balanceOf(pool.address),
+            pool.claimableBalances(stab_asset, claim),
+            pool.totalClaimableBalances(claim),
+            pool.indexOfClaimableAsset(stab_asset, claim),
+            pool.getClaimAssetState(stab_asset, claim),
+        )
+    for i in range(1, MAX_ACTIVE_CLAIM_ASSETS + 1):
+        state[("claim_slot", i)] = pool.claimableAssets(stab_asset, i)
+    for user in users:
+        state[("user", user)] = (
+            pool.userBalances(user, stab_asset),
+            pool.getTotalUserValue(user, stab_asset) if include_values else None,
+            pool.numUserAssets(user),
+            pool.indexOfUserAsset(user, stab_asset),
+            stab_asset.balanceOf(user),
+        )
+    return state
+
+
+@pytest.fixture
+def deficit_pool(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+):
+    """A pool whose recorded claim liability exceeds real claim custody.
+
+    Half the bravo claim custody is burned after activation, leaving
+    totalClaimableBalances above balanceOf. Returns the recorded claim amount.
+    """
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    claim_amount = 10 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, claim_amount,
+        bob, auction_house, green_token, savings_green,
+    )
+    bravo_token.burn(claim_amount // 2, sender=stability_pool.address)
+    assert bravo_token.balanceOf(stability_pool) < stability_pool.totalClaimableBalances(
+        bravo_token
+    )
+    return claim_amount
+
+
+def test_active_claim_custody_deficit_blocks_deposit(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bob, alice,
+    teller, deficit_pool,
+):
+    """DV-09 hardening target, deposit half (SP-1, Section 11.1)."""
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob, alice], False
+    )
+    with boa.reverts("claim custody deficit"):
+        stability_pool.depositTokensInVault(
+            alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+        )
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob, alice], False
+    ) == before
+
+
+def test_active_claim_custody_deficit_blocks_withdrawal(
+    stability_pool, alpha_token, bravo_token, bob, teller, deficit_pool,
+):
+    """DV-09 hardening target, withdrawal half (SP-1, Section 11.1)."""
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    )
+    with boa.reverts("claim custody deficit"):
+        stability_pool.withdrawTokensFromVault(
+            bob, alpha_token, EIGHTEEN_DECIMALS, bob, sender=teller.address
+        )
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    ) == before
+
+
+def test_active_claim_custody_deficit_blocks_total_value(
+    stability_pool, alpha_token, deficit_pool,
+):
+    """DV-09 hardening target, valuation half (SP-1, Section 11.1).
+
+    Section 11.1 lists total pool value first: NAV must not keep valuing a
+    liability the pool cannot honour.
+    """
+    with boa.reverts("claim custody deficit"):
+        stability_pool.getTotalValue(alpha_token)
+
+
+def test_active_claim_custody_deficit_is_repaired_by_replenishment(
+    stability_pool, alpha_token, bravo_token, bravo_token_whale, bob, alice,
+    alpha_token_whale, teller, deficit_pool,
+):
+    """Section 11.1 repair half: direct replenishment restores normal operation.
+
+    A repair action may proceed only if it cannot worsen another user's
+    position. Replenishing the missing custody leaves every recorded liability
+    and every user's share balance untouched, and normal operations resume.
+    """
+    missing = stability_pool.totalClaimableBalances(bravo_token) - bravo_token.balanceOf(
+        stability_pool.address
+    )
+    assert missing > 0
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    pair_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    bob_shares_before = stability_pool.userBalances(bob, alpha_token)
+
+    bravo_token.transfer(stability_pool, missing, sender=bravo_token_whale)
+
+    assert bravo_token.balanceOf(stability_pool) == liability_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == pair_before
+    assert stability_pool.userBalances(bob, alpha_token) == bob_shares_before
+
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    assert stability_pool.depositTokensInVault(
+        alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+    ) == EIGHTEEN_DECIMALS
+
+
+############################################################################
+# WP1 (Section 8.4): StabilityPool token and custody matrix
+#
+# Every token behavior is an independently parametrized node. Two return-shape
+# doubles are declared inline because no repository mock produces them; per
+# Section 3.3 they are the smallest way to exercise the real contract path and
+# are deliberately not a framework.
+############################################################################
+
+# transfer(address,uint256) with no return data at all. Vyper's
+# default_return_value=True is supposed to accept this shape.
+NO_RETURN_TOKEN_SOURCE = """
+# @version 0.4.3
+
+event Transfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    value: uint256
+
+name: public(constant(String[32])) = "No Return Token"
+symbol: public(constant(String[32])) = "NORET"
+decimals: public(constant(uint8)) = 18
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+
+@deploy
+def __init__(_holder: address, _supply: uint256):
+    self.balanceOf[_holder] = _supply
+    self.totalSupply = _supply
+
+@external
+def mint(_to: address, _value: uint256):
+    self.balanceOf[_to] += _value
+    self.totalSupply += _value
+
+@external
+def transfer(_to: address, _value: uint256):
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] += _value
+    log Transfer(sender=msg.sender, receiver=_to, value=_value)
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256):
+    self.allowance[_from][msg.sender] -= _value
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] += _value
+    log Transfer(sender=_from, receiver=_to, value=_value)
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+"""
+
+# transfer(address,uint256) returning 64 bytes -- trailing/malformed return
+# data for a caller that expects a single bool.
+WIDE_RETURN_TOKEN_SOURCE = """
+# @version 0.4.3
+
+event Transfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    value: uint256
+
+name: public(constant(String[32])) = "Wide Return Token"
+symbol: public(constant(String[32])) = "WIDE"
+decimals: public(constant(uint8)) = 18
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+
+@deploy
+def __init__(_holder: address, _supply: uint256):
+    self.balanceOf[_holder] = _supply
+    self.totalSupply = _supply
+
+@external
+def mint(_to: address, _value: uint256):
+    self.balanceOf[_to] += _value
+    self.totalSupply += _value
+
+@external
+def transfer(_to: address, _value: uint256) -> (bool, bool):
+    self.balanceOf[msg.sender] -= _value
+    self.balanceOf[_to] += _value
+    log Transfer(sender=msg.sender, receiver=_to, value=_value)
+    return True, True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256) -> (bool, bool):
+    self.allowance[_from][msg.sender] -= _value
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] += _value
+    log Transfer(sender=_from, receiver=_to, value=_value)
+    return True, True
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _value
+    return True
+"""
+
+
+def _no_return_token(holder, supply):
+    return boa.loads(
+        NO_RETURN_TOKEN_SOURCE,
+        holder,
+        supply,
+        name="no_return_claim_token",
+        override_address=boa.env.generate_address(),
+    )
+
+
+def _wide_return_token(holder, supply):
+    return boa.loads(
+        WIDE_RETURN_TOKEN_SOURCE,
+        holder,
+        supply,
+        name="wide_return_claim_token",
+        override_address=boa.env.generate_address(),
+    )
+
+
+# ---- inbound settlement matrix -------------------------------------------
+
+
+def test_inbound_exact_settlement_records_exactly(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+):
+    """Section 8.4 row 1: exact transfer."""
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    declared = 10 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, declared,
+        bob, auction_house, green_token, savings_green,
+    )
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == declared
+    assert stability_pool.totalClaimableBalances(bravo_token) == declared
+    assert bravo_token.balanceOf(stability_pool) == declared
+
+
+def test_inbound_donation_plus_exact_settlement_leaves_donation_unallocated(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+):
+    """Section 8.4 row 2: pre-existing donation plus an exact transfer.
+
+    The donation must remain unallocated surplus -- custody above recorded
+    liability -- and must not be credited as liquidation receipt.
+    """
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    donation = 3 * EIGHTEEN_DECIMALS
+    declared = 10 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, donation, sender=bravo_token_whale)
+
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, declared,
+        bob, auction_house, green_token, savings_green,
+    )
+
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == declared
+    assert stability_pool.totalClaimableBalances(bravo_token) == declared
+    # Surplus is retained, not credited.
+    assert bravo_token.balanceOf(stability_pool) == declared + donation
+
+
+def test_inbound_fee_on_transfer_settlement_reverts_atomically(
+    stability_pool, alpha_token, alpha_token_whale, bob, governance, teller,
+    auction_house, mock_price_source, savings_green,
+):
+    """Section 8.4 row 4: inbound fee.
+
+    AuctionHouse declares the gross amount but a fee-on-transfer claim token
+    delivers less, so the aggregate free-surplus guard fires and the whole
+    settlement rolls back.
+    """
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source
+    )
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        5_00,  # 5% transfer fee
+        name="fee_claim_token",
+        override_address=boa.env.generate_address(),
+    )
+    mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+
+    declared = 10 * EIGHTEEN_DECIMALS
+    fee_token.transfer(stability_pool, declared, sender=governance.address)
+    assert fee_token.balanceOf(stability_pool) < declared
+
+    before = _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob])
+    with boa.reverts("short claim receipt"):
+        stability_pool.swapForLiquidatedCollateral(
+            alpha_token, 1, fee_token, declared, ZERO_ADDRESS, alpha_token,
+            savings_green, sender=auction_house.address,
+        )
+    assert _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob]) == before
+
+
+def test_upward_rebase_after_activation_is_not_credited_to_claim_liability(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+):
+    """Section 8.4 row 6: upward rebase after activation.
+
+    Extra custody arriving after activation is surplus: it must not inflate the
+    recorded liability or the pool's reported value.
+    """
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, mock_price_source
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    declared = 10 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, declared,
+        bob, auction_house, green_token, savings_green,
+    )
+    value_before = stability_pool.getTotalValue(alpha_token)
+
+    bravo_token.transfer(stability_pool, 5 * EIGHTEEN_DECIMALS, sender=bravo_token_whale)
+
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == declared
+    assert stability_pool.totalClaimableBalances(bravo_token) == declared
+    assert stability_pool.getTotalValue(alpha_token) == value_before
+
+
+# ---- outbound claim-delivery matrix ---------------------------------------
+
+
+def _setup_outbound_claim(
+    stability_pool, alpha_token, alpha_token_whale, bob, teller, auction_house,
+    mock_price_source, savings_green, setGeneralConfig, setAssetConfig, vault_book,
+    claim_token, claim_holder, declared,
+):
+    """Seed a pool and record `declared` of `claim_token` as claimable."""
+    setGeneralConfig()
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(claim_token, EIGHTEEN_DECIMALS)
+    setAssetConfig(claim_token)
+    claim_token.transfer(stability_pool, declared, sender=claim_holder)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, 1, claim_token, declared, ZERO_ADDRESS, alpha_token,
+        savings_green, sender=auction_house.address,
+    )
+    assert stability_pool.claimableBalances(alpha_token, claim_token) == declared
+    return vault_book.getRegId(stability_pool)
+
+
+def test_outbound_exact_delivery_reduces_liability_exactly(
+    stability_pool, alpha_token, alpha_token_whale, bravo_token, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, savings_green,
+    setGeneralConfig, setAssetConfig, vault_book,
+):
+    """Section 8.4 outbound row 1: exact transfer out."""
+    declared = 10 * EIGHTEEN_DECIMALS
+    vault_id = _setup_outbound_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, auction_house,
+        mock_price_source, savings_green, setGeneralConfig, setAssetConfig,
+        vault_book, bravo_token, bravo_token_whale, declared,
+    )
+    recipient_before = bravo_token.balanceOf(bob)
+
+    claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+
+    delivered = bravo_token.balanceOf(bob) - recipient_before
+    assert delivered == declared
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == 0
+
+
+@pytest.mark.parametrize("failure_mode", ("return_false", "revert"))
+def test_outbound_failing_delivery_rolls_back_the_whole_claim(
+    failure_mode,
+    stability_pool, alpha_token, alpha_token_whale, bob, governance, teller,
+    auction_house, mock_price_source, savings_green, setGeneralConfig,
+    setAssetConfig, vault_book,
+):
+    """Section 8.4 outbound rows: false return and revert.
+
+    SP-4: a failed outbound transfer must roll the share burn back completely.
+    """
+    declared = 10 * EIGHTEEN_DECIMALS
+    probe = boa.load(
+        "contracts/mock/MockProbeErc20.vy",
+        governance,
+        1_000 * EIGHTEEN_DECIMALS,
+        name=f"probe_claim_token_{failure_mode}",
+        override_address=boa.env.generate_address(),
+    )
+    vault_id = _setup_outbound_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, auction_house,
+        mock_price_source, savings_green, setGeneralConfig, setAssetConfig,
+        vault_book, probe, governance.address, declared,
+    )
+
+    if failure_mode == "return_false":
+        probe.setReturnFalse(True, sender=governance.address)
+    else:
+        probe.setRevertTransfers(True, sender=governance.address)
+
+    before = _stab_state_snapshot(stability_pool, alpha_token, [probe], [bob])
+    with boa.reverts():
+        claim_from_stability_pool(teller, vault_id, alpha_token, probe, sender=bob)
+    assert _stab_state_snapshot(stability_pool, alpha_token, [probe], [bob]) == before
+
+
+@pytest.mark.parametrize("return_shape", ("no_return_data", "wide_return_data"))
+def test_outbound_nonstandard_return_shape_delivery(
+    return_shape,
+    stability_pool, alpha_token, alpha_token_whale, bob, governance, teller,
+    auction_house, mock_price_source, savings_green, setGeneralConfig,
+    setAssetConfig, vault_book,
+):
+    """Section 8.4 outbound rows: no return data and trailing return data.
+
+    Characterizes the exact bound behavior rather than asserting a policy.
+    Measured on the bound tree: Vyper's `default_return_value=True` accepts an
+    empty return, and a 64-byte return for a bool-typed call is *also* accepted
+    -- the decoder reads the first word and does not reject the trailing data.
+    Both shapes therefore deliver normally. The protocol does not fail closed on
+    non-canonical return data; it simply is not misled by it (SP-6).
+    """
+    declared = 10 * EIGHTEEN_DECIMALS
+    supply = 1_000 * EIGHTEEN_DECIMALS
+    token = (
+        _no_return_token(governance.address, supply)
+        if return_shape == "no_return_data"
+        else _wide_return_token(governance.address, supply)
+    )
+    vault_id = _setup_outbound_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, auction_house,
+        mock_price_source, savings_green, setGeneralConfig, setAssetConfig,
+        vault_book, token, governance.address, declared,
+    )
+    before = _stab_state_snapshot(stability_pool, alpha_token, [token], [bob])
+    recipient_before = token.balanceOf(bob)
+
+    claim_from_stability_pool(teller, vault_id, alpha_token, token, sender=bob)
+
+    # Both shapes deliver the exact amount and clear the liability exactly, so
+    # no phantom value is created and no deficit is concealed.
+    assert token.balanceOf(bob) - recipient_before == declared
+    assert stability_pool.claimableBalances(alpha_token, token) == 0
+    assert stability_pool.totalClaimableBalances(token) == 0
+    assert token.balanceOf(stability_pool.address) == 0
+    assert before[("claim", _asset_address(token))][1] == declared
+
+
+def test_outbound_fee_on_transfer_short_delivery_reverts_atomically(
+    stability_pool, alpha_token, alpha_token_whale, bob, governance, teller,
+    auction_house, mock_price_source, savings_green, setGeneralConfig,
+    setAssetConfig, vault_book,
+):
+    """A fee-on-transfer claim cannot burn shares or recorded liability."""
+    declared = 10 * EIGHTEEN_DECIMALS
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        0,  # no fee during settlement, so the receipt guard is satisfied
+        name="outbound_fee_claim_token",
+        override_address=boa.env.generate_address(),
+    )
+    vault_id = _setup_outbound_claim(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller, auction_house,
+        mock_price_source, savings_green, setGeneralConfig, setAssetConfig,
+        vault_book, fee_token, governance.address, declared,
+    )
+
+    # Turn the fee on only for the outbound leg.
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    before = _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob])
+
+    with boa.reverts():
+        claim_from_stability_pool(teller, vault_id, alpha_token, fee_token, sender=bob)
+    assert _stab_state_snapshot(stability_pool, alpha_token, [fee_token], [bob]) == before
+
+
+def test_outbound_fee_on_transfer_stability_asset_does_not_burn_shares(
+    stability_pool, governance, bob, teller, mock_price_source,
+):
+    """The exact-delivery invariant also covers ordinary pool withdrawals."""
+    amount = 100 * EIGHTEEN_DECIMALS
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance,
+        0,
+        name="fee_stability_asset",
+        override_address=boa.env.generate_address(),
+    )
+    _seed_stability_asset(
+        stability_pool, fee_token, governance.address, bob, teller,
+        mock_price_source, amount,
+    )
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    before = (
+        fee_token.balanceOf(stability_pool),
+        fee_token.balanceOf(bob),
+        stability_pool.userBalances(bob, fee_token),
+        stability_pool.totalBalances(fee_token),
+    )
+
+    with boa.reverts():
+        stability_pool.withdrawTokensFromVault(
+            bob, fee_token, amount, bob, sender=teller.address
+        )
+
+    assert (
+        fee_token.balanceOf(stability_pool),
+        fee_token.balanceOf(bob),
+        stability_pool.userBalances(bob, fee_token),
+        stability_pool.totalBalances(fee_token),
+    ) == before
+
+
+############################################################################
+# WP5 (Section 12.1) / DV-14: the PriceDesk boundary, per price state
+#
+# SP-PRICE-01 is option A on the bound baseline, so these are characterizations
+# of the exact result each price state produces. Section 12.2 requires source
+# revert, malformed response, and unexpected call failure to remain atomic
+# failures unless the approved policy explicitly classifies them as zero -- so
+# the source-revert row is a checkpoint, not an accepted behavior.
+############################################################################
+
+# (price state, applies it, expected NAV outcome on the bound tree)
+PRICE_STATES = ("valid", "zero", "absent_feed", "source_revert")
+
+
+def _apply_price_state(mock_price_source, asset, state):
+    if state == "valid":
+        mock_price_source.setPrice(asset, EIGHTEEN_DECIMALS)
+    elif state == "zero":
+        mock_price_source.setPrice(asset, 0)
+    elif state == "absent_feed":
+        mock_price_source.disablePriceFeed(asset)
+    elif state == "source_revert":
+        mock_price_source.setShouldRevert(asset, True)
+    else:  # pragma: no cover
+        raise AssertionError(state)
+
+
+@pytest.fixture
+def priced_claim_pool(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+    setGeneralConfig, setAssetConfig,
+):
+    """100 alpha deposited by bob, 20 bravo recorded as an active claim asset."""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    claim_amount = 20 * EIGHTEEN_DECIMALS
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, claim_amount,
+        bob, auction_house, green_token, savings_green,
+    )
+    return claim_amount
+
+
+@pytest.mark.parametrize("state", PRICE_STATES)
+def test_claim_asset_price_state_nav_outcome(
+    state, stability_pool, alpha_token, bravo_token, mock_price_source,
+    priced_claim_pool,
+):
+    """Every unavailable-price state fails closed while a claim is active."""
+    priced_nav = stability_pool.getTotalValue(alpha_token)
+    stab_custody = alpha_token.balanceOf(stability_pool.address)
+    assert priced_nav == stab_custody + priced_claim_pool
+
+    _apply_price_state(mock_price_source, bravo_token, state)
+
+    if state == "valid":
+        assert stability_pool.getTotalValue(alpha_token) == priced_nav
+    else:
+        with boa.reverts():
+            stability_pool.getTotalValue(alpha_token)
+
+
+@pytest.mark.parametrize(
+    "action", ("total_value", "user_value", "deposit", "withdraw", "claim", "prune")
+)
+def test_reverting_price_source_takes_down_every_nav_dependent_action(
+    action, stability_pool, alpha_token, bravo_token, alpha_token_whale, bob, alice,
+    teller, mock_price_source, vault_book, priced_claim_pool,
+):
+    """DV-14 characterization (SP-3, Section 12.1) across the affected methods.
+
+    A single reverting price source is not a "zero price"; it is a hard
+    liveness failure for every path that touches NAV, including the deposits
+    and withdrawals that SP-PRICE-01 option A is supposed to keep available.
+    """
+    vault_id = vault_book.getRegId(stability_pool)
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    mock_price_source.setShouldRevert(bravo_token, True)
+
+    if action == "prune":
+        # Pruning reads the claim price too, so it also fails closed.
+        with boa.reverts():
+            stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=alice)
+        return
+
+    with boa.reverts():
+        if action == "total_value":
+            stability_pool.getTotalValue(alpha_token)
+        elif action == "user_value":
+            stability_pool.getTotalUserValue(bob, alpha_token)
+        elif action == "deposit":
+            stability_pool.depositTokensInVault(
+                alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+            )
+        elif action == "withdraw":
+            stability_pool.withdrawTokensFromVault(
+                bob, alpha_token, EIGHTEEN_DECIMALS, bob, sender=teller.address
+            )
+        else:
+            claim_from_stability_pool(
+                teller, vault_id, alpha_token, bravo_token, sender=bob
+            )
+
+
+def test_reverting_price_source_is_fully_atomic_and_recovers(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bob, alice, teller,
+    mock_price_source, priced_claim_pool,
+):
+    """Section 12.2: a source failure must leave no partial state behind."""
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    before = _stab_state_snapshot(stability_pool, alpha_token, [bravo_token], [bob, alice])
+
+    mock_price_source.setShouldRevert(bravo_token, True)
+    with boa.reverts():
+        stability_pool.depositTokensInVault(
+            alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+        )
+    mock_price_source.setShouldRevert(bravo_token, False)
+
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob, alice]
+    ) == before
+    # Normal operation resumes once the source recovers.
+    assert stability_pool.depositTokensInVault(
+        alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+    ) == EIGHTEEN_DECIMALS
+
+
+@pytest.mark.parametrize("state", ("zero", "absent_feed", "source_revert"))
+@pytest.mark.parametrize("action", ("deposit", "withdraw"))
+def test_unavailable_claim_price_blocks_deposits_and_withdrawals(
+    state, action, stability_pool, alpha_token, bravo_token, alpha_token_whale,
+    bob, alice, teller, mock_price_source, priced_claim_pool,
+):
+    """Cohort shares cannot move while an active claim cannot be priced."""
+    alpha_token.transfer(stability_pool, EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    _apply_price_state(mock_price_source, bravo_token, state)
+
+    with boa.reverts():
+        if action == "deposit":
+            stability_pool.depositTokensInVault(
+                alice, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address
+            )
+        else:
+            stability_pool.withdrawTokensFromVault(
+                bob, alpha_token, EIGHTEEN_DECIMALS, bob, sender=teller.address
+            )
+
+
+# ---- Section 8.3 remaining zero-price transitions -------------------------
+
+
+@pytest.mark.parametrize("portion", ("partial", "full"))
+def test_withdrawal_during_zero_price_outage_reverts_without_abandoning_claims(
+    portion, stability_pool, alpha_token, bravo_token, alpha_token_whale, bob,
+    teller, mock_price_source, priced_claim_pool,
+):
+    """Partial and full exits fail closed until the active claim is priced."""
+    stab_custody = alpha_token.balanceOf(stability_pool.address)
+
+    mock_price_source.setPrice(bravo_token, 0)
+    amount = stab_custody if portion == "full" else stab_custody // 4
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    )
+    with boa.reverts():
+        stability_pool.withdrawTokensFromVault(
+            bob, alpha_token, amount, bob, sender=teller.address
+        )
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    ) == before
+
+
+def test_claim_and_redemption_resume_exactly_after_price_restoration(
+    stability_pool, alpha_token, bravo_token, bob, teller, mock_price_source,
+    vault_book, priced_claim_pool,
+):
+    """Section 8.3: claim before, during, and after the outage.
+
+    Before the outage the claim works; during it the claim path fails closed
+    (its amount resolution uses _shouldRaise=True); after restoration it works
+    again and delivers exactly the recorded balance.
+    """
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # During the outage the claim fails closed and changes nothing.
+    mock_price_source.setPrice(bravo_token, 0)
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    )
+    with boa.reverts():
+        claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], False
+    ) == before
+
+    # After restoration the claim succeeds and delivers exactly.
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    recipient_before = bravo_token.balanceOf(bob)
+    claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+
+    assert bravo_token.balanceOf(bob) - recipient_before == priced_claim_pool
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == 0
+
+
+def test_zero_price_at_the_maximum_active_claim_asset_count(
+    stability_pool, alpha_token, alpha_token_whale, bob, alice, governance, teller,
+    auction_house, mock_price_source, green_token, savings_green,
+):
+    """A zero price at the active cap freezes NAV without mutating the registry."""
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS + MAX_ACTIVE_CLAIM_ASSETS,
+    )
+    per_asset = ACTIVATION_THRESHOLD + EIGHTEEN_DECIMALS
+    claim_tokens = [
+        _deploy_claim_token(governance, alice, 4_100 + i, per_asset)
+        for i in range(MAX_ACTIVE_CLAIM_ASSETS)
+    ]
+    for token in claim_tokens:
+        mock_price_source.setPrice(token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool, alpha_token, token, alice, per_asset, bob,
+            auction_house, green_token, savings_green,
+        )
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS
+
+    full_nav = stability_pool.getTotalValue(alpha_token)
+    target = claim_tokens[MAX_ACTIVE_CLAIM_ASSETS // 2]
+    index_before = stability_pool.indexOfClaimableAsset(alpha_token, target)
+
+    mock_price_source.setPrice(target, 0)
+
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == MAX_ACTIVE_CLAIM_ASSETS
+    assert stability_pool.indexOfClaimableAsset(alpha_token, target) == index_before
+    assert stability_pool.getClaimAssetState(alpha_token, target) == CLAIM_ASSET_ACTIVE
+
+    mock_price_source.setPrice(target, EIGHTEEN_DECIMALS)
+    assert stability_pool.getTotalValue(alpha_token) == full_nav
+
+
+# ---- Section 11.4: dormant-only dust exit liveness -------------------------
+
+
+@pytest.mark.parametrize(
+    ("label", "dust"),
+    (
+        ("below_activation", ACTIVATION_THRESHOLD - 1),
+        ("at_retention", RETENTION_THRESHOLD),
+        ("below_retention", RETENTION_THRESHOLD - 1),
+    ),
+    ids=("below_activation", "at_retention", "below_retention"),
+)
+def test_dormant_dust_is_claimable_before_exit_but_stranded_after(
+    label, dust, stability_pool, alpha_token, bravo_token, alpha_token_whale,
+    bravo_token_whale, bob, teller, auction_house, mock_price_source, green_token,
+    savings_green, vault_book, setGeneralConfig, setAssetConfig,
+):
+    """DV-15 characterization (SP-5, Section 11.4).
+
+    A below-activation claim balance stays dormant: it is recorded in
+    claimableBalances but never enters the iterable active set, so it is
+    invisible to NAV. _claimFromStabilityPool reads claimableBalances directly,
+    so the holder CAN take it out -- but only while they still hold stability
+    shares. A full exit burns those shares, and the dust is then unreachable by
+    its economic owner and can only be revived by someone else's liquidation
+    topping the same pair over the activation threshold.
+    """
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, dust, bob,
+        auction_house, green_token, savings_green,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Dormant: recorded, but not active and not in NAV.
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == dust
+    assert stability_pool.getNumActiveClaimAssets(alpha_token) == 0
+    assert stability_pool.getTotalValue(alpha_token) == alpha_token.balanceOf(
+        stability_pool.address
+    )
+
+    # While bob still holds shares the dust is reachable.
+    with boa.env.anchor():
+        recipient_before = bravo_token.balanceOf(bob)
+        claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+        assert bravo_token.balanceOf(bob) - recipient_before == dust
+        assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+
+    # After a full exit the same dust is stranded.
+    stability_pool.withdrawTokensFromVault(
+        bob, alpha_token, MAX_UINT256, bob, sender=teller.address
+    )
+    assert stability_pool.userBalances(bob, alpha_token) == 0
+    assert stability_pool.claimableBalances(alpha_token, bravo_token) == dust
+    assert bravo_token.balanceOf(stability_pool.address) == dust
+
+    with boa.reverts("nothing claimed"):
+        claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="DV-15: a dormant-only dust balance has no exit path after the owner's "
+    "stability shares are burned; the Section 11.4 rule is gated on RH-CHANGE-01",
+)
+def test_dormant_dust_remains_recoverable_after_full_exit(
+    stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
+    bob, teller, auction_house, mock_price_source, green_token, savings_green,
+    vault_book, setGeneralConfig, setAssetConfig,
+):
+    """DV-15 hardening target (Section 11.4).
+
+    The user must have a defined way to recover every economically owned
+    balance without relying on a future liquidation by someone else.
+    """
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    _seed_stability_asset(
+        stability_pool, alpha_token, alpha_token_whale, bob, teller,
+        mock_price_source, 100 * EIGHTEEN_DECIMALS,
+    )
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    dust = ACTIVATION_THRESHOLD - 1
+    _record_claim(
+        stability_pool, alpha_token, bravo_token, bravo_token_whale, dust, bob,
+        auction_house, green_token, savings_green,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+
+    stability_pool.withdrawTokensFromVault(
+        bob, alpha_token, MAX_UINT256, bob, sender=teller.address
+    )
+    recipient_before = bravo_token.balanceOf(bob)
+    claim_from_stability_pool(teller, vault_id, alpha_token, bravo_token, sender=bob)
+    assert bravo_token.balanceOf(bob) - recipient_before == dust
+
+
+def test_redemption_fails_closed_during_outage_and_resumes_after_restoration(
+    stability_pool, alpha_token, bravo_token, bob, whale, teller, green_token,
+    mock_price_source, vault_book, priced_claim_pool,
+):
+    """Section 8.3: redemption before, during, and after a zero-price outage."""
+    vault_id = vault_book.getRegId(stability_pool)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    redeem_amount = 5 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount * 2, sender=whale)
+    green_token.approve(teller, redeem_amount * 2, sender=bob)
+
+    # During the outage the redemption fails closed and changes nothing.
+    mock_price_source.setPrice(bravo_token, 0)
+    with boa.reverts():
+        stability_pool.getTotalValue(alpha_token)
+    before = _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], include_values=False
+    )
+    with boa.reverts():
+        redeem_from_stability_pool(
+            teller, vault_id, bravo_token, redeem_amount, bob, sender=bob
+        )
+    assert _stab_state_snapshot(
+        stability_pool, alpha_token, [bravo_token], [bob], include_values=False
+    ) == before
+
+    # After restoration it succeeds and reduces the recorded liability exactly.
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    liability_before = stability_pool.totalClaimableBalances(bravo_token)
+    recipient_before = bravo_token.balanceOf(bob)
+
+    redeem_from_stability_pool(
+        teller, vault_id, bravo_token, redeem_amount, bob, sender=bob
+    )
+
+    delivered = bravo_token.balanceOf(bob) - recipient_before
+    assert delivered != 0
+    assert stability_pool.totalClaimableBalances(bravo_token) == liability_before - delivered

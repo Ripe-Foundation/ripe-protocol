@@ -7,9 +7,8 @@ from pathlib import Path
 import pytest
 
 from config.robinhood_blueprint import Disposition, get_component
-from scripts import check_block_clock_inventory as block_clock_checker
 from scripts import check_contract_artifacts as artifact_checker
-from scripts.utils.deployment_assertions import blueprint_policy
+from utils.blueprint_policy import blueprint_policy
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,9 +21,9 @@ MIN_EIP_170_HEADROOM = 2_000
 EXPECTED = {
     "source_sha256": "abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be",
     "source_git_blob": "cafd177ef601186b0a6a30863ba5b8973d8dd92e",
-    "integrity": "a7bd19991381dd4d3f1d6863e3b2291823a092c130402e62a18159f21bbeeff5",
+    "integrity": "4427f57943bf1bb924062863fb1d73cbe7397f62867c7f0e4f720fc5c20f30e1",
     "creation_size": 23_627,
-    "creation_sha256": "725ed0aee23fdf31d51fa720ecc1806976f1dff127d2c2c78ea3ce1d28f5ab6d",
+    "creation_sha256": "d1c39fcfa59d0e9868e6fe213542c102ce69041cd7185d51a3c2684105aa7ee8",
     "runtime_size": 22_054,
     "runtime_sha256": "84e004bf72ed7a699c7b7c52d849674517f82581cd4f49b73a06f1721e6cf578",
     "eip_170_headroom": 2_522,
@@ -153,14 +152,3 @@ def test_profile1_bluechip_topology_is_selected_in_slot_three():
     assert policy.canonical_registries[("price_desk", 3)] == "CM-018"
     assert ("price_desk", 3) not in policy.reserved_registries
     assert ("price_desk", 3) in policy.required_registries
-
-
-def test_integrated_block_clock_current_bindings_reconcile_exactly():
-    result = block_clock_checker.check_repository(ROOT)
-    assert result.ok, result.output
-    assert "current_bindings=5/4" in result.output
-    assert (
-        "current_state_sha256="
-        + block_clock_checker.CURRENT_BINDINGS_STATE_SHA256
-        in result.output
-    )

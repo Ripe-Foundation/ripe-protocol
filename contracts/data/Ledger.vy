@@ -316,13 +316,6 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
     self._removeVaultFromUser(_user, _vaultId)
 
 
-@external
-def removeVaultFromUserForMigration(_user: address, _vaultId: uint256):
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert not deptBasics.isPaused # dev: not activated
-    self._removeVaultFromUser(_user, _vaultId)
-
-
 @internal
 def _removeVaultFromUser(_user: address, _vaultId: uint256):
 

@@ -24,7 +24,7 @@ from config.robinhood_blueprint import (
     get_symbolic_input,
     validate_blueprint,
 )
-from scripts.utils.deployment_assertions import (
+from utils.blueprint_policy import (
     blueprint_policy,
     blueprint_registry_map as registry_map,
 )
@@ -334,7 +334,7 @@ def test_unselected_oracles_are_unreachable_and_bluechip_source_is_selected():
     assert ("price_desk", 3) in policy.required_registries
 
 
-def test_ccip_capability_withheld_until_complete():
+def test_ccip_capability_is_live_while_operational_gates_remain_explicit():
     surfaces = surface_map()
     promotion = get_promotion("P-CCIP-SEVEN-DAY")
     assert promotion.surface_ids == (
@@ -345,13 +345,14 @@ def test_ccip_capability_withheld_until_complete():
         "S-053-REGISTRATION",
         "S-058-TOOLCHAIN",
     )
-    assert promotion.disposition is Disposition.DEFERRED
+    assert promotion.disposition is Disposition.REQUIRED
+    assert promotion.promotion_phase is LifecyclePhase.DEPLOYED_INITIAL_VALUE
     for surface_id in ("S-001-CCIP-CAP", "S-002-CCIP-CAP"):
-        assert surfaces[surface_id].disposition is Disposition.DISABLED
+        assert surfaces[surface_id].disposition is Disposition.REQUIRED
         assert surfaces[surface_id].lifecycle_phase is (
-            LifecyclePhase.WITHIN_SEVEN_DAY_SEPARATELY_REVIEWED_CCIP_PROMOTION
+            LifecyclePhase.DEPLOYED_INITIAL_VALUE
         )
-        assert "continuously" in surfaces[surface_id].semantic_meaning
+        assert "confirmed live" in surfaces[surface_id].semantic_meaning
     assert_code(
         "H03_PROMOTION_SET",
         replace(
@@ -369,10 +370,10 @@ def test_ccip_capability_withheld_until_complete():
 def test_registry_semantic_ids_cannot_shift():
     topology = registry_map()
     assert topology[(RegistryDomain.RIPE_HQ, 23)].semantic_name == (
-        "GREEN CCIP BurnMint pool"
+        "RIPE CCIP BurnMint pool"
     )
     assert topology[(RegistryDomain.RIPE_HQ, 24)].semantic_name == (
-        "RIPE CCIP BurnMint pool"
+        "GREEN CCIP BurnMint pool"
     )
     assert all(
         topology[(RegistryDomain.RIPE_HQ, value)].authority

@@ -1,20 +1,31 @@
+from pathlib import Path
+
+import boa
 import boa.deployments
 import click
-import boa
+from boa.rpc import EthereumRPC
 
+from config.network_profiles import (
+    NETWORK_PROFILE_IDS,
+    NetworkProfileError,
+    Operation,
+    get_profile,
+    repository_paths,
+    resolve_rpc_reference,
+    validate_fork_request,
+    validate_verified_identity,
+    verify_chain_identity,
+)
 from scripts.utils import log
 from scripts.utils.migration_helpers import get_account, load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
-from boa.environment import Env
-# from scripts.utils.safe_account import SafeAccount
-# from scripts.utils.ledger_account import LedgerAccount
 from scripts.utils.mock_account import MockAccount
 import os
 
 
-MIGRATION_SCRIPTS_DIR = "./migrations"
-MIGRATION_HISTORY_DIR = "./migration_history"
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def _load_dotenv() -> None:
     """Read .env so the RPC and keys need not be exported by hand.
@@ -35,67 +46,59 @@ def _load_dotenv() -> None:
     load_dotenv(override=False)
 
 
-def _redact_rpc(url: str) -> str:
-    """Reduce a provider URL to scheme and host.
-
-    Everything after the host is dropped: Alchemy and friends put the key in
-    the path, and some providers use a query parameter.
-    """
-    if not url or "://" not in url:
-        return url or "<unset>"
-    scheme, _, rest = url.partition("://")
-    host = rest.split("/", 1)[0].split("?", 1)[0]
-    return f"{scheme}://{host}/<redacted>"
+def read_chain_id(rpc_url: str) -> int | str:
+    """Read the identity directly from the selected endpoint before signing."""
+    return EthereumRPC(rpc_url).fetch("eth_chainId", [])
 
 
-def _rpc_from_env(chain):
-    """Per-chain RPC override, e.g. ROBINHOOD_MAINNET_RPC_URL."""
-    return os.environ.get(f"{chain.replace('-', '_').upper()}_RPC_URL")
-
-
-def _local_account(account_name):
-    """Load the deployer key from {ACCOUNT}_PRIVATE_KEY, e.g. DEPLOYER.
-
-    scripts.utils.migration_helpers.get_account now requires a verified
-    network identity for the H-02 path, so this keeps the plain key route
-    without changing a helper that other callers depend on. There is no
-    fallback test key: deploying from a well-known key is never what anyone
-    wants, and a missing key should say so rather than pick one.
-    """
-    from eth_account import Account
-
-    log.h1(f"Connecting to deployer account {account_name}")
-    key = os.environ.get(f"{account_name}_PRIVATE_KEY")
-    if not key:
-        raise click.ClickException(
-            f"{account_name}_PRIVATE_KEY is not set. Export it, put it in "
-            ".env, or pass --ledger <index> to sign with a device."
+def _require_backend(profile, operation, identity, backend_id):
+    """Validate a signer choice before constructing or touching the signer."""
+    validate_verified_identity(
+        profile, operation, identity, require_account=True
+    )
+    if (
+        operation is Operation.MIGRATION_LIVE
+        and backend_id not in profile.live_account_backend_ids
+    ):
+        raise NetworkProfileError(
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
         )
-    account = Account.from_key(key)
-    log.h2(f"Deployer account {account_name} connected")
-    return account
 
 
 CLICK_PROMPTS = {
     "safe": {
         "prompt": "What is the safe address?",
         "default": "",
-        "help": "Safe address to use for the migration. Defaults to ``.",
+        "help": (
+            "Fork-only Safe address to impersonate. Live Safe proposal "
+            "submission is not implemented and fails closed."
+        ),
     },
     "rpc": {
         "prompt": "What is the desired rpc?",
-        "default": "",
-        "help": "RPC url for the chain to deploy to. Defaults to ``.",
+        "default": None,
+        "help": (
+            "Sensitive RPC URL override. If omitted, use the selected "
+            "profile's named RPC environment variable."
+        ),
     },
     "environment": {
         "prompt": "Inform the environment name",
-        "default": "v1",
-        "help": f"Environment of manifests that are written and read by migration scripts to pass state from previous migrations. Defaults to `dev`.",
+        "default": None,
+        "help": (
+            "Optional compatibility assertion; it must equal the "
+            "profile-owned history namespace."
+        ),
     },
     "start_timestamp": {
         "prompt": "Start timestamp",
-        "default": "0",
-        "help": "Timestamp at which to start running migrations. If none is provided, the timestamp of the first manifest is used.",
+        "default": None,
+        "help": (
+            "Explicit first migration timestamp. If omitted, resume strictly "
+            "after the latest numeric manifest checkpoint."
+        ),
     },
     "single": {
         "prompt": "Is single migration?",
@@ -104,22 +107,25 @@ CLICK_PROMPTS = {
     },
     "end_timestamp": {
         "prompt": "End timestamp",
-        "default": "0",
-        "help": "Last timestamp migration that will run. If none is provided, the timestamp of the most recent manifest is used.",
+        "default": None,
+        "help": "Optional last migration timestamp (inclusive).",
         "depends": {
             "single": False
         }
     },
     "blueprint": {
         "prompt": "Blueprint",
-        "default": "base",
-        "help": "Blueprint to use for the migration. Defaults to ``.",
+        "default": None,
+        "help": (
+            "Optional compatibility assertion. The profile-owned blueprint "
+            "is always used."
+        ),
     },
     "chain": {
-        "prompt": "Chain name",
+        "prompt": "Network profile",
         "default": "base-mainnet",
-        "help": "Chain name for custom configuration on the deployment (ex: eth-mainnet, eth-sepolia, base-mainnet, base-sepolia).  Defaults to `local`",
-        "type": click.Choice(["local", "base-mainnet", "base-sepolia", "eth-sepolia", "eth-mainnet", "robinhood-mainnet", "robinhood-testnet"], case_sensitive=False),
+        "help": "Canonical network profile. Defaults to `base-mainnet`.",
+        "type": click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
 
     },
     "account": {
@@ -128,8 +134,11 @@ CLICK_PROMPTS = {
         "help": "Account name for deployment. Defaults to `DEPLOYER`"
     },
     "is_retry": {
-        "prompt": "Ignore current logs (always run transactions)?",
-        "help": "Ignore previous log files",
+        "prompt": "Force replay despite prior transaction logs?",
+        "help": (
+            "Dangerous explicit replay mode: ignore the selected migration's "
+            "transaction log and execute its calls again."
+        ),
         "default": False,
     },
     "manifest": {
@@ -144,7 +153,7 @@ CLICK_PROMPTS = {
 # it is needed, never at import: importing this module must not require, or
 # capture, a credential -- and a missing key should not stop `--help` or a
 # deployment to a chain that has no explorer.
-_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia")
+_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia", "robinhood-testnet")
 
 
 def _etherscan_api_key(chain):
@@ -158,11 +167,13 @@ ETHERSCAN_URLS = {
     "base-mainnet": "https://api.basescan.org/api",
     "base-goerli": "https://api-goerli.basescan.org/api",
     "base-sepolia": "https://api-sepolia.basescan.org/api",
+    "robinhood-testnet": "https://api-sepolia.basescan.org/api",
 }
 
 
 def param_prompt(ctx, param, value):
-    param_config = CLICK_PROMPTS[param.name]
+    config_name = "chain" if param.name == "profile_id" else param.name
+    param_config = CLICK_PROMPTS[config_name]
     is_configured_param = not (param_config is None)
 
     if not is_configured_param:
@@ -175,10 +186,10 @@ def param_prompt(ctx, param, value):
     optional = not default_val is None if "optional" not in param_config.keys(
     ) else param_config["optional"]
 
-    if value != default_val:
+    if value != default_val or not ctx.params.get("ask"):
         return value
 
-    if prompt is None or (not ctx.params.get("ask") and optional):
+    if prompt is None:
         return value
 
     should_prompt = True
@@ -217,7 +228,7 @@ def param_prompt(ctx, param, value):
     help=CLICK_PROMPTS["safe"]["help"],
     callback=param_prompt,
 )
-@click.option("--fork", is_flag=True, default=False, help="Declare that the migration is running on a fork.")
+@click.option("--fork", is_flag=True, default=False, help="Run against a local fork of the profile RPC.")
 @click.option(
     "--rpc",
     default=CLICK_PROMPTS["rpc"]["default"],
@@ -250,8 +261,9 @@ def param_prompt(ctx, param, value):
     callback=param_prompt,
 )
 @click.option(
-    "--chain", "-f",
+    "--profile", "--chain", "profile_id",
     default=CLICK_PROMPTS["chain"]["default"],
+    type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=CLICK_PROMPTS["chain"]["help"],
     callback=param_prompt,
 )
@@ -274,7 +286,7 @@ def param_prompt(ctx, param, value):
     type=int,
 )
 @click.option(
-    "--is-retry",
+    "--force-replay", "--is-retry", "is_retry",
     is_flag=True,
     default=CLICK_PROMPTS["is_retry"]["default"],
     help=CLICK_PROMPTS["is_retry"]["help"],
@@ -290,7 +302,7 @@ def cli(
     environment,
     start_timestamp,
     end_timestamp,
-    chain,
+    profile_id,
     blueprint,
     account,
     ledger,
@@ -323,15 +335,60 @@ def cli(
 
     _load_dotenv()
 
-    # No provider URL is assembled from a token here: a half-built URL with a
-    # missing key silently becomes a request to the wrong place. Supply the
-    # endpoint explicitly via --rpc or <CHAIN>_RPC_URL.
-    final_rpc = rpc or _rpc_from_env(chain) or ('boa' if chain == 'local' else None)
-    if not final_rpc:
-        raise click.ClickException(
-            f"No RPC for `{chain}`. Set {chain.replace('-', '_').upper()}_RPC_URL "
-            "in the environment or .env, or pass --rpc."
+    operation = (
+        Operation.MIGRATION_FORK if fork else Operation.MIGRATION_LIVE
+    )
+    try:
+        profile = get_profile(profile_id)
+        if profile.identity.profile_id.startswith("robinhood-"):
+            from config.robinhood_launch import (
+                validate_deployment_external_facts,
+            )
+
+            try:
+                validate_deployment_external_facts()
+            except ValueError:
+                raise NetworkProfileError(
+                    "H02_EXTERNAL_FACTS_UNVERIFIED",
+                    profile_id=profile.identity.profile_id,
+                    operation=operation,
+                ) from None
+        redacted_rpc = resolve_rpc_reference(
+            profile, operation, os.environ, rpc
         )
+        identity = verify_chain_identity(
+            profile, operation, redacted_rpc, read_chain_id
+        )
+        if fork:
+            validate_fork_request(
+                profile,
+                operation,
+                evidence_mode=False,
+                block_number=None,
+                allow_dirty=True,
+            )
+        paths = repository_paths(
+            profile, operation, root=ROOT, identity=identity
+        )
+        if environment is not None and environment != paths.history_dir.name:
+            raise NetworkProfileError(
+                "H02_HISTORY_ALIAS",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        selected_blueprint = profile.repository.blueprint_id
+        if selected_blueprint is None or (
+            blueprint is not None and blueprint != selected_blueprint
+        ):
+            raise NetworkProfileError(
+                "H02_PROFILE_INVALID",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
+
+    final_rpc = redacted_rpc.value
 
     # A fork cannot execute ArbSys: it is a node-implemented precompile, so
     # `arbBlockNumber()` reverts and the Ledger constructor refuses to deploy.
@@ -341,37 +398,70 @@ def cli(
     if fork and not os.environ.get("RIPE_LEDGER_BLOCK_SOURCE"):
         os.environ["RIPE_LEDGER_BLOCK_SOURCE"] = "native"
 
-    if safe != "":
-        if fork:
+    try:
+        if safe and ledger != -1:
+            raise NetworkProfileError(
+                "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        if safe:
+            _require_backend(profile, operation, identity, "safe")
+            if not fork:
+                # SafeAccount is intentionally not used here: its proposal
+                # path is not qualified as a live signer/backend.
+                raise NetworkProfileError(
+                    "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                    profile_id=profile.identity.profile_id,
+                    operation=operation,
+                )
             sender = MockAccount(safe)
-        # else:
-        #     sender = SafeAccount(
-        #         safe_address=safe,
-        #         rpc_url=final_rpc
-        #     )
-    elif ledger != -1:
-        from scripts.utils.ledger_account import LedgerAccount
+        elif ledger != -1:
+            _require_backend(profile, operation, identity, "ledger")
+            from scripts.utils.ledger_account import LedgerAccount
 
-        sender = LedgerAccount(final_rpc, ledger)
-        # On a fork nothing is broadcast, so resolve the address from the device
-        # and then stop touching it -- a fork must never prompt for signatures.
-        if fork:
-            sender = MockAccount(sender.address)
-    else:
-        sender = _local_account(account)
+            sender = LedgerAccount(final_rpc, ledger)
+            if fork:
+                sender = MockAccount(sender.address)
+        else:
+            _require_backend(
+                profile, operation, identity, "env-private-key"
+            )
+            sender = get_account(account, identity, operation)
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
 
-    deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
+    # Normal operation resumes/skips from the selected migration log. Replaying
+    # prior calls is possible only through the explicit dangerous flag.
+    deploy_args = DeployArgs(
+        sender,
+        profile.identity.profile_id,
+        ignore_logs=is_retry,
+        blueprint=selected_blueprint,
+        rpc=final_rpc,
+    )
 
     log.h1("Contract Migration")
     # The RPC value is never logged, not even redacted: the reference is what
     # an operator needs, and a URL in scrollback or CI output is a key in
     # scrollback or CI output.
-    log.info(f"RPC configured for chain `{chain}`.")
+    log.info(
+        "RPC configured for profile "
+        f"`{profile.identity.profile_id}` from `{redacted_rpc.reference}`."
+    )
     log.info(f"Deployer account `{sender.address}`.")
-    log.info(f"Manifests are stored in `{environment}`.")
+    log.info(
+        "Manifests are stored in the profile-owned history namespace "
+        f"`{paths.history_dir.relative_to(ROOT)}`."
+    )
     log.info(f"Deployment arguments: {deploy_args}")
-    log.info(f"Running migrations starting with timestamp {start_timestamp}.")
-    log.info(f"Chain: {chain}.")
+    log.info(
+        "Migration start: "
+        + (str(start_timestamp) if start_timestamp is not None else "auto-resume")
+        + "."
+    )
+    log.info(f"Profile: {profile.identity.profile_id}.")
+    log.info(f"Verified chain id: {identity.observed_chain_id}.")
     log.info(f"Fork: {fork}.")
     log.info("")
     vyper_files = load_vyper_files()
@@ -379,24 +469,22 @@ def cli(
     log.h2("Running migrations...")
 
     migrations = MigrationRunner(
-        f"{MIGRATION_SCRIPTS_DIR}/{chain}",
-        f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}",
+        str(paths.migration_dir),
+        str(paths.history_dir),
         vyper_files
     )
 
     boa.deployments.set_deployments_db(boa.deployments.DeploymentsDB(":memory:"))
     # Robinhood has no Etherscan; it uses Blockscout, and nothing here needs a
     # verifier. Only configure one for chains that actually have an entry.
-    api_key = _etherscan_api_key(chain)
-    if api_key and chain in ETHERSCAN_URLS:
-        boa.set_etherscan(api_key=api_key, uri=ETHERSCAN_URLS[chain])
+    api_key = _etherscan_api_key(profile.identity.profile_id)
+    if api_key and profile.identity.profile_id in ETHERSCAN_URLS:
+        boa.set_etherscan(
+            api_key=api_key,
+            uri=ETHERSCAN_URLS[profile.identity.profile_id],
+        )
 
-    if final_rpc == 'boa':
-        with boa.set_env(Env()) as env:
-            total_gas = migrations.run(
-                deploy_args, start_timestamp, end_timestamp, not single)
-
-    elif fork:
+    if fork:
         with boa.fork(final_rpc, allow_dirty=True) as env:
             try:
                 env.set_balance(sender.address, 10*10**18)
@@ -408,6 +496,21 @@ def cli(
     else:
         with boa.set_network_env(final_rpc) as env:
             env.add_account(sender)
+            # Disable boa's transaction tracer. It probes the node with a
+            # dummy `debug_traceTransaction` on first use, which providers can
+            # be slow enough to time out -- and that probe runs AFTER the
+            # transaction has broadcast, so a deployment that actually
+            # succeeded raises before it is written to the log and manifest.
+            # The next run then has no idea it already happened and deploys a
+            # second copy. Traces only improve error messages; losing the
+            # record of a live deployment is the worse failure.
+            #
+            # boa catches HTTPError and RPCError there but not
+            # requests.ReadTimeout, so suppress_debug_tt() alone is not
+            # enough: `_tracer` is a cached_property, and seeding it skips
+            # the probe entirely.
+            env._tracer = None
+            env.suppress_debug_tt()
             total_gas = migrations.run(
                 deploy_args, start_timestamp, end_timestamp, not single)
 

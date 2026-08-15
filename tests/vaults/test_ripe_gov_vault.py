@@ -70,7 +70,8 @@ def test_ripe_gov_vault_initial_deposit_no_lock(
 
 
 def test_ripe_gov_vault_deposit_with_lock_duration(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test deposit with specific lock duration"""
     setupRipeGovVaultConfig()
@@ -82,7 +83,7 @@ def test_ripe_gov_vault_deposit_with_lock_duration(
     
     # Deposit with lock duration
     deposited = ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, lock_duration, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, lock_duration, sender=teller.address
     )
     assert deposited == deposit_amount
     
@@ -110,7 +111,7 @@ def test_ripe_gov_vault_multiple_deposits_weighted_lock(
     # Second deposit with longer lock
     ripe_token.transfer(ripe_gov_vault, second_deposit, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, second_deposit, 800, sender=switchboard_alpha.address
+        bob, ripe_token, second_deposit, 800, sender=teller.address
     )
     
     second_unlock = ripe_gov_vault.userGovData(bob, ripe_token).unlock
@@ -131,7 +132,7 @@ def test_ripe_gov_vault_deposit_validation(
         ripe_gov_vault.depositTokensInVault(bob, ripe_token, 100, sender=alice)
     
     # Test unauthorized caller for depositWithLockDuration
-    with boa.reverts("no perms"):
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.depositTokensWithLockDuration(bob, ripe_token, 100, 500, sender=alice)
 
 
@@ -182,7 +183,7 @@ def test_ripe_gov_vault_withdrawal_before_unlock_fails(
     # Deposit with lock
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 100, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 100, sender=teller.address
     )
     
     # Should revert with "not reached unlock" - trying to withdraw before unlock time
@@ -301,19 +302,20 @@ def test_ripe_gov_vault_adjust_lock_permission_check(
     setupRipeGovVaultConfig()
 
     # Should revert with "no perms" - only RipeHq addresses can call adjustLock
-    with boa.reverts("no perms"):
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=alice)
 
 
 def test_ripe_gov_vault_adjust_lock_no_position_fails(
-    ripe_gov_vault, ripe_token, bob, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, bob, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test adjusting lock with no position fails"""
     setupRipeGovVaultConfig()
 
     # Should revert with "no lock terms" - no lock terms configured yet (first assertion)
     with boa.reverts("no lock terms"):
-        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=switchboard_alpha.address)
+        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=teller.address)
 
 
 def test_ripe_gov_vault_adjust_lock_with_terms_but_no_position_fails(
@@ -337,7 +339,7 @@ def test_ripe_gov_vault_adjust_lock_with_terms_but_no_position_fails(
     
     # Should revert with "no position" - user has lock terms configured but no shares
     with boa.reverts("no position"):
-        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=switchboard_alpha.address)
+        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=teller.address)
 
 
 def test_ripe_gov_vault_adjust_lock_extend_duration(
@@ -359,7 +361,7 @@ def test_ripe_gov_vault_adjust_lock_extend_duration(
     assert initial_unlock == current_block + 100  # Should be minimum lock duration
     
     # Adjust lock to extend duration to 800 blocks
-    ripe_gov_vault.adjustLock(bob, ripe_token, 800, sender=switchboard_alpha.address)
+    ripe_gov_vault.adjustLock(bob, ripe_token, 800, sender=teller.address)
     
     # Verify unlock time was updated
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -382,7 +384,7 @@ def test_ripe_gov_vault_adjust_lock_cannot_reduce_duration(
     # Deposit tokens with long lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 800, sender=switchboard_alpha.address  # 800 block lock
+        bob, ripe_token, deposit_amount, 800, sender=teller.address  # 800 block lock
     )
     
     # Verify initial unlock time
@@ -395,18 +397,19 @@ def test_ripe_gov_vault_adjust_lock_cannot_reduce_duration(
     # Even though we're asking for 500 blocks, the new unlock would be current_block + 500
     # which is less than the existing unlock time
     with boa.reverts("new lock cannot be earlier"):
-        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=switchboard_alpha.address)
+        ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=teller.address)
 
 
 def test_ripe_gov_vault_release_lock_no_position_fails(
-    ripe_gov_vault, ripe_token, bob, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, bob, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test releasing lock with no position fails"""
     setupRipeGovVaultConfig()
 
     # Should revert with "no release needed" - no unlock time set (first assertion)
     with boa.reverts("no release needed"):
-        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
 
 def test_ripe_gov_vault_release_lock_permission_check(
@@ -416,7 +419,7 @@ def test_ripe_gov_vault_release_lock_permission_check(
     setupRipeGovVaultConfig()
 
     # Should revert with "no perms" - only RipeHq addresses can call releaseLock
-    with boa.reverts("no perms"):
+    with boa.reverts("only Teller allowed"):
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=alice)
 
 
@@ -476,7 +479,7 @@ def test_ripe_gov_vault_lock_bonus_points(
     # Alice deposits with long lock duration (should get bonus)
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        alice, ripe_token, deposit_amount, 900, sender=switchboard_alpha.address  # Near max lock
+        alice, ripe_token, deposit_amount, 900, sender=teller.address  # Near max lock
     )
     
     # Advance time equally for both
@@ -679,7 +682,8 @@ def test_ripe_gov_vault_configuration_updates_after_deposit(
 
 
 def test_ripe_gov_vault_lock_terms_enforcement(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that lock terms are enforced (min/max durations)"""
     setupRipeGovVaultConfig()
@@ -689,7 +693,7 @@ def test_ripe_gov_vault_lock_terms_enforcement(
     # Test with below minimum lock duration (should be increased to minimum)
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 50, sender=switchboard_alpha.address  # Below min (100)
+        bob, ripe_token, deposit_amount, 50, sender=teller.address  # Below min (100)
     )
     
     userData = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -699,7 +703,7 @@ def test_ripe_gov_vault_lock_terms_enforcement(
     # Test with above maximum lock duration (should be capped to maximum)
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 1500, sender=switchboard_alpha.address  # Above max (1000)
+        bob, ripe_token, deposit_amount, 1500, sender=teller.address  # Above max (1000)
     )
     
     # The unlock should be a weighted average between previous min lock (100) and max lock (1000)
@@ -725,7 +729,7 @@ def test_ripe_gov_vault_release_lock_when_cannot_exit(
     
     # Should revert with "cannot exit" - exit is disabled in config
     with boa.reverts("cannot exit"):
-        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
 
 def test_ripe_gov_vault_release_lock_when_no_unlock_needed(
@@ -748,11 +752,12 @@ def test_ripe_gov_vault_release_lock_when_no_unlock_needed(
     
     # Should revert with "no release needed" - already past unlock time
     with boa.reverts("no release needed"):
-        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
 
 def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that release lock works successfully and charges exit fee"""
     # Setup with exit enabled and 10% exit fee
@@ -763,7 +768,7 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 500, sender=switchboard_alpha.address  # 500 block lock
+        bob, ripe_token, deposit_amount, 500, sender=teller.address  # 500 block lock
     )
     
     # Verify initial state - should be locked
@@ -778,7 +783,7 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
     assert shares_before > 0  # Should have shares
     
     # Release lock early (should charge 10% exit fee)
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # Verify state after release
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -803,7 +808,8 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
 
 
 def test_ripe_gov_vault_release_lock_state_changes(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, _test, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that release lock properly updates all state variables"""
     # Setup with exit enabled and 5% exit fee
@@ -814,7 +820,7 @@ def test_ripe_gov_vault_release_lock_state_changes(
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 600, sender=switchboard_alpha.address  # 600 block lock
+        bob, ripe_token, deposit_amount, 600, sender=teller.address  # 600 block lock
     )
     
     # Advance some time to accumulate governance points while locked
@@ -831,7 +837,7 @@ def test_ripe_gov_vault_release_lock_state_changes(
     assert shares_before > 0  # Has shares
     
     # Release lock
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # Verify all state changes
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -868,7 +874,7 @@ def test_ripe_gov_vault_complex_points_scenario(
     # Bob deposits with lock
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 800, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 800, sender=teller.address
     )
     
     # Alice deposits with minimum lock
@@ -960,18 +966,23 @@ def test_ripe_gov_vault_zero_asset_weight_no_points(
     boa.env.time_travel(blocks=100)
     ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     
-    # With zero asset weight, there may still be base/lock bonus points
+    # GOV-WEIGHT-01: zero weight means zero points. This previously asserted only
+    # `>= 0`, which is vacuous for a uint256 -- it passed while the multiplier was
+    # being skipped and the balance was accruing full unweighted points.
     points = ripe_gov_vault.userGovData(bob, ripe_token).govPoints
     total_points = ripe_gov_vault.totalUserGovPoints(bob)
-    
-    # Operations should work and points should be reasonable values
-    assert points >= 0
-    assert total_points >= 0
+
+    assert points == 0
+    assert total_points == 0
     assert total_points == points  # Should be consistent
+
+    # the deposit itself must still be intact -- zero points, not a failed deposit
+    assert ripe_gov_vault.userGovData(bob, ripe_token).lastShares > 0
 
 
 def test_ripe_gov_vault_max_lock_boost_comparison(
-    ripe_gov_vault, ripe_token, whale, bob, charlie, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, charlie, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that higher max lock boost results in more bonus points"""
     deposit_amount = 100 * EIGHTEEN_DECIMALS
@@ -981,7 +992,7 @@ def test_ripe_gov_vault_max_lock_boost_comparison(
 
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 1000, sender=switchboard_alpha.address  # Max lock
+        bob, ripe_token, deposit_amount, 1000, sender=teller.address  # Max lock
     )
     
     # Advance time and update points
@@ -995,7 +1006,7 @@ def test_ripe_gov_vault_max_lock_boost_comparison(
 
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        charlie, ripe_token, deposit_amount, 1000, sender=switchboard_alpha.address  # Max lock
+        charlie, ripe_token, deposit_amount, 1000, sender=teller.address  # Max lock
     )
     
     # Advance time and update points
@@ -1011,7 +1022,8 @@ def test_ripe_gov_vault_max_lock_boost_comparison(
 
 
 def test_ripe_gov_vault_short_lock_range_enforcement(
-    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test vault with very short lock duration range"""
     # Setup with narrow lock range
@@ -1022,7 +1034,7 @@ def test_ripe_gov_vault_short_lock_range_enforcement(
     # Test that lock durations are properly clamped to range
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 200, sender=switchboard_alpha.address  # Should be clamped to 110
+        bob, ripe_token, deposit_amount, 200, sender=teller.address  # Should be clamped to 110
     )
     
     userData = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -1109,14 +1121,17 @@ def test_ripe_gov_vault_get_latest_gov_points_with_asset_weight(ripe_gov_vault):
         (0, 0, 0, False, 0),  # no lock terms
         0  # 0% weight
     )
-    
+
     # Expected: 1000 shares * 100 blocks = 100,000 base points
     expected_base = 1000 * time_elapsed
     assert points_100 == expected_base
     assert points_200 == expected_base * 2
     assert points_50 == expected_base // 2
-    # Note: 0% weight doesn't zero out points, it just doesn't apply weight multiplier
-    assert points_0 == expected_base
+    # GOV-WEIGHT-01: 0% weight zeroes the points. This previously asserted
+    # `points_0 == expected_base` with the note that a zero weight "doesn't zero out
+    # points, it just doesn't apply weight multiplier" -- that was the DV-07 defect,
+    # not intended behavior, and a zero weight now earns nothing.
+    assert points_0 == 0
 
 
 def test_ripe_gov_vault_get_latest_gov_points_with_lock_bonus(ripe_gov_vault):
@@ -1636,7 +1651,7 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 500, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 500, sender=teller.address
     )
     
     # Verify user is locked
@@ -1648,7 +1663,7 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
     
     # Try to release lock - vault should defensively reject this
     with boa.reverts():  # Should revert with "no exit fee" - vault's defensive validation
-        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # This demonstrates the vault's defensive programming:
     # Even if somehow an invalid configuration exists, the vault protects itself
@@ -2139,7 +2154,8 @@ def test_ripe_gov_vault_withdrawal_works_when_bad_debt_freeze_disabled(
 
 
 def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
-    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that releaseLock() is blocked when bad debt exists and shouldFreezeWhenBadDebt=True to save users money"""
     # Setup with exit enabled and exit fee, and freeze enabled
@@ -2156,7 +2172,7 @@ def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 500, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 500, sender=teller.address
     )
     
     # Verify user is locked and can normally release lock without bad debt
@@ -2180,7 +2196,7 @@ def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
     
     # Now releaseLock should fail to save user money since withdrawals would be frozen anyway
     with boa.reverts("saving user money"):
-        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # User's position should remain unchanged (not charged exit fee)
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -2189,7 +2205,8 @@ def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
 
 
 def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
-    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that releaseLock() works when bad debt exists but shouldFreezeWhenBadDebt=False"""
     # Setup with exit enabled and exit fee, but freeze disabled
@@ -2206,7 +2223,7 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 400, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 400, sender=teller.address
     )
     
     # Verify user is locked
@@ -2225,7 +2242,7 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     assert ledger.badDebt() == bad_debt_amount
     
     # Release lock should work because freeze is disabled (even with bad debt)
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # Verify lock was released and exit fee was charged
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -2242,7 +2259,8 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
 
 
 def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze_setting(
-    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig,
+    teller,
 ):
     """Test that releaseLock() works normally when there's no bad debt, regardless of shouldFreezeWhenBadDebt setting"""
     # Test with freeze enabled first
@@ -2259,7 +2277,7 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     # Deposit tokens with lock duration
     ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
     ripe_gov_vault.depositTokensWithLockDuration(
-        bob, ripe_token, deposit_amount, 600, sender=switchboard_alpha.address
+        bob, ripe_token, deposit_amount, 600, sender=teller.address
     )
     
     # Verify user is locked
@@ -2272,7 +2290,7 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     assert ledger.badDebt() == 0
     
     # Release lock should work normally since there's no bad debt
-    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
     
     # Verify lock was released and exit fee was charged
     userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
@@ -2782,3 +2800,151 @@ def test_core_pointer_rotation_preserves_legacy_position_points_and_explicit_exi
         alternate_ripe_gov_vault.getTotalAmountForUser(whale, ripe_token)
         == replacement_amount
     )
+
+
+############################################################################
+# WP1 / GOV-WEIGHT-01 (Section 5.2): zero governance weight characterization
+#
+# GOV-WEIGHT-01 has no autonomous default. These tests pin the exact bound
+# behavior at every boundary the decision must cover and keep the preferred
+# "zero means zero" rule as a Section 6.1(B) strict-xfail checkpoint.
+############################################################################
+
+# (minLockDuration, maxLockDuration, maxLockBoost, canExit, exitFee)
+NO_BOOST_TERMS = (0, 0, 0, False, 0)
+HUNDRED_PERCENT = 100_00
+
+
+def _weighted_points(vault, weight, *, shares=1_000 * EIGHTEEN_DECIMALS, blocks=10):
+    """Pure points calculation for `shares` held over `blocks`, at `weight`."""
+    current = boa.env.evm.patch.block_number
+    if current <= blocks:
+        boa.env.time_travel(blocks=blocks + 1 - current)
+        current = boa.env.evm.patch.block_number
+    return vault.getLatestGovPoints(
+        shares,
+        current - blocks,
+        0,
+        NO_BOOST_TERMS,
+        weight,
+    )
+
+
+def test_zero_asset_weight_yields_zero_points(ripe_gov_vault):
+    """GOV-WEIGHT-01, resolved: a configured zero weight earns zero points.
+
+    Replaces the DV-07 characterization, which asserted the defect -- the
+    multiplier was guarded by `if _weight != 0`, so a zero weight skipped the
+    multiplication and produced the unweighted base, i.e. behaved as 100.00%.
+    The multiplier is now applied unconditionally.
+    """
+    unweighted = 1_000 * 10  # shares normalized by PRECISION, times blocks held
+
+    assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT) == unweighted
+    assert _weighted_points(ripe_gov_vault, 0) == 0
+
+    # the specific confusion being closed: zero must not equal full weight
+    assert _weighted_points(ripe_gov_vault, 0) != _weighted_points(
+        ripe_gov_vault, HUNDRED_PERCENT
+    )
+
+
+def test_nonzero_asset_weight_boundaries_are_exact(ripe_gov_vault):
+    """GOV-WEIGHT-01 boundary matrix for every weight the decision must cover.
+
+    Section 5.2 requires the selected rule to be asserted at zero, one unit, one
+    less than full scale, full scale, and greater than full scale. Zero lives in
+    test_zero_asset_weight_yields_zero_points; the rest are here. These values are
+    unchanged by the GOV-WEIGHT-01 fix, which only ever altered the zero case --
+    that they still hold is the evidence the fix was surgical.
+    """
+    base = 1_000 * 10
+
+    assert _weighted_points(ripe_gov_vault, 1) == base * 1 // HUNDRED_PERCENT
+    assert _weighted_points(ripe_gov_vault, 50_00) == base // 2
+    assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT - 1) == (
+        base * (HUNDRED_PERCENT - 1) // HUNDRED_PERCENT
+    )
+    assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT) == base
+    assert _weighted_points(ripe_gov_vault, HUNDRED_PERCENT + 1) == (
+        base * (HUNDRED_PERCENT + 1) // HUNDRED_PERCENT
+    )
+    assert _weighted_points(ripe_gov_vault, 2 * HUNDRED_PERCENT) == base * 2
+
+    # 500_00 is the ceiling SwitchboardAlpha._isValidRipeVaultConfig permits
+    assert _weighted_points(ripe_gov_vault, 500_00) == base * 5
+
+
+def test_zero_weight_deposit_accrues_no_points(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+):
+    """GOV-WEIGHT-01 at the deposit boundary, resolved.
+
+    Exercised through real deposits rather than the pure view, so the decision is
+    bound to observable vault state and not just to the helper. Previously the DV-07
+    characterization, which asserted zero weight accrued at the full-weight rate.
+    """
+    amount = 100 * EIGHTEEN_DECIMALS
+
+    setupRipeGovVaultConfig(_assetWeight=HUNDRED_PERCENT, _maxLockBoost=0)
+    ripe_token.transfer(ripe_gov_vault, amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, amount, sender=teller.address)
+    boa.env.time_travel(blocks=25)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    full_weight_points = ripe_gov_vault.userGovData(bob, ripe_token).govPoints
+    assert full_weight_points > 0
+
+    setupRipeGovVaultConfig(_assetWeight=0, _maxLockBoost=0)
+    ripe_token.transfer(ripe_gov_vault, amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(alice, ripe_token, amount, sender=teller.address)
+    boa.env.time_travel(blocks=25)
+    ripe_gov_vault.updateUserGovPoints(alice, sender=switchboard_alpha.address)
+    zero_weight_points = ripe_gov_vault.userGovData(alice, ripe_token).govPoints
+
+    # A configured zero weight earns nothing, and the deposit itself still works.
+    assert zero_weight_points == 0
+    assert zero_weight_points != full_weight_points
+    assert ripe_gov_vault.userGovData(alice, ripe_token).lastShares > 0
+    assert ripe_gov_vault.totalUserGovPoints(alice) == 0
+
+
+def test_zero_asset_weight_means_zero_points(ripe_gov_vault):
+    """GOV-WEIGHT-01: the Section 5.2 preferred rule, now implemented.
+
+    Was xfail(strict=True) while the gate was unresolved. The marker is removed
+    rather than the test, so the same assertion that pinned the defect now pins
+    the fix -- with strict=True still set it would XPASS and fail the suite.
+    """
+    assert _weighted_points(ripe_gov_vault, 0) == 0
+
+
+def test_zero_weight_earns_no_lock_bonus(ripe_gov_vault):
+    """A zero weight must not earn a lock bonus on top of zero base points.
+
+    The bonus is applied after the weight multiplier, so this pins the ordering:
+    if the multiplier were ever moved after the bonus, a zero weight would still
+    accrue boost points and this would catch it.
+    """
+    current = boa.env.evm.patch.block_number
+    if current <= 10:
+        boa.env.time_travel(blocks=11 - current)
+        current = boa.env.evm.patch.block_number
+
+    boosted_terms = (0, 100, 200_00, True, 0)  # min, max, maxLockBoost, canExit, exitFee
+    unlock = current + 50
+
+    weighted = ripe_gov_vault.getLatestGovPoints(
+        1_000 * EIGHTEEN_DECIMALS, current - 10, unlock, boosted_terms, HUNDRED_PERCENT
+    )
+    assert weighted > 1_000 * 10  # base plus a real bonus, so the terms do boost
+
+    assert ripe_gov_vault.getLatestGovPoints(
+        1_000 * EIGHTEEN_DECIMALS, current - 10, unlock, boosted_terms, 0
+    ) == 0

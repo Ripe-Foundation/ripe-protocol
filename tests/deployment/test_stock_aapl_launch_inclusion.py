@@ -9,6 +9,7 @@ import subprocess
 import pytest
 
 import config.BluePrint as source_authority
+from config.artifact_expectations import load_artifact_expectations
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -118,8 +119,8 @@ def test_every_non_repository_fact_has_an_explicit_typed_blocker():
 
 def test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes():
     binding = dict(source_authority.ROBINHOOD_STOCK_ARTIFACT_BINDING)
-    expectations = json.loads(
-        (ROOT / "config/contract-artifact-expectations.json").read_text()
+    expectations = load_artifact_expectations(
+        ROOT / "config/contract-artifact-expectations.json", root=ROOT
     )["contracts"]["SimpleErc20"]
     source = ROOT / binding["sourcePath"]
 
@@ -350,7 +351,7 @@ def test_atomic_policy_keeps_defaults_routes_and_rewards_fail_closed():
     ]
     assert promotion.disposition == "approved"
     assert promotion.value == (
-        "7395a0bff4abd75e11f832fbd0dee2f6569244dafa2ba52604d3f5989662acec"
+        "f84bb5558c3bcce6eb5018e723a42f7270eae63ed8f23789b47ee99663d51234"
     )
 
 

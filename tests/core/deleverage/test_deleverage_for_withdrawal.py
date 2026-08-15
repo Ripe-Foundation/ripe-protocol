@@ -3043,7 +3043,7 @@ def test_denominator_underflow_returns_false(
     # totalMaxDebt = $0.07 + $630 = $630.07
     # debtTimesEffectiveLtv = $700 * 0.90 = $630
     # Still positive. Let's go to 0.
-    mock_price_source.setPrice(alpha_token, 0)  # $0
+    mock_price_source.disablePriceFeed(alpha_token)
 
     # At $0: alpha collateral = $0, capacity = $0
     # totalMaxDebt = $630 (USDC only)

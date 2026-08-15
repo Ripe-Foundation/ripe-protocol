@@ -9,7 +9,7 @@ from conf_utils import filter_logs
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "6f2da0e344c5cbb3e45aae72c289282e6ea7a635aab53d01d166780b3558caac"
+    "f8a6e21d742fab14010f165f8a44dd69f88e4d076395185680c05c18b7194f09"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -1889,14 +1889,12 @@ def test_ah_liquidation_savings_green_keeper_rewards(
     sally,
     green_token,
     savings_green,
-    _test,
 ):
-    """Test keeper rewards paid in savings GREEN tokens
-    
-    This tests:
-    - Keeper can choose to receive rewards in savings GREEN
-    - _shouldStakeRewards parameter works correctly
-    - Savings GREEN deposit happens correctly
+    """A no-progress liquidation cannot mint a savings-GREEN keeper reward.
+
+    This collateral is routed only to Deleverage, so AuctionHouse neither
+    repays debt nor starts an auction. The keeper's reward preference must not
+    turn that retryable no-progress call into a fee-bearing action.
     """
     
     setGeneralConfig()
@@ -1933,22 +1931,13 @@ def test_ah_liquidation_savings_green_keeper_rewards(
     keeper_savings_before = savings_green.balanceOf(sally)
 
     # Perform liquidation with _wantsSavingsGreen=True
-    expected_keeper_fee = debt_amount * 2_00 // HUNDRED_PERCENT
     keeper_rewards = teller.liquidateUser(bob, True, sender=sally)  # True = should stake rewards (savings GREEN)
 
-    # Verify keeper rewards
-    _test(expected_keeper_fee, keeper_rewards)
-
-    # Verify keeper received savings GREEN, not regular GREEN
+    assert keeper_rewards == 0
     keeper_green_after = green_token.balanceOf(sally)
     keeper_savings_after = savings_green.balanceOf(sally)
-    
-    assert keeper_green_after == keeper_green_before  # No regular GREEN received
-    assert keeper_savings_after > keeper_savings_before  # Savings GREEN received
-    
-    # Verify the amount of savings GREEN received
-    savings_green_received = keeper_savings_after - keeper_savings_before
-    _test(expected_keeper_fee, savings_green.convertToAssets(savings_green_received))
+    assert keeper_green_after == keeper_green_before
+    assert keeper_savings_after == keeper_savings_before
 
 
 def test_ah_liquidation_edge_cases(
@@ -1963,6 +1952,8 @@ def test_ah_liquidation_edge_cases(
     mock_price_source,
     createDebtTerms,
     credit_engine,
+    green_token,
+    ledger,
     sally,
 ):
     """Test edge cases in liquidation logic
@@ -2014,19 +2005,151 @@ def test_ah_liquidation_edge_cases(
     keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards == 0
 
-    # Test 4: User becomes liquidatable, then try to liquidate twice
+    # Test 4: A liquidatable position routed only to Deleverage makes no
+    # AuctionHouse progress. Repeated permissionless calls must remain
+    # retryable without charging the user or rewarding the keeper.
     new_price = 60 * EIGHTEEN_DECIMALS // 100  # 0.60 - makes user liquidatable
     mock_price_source.setPrice(alpha_token, new_price)
     
     assert credit_engine.canLiquidateUser(bob)
     
-    # First liquidation should work
+    debt_before = ledger.userDebt(bob).amount
+    keeper_green_before = green_token.balanceOf(sally)
+
     keeper_rewards1 = teller.liquidateUser(bob, False, sender=sally)
-    assert keeper_rewards1 > 0
-    
-    # Second liquidation should return 0 (already in liquidation)
+    assert keeper_rewards1 == 0
+    assert ledger.userDebt(bob).amount == debt_before
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
+    assert green_token.balanceOf(sally) == keeper_green_before
+    first_log = filter_logs(teller, "LiquidateUser")[0]
+    assert first_log.totalLiqFees == 0
+    assert first_log.keeperFee == 0
+    assert first_log.repayAmount == 0
+    assert first_log.numAuctionsStarted == 0
+
+    # Boa does not clear EIP-1153 state between direct top-level calls. This
+    # boundary models a second production transaction.
+    boa.env.evm.vm.state.clear_transient_storage()
+    assert credit_engine.canLiquidateUser(bob)
     keeper_rewards2 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards2 == 0
+    assert ledger.userDebt(bob).amount == debt_before
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
+    assert green_token.balanceOf(sally) == keeper_green_before
+    second_log = filter_logs(teller, "LiquidateUser")[0]
+    assert second_log.totalLiqFees == 0
+    assert second_log.keeperFee == 0
+    assert second_log.repayAmount == 0
+    assert second_log.numAuctionsStarted == 0
+
+
+def test_non_auctionable_collateral_freezes_zero_ltv_assets_while_remaining_retryable(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    teller,
+    simple_erc20_vault,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    green_token,
+    ledger,
+    sally,
+):
+    """A frozen security position locks unrelated zero-LTV protocol assets."""
+    setGeneralConfig()
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=1_00,
+        _minKeeperFee=EIGHTEEN_DECIMALS,
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,
+    )
+
+    # Alpha models positive-LTV collateral that policy does not permit the
+    # AuctionHouse to burn, transfer, swap, or auction (for example, a
+    # tokenized security awaiting a governance-controlled recovery route).
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=80_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=alpha_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Bravo models RIPE/GREEN-like protocol collateral with no borrowing or
+    # liquidation value. It still must remain locked with the rest of the
+    # account after Alpha crosses its liquidation threshold.
+    zero_ltv_terms = createDebtTerms(
+        _ltv=0,
+        _redemptionThreshold=0,
+        _liqThreshold=0,
+        _liqFee=0,
+        _borrowRate=0,
+        _daowry=0,
+    )
+    setAssetConfig(
+        bravo_token,
+        _debtTerms=zero_ltv_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    performDeposit(bob, 10 * EIGHTEEN_DECIMALS, bravo_token, bravo_token_whale)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    assert credit_engine.canLiquidateUser(bob)
+
+    debt_before = ledger.userDebt(bob).amount
+    keeper_before = green_token.balanceOf(sally)
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+
+    assert ledger.userDebt(bob).inLiquidation
+    assert not ledger.hasFungibleAuctions(bob)
+    assert credit_engine.canLiquidateUser(bob)
+    assert ledger.userDebt(bob).amount == debt_before
+    assert green_token.balanceOf(sally) == keeper_before
+
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+    assert liq_log.totalLiqFees == 0
+    assert liq_log.keeperFee == 0
+    assert liq_log.repayAmount == 0
+    assert liq_log.numAuctionsStarted == 0
+
+    assert credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        0,
+        bravo_token,
+        simple_erc20_vault,
+    ) == 0
+    with boa.reverts("cannot withdraw anything"):
+        teller.withdraw(
+            bravo_token,
+            EIGHTEEN_DECIMALS,
+            bob,
+            simple_erc20_vault,
+            sender=bob,
+        )
 
 
 def test_ah_liquidation_special_stab_pool(

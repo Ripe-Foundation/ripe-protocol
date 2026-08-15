@@ -1,5 +1,19 @@
 # Block-clock validation plan
 
+> **11 August 2026 CCIP currentness note:** CCIP pending/disabled language in
+> this removed-inventory plan is historical. GREEN/RIPE topology and mint
+> capabilities are confirmed live; current operational gates are in
+> [`ccip-live-state.md`](ccip-live-state.md).
+
+> **8 August 2026 removal overlay:** This plan validated
+> `scripts/check_block_clock_inventory.py` against
+> `config/block-clock-inventory.json`. Both, and
+> `tests/inventory/test_block_clock_inventory.py`, have been removed, as have
+> the `contracts/testing/` probes and `tests/probes/` that S2 was to classify.
+> The stages, fingerprints, and counts below no longer describe anything that
+> runs; they are retained as the record of how the inventory was validated while
+> it existed. Removed sources are recoverable from git history.
+
 > **31 July 2026 currentness overlay:** The current configuration-source baseline
 > is `e4473ce6485888f1b747761a5ee8693443108877`, tree
 > `33b705690007bda9b11900b5775bd9230e79f09e`. The direct checker covers the

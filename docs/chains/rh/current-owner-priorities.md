@@ -21,18 +21,22 @@ now advance:
 
 - unresolved non-Deleverage external verification and deployment-produced
   bindings, while preserving configuration consistency;
-- H-05 release-candidate planning readiness without migration execution;
+- deterministic review of the eight-file imperative migration candidate,
+  without creating an executable plan or migration history;
 - final H-06 operator machine/volume binding; and
 - remaining predeployment infrastructure, qualification, rehearsal, SecOps,
   release-packet, rollback/abort, and signer-ceremony preparation.
 
-H-04 source authority and H-05 blocked planning are integrated; M4 proof is
-integrated. `DefaultsRobinhood.vy` exists, compiles, and is synchronized with
+H-04 source authority and M4 proof are integrated. The former H-05 declarative
+runner, executor, and plan census are retired; the imperative migration
+candidate remains repository review input only. `DefaultsRobinhood.vy` exists,
+compiles, and is synchronized with
 the derived ledger. The generator reports `configuration_consistent=true`,
-`deployment_ready=false`, and 80 blockers. Repository configuration is
+`deployment_ready=false`, and 64 blockers. Repository configuration is
 prepared and consistent; production/onchain configuration has not occurred.
-No deployment, migration execution or history, activation, or release has
-occurred. The smart-contract reassessment and
+No launch-remediation-candidate deployment, migration execution or history,
+activation, or release has occurred. Separately observed live CCIP and
+monitoring-only Uniswap state grants no such authority. The smart-contract reassessment and
 Robinhood fork/external-integration reports are consolidated in
 [`reassessment-and-qualification-synthesis.md`](reassessment-and-qualification-synthesis.md);
 affected gates must consume that synthesis.
@@ -54,10 +58,11 @@ activation, or release posture below.
   measurement/clock boundaries, subject to the pending Teller candidate above.
 - Use the protected shared `BasicVault` behavior through `SimpleErc20`; do not
   deploy or configure a separate `GuardedErc20` artifact.
-- Launch with Chainlink at PriceDesk slot 1, unchanged CurvePrices at slot 2
-  for GREEN only, and BlueChipYield at slot 3. USDG has no Curve feed, slots 4
-  and 5 remain empty, neither LP token is admitted, and priority source IDs
-  remain `[1, 3]`.
+- Launch with Chainlink at PriceDesk slot 1 and unchanged CurvePrices at slot 2
+  for GREEN only. BlueChipYield at slot 3 remains blueprint-selected but is not
+  deployed or finalized by the current candidate. USDG has no Curve feed,
+  slots 4 and 5 remain empty, neither LP token is admitted, and priority source
+  IDs remain `[1, 2]`.
 - Treat RIPE/WETH V2 only as an optional externally held liquidity canary.
 - Treat GREEN/USDG as a bounded launch-pricing venue candidate only; keep its
   deployment/operations, both LP admissions, additional Curve feeds or
@@ -82,17 +87,21 @@ the eight reports into separate implementation trains.
 
 ## Parked lanes
 
-### 1. All CCIP workflows are parked
+### 1. CCIP is live; operational dispositions remain gated
 
-CCIP is disabled and outside the current work queue.
+The earlier parked instruction is superseded. RIPE and GREEN pools are registered,
+wired, owned by governance, and mint-enabled on Base and Robinhood mainnet. The
+current evidence authority is [ccip-live-state.md](ccip-live-state.md).
 
-- Do not perform CCIP research, implementation, review, external coordination,
-  production packaging, testing, testnet work, deployment, promotion, or
-  current-status investigation.
-- Do not treat historical CCIP gaps as blockers for current non-CCIP work.
-- Preserve historical CCIP documents and examples as technical records; do not
-  rewrite them to imply that their risks or gates were resolved.
-- Reopen CCIP only after an explicit owner instruction.
+- Preserve RIPE RipeHq ID 23 and GREEN RipeHq ID 24 on both chains.
+- Do not infer an approved policy from disabled inbound/outbound rate limits or
+  zero `rateLimitAdmin`; the owner disposition remains explicit and open.
+- Do not claim automatic-execution readiness until the full real-token OffRamp
+  destination-gas path has accepted evidence and margin.
+- Do not broadcast from `scripts/ccip_send.py`; it remains fork/preflight-only
+  until a signer or Safe transaction backend is separately authorized.
+- No additional CCIP transaction or release decision is authorized by the fact
+  that the topology is already live.
 
 ### 2. CreditEngine zero-backing reassessment and policy are parked
 
@@ -123,14 +132,14 @@ the four zero-valued controls.
 
 ### 4. Uniswap V2 price-source admission and activation are parked
 
-The smaller `UniswapV2Prices` candidate replaces the deleted cumulative-price
-prototype. Its tests are strong, but its spot-reserve input, unbound pair
-provenance, absent minimum-liquidity requirement, and repeatable snapshot
-poisoning remain unresolved. Bootstrap and fully stale snapshot states now fail
-closed to zero. It is not registered, configured, admitted, deployed, or
-activated and is unavailable for protocol accounting. No Uniswap launch
-price source is required; bounded launch behavior and PriceDesk priority source
-IDs `[1, 3]` remain unchanged.
+The stripped `UniswapV2Prices` replacement is a stateless RIPE/WETH monitor.
+Its PriceSource interface is permanently inert, while its explicitly named
+monitoring views expose a manipulable spot-reserve observation. Pair
+provenance and minimum-liquidity policy remain operational monitoring concerns,
+not oracle-admission work. The replacement is not registered, configured,
+admitted, deployed, or activated and is unavailable for protocol accounting.
+No Uniswap launch price source is required; bounded launch behavior and
+PriceDesk priority source IDs `[1, 2]` remain unchanged.
 
 - Do not add a checkpoint service, PriceDesk registration, Chainlink fallback,
   pool address, liquidity amount, funding or custody authority, migration,

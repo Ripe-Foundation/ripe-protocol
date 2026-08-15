@@ -11,8 +11,16 @@
 > matrix below is preserved as historical planning evidence, so its earlier
 > omitted/absent proposals are not current authority. CM-017 is now selected
 > at PriceDesk ID 2 for GREEN only; see
-> [`curve-launch-activation.md`](curve-launch-activation.md). Nothing has been
-> deployed, migrated, activated, or released.
+> [`curve-launch-activation.md`](curve-launch-activation.md).
+>
+> **11 August 2026 CCIP supersession:** the CM-051/052/053/058 rows and all
+> “deferred,” “disabled,” “not deployed,” or exact-source statements about CCIP
+> below are historical Phase-0 planning, not current-state authority. GREEN and
+> RIPE pools, HQ rows 23/24, TokenAdminRegistry assignments, reciprocal wiring,
+> ownership, and token-specific mint capabilities are confirmed live; exact
+> live creation source/compiler/constructor identity remains unresolved. See
+> [`ccip-live-state.md`](ccip-live-state.md). No non-CCIP launch deployment,
+> migration, activation, or release is established by this matrix.
 
 **Status:** Complete analysis; S3, S4, S5, and Stock Token launch-scope
 decisions are recorded; remaining recommendations and owner decisions are

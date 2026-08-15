@@ -1,5 +1,10 @@
 # Robinhood Chain CCIP public-evidence record
 
+> **Historical predeployment evidence.** For the confirmed live topology,
+> exact RipeHq event transactions, pools reporting version 1.5.1, and unresolved
+> operational gates, see [ccip-live-state.md](ccip-live-state.md). Any “not
+> deployed” conclusion below is superseded by the 2026-08-11 onchain snapshot.
+
 Status: Public-evidence baseline complete; external confirmation remains required
 
 Evidence retrieved: 2026-07-23; directory/API facts and thin-subclass build
@@ -194,7 +199,7 @@ contains one GREEN and one RIPE subclass of the concrete v1.6.1
 deployment source. The review is bound to source SHA-256
 `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
 see the
-[`Round-3 review record`](evidence/ccip-solidity-reference-round-3-review.md).
+Round-3 review record.
 
 Each subclass:
 

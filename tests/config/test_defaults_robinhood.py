@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 from collections import Counter
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -24,6 +26,17 @@ ROOT = Path(__file__).resolve().parents[2]
 LEDGER = ROOT / "config" / "robinhood-parameters.json"
 DEFAULTS = ROOT / "contracts" / "config" / "DefaultsRobinhood.vy"
 GENERATOR = ROOT / "scripts" / "params" / "generate_robinhood_defaults.py"
+HISTORICAL_AUTHORITY = (
+    ROOT
+    / "tests"
+    / "fixtures"
+    / "robinhood"
+    / "provenance"
+    / "historical-authority-baselines.json"
+)
+HISTORICAL_AUTHORITY_SHA256 = (
+    "516611b3125004ea002476505b16cb4ddf02579aec84dc9fb1d5c3a3c41ec6fa"
+)
 PR66 = "0f79b626c6ec4788ba43b3132ada9ebec6084f2a"
 LAUNCH = "74c4120fbfa1ade859dc32f61acdf567c139fe02"
 MORPHO = "33ad0f3c08bf6dc88f6569c622886d264d6e2868"
@@ -89,6 +102,43 @@ def _semantic_raw(value: dict):
     if isinstance(raw, str) and raw.startswith("0x"):
         return raw.lower()
     return raw
+
+
+def _record_projection(record: dict) -> dict:
+    return {
+        "id": record["id"],
+        "destination": record["destination"],
+        "status": record["status"],
+        "value": _semantic_raw(record["value"]),
+    }
+
+
+def _projection_sha256(records: list[dict]) -> str:
+    payload = json.dumps(
+        records,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _historical_authority() -> dict:
+    payload = HISTORICAL_AUTHORITY.read_bytes()
+    assert hashlib.sha256(payload).hexdigest() == (
+        HISTORICAL_AUTHORITY_SHA256
+    )
+    fixture = json.loads(payload)
+    assert fixture["schema_version"] == (
+        "rh-historical-authority-baselines-v1"
+    )
+    assert fixture["projection_semantics"] == {
+        "canonical_json": (
+            "sort_keys=true,separators=(',',':'),ensure_ascii=false"
+        ),
+        "fields": ["id", "destination", "status", "value"],
+    }
+    return fixture
 
 
 def test_canonical_sources_exist_and_filename_casing_is_unique():
@@ -163,21 +213,32 @@ def test_constructor_abi_intentionally_extends_pr66_to_seven_arguments():
     assert [item["name"] for item in constructor["inputs"]] == list(
         sync.CONSTRUCTOR_ABI_NAMES
     )
-    tree_paths = subprocess.check_output(
-        ["git", "ls-tree", "-r", "--name-only", PR66],
-        cwd=ROOT,
-        text=True,
+    baseline = _historical_authority()["pr66_defaults"]
+    assert baseline == {
+        "blob_oid": "e22bf986a4a1e01a33712ff7e82c5dcab33a04f8",
+        "commit": PR66,
+        "encoding": "base64",
+        "path": "contracts/config/DefaultsRobinHood.vy",
+        "sha256": (
+            "4d2093f917c881181f8dc8ccd07f92e6bfd8c542476a84c06b15608d0bb89ca8"
+        ),
+        "snapshot_path": (
+            "tests/fixtures/robinhood/provenance/"
+            "defaults-robinhood-pr66.vy.snapshot.base64"
+        ),
+        "tree": "d198a3e70b420a5d1de1f272f9c785506d91da4d",
+    }
+    precedent_path = ROOT / baseline["snapshot_path"]
+    encoded_lines = precedent_path.read_text(encoding="ascii").splitlines()
+    assert encoded_lines
+    assert all(len(line) == 76 for line in encoded_lines[:-1])
+    assert 1 <= len(encoded_lines[-1]) <= 76
+    precedent_bytes = base64.b64decode(
+        "".join(encoded_lines),
+        validate=True,
     )
-    precedent_path = next(
-        path
-        for path in tree_paths.splitlines()
-        if path.lower() == "contracts/config/defaultsrobinhood.vy"
-    )
-    precedent = subprocess.check_output(
-        ["git", "show", f"{PR66}:{precedent_path}"],
-        cwd=ROOT,
-        text=True,
-    )
+    assert hashlib.sha256(precedent_bytes).hexdigest() == baseline["sha256"]
+    precedent = precedent_bytes.decode()
     assert precedent.count("immutable(address)") == 5
     assert "_usdgToken" not in precedent
     assert "_wethToken" not in precedent
@@ -467,6 +528,123 @@ def test_sensitive_and_placeholder_rejection_remains_fail_closed():
         sync.extract_deployment_values(defaults, blueprint=proxy)
 
 
+def test_source_reference_is_limited_to_defaults_and_allowlisted_live_evidence():
+    defaults = sync.extract_defaults_values()
+    values = sync.extract_deployment_values(defaults)
+    assert values["Deployment.DP-16.ccip.promotion"] == {
+        "kind": "external_fact",
+        "raw": sync.CCIP_LIVE_EVIDENCE_PATH,
+    }
+
+    proxy = _blueprint_proxy()
+    path = "Deployment.DP-16.ccip.promotion"
+    proxy.ROBINHOOD_DEPLOYMENT_INPUTS[path] = blueprint_source.RobinhoodInput(
+        blueprint_source.SourceReference("docs/chains/rh/evidence/not-allowlisted.json"),
+        "external_fact",
+    )
+    with pytest.raises(sync.ManifestError, match="H04_SOURCE_REFERENCE"):
+        sync.extract_deployment_values(defaults, blueprint=proxy)
+
+
+def test_ccip_source_reference_rejects_same_path_byte_replacement(
+    tmp_path, monkeypatch
+):
+    evidence_path = tmp_path / sync.CCIP_LIVE_EVIDENCE_PATH
+    evidence_path.parent.mkdir(parents=True)
+    payload = (ROOT / sync.CCIP_LIVE_EVIDENCE_PATH).read_bytes()
+    evidence_path.write_bytes(payload + b"\n")
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    with pytest.raises(sync.ManifestError, match="H04_CCIP_EVIDENCE_DIGEST"):
+        sync._validated_ccip_live_evidence()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "code"),
+    [
+        (lambda value: value.__setitem__("schema_version", 2), "SCHEMA"),
+        (
+            lambda value: value["chains"]["robinhood-mainnet"].__setitem__(
+                "chain_id", 999
+            ),
+            "TOPOLOGY",
+        ),
+        (
+            lambda value: value["chains"]["robinhood-mainnet"]["pools"][
+                "RIPE"
+            ].__setitem__("can_mint_ripe", False),
+            "CAPABILITY",
+        ),
+    ],
+)
+def test_ccip_source_reference_validates_schema_topology_and_capabilities(
+    tmp_path, monkeypatch, mutation, code
+):
+    evidence_path = tmp_path / sync.CCIP_LIVE_EVIDENCE_PATH
+    evidence_path.parent.mkdir(parents=True)
+    value = json.loads((ROOT / sync.CCIP_LIVE_EVIDENCE_PATH).read_bytes())
+    mutation(value)
+    payload = json.dumps(value, sort_keys=True).encode()
+    evidence_path.write_bytes(payload)
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        sync, "CCIP_LIVE_EVIDENCE_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+    with pytest.raises(sync.ManifestError, match=f"H04_CCIP_EVIDENCE_{code}"):
+        sync._validated_ccip_live_evidence()
+
+
+def test_dp16_ledger_records_current_live_fact_and_preserves_no_action_boundary():
+    ledger = sync.derive_ledger(_ledger())
+    records = _records(ledger)
+    expected = {
+        "Deployment.DP-16.ccip.greenEnabled": ("CM-051", True),
+        "Deployment.DP-16.ccip.ripeEnabled": ("CM-052", True),
+    }
+    for path, (h03_ref, value) in expected.items():
+        record = records[path]
+        assert record["h03_ref"] == h03_ref
+        assert record["status"] == "external_fact"
+        assert record["value"] == {"kind": "external_fact", "raw": value}
+        assert record["source"] == {
+            "citation": sync.CCIP_LIVE_EVIDENCE_PATH,
+            "capture_commit": sync.CCIP_LIVE_EVIDENCE_CAPTURE_COMMIT,
+            "sha256": sync.CCIP_LIVE_EVIDENCE_SHA256,
+        }
+        assert record["approval"]["status"] == "confirmed_existing_state"
+        assert record["blockers"] == ["B-T1-CCIP", "B-T1-TOOLCHAIN"]
+        assert "no mutation authorized" in record["approval"]["provenance"]
+
+    sgreen = records["Deployment.DP-16.ccip.sgreenEnabled"]
+    assert sgreen["status"] == "disabled"
+    assert sgreen["value"] == {"kind": "concrete", "raw": False}
+    assert sgreen["source"]["citation"] == (
+        "review-archives/h04/h04-group2-proposal-R2.md"
+    )
+
+    promotion = records["Deployment.DP-16.ccip.promotion"]
+    assert promotion["h03_ref"] == "CM-053"
+    assert promotion["status"] == "external_fact"
+    assert promotion["value"] == {
+        "kind": "external_fact",
+        "raw": sync.CCIP_LIVE_EVIDENCE_PATH,
+    }
+    assert promotion["approval"]["schedule_id"] == "BS-H04-CCIP-PARKED"
+    assert "no further transaction" in promotion["launch_phase"]
+
+    schedule = next(
+        item
+        for item in ledger["binding_schedules"]
+        if item["id"] == "BS-H04-CCIP-PARKED"
+    )
+    assert schedule["records"] == ["P-H04-403"]
+    assert schedule["classification"] == (
+        "confirmed_existing_state_with_operational_gates"
+    )
+    assert "separate transaction and release authority" in schedule[
+        "closure_artifacts"
+    ]
+
+
 def test_sync_is_deterministic_and_writes_only_the_ledger(tmp_path):
     path = _write_ledger(tmp_path, _ledger())
     first_identity = sync.sync_ledger(path)
@@ -533,8 +711,9 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False
-    assert len(blockers) == 65
+    assert len(blockers) == 64
     assert not any("Deployment.DP-15.rewards.promotion" in item for item in blockers)
+    assert not any("Deployment.DP-16.ccip.promotion" in item for item in blockers)
     assert any(item.endswith(":unresolved") for item in blockers)
     assert any(item.endswith(":unverified") for item in blockers)
     assert any(item.startswith("curve:owner_selected:") for item in blockers)
@@ -561,19 +740,36 @@ def test_curve_launch_values_are_blueprint_owned_and_not_derived_json_values():
 
 
 def test_launch_authority_semantics_preserve_stable_ids_and_selected_reconciliations():
-    launch = json.loads(
-        subprocess.check_output(
-            ["git", "show", f"{LAUNCH}:config/robinhood-parameters.json"],
-            cwd=ROOT,
-            text=True,
-        )
+    baseline = _historical_authority()["launch_parameters"]
+    assert {
+        key: baseline[key]
+        for key in ("blob_oid", "commit", "path", "sha256", "tree")
+    } == {
+        "blob_oid": "d0d367fb68f374b39e9540e1209051c913e05fe3",
+        "commit": LAUNCH,
+        "path": "config/robinhood-parameters.json",
+        "sha256": (
+            "1895fff3751fe6bc6f0d437cef78b757687fe519c0dd4ba2ce6a5c6baf3112bf"
+        ),
+        "tree": "296e1dcaf5e5c81f67b876cdfc9f78e3abd92f7a",
+    }
+    assert baseline["old_record_count"] == 436
+    assert baseline["current_record_count"] == 403
+    assert baseline["removed_record_count"] == 33
+    assert baseline["reconciled_record_count"] == 16
+    assert baseline["stable_record_count"] == 387
+    assert baseline["stable_projection_sha256"] == (
+        "f6570a4b8d0d198d7ee2d078497e47173303948b0a5a70c6af8864175b52ca50"
     )
+
     current = _ledger()
-    old_by_id = {record["id"]: record for record in launch["parameters"]}
     new_by_id = {record["id"]: record for record in current["parameters"]}
-    assert set(new_by_id) < set(old_by_id)
-    removed = [old_by_id[record_id] for record_id in set(old_by_id) - set(new_by_id)]
-    assert len(removed) == 33
+    assert len(new_by_id) == baseline["current_record_count"]
+    removed = baseline["removed"]
+    removed_by_id = {record["id"]: record for record in removed}
+    assert len(removed_by_id) == baseline["removed_record_count"]
+    assert set(new_by_id).isdisjoint(removed_by_id)
+    assert len(new_by_id) + len(removed_by_id) == baseline["old_record_count"]
     assert all(
         "STEAKHOUSE" in record["destination"]["path"]
         or record["destination"]["path"].startswith(
@@ -581,41 +777,45 @@ def test_launch_authority_semantics_preserve_stable_ids_and_selected_reconciliat
         )
         for record in removed
     )
-    reconciled_ids = {
-        "P-H04-018",
-        "P-H04-035",
-        "P-H04-036",
-        "P-H04-037",
-        "P-H04-039",
-        "P-H04-042",
-        "P-H04-046",
-        "P-H04-211",
-        "P-H04-299",
-        "P-H04-304",
-        "P-H04-389",
-        "P-H04-391",
-        "P-H04-399",
-        "P-H04-415",
-        "P-H04-417",
-        "P-H04-436",
+    reconciled = baseline["reconciled"]
+    reconciled_ids = set(reconciled)
+    assert len(reconciled_ids) == baseline["reconciled_record_count"]
+    stable_ids = sorted(set(new_by_id) - reconciled_ids)
+    # Preserve the immutable launch-baseline proof while explicitly normalizing
+    # the later dated CCIP live-state reconciliation back to its historical
+    # projection. The generated ledger tests below assert the current facts.
+    pre_live_ccip_projection = {
+        "P-H04-400": ("disabled", False),
+        "P-H04-401": ("disabled", False),
+        "P-H04-403": ("blocked", None),
     }
+    stable_projection = []
+    for record_id in stable_ids:
+        projection = _record_projection(new_by_id[record_id])
+        if record_id in pre_live_ccip_projection:
+            projection["status"], projection["value"] = (
+                pre_live_ccip_projection[record_id]
+            )
+        stable_projection.append(projection)
+    assert len(stable_projection) == baseline["stable_record_count"]
+    assert _projection_sha256(stable_projection) == (
+        baseline["stable_projection_sha256"]
+    )
     semantic_changes = {
-        record_id
-        for record_id, new in new_by_id.items()
-        if new["status"] != old_by_id[record_id]["status"]
-        or _semantic_raw(new["value"])
-        != _semantic_raw(old_by_id[record_id]["value"])
+        record_id for record_id, old in reconciled.items()
+        if new_by_id[record_id]["status"] != old["status"]
+        or _semantic_raw(new_by_id[record_id]["value"]) != old["value"]
     }
     assert semantic_changes == reconciled_ids
-    for record_id, new in new_by_id.items():
-        old = old_by_id[record_id]
+    for record_id, old in reconciled.items():
+        new = new_by_id[record_id]
         assert new["destination"] == old["destination"]
         if record_id in {"P-H04-399", "P-H04-436"}:
             assert old["status"] == "blocked"
             assert new["status"] == "approved"
             continue
         if record_id == "P-H04-391":
-            assert old["value"] == {"kind": "concrete", "raw": False}
+            assert old["value"] is False
             assert new["value"] == {"kind": "concrete", "raw": True}
             assert new["zero_semantics"] == {
                 "kind": "not_zero",
@@ -625,12 +825,7 @@ def test_launch_authority_semantics_preserve_stable_ids_and_selected_reconciliat
                 ),
             }
             continue
-        if record_id in reconciled_ids:
-            assert new["status"] == old["status"]
-            continue
         assert new["status"] == old["status"]
-        if old["status"] in {"approved", "disabled", "external_fact", "derived"}:
-            assert _semantic_raw(new["value"]) == _semantic_raw(old["value"])
 
 
 def test_base_and_local_blueprint_values_are_byte_semantically_unchanged():

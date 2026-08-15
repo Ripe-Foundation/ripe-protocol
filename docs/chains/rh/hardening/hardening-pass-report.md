@@ -1,5 +1,17 @@
 # RH hardening and release-support pass report
 
+> **11 August 2026 CCIP currentness note:** this report's `parked` CCIP rows are
+> historical classifications. GREEN/RIPE CCIP topology is now confirmed live;
+> current operational and release gates are in
+> [`../ccip-live-state.md`](../ccip-live-state.md).
+
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 This report closes the locally authorized implementation pass against the
 frozen `rh` baseline. It does not authorize a deployment, integration,
 activation, release, monitoring rollout, or owner-gated decision.

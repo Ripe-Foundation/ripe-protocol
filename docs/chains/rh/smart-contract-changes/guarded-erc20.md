@@ -1,5 +1,16 @@
 # GuardedErc20: custody and delivery containment
 
+> **11 August 2026 CCIP currentness note:** the “owner-parked” CCIP label below
+> is historical. GREEN/RIPE CCIP topology is now confirmed live; current gates
+> are in [`../ccip-live-state.md`](../ccip-live-state.md).
+
+> **Path note (8 August 2026):** some paths cited below no longer exist in the
+> active tree — the block-clock inventory, the `contracts/testing/` probes, and
+> the extracted deploy manifests and review records were removed. The citations
+> were accurate when written and are left intact. See
+> [`REMOVED.md`](../../../simplification/REMOVED.md) for the full index; everything is
+> recoverable from git history. No production contract was modified.
+
 > **Superseded 4 August 2026.** This explainer is retained only as historical
 > evidence for the removed artifact. The current candidate puts the narrowed
 > fail-closed behavior in `BasicVault` and uses it through `SimpleErc20`; it
@@ -25,8 +36,8 @@ results below remain historical evidence.
 | --- | --- |
 | GuardedErc20 source Git blob / SHA-256 | `713dab98bb9a08585e0c1f937425e8142cd600ab` / `0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed` |
 | Runtime template | 10,524 bytes; SHA-256 `e3dae3cc8bc64712d9d95adb24674f3c363e0df43d8eb853c6b430907d544a14`; 14,052 bytes EIP-170 headroom |
-| [`test_guarded_erc20.py`](../../../../tests/vaults/test_guarded_erc20.py) | Git blob `700d6c3857795cc2058d54668252b53168fdb738`; SHA-256 `45fb971f92987017fed5ea40e85f74a3f3bb41bfe3f0a2f367f57f76c5b248f9` |
-| [Consumer inventory test](../../../../tests/vaults/test_guarded_consumer_inventory.py) | Git blob `f845bb4e317cb4031b0f67cb14f5504d9d3a3c70`; SHA-256 `b975206683403daf27ae40d25a34d56d802fccc731512227888e55bd99697817` |
+| `test_guarded_erc20.py` | Git blob `700d6c3857795cc2058d54668252b53168fdb738`; SHA-256 `45fb971f92987017fed5ea40e85f74a3f3bb41bfe3f0a2f367f57f76c5b248f9` |
+| Consumer inventory test | Git blob `f845bb4e317cb4031b0f67cb14f5504d9d3a3c70`; SHA-256 `b975206683403daf27ae40d25a34d56d802fccc731512227888e55bd99697817` |
 | [Stock comparison test](../../../../tests/vaults/test_stock_token_vault_comparison.py) | Git blob `b8c33f0df312d1ed1e04343337685c4f8c88a377`; SHA-256 `288f8d3fb5cc5de902e4d3918f1ab0c1b7946af243148af34dc6f084e681191c` |
 | [AuctionHouse Stock-delivery test](../../../../tests/core/auctionHouse/test_auctionhouse_stock_delivery.py) | Git blob `f19d5dcb1fcf7a6a37132ee1a0b0e02b3b70c3e7`; SHA-256 `2a0be15fe4241562bee5b3157a1f98d17ba9306c7403314c2a7e514df96a9546` |
 | [Deleverage Stock-delivery test](../../../../tests/core/deleverage/test_deleverage_stock_delivery.py) | Git blob `d8a0d95317b45ac7a20016945a05f14ae3eead6d`; SHA-256 `c74b1b0d8b22e5a064109c6f811b98010d40aa979600683d57d3d67e5a385d54` |
@@ -68,7 +79,7 @@ disposition.
 | Field | Reviewed value and status |
 | --- | --- |
 | Review date | 28 July 2026 |
-| Production source | [`contracts/vaults/GuardedErc20.vy`](../../../../contracts/vaults/GuardedErc20.vy) |
+| Production source | `contracts/vaults/GuardedErc20.vy` |
 | Implementation commit | `4f887207d344a1513d6c3a79d315c8315a10a9c8` |
 | Implementation parent | `e39815d710ecfaf8bbeea54cabe8ae8d553a2740` |
 | Reviewed `rh` commit | `cca60bb85c772c977bb9fb62c1c6c5252c3a1438` |
@@ -198,7 +209,7 @@ flowchart TD
 ```
 
 Guarded's declarations at
-[`GuardedErc20.vy:6-18`](../../../../contracts/vaults/GuardedErc20.vy#L6-L18)
+`GuardedErc20.vy:6-18`
 match Simple's `Vault`, `Addys`, `VaultData`, and `BasicVault` composition
 ([`SimpleErc20.vy:6-18`](../../../../contracts/vaults/SimpleErc20.vy#L6-L18)).
 Rebase instead initializes SharesVault
@@ -216,24 +227,24 @@ recipient-delivery checks.
 
 | Guarded function | Source and closest predecessor | Exact behavioral delta |
 | --- | --- | --- |
-| `__init__` | [`Guarded 39-43`](../../../../contracts/vaults/GuardedErc20.vy#L39-L43); [`Simple 40-44`](../../../../contracts/vaults/SimpleErc20.vy#L40-L44) | Same `Addys`, unpaused `VaultData`, and `BasicVault` initialization; no mode field or new stored policy. |
-| `depositTokensInVault` | [`Guarded 51-79`](../../../../contracts/vaults/GuardedErc20.vy#L51-L79); [`Simple 52-64`](../../../../contracts/vaults/SimpleErc20.vy#L52-L64); [`Basic 23-39`](../../../../contracts/vaults/modules/BasicVault.vy#L23-L39) | Require known custody and `C >= N + request`; call Basic; require exact credit, unchanged custody during accounting, and exact total-liability increase. |
-| `withdrawTokensFromVault` | [`Guarded 82-137`](../../../../contracts/vaults/GuardedErc20.vy#L82-L137); [`Simple 67-82`](../../../../contracts/vaults/SimpleErc20.vy#L67-L82); [`Basic 42-65`](../../../../contracts/vaults/modules/BasicVault.vy#L42-L65) | Require known pre-solvency; reject current nonzero Endaoment endpoints; reduce nominal directly; strict raw transfer; prove exact vault outflow, recipient delivery, and post-solvency. |
-| `transferBalanceWithinVault` | [`Guarded 140-182`](../../../../contracts/vaults/GuardedErc20.vy#L140-L182); [`Simple 85-100`](../../../../contracts/vaults/SimpleErc20.vy#L85-L100); [`Basic 68-87`](../../../../contracts/vaults/modules/BasicVault.vy#L68-L87) | Require known solvency; prove exact seller/buyer deltas, unchanged total liability, unchanged custody, and post-solvency. |
+| `__init__` | Guarded 39-43; [Simple 40-44](../../../../contracts/vaults/SimpleErc20.vy#L40-L44) | Same `Addys`, unpaused `VaultData`, and `BasicVault` initialization; no mode field or new stored policy. |
+| `depositTokensInVault` | Guarded 51-79; [Simple 52-64](../../../../contracts/vaults/SimpleErc20.vy#L52-L64); [Basic 23-39](../../../../contracts/vaults/modules/BasicVault.vy#L23-L39) | Require known custody and `C >= N + request`; call Basic; require exact credit, unchanged custody during accounting, and exact total-liability increase. |
+| `withdrawTokensFromVault` | Guarded 82-137; [Simple 67-82](../../../../contracts/vaults/SimpleErc20.vy#L67-L82); [Basic 42-65](../../../../contracts/vaults/modules/BasicVault.vy#L42-L65) | Require known pre-solvency; reject current nonzero Endaoment endpoints; reduce nominal directly; strict raw transfer; prove exact vault outflow, recipient delivery, and post-solvency. |
+| `transferBalanceWithinVault` | Guarded 140-182; [Simple 85-100](../../../../contracts/vaults/SimpleErc20.vy#L85-L100); [Basic 68-87](../../../../contracts/vaults/modules/BasicVault.vy#L68-L87) | Require known solvency; prove exact seller/buyer deltas, unchanged total liability, unchanged custody, and post-solvency. |
 
 ### Views and helpers
 
 | Function | Source | Guarded behavior |
 | --- | --- | --- |
-| `getVaultDataOnDeposit` | [`190-194`](../../../../contracts/vaults/GuardedErc20.vy#L190-L194) | Reuses nominal Basic metadata; not a credit valuation getter. |
-| `getUserLootBoxShare` | [`197-201`](../../../../contracts/vaults/GuardedErc20.vy#L197-L201) | Reuses nominal share; reward enablement remains configuration. |
-| `getUserAssetAndAmountAtIndex` | [`204-218`](../../../../contracts/vaults/GuardedErc20.vy#L204-L218) | Empty remains `(zero, 0)`; a nonempty unsafe position becomes `(asset, 0)`; safe position returns nominal. |
-| `getUserAssetAtIndexAndHasBalance` | [`221-225`](../../../../contracts/vaults/GuardedErc20.vy#L221-L225) | Reuses nominal position existence so unsafe backing does not erase identity. |
-| `getTotalAmountForUser` | [`233-239`](../../../../contracts/vaults/GuardedErc20.vy#L233-L239) | Returns zero for unknown/deficient backing, otherwise nominal. |
-| `getTotalAmountForVault` | [`242-245`](../../../../contracts/vaults/GuardedErc20.vy#L242-L245) | Returns nominal liability, not custody. |
-| `_hasUsableBacking` | [`248-254`](../../../../contracts/vaults/GuardedErc20.vy#L248-L254) | True only for an exact successful observation with `C >= N`. |
-| `_transferOut` | [`257-275`](../../../../contracts/vaults/GuardedErc20.vy#L257-L275) | Accepts empty returndata or exact 32-byte canonical `true`; rejects failure, false, malformed, short, and oversized data. |
-| `_observeExactBalance` | [`278-292`](../../../../contracts/vaults/GuardedErc20.vy#L278-L292) | Static raw call; failed or non-32-byte data becomes `(False, 0)` rather than bubbling through backing-aware views. |
+| `getVaultDataOnDeposit` | `190-194` | Reuses nominal Basic metadata; not a credit valuation getter. |
+| `getUserLootBoxShare` | `197-201` | Reuses nominal share; reward enablement remains configuration. |
+| `getUserAssetAndAmountAtIndex` | `204-218` | Empty remains `(zero, 0)`; a nonempty unsafe position becomes `(asset, 0)`; safe position returns nominal. |
+| `getUserAssetAtIndexAndHasBalance` | `221-225` | Reuses nominal position existence so unsafe backing does not erase identity. |
+| `getTotalAmountForUser` | `233-239` | Returns zero for unknown/deficient backing, otherwise nominal. |
+| `getTotalAmountForVault` | `242-245` | Returns nominal liability, not custody. |
+| `_hasUsableBacking` | `248-254` | True only for an exact successful observation with `C >= N`. |
+| `_transferOut` | `257-275` | Accepts empty returndata or exact 32-byte canonical `true`; rejects failure, false, malformed, short, and oversized data. |
+| `_observeExactBalance` | `278-292` | Static raw call; failed or non-32-byte data becomes `(False, 0)` rather than bubbling through backing-aware views. |
 
 ### Complete operation flow
 
@@ -348,40 +359,40 @@ adopt Guarded behavior.
 Primary configuration evidence:
 
 - ordinary Simple and omitted Rebase roles:
-  [`robinhood-blueprint-phase-a.md:1543-1548`](../evidence/robinhood-blueprint-phase-a.md#L1543-L1548);
+  `robinhood-blueprint-phase-a.md:1543-1548`;
 - AAPL-only initial Stock and route boundaries:
-  [`robinhood-blueprint-phase-a.md:2733-2743`](../evidence/robinhood-blueprint-phase-a.md#L2733-L2743); and
+  `robinhood-blueprint-phase-a.md:2733-2743`; and
 - no guessed Guarded VaultBook ID:
-  [`robinhood-blueprint-phase-a.md:2553-2562`](../evidence/robinhood-blueprint-phase-a.md#L2553-L2562).
+  `robinhood-blueprint-phase-a.md:2553-2562`.
 
 ## Test-to-invariant matrix
 
 The focused file is
-[`tests/vaults/test_guarded_erc20.py`](../../../../tests/vaults/test_guarded_erc20.py).
+`tests/vaults/test_guarded_erc20.py`.
 
 | Test | Invariant, adversary, and rollback evidence |
 | --- | --- |
-| [`test_exact_deposit_preserves_units_layout_and_event`, 516-538](../../../../tests/vaults/test_guarded_erc20.py#L516-L538) | Real Teller deposit produces exact user/total delta and event; Teller supplies call-local receipt proof. |
-| [`test_preexisting_surplus_remains_uncredited_and_live`, 541-559](../../../../tests/vaults/test_guarded_erc20.py#L541-L559) | Donation stays surplus; user receives only the request. |
-| [`test_deficit_blocks_deposit_without_allocating_new_nominal`, 562-585](../../../../tests/vaults/test_guarded_erc20.py#L562-L585) | Issuer burn creates deficit; deposit reverts with token and nominal state unchanged. |
-| [`test_unknown_backing_blocks_mutation_and_zeroes_usable_views`, 593-637](../../../../tests/vaults/test_guarded_erc20.py#L593-L637) | Revert/empty/1/31/33/64-byte `balanceOf` blocks mutations and zeroes usable views without erasing position identity. |
-| [`test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal`, 640-663](../../../../tests/vaults/test_guarded_erc20.py#L640-L663) | Deficit, restoration, exact backing, and surplus follow the selected view semantics. |
-| [`test_true_empty_and_zero_nominal_index_returns_empty_zero`, 691-714](../../../../tests/vaults/test_guarded_erc20.py#L691-L714) | True empty `(zero, 0)` remains distinct from nonempty unsafe `(asset, 0)`. |
-| [`test_internal_movement_is_exact_partial_or_full_and_custody_neutral`, 725-757](../../../../tests/vaults/test_guarded_erc20.py#L725-L757) | Partial/full/over-request amounts preserve exact seller/buyer deltas, custody, and total liability. |
-| [`test_internal_movement_ignores_token_transfer_controls`, 760-782](../../../../tests/vaults/test_guarded_erc20.py#L760-L782) | Documents intentional custody-neutral behavior: pause/blocklist transfer controls are not consulted because no token transfer occurs. |
-| [`test_internal_failure_on_deficit_or_self_transfer_is_atomic`, 785-828](../../../../tests/vaults/test_guarded_erc20.py#L785-L828) | Deficit or self-transfer reverts every nominal/index/custody effect. |
-| [`test_internal_unknown_post_read_reverts_all_nominal_changes`, 831-866](../../../../tests/vaults/test_guarded_erc20.py#L831-L866) | Malformed/reverting post-read rolls back earlier nominal movement. |
-| [`test_external_partial_and_full_withdrawals_match_outflow_delivery_and_report`, 869-901](../../../../tests/vaults/test_guarded_erc20.py#L869-L901) | Partial/full/over-request withdrawal matches nominal reduction, vault outflow, recipient delivery, and depletion flag. |
-| [`test_external_withdrawal_preserves_surplus_without_assigning_it`, 904-924](../../../../tests/vaults/test_guarded_erc20.py#L904-L924) | Donation remains after nominal withdrawal. |
-| [`test_compatible_transfer_returndata_succeeds`, 1172-1195](../../../../tests/vaults/test_guarded_erc20.py#L1172-L1195) | Empty and exact true-return transfers remain live. |
-| [`test_rejected_transfer_returndata_rolls_back_every_observable_effect`, 1209-1232](../../../../tests/vaults/test_guarded_erc20.py#L1209-L1232) | Revert/false/short/33/64/malformed Boolean rejects and rolls back nominal, token, index, and log effects. |
-| [`test_nonexact_external_delivery_reverts_all_vault_and_token_state`, 1248-1271](../../../../tests/vaults/test_guarded_erc20.py#L1248-L1271) | Fee/burn/reflection-style delta mismatch reverts all token and vault state. |
-| [`test_post_transfer_unknown_balance_reverts_atomically`, 1276-1299](../../../../tests/vaults/test_guarded_erc20.py#L1276-L1299) | Successful transfer followed by unknown post-read rolls back transfer and nominal reduction. |
-| [`test_shared_mutex_rejects_authorized_callback_and_rolls_back_outer_withdrawal`, 1302-1356](../../../../tests/vaults/test_guarded_erc20.py#L1302-L1356) | Actually authorized nested caller reaches the shared mutex; outer withdrawal and token effects roll back. |
-| [`test_real_teller_batch_routes_partial_exact_and_over_request_through_guarded`, 1690-1801](../../../../tests/vaults/test_guarded_erc20.py#L1690-L1801) | Real Teller batch preserves amount/depletion behavior. |
-| [`test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, 1804-1925](../../../../tests/vaults/test_guarded_erc20.py#L1804-L1925) | Later failure restores every earlier nominal/token/purchaser/event effect in the transaction. |
-| [`test_current_endaoment_endpoints_are_rejected_before_delivery`, 1933-1989](../../../../tests/vaults/test_guarded_erc20.py#L1933-L1989) | Current nonzero Endaoment Funds/PSM recipients reject before delivery. |
-| [`test_roles_pause_and_normal_recipient_behavior_remain_live`, 1992-2051](../../../../tests/vaults/test_guarded_erc20.py#L1992-L2051) | Unauthorized/paused paths reject while authorized ordinary recipients remain live. |
+| ``test_exact_deposit_preserves_units_layout_and_event`, 516-538` | Real Teller deposit produces exact user/total delta and event; Teller supplies call-local receipt proof. |
+| ``test_preexisting_surplus_remains_uncredited_and_live`, 541-559` | Donation stays surplus; user receives only the request. |
+| ``test_deficit_blocks_deposit_without_allocating_new_nominal`, 562-585` | Issuer burn creates deficit; deposit reverts with token and nominal state unchanged. |
+| ``test_unknown_backing_blocks_mutation_and_zeroes_usable_views`, 593-637` | Revert/empty/1/31/33/64-byte `balanceOf` blocks mutations and zeroes usable views without erasing position identity. |
+| ``test_deficit_zeroes_usable_views_but_surplus_preserves_only_nominal`, 640-663` | Deficit, restoration, exact backing, and surplus follow the selected view semantics. |
+| ``test_true_empty_and_zero_nominal_index_returns_empty_zero`, 691-714` | True empty `(zero, 0)` remains distinct from nonempty unsafe `(asset, 0)`. |
+| ``test_internal_movement_is_exact_partial_or_full_and_custody_neutral`, 725-757` | Partial/full/over-request amounts preserve exact seller/buyer deltas, custody, and total liability. |
+| ``test_internal_movement_ignores_token_transfer_controls`, 760-782` | Documents intentional custody-neutral behavior: pause/blocklist transfer controls are not consulted because no token transfer occurs. |
+| ``test_internal_failure_on_deficit_or_self_transfer_is_atomic`, 785-828` | Deficit or self-transfer reverts every nominal/index/custody effect. |
+| ``test_internal_unknown_post_read_reverts_all_nominal_changes`, 831-866` | Malformed/reverting post-read rolls back earlier nominal movement. |
+| ``test_external_partial_and_full_withdrawals_match_outflow_delivery_and_report`, 869-901` | Partial/full/over-request withdrawal matches nominal reduction, vault outflow, recipient delivery, and depletion flag. |
+| ``test_external_withdrawal_preserves_surplus_without_assigning_it`, 904-924` | Donation remains after nominal withdrawal. |
+| ``test_compatible_transfer_returndata_succeeds`, 1172-1195` | Empty and exact true-return transfers remain live. |
+| ``test_rejected_transfer_returndata_rolls_back_every_observable_effect`, 1209-1232` | Revert/false/short/33/64/malformed Boolean rejects and rolls back nominal, token, index, and log effects. |
+| ``test_nonexact_external_delivery_reverts_all_vault_and_token_state`, 1248-1271` | Fee/burn/reflection-style delta mismatch reverts all token and vault state. |
+| ``test_post_transfer_unknown_balance_reverts_atomically`, 1276-1299` | Successful transfer followed by unknown post-read rolls back transfer and nominal reduction. |
+| ``test_shared_mutex_rejects_authorized_callback_and_rolls_back_outer_withdrawal`, 1302-1356` | Actually authorized nested caller reaches the shared mutex; outer withdrawal and token effects roll back. |
+| ``test_real_teller_batch_routes_partial_exact_and_over_request_through_guarded`, 1690-1801` | Real Teller batch preserves amount/depletion behavior. |
+| ``test_real_teller_batch_later_guarded_failure_rolls_back_every_earlier_row`, 1804-1925` | Later failure restores every earlier nominal/token/purchaser/event effect in the transaction. |
+| ``test_current_endaoment_endpoints_are_rejected_before_delivery`, 1933-1989` | Current nonzero Endaoment Funds/PSM recipients reject before delivery. |
+| ``test_roles_pause_and_normal_recipient_behavior_remain_live`, 1992-2051` | Unauthorized/paused paths reject while authorized ordinary recipients remain live. |
 
 The real batch tests use Teller's fungible-auction batch path with an
 AuctionHouse-compatible endpoint. The current package also inspects the later
@@ -586,7 +597,7 @@ recipient mismatch, and batch rollback.
 | Value under deficit | Nominal | Zero through two amount getters | Credit behavior changes without erasing position identity |
 
 Event declarations are at
-[`GuardedErc20.vy:20-37`](../../../../contracts/vaults/GuardedErc20.vy#L20-L37)
+`GuardedErc20.vy:20-37`
 and
 [`SimpleErc20.vy:21-38`](../../../../contracts/vaults/SimpleErc20.vy#L21-L38).
 Indexers must select the correct wrapper topics rather than assuming Simple
@@ -644,11 +655,11 @@ Operational rollback is correspondingly staged:
 | Full repository suite | Not rerun for this review; no current full-suite claim is made |
 
 The production record at
-[`config/block-clock-inventory.json:16260`](../../../../config/block-clock-inventory.json#L16260)
+`config/block-clock-inventory.json:16260`
 pins the Guarded path and source hash. The checker identifies Guarded at
-[`check_block_clock_inventory.py:207`](../../../../scripts/check_block_clock_inventory.py#L207)
+`check_block_clock_inventory.py:207`
 and fails on source drift near
-[`check_block_clock_inventory.py:3581`](../../../../scripts/check_block_clock_inventory.py#L3581).
+`check_block_clock_inventory.py:3581`.
 Inventory identity is path-plus-bytes, not inode identity; identical bytes at
 the approved path are equivalent for Git review.
 
@@ -656,18 +667,18 @@ the approved path are equivalent for Git review.
 
 Primary files:
 
-- [`GuardedErc20.vy`](../../../../contracts/vaults/GuardedErc20.vy)
+- `GuardedErc20.vy`
 - [`SimpleErc20.vy`](../../../../contracts/vaults/SimpleErc20.vy)
 - [`RebaseErc20.vy`](../../../../contracts/vaults/RebaseErc20.vy)
 - [`BasicVault.vy`](../../../../contracts/vaults/modules/BasicVault.vy)
 - [`SharesVault.vy`](../../../../contracts/vaults/modules/SharesVault.vy)
 - [`VaultData.vy`](../../../../contracts/vaults/modules/VaultData.vy)
 - [`Vault.vyi`](../../../../interfaces/Vault.vyi)
-- [`GuardedErc20 ABI`](../../../../scripts/abis/GuardedErc20.json)
-- [`test_guarded_erc20.py`](../../../../tests/vaults/test_guarded_erc20.py)
-- [`stock-token-vault-change-specification.md`](../stock-token-vault-change-specification.md)
-- [`stock-token-vault-change-validation-plan.md`](../stock-token-vault-change-validation-plan.md)
-- [`stock-token-vault-fix-recommendations.md`](../stock-token-vault-fix-recommendations.md)
+- GuardedErc20 ABI
+- `test_guarded_erc20.py`
+- `stock-token-vault-change-specification.md`
+- `stock-token-vault-change-validation-plan.md`
+- `stock-token-vault-fix-recommendations.md`
 
 Source identities at the reviewed snapshot:
 

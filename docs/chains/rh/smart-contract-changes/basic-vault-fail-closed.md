@@ -26,9 +26,9 @@ enough backing makes the vault usable again; no permanent brick flag is stored.
   CreditEngine explicitly excludes stability vault ID `1` from collateral and
   debt-term calculations, while AuctionHouse phase 2 can still process an
   otherwise eligible Stability Pool position.
-- An all-deficient position does not set `inLiquidation` when liquidation
-  seizes nothing and creates no auction. A later permissionless liquidation
-  can retry after backing is restored.
+- An all-deficient position remains globally frozen with `inLiquidation` while
+  unhealthy. Because no auction exists, a later permissionless liquidation can
+  retry after backing is restored.
 - An auction created while healthy remains active if its asset later becomes
   deficient. Purchases spend zero and roll back through Teller while deficient;
   restored backing makes the same auction fillable again. Switchboard pause is

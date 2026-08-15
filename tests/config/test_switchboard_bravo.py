@@ -66,12 +66,15 @@ def new_mission_control(ripe_hq, defaults, switchboard_bravo):
 
 @pytest.fixture(scope="function")
 def zero_pointer_mission_control(ripe_hq, defaults):
-    return boa.load(
+    mc = boa.load(
         "contracts/data/MissionControl.vy",
         ripe_hq,
         defaults,
         name="zero_pointer_mission_control",
     )
+    mc.eval("self.coreRipeGovVaultId = 0")
+    mc.eval("self.preferredStabVaultId = 0")
+    return mc
 
 
 def _replace_registered_mission_control(ripe_hq, governance, replacement):
@@ -1781,6 +1784,128 @@ def test_special_stab_pool_rejects_valid_non_stability_vault_ids(
             sender=governance.address,
         )
     assert not mission_control.isStabVaultId(wrong_vault_id)
+
+
+def test_special_stab_pool_rejects_legacy_partial_interface(
+    switchboard_bravo,
+    governance,
+    alpha_token,
+    savings_green,
+    vault_book,
+):
+    """A pool exposing the pre-canAccept read surface is not activatable."""
+    legacy_pool = boa.loads(
+        """
+asset: immutable(address)
+
+@deploy
+def __init__(_asset: address):
+    asset = _asset
+
+@external
+@view
+def vaultAssets(_index: uint256) -> address:
+    return asset
+
+@external
+@view
+def totalClaimableBalances(_asset: address) -> uint256:
+    return 0
+
+@external
+@view
+def isPaused() -> bool:
+    return False
+""",
+        savings_green,
+        name="legacy_partial_special_stability_pool",
+    )
+    assert vault_book.startAddNewAddressToRegistry(
+        legacy_pool, "Legacy Partial Stability Pool", sender=governance.address
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    legacy_id = vault_book.confirmNewAddressToRegistry(
+        legacy_pool, sender=governance.address
+    )
+
+    with boa.reverts():
+        switchboard_bravo.addAsset(
+            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False, False, True, True, True, True, True, True, True, True,
+            legacy_id,
+            sender=governance.address,
+        )
+
+
+def test_special_stab_pool_rejects_paused_pool(
+    switchboard_bravo,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    stability_pool,
+):
+    stability_pool.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.addAsset(
+            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+            False, False, True, True, True, True, True, True, True, True, 1,
+            sender=governance.address,
+        )
+
+
+def test_special_stab_pool_accepts_reusable_pool_with_stale_removed_slot(
+    switchboard_bravo,
+    switchboard_alpha,
+    governance,
+    alpha_token,
+    stability_pool,
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    teller,
+):
+    """Emptiness follows the authoritative count, not a stale array slot."""
+    assert stability_pool.getNumVaultAssets() == 0
+
+    amount = 100 * 10**18
+    green_token.transfer(bob, amount, sender=whale)
+    green_token.approve(savings_green, amount, sender=bob)
+    shares = savings_green.deposit(amount, bob, sender=bob)
+    savings_green.transfer(stability_pool, shares, sender=bob)
+    assert stability_pool.depositTokensInVault(
+        bob,
+        savings_green,
+        shares,
+        sender=teller.address,
+    ) == shares
+    assert stability_pool.getNumVaultAssets() == 1
+
+    withdrawn, depleted = stability_pool.withdrawTokensFromVault(
+        bob,
+        savings_green,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert withdrawn == shares
+    assert depleted
+    assert stability_pool.deregisterVaultAsset(
+        savings_green,
+        sender=switchboard_alpha.address,
+    )
+    assert stability_pool.getNumVaultAssets() == 0
+    assert stability_pool.vaultAssets(1) == savings_green.address
+
+    action_id = switchboard_bravo.addAsset(
+        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),
+        False, False, True, True, True, True, True, True, True, True, 1,
+        sender=governance.address,
+    )
+    assert action_id > 0
 
 
 def test_whitelist_interface_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):

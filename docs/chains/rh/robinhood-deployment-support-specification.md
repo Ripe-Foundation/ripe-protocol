@@ -1,21 +1,32 @@
 # Robinhood deployment-support specification
 
+> **CCIP supersession note (2026-08-11):** this specification's CCIP rows are
+> predeployment planning history. GREEN/RIPE CCIP is now live; current topology,
+> unresolved exact live-creation source identity, and remaining operational gates are in
+> [ccip-live-state.md](ccip-live-state.md). Non-CCIP content retains its stated
+> scope and authority.
+
 > **1 August 2026 currentness overlay:** Ready to continue bounded launch
 > preparation from exact baseline `5f5d22b7ee78cbb904c4fe3c6e46599c330c4353`,
 > tree `7454b5456ebb6cd02d716a64b408629ab501629e`. PR #61, Morpho V2 and
-> BlueChipYield support, H-04 source authority, H-05 deterministic blocked
-> planning, M4 proof, and the H-06 candidate operator/storage class are
-> integrated. `DefaultsRobinhood.vy` exists and compiles; Blueprint and Defaults
+> BlueChipYield support, H-04 source authority, M4 proof, and the H-06 candidate
+> operator/storage class are integrated. The former H-05 declarative runner,
+> executor, and plan census are retired; the eight-file imperative migration
+> candidate remains repository review input, not an executable plan.
+> `DefaultsRobinhood.vy` exists and compiles; Blueprint and Defaults
 > are the two editable value authorities, and the JSON ledger is synchronized
 > derived evidence. The current check is `configuration_consistent=true`,
-> `deployment_ready=false`, with 80 blockers. The current launch candidate
+> `deployment_ready=false`, with 64 blockers. The current launch candidate
 > selects unchanged CurvePrices at PriceDesk ID 2 for GREEN only, with ID 1
-> Chainlink, ID 3 BlueChipYield, IDs 4/5 empty, and priorities `[1,3]`.
+> Chainlink and priorities `[1,2]`. ID 3 BlueChipYield remains
+> blueprint-selected but is not deployed or finalized by the current candidate;
+> IDs 4/5 are empty.
 > USDG remains Chainlink-only; no LP token or Curve higher power is admitted.
 > Repository configuration is
 > prepared and consistent; production/onchain configuration has not occurred.
-> No Robinhood migration, deployment, activation, RPC, account, key, signer,
-> or release action has occurred. The sole current operational handoff is
+> No launch-remediation-candidate migration, deployment, activation, RPC,
+> account, key, signer, or release action has occurred. Separately observed
+> live CCIP and monitoring-only Uniswap state grants no such authority. The sole current operational handoff is
 > [`deployment-owner-quickstart.md`](deployment-owner-quickstart.md). The
 > phase tables below preserve historical specification proposals and are not
 > current source or lifecycle authority. In particular, their CM-017
@@ -287,6 +298,37 @@ backends empty until owner approval.
 | Prior addresses are trusted without bytecode or state reconciliation. | `scripts/utils/migration.py:100-106` | Design limitation | Resume does not establish that a recorded address is the intended deployment. |
 
 ### 3.6 Existing migration and history conventions
+
+> [!NOTE]
+> **Active-tree extraction, 2026-08-07.** The numeric step manifests described
+> below were extracted from the active tree by the RH codebase simplification
+> pass. Both directories, both current manifests, and every
+> `config/network_profiles.py` declaration are unchanged. All 66 extracted step
+> manifests remain recoverable from
+> `610b43f4508e85628a1362532a79d68d71ea902c`, with per-file blob IDs and
+> SHA-256 values in
+> [`extracted-files.tsv`](../../simplification/extracted-files.tsv).
+>
+> **Current active-tree contents, and they are not symmetric:**
+>
+> ```text
+> migration_history/base-mainnet/v1/       current-manifest.json
+> migration_history/robinhood-mainnet/v1/  0008-manifest.json
+>                                          current-manifest.json
+> ```
+>
+> `0008-manifest.json` is **retained, not extracted**. It was produced after the
+> extraction baseline, it is live Robinhood deployment history, and the
+> extraction manifest is bound to `610b43f…` and makes no claim about material
+> created after it. Operators should expect numeric step manifests produced from
+> now on to accumulate here normally; nothing in this cleanup removes, rewrites,
+> or suppresses them, and the runner's write path is unchanged.
+>
+> This changes no operator behavior. `--start-timestamp` defaults to the string
+> `"0"`, so `MigrationRunner._migrations()` always takes the explicit-start
+> branch and `_latest_manifest_timestamp()` stays unreachable from the CLI, as
+> Section 2.4 of the simplification plan records. The counts below remain the
+> historical observation made at the starting commit.
 
 At the starting commit:
 
@@ -1118,14 +1160,14 @@ shifted registration.
 | CM-048 `EndaomentPSM` | Scaffolded disabled to preserve ID 22; omission instead requires approved shared sparse-registry redesign | `contracts/core/EndaomentPSM.vy`; `ARG-HQ`; interval/fees/caps/reserve token from approved Track 4 manifest; yield `(0, zero address)` | `0600` deploy/register; `0800` proves disabled; RipeHq ID 22 `Endaoment PSM`; no GREEN capability | `canMint=false`, `canRedeem=false`, auto-deposit false, no approvals; `ASSERT-D`; `BASE-U`; `ABORT-G`; activation separately blocked |
 | CM-049 `DefaultsRobinhood` | Selected chain-specific configuration artifact; not divergent protocol logic | Proposed `contracts/config/DefaultsRobinhood.vy`; generated only from approved parameter manifest | Built before `0100`; constructor mirrors canonical defaults interface; not registered | Hash/parity/field-denominator assertions; no Base addresses; `BASE-O`; replacement approved in architecture, values open |
 | CM-050 `AeroRipePrices` | Omitted | `contracts/priceSources/AeroRipePrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
-| CM-051 GREEN CCIP BurnMint pool | Deferred thin Solidity subclass | Exact-hash Round-3 v1.6.1 inheritance-reference review passed; production source still awaits Track 1 support/version, owner-approved dependency packaging, production audit, gas and role gates | `1000_CcipPoolsAndRegistration.py`; provisional RipeHq ID 23 `GREEN CCIP Pool`; direct `canMintGreen=true` only after registration/timelock | `ROLE-G` plus external token-admin/router roles; exact dependency/compiler, no-storage/no-override, inherited lifecycle, remote/rate-limit and gas assertions; `BASE-M` new shared integration; `ABORT-G`; Track 1/owner blocked |
-| CM-052 RIPE CCIP BurnMint pool | Deferred thin Solidity subclass | Same inherited behavior as CM-051 with opposite Ripe capability; same production gates | `1000`; provisional RipeHq ID 24 `RIPE CCIP Pool`; direct `canMintRipe=true` only after registration/timelock | Same as CM-051; `ASSERT-D` until active; Track 1/owner blocked |
-| CM-053 CCIP token-admin registration | Deferred external configuration sequence | Chainlink Token Admin Registry/Router facts pending Track 1 | `1000`, after both pools and before capability enablement | Assisted registration preferred; no secret/signature in manifest; Base and RH mappings asserted; `ABORT-G`; external-action approval required |
+| CM-051 GREEN CCIP BurnMint pool | Live pool reporting `BurnMintTokenPool 1.5.1`; exact creation source identity unresolved | Ownership, routing and GREEN-only capability confirmed in the 2026-08-11 live snapshot; repository-source equivalence, rate policy and full destination-gas evidence remain open | Confirmed RipeHq ID 24 `GREEN CCIP Pool`; `canMintGreen=true`, `canMintRipe=false` | Preserve exact topology; owner disposition for disabled rate limits/zero rate admin; accepted full OffRamp gas evidence; no inferred source equivalence or transaction authority |
+| CM-052 RIPE CCIP BurnMint pool | Live pool reporting `BurnMintTokenPool 1.5.1`; exact creation source identity unresolved | Same live evidence boundary as CM-051 with the RIPE-only capability | Confirmed RipeHq ID 23 `RIPE CCIP Pool`; `canMintRipe=true`, `canMintGreen=false` | Same operational and authority gates as CM-051 |
+| CM-053 CCIP token-admin registration | Confirmed existing live external state | Current TokenAdminRegistry pool assignments and reciprocal remote wiring are bound by the dated snapshot; exact historical mutation hashes remain an evidence gap | Observed external state, not launch mutation `1000` | Preserve and revalidate; any further transaction requires owner/evidence gates, separate transaction authority, and post-readback assertions |
 | CM-054 GREEN/RIPE local price adapter | Deferred; no fabricated peg | Source/artifact and constructor do not yet exist | No migration ID until separate oracle specification; dependent features disabled | `ASSERT-O`; `BASE-M` if new shared source; owner/oracle/security blocked |
 | CM-055 deployment/migration/report tooling | Selected follow-on shared tooling, not onchain | `config/BluePrint.py`, deployment scripts and parameter scripts; profile/schema inputs from this specification | No onchain migration; implementation slices H-01–H-08 | Secret-safe, deterministic, chain-neutral assertions; `BASE-M` tooling regression; normal code revert is rollback |
 | CM-056 manifests/history | Selected follow-on shared tooling and chain-local evidence | Migration utilities plus schema in Section 15 | No onchain migration; separate RH histories | Atomic/progression assertions; Base reader compatibility; normal code revert cannot erase already-published evidence |
 | CM-057 ABI/export/verifier | Selected follow-on shared tooling | `scripts/export_abis.py`, `scripts/verify.py`, provider adapters | No onchain migration; verification follows deployed receipt | Deterministic clean build and truthful provider status; Base regression; code revert only |
-| CM-058 CCIP Solidity inheritance/build/test boundary | No production Solidity path yet; thin reference compiled and independently reproduced against the candidate pinned Chainlink packages | Exact-hash reference review exists; production source, lock/build/test package, audit and declared artifact index await Track 1 and owner/security gates | No migration; required before CM-051–053 | Pin dependencies/compiler/EVM/optimizer/IR/metadata and license/notice inputs; storage/method delta, inherited behavior, production review/audit, fork and gas evidence required; owner/security blocked |
+| CM-058 CCIP Solidity inheritance/build/test boundary | Repository 1.5.1 candidate source and focused Foundry toolchain integrated; exact live creation binding unresolved | Repository candidate/build tests do not prove the source/compiler/settings/constructor identity of the four live pools | No launch mutation; required input for any future replacement or source-equivalence claim | Preserve pinned dependencies/compiler/EVM/optimizer/IR/metadata and license/notice inputs; source/storage/method delta and inherited behavior tests remain repository evidence only; live identity, full gas, review, and release gates remain open |
 | CM-059 Base/RH test profiles | Selected future test tooling | `tests/**`, `tests/conf_core.py`, `tests/conf_utils.py` plus Track 6 inputs | No onchain migration; Deliverable B Stages 1–5 | Pinned/clean fork evidence; Base regression; no production effect |
 | CM-060 `DefaultsLocal` | Omitted from RH artifacts; retained for generic local tests | `contracts/config/DefaultsLocal.vy` | No RH migration/manifest record | Assert CM-049 selected for RH; `BASE-U`; no rollback |
 
