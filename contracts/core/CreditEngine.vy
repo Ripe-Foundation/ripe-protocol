@@ -563,11 +563,12 @@ def _repayDebt(
         isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
         bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-        # A max-value highest LTV is an internal-only signal that non-strict
-        # repayment valuation saw a positive amount without a usable price.
-        # Keep the stored terms in that case; the conservative capacity still
-        # controls this repayment's health result.
-        if bt.highestLtv != max_value(uint256):
+        # A zero highest LTV means traversal found no eligible debt-bearing
+        # collateral record. A max-value highest LTV signals that non-strict
+        # valuation saw a positive amount without a usable price. Keep the
+        # stored terms in both cases; conservative capacity still controls this
+        # repayment's health result.
+        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT:
             userDebt.debtTerms = bt.debtTerms
         hasGoodDebtHealth = userDebt.amount <= bt.totalMaxDebt
 
@@ -1133,7 +1134,10 @@ def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> b
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
-    userDebt.debtTerms = bt.debtTerms
+    # Preserve the terms used to accrue this interval when stale traversal found
+    # no eligible debt-bearing collateral record.
+    if bt.highestLtv != 0:
+        userDebt.debtTerms = bt.debtTerms
 
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
