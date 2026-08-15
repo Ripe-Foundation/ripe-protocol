@@ -720,7 +720,7 @@ def test_profile1_predeployment_safety_envelope_is_atomic_and_fail_closed():
 def test_curve_launch_graph_and_registry_selection_are_exact():
     curve = get_component("CM-017")
     assert curve.deployment is Disposition.REQUIRED
-    assert len(curve.blocker_ids) == 9
+    assert len(curve.blocker_ids) == 10
     assert all(blocker.startswith("B-CURVE-") for blocker in curve.blocker_ids)
     assert {surface.surface_id for surface in curve.surfaces} == {
         "S-017-DEPLOYMENT",
