@@ -5,11 +5,11 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs, get_boa_dev_reasons
+from conf_utils import clear_transient_storage, filter_logs, get_boa_dev_reasons
 
 
 AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "2df2c80609a9a5edbd350c06305043f97737fd2cd334ee89b7aa90e30e9a03f0"
+    "450d4c954cc20ee262972f676c46cf031bb8eede2fcce33c89021fabcf17996a"
 )
 # AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
@@ -274,7 +274,9 @@ def test_ah_liquidation_stab_pool_swap(
 
     # expected values
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
-    target_collateral_val = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - liq_fee)
+    target_collateral_val = (
+        target_repay_amount * HUNDRED_PERCENT - 1
+    ) // (HUNDRED_PERCENT - liq_fee) + 1
     exp_liq_fees = debt_amount * liq_fee // HUNDRED_PERCENT
 
     # liquidate user
@@ -2102,7 +2104,7 @@ def test_ah_liquidation_edge_cases(
 
     # Boa does not clear EIP-1153 state between direct top-level calls. This
     # boundary models a second production transaction.
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     assert credit_engine.canLiquidateUser(bob)
     keeper_rewards2 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards2 == 0

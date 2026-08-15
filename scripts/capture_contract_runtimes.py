@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Capture one sealed, provenance-bound RH deployed-runtime generation.
-
-Chain-specific artifacts that are not RH-authoritative are explicitly excluded
-and described in the completion manifest rather than mixed into this capture.
-"""
+"""Capture one sealed, provenance-bound RH deployed-runtime generation."""
 
 from __future__ import annotations
 
@@ -25,7 +21,7 @@ from scripts import check_contract_artifacts as checker
 
 
 DEFAULT_OUTPUT = Path("/private/tmp/pr67-final-runtime-capture")
-CAPTURE_SCHEMA_VERSION = 2
+CAPTURE_SCHEMA_VERSION = 1
 CAPTURE_MANIFEST = "capture-manifest.json"
 
 ZERO = "0x0000000000000000000000000000000000000000"
@@ -262,17 +258,17 @@ def _json_value(value: Any) -> Any:
 
 
 def expected_capture_provenance() -> Mapping[str, Mapping[str, Any]]:
-    if set(CONSTRUCTOR_INPUTS) != checker.RH_CAPTURED_RUNTIME_CONTRACTS:
+    if set(CONSTRUCTOR_INPUTS) != checker.DEPLOYED_RUNTIME_CONTRACTS:
         raise checker.ArtifactCheckError(
-            "capture constructor-input census does not match the exact RH runtime set"
+            "capture constructor-input census does not match the exact runtime set"
         )
-    if set(PROSPECTIVE_STATE) != checker.RH_CAPTURED_RUNTIME_CONTRACTS:
+    if set(PROSPECTIVE_STATE) != checker.DEPLOYED_RUNTIME_CONTRACTS:
         raise checker.ArtifactCheckError(
-            "capture prospective-state census does not match the exact RH runtime set"
+            "capture prospective-state census does not match the exact runtime set"
         )
 
     records = {}
-    for name in sorted(checker.RH_CAPTURED_RUNTIME_CONTRACTS):
+    for name in sorted(checker.DEPLOYED_RUNTIME_CONTRACTS):
         inputs = _json_value(CONSTRUCTOR_INPUTS[name])
         prospective_state = _json_value(PROSPECTIVE_STATE[name])
         records[name] = {
@@ -283,12 +279,6 @@ def expected_capture_provenance() -> Mapping[str, Mapping[str, Any]]:
             "prospective_state_sha256": checker._json_sha256(prospective_state),
         }
     return records
-
-
-def separately_bound_runtime_contracts() -> Mapping[str, Mapping[str, Any]]:
-    return {
-        "Endaoment": checker.base_endaoment_deployed_runtime_authority(),
-    }
 
 
 def _constructor_values(name: str) -> list[Any]:
@@ -388,7 +378,7 @@ def _deploy_graph():
     pair.configureIdentity(ZERO, WETH, RIPE)
 
     deployed = {}
-    for index, name in enumerate(sorted(checker.RH_CAPTURED_RUNTIME_CONTRACTS), 1):
+    for index, name in enumerate(sorted(checker.DEPLOYED_RUNTIME_CONTRACTS), 1):
         deployed[name] = boa.load(
             checker.GOVERNED_SOURCES[name],
             *_constructor_values(name),
@@ -420,7 +410,7 @@ def capture(output: Path) -> Path:
         boa, deployed = _deploy_graph()
         provenance = expected_capture_provenance()
         records = {}
-        for name in sorted(checker.RH_CAPTURED_RUNTIME_CONTRACTS):
+        for name in sorted(checker.DEPLOYED_RUNTIME_CONTRACTS):
             runtime = bytes(boa.env.get_code(deployed[name].address))
             if not runtime:
                 raise checker.ArtifactCheckError(f"{name}: empty deployed runtime")
@@ -436,7 +426,7 @@ def capture(output: Path) -> Path:
             }
 
         expected_runtime_files = {
-            f"{name}.runtime" for name in checker.RH_CAPTURED_RUNTIME_CONTRACTS
+            f"{name}.runtime" for name in checker.DEPLOYED_RUNTIME_CONTRACTS
         }
         actual_runtime_files = {path.name for path in stage.iterdir()}
         if actual_runtime_files != expected_runtime_files:
@@ -460,8 +450,7 @@ def capture(output: Path) -> Path:
                 ).strip(),
             },
             "governed_contracts": sorted(checker.GOVERNED_CONTRACTS),
-            "runtime_contracts": sorted(checker.RH_CAPTURED_RUNTIME_CONTRACTS),
-            "separately_bound_runtime_contracts": separately_bound_runtime_contracts(),
+            "runtime_contracts": sorted(checker.DEPLOYED_RUNTIME_CONTRACTS),
             "template_identity_contracts": ["DefaultsRobinhoodLive"],
             "contracts": records,
         }
@@ -483,7 +472,7 @@ def capture(output: Path) -> Path:
         raise
 
     print(
-        f"captured {len(checker.RH_CAPTURED_RUNTIME_CONTRACTS)} RH runtimes "
+        f"captured {len(checker.DEPLOYED_RUNTIME_CONTRACTS)} runtimes "
         f"and {CAPTURE_MANIFEST} in {output}"
     )
     return output / CAPTURE_MANIFEST

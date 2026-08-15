@@ -198,6 +198,190 @@ def test_confirm_new_address_to_registry_lifecycle_still_works(
     assert vault_book.pendingNewAddr(candidate).confirmBlock == 0
 
 
+def test_disabled_vault_slot_can_be_reused_through_update_lifecycle(
+    ripe_hq,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    original_info = vault_book.getAddrInfo(vault_id)
+    original_num_addrs = vault_book.getNumAddrs()
+
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    disabled_info = vault_book.getAddrInfo(vault_id)
+    assert disabled_info.addr == ZERO_ADDRESS
+    assert disabled_info.description == original_info.description
+    assert disabled_info.version == original_info.version + 1
+    assert vault_book.getRegId(simple_erc20_vault) == 0
+    assert vault_book.getNumAddrs() == original_num_addrs
+
+    replacement = _deploy_replacement(ripe_hq, "disabled_slot_replacement")
+    assert vault_book.startAddressUpdateToRegistry(
+        vault_id,
+        replacement,
+        sender=governance.address,
+    )
+    assert vault_book.pendingAddrUpdate(vault_id).confirmBlock != 0
+
+    with boa.reverts("time lock not reached"):
+        vault_book.confirmAddressUpdateToRegistry(
+            vault_id,
+            sender=governance.address,
+        )
+
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressUpdateToRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    replacement_info = vault_book.getAddrInfo(vault_id)
+    assert replacement_info.addr == replacement.address
+    assert replacement_info.description == original_info.description
+    assert replacement_info.version == original_info.version + 2
+    assert vault_book.getNumAddrs() == original_num_addrs
+    assert vault_book.getRegId(replacement) == vault_id
+    assert vault_book.getRegId(simple_erc20_vault) == 0
+    assert vault_book.pendingAddrUpdate(vault_id).confirmBlock == 0
+
+
+def test_invalid_ids_remain_invalid_after_zero_address_short_circuit(
+    ripe_hq,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+):
+    replacement = _deploy_replacement(ripe_hq, "invalid_id_replacement")
+    original_num_addrs = vault_book.getNumAddrs()
+
+    for invalid_id in (0, original_num_addrs + 1):
+        info_before = vault_book.getAddrInfo(invalid_id)
+        with boa.reverts("invalid update"):
+            vault_book.startAddressUpdateToRegistry(
+                invalid_id,
+                replacement,
+                sender=governance.address,
+            )
+        assert vault_book.getAddrInfo(invalid_id) == info_before
+        assert vault_book.pendingAddrUpdate(invalid_id).confirmBlock == 0
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    disabled_info = vault_book.getAddrInfo(vault_id)
+    with boa.reverts("invalid disable"):
+        vault_book.startAddressDisableInRegistry(
+            vault_id,
+            sender=governance.address,
+        )
+
+    assert vault_book.getAddrInfo(vault_id) == disabled_info
+    assert vault_book.pendingAddrDisable(vault_id).confirmBlock == 0
+    assert vault_book.getNumAddrs() == original_num_addrs
+    assert vault_book.getRegId(replacement) == 0
+    assert vault_book.getRegId(simple_erc20_vault) == 0
+
+
+def test_unauthorized_disabled_slot_calls_remain_blocked(
+    ripe_hq,
+    governance,
+    vault_book,
+    simple_erc20_vault,
+    bob,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert vault_book.startAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmAddressDisableInRegistry(
+        vault_id,
+        sender=governance.address,
+    )
+
+    replacement = _deploy_replacement(ripe_hq, "unauthorized_slot_replacement")
+    disabled_info = vault_book.getAddrInfo(vault_id)
+    original_num_addrs = vault_book.getNumAddrs()
+
+    with boa.reverts("no perms"):
+        vault_book.startAddressUpdateToRegistry(
+            vault_id,
+            replacement,
+            sender=bob,
+        )
+    with boa.reverts("no perms"):
+        vault_book.startAddressDisableInRegistry(vault_id, sender=bob)
+
+    assert vault_book.getAddrInfo(vault_id) == disabled_info
+    assert vault_book.pendingAddrUpdate(vault_id).confirmBlock == 0
+    assert vault_book.pendingAddrDisable(vault_id).confirmBlock == 0
+    assert vault_book.getNumAddrs() == original_num_addrs
+    assert vault_book.getRegId(replacement) == 0
+    assert vault_book.getRegId(simple_erc20_vault) == 0
+
+
+@pytest.mark.parametrize("action_kind", ["update", "disable"])
+def test_nonzero_incompatible_vault_remains_fail_closed(
+    action_kind,
+    ripe_hq,
+    governance,
+    vault_book,
+):
+    incompatible = _deploy_fake_ledger()
+    vault_id = vault_book.getNumAddrs() + 1
+    assert vault_book.startAddNewAddressToRegistry(
+        incompatible,
+        "Incompatible vault",
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
+    assert vault_book.confirmNewAddressToRegistry(
+        incompatible,
+        sender=governance.address,
+    ) == vault_id
+
+    replacement = None
+    if action_kind == "update":
+        replacement = _deploy_replacement(ripe_hq, "incompatible_replacement")
+
+    info_before = vault_book.getAddrInfo(vault_id)
+    num_addrs_before = vault_book.getNumAddrs()
+    with boa.reverts():
+        _start_retirement(
+            action_kind,
+            vault_book,
+            governance,
+            vault_id,
+            replacement,
+        )
+
+    assert vault_book.getAddrInfo(vault_id) == info_before
+    assert _pending_retirement(action_kind, vault_book, vault_id).confirmBlock == 0
+    assert vault_book.getNumAddrs() == num_addrs_before
+    assert vault_book.getRegId(incompatible) == vault_id
+    if replacement is not None:
+        assert vault_book.getRegId(replacement) == 0
+
+
 @pytest.mark.parametrize("action_kind", ["update", "disable"])
 def test_funded_confirmation_reverts_and_preserves_pending_and_protocol_state(
     action_kind,

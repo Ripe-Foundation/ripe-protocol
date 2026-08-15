@@ -1,8 +1,10 @@
 import hashlib
 from pathlib import Path
+import re
 
 import boa
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +26,8 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     "Lootbox": 22_993,
-    "RipeGov": 23_572,
+    "RipeGov": 23_152,
+    "AuctionHouse": 24_554,
     "CreditEngine": 24_566,
     "StabilityPool": 24_371,
 }
@@ -48,21 +51,22 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
 DEFAULT_MIN_HEADROOM = 200
 
 # Measured headroom against the 24,576 limit in this integration candidate:
-# Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
-# SwitchboardAlpha 108, Lootbox 1,231, RipeGov 1,004, SwitchboardBravo 373,
+# AuctionHouse 22, Teller 20, CreditEngine 10, StabilityPool 263, SwitchboardCharlie 703,
+# SwitchboardAlpha 108, Lootbox 1,231, RipeGov 1,424, SwitchboardBravo 373,
 # SwitchboardEcho 1,384, and the rest far larger.
 #
 # CreditEngine reopened and retired RH-D026 when this source changed. The owner
 # granted replacement RH-D029 for this exact 10-byte-headroom combined
 # reward-suppression, payer-refund, and redemption-isolation artifact. RH-D030
 # separately waives the exact 108-byte-headroom SwitchboardAlpha artifact, and
-# RH-D031 waives the exact 20-byte-headroom Teller third-party-touch artifact.
+# RH-D032 controls the exact 20-byte-headroom current Teller artifact.
 # See the decision register.
 #
 MIN_HEADROOM_OVERRIDES = {
+    "AuctionHouse": 22,  # RH-D036; exact conservation artifact, zero growth
     "CreditEngine": 10,  # RH-D029; exact combined artifact, zero growth
     "SwitchboardAlpha": 108,  # RH-D030; exact priority-vault validation artifact
-    "Teller": 20,  # RH-D031; exact third-party-touch artifact, zero growth
+    "Teller": 20,  # RH-D032; exact minimum-payout artifact, zero growth
 }
 
 # Preserve the migration branch's explicit contract-specific guards. Lootbox is
@@ -127,6 +131,26 @@ MIN_RIPE_GOV_MARGIN = 1_000
 # headroom, its override and identity entry are both removed, and it goes back to
 # being governed by the floor like everything else.
 WAIVED_CONTRACT_IDENTITIES = {
+    "AuctionHouse": {
+        "decision": "RH-D036",
+        "fixture": "auction_house",
+        "source": "contracts/core/AuctionHouse.vy",
+        "source_sha256": (
+            "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e"
+        ),
+        "runtime_sha256": (
+            "0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2"
+        ),
+        "runtime_template_bytes": 24_458,
+        "deployed_runtime_bytes": 24_554,
+        "pinned_hq": "0x00000000000000000000000000000000000000A4",
+        "constructor_args": (
+            "0x00000000000000000000000000000000000000A4",
+        ),
+        "deployed_sha256": (
+            "d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6"
+        ),
+    },
     "CreditEngine": {
         "decision": "RH-D029",
         "fixture": "credit_engine",
@@ -210,6 +234,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     lootbox,
     ripe_gov_vault,
     human_resources,
+    auction_house,
     credit_engine,
     credit_redeem,
     stability_pool,
@@ -228,6 +253,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
         "RipeGov": len(ripe_gov_vault.env.get_code(ripe_gov_vault.address)),
         "HumanResources": len(human_resources.env.get_code(human_resources.address)),
+        "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
@@ -315,6 +341,42 @@ def test_every_below_floor_waiver_declares_an_exact_identity():
             f"{EIP170_LIMIT - pinned['deployed_runtime_bytes']} bytes of headroom, "
             f"but its recorded floor is {floor}"
         )
+
+
+def test_rh_decision_register_status_and_waiver_ids_have_exact_parity():
+    register_text = (ROOT / "docs/chains/rh/decision-register.md").read_text()
+    register_rows = re.findall(
+        r"^### (RH-D\d{3}) — (.+)$",
+        register_text,
+        flags=re.MULTILINE,
+    )
+    register = dict(register_rows)
+    assert len(register) == len(register_rows), "duplicate RH decision ID"
+
+    status = yaml.safe_load((ROOT / "docs/chains/rh/status.yaml").read_text())
+    status_rows = [
+        (row["id"], row["title"])
+        for row in status["decisions"]
+        if row["id"].startswith("RH-D")
+    ]
+    status_decisions = dict(status_rows)
+    assert len(status_decisions) == len(status_rows), "duplicate status RH decision ID"
+    fully_retired = {
+        row["id"]
+        for row in status["decisions"]
+        if row["id"].startswith("RH-D")
+        and row["status"] == "retired_default_floor_restored"
+    }
+    assert fully_retired == {"RH-D026"}
+    assert status["counts"]["rh_d_decisions"] == (
+        len(status_rows) - len(fully_retired)
+    )
+    assert status_decisions == register
+
+    waiver_decisions = {
+        pinned["decision"] for pinned in WAIVED_CONTRACT_IDENTITIES.values()
+    }
+    assert waiver_decisions <= set(register)
 
 
 @pytest.mark.parametrize("name", sorted(WAIVED_CONTRACT_IDENTITIES))

@@ -87,14 +87,22 @@ later, and the intentional no-expiration behavior when `staleTime == 0`.
 
 ## Zero-supply bootstrap invariant
 
-A fresh zero-supply ERC-4626 snapshot may supply a bootstrap PPS through
-`lastSnapshot`, even though zero-supply observations are excluded from the ring
-TWAP. This is the pre-existing empty-vault policy retained by SC-17. It remains
+Here, zero supply means normalized stored supply:
+`rawTotalSupply // 10**vaultTokenDecimals == 0`. Standard ERC-4626 BlueChip and
+Undy feeds may expose a fresh normalized-zero observation through
+`lastSnapshot`, even though that observation is excluded from the ring TWAP.
+This is the pre-existing empty-vault policy retained by SC-17. It remains
 bounded by SC-23 freshness and by the normal live-PPS minimum composition, so
-it cannot bypass the current-vault PPS clamp. Transition tests use two distinct
-nonzero-supply PPS observations and independently derive an interval-weighted
-output different from the latest fallback, proving that the supply-ineligible
-bootstrap is excluded and the nonzero-supply ring takes over.
+it cannot bypass the current-vault PPS clamp. Transition tests use distinct
+eligible and ineligible observations and independently derive an
+interval-weighted output different from the latest fallback, proving that the
+supply-ineligible bootstrap is excluded and the nonzero-supply ring takes over.
+
+Morpho V2 intentionally does not inherit that bootstrap policy. A raw supply
+below one vault-token scale also normalizes to zero, but Morpho V2 rejects it
+during registration and returns zero PPS and zero supply at runtime. This is a
+clarification of existing behavior, not a new owner decision or activation
+authorization.
 
 ## RH-D034 owner decision: conditional acceptance of SC-17 timing residual
 

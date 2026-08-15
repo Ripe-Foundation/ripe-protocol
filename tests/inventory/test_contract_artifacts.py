@@ -11,7 +11,6 @@ from pathlib import Path
 import boa
 import pytest
 
-from config.BluePrint import ADDYS
 from config.artifact_expectations import (
     ArtifactExpectationsError,
     load_artifact_expectations,
@@ -34,7 +33,6 @@ REQUIRED_CONTRACTS = frozenset(
         "Deleverage",
         "DefaultsRobinhood",
         "DefaultsRobinhoodLive",
-        "Endaoment",
         "SimpleErc20",
         "Ledger",
         "Lootbox",
@@ -56,7 +54,6 @@ NEW_CONTRACT_SOURCES = {
         ROOT / "contracts" / "priceSources" / "BlueChipYieldPrices.vy"
     ),
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
-    "Endaoment": ROOT / "contracts" / "core" / "Endaoment.vy",
     "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": (
         ROOT / "contracts" / "config" / "DefaultsRobinhoodLive.vy"
@@ -77,10 +74,9 @@ NEW_CONTRACT_SOURCES = {
 # These are constructor-bound deployed-code measurements. They are deliberately
 # distinct from the pre-constructor runtime-template values frozen in the JSON.
 DEPLOYED_RUNTIME_FACTS = {
-    "AuctionHouse": {"size": 24_440, "headroom": 136},
+    "AuctionHouse": {"size": 24_554, "headroom": 22},
     "CreditEngine": {"size": 24_566, "headroom": 10},
-    "Deleverage": {"size": 23_261, "headroom": 1_315},
-    "Endaoment": {"size": 24_102, "headroom": 474},
+    "Deleverage": {"size": 24_309, "headroom": 267},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
@@ -137,7 +133,7 @@ def _write_capture_fixture(tmp_path: Path, monkeypatch):
     provenance = runtime_capture.expected_capture_provenance()
     runtime_paths = {}
     records = {}
-    for name in sorted(artifact_checker.RH_CAPTURED_RUNTIME_CONTRACTS):
+    for name in sorted(artifact_checker.DEPLOYED_RUNTIME_CONTRACTS):
         runtime = f"runtime:{name}".encode()
         runtime_path = capture_dir / f"{name}.runtime"
         runtime_path.write_bytes(runtime)
@@ -173,10 +169,7 @@ def _write_capture_fixture(tmp_path: Path, monkeypatch):
         },
         "governed_contracts": sorted(artifact_checker.GOVERNED_CONTRACTS),
         "runtime_contracts": sorted(
-            artifact_checker.RH_CAPTURED_RUNTIME_CONTRACTS
-        ),
-        "separately_bound_runtime_contracts": (
-            runtime_capture.separately_bound_runtime_contracts()
+            artifact_checker.DEPLOYED_RUNTIME_CONTRACTS
         ),
         "template_identity_contracts": ["DefaultsRobinhoodLive"],
         "contracts": records,
@@ -354,12 +347,9 @@ def test_artifact_pipeline_validates_every_compiler_envelope_field(
 
 def test_artifact_pipeline_capture_provenance_is_exact_and_state_honest():
     provenance = runtime_capture.expected_capture_provenance()
-    assert set(provenance) == artifact_checker.RH_CAPTURED_RUNTIME_CONTRACTS
+    assert set(provenance) == artifact_checker.DEPLOYED_RUNTIME_CONTRACTS
     assert artifact_checker.DEPLOYED_RUNTIME_CONTRACTS == (
         artifact_checker.GOVERNED_CONTRACTS - {"DefaultsRobinhoodLive"}
-    )
-    assert artifact_checker.RH_CAPTURED_RUNTIME_CONTRACTS == (
-        artifact_checker.DEPLOYED_RUNTIME_CONTRACTS - {"Endaoment"}
     )
     teller_inputs = provenance["Teller"]["constructor_inputs"]
     assert teller_inputs[-1] == {
@@ -370,51 +360,6 @@ def test_artifact_pipeline_capture_provenance_is_exact_and_state_honest():
     assert "storage and post-deploy state require" in provenance["Teller"][
         "prospective_state"
     ]["runtime_identity_limit"]
-    assert "Endaoment" not in provenance
-
-    authority = runtime_capture.separately_bound_runtime_contracts()["Endaoment"]
-    assert authority == artifact_checker.base_endaoment_deployed_runtime_authority()
-    assert authority["chain"] == "base"
-    assert authority["robinhood_constructor_binding_satisfied"] is False
-    base_manifest = json.loads(
-        artifact_checker.BASE_ENDAOMENT_MANIFEST.read_text()
-    )
-    assert authority["constructor_inputs"] == [
-        {
-            "name": "_ripeHq",
-            "type": "address",
-            "value": base_manifest["contracts"]["RipeHq"]["address"],
-        },
-        {
-            "name": "_weth",
-            "type": "address",
-            "value": ADDYS["base"]["WETH"],
-        },
-        {
-            "name": "_eth",
-            "type": "address",
-            "value": ADDYS["base"]["ETH"],
-        },
-    ]
-
-
-def test_base_endaoment_binding_matches_fresh_authoritative_deployment():
-    authority = artifact_checker.base_endaoment_deployed_runtime_authority()
-    constructor_values = [
-        entry["value"] for entry in authority["constructor_inputs"]
-    ]
-
-    with boa.env.anchor():
-        deployed = boa.load(
-            artifact_checker.GOVERNED_SOURCES["Endaoment"],
-            *constructor_values,
-            name="base_scoped_endaoment_artifact",
-        )
-        runtime = bytes(boa.env.get_code(deployed.address))
-
-    immutable_data = artifact_checker.base_endaoment_immutable_data()
-    assert len(immutable_data) == 160
-    assert runtime.endswith(immutable_data)
 
 
 def test_artifact_pipeline_capture_command_is_directly_invocable():

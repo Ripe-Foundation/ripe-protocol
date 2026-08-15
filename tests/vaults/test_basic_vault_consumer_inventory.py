@@ -113,6 +113,29 @@ def test_basic_vault_consumer_inventory_matches_reviewed_sources():
     )
 
 
+def test_auction_house_basic_vault_consumer_rows_are_current():
+    """Enforce the changed consumer independently of unrelated inventory drift."""
+    inventory = _load_inventory()
+    relative_path = "contracts/core/AuctionHouse.vy"
+    path = ROOT / relative_path
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        inventory["sources"][relative_path]
+    )
+    actual_rows = _scan_calls(path, inventory["getter_scope"])
+    expected_rows = [
+        {
+            "path": row["path"],
+            "line": row["line"],
+            "function": row["function"],
+            "getter": row["getter"],
+        }
+        for row in inventory["rows"]
+        if row["path"] == relative_path
+    ]
+    assert actual_rows == expected_rows
+
+
 def test_basic_vault_consumer_inventory_enforces_amount_policy():
     inventory = _load_inventory()
     category_getters = {
@@ -149,17 +172,18 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
         in {"value_backing_required", "quarantine_status_backing_required"}
     }
     assert backing_aware_paths == {
-        ("contracts/core/AuctionHouse.vy", 436),
-        ("contracts/core/AuctionHouse.vy", 532),
-        ("contracts/core/AuctionHouse.vy", 907),
-        ("contracts/core/AuctionHouse.vy", 1253),
-        ("contracts/core/AuctionHouse.vy", 1281),
+        ("contracts/core/AuctionHouse.vy", 439),
+        ("contracts/core/AuctionHouse.vy", 535),
+        ("contracts/core/AuctionHouse.vy", 913),
+        ("contracts/core/AuctionHouse.vy", 1265),
+        ("contracts/core/AuctionHouse.vy", 1293),
         ("contracts/core/CreditEngine.vy", 736),
         ("contracts/core/CreditEngine.vy", 753),
         ("contracts/core/CreditEngine.vy", 1256),
         ("contracts/core/CreditRedeem.vy", 191),
-        ("contracts/core/Deleverage.vy", 563),
-        ("contracts/core/Deleverage.vy", 1070),
+        ("contracts/core/Deleverage.vy", 579),
+        ("contracts/core/Deleverage.vy", 966),
+        ("contracts/core/Deleverage.vy", 1141),
         ("contracts/core/Teller.vy", 410),
         ("contracts/core/VaultMigrator.vy", 472),
         ("contracts/core/VaultMigrator.vy", 523),

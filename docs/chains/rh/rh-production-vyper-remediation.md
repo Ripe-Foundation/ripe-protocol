@@ -126,6 +126,26 @@ whose source Ledger entry was already removed cannot currently migrate; that
 pre-cleaned-source liveness case remains an explicit residual rather than
 bypassing the source-first position-count invariant.
 
+SC-12 corrects early-release fee accounting by burning shares while retaining
+the largest post-release share balance whose exact floored claim is no greater
+than the fee-adjusted live target. The accepted integration invariant is
+`claim(postShares) <= target < claim(postShares + 1)`; indivisible shares can
+therefore produce more than one asset base unit of unavoidable fee granularity.
+The fee remains inside the same asset pool. A remaining holder **address** is
+required, so a genuine single-address holder cannot release early; common
+beneficial ownership across multiple addresses is neither detectable nor
+prevented, and a controller of both addresses can recapture redistributed
+value.
+
+Early release accrues through the release and preserves saved governance
+points, while an equivalent ordinary partial withdrawal proportionally reduces
+them. A 100%-fee release can leave nonzero points with zero shares. That record
+does not accrue further and cannot migrate, but a later deposit reattaches the
+points and a later complete withdrawal clears them. Active or future
+governance-power consumers must treat that interim point stock as live. The
+complete owner-facing policy and Base-candidate rollout consequence are in
+[`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md).
+
 ## Special targets, price configuration, and CCIP
 
 SwitchboardBravo validates every nonzero special vault ID before monotonic

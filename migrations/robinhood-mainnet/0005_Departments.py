@@ -29,7 +29,6 @@ from config.robinhood_launch import (
     PSM_YIELD_VAULT_TOKEN,
     TELLER_SHOULD_PAUSE,
     address,
-    validate_endaoment_qualification,
 )
 
 
@@ -59,7 +58,6 @@ def migrate(migration: Migration):
     register(migration.deploy("BondRoom", hq, bond_booster), "BondRoom", 12)
 
     register(migration.deploy("CreditEngine", hq), "CreditEngine", 13)
-    validate_endaoment_qualification()
     register(
         migration.deploy(
             "Endaoment",

@@ -169,12 +169,24 @@ through `migrateRipeGovPositions`; the immutable Base source remains dedicated t
 The planned replacement Base MissionControl supplies `coreRipeGovVaultId()`. Per owner direction,
 there is no live Base RPC-check task for the old MissionControl.
 
-### Current deployed runtime sizes
+### Last measured deployed runtime sizes
 
 Measured from Boa-deployed code with Vyper 0.4.3; VaultMigrator and RipeGov were remeasured after the
 2026-08-11 core remediation. The regression test enforces EIP-170 and headroom floors; Teller and
 CreditEngine, the two contracts below RH's 200-byte default, are additionally pinned to the exact
 owner-waived source, compiler output, deployed size and immutable-bearing runtime identity.
+
+> [!CAUTION]
+> **The RipeGov row below is stale as of Robinhood SC-12 PR #144.** SC-12
+> changes the shared RipeGov source and compiler-input identity. The Base
+> migration candidate also contains independent integration changes, so the RH
+> size must not be copied here. GitHub issue
+> [#150](https://github.com/Ripe-Foundation/ripe-protocol/issues/150) owns the
+> exact-candidate rebase, runtime/source identity rebind, remeasurement, and
+> dependency-assumption review. The issue must close before the Base migration
+> candidate relies on the SC-12 RipeGov version. Until then, `23,427` bytes and
+> `1,149` bytes of headroom are historical measurements only, not current
+> qualification evidence.
 
 | Contract | Deployed runtime | EIP-170 headroom |
 |---|---:|---:|
@@ -183,7 +195,7 @@ owner-waived source, compiler output, deployed size and immutable-bearing runtim
 | TellerUtils | 8,976 | 15,600 |
 | SwitchboardEcho | 23,053 | 1,523 |
 | Lootbox | 22,993 | 1,583 |
-| RipeGov | 23,427 | 1,149 |
+| RipeGov (**stale; issue #150**) | 23,427 | 1,149 |
 | Ledger | 13,306 | 11,270 |
 | CreditEngine | 24,392 | **184 — RH-D026 exact waiver** |
 | StabilityPool | 24,371 | 205 |

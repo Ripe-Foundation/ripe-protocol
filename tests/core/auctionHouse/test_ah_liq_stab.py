@@ -2,7 +2,7 @@ import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import filter_logs
+from conf_utils import clear_transient_storage, filter_logs
 
 
 # green lp token
@@ -291,7 +291,7 @@ def test_quarantine_suppresses_direct_settlement_until_custody_recovers(
     assert credit_engine.canLiquidateUser(bob)
     # Titanoboa retains EIP-1153 values between simulated top-level calls;
     # production EVMs clear the liquidation caches before this transaction.
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     debt_before = credit_engine.getUserDebtAmount(bob)
     teller.liquidateUser(bob, False, sender=sally)
     # Boa exposes logs from the latest top-level computation, not cumulative

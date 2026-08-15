@@ -12,7 +12,6 @@ import their values from config/ and scripts/.
 from config.BluePrint import (
     ROBINHOOD_ADDRESSES,
     ROBINHOOD_ADDRESS_STATUS,
-    ROBINHOOD_ENDAOMENT_QUALIFICATION,
     ROBINHOOD_GOVERNANCE,
     SymbolicBinding,
 )
@@ -48,21 +47,6 @@ def address(key):
     ):
         raise ValueError(f"RH_EXTERNAL_FACT_UNVERIFIED:{key}:{status}")
     return value
-
-
-def validate_endaoment_qualification():
-    """Fail closed until RH constructor and partner-liquidity scope are approved."""
-    gate = ROBINHOOD_ENDAOMENT_QUALIFICATION
-    if (
-        not gate["deployment_allowed"]
-        or not gate["partner_liquidity_configuration_allowed"]
-        or not gate["qualified_legos"]
-        or not gate["qualified_partner_assets"]
-    ):
-        raise ValueError(
-            "RH_ENDAOMENT_QUALIFICATION_BLOCKED:"
-            + ";".join(gate["blockers"])
-        )
 
 
 # --- block units ------------------------------------------------------------

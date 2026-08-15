@@ -214,7 +214,7 @@ jobs:
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
           unset ETHERSCAN_API_KEY BASESCAN_API_KEY
-          # 14 nodes across two suites fail identically on pristine
+          # 15 parametrized nodes across two suites fail identically on pristine
           # origin/rh -- they are rh bugs, invisible there because pytest.ini
           # ignores tests/deployment and the comprehensive lane is manual.
           # Deselected individually rather than by file: those two files hold

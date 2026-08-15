@@ -16,18 +16,6 @@ exactly. This register does not replace the linked decision records, authorize
 a new phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
-On 15 August 2026, the owner serialized the identifiers being introduced by
-the simultaneously open remediation PRs: PR #142 owns RH-D033 and RH-D034,
-PR #144 owns RH-D035, PR #143 owns RH-D036, PR #146 owns RH-D037, PR #145 owns
-RH-D038, PR #147 owns RH-D039 through RH-D041, and PR #152 owns RH-D042. PR
-#157 inherits the PR #142 entries in its current stacked history and introduced
-no new RH-D heading at this sweep. These are merge-order reservations, not
-authority for the other PRs' source or decisions. The live sibling heads must be swept
-again immediately before rebase or merge; every affected branch must preserve
-unique headings, exact status-mirror title parity, and an active-decision count
-that excludes only entries explicitly marked fully retired rather than
-inferring the next ID from a stale branch tail.
-
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
 merge `91eda49…`; its production contract changes are integrated into `rh`.
 The historical import ancestor `ad831669…` is not the present branch authority.
@@ -37,9 +25,10 @@ the GREEN/RIPE CCIP topology is confirmed live as recorded in
 transaction or release action. The four corrected-PR controls remain zero and
 deferred and lack Robinhood machine-facing parameter/planning representation.
 RH-D028 is a bounded candidate-only exception to the historical CreditEngine
-zero-backing and Deleverage parked instructions; it does not reopen cooldown,
-Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
-candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing and Deleverage parked instructions. RH-D038 separately reopens only
+the exact SC-07/SC-09 Deleverage remediation in draft PR #145; neither decision
+reopens cooldown, Underscore, broader settlement, or bad-debt work. Outside
+those exact candidates, the five broader lanes remain parked and nonblocking: CreditEngine
 zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
 Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
 closed.
@@ -200,6 +189,10 @@ removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
 adds quarantine suppression without changing zero cooldown, enabling
 Underscore, or reopening the four deferred controls.
 
+RH-D038 is a separate narrow exception for draft PR #145's exact SC-07/SC-09
+remediation and review evidence. It likewise leaves zero cooldown, omitted
+Underscore, and the four deferred controls unchanged.
+
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
@@ -268,8 +261,8 @@ binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
 remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
-preserved, but every Deleverage task is parked and no implementation track is
-open until explicit owner reopening.
+preserved. RH-D038 is the explicit bounded reopening for draft PR #145 only;
+every other Deleverage task remains parked.
 
 Source:
 `track-6-s6-track-7-h4-defaults-parameters.md`.
@@ -422,8 +415,8 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
-every Deleverage task including size/headroom work, UniswapV2Prices admission
+Except for the exact RH-D028 and RH-D038 candidates, CreditEngine zero-backing
+reassessment, every Deleverage task including size/headroom work, UniswapV2Prices admission
 and deployment, Sites recovery, and non-CCIP live deployment are deferred or
 separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
@@ -1097,167 +1090,194 @@ because it could conceal a genuine vault loss.
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
 
-### RH-D039 — Endaoment value conservation and StableSwap-NG boundary are conditionally qualified
+## Namespace coordination note — 15 August 2026
 
-**Status:** Proposed on 15 August 2026 for the final SC-18/SC-19 candidate;
-substantive owner approval is pending. The owner's decision-ID allocation is
-namespace authority only and is not approval of this decision's artifact,
-constructor scope, Lego boundary, gas budget, or headroom position.
+A read-only live check after PR #143 merged found that the target owns
+`RH-D033` through `RH-D036`. The intended open integration set then adds unique
+claims: PR #146 adds `RH-D037`, PR #145 adds `RH-D038`, PR #147 adds `RH-D039`
+through `RH-D041`, PR #152 adds `RH-D042`, and PR #157 adds `RH-D043`. PR #163
+adds no decision. The fail-closed integration allocator passed across these six
+open PR heads and the live target; no duplicate or base-conflicting claim
+remains.
 
-The initial external partner transfer is valued from the positive recipient
-balance delta at EndaomentFunds, including controlled positive overdelivery.
-During the subsequent Lego-call window, the Lego-reported contribution must
-equal the decrease in combined Endaoment and EndaomentFunds custody and cannot
-exceed the partner asset or GREEN made available by the action. Synchronous
-credits to protocol custody during that later window therefore fail
-reconciliation. Legitimate ratio-excess remains supported: the excess is
-returned to EndaomentFunds, pre-existing GREEN reserve is attributed first,
-unused provisional GREEN is burned, and pool debt, events, return values, and
-LP allocation use the reconciled contribution. A partner asset equal to GREEN
-is rejected because the independent custody channels would alias.
+This snapshot records allocation only. It does not edit, renumber, approve, or
+reject another branch's decision, and it does not grant integration,
+deployment, configuration, activation, or release authority.
 
-That reconciliation proves protocol custody decrease equals the Lego report;
-it does not independently prove the report equals net venue receipt. The
-deployed Base Underscore Curve Lego at
-`0x4e0C4B96FAdc84D41144C1aE868aA1411c1d0743` selects its report before
-`transferFrom` and refunds only balances above its pre-call inventory. Its
-manifest-embedded `Curve.vy` source has SHA-256
-`aaadabed405acd96ce34c186a570b5684f8b015d7e83938412c75d05ffa701c9`.
-An executable regression preserves the resulting counterexample: with a
-downstream transfer fee and pre-existing Lego inventory, the gross report can
-equal protocol custody decrease while exceeding the venue's net receipt. A
-separate regression proves legitimate partial-fill/refund behavior.
+### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 
-Accordingly, Robinhood Endaoment deployment and partner-liquidity
-configuration are machine-blocked by
-`ROBINHOOD_ENDAOMENT_QUALIFICATION` and
-`validate_endaoment_qualification()`. No Lego or partner asset is qualified.
-Those gates may open only after the exact Lego address/runtime/source and every
-permitted asset's transfer behavior prove net venue-contribution semantics.
-The migration calls the validator before deploying Endaoment. Switchboard
-addresses can also hold token, Lego, or pool roles, so
-`stabilizeGreenRefPool`, `mintPartnerLiquidity`, and `addPartnerLiquidity` are
-nonreentrant; a dual-role callback-token regression proves atomic rejection.
+**Status:** Owner-accepted SC-12 policy recorded on 14 August 2026; source and
+focused evidence are candidate-complete. A nonzero Underscore registry is
+blocked on issue #161, while integration, deployment, activation,
+governance-power consumption, migration, and release remain separately gated.
 
-Stabilizer removal is qualified only for the configured Base StableSwap-NG
-interface and quote/burn relationship. Missing code or selector, a reverting
-quote, and empty, short, 64-byte, or longer returndata fail closed; only an
-exact 32-byte `calc_token_amount(uint256[],bool)` result is accepted. The
-largest amount whose quote plus one is within held LP is selected, while an
-invalid two-coin index returns zero before snapshot arithmetic on both add and
-remove paths. A legacy or otherwise non-NG pool disables removal.
+RipeGov keeps an early-release fee inside the same asset pool and burns enough
+of the exiting address's shares to retain the largest indivisible post-release
+balance satisfying:
 
-The governed compiler/template artifact and the separately scoped prospective
-Base deployed-runtime identity are executable under
-`scripts/check_contract_artifacts.py` and
-`config/contract-artifact-expectations.json`:
+```text
+claim(postShares) <= target < claim(postShares + 1)
+target = floor(claim(preShares) * (100% - exitFee))
+```
+
+The exact SharesVault claim includes virtual shares, the virtual asset term,
+and integer flooring. Indivisible-share granularity can therefore charge more
+than one asset base unit above the ideal target; maximal retained shares, not a
+one-unit fee-error bound, is the accepted invariant.
+
+At least one other address must hold actual shares. A genuine single-address
+holder cannot release early until another address holds shares. This is an
+address-level guard only: permissionless addresses do not prove distinct
+beneficial ownership, and a controller of multiple addresses can recapture
+redistributed value through another controlled position. Same-pool
+redistribution is not an unrecapturable economic penalty.
+
+Early release accrues governance points through the release block and preserves
+all saved points while burning shares. An equivalent enabled ordinary partial
+withdrawal proportionally reduces saved points, so the early-release route is
+more points-favorable until a complete withdrawal. A 100%-fee release can leave
+`lastShares == 0` with nonzero `govPoints`; that record accrues no new points and
+cannot migrate, a later same-asset deposit reattaches the points, and a later
+complete ordinary withdrawal clears them from the asset, user, and global
+totals. Boardroom and any future governance-power consumer must treat this
+zero-share point stock as live.
+
+The Teller authorization used by the public release route has a separate,
+unaccepted activation blocker. `isUnderscoreOwnerOrLego` accepts any registered
+Underscore address or Lego without binding that registered caller to the target
+user. If `underscoreRegistry` is nonzero and such a contract exposes or makes
+the call, it can force an unrelated user's release; a caller holding pool shares
+can receive part of the victim's redistributed fee. The initial Robinhood
+default keeps this path dormant by returning the zero address. A nonzero
+registry must not be configured until issue #161 either binds authorization to
+the actual wallet/user relationship with negative unrelated-Lego tests, or
+records explicit owner and security-reviewer acceptance covering exact
+contracts, callable surfaces, monitoring, and incident controls. RH-D035 does
+not accept the broad authorization and PR #144 does not redesign Teller.
+
+RipeGov's `adjustLock` and `releaseLock` lack local `@nonreentrant` decorators,
+but both accept only the exact Teller and their Teller entry points are already
+`@nonreentrant`; Boardroom and Lootbox callbacks cannot impersonate Teller.
+This is reviewed with no action under the existing registered-component trust
+model. Any defense-in-depth decorator is a separate authorized bytecode change
+requiring size, artifact, callback, and full-regression review.
+
+The Base migration candidate has an independent source/artifact identity. Its
+pre-SC-12 RipeGov size evidence is stale; issue #150 must rebase and remeasure
+that exact candidate before it relies on the SC-12 source. This decision grants
+no deployment, configuration, migration, activation, or release authority.
+
+**Source:**
+[`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md),
+[`issue #161`](https://github.com/Ripe-Foundation/ripe-protocol/issues/161),
+`contracts/vaults/RipeGov.vy`,
+`tests/vaults/ripe_gov_exit_fee_model.py`,
+`tests/vaults/test_ripe_gov_exit_fee.py`, and
+`tests/vaults/test_ripe_gov_controls_and_migration.py`.
+
+### RH-D036 — AuctionHouse conservation exact waiver at 22 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact SC-01, SC-02, and
+SC-08 AuctionHouse conservation artifact on draft PR #143. The owner separately
+authorized this waiver record and the test-only Deleverage size-pin refresh
+after review reopened the below-floor decision.
+
+The ratified 200-byte minimum remains controlling for every non-waived
+contract. The final artifact caps Stability GREEN before collateral moves,
+caps every fungible-auction iteration at current live debt, makes retry fee
+eligibility precede irreversible execution, and replaces the downstream
+repayment clamp with a fail-closed invariant. It deploys at 24,554 bytes,
+including 96 bytes of immutable data, leaving **22 bytes** before EIP-170.
+The owner accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One source and compiler-output identity under
+CPython 3.12.0, Vyper `0.4.3+commit.bff19ea2`, and titanoboa 0.2.7:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/Endaoment.vy` SHA-256 | `263281ca8d9a113881777ba00b4fc366b190436e741ffe4c408faf005ceb9f42` |
-| Source Git blob | `4bb98dfc73099c9e952ed0adba4f9eb2cbed6b2d` |
-| Transitive compiler-input integrity | `74241cf1e55a7ddb0fc569fa365e79d574300ac1128d20b9f2abea0774fb8711` |
-| Creation bytecode SHA-256 / bytes | `86c6afdf7ed17c6329824e5deb20ac61e61fb6385d97877d43b1bfe4acc22714` / 24,213 |
-| Runtime-template SHA-256 / bytes | `aa0f69662133eeb43915c13f05cc68d2b9adab043e0f1a346245647338674e10` / 23,942 |
-| Base immutable data SHA-256 / bytes | `8e75a1a703030bbdf061b4aba4d34b4c9d2ae162425b021f35c7d5d69b32f77b` / 160 |
-| Prospective Base deployed-runtime SHA-256 / bytes | `5b69ef04e24075a6f1b1d406fb9e67bab447d18fd1b1101e4ee4c15662f0bb90` / 24,102 |
-| Prospective Base deployed EIP-170 headroom | 474 bytes |
-| Canonical ABI SHA-256 | `588a5d0ba2aa792932c42dcfb31057483ea6ac730f516830a5fbe0fae32bbb10` |
+| `contracts/core/AuctionHouse.vy` SHA-256 | `e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e` |
+| Runtime-template SHA-256 (immutable-free) | `0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2` |
+| Runtime-template bytes | 24,458 |
+| Immutable data bytes | 96 |
+| Deployed runtime bytes | 24,554 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A4` | `d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6` |
+| Complete deployed-runtime SHA-256 at production-capture HQ `0xD4e8…0940` | `dec131999301b49ed3c85c7f53f9d785cb01a9b2204eeccdf05fb2e247c98965` |
 
-The prospective Base constructor tuple is derived, not independently
-literalized: RipeHq comes from
-`migration_history/base-mainnet/v1/current-manifest.json`, while WETH and the
-native-ETH sentinel come from `ADDYS["base"]` in `config/BluePrint.py`.
-It binds RipeHq `0x6162df1b329E157479F8f1407E888260E0EC3d2b`, WETH
-`0x4200000000000000000000000000000000000006`, native ETH
-`0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`, `canMintGreen = true`, and
-`canMintRipe = false`. An executable fresh deployment proves that derived tuple
-produces the recorded immutable suffix. This Base identity is not a Robinhood
-deployed-runtime binding and does not satisfy the still-open Robinhood
-constructor decision. Robinhood RipeHq is deployment-produced, DP-21 WETH
-remains externally unverified, and the native-ETH sentinel must be rebound
-with the final chain authority before an RH identity can be captured.
+The declared `0x…00A4` HQ is a deterministic waiver-test input, not a
+production address. The production-capture identity uses the constructor input
+declared by the governed artifact ledger. Any constructor-input change produces
+a different complete deployed byte string and reopens exact deployment-capture
+review even when the source and length do not move.
 
-The artifact has 474 bytes of deployed headroom, 274 bytes above the ordinary
-200-byte floor. No below-floor waiver has been granted. Every source or
-compiler-input change must recalculate headroom; any change that reduces it
-below 200 bytes must be optimized away or separately waived through the
-established process.
+**Measured progression.** The authoritative baseline deployed runtime was
+24,440 bytes with 136 bytes of headroom. SC-01 measured 24,501/75; SC-02
+measured 24,566/10; the first SC-08 candidate measured 24,571/5. Review then
+removed a behaviorally redundant fee local and replaced a masking repayment
+clamp with a fail-closed assertion, yielding the final 24,554/22 artifact
+without removing the Stability exact-receipt check, the AuctionHouse GREEN
+balance cap, or a public ABI entry.
 
-At Base block 34,471,929, the configured production pool
-`0xd6c283655B42FA0eb2685F7AB819784F071459dc` has full runtime SHA-256
-`7e947f3a43a183801674f31e60664273c170333f2c16799af2847d8ee384f0dc`.
-Its executable logic and math/configuration immutable prefix, excluding the
-final 64-byte per-pool salt and EIP-712 domain separator, has SHA-256
-`1b68d8ca78dc82257510fd5a12f39e5246dc66a7149c7bbd13f78c3379b1f8b3`.
+**Residual risk accepted.** Only 22 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any AuctionHouse source, compiler, transitive
+dependency, constructor input, runtime-template, or complete deployed-runtime
+identity change invalidates the exact record and reopens this decision. A
+future change must restore at least 200 bytes or receive a new exact owner
+waiver; refreshing the constants merely to make a test pass is prohibited.
 
-Any Endaoment source, compiler input, Vyper setting, constructor authority,
-ABI, artifact identity, configured pool, or qualified Lego/asset change
-reopens this decision. This proposal authorizes no deployment, configuration,
-activation, transaction, or release.
+**SC-08 economic and liveness policy.** The owner accepts all three semantics
+below for this exact artifact:
 
-**Source:** `contracts/core/Endaoment.vy`,
-`config/BluePrint.py`, `config/robinhood_launch.py`,
-`migrations/robinhood-mainnet/0005_Departments.py`,
-`tests/core/endaoment/test_partner_liquidity_reserve.py`,
-`tests/core/endaoment/test_endao_stabilizer.py`,
-`tests/deployment/test_robinhood_endaoment_qualification.py`,
-`tests/inventory/test_contract_artifacts.py`,
-`config/contract-artifact-expectations.json`, and
-[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
-Substantive owner approval for the final versions of RH-D039 through RH-D041
-is pending.
+- `liqFee` remains the legacy Stability Pool discount rate. Its gross-up
+  collateral spread can exceed the nominal base liquidation fee; settlement
+  credits no more than the nominal base fee, and keeper fees are never
+  spread-paid.
+- If an economically empty first pass freezes the account without repayment or
+  an auction, that episode permanently waives base and keeper fees. A later
+  retry may complete liquidation, but it does so fee-free and cannot recover
+  the waived compensation.
+- Fee-free retries deliberately carry no onchain keeper reward or liveness
+  guarantee. Activation therefore depends on a protocol-operated monitor or
+  keeper to retry eligible accounts, with auction buyers supplying progress
+  where an auction exists. That operational actor and alert path must be bound
+  before activation.
 
-### RH-D040 — Endaoment stabilizer execution is quote-bound
+This decision accepts deployability of the exact artifact. It does not
+authorize deployment, registry mutation, configuration, activation, or release.
 
-**Status:** Proposed on 15 August 2026 for the final RH-D039 candidate and the
-exact Base StableSwap-NG identity qualified there; substantive owner approval
-is pending.
+**Source:** `contracts/core/AuctionHouse.vy`,
+`tests/test_vault_pointer_runtime_sizes.py`,
+`tests/core/deleverage/test_deleverage_phase2.py`, and
+`config/contract-artifact-expectations.json`.
+### RH-D038 — SC-07/SC-09 Deleverage remediation is reopened and bounded
 
-After sizing and LP approval, Endaoment re-quotes the selected GREEN amount.
-A missing, reverting, malformed, or no-longer-executable quote clears approval
-and returns `False`. A valid quote is converted to the implementation's exact
-`quote + 1` burn and passed as `_maxLpBurnAmount`. If execution attempts even
-one additional wei of LP burn, the pool call and the whole stabilizer action
-revert atomically. Exact-cap and cap-plus-one tests run against both a fresh
-factory pool and the directly attached configured production pool.
+**Status:** Owner-authorized on 14 August 2026 for the exact remediation and
+review follow-through in draft PR #145. Integration, deployment,
+configuration, activation, and release remain unauthorized.
 
-This candidate closes the former unbounded-max-burn residual; LP approval is
-cleanup, not the execution bound. Any quote/burn rule, pool implementation, or
-removal-call semantic change reopens RH-D039 and this decision. The existing
-profitability invariant remains an independent transaction-wide rollback
-condition. No deployment, configuration, activation, or release is authorized.
+SC-07 refreshes the complete live debt and current interest after collateral
+interactions, rejects a changed debt amount atomically, and uses one shared
+Deleverage reentrancy domain across the four debt-writing routes and
+`swapCollateral`.
 
-**Source:** `contracts/core/Endaoment.vy`,
-`tests/core/endaoment/test_endao_stabilizer.py`, and
-[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
-Substantive owner approval is pending.
+SC-09 treats a Stability Pool cohort as unavailable for optional broad
+Deleverage and withdrawal-assist preflight when the pool's existing fail-soft
+probe reports zero because of a price outage, pause, or aggregate claim-custody
+deficit. Healthy ordinary collateral remains usable. Ordinary-vault failures
+and all failures after real processing starts still propagate; direct claims,
+withdrawals, deposits, explicit redemptions, and strict requested handling
+remain fail-closed.
 
-### RH-D041 — Endaoment cap-binding keeper gas budget is proposed at five million
+The final deployed candidate is 24,309 bytes with 267 bytes of EIP-170
+headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
+headroom override or exact-identity waiver.
 
-**Status:** Proposed on 15 August 2026 for the final RH-D039 candidate on Base,
-chain ID 8453, at qualification block 34,471,929; substantive owner and
-operations approval is pending.
+This decision reopens no cooldown, Underscore, deferred control, fork,
+deployment, configuration, activation, or release work. Robinhood deployment
+verification must establish `MissionControl.isStabVaultId(1) == true`. The
+recorded Base MissionControl is incompatible until separately upgraded and
+populated, so this Deleverage must not replace Base Deleverage as-is.
 
-The common full-request path performs one sizing quote and one execution
-re-quote; the final-artifact keeper route used 334,120 gas. Cap-binding binary
-search remains deliberately exact to one wei and used 75-82 quote calls across
-the final-artifact Base cases. The controlled cap-binding cases used 3,005,896
-and 3,049,674 gas; direct configured-production-pool execution used 3,256,452
-gas. The proposed execution-gas budget for
-`SwitchboardEcho.stabilizeGreenRefPoolInEndaoment` is 5,000,000. The fork
-regression fails above that ceiling. If approved, a keeper must estimate
-against then-current state and must not submit when its estimate exceeds the
-budget; it should alert for review instead.
-
-This proposal is Base- and artifact-specific. A chain execution-rule change,
-pool/runtime change, quote-count increase, regression above 5,000,000 gas, or
-operational move to another chain reopens the decision. It does not authorize a
-keeper transaction, deployment, configuration, activation, or release.
-
-**Source:** `tests/core/endaoment/test_endao_stabilizer.py` and
-[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
-Substantive owner and operations approval is pending.
+**Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
 ## Maintenance rule
 
