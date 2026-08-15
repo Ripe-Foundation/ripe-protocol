@@ -4,9 +4,11 @@ on:
   pull_request:
     branches:
       - rh
+      - rh-audit-remediation
   merge_group:
     branches:
       - rh
+      - rh-audit-remediation
   push:
     branches:
       - master
@@ -236,12 +238,68 @@ jobs:
             --deselect 'tests/deployment/test_stock_aapl_launch_inclusion.py::test_m4_current_applicability_mutants_fail_closed' \
             tests/deployment
 
+  snapshot-gas:
+    name: Python 3.12.0 / snapshot-gas
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ETHERSCAN_API_KEY: local-placeholder
+      HYPOTHESIS_STORAGE_DIRECTORY: ${{ github.workspace }}/.ci/hypothesis
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.ci/pycache
+      PYTHONHASHSEED: "0"
+      RIPE_BOA_CACHE_DIR: ${{ github.workspace }}/.ci/boa
+      TMPDIR: ${{ github.workspace }}/.ci/tmp
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci/xdg
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Python 3.12.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.0"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Create private runtime directories
+        run: |
+          mkdir -p \
+            "$HYPOTHESIS_STORAGE_DIRECTORY" \
+            "$PYTHONPYCACHEPREFIX" \
+            "$RIPE_BOA_CACHE_DIR" \
+            "$TMPDIR" \
+            "$XDG_CACHE_HOME" \
+            "$RUNNER_TEMP/pytest-cache" \
+            "$RUNNER_TEMP/pytest-basetemp"
+
+      - name: Install pinned requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+
+      - name: Enforce snapshot gas budgets when present
+        run: |
+          unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
+          unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          test_file=tests/priceSources/blueChip/test_bluechip_local.py
+          if grep -q '^def test_sc05_sc17_bluechip_gas_measurements' "$test_file"; then
+            /usr/bin/time -p python -m pytest \
+              -o addopts='' \
+              -o cache_dir="$RUNNER_TEMP/pytest-cache" \
+              --basetemp="$RUNNER_TEMP/pytest-basetemp" \
+              -m gas \
+              "$test_file"
+          else
+            echo "Snapshot gas benchmark not present on this prerequisite head."
+          fi
+
   rh-pr-gate:
     name: rh-pr-gate
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     needs:
       - test
       - deployment-controls
+      - snapshot-gas
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -260,5 +318,14 @@ jobs:
         run: |
           if [ "$CONTROLS_RESULT" != "success" ]; then
             echo "Deployment control suites did not succeed: $CONTROLS_RESULT"
+            exit 1
+          fi
+
+      - name: Require successful snapshot gas budgets
+        env:
+          GAS_RESULT: ${{ needs.snapshot-gas.result }}
+        run: |
+          if [ "$GAS_RESULT" != "success" ]; then
+            echo "Snapshot gas lane did not succeed: $GAS_RESULT"
             exit 1
           fi
