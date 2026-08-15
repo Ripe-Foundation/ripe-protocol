@@ -363,6 +363,7 @@ STABILIZER_REMOVAL_POOL_SOURCE = """
 
 interface IERC20:
     def transfer(_to: address, _amount: uint256) -> bool: nonpayable
+    def balanceOf(_owner: address) -> uint256: view
 
 GREEN: immutable(address)
 BURN_NUMERATOR: immutable(uint256)
@@ -440,6 +441,7 @@ def calc_token_amount(
 ) -> uint256:
     assert not _isDeposit
     assert not QUOTE_REVERTS
+    assert _amounts[0] <= staticcall IERC20(GREEN).balanceOf(self)
     return _amounts[0] * BURN_NUMERATOR // BURN_DENOMINATOR
 
 @external
@@ -497,6 +499,21 @@ def _count_selector_calls(computation, selector):
         _count_selector_calls(child, selector)
         for child in getattr(computation, "children", ())
     )
+
+
+def _quoted_green_amounts(computation, green_index=0):
+    data = bytes(getattr(computation.msg, "data", b""))
+    quoted = []
+    if data[:4] == CALC_TOKEN_AMOUNT_SELECTOR:
+        array_offset = int.from_bytes(data[4:36], "big")
+        array_start = 4 + array_offset
+        array_length = int.from_bytes(data[array_start : array_start + 32], "big")
+        assert green_index < array_length
+        value_start = array_start + 32 * (green_index + 1)
+        quoted.append(int.from_bytes(data[value_start : value_start + 32], "big"))
+    for child in getattr(computation, "children", ()):
+        quoted.extend(_quoted_green_amounts(child, green_index))
+    return quoted
 
 
 def _install_stabilizer_transition_harness(
@@ -881,6 +898,98 @@ def test_sc19_proportional_policy_allowance_preserves_exact_value(
         assert endaoment.getGreenAmountToRemoveInStabilizer() == expected
 
 
+def test_sc19_full_request_fast_path_matches_full_search(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    green_token,
+):
+    lp_balance = 200 * EIGHTEEN_DECIMALS
+    lp_total_supply = 1_000 * EIGHTEEN_DECIMALS
+    pool_green = 15_000 * EIGHTEEN_DECIMALS
+    with boa.env.anchor():
+        pool = _install_stabilizer_removal_harness(
+            curve_prices,
+            green_token,
+            pool_green,
+            75_00,
+            burn_numerator=EIGHTEEN_DECIMALS // 100,
+            adjust_weight=50_00,
+        )
+        pool.seedLp(endaoment_funds, lp_balance)
+        pool.seedLp(boa.env.generate_address(), lp_total_supply - lp_balance)
+        green_token.mint(pool.address, pool_green, sender=endaoment.address)
+
+        expected = 3_000 * EIGHTEEN_DECIMALS
+        full_search_result = _max_executable_green(
+            pool,
+            0,
+            expected,
+            lp_balance,
+        )
+        requested = endaoment.getGreenAmountToRemoveInStabilizer()
+        quote_calls = _quoted_green_amounts(endaoment._computation)
+
+        assert full_search_result == expected
+        assert requested == full_search_result
+        assert quote_calls == [requested]
+
+
+def test_sc19_reverting_full_request_falls_through_to_search(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    green_token,
+    switchboard_delta,
+):
+    lp_balance = 200 * EIGHTEEN_DECIMALS
+    lp_total_supply = 1_000 * EIGHTEEN_DECIMALS
+    reported_pool_green = 1_000 * EIGHTEEN_DECIMALS
+    quoteable_pool_green = 100 * EIGHTEEN_DECIMALS
+    with boa.env.anchor():
+        pool = _install_stabilizer_removal_harness(
+            curve_prices,
+            green_token,
+            reported_pool_green,
+            75_00,
+            burn_numerator=EIGHTEEN_DECIMALS,
+        )
+        pool.seedLp(endaoment_funds, lp_balance)
+        pool.seedLp(boa.env.generate_address(), lp_total_supply - lp_balance)
+        green_token.mint(
+            pool.address,
+            quoteable_pool_green,
+            sender=endaoment.address,
+        )
+
+        full_request = reported_pool_green * lp_balance // lp_total_supply
+        assert full_request == 200 * EIGHTEEN_DECIMALS
+        with boa.reverts():
+            pool.calc_token_amount([full_request, 0], False)
+
+        full_search_result = _max_executable_green(
+            pool,
+            0,
+            full_request,
+            lp_balance,
+        )
+        requested = endaoment.getGreenAmountToRemoveInStabilizer()
+        quote_calls = _quoted_green_amounts(endaoment._computation)
+
+        assert full_search_result == quoteable_pool_green
+        assert requested == full_search_result
+        assert quote_calls[0] == full_request
+        assert requested in quote_calls
+        assert quote_calls[-1] == requested + 1
+        assert len(quote_calls) > 1
+        assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        log = filter_logs(endaoment, "StabilizerPoolLiqRemoved")[0]
+        assert log.greenAmountRemoved == quoteable_pool_green
+        assert log.lpBurned == quoteable_pool_green + 1
+        assert log.debtRepaid == 0
+
+
 def test_sc19_reverting_quote_is_external_noop_with_no_state_change(
     endaoment,
     endaoment_funds,
@@ -1243,14 +1352,19 @@ def test_sc19_base_pool_runtime_equivalence(
 @pytest.base
 @pytest.mark.fork_qualification
 @pytest.mark.parametrize(
-    ("green_swap", "lp_divisor", "use_keeper_route"),
+    ("green_swap", "lp_divisor", "pool_debt", "use_keeper_route", "cap_binds"),
     [
-        (5_000 * EIGHTEEN_DECIMALS, 20, False),
-        (8_000 * EIGHTEEN_DECIMALS, 33, True),
+        (5_000 * EIGHTEEN_DECIMALS, 20, 20_000 * EIGHTEEN_DECIMALS, False, True),
+        (8_000 * EIGHTEEN_DECIMALS, 33, 20_000 * EIGHTEEN_DECIMALS, True, True),
+        (5_000 * EIGHTEEN_DECIMALS, 20, 0, True, False),
     ],
-    ids=["case1-cap-binds", "case2-material-imbalance-fees"],
+    ids=[
+        "case1-cap-binds",
+        "case2-material-imbalance-fees",
+        "case3-full-request-fast-path",
+    ],
 )
-def test_sc19_base_executable_cap_binds_real_pool(
+def test_sc19_base_executable_request_real_pool(
     fork,
     addSeedGreenLiq,
     setGreenRefConfig,
@@ -1267,7 +1381,9 @@ def test_sc19_base_executable_cap_binds_real_pool(
     bob,
     green_swap,
     lp_divisor,
+    pool_debt,
     use_keeper_route,
+    cap_binds,
 ):
     assert fork == "base"
     addSeedGreenLiq()
@@ -1301,13 +1417,13 @@ def test_sc19_base_executable_cap_binds_real_pool(
         assert imbalanced_burn == imbalanced_quote + 1
     assert imbalanced_quote != balanced_quote
 
-    pool_debt = 20_000 * EIGHTEEN_DECIMALS
-    ledger.updateGreenPoolDebt(
-        green_pool.address,
-        pool_debt,
-        True,
-        sender=endaoment.address,
-    )
+    if pool_debt != 0:
+        ledger.updateGreenPoolDebt(
+            green_pool.address,
+            pool_debt,
+            True,
+            sender=endaoment.address,
+        )
     total_pool_balance = data.greenBalance * HUNDRED_PERCENT // data.greenRatio
     target_balance = total_pool_balance // 2
     desired_weighted = (
@@ -1339,10 +1455,13 @@ def test_sc19_base_executable_cap_binds_real_pool(
     assert requested == executable_cap > 0
     assert desired_weighted >= executable_cap
     assert policy_allowance >= executable_cap
-    assert desired_uncapped > executable_cap
-    assert pool_debt > executable_cap
     assert cap_quote + 1 <= lp_balance
-    assert above_quote + 1 > lp_balance
+    if cap_binds:
+        assert desired_uncapped > executable_cap
+        assert pool_debt > executable_cap
+        assert above_quote + 1 > lp_balance
+    else:
+        assert desired_uncapped == executable_cap
     log_contract = endaoment
     entrypoint = "Endaoment.stabilizeGreenRefPool"
     if use_keeper_route:
@@ -1368,6 +1487,8 @@ def test_sc19_base_executable_cap_binds_real_pool(
     )
     assert stabilize_gas > 0
     assert 0 < quote_calls <= 256
+    if not cap_binds:
+        assert quote_calls == 1
 
     log = filter_logs(log_contract, "StabilizerPoolLiqRemoved")[0]
     actual_lp_burned = lp_balance - green_pool.balanceOf(endaoment_funds)
@@ -1375,9 +1496,11 @@ def test_sc19_base_executable_cap_binds_real_pool(
     assert actual_lp_burned == cap_quote + 1 == log.lpBurned
     assert actual_lp_burned <= lp_balance
     assert actual_green_received == executable_cap == log.greenAmountRemoved
-    assert log.debtRepaid == executable_cap
-    assert ledger.greenPoolDebt(green_pool.address) == pool_debt - executable_cap
-    assert green_token.balanceOf(endaoment_funds) == funds_green_before
+    assert log.debtRepaid == min(executable_cap, pool_debt)
+    assert ledger.greenPoolDebt(green_pool.address) == pool_debt - log.debtRepaid
+    assert green_token.balanceOf(endaoment_funds) == (
+        funds_green_before + actual_green_received - log.debtRepaid
+    )
     assert green_pool.balanceOf(endaoment.address) == 0
     assert green_token.balanceOf(endaoment.address) == 0
 
@@ -1407,8 +1530,13 @@ def test_sc19_base_executable_cap_binds_real_pool(
                 "debt_repaid": log.debtRepaid,
                 "stabilize_gas": stabilize_gas,
                 "quote_calls": quote_calls,
+                "fast_path_used": not cap_binds,
                 "entrypoint": entrypoint,
-                "post_fix_result": "exact executable cap succeeded",
+                "post_fix_result": (
+                    "exact executable cap succeeded"
+                    if cap_binds
+                    else "full executable request succeeded with one quote"
+                ),
             },
             sort_keys=True,
         ),
