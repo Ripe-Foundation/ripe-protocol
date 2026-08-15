@@ -152,7 +152,7 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "switchboard_alpha",
         "source": "contracts/config/SwitchboardAlpha.vy",
         "source_sha256": (
-            "0d4ac147a0d36b8e13fd079d2c2ebc5702bda9f03096914087eb301d78d1ae13"
+            "51aab6ff276c9fe85f323899356f6bf7e722782cd969e30d3719612677fa24d5"
         ),
         "runtime_sha256": (
             "eec69265f4cfa7157bcf97b16ab05ec8cd3721a04d2659ea0d25bf16f5dce7c9"

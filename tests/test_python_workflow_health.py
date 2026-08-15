@@ -158,8 +158,14 @@ def test_python_workflow_routes_automatic_events_to_one_lean_lane():
         "push",
         "workflow_dispatch",
     }
-    assert workflow["on"]["pull_request"]["branches"] == ["rh"]
-    assert workflow["on"]["merge_group"]["branches"] == ["rh"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "rh",
+        "rh-audit-remediation",
+    ]
+    assert workflow["on"]["merge_group"]["branches"] == [
+        "rh",
+        "rh-audit-remediation",
+    ]
     assert workflow["on"]["push"]["branches"] == ["master"]
     assert workflow["permissions"] == {"contents": "read"}
 
@@ -315,7 +321,7 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test", "deployment-controls"]
+    assert job["needs"] == ["test", "deployment-controls", "snapshot-gas"]
     assert job["runs-on"] == "ubuntu-latest"
     assert job["timeout-minutes"] == "5"
     assert job["if"] == (
@@ -326,6 +332,11 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     step = _step(job, "Require successful lean lane")
     assert step["env"]["TEST_RESULT"] == "${{ needs.test.result }}"
     assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
+    assert "exit 1" in step["run"]
+
+    step = _step(job, "Require successful snapshot gas budgets")
+    assert step["env"]["GAS_RESULT"] == "${{ needs.snapshot-gas.result }}"
+    assert 'if [ "$GAS_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
 
     controls = _step(job, "Require successful deployment controls")
