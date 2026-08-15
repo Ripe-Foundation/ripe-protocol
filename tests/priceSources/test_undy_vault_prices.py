@@ -2550,6 +2550,98 @@ def test_undy_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
     assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == expected
 
 
+def test_undy_sub_one_share_supply_uses_fresh_fallback_and_one_share_enters_ring(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    mock_price_source,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    scale = EIGHTEEN_DECIMALS
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    with boa.env.anchor():
+        alpha_token_vault.eval(f"self.totalSupply = {scale - 1}")
+        alpha_token.eval(
+            f"self.balanceOf[{alpha_token_vault.address}] = {2 * scale}"
+        )
+        _register_undy_integrity_feed(
+            undy_vault_prices,
+            governance,
+            alpha_token_vault,
+            max_snapshots=3,
+            stale_time=5,
+        )
+        latest = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        expected_fallback = 2 * scale * scale // (scale - 1)
+        assert latest.totalSupply == 0
+        assert latest.pricePerShare == expected_fallback
+        assert undy_vault_prices.snapShots(
+            alpha_token_vault, 0
+        ).totalSupply == 0
+        # The normalized-zero observation is ring-ineligible, so its nonzero
+        # PPS is available only through the fresh lastSnapshot fallback.
+        assert (
+            undy_vault_prices.getWeightedPrice(alpha_token_vault)
+            == expected_fallback
+        )
+        assert undy_vault_prices.getPrice(alpha_token_vault) == expected_fallback
+        boa.env.time_travel(seconds=5)
+        assert (
+            undy_vault_prices.getWeightedPrice(alpha_token_vault)
+            == expected_fallback
+        )
+        boa.env.time_travel(seconds=1)
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert undy_vault_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        alpha_token_vault.eval(f"self.totalSupply = {scale}")
+        alpha_token.eval(f"self.balanceOf[{alpha_token_vault.address}] = {scale}")
+        _register_undy_integrity_feed(
+            undy_vault_prices,
+            governance,
+            alpha_token_vault,
+            max_snapshots=3,
+            stale_time=100,
+        )
+        eligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        assert eligible.totalSupply == 1
+        assert eligible.pricePerShare == scale
+
+        boa.env.time_travel(seconds=3)
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == scale
+        alpha_token_vault.eval(f"self.totalSupply = {scale - 1}")
+        alpha_token.eval(
+            f"self.balanceOf[{alpha_token_vault.address}] = {2 * scale}"
+        )
+        assert undy_vault_prices.addPriceSnapshot(
+            alpha_token_vault,
+            sender=teller.address,
+        )
+        ineligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        assert ineligible.totalSupply == 0
+        assert ineligible.pricePerShare != eligible.pricePerShare
+
+        boa.env.time_travel(seconds=4)
+        # The one-share seed remains the only eligible ring observation. Its
+        # value differs from the fresh normalized-zero lastSnapshot fallback.
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == (
+            eligible.pricePerShare
+        )
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) != (
+            ineligible.pricePerShare
+        )
+
+
 def test_undy_sc17_capacity_one_and_malformed_chronology_fail_soft(
     undy_vault_prices,
     governance,
@@ -2596,6 +2688,72 @@ def test_undy_sc17_capacity_one_and_malformed_chronology_fail_soft(
         f"self.snapShots[{alpha_token_vault.address}][1].lastUpdate"
     )
     assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+
+
+def test_undy_sc17_corrupt_capacity_cursor_and_future_timestamp_fail_soft(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token_whale,
+    mock_price_source,
+    alpha_token,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _deposit_undy(
+        alpha_token_vault,
+        alpha_token,
+        alpha_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        alpha_token_vault,
+        max_snapshots=3,
+        stale_time=100,
+    )
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) != 0
+    assert undy_vault_prices.getPrice(alpha_token_vault) != 0
+
+    # Validated public operations cannot create any of these states. Each
+    # isolated mutation pins the defense-in-depth fail-soft guards.
+    with boa.env.anchor():
+        undy_vault_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots = 26"
+        )
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert undy_vault_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        undy_vault_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots = 0"
+        )
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert undy_vault_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        undy_vault_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].nextIndex = "
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots"
+        )
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert undy_vault_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        future_timestamp = boa.env.evm.patch.timestamp + 1
+        undy_vault_prices.eval(
+            f"self.snapShots[{alpha_token_vault.address}][0].lastUpdate = "
+            f"{future_timestamp}"
+        )
+        assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert undy_vault_prices.getPrice(alpha_token_vault) == 0
 
 
 def test_undy_sc17_duration_multiplication_overflow_fails_soft(

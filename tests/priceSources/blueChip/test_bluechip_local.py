@@ -2844,6 +2844,91 @@ def test_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
     assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == expected
 
 
+def test_sub_one_share_supply_uses_fresh_fallback_and_one_share_enters_ring(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    mock_price_source,
+    teller,
+):
+    scale = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    with boa.env.anchor():
+        alpha_token_vault.eval(f"self.totalSupply = {scale - 1}")
+        alpha_token.eval(
+            f"self.balanceOf[{alpha_token_vault.address}] = {2 * scale}"
+        )
+        _register_integrity_feed(
+            blue_chip_prices,
+            governance,
+            alpha_token_vault,
+            max_snapshots=3,
+            stale_time=5,
+        )
+        latest = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        expected_fallback = 2 * scale * scale // (scale - 1)
+        assert latest.totalSupply == 0
+        assert latest.pricePerShare == expected_fallback
+        assert blue_chip_prices.snapShots(
+            alpha_token_vault, 0
+        ).totalSupply == 0
+        # The normalized-zero observation is ring-ineligible, so its nonzero
+        # PPS is available only through the fresh lastSnapshot fallback.
+        assert (
+            blue_chip_prices.getWeightedPrice(alpha_token_vault)
+            == expected_fallback
+        )
+        assert blue_chip_prices.getPrice(alpha_token_vault) == expected_fallback
+        boa.env.time_travel(seconds=5)
+        assert (
+            blue_chip_prices.getWeightedPrice(alpha_token_vault)
+            == expected_fallback
+        )
+        boa.env.time_travel(seconds=1)
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert blue_chip_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        alpha_token_vault.eval(f"self.totalSupply = {scale}")
+        alpha_token.eval(f"self.balanceOf[{alpha_token_vault.address}] = {scale}")
+        _register_integrity_feed(
+            blue_chip_prices,
+            governance,
+            alpha_token_vault,
+            max_snapshots=3,
+            stale_time=100,
+        )
+        eligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        assert eligible.totalSupply == 1
+        assert eligible.pricePerShare == scale
+
+        boa.env.time_travel(seconds=3)
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == scale
+        alpha_token_vault.eval(f"self.totalSupply = {scale - 1}")
+        alpha_token.eval(
+            f"self.balanceOf[{alpha_token_vault.address}] = {2 * scale}"
+        )
+        assert blue_chip_prices.addPriceSnapshot(
+            alpha_token_vault,
+            sender=teller.address,
+        )
+        ineligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+        assert ineligible.totalSupply == 0
+        assert ineligible.pricePerShare != eligible.pricePerShare
+
+        boa.env.time_travel(seconds=4)
+        # The one-share seed remains the only eligible ring observation. Its
+        # value differs from the fresh normalized-zero lastSnapshot fallback.
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == (
+            eligible.pricePerShare
+        )
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) != (
+            ineligible.pricePerShare
+        )
+
+
 @pytest.mark.parametrize(
     "snapshotless_protocol",
     [BLUE_CHIP_PROTOCOL_AAVE_V3, BLUE_CHIP_PROTOCOL_COMPOUND_V3],
@@ -2945,6 +3030,65 @@ def test_sc17_capacity_one_and_malformed_chronology_fail_soft(
         f"self.snapShots[{alpha_token_vault.address}][1].lastUpdate"
     )
     assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+
+
+def test_sc17_corrupt_capacity_cursor_and_future_timestamp_fail_soft(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token_whale,
+    mock_price_source,
+    alpha_token,
+):
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _deposit(
+        alpha_token_vault,
+        alpha_token,
+        alpha_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        alpha_token_vault,
+        max_snapshots=3,
+        stale_time=100,
+    )
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) != 0
+    assert blue_chip_prices.getPrice(alpha_token_vault) != 0
+
+    # Validated public operations cannot create any of these states. Each
+    # isolated mutation pins the defense-in-depth fail-soft guards.
+    with boa.env.anchor():
+        blue_chip_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots = 26"
+        )
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert blue_chip_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        blue_chip_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots = 0"
+        )
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert blue_chip_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        blue_chip_prices.eval(
+            f"self.priceConfigs[{alpha_token_vault.address}].nextIndex = "
+            f"self.priceConfigs[{alpha_token_vault.address}].maxNumSnapshots"
+        )
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert blue_chip_prices.getPrice(alpha_token_vault) == 0
+
+    with boa.env.anchor():
+        future_timestamp = boa.env.evm.patch.timestamp + 1
+        blue_chip_prices.eval(
+            f"self.snapShots[{alpha_token_vault.address}][0].lastUpdate = "
+            f"{future_timestamp}"
+        )
+        assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == 0
+        assert blue_chip_prices.getPrice(alpha_token_vault) == 0
 
 
 def test_sc23_zero_stale_time_never_expires_and_deadline_overflow_fails_soft(
