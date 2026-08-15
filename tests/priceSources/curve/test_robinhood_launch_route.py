@@ -7,6 +7,52 @@ from config import BluePrint as source_blueprint
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
+FOUR_COIN_CURVE_SYSTEM = """# @version 0.4.3
+coins: address[4]
+@deploy
+def __init__(_coins: address[4]):
+    self.coins = _coins
+@view
+@external
+def get_address(_id: uint256) -> address:
+    if _id == 7 or _id == 12:
+        return self
+    return empty(address)
+@view
+@external
+def is_registered(_pool: address) -> bool:
+    return _pool == self
+@view
+@external
+def get_lp_token(_pool: address) -> address:
+    return self
+@view
+@external
+def get_underlying_coins(_pool: address) -> address[8]:
+    return [self.coins[0], self.coins[1], self.coins[2], self.coins[3], empty(address), empty(address), empty(address), empty(address)]
+@view
+@external
+def get_n_underlying_coins(_pool: address) -> uint256:
+    return 4
+@view
+@external
+def get_registry_handlers_from_pool(_pool: address) -> address[10]:
+    return [self, empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address)]
+@view
+@external
+def get_base_registry(_handler: address) -> address:
+    return self
+@view
+@external
+def totalSupply() -> uint256:
+    return 1
+@view
+@external
+def get_virtual_price() -> uint256:
+    return 10**18
+"""
+
+
 @pytest.fixture
 def robinhood_curve_launch_route(
     ripe_hq_deploy,
@@ -155,6 +201,87 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
         "PriceDesk",
         "Chainlink:USDG/USD",
     )
+
+
+@pytest.mark.gas
+def test_final_curve_nested_price_desk_route_gas(robinhood_curve_launch_route):
+    route = robinhood_curve_launch_route
+    assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
+    gas_used = route.price_desk._computation.get_gas_used()
+    print(f"CURVE_NESTED_PRICEDESK_GAS={gas_used}")
+    assert gas_used > 0
+
+
+@pytest.mark.gas
+def test_final_curve_worst_case_honest_nested_price_desk_gas(
+    ripe_hq,
+    deploy3r,
+    governance,
+    green_token,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+):
+    coins = [alpha_token, bravo_token, charlie_token, delta_token]
+    for coin in coins:
+        mock_price_source.setPrice(coin, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityPriceSourceIds([1, 2, 3], sender=switchboard_alpha.address)
+
+    curve_system = boa.loads(
+        FOUR_COIN_CURVE_SYSTEM,
+        [coin.address for coin in coins],
+        name="final_four_coin_curve_gas_system",
+    )
+    curve = boa.load(
+        "contracts/priceSources/CurvePrices.vy",
+        ripe_hq,
+        ZERO_ADDRESS,
+        curve_system,
+        green_token,
+        savings_green,
+        1,
+        2,
+        name="final_four_coin_curve_gas_source",
+    )
+    assert curve.addNewPriceFeed(curve_system, curve_system, sender=governance.address)
+    assert curve.confirmNewPriceFeed(curve_system, sender=governance.address)
+
+    sources = []
+    for index in range(8):
+        source = boa.load(
+            "contracts/mock/MockRawPriceSource.vy",
+            name=f"final_curve_no_feed_{index}",
+        )
+        source.configure(0, False)
+        sources.append(source)
+    sources.extend((mock_price_source, curve))
+
+    desk = boa.load(
+        "contracts/registries/PriceDesk.vy",
+        ripe_hq,
+        deploy3r,
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        1,
+        2,
+        name="final_curve_gas_price_desk",
+    )
+    for index, source in enumerate(sources, start=1):
+        assert desk.startAddNewAddressToRegistry(
+            source,
+            f"curve gas source {index}",
+            sender=deploy3r,
+        )
+        assert desk.confirmNewAddressToRegistry(source, sender=deploy3r) == index
+
+    assert desk.getPrice(curve_system, True, gas=2_000_000) == EIGHTEEN_DECIMALS
+    gas_used = desk._computation.get_gas_used()
+    print(f"CURVE_WORST_HONEST_NESTED_PRICEDESK_GAS={gas_used}")
+    assert gas_used < 2_000_000
 
 
 @pytest.mark.parametrize("failure", ("zero_pool", "zero_chainlink", "stale_chainlink"))

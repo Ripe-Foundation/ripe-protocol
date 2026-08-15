@@ -83,7 +83,7 @@ DEPLOYED_RUNTIME_FACTS = {
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
-        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
+        "cad1a936440d0b1fd25b05bced523053bbcdc98803f97ee726e0c58ed5e84ba1"
     ),
     ROOT / "scripts" / "abis" / "CurvePrices.json": (
         "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
