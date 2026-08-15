@@ -1084,6 +1084,65 @@ because it could conceal a genuine vault loss.
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
+## In-flight namespace coordination note — 14 August 2026
+
+A read-only live check immediately before this PR's allocation found that open
+PRs #142, #146, and #147 each claim `RH-D033`; PR #147 additionally claims
+`RH-D034`. PR #144 does not edit, renumber, or otherwise dispose those other
+branches. `RH-D035` had no open-PR claim and is reserved below for SC-12. The
+integration owner must resolve the pre-existing `RH-D033` collision before
+combining the affected decision records. This note records namespace state; it
+does not approve or reject another PR's decision.
+
+### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
+
+**Status:** Owner-accepted SC-12 policy recorded on 14 August 2026; source and
+focused evidence are candidate-complete, while integration, deployment,
+activation, governance-power consumption, migration, and release remain
+separately gated.
+
+RipeGov keeps an early-release fee inside the same asset pool and burns enough
+of the exiting address's shares to retain the largest indivisible post-release
+balance satisfying:
+
+```text
+claim(postShares) <= target < claim(postShares + 1)
+target = floor(claim(preShares) * (100% - exitFee))
+```
+
+The exact SharesVault claim includes virtual shares, the virtual asset term,
+and integer flooring. Indivisible-share granularity can therefore charge more
+than one asset base unit above the ideal target; maximal retained shares, not a
+one-unit fee-error bound, is the accepted invariant.
+
+At least one other address must hold actual shares. A genuine single-address
+holder cannot release early until another address holds shares. This is an
+address-level guard only: permissionless addresses do not prove distinct
+beneficial ownership, and a controller of multiple addresses can recapture
+redistributed value through another controlled position. Same-pool
+redistribution is not an unrecapturable economic penalty.
+
+Early release accrues governance points through the release block and preserves
+all saved points while burning shares. An equivalent enabled ordinary partial
+withdrawal proportionally reduces saved points, so the early-release route is
+more points-favorable until a complete withdrawal. A 100%-fee release can leave
+`lastShares == 0` with nonzero `govPoints`; that record accrues no new points and
+cannot migrate, a later same-asset deposit reattaches the points, and a later
+complete ordinary withdrawal clears them from the asset, user, and global
+totals. Boardroom and any future governance-power consumer must treat this
+zero-share point stock as live.
+
+The Base migration candidate has an independent source/artifact identity. Its
+pre-SC-12 RipeGov size evidence is stale; issue #150 must rebase and remeasure
+that exact candidate before it relies on the SC-12 source. This decision grants
+no deployment, configuration, migration, activation, or release authority.
+
+**Source:**
+[`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md),
+`contracts/vaults/RipeGov.vy`,
+`tests/vaults/ripe_gov_exit_fee_model.py`,
+`tests/vaults/test_ripe_gov_exit_fee.py`, and
+`tests/vaults/test_ripe_gov_controls_and_migration.py`.
 
 ## Maintenance rule
 

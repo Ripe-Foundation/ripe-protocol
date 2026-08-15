@@ -2,7 +2,7 @@ schema_version: 14
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-11
+  as_of: 2026-08-14
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
@@ -308,7 +308,13 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: RH-D001 through RH-D023 must match this register exactly and cannot be silently closed.
+  mirror_contract: Every integrated entry in this file must match the canonical register's identifier and title exactly and cannot be silently closed.
+  in_flight_coordination:
+    checked_on: 2026-08-14
+    sc12_reserved_id: RH-D035
+    external_open_pr_claims: { RH-D033: [142, 146, 147], RH-D034: [147] }
+    external_collision: RH-D033 is claimed by three open PRs and must be resolved by the integration owner before those records are combined.
+    scope: PR 144 records the collision read-only and does not edit or renumber another branch.
 
 document_roles:
   - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
@@ -1155,6 +1161,7 @@ decisions:
   - { id: RH-D032, title: "Teller bond minimum-payout protection exact waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The exact caller-specified minimum-payout candidate deploys at 24,556 bytes including immutables, leaving 20 bytes. It removes the one-argument purchase selector, requires the payment amount, and adds an opt-in realized-payout floor. The waiver permits zero growth and reopens on any source or compiler-output change; SDK, UI, deployment, activation, and release gates remain separate.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D033, title: "BlueChip SC-05/SC-17/SC-23 uses the codesize optimizer", status: "owner_approved_candidate_compiler_profile", summary: "The owner selected Vyper codesize after independent comparison: +255 gas on each of three measured top-level paths saves 1,076 deployed bytes versus gas optimization. The candidate deploys at 22,739 bytes with 1,837 bytes of EIP-170 headroom, so the ordinary 200-byte floor applies and no waiver is granted. RH-D034 separately accepts the SC-17 residual; this compiler decision does not authorize deployment or activation.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
   - { id: RH-D034, title: "SC-17 timing residual is conditionally accepted", status: "owner_conditionally_accepted_candidate_residual", summary: "The owner accepted retaining observation-interval TWAP with its documented snapshot-timing residual. Every snapshot-backed feed remains inactive until it has finite nonzero freshness, minSnapshotDelay no greater than staleTime, vault-specific downward-PPS manipulation qualification, monitored honest refresh before expiry, and tested alert/pause/disable procedures. Undy and all deployment, registration, activation, release, vault, and exact-parameter decisions remain separately gated.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
+  - { id: RH-D035, title: "RipeGov early-release redistribution and governance-point lifecycle", status: "owner_accepted_sc12_candidate_complete_lifecycle_gated", summary: "SC-12 keeps the fee in-pool and retains the maximal indivisible share balance under the exact post-state claim bound. The remaining-holder guard is address-level, common-owner recapture is accepted, early release preserves saved governance points, and a 100%-fee zero-share point stock cannot migrate but reattaches on deposit and clears on complete withdrawal. Base rebind issue #150, integration, deployment, activation, governance-power use, migration, and release remain separate gates.", source: "docs/chains/rh/smart-contract-changes/ripe-gov.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
