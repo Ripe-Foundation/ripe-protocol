@@ -1026,6 +1026,27 @@ mutation, activation, or release.
 `tests/test_vault_pointer_runtime_sizes.py`, and
 `config/contract-artifact-expectations.json`.
 
+### RH-D033 — BlueChip SC-05/SC-17/SC-23 uses the codesize optimizer
+
+**Status:** Owner-approved candidate compiler profile on 14 August 2026.
+
+The owner selected Vyper's `codesize` optimizer for the BlueChip snapshot
+remediation after independent reproduction of the gas-versus-size comparison.
+The accepted candidate adds 255 gas on each of the three measured top-level
+paths while saving 1,076 deployed bytes relative to the `gas` build. It deploys
+at 22,739 bytes with 1,837 bytes of EIP-170 headroom.
+
+This is not a below-floor waiver. The ordinary 200-byte headroom policy remains
+controlling. A change to the optimizer, a material change to the accepted
+trade, or a later artifact below the normal floor reopens this decision. The
+decision does not accept SC-17's liquidation-relevant timing residual and does
+not authorize deployment, configuration, activation, or release.
+
+**Source:**
+`docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
+`config/contract-artifact-expectations.json`, and
+`tests/priceSources/blueChip/test_bluechip_local.py`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

@@ -1143,13 +1143,14 @@ def _register_undy_integrity_feed(
     prices,
     governance,
     vault,
+    min_delay=0,
     max_snapshots=5,
     max_upside=0,
     stale_time=0,
 ):
     assert prices.addNewPriceFeed(
         vault,
-        0,
+        min_delay,
         max_snapshots,
         max_upside,
         stale_time,
@@ -2339,6 +2340,186 @@ def test_undy_sc17_timing_manipulation_and_supply_inflation_controls(
         + EIGHTEEN_DECIMALS * 13
     ) // 34
     assert results == [expected, expected]
+
+
+def test_undy_ordinary_user_teller_deposit_can_time_downward_snapshot(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    setGeneralConfig,
+    setAssetConfig,
+    simple_erc20_vault,
+    teller,
+):
+    """Exercise the production Teller -> PriceDesk -> Undy snapshot path."""
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    setGeneralConfig()
+    setAssetConfig(alpha_token_vault)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, amount, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault, amount, sender=bob)
+    assert alpha_token_vault.deposit(amount, bob, sender=bob) == amount
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        alpha_token_vault,
+        min_delay=10,
+        max_snapshots=5,
+        stale_time=100,
+    )
+    seed = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+
+    boa.env.time_travel(seconds=10)
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {50 * EIGHTEEN_DECIMALS}"
+    )
+    share_amount = EIGHTEEN_DECIMALS
+    alpha_token_vault.approve(teller, share_amount, sender=bob)
+    assert teller.deposit(
+        alpha_token_vault,
+        share_amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == share_amount
+
+    manipulated = undy_vault_prices.priceConfigs(alpha_token_vault)
+    assert manipulated.nextIndex == 2
+    assert manipulated.lastSnapshot.lastUpdate == boa.env.evm.patch.timestamp
+    assert manipulated.lastSnapshot.pricePerShare == EIGHTEEN_DECIMALS // 2
+
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {100 * EIGHTEEN_DECIMALS}"
+    )
+    boa.env.time_travel(seconds=30)
+    expected = (
+        seed.pricePerShare * 10
+        + (EIGHTEEN_DECIMALS // 2) * 30
+    ) // 40
+    assert undy_vault_prices.getPrice(alpha_token_vault) == expected
+
+
+def test_undy_delay_freshness_boundary_and_zero_stale_policy(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    bravo_token_vault,
+    bravo_token,
+    charlie_token_vault,
+    charlie_token,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    teller,
+):
+    """staleTime < minSnapshotDelay is allowed and intentionally fail-closed."""
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert undy_vault_prices.isValidNewFeed(alpha_token_vault, 10, 3, 0, 10)
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        alpha_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=10,
+    )
+    boa.env.time_travel(seconds=10)
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    assert undy_vault_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+
+    mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        bravo_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=9,
+    )
+    boa.env.time_travel(seconds=9)
+    assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
+    boa.env.time_travel(seconds=1)
+    assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == 0
+    assert undy_vault_prices.addPriceSnapshot(bravo_token_vault, sender=teller.address)
+    assert undy_vault_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
+
+    mock_price_source.setPrice(charlie_token, 3 * EIGHTEEN_DECIMALS)
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        charlie_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=0,
+    )
+    charlie_pps = undy_vault_prices.priceConfigs(
+        charlie_token_vault
+    ).lastSnapshot.pricePerShare
+    boa.env.time_travel(seconds=10**7)
+    assert charlie_pps != 0
+    assert undy_vault_prices.getWeightedPrice(charlie_token_vault) == charlie_pps
+
+
+def test_undy_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    teller,
+):
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _register_undy_integrity_feed(
+        undy_vault_prices,
+        governance,
+        alpha_token_vault,
+        max_snapshots=3,
+    )
+    initial = undy_vault_prices.priceConfigs(alpha_token_vault)
+    assert initial.lastSnapshot.totalSupply == 0
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+
+    _deposit_undy(
+        alpha_token_vault,
+        alpha_token,
+        alpha_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    boa.env.time_travel(seconds=1)
+    assert undy_vault_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    eligible = undy_vault_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    # Snapshot supply is normalized by the vault-token decimal scale.
+    assert eligible.totalSupply == 100
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    boa.env.time_travel(seconds=7)
+    assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
 
 
 def test_undy_sc17_capacity_one_and_malformed_chronology_fail_soft(

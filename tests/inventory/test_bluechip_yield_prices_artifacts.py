@@ -19,11 +19,11 @@ ACCEPTED_RUNTIME_CEILING = 22_500
 MIN_EIP_170_HEADROOM = 2_000
 
 EXPECTED = {
-    "source_sha256": "8fc427fcbb9dcde255bc9315fc4d0da2a29ae8727ae06085b42394c6e4c531c6",
-    "source_git_blob": "ebce2b295d5aa39200b68437eab4b9c0c7498f5b",
-    "integrity": "7ba16ef6e2efb6b8041ca96be970b875804a30dcc93df1d7554a3760b95dd715",
+    "source_sha256": "f73a608e2f61a97dc57526011c82840b79e4228d3925375abe6d46e8931c57b0",
+    "source_git_blob": "ecf043a614838802c50b24187fa0556ee6466fea",
+    "integrity": "00fbbc1aaba3103468d83b29f41fd258a9751e7c7c0213f16fc3149d318d3775",
     "creation_size": 23_871,
-    "creation_sha256": "bccaa7e659e56ad12979a869f5bc4e81f20b4b0485e45e081f8f23b5efedf669",
+    "creation_sha256": "b38f0668830875bb42fd93df3a56395e93ede1ff7e3545dfb42b33d2a021529e",
     "runtime_size": 22_259,
     "runtime_sha256": "afd1c6c61a2da3f5a172f24917e1bc10377270924edc1c1aa7dc4cc4b585d74b",
     "eip_170_headroom": 2_317,

@@ -2,6 +2,8 @@ import boa
 import pytest
 
 from constants import (
+    BLUE_CHIP_PROTOCOL_AAVE_V3,
+    BLUE_CHIP_PROTOCOL_COMPOUND_V3,
     BLUE_CHIP_PROTOCOL_EULER,
     BLUE_CHIP_PROTOCOL_FLUID,
     BLUE_CHIP_PROTOCOL_MORPHO,
@@ -1572,6 +1574,7 @@ def _register_integrity_feed(
     governance,
     vault,
     protocol=BLUE_CHIP_PROTOCOL_MORPHO,
+    min_delay=0,
     max_snapshots=5,
     max_upside=0,
     stale_time=0,
@@ -1579,7 +1582,7 @@ def _register_integrity_feed(
     assert prices.addNewPriceFeed(
         vault,
         protocol,
-        0,
+        min_delay,
         max_snapshots,
         max_upside,
         stale_time,
@@ -2471,6 +2474,14 @@ def test_sc17_resize_seed_clamps_then_twap_ratchets_toward_live_pps(
     assert blue_chip_prices.getPrice(alpha_token_vault) == expected_third
 
 
+@pytest.mark.parametrize(
+    "protocol",
+    [
+        BLUE_CHIP_PROTOCOL_MORPHO,
+        BLUE_CHIP_PROTOCOL_EULER,
+        BLUE_CHIP_PROTOCOL_FLUID,
+    ],
+)
 def test_sc17_timing_manipulation_is_conservative_but_persists_until_refresh(
     blue_chip_prices,
     governance,
@@ -2479,6 +2490,7 @@ def test_sc17_timing_manipulation_is_conservative_but_persists_until_refresh(
     mock_price_source,
     alpha_token,
     teller,
+    protocol,
 ):
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     _deposit(
@@ -2489,7 +2501,7 @@ def test_sc17_timing_manipulation_is_conservative_but_persists_until_refresh(
     )
     assert blue_chip_prices.addNewPriceFeed(
         alpha_token_vault,
-        BLUE_CHIP_PROTOCOL_MORPHO,
+        protocol,
         10,
         5,
         0,
@@ -2622,6 +2634,246 @@ def test_sc17_flash_supply_inflation_does_not_change_duration_result(
         + EIGHTEEN_DECIMALS * 13
     ) // 31
     assert results == [expected, expected]
+
+
+def test_sc17_ordinary_user_teller_deposit_can_time_downward_snapshot(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    mock_price_source,
+    setGeneralConfig,
+    setAssetConfig,
+    simple_erc20_vault,
+    teller,
+):
+    """Exercise the production Teller -> PriceDesk -> BlueChip snapshot path."""
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    setGeneralConfig()
+    setAssetConfig(alpha_token_vault)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, amount, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault, amount, sender=bob)
+    assert alpha_token_vault.deposit(amount, bob, sender=bob) == amount
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        alpha_token_vault,
+        min_delay=10,
+        max_snapshots=5,
+        stale_time=100,
+    )
+    seed = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+
+    # At the first eligible instant, depress PPS and use an ordinary user
+    # deposit. The test deliberately never calls addPriceSnapshot directly.
+    boa.env.time_travel(seconds=10)
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {50 * EIGHTEEN_DECIMALS}"
+    )
+    share_amount = EIGHTEEN_DECIMALS
+    alpha_token_vault.approve(teller, share_amount, sender=bob)
+    assert teller.deposit(
+        alpha_token_vault,
+        share_amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == share_amount
+
+    manipulated = blue_chip_prices.priceConfigs(alpha_token_vault)
+    assert manipulated.nextIndex == 2
+    assert manipulated.lastSnapshot.lastUpdate == boa.env.evm.patch.timestamp
+    assert manipulated.lastSnapshot.pricePerShare == EIGHTEEN_DECIMALS // 2
+
+    # Restoring live PPS does not erase the chosen-duration observation. It
+    # accrues 30 seconds of influence until a later honest snapshot or expiry.
+    alpha_token.eval(
+        f"self.balanceOf[{alpha_token_vault.address}] = {100 * EIGHTEEN_DECIMALS}"
+    )
+    boa.env.time_travel(seconds=30)
+    expected = (
+        seed.pricePerShare * 10
+        + (EIGHTEEN_DECIMALS // 2) * 30
+    ) // 40
+    assert blue_chip_prices.getPrice(alpha_token_vault) == expected
+
+
+def test_sc23_delay_freshness_boundary_and_zero_stale_policy(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    bravo_token_vault,
+    bravo_token,
+    charlie_token_vault,
+    charlie_token,
+    mock_price_source,
+    teller,
+):
+    """staleTime < minSnapshotDelay is allowed and intentionally fail-closed."""
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    # Equality is the no-gap boundary: the old observation remains fresh at
+    # the exact instant a replacement first becomes eligible.
+    assert blue_chip_prices.isValidNewFeed(
+        alpha_token_vault,
+        BLUE_CHIP_PROTOCOL_MORPHO,
+        10,
+        3,
+        0,
+        10,
+    )
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        alpha_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=10,
+    )
+    boa.env.time_travel(seconds=10)
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    assert blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+
+    mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        bravo_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=9,
+    )
+    boa.env.time_travel(seconds=9)
+    assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
+    # One second over the inclusive freshness boundary is fail-closed. A new
+    # snapshot is eligible at this same instant and restores price.
+    boa.env.time_travel(seconds=1)
+    assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == 0
+    assert blue_chip_prices.addPriceSnapshot(bravo_token_vault, sender=teller.address)
+    assert blue_chip_prices.getWeightedPrice(bravo_token_vault) == EIGHTEEN_DECIMALS
+
+    mock_price_source.setPrice(charlie_token, 3 * EIGHTEEN_DECIMALS)
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        charlie_token_vault,
+        min_delay=10,
+        max_snapshots=3,
+        stale_time=0,
+    )
+    charlie_pps = blue_chip_prices.priceConfigs(
+        charlie_token_vault
+    ).lastSnapshot.pricePerShare
+    boa.env.time_travel(seconds=10**7)
+    assert charlie_pps != 0
+    assert blue_chip_prices.getWeightedPrice(charlie_token_vault) == charlie_pps
+
+
+def test_zero_supply_bootstrap_hands_off_to_eligible_ring_observation(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    teller,
+):
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        alpha_token_vault,
+        max_snapshots=3,
+    )
+    initial = blue_chip_prices.priceConfigs(alpha_token_vault)
+    assert initial.lastSnapshot.totalSupply == 0
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+
+    _deposit(
+        alpha_token_vault,
+        alpha_token,
+        alpha_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    boa.env.time_travel(seconds=1)
+    assert blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    eligible = blue_chip_prices.priceConfigs(alpha_token_vault).lastSnapshot
+    # Snapshot supply is normalized by the vault-token decimal scale.
+    assert eligible.totalSupply == 100
+
+    # Same-block pricing is the fresh fallback because the newly eligible
+    # observation has zero duration. After time advances, the ring itself is
+    # the source of the same value.
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+    boa.env.time_travel(seconds=7)
+    assert blue_chip_prices.getWeightedPrice(alpha_token_vault) == EIGHTEEN_DECIMALS
+
+
+@pytest.mark.parametrize(
+    "snapshotless_protocol",
+    [BLUE_CHIP_PROTOCOL_AAVE_V3, BLUE_CHIP_PROTOCOL_COMPOUND_V3],
+)
+def test_sc05_snapshotless_protocol_resize_clears_residual_ring_without_seed(
+    blue_chip_prices,
+    governance,
+    alpha_token_vault,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    teller,
+    snapshotless_protocol,
+):
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    _deposit(
+        alpha_token_vault,
+        alpha_token,
+        alpha_token_whale,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    _register_integrity_feed(
+        blue_chip_prices,
+        governance,
+        alpha_token_vault,
+        max_snapshots=3,
+    )
+    boa.env.time_travel(seconds=1)
+    assert blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
+    assert any(snapshot != (0, 0, 0) for snapshot in _ring_state(blue_chip_prices, alpha_token_vault))
+
+    # Local mocks do not implement the external Aave/Compound registries, so
+    # install the already-validated storage shape to isolate their shared
+    # snapshotless resize branch.
+    protocol_name = (
+        "AAVE_V3"
+        if snapshotless_protocol == BLUE_CHIP_PROTOCOL_AAVE_V3
+        else "COMPOUND_V3"
+    )
+    blue_chip_prices.eval(
+        f"self.priceConfigs[{alpha_token_vault.address}].protocol = Protocol.{protocol_name}"
+    )
+    assert blue_chip_prices.updatePriceConfig(
+        alpha_token_vault,
+        0,
+        2,
+        0,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
+    assert blue_chip_prices.confirmPriceFeedUpdate(
+        alpha_token_vault,
+        sender=governance.address,
+    )
+    config = blue_chip_prices.priceConfigs(alpha_token_vault)
+    assert config.protocol == snapshotless_protocol
+    assert config.lastSnapshot == (0, 0, 0)
+    assert config.nextIndex == 0
+    assert _ring_state(blue_chip_prices, alpha_token_vault) == ((0, 0, 0),) * 25
 
 
 def test_sc17_capacity_one_and_malformed_chronology_fail_soft(
@@ -2783,4 +3035,8 @@ def test_sc05_sc17_bluechip_gas_measurements(
         f"fresh_fallback={fallback_gas}",
         f"resize_clear_25_and_seed={resize_confirmation_gas}",
     )
-    assert min(full_traversal_gas, fallback_gas, resize_confirmation_gas) > 0
+    # Deliberate ~25% regression budgets over the measured baselines. These
+    # are top-level costs, not the future PriceDesk source-call stipend.
+    assert full_traversal_gas <= 75_000
+    assert fallback_gas <= 50_000
+    assert resize_confirmation_gas <= 165_000
