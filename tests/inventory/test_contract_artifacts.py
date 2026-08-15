@@ -80,7 +80,7 @@ DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_440, "headroom": 136},
     "CreditEngine": {"size": 24_566, "headroom": 10},
     "Deleverage": {"size": 23_261, "headroom": 1_315},
-    "Endaoment": {"size": 24_372, "headroom": 204},
+    "Endaoment": {"size": 24_102, "headroom": 474},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (

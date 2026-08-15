@@ -24,8 +24,9 @@ RH-D038, PR #147 owns RH-D039 through RH-D041, and PR #152 owns RH-D042. PR
 no new RH-D heading at this sweep. These are merge-order reservations, not
 authority for the other PRs' source or decisions. The live sibling heads must be swept
 again immediately before rebase or merge; every affected branch must preserve
-unique headings, exact status-mirror title parity, and an actual-entry count
-rather than inferring the next ID from a stale branch tail.
+unique headings, exact status-mirror title parity, and an active-decision count
+that excludes only entries explicitly marked fully retired rather than
+inferring the next ID from a stale branch tail.
 
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
 merge `91eda49…`; its production contract changes are integrated into `rh`.
@@ -1096,54 +1097,92 @@ because it could conceal a genuine vault loss.
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
 
-### RH-D039 — Endaoment value conservation and StableSwap-NG boundary are exact
+### RH-D039 — Endaoment value conservation and StableSwap-NG boundary are conditionally qualified
 
-**Status:** Owner-approved on 15 August 2026 for the exact SC-18/SC-19 artifact
-on `codex/rh-sc-18-sc-19-endaoment`, subject to the lifecycle exclusions below.
+**Status:** Proposed on 15 August 2026 for the final SC-18/SC-19 candidate;
+substantive owner approval is pending. The owner's decision-ID allocation is
+namespace authority only and is not approval of this decision's artifact,
+constructor scope, Lego boundary, gas budget, or headroom position.
 
-Partner liquidity is reconciled from the protocol's combined Endaoment and
-EndaomentFunds custody immediately around the qualified Lego call. The Lego's
-reported net venue contributions must equal the custody decrease and cannot
-exceed the partner asset or GREEN made available by the action. That rejects
-fees, burns, synchronous custody credits, inventory top-ups, and inaccurate
-venue reports on later hops. A legitimate partial fill remains supported:
-ratio-excess is returned to EndaomentFunds, pre-existing GREEN reserve is
-attributed first, unused provisional GREEN is burned, and pool debt, both event
-amounts, and return values use only the actual contributions. The partner still
-receives half of the exact current-action LP delta; an odd remainder stays with
-EndaomentFunds. A partner asset equal to GREEN is rejected because the two
-independent custody channels would alias.
+The initial external partner transfer is valued from the positive recipient
+balance delta at EndaomentFunds, including controlled positive overdelivery.
+During the subsequent Lego-call window, the Lego-reported contribution must
+equal the decrease in combined Endaoment and EndaomentFunds custody and cannot
+exceed the partner asset or GREEN made available by the action. Synchronous
+credits to protocol custody during that later window therefore fail
+reconciliation. Legitimate ratio-excess remains supported: the excess is
+returned to EndaomentFunds, pre-existing GREEN reserve is attributed first,
+unused provisional GREEN is burned, and pool debt, events, return values, and
+LP allocation use the reconciled contribution. A partner asset equal to GREEN
+is rejected because the independent custody channels would alias.
 
-Stabilizer removal remains qualified only for the configured StableSwap-NG
+That reconciliation proves protocol custody decrease equals the Lego report;
+it does not independently prove the report equals net venue receipt. The
+deployed Base Underscore Curve Lego at
+`0x4e0C4B96FAdc84D41144C1aE868aA1411c1d0743` selects its report before
+`transferFrom` and refunds only balances above its pre-call inventory. Its
+manifest-embedded `Curve.vy` source has SHA-256
+`aaadabed405acd96ce34c186a570b5684f8b015d7e83938412c75d05ffa701c9`.
+An executable regression preserves the resulting counterexample: with a
+downstream transfer fee and pre-existing Lego inventory, the gross report can
+equal protocol custody decrease while exceeding the venue's net receipt. A
+separate regression proves legitimate partial-fill/refund behavior.
+
+Accordingly, Robinhood Endaoment deployment and partner-liquidity
+configuration are machine-blocked by
+`ROBINHOOD_ENDAOMENT_QUALIFICATION` and
+`validate_endaoment_qualification()`. No Lego or partner asset is qualified.
+Those gates may open only after the exact Lego address/runtime/source and every
+permitted asset's transfer behavior prove net venue-contribution semantics.
+The migration calls the validator before deploying Endaoment. Switchboard
+addresses can also hold token, Lego, or pool roles, so
+`stabilizeGreenRefPool`, `mintPartnerLiquidity`, and `addPartnerLiquidity` are
+nonreentrant; a dual-role callback-token regression proves atomic rejection.
+
+Stabilizer removal is qualified only for the configured Base StableSwap-NG
 interface and quote/burn relationship. Missing code or selector, a reverting
 quote, and empty, short, 64-byte, or longer returndata fail closed; only an
 exact 32-byte `calc_token_amount(uint256[],bool)` result is accepted. The
 largest amount whose quote plus one is within held LP is selected, while an
 invalid two-coin index returns zero before snapshot arithmetic on both add and
-remove paths. A legacy or otherwise non-NG pool therefore disables removal
-rather than attempting an unsupported call.
+remove paths. A legacy or otherwise non-NG pool disables removal.
 
-The exact governed artifact is executable under
+The governed compiler/template artifact and the separately scoped prospective
+Base deployed-runtime identity are executable under
 `scripts/check_contract_artifacts.py` and
 `config/contract-artifact-expectations.json`:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/Endaoment.vy` SHA-256 | `2c6af9c8118e3ef381b1fce784ef945aab77774640ef3f2875382f3a8df95fa5` |
-| Source Git blob | `7f8ea236948cc2fa6669b7b5cf040382330551d4` |
-| Transitive compiler-input integrity | `754a2a4a703ba6d22377cccccc171d45c2bb72a41acb90115107a47ebc64e5f3` |
-| Creation bytecode SHA-256 / bytes | `8d5555ccd4f7d1f6d1951cacfbe6a232df8420545be57bcfe3f92549972f637b` / 24,483 |
-| Runtime-template SHA-256 / bytes | `af51f950c9bd4849b8e3252fc9be7e2153239b16b37ab2f23f452a2dc74355ab` / 24,212 |
-| Immutable data SHA-256 / bytes | `8e75a1a703030bbdf061b4aba4d34b4c9d2ae162425b021f35c7d5d69b32f77b` / 160 |
-| Deployed-runtime SHA-256 / bytes | `df7105dc1eeef9165a2974f90c8471fb549e678e968de16623ff0af1930f54f8` / 24,372 |
-| Deployed EIP-170 headroom | 204 bytes |
+| `contracts/core/Endaoment.vy` SHA-256 | `263281ca8d9a113881777ba00b4fc366b190436e741ffe4c408faf005ceb9f42` |
+| Source Git blob | `4bb98dfc73099c9e952ed0adba4f9eb2cbed6b2d` |
+| Transitive compiler-input integrity | `74241cf1e55a7ddb0fc569fa365e79d574300ac1128d20b9f2abea0774fb8711` |
+| Creation bytecode SHA-256 / bytes | `86c6afdf7ed17c6329824e5deb20ac61e61fb6385d97877d43b1bfe4acc22714` / 24,213 |
+| Runtime-template SHA-256 / bytes | `aa0f69662133eeb43915c13f05cc68d2b9adab043e0f1a346245647338674e10` / 23,942 |
+| Base immutable data SHA-256 / bytes | `8e75a1a703030bbdf061b4aba4d34b4c9d2ae162425b021f35c7d5d69b32f77b` / 160 |
+| Prospective Base deployed-runtime SHA-256 / bytes | `5b69ef04e24075a6f1b1d406fb9e67bab447d18fd1b1101e4ee4c15662f0bb90` / 24,102 |
+| Prospective Base deployed EIP-170 headroom | 474 bytes |
 | Canonical ABI SHA-256 | `588a5d0ba2aa792932c42dcfb31057483ea6ac730f516830a5fbe0fae32bbb10` |
 
-The deployed identity binds constructor inputs RipeHq
-`0x6162df1b329E157479F8f1407E888260E0EC3d2b`, WETH
-`0x4200000000000000000000000000000000000006`, and native-ETH sentinel
-`0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`; the immutable layout also binds
-`canMintGreen = true` and `canMintRipe = false`.
+The prospective Base constructor tuple is derived, not independently
+literalized: RipeHq comes from
+`migration_history/base-mainnet/v1/current-manifest.json`, while WETH and the
+native-ETH sentinel come from `ADDYS["base"]` in `config/BluePrint.py`.
+It binds RipeHq `0x6162df1b329E157479F8f1407E888260E0EC3d2b`, WETH
+`0x4200000000000000000000000000000000000006`, native ETH
+`0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`, `canMintGreen = true`, and
+`canMintRipe = false`. An executable fresh deployment proves that derived tuple
+produces the recorded immutable suffix. This Base identity is not a Robinhood
+deployed-runtime binding and does not satisfy the still-open Robinhood
+constructor decision. Robinhood RipeHq is deployment-produced, DP-21 WETH
+remains externally unverified, and the native-ETH sentinel must be rebound
+with the final chain authority before an RH identity can be captured.
+
+The artifact has 474 bytes of deployed headroom, 274 bytes above the ordinary
+200-byte floor. No below-floor waiver has been granted. Every source or
+compiler-input change must recalculate headroom; any change that reduces it
+below 200 bytes must be optimized away or separately waived through the
+established process.
 
 At Base block 34,471,929, the configured production pool
 `0xd6c283655B42FA0eb2685F7AB819784F071459dc` has full runtime SHA-256
@@ -1152,23 +1191,28 @@ Its executable logic and math/configuration immutable prefix, excluding the
 final 64-byte per-pool salt and EIP-712 domain separator, has SHA-256
 `1b68d8ca78dc82257510fd5a12f39e5246dc66a7149c7bbd13f78c3379b1f8b3`.
 
-Any Endaoment source, imported compiler input, Vyper version/settings,
-constructor input, ABI, creation/runtime identity, configured pool address,
-full pool runtime, or normalized logic/math identity change reopens this
-decision. A Lego or venue not qualified to report net contributions cannot use
-the partner-liquidity composition. This decision does not authorize deployment,
-pool or Lego configuration, activation, or release.
+Any Endaoment source, compiler input, Vyper setting, constructor authority,
+ABI, artifact identity, configured pool, or qualified Lego/asset change
+reopens this decision. This proposal authorizes no deployment, configuration,
+activation, transaction, or release.
 
 **Source:** `contracts/core/Endaoment.vy`,
+`config/BluePrint.py`, `config/robinhood_launch.py`,
+`migrations/robinhood-mainnet/0005_Departments.py`,
 `tests/core/endaoment/test_partner_liquidity_reserve.py`,
 `tests/core/endaoment/test_endao_stabilizer.py`,
-`tests/inventory/test_contract_artifacts.py`, and
-`config/contract-artifact-expectations.json`.
+`tests/deployment/test_robinhood_endaoment_qualification.py`,
+`tests/inventory/test_contract_artifacts.py`,
+`config/contract-artifact-expectations.json`, and
+[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
+Substantive owner approval for the final versions of RH-D039 through RH-D041
+is pending.
 
 ### RH-D040 — Endaoment stabilizer execution is quote-bound
 
-**Status:** Owner-approved on 15 August 2026 for the RH-D039 artifact and the
-exact StableSwap-NG identity qualified there.
+**Status:** Proposed on 15 August 2026 for the final RH-D039 candidate and the
+exact Base StableSwap-NG identity qualified there; substantive owner approval
+is pending.
 
 After sizing and LP approval, Endaoment re-quotes the selected GREEN amount.
 A missing, reverting, malformed, or no-longer-executable quote clears approval
@@ -1178,37 +1222,42 @@ one additional wei of LP burn, the pool call and the whole stabilizer action
 revert atomically. Exact-cap and cap-plus-one tests run against both a fresh
 factory pool and the directly attached configured production pool.
 
-This closes the former unbounded-max-burn residual; LP approval is cleanup, not
-the execution bound. Any quote/burn rule, pool implementation, or removal-call
-semantic change reopens RH-D039 and this decision. The existing profitability
-invariant remains an independent transaction-wide rollback condition. No
-deployment, configuration, activation, or release is authorized.
+This candidate closes the former unbounded-max-burn residual; LP approval is
+cleanup, not the execution bound. Any quote/burn rule, pool implementation, or
+removal-call semantic change reopens RH-D039 and this decision. The existing
+profitability invariant remains an independent transaction-wide rollback
+condition. No deployment, configuration, activation, or release is authorized.
 
-**Source:** `contracts/core/Endaoment.vy` and
-`tests/core/endaoment/test_endao_stabilizer.py`.
+**Source:** `contracts/core/Endaoment.vy`,
+`tests/core/endaoment/test_endao_stabilizer.py`, and
+[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
+Substantive owner approval is pending.
 
-### RH-D041 — Endaoment cap-binding keeper gas budget is five million
+### RH-D041 — Endaoment cap-binding keeper gas budget is proposed at five million
 
-**Status:** Owner/operations-approved on 15 August 2026 for the RH-D039
-artifact on Base, chain ID 8453, at qualification block 34,471,929.
+**Status:** Proposed on 15 August 2026 for the final RH-D039 candidate on Base,
+chain ID 8453, at qualification block 34,471,929; substantive owner and
+operations approval is pending.
 
 The common full-request path performs one sizing quote and one execution
-re-quote; the reproduced keeper route used 333,790 gas. Cap-binding binary
+re-quote; the final-artifact keeper route used 334,120 gas. Cap-binding binary
 search remains deliberately exact to one wei and used 75-82 quote calls across
-the reproduced Base cases. The controlled cap-binding cases used 3,006,807 and
-3,050,602 gas; direct configured-production-pool execution used 3,257,482 gas.
-Operations accepts a 5,000,000 execution-gas budget for
-`SwitchboardEcho.stabilizeGreenRefPoolInEndaoment`. The fork regression fails
-above that ceiling. A keeper must estimate against then-current state and must
-not submit this action when its estimate exceeds the budget; it should alert
-for review instead.
+the final-artifact Base cases. The controlled cap-binding cases used 3,005,896
+and 3,049,674 gas; direct configured-production-pool execution used 3,256,452
+gas. The proposed execution-gas budget for
+`SwitchboardEcho.stabilizeGreenRefPoolInEndaoment` is 5,000,000. The fork
+regression fails above that ceiling. If approved, a keeper must estimate
+against then-current state and must not submit when its estimate exceeds the
+budget; it should alert for review instead.
 
-This acceptance is Base- and artifact-specific. A chain execution-rule change,
+This proposal is Base- and artifact-specific. A chain execution-rule change,
 pool/runtime change, quote-count increase, regression above 5,000,000 gas, or
 operational move to another chain reopens the decision. It does not authorize a
 keeper transaction, deployment, configuration, activation, or release.
 
-**Source:** `tests/core/endaoment/test_endao_stabilizer.py`.
+**Source:** `tests/core/endaoment/test_endao_stabilizer.py` and
+[PR #147](https://github.com/Ripe-Foundation/ripe-protocol/pull/147).
+Substantive owner and operations approval is pending.
 
 ## Maintenance rule
 

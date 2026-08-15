@@ -752,11 +752,11 @@ def _check_contract(
     if deployed_binding is not None:
         if name in BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS:
             runtime_label += (
-                " (prospective Base deployed-runtime identity bound; "
+                " (full deployed-runtime identity bound; prospective Base scope; "
                 "Robinhood constructor binding open)"
             )
         else:
-            runtime_label += " (full RH deployed-runtime identity bound)"
+            runtime_label += " (full deployed-runtime identity bound; RH capture)"
     elif expected.get("constructor_bound_runtime_template"):
         runtime_label += " (not a deployed-runtime identity; constructor immutables)"
     return (
