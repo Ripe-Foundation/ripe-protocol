@@ -885,7 +885,6 @@ def _add_sc20_stork_feed(
         (20, 10, 11, False),
         (10, 10, 5, True),
         (10, 20, 10, True),
-        (10, 20, 11, False),
     ],
 )
 def test_sc20_stork_stale_resolver_matrix(

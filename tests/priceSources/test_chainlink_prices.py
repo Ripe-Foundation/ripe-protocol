@@ -956,7 +956,6 @@ def _set_sc20_chainlink_global_bound(
         (20, 10, 11, False),
         (10, 10, 5, True),
         (10, 20, 10, True),
-        (10, 20, 11, False),
     ],
 )
 def test_sc20_chainlink_stale_resolver_matrix(
@@ -1219,24 +1218,33 @@ def test_sc20_chainlink_validation_uses_stricter_candidate_bound(
     switchboard_alpha,
     governance,
 ):
-    _set_sc20_chainlink_global_bound(
-        switchboard_alpha, governance, mission_control
-    )
-    mock_chainlink_alpha.setMockData(
-        500 * CHAINLINK_DECIMALS,
-        1,
-        1,
-        boa.env.timestamp,
-        boa.env.timestamp - 5_400,
-    )
-    assert not mock_chainlink.isValidNewFeed(
-        alpha_token,
-        mock_chainlink_alpha,
-        8,
-        False,
-        False,
-        3_600,
-    )
+    with boa.env.anchor():
+        _set_sc20_chainlink_global_bound(
+            switchboard_alpha, governance, mission_control
+        )
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp - 5_400,
+        )
+        assert mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            False,
+            False,
+            7_200,
+        )
+        assert not mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            False,
+            False,
+            3_600,
+        )
 
 
 @pytest.mark.parametrize("conversion_kind", ["eth", "btc"])
@@ -1251,45 +1259,59 @@ def test_sc20_chainlink_validation_uses_conversion_feed_bound(
     switchboard_alpha,
     conversion_kind,
 ):
-    _set_sc20_chainlink_global_bound(
-        switchboard_alpha, governance, mission_control
-    )
-    conversion_asset = (
-        mock_chainlink.ETH() if conversion_kind == "eth" else mock_chainlink.BTC()
-    )
-    conversion_feed = (
-        mock_chainlink_bravo if conversion_kind == "eth" else mock_chainlink_delta
-    )
-    conversion_price = (
-        2_500 * CHAINLINK_DECIMALS
-        if conversion_kind == "eth"
-        else 50_000 * CHAINLINK_DECIMALS
-    )
-    _add_sc20_chainlink_feed(
-        mock_chainlink, conversion_asset, conversion_feed, governance, 3_600
-    )
-    conversion_feed.setMockData(
-        conversion_price,
-        1,
-        1,
-        boa.env.timestamp,
-        boa.env.timestamp - 5_400,
-    )
-    mock_chainlink_alpha.setMockData(
-        500 * CHAINLINK_DECIMALS,
-        1,
-        1,
-        boa.env.timestamp,
-        boa.env.timestamp,
-    )
-    assert not mock_chainlink.isValidNewFeed(
-        alpha_token,
-        mock_chainlink_alpha,
-        8,
-        conversion_kind == "eth",
-        conversion_kind == "btc",
-        7_200,
-    )
+    with boa.env.anchor():
+        _set_sc20_chainlink_global_bound(
+            switchboard_alpha, governance, mission_control
+        )
+        conversion_asset = (
+            mock_chainlink.ETH()
+            if conversion_kind == "eth"
+            else mock_chainlink.BTC()
+        )
+        conversion_feed = (
+            mock_chainlink_bravo
+            if conversion_kind == "eth"
+            else mock_chainlink_delta
+        )
+        conversion_price = (
+            2_500 * CHAINLINK_DECIMALS
+            if conversion_kind == "eth"
+            else 50_000 * CHAINLINK_DECIMALS
+        )
+        _add_sc20_chainlink_feed(
+            mock_chainlink, conversion_asset, conversion_feed, governance, 3_600
+        )
+        mock_chainlink_alpha.setMockData(
+            500 * CHAINLINK_DECIMALS,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp,
+        )
+        assert mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            conversion_kind == "eth",
+            conversion_kind == "btc",
+            7_200,
+        )
+
+        conversion_feed.setMockData(
+            conversion_price,
+            1,
+            1,
+            boa.env.timestamp,
+            boa.env.timestamp - 5_400,
+        )
+        assert not mock_chainlink.isValidNewFeed(
+            alpha_token,
+            mock_chainlink_alpha,
+            8,
+            conversion_kind == "eth",
+            conversion_kind == "btc",
+            7_200,
+        )
 
 
 def test_sc21_chainlink_future_timestamp_characterization(

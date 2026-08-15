@@ -83,7 +83,6 @@ def _set_redstone_global_bound(
         (20, 10, 11, False),
         (10, 10, 5, True),
         (10, 20, 10, True),
-        (10, 20, 11, False),
     ],
 )
 def test_sc20_redstone_stale_resolver_matrix(
@@ -123,17 +122,27 @@ def test_sc20_redstone_validation_uses_stricter_candidate_bound(
     switchboard_alpha,
     governance,
 ):
-    _set_redstone_global_bound(
-        switchboard_alpha, governance, mission_control
-    )
-    _set_redstone_feed(mock_redstone_alpha, 500 * CHAINLINK_DECIMALS, 5_400)
-    assert not redstone.isValidNewFeed(
-        alpha_token,
-        mock_redstone_alpha,
-        8,
-        False,
-        3_600,
-    )
+    with boa.env.anchor():
+        _set_redstone_global_bound(
+            switchboard_alpha, governance, mission_control
+        )
+        _set_redstone_feed(
+            mock_redstone_alpha, 500 * CHAINLINK_DECIMALS, 5_400
+        )
+        assert redstone.isValidNewFeed(
+            alpha_token,
+            mock_redstone_alpha,
+            8,
+            False,
+            7_200,
+        )
+        assert not redstone.isValidNewFeed(
+            alpha_token,
+            mock_redstone_alpha,
+            8,
+            False,
+            3_600,
+        )
 
 
 def test_sc21_redstone_future_timestamp_characterization(

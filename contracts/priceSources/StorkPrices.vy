@@ -174,6 +174,7 @@ def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
         return 0
 
     # price is too stale
+    # Sub-second future values within the current second truncate to current time.
     publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
     if publishTime > block.timestamp:
         return 0

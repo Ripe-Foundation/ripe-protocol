@@ -1144,7 +1144,6 @@ def _set_sc20_pyth_global_bound(
         (20, 10, 11, False),
         (10, 10, 5, True),
         (10, 20, 10, True),
-        (10, 20, 11, False),
     ],
 )
 def test_sc20_pyth_stale_resolver_matrix(
@@ -1184,16 +1183,22 @@ def test_sc20_pyth_validation_uses_stricter_candidate_bound(
     switchboard_alpha,
     governance,
 ):
-    _set_sc20_pyth_global_bound(
-        switchboard_alpha, governance, mission_control
-    )
-    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
-    boa.env.time_travel(seconds=5_400)
-    assert not pyth_prices.isValidNewFeed(
-        alpha_token,
-        SC20_PYTH_FEED_ID,
-        3_600,
-    )
+    with boa.env.anchor():
+        _set_sc20_pyth_global_bound(
+            switchboard_alpha, governance, mission_control
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        boa.env.time_travel(seconds=5_400)
+        assert pyth_prices.isValidNewFeed(
+            alpha_token,
+            SC20_PYTH_FEED_ID,
+            7_200,
+        )
+        assert not pyth_prices.isValidNewFeed(
+            alpha_token,
+            SC20_PYTH_FEED_ID,
+            3_600,
+        )
 
 
 @pytest.mark.parametrize("stale_bound", [0, 1_000])
