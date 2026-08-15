@@ -40,6 +40,9 @@ TRAINING_WHEELS = "0x987DEa46AEfA442B67Faa5Db6F71024e5be01406"
 RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 MORPHO_V2 = "0x0FBad98595b0186dA120E41f77C102beb49f803c"
 ARB_SYS = "0x0000000000000000000000000000000000000064"
+ENDAOMENT_HQ = "0x6162df1b329E157479F8f1407E888260E0EC3d2b"
+ENDAOMENT_WETH = "0x4200000000000000000000000000000000000006"
+ENDAOMENT_ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
 
 def _input(name: str, abi_type: str, value: Any) -> Mapping[str, Any]:
@@ -81,6 +84,11 @@ CONSTRUCTOR_INPUTS: Mapping[str, Sequence[Mapping[str, Any]]] = {
         _input("_deleverageOverageBps", "uint256", 100),
         _input("_deleverageDustThreshold", "uint256", 0),
         _input("_deleverageDustBps", "uint256", 0),
+    ],
+    "Endaoment": [
+        _input("_ripeHq", "address", ENDAOMENT_HQ),
+        _input("_weth", "address", ENDAOMENT_WETH),
+        _input("_eth", "address", ENDAOMENT_ETH),
     ],
     "Ledger": [
         _input("_ripeHq", "address", HQ),
@@ -187,6 +195,15 @@ PROSPECTIVE_STATE: Mapping[str, Mapping[str, Any]] = {
             "deleverageDustBps": 0,
         },
         required_readbacks=("all eight Deleverage policy getters",),
+    ),
+    "Endaoment": _prospective(
+        initial={"isPaused": False},
+        required_readbacks=(
+            f"getRipeHq()=={ENDAOMENT_HQ}",
+            f"WETH()=={ENDAOMENT_WETH}",
+            f"ETH()=={ENDAOMENT_ETH}",
+            "can mint GREEN and cannot mint RIPE",
+        ),
     ),
     "Ledger": _prospective(
         initial={"defaults": DEFAULTS, "actionBlockSource": ARB_SYS},

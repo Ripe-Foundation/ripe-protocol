@@ -835,6 +835,8 @@ def _getGreenAmountToAdd(
     # only add green when green ratio < 50% (pool has excess other asset)
     if _data.greenRatio == 0 or _data.greenRatio >= FIFTY_PERCENT:
         return 0
+    if _data.greenIndex >= 2:
+        return 0
     
     totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
     targetBalance: uint256 = totalPoolBalance // 2
@@ -882,9 +884,15 @@ def _removeStabilizerGreenLiquidity(
 
     # remove liquidity
     assert extcall IERC20(_data.lpToken).approve(_data.pool, _lpBalance, default_return_value=True) # dev: approval failed
+    didQuote: bool = False
+    lpQuote: uint256 = 0
+    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
+    if not didQuote or lpQuote >= _lpBalance:
+        assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
+        return False
     amounts: DynArray[uint256, 2] = [0, 0]
     amounts[_data.greenIndex] = greenAmount
-    lpBurned: uint256 = extcall CurvePool(_data.pool).remove_liquidity_imbalance(amounts, max_value(uint256), self)
+    lpBurned: uint256 = extcall CurvePool(_data.pool).remove_liquidity_imbalance(amounts, lpQuote + 1, self)
     assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
 
     # update pool debt
@@ -907,6 +915,8 @@ def _getGreenAmountToRemove(
     # only remove green when green ratio > 50% (pool has excess green)
     if _data.greenRatio <= FIFTY_PERCENT:
         return 0
+    if _lpBalance == 0 or _data.greenIndex >= 2:
+        return 0
     
     totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
     targetBalance: uint256 = totalPoolBalance // 2
@@ -917,9 +927,6 @@ def _getGreenAmountToRemove(
     
     greenAdjustFull: uint256 = (_data.greenBalance - targetBalance) * 2
     greenAdjustWeighted: uint256 = greenAdjustFull * _data.stabilizerAdjustWeight // HUNDRED_PERCENT
-    if _lpBalance == 0 or _data.greenIndex >= 2:
-        return 0
-
     lpTotalSupply: uint256 = staticcall IERC20(_data.lpToken).totalSupply()
     if lpTotalSupply == 0:
         return 0
@@ -960,13 +967,13 @@ def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint2
     amounts: DynArray[uint256, 2] = [0, 0]
     amounts[_greenIndex] = _greenAmount
     success: bool = False
-    response: Bytes[32] = b""
+    response: Bytes[64] = b""
     # The supported StableSwap-NG pool must expose this exact selector.
-    # Missing, reverting, or malformed quote surfaces fail closed to zero.
+    # Missing, reverting, short, or oversized quote surfaces fail closed.
     success, response = raw_call(
         _pool,
         abi_encode(amounts, False, method_id=method_id("calc_token_amount(uint256[],bool)")),
-        max_outsize=32,
+        max_outsize=64,
         is_static_call=True,
         revert_on_failure=False,
     )
@@ -1073,6 +1080,7 @@ def addPartnerLiquidity(
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _expectedLpToken != empty(address) # dev: invalid lp token
     a: addys.Addys = addys._getAddys()
+    assert _asset != a.greenToken # dev: invalid partner asset
     endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # mint green
@@ -1080,6 +1088,8 @@ def addPartnerLiquidity(
     greenAmount: uint256 = 0
     greenMinted: uint256 = 0
     partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
+    partnerCustodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(endaoFunds)
+    greenCustodyBefore: uint256 = staticcall IERC20(a.greenToken).balanceOf(self) + staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
 
     # add liquidity (LP goes here so only the current action's delta is split)
     lpBefore: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
@@ -1093,6 +1103,36 @@ def addPartnerLiquidity(
     assert lpAmountReceived != 0 # dev: no liquidity added
     lpAfter: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
     assert lpAfter - lpBefore == lpAmountReceived # dev: lp amount mismatch
+
+    # Qualified Legos report net venue contributions. Match those reports to
+    # the protocol's custody decrease so downstream fees or inventory top-ups
+    # cannot be attributed to this partner action. Partial fills remain valid.
+    partnerCustodyAfter: uint256 = staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(endaoFunds)
+    greenCustodyAfter: uint256 = staticcall IERC20(a.greenToken).balanceOf(self) + staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
+    assert partnerCustodyBefore >= partnerCustodyAfter # dev: partner asset accounting
+    assert greenCustodyBefore >= greenCustodyAfter # dev: green accounting
+    assert partnerCustodyBefore - partnerCustodyAfter == liqAmountA # dev: partner asset accounting
+    assert greenCustodyBefore - greenCustodyAfter == liqAmountB # dev: green accounting
+    assert liqAmountA <= partnerAmount # dev: partner asset accounting
+    assert liqAmountB <= greenAmount # dev: green accounting
+
+    # Attribute pre-existing GREEN reserve first, then burn any provisional
+    # mint that a partial fill did not actually contribute to the venue.
+    greenReserve: uint256 = greenAmount - greenMinted
+    finalGreenMinted: uint256 = 0
+    if liqAmountB > greenReserve:
+        finalGreenMinted = liqAmountB - greenReserve
+    excessGreenMinted: uint256 = greenMinted - finalGreenMinted
+    if excessGreenMinted != 0:
+        greenBeforeBurn: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+        self._prepareEndaomentFunds(a.greenToken, excessGreenMinted, endaoFunds)
+        greenAfterPull: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+        assert greenAfterPull > greenBeforeBurn # dev: green refund accounting
+        assert greenAfterPull - greenBeforeBurn == excessGreenMinted # dev: green refund accounting
+        assert extcall GreenToken(a.greenToken).burn(excessGreenMinted) # dev: could not burn green
+    partnerAmount = liqAmountA
+    greenAmount = liqAmountB
+    greenMinted = finalGreenMinted
 
     # transfer partner's half
     partnerShare: uint256 = 0

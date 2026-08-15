@@ -1,9 +1,9 @@
-import json
 import hashlib
+import json
 from pathlib import Path
 
-import pytest
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from config.BluePrint import CORE_TOKENS, CURVE_PARAMS, ADDYS, WHALES
@@ -194,6 +194,7 @@ CURVE_STABLE_POOL_ABI = """
 
 BASE_RIPE_HQ = "0x6162df1b329E157479F8f1407E888260E0EC3d2b"
 CALC_TOKEN_AMOUNT_SELECTOR = bytes.fromhex("3db06dd8")
+STABILIZER_KEEPER_GAS_BUDGET = 5_000_000
 
 
 STABILIZER_LP_TOKEN_SOURCE = """
@@ -376,6 +377,7 @@ allowances: HashMap[address, HashMap[address, uint256]]
 lpTotalSupply: uint256
 lastGreenRemoved: public(uint256)
 lastLpBurned: public(uint256)
+executionExtraBurn: public(uint256)
 
 @deploy
 def __init__(
@@ -393,6 +395,10 @@ def __init__(
 def seedLp(_holder: address, _amount: uint256):
     self.balances[_holder] += _amount
     self.lpTotalSupply += _amount
+
+@external
+def setExecutionExtraBurn(_amount: uint256):
+    self.executionExtraBurn = _amount
 
 @view
 @external
@@ -451,7 +457,7 @@ def remove_liquidity_imbalance(
     _recipient: address = msg.sender,
 ) -> uint256:
     greenAmount: uint256 = _amounts[0]
-    lpBurned: uint256 = greenAmount * BURN_NUMERATOR // BURN_DENOMINATOR + 1
+    lpBurned: uint256 = greenAmount * BURN_NUMERATOR // BURN_DENOMINATOR + 1 + self.executionExtraBurn
     assert lpBurned <= _maxLpBurnAmount
     self.balances[msg.sender] -= lpBurned
     self.lpTotalSupply -= lpBurned
@@ -459,6 +465,36 @@ def remove_liquidity_imbalance(
     self.lastGreenRemoved = greenAmount
     self.lastLpBurned = lpBurned
     return lpBurned
+"""
+
+
+STABILIZER_QUOTE_SHAPE_SOURCE = """
+# @version 0.4.3
+
+MODE: immutable(uint256)
+
+@deploy
+def __init__(_mode: uint256):
+    MODE = _mode
+
+@view
+@external
+@raw_return
+def calc_token_amount(
+    _amounts: DynArray[uint256, 2],
+    _isDeposit: bool,
+) -> Bytes[96]:
+    assert not _isDeposit
+    response: bytes32 = convert(7, bytes32)
+    if MODE == 0:
+        return b""
+    if MODE == 1:
+        return slice(response, 0, 31)
+    if MODE == 2:
+        return slice(response, 0, 32)
+    if MODE == 3:
+        return concat(response, convert(9, bytes32))
+    return concat(response, convert(9, bytes32), convert(11, bytes32))
 """
 
 
@@ -524,6 +560,7 @@ def _install_stabilizer_transition_harness(
     next_virtual_price=0,
     green_balance=40 * EIGHTEEN_DECIMALS,
     green_ratio=40_00,
+    green_index=0,
 ):
     pool = boa.loads(
         STABILIZER_POOL_SOURCE,
@@ -539,7 +576,7 @@ def _install_stabilizer_transition_harness(
         pool.address,
         green_balance,
         green_ratio,
-        0,
+        green_index,
         HUNDRED_PERCENT,
         1_000_000 * EIGHTEEN_DECIMALS,
         name="stabilizer transition config",
@@ -590,12 +627,14 @@ def _install_stabilizer_view_mocks(
     curve_prices,
     lp_total_supply,
     green_index=1,
+    green_balance=15_000 * EIGHTEEN_DECIMALS,
+    pool=None,
 ):
     lp_balance = 200 * EIGHTEEN_DECIMALS
-    green_balance = 15_000 * EIGHTEEN_DECIMALS
     green_ratio = 75_00
     stabilizer_adjust_weight = 50_00
-    pool = boa.env.generate_address()
+    if pool is None:
+        pool = boa.env.generate_address()
     lp_token = boa.loads(
         STABILIZER_LP_TOKEN_SOURCE,
         lp_balance,
@@ -812,10 +851,6 @@ def test_green_amount_to_remove_zero_lp_supply_returns_zero(
             0,
         )
         data = curve_prices.getGreenStabilizerConfig()
-        total_pool_balance = (
-            data.greenBalance * HUNDRED_PERCENT // data.greenRatio
-        )
-        target_balance = total_pool_balance // 2
 
         assert data.pool == pool != ZERO_ADDRESS
         assert data.greenBalance != 0
@@ -830,7 +865,6 @@ def test_green_amount_to_remove_unsupported_quote_fails_closed(
     endaoment,
     endaoment_funds,
     curve_prices,
-    ledger,
 ):
     lp_total_supply = 1_000 * EIGHTEEN_DECIMALS
     with boa.env.anchor():
@@ -863,6 +897,98 @@ def test_green_amount_to_remove_invalid_green_index_fails_closed(
         assert pool != ZERO_ADDRESS
         assert lp_token.balanceOf(endaoment_funds) == lp_balance != 0
         assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
+
+
+def test_green_amount_to_remove_invalid_index_precedes_snapshot_arithmetic(
+    endaoment,
+    curve_prices,
+):
+    with boa.env.anchor():
+        _install_stabilizer_view_mocks(
+            curve_prices,
+            1_000 * EIGHTEEN_DECIMALS,
+            green_index=2,
+            green_balance=MAX_UINT256,
+        )
+
+        assert endaoment.getGreenAmountToRemoveInStabilizer() == 0
+
+
+def test_green_amount_to_add_invalid_index_is_external_noop(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    green_token,
+    switchboard_delta,
+):
+    with boa.env.anchor():
+        pool = _install_stabilizer_transition_harness(
+            curve_prices,
+            green_token,
+            2 * EIGHTEEN_DECIMALS,
+            green_index=2,
+        )
+        before = (
+            pool.addCallCount(),
+            green_token.totalSupply(),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            pool.balanceOf(endaoment_funds),
+        )
+
+        assert endaoment.getGreenAmountToAddInStabilizer() == 0
+        assert not endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+        assert not filter_logs(endaoment, "StabilizerPoolLiqAdded")
+        assert (
+            pool.addCallCount(),
+            green_token.totalSupply(),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            pool.balanceOf(endaoment_funds),
+        ) == before
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        (0, 0),
+        (1, 0),
+        (2, 3_000 * EIGHTEEN_DECIMALS),
+        (3, 0),
+        (4, 0),
+    ],
+    ids=["empty", "short", "exact-32", "oversized-64", "oversized-96"],
+)
+def test_sc19_quote_return_shape_is_exactly_one_word(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    mode,
+    expected,
+):
+    with boa.env.anchor():
+        quote_pool = boa.loads(
+            STABILIZER_QUOTE_SHAPE_SOURCE,
+            mode,
+            name=f"stabilizer quote shape {mode}",
+        )
+        _, lp_token, lp_balance = _install_stabilizer_view_mocks(
+            curve_prices,
+            1_000 * EIGHTEEN_DECIMALS,
+            green_index=0,
+            pool=quote_pool.address,
+        )
+        before = (
+            lp_token.balanceOf(endaoment_funds),
+            lp_token.totalSupply(),
+        )
+
+        assert lp_balance == 200 * EIGHTEEN_DECIMALS
+        assert endaoment.getGreenAmountToRemoveInStabilizer() == expected
+        assert (
+            lp_token.balanceOf(endaoment_funds),
+            lp_token.totalSupply(),
+        ) == before
 
 
 def test_sc19_proportional_policy_allowance_preserves_exact_value(
@@ -980,8 +1106,11 @@ def test_sc19_reverting_full_request_falls_through_to_search(
         assert requested == full_search_result
         assert quote_calls[0] == full_request
         assert requested in quote_calls
-        assert quote_calls[-1] == requested + 1
         assert len(quote_calls) > 1
+        requested_quote = pool.calc_token_amount([requested, 0], False)
+        assert requested_quote < lp_balance
+        with boa.reverts():
+            pool.calc_token_amount([requested + 1, 0], False)
         assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
         log = filter_logs(endaoment, "StabilizerPoolLiqRemoved")[0]
@@ -1206,6 +1335,61 @@ def test_sc19_debt_request_is_capped_to_executable_lp_capacity(
         assert pool.balanceOf(endaoment.address) == 0
         assert green_token.balanceOf(endaoment.address) == 0
         assert pool.balanceOf(endaoment_funds) == lp_balance - log.lpBurned
+
+
+def test_sc19_execution_quote_bound_reverts_on_quote_execution_mismatch(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+):
+    lp_balance = 100 * EIGHTEEN_DECIMALS
+    pool_debt = 20 * EIGHTEEN_DECIMALS
+    pool_green = 1_000 * EIGHTEEN_DECIMALS
+    with boa.env.anchor():
+        pool = _install_stabilizer_removal_harness(
+            curve_prices,
+            green_token,
+            pool_green,
+            75_00,
+            burn_numerator=2 * EIGHTEEN_DECIMALS,
+        )
+        pool.seedLp(endaoment_funds, lp_balance)
+        pool.seedLp(boa.env.generate_address(), 9_900 * EIGHTEEN_DECIMALS)
+        green_token.mint(pool.address, pool_green, sender=endaoment.address)
+        ledger.updateGreenPoolDebt(
+            pool.address,
+            pool_debt,
+            True,
+            sender=endaoment.address,
+        )
+        pool.setExecutionExtraBurn(1)
+        before = (
+            pool.balanceOf(endaoment_funds),
+            pool.balanceOf(endaoment.address),
+            pool.totalSupply(),
+            pool.allowance(endaoment.address, pool.address),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            green_token.balanceOf(pool.address),
+            ledger.greenPoolDebt(pool.address),
+        )
+
+        with boa.reverts():
+            endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+        assert (
+            pool.balanceOf(endaoment_funds),
+            pool.balanceOf(endaoment.address),
+            pool.totalSupply(),
+            pool.allowance(endaoment.address, pool.address),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            green_token.balanceOf(pool.address),
+            ledger.greenPoolDebt(pool.address),
+        ) == before
 
 
 def test_sc19_zero_quote_accounts_for_stableswap_rounding_burn(
@@ -1486,9 +1670,11 @@ def test_sc19_base_executable_request_real_pool(
         CALC_TOKEN_AMOUNT_SELECTOR,
     )
     assert stabilize_gas > 0
-    assert 0 < quote_calls <= 256
+    assert 0 < quote_calls <= 257
+    assert stabilize_gas <= STABILIZER_KEEPER_GAS_BUDGET
     if not cap_binds:
-        assert quote_calls == 1
+        # One sizing quote plus one execution-bound re-quote.
+        assert quote_calls == 2
 
     log = filter_logs(log_contract, "StabilizerPoolLiqRemoved")[0]
     actual_lp_burned = lp_balance - green_pool.balanceOf(endaoment_funds)
@@ -1535,7 +1721,7 @@ def test_sc19_base_executable_request_real_pool(
                 "post_fix_result": (
                     "exact executable cap succeeded"
                     if cap_binds
-                    else "full executable request succeeded with one quote"
+                    else "full executable request succeeded with two quotes"
                 ),
             },
             sort_keys=True,
@@ -1649,7 +1835,8 @@ def test_sc19_base_production_pool_direct_external_path(
         CALC_TOKEN_AMOUNT_SELECTOR,
     )
     assert stabilize_gas > 0
-    assert 0 < quote_calls <= 256
+    assert 0 < quote_calls <= 257
+    assert stabilize_gas <= STABILIZER_KEEPER_GAS_BUDGET
 
     log = filter_logs(endaoment, "StabilizerPoolLiqRemoved")[0]
     actual_lp_burned = lp_balance - pool.balanceOf(endaoment_funds)

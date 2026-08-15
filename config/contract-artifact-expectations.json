@@ -824,6 +824,116 @@
       },
       "transitive_compiler_input_integrity": "37f9b243daa959f8bd4d7e2f0c38ec1211550d95930d8f2b32f90411614f7469"
     },
+    "Endaoment": {
+      "abi": {
+        "canonical_sha256": "588a5d0ba2aa792932c42dcfb31057483ea6ac730f516830a5fbe0fae32bbb10",
+        "committed_file_sha256": "ab3bb77b48dd4dfc6506ef34d51e052f8beb8b77d3d230ac179d3f16ba5c2f92",
+        "committed_path": "scripts/abis/Endaoment.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "a14234585bf86f335758e0955c01b7e359080409689131ccda25185fcadafd5f",
+        "creation_executable_prefix_size": 24415,
+        "creation_metadata_sha256": "474406916c316b7fa71b7006aba0daf2a9eda55119604f8439103cbb74319cca",
+        "creation_metadata_size": 68,
+        "creation_sha256": "8d5555ccd4f7d1f6d1951cacfbe6a232df8420545be57bcfe3f92549972f637b",
+        "creation_size": 24483,
+        "deployed_eip170_headroom": 204,
+        "deployed_runtime_immutable_data_hex": "0000000000000000000000006162df1b329e157479f8f1407e888260e0ec3d2b000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000004200000000000000000000000000000000000006000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "deployed_runtime_immutable_data_sha256": "8e75a1a703030bbdf061b4aba4d34b4c9d2ae162425b021f35c7d5d69b32f77b",
+        "deployed_runtime_immutable_data_size": 160,
+        "deployed_runtime_sha256": "df7105dc1eeef9165a2974f90c8471fb549e678e968de16623ff0af1930f54f8",
+        "deployed_runtime_size": 24372,
+        "eip170_headroom": 364,
+        "runtime_template_sha256": "af51f950c9bd4849b8e3252fc9be7e2153239b16b37ab2f23f452a2dc74355ab",
+        "runtime_template_size": 24212
+      },
+      "code_layout": {
+        "ETH": {
+          "length": 32,
+          "offset": 128,
+          "type": "address"
+        },
+        "WETH": {
+          "length": 32,
+          "offset": 96,
+          "type": "address"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "deptBasics": {
+          "CAN_MINT_GREEN": {
+            "length": 32,
+            "offset": 32,
+            "type": "bool"
+          },
+          "CAN_MINT_RIPE": {
+            "length": 32,
+            "offset": 64,
+            "type": "bool"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "codesize"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_weth",
+              "type": "address"
+            },
+            {
+              "name": "_eth",
+              "type": "address"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "codesize",
+      "events": {
+        "canonical_sha256": "e6ca04dad8c0c89c3d654a573e857e75d4731593e02700974f892eeeac2f6c46",
+        "count": 9
+      },
+      "selectors": {
+        "canonical_sha256": "68519eea75f718c107644959945b923df4b3f91d6a04f9a78f54bf85defe69f1",
+        "count": 53
+      },
+      "source_git_blob": "7f8ea236948cc2fa6669b7b5cf040382330551d4",
+      "source_path": "contracts/core/Endaoment.vy",
+      "source_sha256": "2c6af9c8118e3ef381b1fce784ef945aab77774640ef3f2875382f3a8df95fa5",
+      "storage_layout": {
+        "deptBasics": {
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "bool"
+          }
+        }
+      },
+      "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        }
+      },
+      "transitive_compiler_input_integrity": "754a2a4a703ba6d22377cccccc171d45c2bb72a41acb90115107a47ebc64e5f3"
+    },
     "Ledger": {
       "abi": {
         "canonical_sha256": "2b055432f1f2e850866ace602e2a03354e7887815c7cab435cb14b9521dc3e3c",

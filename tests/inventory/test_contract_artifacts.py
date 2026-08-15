@@ -33,6 +33,7 @@ REQUIRED_CONTRACTS = frozenset(
         "Deleverage",
         "DefaultsRobinhood",
         "DefaultsRobinhoodLive",
+        "Endaoment",
         "SimpleErc20",
         "Ledger",
         "Lootbox",
@@ -54,6 +55,7 @@ NEW_CONTRACT_SOURCES = {
         ROOT / "contracts" / "priceSources" / "BlueChipYieldPrices.vy"
     ),
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
+    "Endaoment": ROOT / "contracts" / "core" / "Endaoment.vy",
     "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": (
         ROOT / "contracts" / "config" / "DefaultsRobinhoodLive.vy"
@@ -77,6 +79,7 @@ DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_440, "headroom": 136},
     "CreditEngine": {"size": 24_566, "headroom": 10},
     "Deleverage": {"size": 23_261, "headroom": 1_315},
+    "Endaoment": {"size": 24_372, "headroom": 204},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
@@ -360,6 +363,23 @@ def test_artifact_pipeline_capture_provenance_is_exact_and_state_honest():
     assert "storage and post-deploy state require" in provenance["Teller"][
         "prospective_state"
     ]["runtime_identity_limit"]
+    assert provenance["Endaoment"]["constructor_inputs"] == [
+        {
+            "name": "_ripeHq",
+            "type": "address",
+            "value": runtime_capture.ENDAOMENT_HQ,
+        },
+        {
+            "name": "_weth",
+            "type": "address",
+            "value": runtime_capture.ENDAOMENT_WETH,
+        },
+        {
+            "name": "_eth",
+            "type": "address",
+            "value": runtime_capture.ENDAOMENT_ETH,
+        },
+    ]
 
 
 def test_artifact_pipeline_capture_command_is_directly_invocable():

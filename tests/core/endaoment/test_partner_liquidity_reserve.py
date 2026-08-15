@@ -22,6 +22,7 @@ actualLpAmount: public(uint256)
 reportedLpAmount: public(uint256)
 lastRecipient: public(address)
 deliverLpByTransfer: public(bool)
+fillBps: public(uint256)
 
 @deploy
 def __init__(_lpToken: address):
@@ -29,6 +30,7 @@ def __init__(_lpToken: address):
     self.returnedLpToken = _lpToken
     self.actualLpAmount = 2
     self.reportedLpAmount = 2
+    self.fillBps = 10_000
 
 @external
 def configure(_returnedLpToken: address, _actualLpAmount: uint256, _reportedLpAmount: uint256):
@@ -39,6 +41,11 @@ def configure(_returnedLpToken: address, _actualLpAmount: uint256, _reportedLpAm
 @external
 def setDeliverLpByTransfer(_shouldTransfer: bool):
     self.deliverLpByTransfer = _shouldTransfer
+
+@external
+def configureFill(_fillBps: uint256):
+    assert _fillBps <= 10_000
+    self.fillBps = _fillBps
 
 @view
 @external
@@ -63,8 +70,14 @@ def addLiquidity(
     _extraData: bytes32,
     _recipient: address,
 ) -> (address, uint256, uint256, uint256, uint256):
-    assert extcall IERC20(_tokenA).transferFrom(msg.sender, self, _amountA)
-    assert extcall IERC20(_tokenB).transferFrom(msg.sender, self, _amountB)
+    requestedA: uint256 = _amountA * self.fillBps // 10_000
+    requestedB: uint256 = _amountB * self.fillBps // 10_000
+    balanceABefore: uint256 = staticcall IERC20(_tokenA).balanceOf(self)
+    balanceBBefore: uint256 = staticcall IERC20(_tokenB).balanceOf(self)
+    assert extcall IERC20(_tokenA).transferFrom(msg.sender, self, requestedA)
+    assert extcall IERC20(_tokenB).transferFrom(msg.sender, self, requestedB)
+    addedA: uint256 = staticcall IERC20(_tokenA).balanceOf(self) - balanceABefore
+    addedB: uint256 = staticcall IERC20(_tokenB).balanceOf(self) - balanceBBefore
     assert self.reportedLpAmount >= _minLpAmount  # dev: insufficient lp amount
 
     self.lastRecipient = _recipient
@@ -74,7 +87,7 @@ def addLiquidity(
         else:
             extcall Mintable(LP_TOKEN).mint(_recipient, self.actualLpAmount)
 
-    return self.returnedLpToken, self.reportedLpAmount, _amountA, _amountB, 0
+    return self.returnedLpToken, self.reportedLpAmount, addedA, addedB, 0
 """
 
 
@@ -444,6 +457,28 @@ def test_sc18_self_partner_uses_only_endaoment_controlled_balance(
     assert ctx.asset.balanceOf(ctx.endaoment_funds.address) == 0
 
 
+def test_sc18_green_cannot_alias_partner_asset_custody(
+    partner_liquidity_env,
+    alice,
+    whale,
+):
+    ctx = partner_liquidity_env
+    ctx.green.transfer(alice, ONE_GREEN, sender=whale)
+    ctx.green.approve(ctx.endaoment.address, ONE_GREEN, sender=alice)
+
+    with boa.reverts("invalid partner asset"):
+        ctx.endaoment.addPartnerLiquidity(
+            LEGO_ID,
+            ctx.lp.address,
+            alice,
+            ctx.green.address,
+            ONE_GREEN,
+            0,
+            ctx.lp.address,
+            sender=ctx.switchboard_delta.address,
+        )
+
+
 def test_sc18_add_partner_liquidity_composes_with_received_delta(
     partner_liquidity_env,
     alice,
@@ -475,6 +510,112 @@ def test_sc18_add_partner_liquidity_composes_with_received_delta(
     assert ctx.ledger.greenPoolDebt(ctx.lp.address) == expected_green
     assert log.partnerAmount == received
     assert log.greenAmount == expected_green
+
+
+def test_sc18_composed_fee_route_reverts_with_preexisting_inventory(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    nominal = 100 * EIGHTEEN_DECIMALS
+    fee_bps = 1_000
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        ctx.governance.address,
+        0,
+        name="sc18_composed_fee_asset",
+    )
+    fee_token.transfer(alice, nominal, sender=ctx.governance.address)
+    fee_token.transfer(
+        ctx.endaoment.address,
+        nominal,
+        sender=ctx.governance.address,
+    )
+    fee_token.setTransferFee(fee_bps, sender=ctx.governance.address)
+    fee_token.approve(ctx.endaoment.address, nominal, sender=alice)
+    ctx.price_source.setPrice(fee_token.address, EIGHTEEN_DECIMALS)
+    before = (
+        fee_token.balanceOf(alice),
+        fee_token.balanceOf(ctx.endaoment.address),
+        fee_token.balanceOf(ctx.endaoment_funds.address),
+        fee_token.balanceOf(ctx.lego.address),
+        fee_token.balanceOf(ctx.governance.address),
+        ctx.green.totalSupply(),
+        ctx.ledger.greenPoolDebt(ctx.lp.address),
+        ctx.lp.balanceOf(alice),
+        ctx.lp.balanceOf(ctx.endaoment_funds.address),
+    )
+
+    with boa.reverts("partner asset accounting"):
+        ctx.endaoment.addPartnerLiquidity(
+            LEGO_ID,
+            ctx.lp.address,
+            alice,
+            fee_token.address,
+            nominal,
+            0,
+            ctx.lp.address,
+            sender=ctx.switchboard_delta.address,
+        )
+
+    assert (
+        fee_token.balanceOf(alice),
+        fee_token.balanceOf(ctx.endaoment.address),
+        fee_token.balanceOf(ctx.endaoment_funds.address),
+        fee_token.balanceOf(ctx.lego.address),
+        fee_token.balanceOf(ctx.governance.address),
+        ctx.green.totalSupply(),
+        ctx.ledger.greenPoolDebt(ctx.lp.address),
+        ctx.lp.balanceOf(alice),
+        ctx.lp.balanceOf(ctx.endaoment_funds.address),
+    ) == before
+
+
+@pytest.mark.parametrize(
+    "green_reserve",
+    [0, 30 * ONE_GREEN],
+    ids=["no-reserve", "reserve-first"],
+)
+def test_sc18_partial_fill_reconciles_contributions_debt_and_refunds(
+    partner_liquidity_env,
+    alice,
+    whale,
+    green_reserve,
+):
+    ctx = partner_liquidity_env
+    nominal = 100 * ONE_ASSET
+    fill_bps = 6_000
+    expected_asset = nominal * fill_bps // 10_000
+    expected_green = 100 * ONE_GREEN * fill_bps // 10_000
+    expected_minted = expected_green - green_reserve
+    expected_asset_refund = nominal - expected_asset
+    ctx.lego.configureFill(fill_bps)
+    if green_reserve != 0:
+        ctx.green.transfer(
+            ctx.endaoment_funds.address,
+            green_reserve,
+            sender=whale,
+        )
+    _fund_partner(ctx, alice, nominal)
+    supply_before = ctx.green.totalSupply()
+
+    result = _add_partner_liquidity(ctx, alice, nominal)
+
+    log = filter_logs(ctx.endaoment, "PartnerLiquidityAdded")[0]
+    assert result == (2, expected_asset, expected_green)
+    assert ctx.asset.balanceOf(ctx.lego.address) == expected_asset
+    assert ctx.asset.balanceOf(ctx.endaoment_funds.address) == expected_asset_refund
+    assert ctx.asset.balanceOf(ctx.endaoment.address) == 0
+    assert ctx.green.balanceOf(ctx.lego.address) == expected_green
+    assert ctx.green.balanceOf(ctx.endaoment.address) == 0
+    assert ctx.green.balanceOf(ctx.endaoment_funds.address) == 0
+    assert ctx.green.totalSupply() - supply_before == expected_minted
+    assert ctx.ledger.greenPoolDebt(ctx.lp.address) == expected_minted
+    assert ctx.lp.balanceOf(alice) == 1
+    assert ctx.lp.balanceOf(ctx.endaoment_funds.address) == 1
+    assert log.partnerAmount == expected_asset
+    assert log.greenAmount == expected_green
+    assert log.lpBalance == 2
 
 
 def test_partner_receives_only_current_action_share(

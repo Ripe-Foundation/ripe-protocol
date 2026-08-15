@@ -16,6 +16,17 @@ exactly. This register does not replace the linked decision records, authorize
 a new phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
+On 15 August 2026, the owner serialized the identifiers being introduced by
+the simultaneously open remediation PRs: PR #142 owns RH-D033 and RH-D034,
+PR #144 owns RH-D035, PR #143 owns RH-D036, PR #146 owns RH-D037, PR #145 owns
+RH-D038, and PR #147 owns RH-D039 through RH-D041. PRs #152 and #157 inherit
+the PR #142 entries in their current stacked histories and introduced no new
+RH-D heading at this sweep. These are merge-order reservations, not authority
+for the other PRs' source or decisions. The live sibling heads must be swept
+again immediately before rebase or merge; every affected branch must preserve
+unique headings, exact status-mirror title parity, and an actual-entry count
+rather than inferring the next ID from a stale branch tail.
+
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
 merge `91eda49…`; its production contract changes are integrated into `rh`.
 The historical import ancestor `ad831669…` is not the present branch authority.
@@ -1085,58 +1096,119 @@ because it could conceal a genuine vault loss.
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
 
-### RH-D039 — Endaoment stabilizer removal is StableSwap-NG-only and fails closed
+### RH-D039 — Endaoment value conservation and StableSwap-NG boundary are exact
 
-**Status:** Owner-approved on 14 August 2026 for the exact SC-19 Endaoment
-value-conservation candidate on `codex/rh-sc-18-sc-19-endaoment`.
+**Status:** Owner-approved on 15 August 2026 for the exact SC-18/SC-19 artifact
+on `codex/rh-sc-18-sc-19-endaoment`, subject to the lifecycle exclusions below.
 
-Endaoment derives the maximum executable one-sided GREEN removal from the
-configured pool's exact `calc_token_amount(uint256[],bool)` quote. The
-supported StableSwap-NG implementation burns that quote plus one wei of LP for
-`remove_liquidity_imbalance`, so the candidate selects the largest GREEN amount
-whose quote is strictly below the LP balance. Missing code, a missing selector,
-a reverting quote, or malformed return data fails closed to zero removal. The
-external stabilizer call then returns `False` without changing LP custody,
-GREEN balances, pool debt, approvals, or events.
+Partner liquidity is reconciled from the protocol's combined Endaoment and
+EndaomentFunds custody immediately around the qualified Lego call. The Lego's
+reported net venue contributions must equal the custody decrease and cannot
+exceed the partner asset or GREEN made available by the action. That rejects
+fees, burns, synchronous custody credits, inventory top-ups, and inaccurate
+venue reports on later hops. A legitimate partial fill remains supported:
+ratio-excess is returned to EndaomentFunds, pre-existing GREEN reserve is
+attributed first, unused provisional GREEN is burned, and pool debt, both event
+amounts, and return values use only the actual contributions. The partner still
+receives half of the exact current-action LP delta; an odd remainder stays with
+EndaomentFunds. A partner asset equal to GREEN is rejected because the two
+independent custody channels would alias.
 
-The configured Base production pool
-`0xd6c283655B42FA0eb2685F7AB819784F071459dc` was attached directly at block
-34,471,929 and qualified at the exact executable cap and cap plus one. This
-acceptance does not generalize to a legacy Curve pool or any implementation
-whose quote/burn relationship differs. Any configured-pool or implementation
-change must requalify the selector, return shape, monotonicity, fee and rounding
-semantics, exact cap, cap plus one, and real removal execution before use.
+Stabilizer removal remains qualified only for the configured StableSwap-NG
+interface and quote/burn relationship. Missing code or selector, a reverting
+quote, and empty, short, 64-byte, or longer returndata fail closed; only an
+exact 32-byte `calc_token_amount(uint256[],bool)` result is accepted. The
+largest amount whose quote plus one is within held LP is selected, while an
+invalid two-coin index returns zero before snapshot arithmetic on both add and
+remove paths. A legacy or otherwise non-NG pool therefore disables removal
+rather than attempting an unsupported call.
 
-This decision accepts the fail-closed compatibility boundary. It does not
-authorize pool configuration, deployment, activation, or release.
+The exact governed artifact is executable under
+`scripts/check_contract_artifacts.py` and
+`config/contract-artifact-expectations.json`:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/Endaoment.vy` SHA-256 | `2c6af9c8118e3ef381b1fce784ef945aab77774640ef3f2875382f3a8df95fa5` |
+| Source Git blob | `7f8ea236948cc2fa6669b7b5cf040382330551d4` |
+| Transitive compiler-input integrity | `754a2a4a703ba6d22377cccccc171d45c2bb72a41acb90115107a47ebc64e5f3` |
+| Creation bytecode SHA-256 / bytes | `8d5555ccd4f7d1f6d1951cacfbe6a232df8420545be57bcfe3f92549972f637b` / 24,483 |
+| Runtime-template SHA-256 / bytes | `af51f950c9bd4849b8e3252fc9be7e2153239b16b37ab2f23f452a2dc74355ab` / 24,212 |
+| Immutable data SHA-256 / bytes | `8e75a1a703030bbdf061b4aba4d34b4c9d2ae162425b021f35c7d5d69b32f77b` / 160 |
+| Deployed-runtime SHA-256 / bytes | `df7105dc1eeef9165a2974f90c8471fb549e678e968de16623ff0af1930f54f8` / 24,372 |
+| Deployed EIP-170 headroom | 204 bytes |
+| Canonical ABI SHA-256 | `588a5d0ba2aa792932c42dcfb31057483ea6ac730f516830a5fbe0fae32bbb10` |
+
+The deployed identity binds constructor inputs RipeHq
+`0x6162df1b329E157479F8f1407E888260E0EC3d2b`, WETH
+`0x4200000000000000000000000000000000000006`, and native-ETH sentinel
+`0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`; the immutable layout also binds
+`canMintGreen = true` and `canMintRipe = false`.
+
+At Base block 34,471,929, the configured production pool
+`0xd6c283655B42FA0eb2685F7AB819784F071459dc` has full runtime SHA-256
+`7e947f3a43a183801674f31e60664273c170333f2c16799af2847d8ee384f0dc`.
+Its executable logic and math/configuration immutable prefix, excluding the
+final 64-byte per-pool salt and EIP-712 domain separator, has SHA-256
+`1b68d8ca78dc82257510fd5a12f39e5246dc66a7149c7bbd13f78c3379b1f8b3`.
+
+Any Endaoment source, imported compiler input, Vyper version/settings,
+constructor input, ABI, creation/runtime identity, configured pool address,
+full pool runtime, or normalized logic/math identity change reopens this
+decision. A Lego or venue not qualified to report net contributions cannot use
+the partner-liquidity composition. This decision does not authorize deployment,
+pool or Lego configuration, activation, or release.
+
+**Source:** `contracts/core/Endaoment.vy`,
+`tests/core/endaoment/test_partner_liquidity_reserve.py`,
+`tests/core/endaoment/test_endao_stabilizer.py`,
+`tests/inventory/test_contract_artifacts.py`, and
+`config/contract-artifact-expectations.json`.
+
+### RH-D040 — Endaoment stabilizer execution is quote-bound
+
+**Status:** Owner-approved on 15 August 2026 for the RH-D039 artifact and the
+exact StableSwap-NG identity qualified there.
+
+After sizing and LP approval, Endaoment re-quotes the selected GREEN amount.
+A missing, reverting, malformed, or no-longer-executable quote clears approval
+and returns `False`. A valid quote is converted to the implementation's exact
+`quote + 1` burn and passed as `_maxLpBurnAmount`. If execution attempts even
+one additional wei of LP burn, the pool call and the whole stabilizer action
+revert atomically. Exact-cap and cap-plus-one tests run against both a fresh
+factory pool and the directly attached configured production pool.
+
+This closes the former unbounded-max-burn residual; LP approval is cleanup, not
+the execution bound. Any quote/burn rule, pool implementation, or removal-call
+semantic change reopens RH-D039 and this decision. The existing profitability
+invariant remains an independent transaction-wide rollback condition. No
+deployment, configuration, activation, or release is authorized.
 
 **Source:** `contracts/core/Endaoment.vy` and
 `tests/core/endaoment/test_endao_stabilizer.py`.
 
-### RH-D040 — Endaoment stabilizer accepts the unbounded max-LP-burn residual
+### RH-D041 — Endaoment cap-binding keeper gas budget is five million
 
-**Status:** Owner-approved on 14 August 2026 for the exact SC-19 Endaoment
-value-conservation candidate on `codex/rh-sc-18-sc-19-endaoment`.
+**Status:** Owner/operations-approved on 15 August 2026 for the RH-D039
+artifact on Base, chain ID 8453, at qualification block 34,471,929.
 
-The candidate proves that the selected GREEN amount has
-`calc_token_amount(amounts, False) + 1 <= lpBalance`, and direct production-pool
-qualification proves that the cap executes while cap plus one does not. The
-subsequent `remove_liquidity_imbalance` call nevertheless continues to pass
-`max_value(uint256)` as `_maxLpBurnAmount`. The pool approval limits collection
-to Endaoment's held LP balance, approval is cleared after the call, and the
-existing post-operation profitability invariant reverts the whole transaction
-when the position worsens. There is still no explicit execution-time burn bound
-equal to the quote plus one, so a state-sensitive or nonconforming pool could
-attempt to consume more held LP than the sizing quote anticipated.
+The common full-request path performs one sizing quote and one execution
+re-quote; the reproduced keeper route used 333,790 gas. Cap-binding binary
+search remains deliberately exact to one wei and used 75-82 quote calls across
+the reproduced Base cases. The controlled cap-binding cases used 3,006,807 and
+3,050,602 gas; direct configured-production-pool execution used 3,257,482 gas.
+Operations accepts a 5,000,000 execution-gas budget for
+`SwitchboardEcho.stabilizeGreenRefPoolInEndaoment`. The fork regression fails
+above that ceiling. A keeper must estimate against then-current state and must
+not submit this action when its estimate exceeds the budget; it should alert
+for review instead.
 
-The owner accepts that residual for this minimized value-conservation batch.
-Bounding `_maxLpBurnAmount` remains a separately scoped hardening opportunity
-and must be reconsidered before changing the supported pool or quote semantics.
-This acceptance does not authorize deployment, configuration, activation, or
-release.
+This acceptance is Base- and artifact-specific. A chain execution-rule change,
+pool/runtime change, quote-count increase, regression above 5,000,000 gas, or
+operational move to another chain reopens the decision. It does not authorize a
+keeper transaction, deployment, configuration, activation, or release.
 
-**Source:** `contracts/core/Endaoment.vy` and
-`tests/core/endaoment/test_endao_stabilizer.py`.
+**Source:** `tests/core/endaoment/test_endao_stabilizer.py`.
 
 ## Maintenance rule
 

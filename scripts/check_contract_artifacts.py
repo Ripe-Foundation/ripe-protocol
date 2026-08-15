@@ -43,6 +43,7 @@ GOVERNED_SOURCES: Mapping[str, str] = {
     "DefaultsRobinhood": "contracts/config/DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
     "Deleverage": "contracts/core/Deleverage.vy",
+    "Endaoment": "contracts/core/Endaoment.vy",
     "Ledger": "contracts/data/Ledger.vy",
     "Lootbox": "contracts/core/Lootbox.vy",
     "MissionControl": "contracts/data/MissionControl.vy",
