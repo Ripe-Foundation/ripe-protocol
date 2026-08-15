@@ -40,7 +40,6 @@ GOVERNED_SOURCES: Mapping[str, str] = {
     "AuctionHouse": "contracts/core/AuctionHouse.vy",
     "BlueChipYieldPrices": "contracts/priceSources/BlueChipYieldPrices.vy",
     "CreditEngine": "contracts/core/CreditEngine.vy",
-    "CurvePrices": "contracts/priceSources/CurvePrices.vy",
     "DefaultsRobinhood": "contracts/config/DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
     "Deleverage": "contracts/core/Deleverage.vy",

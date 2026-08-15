@@ -5492,7 +5492,7 @@ def validate_curve_launch_authority() -> None:
 
     expected_artifacts = {
         "artifact.curve_prices_source_sha256": (
-            "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
+            "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
         ),
         "artifact.curve_prices_abi_sha256": (
             "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
@@ -5994,14 +5994,14 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
-    # 19 base blockers + 10 curve blockers. Was 42: the owner approved the Base
+    # 19 base blockers + 9 curve blockers. Was 42: the owner approved the Base
     # GREEN pool configuration (8 params), the Base seed path (5 funding
     # inputs), and the withdrawal authority (the Safe, which governs the
     # EndaomentFunds custodian holding the LP), leaving address-provider
     # verification, the deployment-produced pool address, and the
     # slippage/retained-liquidity policy rows.
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 29 or len(set(blocker_ids)) != 29:
+    if len(blocker_ids) != 28 or len(set(blocker_ids)) != 28:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")

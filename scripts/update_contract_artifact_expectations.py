@@ -15,8 +15,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from config.artifact_expectations import load_artifact_expectations  # noqa: E402
-from scripts import check_contract_artifacts as checker  # noqa: E402
-from scripts import capture_contract_runtimes as runtime_capture  # noqa: E402
+from scripts import check_contract_artifacts as checker
+from scripts import capture_contract_runtimes as runtime_capture
 
 
 EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
@@ -53,8 +53,7 @@ def _record(
     if constructor_bound != expected_constructor_bound:
         raise checker.ArtifactCheckError(
             f"{name}: deployed-runtime capture classification changed; "
-            f"review the exact {len(DEPLOYED_RUNTIME_CONTRACTS)}-contract "
-            "capture policy"
+            "review the exact 18-contract capture policy"
         )
     creation_binding = checker._creation_binding(
         compiled.creation,
@@ -159,11 +158,6 @@ def _record(
         entry for entry in compiled.abi if entry.get("type") == "constructor"
     ]
     return {
-        **(
-            {"qualification": prior["qualification"]}
-            if "qualification" in prior
-            else {}
-        ),
         "abi": {
             "canonical_sha256": checker._json_sha256(compiled.abi),
             "committed_file_sha256": checker._sha256(abi_bytes),

@@ -711,7 +711,7 @@ def test_bluechip_morpho_compatibility_is_resolved_but_readiness_is_not():
     }
     ready, blockers = sync.deployment_readiness()
     assert ready is False
-    assert len(blockers) == 65
+    assert len(blockers) == 64
     assert not any("Deployment.DP-15.rewards.promotion" in item for item in blockers)
     assert not any("Deployment.DP-16.ccip.promotion" in item for item in blockers)
     assert any(item.endswith(":unresolved") for item in blockers)

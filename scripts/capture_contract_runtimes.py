@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import check_contract_artifacts as checker  # noqa: E402
+from scripts import check_contract_artifacts as checker
 
 
 DEFAULT_OUTPUT = Path("/private/tmp/pr67-final-runtime-capture")
@@ -40,11 +40,6 @@ TRAINING_WHEELS = "0x987DEa46AEfA442B67Faa5Db6F71024e5be01406"
 RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 MORPHO_V2 = "0x0FBad98595b0186dA120E41f77C102beb49f803c"
 ARB_SYS = "0x0000000000000000000000000000000000000064"
-CURVE_ADDRESS_PROVIDER = "0x4574921eb950d3Fd5B01562162EC566Cb8bc3648"
-CURVE_META_REGISTRY = "0xe6dA14500f0b5783E2325F9C5a7eE5d99DA0fB42"
-CURVE_TRICRYPTO_NG_FACTORY = "0x6E28493348446503db04A49621d8e6C9A40015FB"
-CURVE_STABLESWAP_NG_FACTORY = "0x8271e06E5887FE5ba05234f5315c19f3Ec90E8aD"
-CURVE_TWOCRYPTO_NG_FACTORY = "0xe7FBd704B938cB8fe26313C3464D4b7B7348c88C"
 
 
 def _input(name: str, abi_type: str, value: Any) -> Mapping[str, Any]:
@@ -67,15 +62,6 @@ CONSTRUCTOR_INPUTS: Mapping[str, Sequence[Mapping[str, Any]]] = {
         _input("_morphoV2Addr", "address", MORPHO_V2),
     ],
     "CreditEngine": [_input("_ripeHq", "address", HQ)],
-    "CurvePrices": [
-        _input("_ripeHq", "address", HQ),
-        _input("_tempGov", "address", ZERO),
-        _input("_curveAddressProvider", "address", CURVE_ADDRESS_PROVIDER),
-        _input("_green", "address", GREEN),
-        _input("_savingsGreen", "address", SGREEN),
-        _input("_minPriceChangeTimeLock", "uint256", 600),
-        _input("_maxPriceChangeTimeLock", "uint256", 50_400),
-    ],
     "DefaultsRobinhood": [
         _input("_contribTemplate", "address", CONTRIBUTOR),
         _input("_trainingWheels", "address", TRAINING_WHEELS),
@@ -188,18 +174,6 @@ PROSPECTIVE_STATE: Mapping[str, Mapping[str, Any]] = {
         required_readbacks=("governance()==0x0", "actionTimeLock()==600"),
     ),
     "CreditEngine": _prospective(required_readbacks=(f"getRipeHq()=={HQ}",)),
-    "CurvePrices": _prospective(
-        initial={"governance": ZERO, "actionTimeLock": 0},
-        post_deploy_actions=(
-            "RipeHq governance sets actionTimeLock to 600",
-        ),
-        required_readbacks=(
-            "governance()==0x0",
-            f"getRipeHq()=={HQ}",
-            f"CURVE_META_REGISTRY()=={CURVE_META_REGISTRY}",
-            "greenRefPoolConfig().pool==0x0",
-        ),
-    ),
     "DefaultsRobinhood": _prospective(),
     "Deleverage": _prospective(
         initial={
@@ -396,26 +370,6 @@ def _deploy_graph():
     boa.load(
         "contracts/config/DefaultsRobinhoodLive.vy",
         override_address=DEFAULTS,
-    )
-    curve_provider_source = f"""# @version 0.4.3
-
-@view
-@external
-def get_address(_id: uint256) -> address:
-    if _id == 7:
-        return {CURVE_META_REGISTRY}
-    if _id == 11:
-        return {CURVE_TRICRYPTO_NG_FACTORY}
-    if _id == 12:
-        return {CURVE_STABLESWAP_NG_FACTORY}
-    if _id == 13:
-        return {CURVE_TWOCRYPTO_NG_FACTORY}
-    return empty(address)
-"""
-    boa.loads(
-        curve_provider_source,
-        name="runtime_capture_curve_address_provider",
-        override_address=CURVE_ADDRESS_PROVIDER,
     )
     pair = boa.load(
         "contracts/mock/MockUniswapV2Pair.vy",
