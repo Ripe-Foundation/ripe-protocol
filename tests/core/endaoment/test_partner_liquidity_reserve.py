@@ -1,7 +1,10 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import boa
 import pytest
+import vyper.ast as vy_ast
+from vyper.compiler.output import build_abi_output
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from conf_utils import filter_logs
@@ -265,18 +268,24 @@ def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
 REENTRANT_SWITCHBOARD_TOKEN_SOURCE = """
 # @version 0.4.3
 
+decimals: public(constant(uint8)) = 6
+
 interface Endaoment:
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256) -> uint256: nonpayable
 
 TARGET: immutable(address)
+CALLBACK_PARTNER: immutable(address)
+CALLBACK_AMOUNT: immutable(uint256)
 
 balances: HashMap[address, uint256]
 allowances: HashMap[address, HashMap[address, uint256]]
 entered: bool
 
 @deploy
-def __init__(_target: address):
+def __init__(_target: address, _callbackPartner: address, _callbackAmount: uint256):
     TARGET = _target
+    CALLBACK_PARTNER = _callbackPartner
+    CALLBACK_AMOUNT = _callbackAmount
 
 @external
 def mint(_to: address, _amount: uint256):
@@ -286,6 +295,11 @@ def mint(_to: address, _amount: uint256):
 @external
 def balanceOf(_owner: address) -> uint256:
     return self.balances[_owner]
+
+@view
+@external
+def allowance(_owner: address, _spender: address) -> uint256:
+    return self.allowances[_owner][_spender]
 
 @external
 def approve(_spender: address, _amount: uint256) -> bool:
@@ -304,16 +318,139 @@ def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
         self.allowances[_from][msg.sender] -= _amount
     if not self.entered:
         self.entered = True
-        extcall Endaoment(TARGET).mintPartnerLiquidity(self, self, 1)
+        extcall Endaoment(TARGET).mintPartnerLiquidity(CALLBACK_PARTNER, self, CALLBACK_AMOUNT)
     self.balances[_from] -= _amount
     self.balances[_to] += _amount
     return True
 """
 
 
+DUAL_ROLE_LEGO_SOURCE = """
+# @version 0.4.3
+
+from ethereum.ercs import IERC20
+
+interface Endaoment:
+    def repayPoolDebt(_pool: address, _amount: uint256) -> bool: nonpayable
+    def transferFundsToGov(_asset: address, _amount: uint256) -> (uint256, uint256): nonpayable
+
+interface Mintable:
+    def mint(_to: address, _amount: uint256): nonpayable
+
+TARGET: immutable(address)
+LP_TOKEN: immutable(address)
+VENUE: immutable(address)
+DEBT_POOL: immutable(address)
+DIVERT_AMOUNT: immutable(uint256)
+MODE: immutable(uint256)
+
+@deploy
+def __init__(
+    _target: address,
+    _lpToken: address,
+    _venue: address,
+    _debtPool: address,
+    _divertAmount: uint256,
+    _mode: uint256,
+):
+    TARGET = _target
+    LP_TOKEN = _lpToken
+    VENUE = _venue
+    DEBT_POOL = _debtPool
+    DIVERT_AMOUNT = _divertAmount
+    MODE = _mode
+
+@external
+def addLiquidity(
+    _pool: address,
+    _tokenA: address,
+    _tokenB: address,
+    _amountA: uint256,
+    _amountB: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _minLpAmount: uint256,
+    _extraData: bytes32,
+    _recipient: address,
+) -> (address, uint256, uint256, uint256, uint256):
+    assert _amountB > DIVERT_AMOUNT
+    assert extcall IERC20(_tokenA).transferFrom(msg.sender, VENUE, _amountA)
+    assert extcall IERC20(_tokenB).transferFrom(msg.sender, VENUE, _amountB - DIVERT_AMOUNT)
+    if MODE == 1:
+        assert extcall Endaoment(TARGET).repayPoolDebt(DEBT_POOL, DIVERT_AMOUNT)
+    else:
+        moved: uint256 = 0
+        value: uint256 = 0
+        moved, value = extcall Endaoment(TARGET).transferFundsToGov(_tokenB, DIVERT_AMOUNT)
+        assert moved == DIVERT_AMOUNT
+    extcall Mintable(LP_TOKEN).mint(_recipient, 2)
+    return LP_TOKEN, 2, _amountA, _amountB, 0
+"""
+
+
 ONE_ASSET = 10**6
 ONE_GREEN = EIGHTEEN_DECIMALS
 LEGO_ID = 1
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _endaoment_without_lock(function_name):
+    source = (ROOT / "contracts/core/Endaoment.vy").read_text()
+    marker = f"@nonreentrant\n@external\ndef {function_name}("
+    replacement = f"@external\ndef {function_name}("
+    assert source.count(marker) == 1
+    return source.replace(marker, replacement, 1)
+
+
+def _install_endaoment_lock_mutant(ctx, function_name):
+    mutant = boa.loads(
+        _endaoment_without_lock(function_name),
+        ctx.endaoment.getRipeHq(),
+        ctx.endaoment.WETH(),
+        ctx.endaoment.ETH(),
+        name=f"endaoment_without_{function_name}_lock",
+    )
+    boa.env.set_code(ctx.endaoment.address, boa.env.get_code(mutant.address))
+
+
+def test_endaoment_external_mutation_surface_uses_one_reentrancy_lock():
+    source_path = ROOT / "contracts/core/Endaoment.vy"
+    module = vy_ast.parse_to_ast(source_path.read_text())
+    checked = set()
+    for function in module.get_descendants(vy_ast.nodes.FunctionDef):
+        decorators = {
+            getattr(decorator, "id", "") for decorator in function.decorator_list
+        }
+        if "external" not in decorators or {"view", "pure"} & decorators:
+            continue
+        if function.name == "__default__":
+            # The receive-only fallback has no state mutation or external call.
+            continue
+        checked.add(function.name)
+        assert "nonreentrant" in decorators, function.name
+
+    abi = build_abi_output(boa.load_partial(source_path).compiler_data)
+    abi_mutators = {
+        item["name"]
+        for item in abi
+        if item.get("type") == "function"
+        and item.get("stateMutability") in {"nonpayable", "payable"}
+    }
+    # This catches state-changing functions introduced indirectly through a
+    # module export as well as ordinary functions declared in this source.
+    assert abi_mutators == checked
+    assert {
+        "pause",
+        "recoverFunds",
+        "recoverFundsMany",
+        "transferFundsToGov",
+        "transferFundsToVault",
+        "transferFundsToEndaomentPSM",
+        "repayPoolDebt",
+        "mintPartnerLiquidity",
+        "addPartnerLiquidity",
+        "stabilizeGreenRefPool",
+    } <= checked
 
 
 @pytest.fixture
@@ -472,6 +609,171 @@ def _use_gross_reporting_curve_lego(ctx):
     return lego, venue
 
 
+def _install_dual_role_lego(ctx, venue, debt_pool, divert_amount, mode):
+    lego = boa.loads(
+        DUAL_ROLE_LEGO_SOURCE,
+        ctx.endaoment.address,
+        ctx.lp.address,
+        venue,
+        debt_pool,
+        divert_amount,
+        mode,
+        name=f"dual_role_lego_mode_{mode}",
+    )
+    ctx.lp.setMinter(lego.address, True, sender=ctx.governance.address)
+    ctx.lego_book.startAddressUpdateToRegistry(
+        LEGO_ID,
+        lego.address,
+        sender=ctx.governance.address,
+    )
+    ctx.switchboard.startAddNewAddressToRegistry(
+        lego.address,
+        "Dual-role callback Lego",
+        sender=ctx.governance.address,
+    )
+    boa.env.time_travel(
+        blocks=max(
+            ctx.lego_book.registryChangeTimeLock(),
+            ctx.switchboard.registryChangeTimeLock(),
+        )
+    )
+    assert ctx.lego_book.confirmAddressUpdateToRegistry(
+        LEGO_ID,
+        sender=ctx.governance.address,
+    )
+    assert ctx.switchboard.confirmNewAddressToRegistry(
+        lego.address,
+        sender=ctx.governance.address,
+    ) != 0
+    assert ctx.switchboard.isSwitchboardAddr(lego.address)
+    return lego
+
+
+def test_endaoment_locked_pause_wrapper_preserves_department_behavior(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    assert not ctx.endaoment.isPaused()
+
+    with boa.reverts("no perms"):
+        ctx.endaoment.pause(True, sender=alice)
+    assert not ctx.endaoment.isPaused()
+
+    assert ctx.endaoment.pause(True, sender=ctx.switchboard_delta.address) is None
+    log = filter_logs(ctx.endaoment, "DepartmentPauseModified")[0]
+    assert log.isPaused
+    assert ctx.endaoment.isPaused()
+
+    with boa.reverts("no change"):
+        ctx.endaoment.pause(True, sender=ctx.switchboard_delta.address)
+    assert ctx.endaoment.isPaused()
+
+    assert ctx.endaoment.pause(False, sender=ctx.switchboard_delta.address) is None
+    assert not ctx.endaoment.isPaused()
+
+
+def test_endaoment_locked_recovery_wrappers_preserve_transfers_and_events(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    asset_amount = 17 * ONE_ASSET
+    lp_amount = 23
+    ctx.asset.mint(
+        ctx.endaoment.address,
+        asset_amount,
+        sender=ctx.governance.address,
+    )
+
+    assert (
+        ctx.endaoment.recoverFunds(
+            alice,
+            ctx.asset.address,
+            sender=ctx.switchboard_delta.address,
+        )
+        is None
+    )
+    assert ctx.asset.balanceOf(ctx.endaoment.address) == 0
+    assert ctx.asset.balanceOf(alice) == asset_amount
+    log = filter_logs(ctx.endaoment, "DepartmentFundsRecovered")[0]
+    assert log.asset == ctx.asset.address
+    assert log.recipient == alice
+    assert log.balance == asset_amount
+
+    ctx.asset.mint(
+        ctx.endaoment.address,
+        asset_amount,
+        sender=ctx.governance.address,
+    )
+    ctx.lp.mint(
+        ctx.endaoment.address,
+        lp_amount,
+        sender=ctx.governance.address,
+    )
+    assert (
+        ctx.endaoment.recoverFundsMany(
+            alice,
+            [ctx.asset.address, ctx.lp.address],
+            sender=ctx.switchboard_delta.address,
+        )
+        is None
+    )
+    assert ctx.asset.balanceOf(ctx.endaoment.address) == 0
+    assert ctx.lp.balanceOf(ctx.endaoment.address) == 0
+    assert ctx.asset.balanceOf(alice) == 2 * asset_amount
+    assert ctx.lp.balanceOf(alice) == lp_amount
+    logs = filter_logs(ctx.endaoment, "DepartmentFundsRecovered")
+    assert [(log.asset, log.recipient, log.balance) for log in logs] == [
+        (ctx.asset.address, alice, asset_amount),
+        (ctx.lp.address, alice, lp_amount),
+    ]
+
+
+def test_endaoment_locked_recovery_wrappers_preserve_revert_behavior(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    amount = 11 * ONE_ASSET
+    ctx.asset.mint(ctx.endaoment.address, amount, sender=ctx.governance.address)
+
+    with boa.reverts("no perms"):
+        ctx.endaoment.recoverFunds(
+            alice,
+            ctx.asset.address,
+            sender=alice,
+        )
+    with boa.reverts("invalid recipient or asset"):
+        ctx.endaoment.recoverFunds(
+            ZERO_ADDRESS,
+            ctx.asset.address,
+            sender=ctx.switchboard_delta.address,
+        )
+    with boa.reverts("invalid recipient or asset"):
+        ctx.endaoment.recoverFunds(
+            alice,
+            ZERO_ADDRESS,
+            sender=ctx.switchboard_delta.address,
+        )
+    with boa.reverts("nothing to recover"):
+        ctx.endaoment.recoverFunds(
+            alice,
+            ctx.wrong_lp.address,
+            sender=ctx.switchboard_delta.address,
+        )
+
+    assert (
+        ctx.endaoment.recoverFundsMany(
+            alice,
+            [],
+            sender=ctx.switchboard_delta.address,
+        )
+        is None
+    )
+    assert ctx.asset.balanceOf(ctx.endaoment.address) == amount
+
+
 def test_sc18_mint_partner_liquidity_values_actual_received_amount(
     partner_liquidity_env,
     alice,
@@ -614,12 +916,21 @@ def test_sc18_positive_overdelivery_is_valued_consistently(
 def test_sc18_dual_role_switchboard_token_cannot_reenter(
     partner_liquidity_env,
     alice,
+    bob,
 ):
     ctx = partner_liquidity_env
-    token = boa.loads(REENTRANT_SWITCHBOARD_TOKEN_SOURCE, ctx.endaoment.address)
+    nested_amount = 25 * ONE_ASSET
+    token = boa.loads(
+        REENTRANT_SWITCHBOARD_TOKEN_SOURCE,
+        ctx.endaoment.address,
+        bob,
+        nested_amount,
+    )
     nominal = 100 * ONE_ASSET
     token.mint(alice, nominal)
+    token.mint(bob, nested_amount)
     token.approve(ctx.endaoment.address, nominal, sender=alice)
+    token.approve(ctx.endaoment.address, nested_amount, sender=bob)
     ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
 
     ctx.switchboard.startAddNewAddressToRegistry(
@@ -636,7 +947,10 @@ def test_sc18_dual_role_switchboard_token_cannot_reenter(
 
     before = (
         token.balanceOf(alice),
+        token.balanceOf(bob),
         token.balanceOf(ctx.endaoment_funds.address),
+        token.allowance(alice, ctx.endaoment.address),
+        token.allowance(bob, ctx.endaoment.address),
         ctx.green.totalSupply(),
     )
     with boa.reverts():
@@ -648,9 +962,158 @@ def test_sc18_dual_role_switchboard_token_cannot_reenter(
         )
     assert (
         token.balanceOf(alice),
+        token.balanceOf(bob),
         token.balanceOf(ctx.endaoment_funds.address),
+        token.allowance(alice, ctx.endaoment.address),
+        token.allowance(bob, ctx.endaoment.address),
         ctx.green.totalSupply(),
     ) == before
+
+    # Mutation evidence: with only this entrypoint's lock removed, every
+    # prerequisite is valid and the nested mint completes. This proves the
+    # protected revert above is caused by the shared reentrancy lock.
+    with boa.env.anchor():
+        _install_endaoment_lock_mutant(ctx, "mintPartnerLiquidity")
+        minted = ctx.endaoment.mintPartnerLiquidity(
+            alice,
+            token.address,
+            nominal,
+            sender=ctx.switchboard_delta.address,
+        )
+        expected_value = nominal * 10**12
+        assert minted == expected_value
+        assert token.balanceOf(alice) == 0
+        assert token.balanceOf(bob) == 0
+        assert token.balanceOf(ctx.endaoment_funds.address) == (
+            nominal + nested_amount
+        )
+        assert token.allowance(alice, ctx.endaoment.address) == 0
+        assert token.allowance(bob, ctx.endaoment.address) == 0
+        nested_value = nested_amount * 10**12
+        assert ctx.green.totalSupply() == (
+            before[-1] + expected_value + nested_value
+        )
+
+
+def _cross_entry_state(ctx, partner, venue, lego, debt_pool):
+    return (
+        ctx.asset.balanceOf(partner),
+        ctx.asset.balanceOf(ctx.endaoment.address),
+        ctx.asset.balanceOf(ctx.endaoment_funds.address),
+        ctx.asset.balanceOf(venue),
+        ctx.asset.balanceOf(lego.address),
+        ctx.green.balanceOf(ctx.endaoment.address),
+        ctx.green.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.balanceOf(venue),
+        ctx.green.balanceOf(lego.address),
+        ctx.green.balanceOf(ctx.governance.address),
+        ctx.green.totalSupply(),
+        ctx.ledger.greenPoolDebt(ctx.lp.address),
+        ctx.ledger.greenPoolDebt(debt_pool),
+        ctx.lp.balanceOf(partner),
+        ctx.lp.balanceOf(ctx.endaoment.address),
+        ctx.lp.balanceOf(ctx.endaoment_funds.address),
+        ctx.lp.totalSupply(),
+        ctx.asset.allowance(ctx.endaoment.address, lego.address),
+        ctx.green.allowance(ctx.endaoment.address, lego.address),
+    )
+
+
+@pytest.mark.parametrize(
+    ("destination", "mode"),
+    (("repayPoolDebt", 1), ("transferFundsToGov", 2)),
+    ids=("pool-debt", "governance-transfer"),
+)
+def test_sc18_dual_role_lego_cross_entry_reverts_atomically_and_is_mutation_sensitive(
+    partner_liquidity_env,
+    alice,
+    destination,
+    mode,
+):
+    ctx = partner_liquidity_env
+    venue = boa.env.generate_address()
+    debt_pool = ctx.wrong_lp.address
+    partner_amount = 100 * ONE_ASSET
+    green_amount = 100 * ONE_GREEN
+    divert_amount = 25 * ONE_GREEN
+    lego = _install_dual_role_lego(
+        ctx,
+        venue,
+        debt_pool,
+        divert_amount,
+        mode,
+    )
+    _fund_partner(ctx, alice, partner_amount)
+
+    # The debt route needs exactly the action's GREEN in custody. The
+    # governance route needs one extra diverted tranche so its nested pull is
+    # fully executable while the action's own remainder stays refundable.
+    reserve = green_amount if mode == 1 else green_amount + divert_amount
+    assert ctx.green.mint(
+        ctx.endaoment_funds.address,
+        reserve,
+        sender=ctx.endaoment.address,
+    )
+    if mode == 1:
+        ctx.ledger.updateGreenPoolDebt(
+            debt_pool,
+            divert_amount,
+            True,
+            sender=ctx.endaoment.address,
+        )
+
+    before = _cross_entry_state(ctx, alice, venue, lego, debt_pool)
+    with boa.reverts():
+        ctx.endaoment.addPartnerLiquidity(
+            LEGO_ID,
+            ctx.lp.address,
+            alice,
+            ctx.asset.address,
+            partner_amount,
+            0,
+            ctx.lp.address,
+            sender=ctx.switchboard_delta.address,
+        )
+    assert ctx.endaoment._computation.is_error
+    assert not ctx.endaoment.get_logs()
+    assert _cross_entry_state(ctx, alice, venue, lego, debt_pool) == before
+
+    # Remove only the nested destination's lock. The attack then completes,
+    # proving that the protected revert above is not caused by an invalid Lego
+    # setup, missing debt, insufficient custody, or an unusable allowance.
+    with boa.env.anchor():
+        _install_endaoment_lock_mutant(ctx, destination)
+        result = ctx.endaoment.addPartnerLiquidity(
+            LEGO_ID,
+            ctx.lp.address,
+            alice,
+            ctx.asset.address,
+            partner_amount,
+            0,
+            ctx.lp.address,
+            sender=ctx.switchboard_delta.address,
+        )
+        assert result == (2, partner_amount, green_amount)
+        assert ctx.asset.balanceOf(venue) == partner_amount
+        assert ctx.green.balanceOf(venue) == green_amount - divert_amount
+        assert ctx.asset.balanceOf(lego.address) == 0
+        assert ctx.green.balanceOf(lego.address) == 0
+        assert ctx.lp.balanceOf(alice) == before[13] + 1
+        assert ctx.lp.balanceOf(ctx.endaoment_funds.address) == before[15] + 1
+        assert ctx.lp.balanceOf(ctx.endaoment.address) == 0
+        assert ctx.asset.allowance(ctx.endaoment.address, lego.address) == 0
+        assert ctx.green.allowance(ctx.endaoment.address, lego.address) == 0
+        assert ctx.ledger.greenPoolDebt(ctx.lp.address) == before[11]
+        if mode == 1:
+            assert ctx.ledger.greenPoolDebt(debt_pool) == 0
+            assert ctx.green.totalSupply() == before[10] - divert_amount
+            assert ctx.green.balanceOf(ctx.governance.address) == before[9]
+        else:
+            assert ctx.ledger.greenPoolDebt(debt_pool) == before[12]
+            assert ctx.green.totalSupply() == before[10]
+            assert ctx.green.balanceOf(ctx.governance.address) == (
+                before[9] + divert_amount
+            )
 
 
 def test_sc18_self_partner_uses_only_endaoment_controlled_balance(

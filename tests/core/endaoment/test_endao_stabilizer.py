@@ -378,6 +378,7 @@ lpTotalSupply: uint256
 lastGreenRemoved: public(uint256)
 lastLpBurned: public(uint256)
 executionExtraBurn: public(uint256)
+executionQuoteMode: public(uint256)
 
 @deploy
 def __init__(
@@ -399,6 +400,11 @@ def seedLp(_holder: address, _amount: uint256):
 @external
 def setExecutionExtraBurn(_amount: uint256):
     self.executionExtraBurn = _amount
+
+@external
+def setExecutionQuoteMode(_mode: uint256):
+    assert _mode <= 2
+    self.executionQuoteMode = _mode
 
 @view
 @external
@@ -448,6 +454,11 @@ def calc_token_amount(
     assert not _isDeposit
     assert not QUOTE_REVERTS
     assert _amounts[0] <= staticcall IERC20(GREEN).balanceOf(self)
+    approved: uint256 = self.allowances[msg.sender][self]
+    if approved != 0:
+        assert self.executionQuoteMode != 1
+        if self.executionQuoteMode == 2:
+            return approved
     return _amounts[0] * BURN_NUMERATOR // BURN_DENOMINATOR
 
 @external
@@ -1169,6 +1180,78 @@ def test_sc19_reverting_quote_is_external_noop_with_no_state_change(
             green_token.balanceOf(endaoment_funds),
             green_token.balanceOf(endaoment.address),
             green_token.balanceOf(pool.address),
+            ledger.greenPoolDebt(pool.address),
+        ) == before
+
+
+@pytest.mark.parametrize(
+    "execution_quote_mode",
+    (1, 2),
+    ids=("reverts", "quote-equals-lp-balance"),
+)
+def test_sc19_execution_requote_failure_or_unsafe_quote_is_atomic_noop(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+    switchboard_delta,
+    execution_quote_mode,
+):
+    lp_balance = 100 * EIGHTEEN_DECIMALS
+    pool_debt = 20 * EIGHTEEN_DECIMALS
+    pool_green = 1_000 * EIGHTEEN_DECIMALS
+    with boa.env.anchor():
+        pool = _install_stabilizer_removal_harness(
+            curve_prices,
+            green_token,
+            pool_green,
+            75_00,
+            burn_numerator=2 * EIGHTEEN_DECIMALS,
+        )
+        pool.seedLp(endaoment_funds, lp_balance)
+        pool.seedLp(boa.env.generate_address(), 9_900 * EIGHTEEN_DECIMALS)
+        green_token.mint(pool.address, pool_green, sender=endaoment.address)
+        ledger.updateGreenPoolDebt(
+            pool.address,
+            pool_debt,
+            True,
+            sender=endaoment.address,
+        )
+        pool.setExecutionQuoteMode(execution_quote_mode)
+
+        # Sizing occurs before LP approval and therefore succeeds. The mock
+        # changes behavior only for the execution-bound quote after approval.
+        assert endaoment.getGreenAmountToRemoveInStabilizer() == pool_debt
+        before = (
+            pool.balanceOf(endaoment_funds),
+            pool.balanceOf(endaoment.address),
+            pool.totalSupply(),
+            pool.allowance(endaoment.address, pool.address),
+            pool.lastGreenRemoved(),
+            pool.lastLpBurned(),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            green_token.balanceOf(pool.address),
+            green_token.totalSupply(),
+            ledger.greenPoolDebt(pool.address),
+        )
+
+        assert not endaoment.stabilizeGreenRefPool(
+            sender=switchboard_delta.address
+        )
+        assert not filter_logs(endaoment, "StabilizerPoolLiqRemoved")
+        assert (
+            pool.balanceOf(endaoment_funds),
+            pool.balanceOf(endaoment.address),
+            pool.totalSupply(),
+            pool.allowance(endaoment.address, pool.address),
+            pool.lastGreenRemoved(),
+            pool.lastLpBurned(),
+            green_token.balanceOf(endaoment_funds),
+            green_token.balanceOf(endaoment.address),
+            green_token.balanceOf(pool.address),
+            green_token.totalSupply(),
             ledger.greenPoolDebt(pool.address),
         ) == before
 

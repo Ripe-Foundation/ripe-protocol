@@ -24,7 +24,10 @@
 implements: Department
 
 exports: addys.__interface__
-exports: deptBasics.__interface__
+exports: (
+    deptBasics.canMintGreen,
+    deptBasics.canMintRipe,
+)
 
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -162,6 +165,41 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     ETH = _eth
 
 
+######################
+# Department Controls #
+######################
+
+
+@nonreentrant
+@external
+def pause(_shouldPause: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _shouldPause != deptBasics.isPaused # dev: no change
+    deptBasics.isPaused = _shouldPause
+    log deptBasics.DepartmentPauseModified(isPaused=_shouldPause)
+
+
+@nonreentrant
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    deptBasics._recoverFunds(_recipient, _asset)
+
+
+@nonreentrant
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    for asset: address in _assets:
+        deptBasics._recoverFunds(_recipient, asset)
+
+
+@view
+@external
+def isPaused() -> bool:
+    return deptBasics.isPaused
+
+
 @payable
 @external
 def __default__():
@@ -173,6 +211,7 @@ def __default__():
 ##################
 
 
+@nonreentrant
 @external
 def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
@@ -201,6 +240,7 @@ def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -
     return amount, txUsdValue
 
 
+@nonreentrant
 @external
 def transferFundsToVault(_assets: DynArray[address, MAX_ASSETS]):
     assert not deptBasics.isPaused # dev: contract paused
@@ -242,6 +282,7 @@ def transferFundsToVault(_assets: DynArray[address, MAX_ASSETS]):
         )
 
 
+@nonreentrant
 @external
 def transferFundsToEndaomentPSM(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
@@ -1198,6 +1239,7 @@ def _mintPartnerLiquidity(
 #############
 
 
+@nonreentrant
 @external
 def repayPoolDebt(_pool: address, _amount: uint256 = max_value(uint256)) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
