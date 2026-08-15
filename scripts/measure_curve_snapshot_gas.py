@@ -92,7 +92,36 @@ def measure(source: Path) -> dict[str, int]:
     _fill(curve, snapshotter, 10)
     _reset_access_counters()
     curve.getCurrentGreenPoolStatus()
-    result["view_partial_10_all_fresh"] = curve._computation.get_gas_used()
+    result["view_capacity_100_with_10_entries_all_fresh"] = (
+        curve._computation.get_gas_used()
+    )
+
+    curve, pool, governance, snapshotter = _deploy(source, 10, 0)
+    _fill(curve, snapshotter, 10)
+    _reset_access_counters()
+    curve.getCurrentGreenPoolStatus()
+    result["view_full_10_all_fresh"] = curve._computation.get_gas_used()
+
+    boa.env.time_travel(blocks=1)
+    _reset_access_counters()
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    result["add_snapshot_full_10"] = curve._computation.get_gas_used()
+
+    action_id = curve.setGreenRefPoolConfig(
+        pool,
+        9,
+        60_00,
+        0,
+        10_00,
+        100_000 * E18,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=1)
+    _reset_access_counters()
+    assert curve.confirmGreenRefPoolConfig(action_id, sender=governance)
+    result["confirm_capacity_10_to_9_clear_and_reseed"] = (
+        curve._computation.get_gas_used()
+    )
 
     curve, pool, governance, snapshotter = _deploy(source, 100, 0)
     _fill(curve, snapshotter, 100)

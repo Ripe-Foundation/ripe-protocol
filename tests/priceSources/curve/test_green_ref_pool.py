@@ -4,6 +4,7 @@ import boa
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from config.BluePrint import CORE_TOKENS, CURVE_PARAMS, ADDYS, WHALES
 from conf_utils import filter_logs
+from utils.clock_profiles import clock_profile
 
 
 @pytest.fixture
@@ -2316,3 +2317,480 @@ def test_mixed_stale_and_fresh_intervals_have_exact_weight(local_curve_ref_syste
     # The 50% seed is stale. The fresh intervals are 80% for two blocks and
     # 20% for one block, so the exact duration-weighted result is 60%.
     assert curve.getCurrentGreenPoolStatus().weightedRatio == 60_00
+
+
+@pytest.mark.fork("local", "base")
+def test_capacity_change_with_counter_and_dangerous_seed_reanchors_exactly(
+    local_curve_ref_system,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=0,
+    )
+    preserved = curve.greenRefPoolData().numBlocksInDanger
+    assert preserved == 2
+
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        4,
+        60_00,
+        0,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    confirmation_block = boa.env.evm.patch.block_number
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+
+    seeded = curve.greenRefPoolData()
+    assert seeded.numBlocksInDanger == preserved
+    assert seeded.nextIndex == 1
+    assert seeded.lastSnapshot.update == confirmation_block
+    assert curve.snapShots(0) == seeded.lastSnapshot
+    assert [curve.snapShots(index).update for index in range(1, 4)] == [0, 0, 0]
+
+    boa.env.time_travel(blocks=7)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    accrued = curve.greenRefPoolData()
+    assert accrued.numBlocksInDanger == preserved + 7
+    assert accrued.nextIndex == 2
+    assert accrued.lastSnapshot.update == confirmation_block + 7
+    assert [curve.snapShots(index).update for index in range(4)] == [
+        confirmation_block,
+        confirmation_block + 7,
+        0,
+        0,
+    ]
+
+
+@pytest.mark.fork("local", "base")
+def test_capacity_and_classification_change_with_dangerous_seed_reanchors_exactly(
+    local_curve_ref_system,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=0,
+    )
+    preserved = curve.greenRefPoolData().numBlocksInDanger
+
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        5,
+        70_00,
+        20,
+        20_00,
+        200_000 * EIGHTEEN_DECIMALS,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    confirmation_block = boa.env.evm.patch.block_number
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+    seeded = curve.greenRefPoolData()
+    assert seeded.numBlocksInDanger == preserved
+    assert seeded.nextIndex == 1
+    assert seeded.lastSnapshot.ratio == 80_00
+    assert seeded.lastSnapshot.update == confirmation_block
+    assert [curve.snapShots(index).update for index in range(5)] == [
+        confirmation_block,
+        0,
+        0,
+        0,
+        0,
+    ]
+
+    boa.env.time_travel(blocks=4)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    after = curve.greenRefPoolData()
+    assert after.numBlocksInDanger == preserved + 4
+    assert after.nextIndex == 2
+    assert after.lastSnapshot.update == confirmation_block + 4
+
+
+@pytest.mark.fork("local", "base")
+def test_capacity_and_classification_change_with_safe_seed_restarts_recovery(
+    local_curve_ref_system,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=3,
+    )
+    preserved = curve.greenRefPoolData().numBlocksInDanger
+    _set_local_green_ratio(pool, 20)
+
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        4,
+        70_00,
+        3,
+        20_00,
+        200_000 * EIGHTEEN_DECIMALS,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    confirmation_block = boa.env.evm.patch.block_number
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+    seeded = curve.greenRefPoolData()
+    assert seeded.numBlocksInDanger == preserved
+    assert seeded.nextIndex == 1
+    assert seeded.lastSnapshot.ratio == 20_00
+    assert seeded.lastSnapshot.update == confirmation_block
+
+    boa.env.time_travel(blocks=2)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    partial = curve.greenRefPoolData()
+    assert partial.numBlocksInDanger == preserved
+    assert partial.nextIndex == 2
+    assert partial.lastSnapshot.update == confirmation_block + 2
+
+    boa.env.time_travel(blocks=1)
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    complete = curve.greenRefPoolData()
+    assert complete.numBlocksInDanger == 0
+    assert complete.nextIndex == 3
+    assert complete.lastSnapshot.update == confirmation_block + 3
+    assert [curve.snapShots(index).update for index in range(4)] == [
+        confirmation_block,
+        confirmation_block + 2,
+        confirmation_block + 3,
+        0,
+    ]
+
+
+@pytest.mark.fork("local", "base")
+@pytest.mark.parametrize("transition", ("noop", "stabilizer"))
+def test_nonclassification_confirmation_preserves_active_danger_anchor(
+    local_curve_ref_system,
+    transition,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=0,
+    )
+    before = curve.greenRefPoolData()
+    anchor_block = before.lastSnapshot.update
+    adjust = 10_00 if transition == "noop" else 30_00
+    maximum = (
+        100_000 * EIGHTEEN_DECIMALS
+        if transition == "noop"
+        else 300_000 * EIGHTEEN_DECIMALS
+    )
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        2,
+        60_00,
+        0,
+        adjust,
+        maximum,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+    assert curve.greenRefPoolData() == before
+
+    boa.env.time_travel(blocks=4)
+    write_block = boa.env.evm.patch.block_number
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    after = curve.greenRefPoolData()
+    assert after.numBlocksInDanger == before.numBlocksInDanger + (
+        write_block - anchor_block
+    )
+    assert after.nextIndex == (before.nextIndex + 1) % 2
+    assert after.lastSnapshot.update == write_block
+    assert sorted(
+        snapshot.update for snapshot in (curve.snapShots(0), curve.snapShots(1))
+    ) == sorted((anchor_block, write_block))
+
+
+@pytest.mark.fork("local", "base")
+@pytest.mark.parametrize("transition", ("noop", "stabilizer"))
+def test_nonclassification_confirmation_preserves_active_recovery_window(
+    local_curve_ref_system,
+    transition,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=3,
+    )
+    preserved = curve.greenRefPoolData().numBlocksInDanger
+
+    # Category C first establishes a fresh, observable recovery anchor.
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        2,
+        90_00,
+        3,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    recovery_start = boa.env.evm.patch.block_number
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+
+    adjust = 10_00 if transition == "noop" else 30_00
+    maximum = (
+        100_000 * EIGHTEEN_DECIMALS
+        if transition == "noop"
+        else 300_000 * EIGHTEEN_DECIMALS
+    )
+    aid = curve.setGreenRefPoolConfig(
+        pool,
+        2,
+        90_00,
+        3,
+        adjust,
+        maximum,
+        sender=governance,
+    )
+    boa.env.time_travel(blocks=curve.actionTimeLock())
+    before = curve.greenRefPoolData()
+    assert curve.confirmGreenRefPoolConfig(aid, sender=governance)
+    assert curve.greenRefPoolData() == before
+
+    # The original Category-C recovery start remains controlling. If this
+    # confirmation reset it, the exact recovery boundary below would not clear.
+    assert boa.env.evm.patch.block_number < recovery_start + 3
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    assert curve.greenRefPoolData().numBlocksInDanger == preserved
+    assert curve.greenRefPoolData().nextIndex == (before.nextIndex + 1) % 2
+    boa.env.time_travel(
+        blocks=recovery_start + 3 - boa.env.evm.patch.block_number
+    )
+    assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    after = curve.greenRefPoolData()
+    assert after.numBlocksInDanger == 0
+    assert after.lastSnapshot.update == recovery_start + 3
+    assert after.nextIndex == before.nextIndex
+
+
+@pytest.mark.fork("local", "base")
+def test_robinhood_repeated_number_suppresses_every_green_ring_write(
+    local_curve_ref_system,
+    clock_controller,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _confirm_local_ref_config(curve, pool, governance, stale_blocks=10)
+    before = curve.greenRefPoolData()
+    current = clock_controller.current
+    profile = clock_profile(
+        "R-REP128",
+        number=current.number,
+        timestamp=current.timestamp,
+    )
+
+    with clock_controller.scenario(profile, "robinhood_candidate"):
+        for step in range(len(profile.points)):
+            clock_controller.apply(profile, step)
+            assert not curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        assert curve.greenRefPoolData() == before
+
+
+@pytest.mark.fork("local", "base")
+def test_robinhood_plus_one_and_jump_profiles_drive_exact_curve_durations(
+    local_curve_ref_system,
+    clock_controller,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _confirm_local_ref_config(
+        curve,
+        pool,
+        governance,
+        capacity=5,
+        trigger=60_00,
+        stale_blocks=100,
+    )
+    _set_local_green_ratio(pool, 80)
+    start = curve.greenRefPoolData().lastSnapshot.update
+    timestamp = clock_controller.current.timestamp
+
+    plus_one = clock_profile("R-PLUS1", number=start, timestamp=timestamp)
+    with clock_controller.scenario(plus_one, "robinhood_candidate"):
+        for step, expected_write in enumerate((False, False, True, False)):
+            clock_controller.apply(plus_one, step)
+            assert (
+                curve.addGreenRefPoolSnapshot(sender=snapshotter)
+                is expected_write
+            )
+        data = curve.greenRefPoolData()
+        assert data.nextIndex == 2
+        assert data.lastSnapshot.update == start + 1
+
+    jumps = clock_profile("R-J2-J4", number=start, timestamp=timestamp)
+    with clock_controller.scenario(jumps, "robinhood_candidate"):
+        for step, expected_write in enumerate((False, False, True, False, True)):
+            clock_controller.apply(jumps, step)
+            assert (
+                curve.addGreenRefPoolSnapshot(sender=snapshotter)
+                is expected_write
+            )
+        status = curve.getCurrentGreenPoolStatus()
+        assert status.weightedRatio == (50_00 * 2 + 80_00 * 2) // 4
+        assert status.numBlocksInDanger == 0
+
+
+@pytest.mark.fork("local", "base")
+def test_robinhood_stress_jump_credits_exact_fresh_danger_duration(
+    local_curve_ref_system,
+    clock_controller,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=100,
+    )
+    before = curve.greenRefPoolData()
+    start = before.lastSnapshot.update
+    profile = clock_profile(
+        "R-STRESS60",
+        number=start,
+        timestamp=clock_controller.current.timestamp,
+    )
+    with clock_controller.scenario(profile, "robinhood_candidate"):
+        clock_controller.apply(profile, 0)
+        assert not curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        clock_controller.apply(profile, 1)
+        assert not curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        clock_controller.apply(profile, 2)
+        assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        after = curve.greenRefPoolData()
+        assert after.numBlocksInDanger == before.numBlocksInDanger + 60
+        assert after.lastSnapshot.update == start + 60
+        assert after.nextIndex == (before.nextIndex + 1) % 2
+
+
+@pytest.mark.fork("local", "base")
+def test_robinhood_jump_crosses_inclusive_freshness_boundary(
+    local_curve_ref_system,
+    clock_controller,
+):
+    curve, pool, _, governance, _ = local_curve_ref_system
+    _confirm_local_ref_config(curve, pool, governance, stale_blocks=3)
+    seeded = curve.greenRefPoolData().lastSnapshot.update
+    profile = clock_profile(
+        "BOUNDARY-OPEN",
+        boundary=seeded + 3,
+        timestamp=clock_controller.current.timestamp,
+    )
+    with clock_controller.scenario(profile, "robinhood_candidate"):
+        clock_controller.apply(profile, 0)
+        assert curve.getCurrentGreenPoolStatus().weightedRatio == 50_00
+        clock_controller.apply(profile, 1)
+        assert curve.getCurrentGreenPoolStatus().weightedRatio == 0
+
+
+@pytest.mark.fork("local", "base")
+def test_robinhood_jump_over_recovery_window_restarts_without_clearing(
+    local_curve_ref_system,
+    clock_controller,
+):
+    curve, pool, _, governance, snapshotter = local_curve_ref_system
+    _establish_local_rolling_danger(
+        curve,
+        pool,
+        governance,
+        snapshotter,
+        stale_blocks=3,
+    )
+    _set_local_green_ratio(pool, 20)
+    for _ in range(2):
+        boa.env.time_travel(blocks=1)
+        assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+    preserved = curve.greenRefPoolData().numBlocksInDanger
+    recovery_start = curve.greenRefPoolData().lastSnapshot.update
+    assert preserved != 0
+
+    profile = clock_profile(
+        "BOUNDARY-WINDOW",
+        start=recovery_start + 1,
+        end=recovery_start + 3,
+        timestamp=clock_controller.current.timestamp,
+    )
+    with clock_controller.scenario(profile, "robinhood_candidate"):
+        clock_controller.apply(profile, 0)
+        assert not curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        clock_controller.apply(profile, 1)
+        assert curve.addGreenRefPoolSnapshot(sender=snapshotter)
+        after = curve.greenRefPoolData()
+        assert after.numBlocksInDanger == preserved
+        assert after.lastSnapshot.update == recovery_start + 4
+
+
+@pytest.mark.fork("local", "base")
+def test_teller_housekeeping_repeated_robinhood_number_writes_once_per_number(
+    local_curve_ref_system,
+    clock_controller,
+    teller,
+    price_desk,
+    governance,
+    deleverage,
+    alice,
+):
+    curve, pool, registry, local_governance, _ = local_curve_ref_system
+    _confirm_local_ref_config(
+        curve,
+        pool,
+        local_governance,
+        capacity=4,
+        trigger=60_00,
+        stale_blocks=10,
+    )
+    registry.setValidRipeAddr(teller, True)
+    assert price_desk.startAddressUpdateToRegistry(
+        2,
+        curve,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=price_desk.registryChangeTimeLock() + 1)
+    assert price_desk.confirmAddressUpdateToRegistry(
+        2,
+        sender=governance.address,
+    )
+
+    start = boa.env.evm.patch.block_number
+    profile = clock_profile(
+        "R-PLUS1",
+        number=start,
+        timestamp=clock_controller.current.timestamp,
+    )
+    before = curve.greenRefPoolData()
+    with clock_controller.scenario(profile, "robinhood_candidate"):
+        for step in range(len(profile.points)):
+            clock_controller.apply(profile, step)
+            teller.performHousekeeping(
+                False,
+                alice,
+                False,
+                sender=deleverage.address,
+            )
+        after = curve.greenRefPoolData()
+        assert after.nextIndex == (before.nextIndex + 2) % 4
+        assert after.lastSnapshot.update == start + 1
+        assert [curve.snapShots(index).update for index in range(3)] == [
+            before.lastSnapshot.update,
+            start,
+            start + 1,
+        ]

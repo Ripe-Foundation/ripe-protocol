@@ -289,6 +289,50 @@ def test_final_curve_worst_case_honest_nested_price_desk_gas(
     assert gas_used <= 200_000
 
 
+@pytest.mark.gas
+def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
+    robinhood_curve_launch_route,
+    teller,
+    deleverage,
+    alice,
+):
+    route = robinhood_curve_launch_route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action_id = route.curve.setGreenRefPoolConfig(
+        route.curve_system,
+        10,
+        60_00,
+        0,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=route.governance.address,
+    )
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert route.curve.confirmGreenRefPoolConfig(
+        action_id,
+        sender=route.governance.address,
+    )
+    for _ in range(9):
+        boa.env.time_travel(blocks=1)
+        assert route.curve.addGreenRefPoolSnapshot(sender=teller.address)
+    assert route.curve.greenRefPoolData().nextIndex == 0
+
+    boa.env.time_travel(blocks=1)
+    teller.performHousekeeping(
+        False,
+        alice,
+        False,
+        sender=deleverage.address,
+        gas=1_000_000,
+    )
+    gas_used = teller._computation.get_gas_used()
+    print(f"CURVE_FULL_CAPACITY_TEN_TELLER_HOUSEKEEPING_GAS={gas_used}")
+    assert route.curve.greenRefPoolData().nextIndex == 1
+    # Initial deterministic in-process measurement is 86,602 gas. The 150k
+    # ceiling retains about 73% margin and is independent of the call stipend.
+    assert gas_used <= 150_000
+
+
 @pytest.mark.parametrize("failure", ("zero_pool", "zero_chainlink", "stale_chainlink"))
 def test_configured_green_feed_safe_and_unsafe_modes_fail_without_fabrication(
     robinhood_curve_launch_route,
