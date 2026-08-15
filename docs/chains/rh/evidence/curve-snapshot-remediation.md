@@ -149,6 +149,14 @@ The first ceiling leaves approximately 96% margin and the second approximately
 The CI workflow-health regression fails if either the BlueChip or Curve gas
 file is removed from the snapshot-gas job.
 
+The downstream SC-06 requalification replaced PriceDesk with exact PR #152
+commit `3752d5d0c220cbb5491c232b859adf50d64c0841` and source SHA-256
+`7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c`
+while retaining this exact Curve source. All nine route nodes passed. The
+bounded PriceDesk added 142 gas to the normal route (25,700 total) and 1,741
+gas to the worst honest route (127,922 total); both remain below the same
+50,000 and 200,000 ceilings. The retained JUnit binds those two exact sources.
+
 ### Maximum-ring cold-access measurements
 
 `scripts/measure_curve_snapshot_gas.py` deploys an isolated system per path and
@@ -184,14 +192,25 @@ Four fail-first regressions demonstrated:
    producing `8046`; and
 4. an extreme `staleBlocks` value poisoned the view with arithmetic reversion.
 
-Each defect can be reproduced by checking out that exact baseline, restoring
-the corresponding `test_sc16_*`, `test_sc23_*`, capacity-regrowth, or
-extreme-staleness regression from the candidate, and running its exact node:
+Each defect was reproduced by checking out that exact baseline, restoring the
+candidate test file and two isolated mocks, applying the retained
+`fail-first-overlay.patch`, and running these exact nodes:
 
 ```sh
 python -m pytest -q -p no:cacheprovider \
-  tests/priceSources/curve/test_green_ref_pool.py::<node>
+  tests/priceSources/curve/test_green_ref_pool.py::test_sc16_single_safe_snapshot_preserves_danger_history \
+  tests/priceSources/curve/test_green_ref_pool.py::test_sc23_fully_stale_status_returns_zero \
+  tests/priceSources/curve/test_green_ref_pool.py::test_capacity_regrowth_cannot_resurrect_discarded_slots \
+  tests/priceSources/curve/test_green_ref_pool.py::test_extreme_stale_blocks_rejected_without_poisoning_view
 ```
+
+The four failures expose, respectively, danger 5 to 0, stale result 5000
+instead of 0, resurrected-history result 8046 instead of the fresh 8500 seed,
+and an arithmetic revert in the view at `snapshot.update + staleBlocks`. The
+overlay changes only the observation sequence/assertion point needed to make
+those values visible; its resulting test-file SHA-256 and exact preparation
+recipe are recorded in `evidence-manifest.yaml`. The fixed Base run executes
+all four permanent regressions as part of its 59 passing nodes.
 
 The final focused behavior recipe is:
 
@@ -214,10 +233,10 @@ python -m pytest -q -p no:cacheprovider \
   tests/inventory/test_contract_artifacts.py
 ```
 
-The PR description and retained machine-readable evidence must state the exact
-final commands, node counts, passed/failed/skipped/deselected counts, tool
-versions, and SHA-256 hashes. CI on the retargeted PR supersedes a local claim
-only where it publishes the same recipe and retained output.
+`evidence-manifest.yaml` records the exact source bindings, commands, node
+counts, passed/failed/skipped/deselected counts, tool versions, artifact sizes,
+and SHA-256 hashes. CI on the retargeted PR supersedes a local claim only where
+it publishes the same recipe and retained output.
 
 ### Pre-existing test rewrite disclosure
 
@@ -250,24 +269,29 @@ values are logged or committed. Retained JUnit must bind the exact final head
 and merge candidate, command, selected nodes, and all pass/fail/skip/deselect
 counts.
 
-The existing `test_curve_prices.py` asset/LP lane has inherited harness debt,
-not a Curve-pool math divergence. On the previously compared base and
-candidate, both produced the same 24 failed / 8 passed set. Before the
-timelock, Chainlink observations were approximately 73,820 seconds old. After
-the required 3,601-block time travel they were approximately 117,032 seconds
-old, exceeding MissionControl freshness 86,400 seconds. The Curve pool oracle
-still returned 1e18 and direct Chainlink reads remained nonzero, but PriceDesk
-correctly applied global staleness. That caused 23 confirmation failures plus
-one downstream missing-event assertion. This debt grants no production
-exception and must be retained with exact failed-node parity on the final base
-and candidate.
+The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 59
+green-ring nodes in 195.93 seconds. The existing `test_curve_prices.py`
+asset/LP lane has inherited harness debt, not a Curve-pool math divergence:
+target `e7b6eeab768a009469a38a7ce8a35bb7e8d8f4bc` and candidate test commit
+`937b491a01f005bd1a65edb9ad81ddf1668596e2` each produced the same 24 failed /
+8 passed set, and the parsed failed-node sets are identical.
 
-The dedicated Base-through-Anvil green-ring lane is expected to pass and must
-be rerun after the final target rebase. The committed JUnit/equivalent record
-must include the exact failed-test-name set for both the inherited base and
-candidate lane, relevant Chainlink timestamps, MissionControl freshness,
-sanitized environment description, and all version and count fields. A digest
-without the underlying artifact is not sufficient evidence.
+At the pinned block, timestamp 1,755,733,205, the USDC Chainlink round was
+updated at 1,755,702,597. Its initial age was 30,608 seconds. The Chainlink
+setup timelock advanced 3,601 blocks to timestamp 1,755,776,417 and age 73,820
+seconds. The later Curve confirmation timelock advanced another 3,601 blocks
+to timestamp 1,755,819,629 and age 117,032 seconds, beyond MissionControl's
+86,400-second global freshness value. The fixture's direct Chainlink source
+uses per-feed `staleTime=0` and remains nonzero, while PriceDesk correctly
+supplies the global bound. That causes 23 confirmation failures and one
+cascading missing-event assertion on both revisions.
+
+The repository retains all five JUnit documents, not only their digests, plus
+the complete failure set, exact commands, versions, sanitized environment,
+timestamps, counts, hashes, fail-first outputs, and PR #152 composition
+measurement in
+[`curve-snapshot-remediation/evidence-manifest.yaml`](curve-snapshot-remediation/evidence-manifest.yaml).
+The evidence grants no production exception for the inherited harness debt.
 
 ## Monitoring, pause, disable, and reopen conditions
 
