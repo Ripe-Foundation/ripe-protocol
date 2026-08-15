@@ -835,6 +835,9 @@ def releaseLock(
     # remove shares (cost to exit early)
     userShares: uint256 = vaultData.userBalances[_user][_asset]
     totalShares: uint256 = vaultData.totalBalances[_asset]
+    # This guard requires a remaining holder address; permissionless addresses
+    # cannot prove distinct beneficial ownership, so same-owner fee recapture
+    # through another address remains possible by accepted policy.
     assert totalShares > userShares # dev: no remaining holders
 
     sharesToRemove: uint256 = userShares
@@ -843,8 +846,9 @@ def releaseLock(
         claimBefore: uint256 = sharesVault._sharesToAmount(userShares, totalShares, totalBalance, False)
         assert claimBefore != 0 # dev: no fee-bearing claim
 
-        # Floor the fee-adjusted live claim, then keep the largest share balance
-        # whose exact post-state floored claim does not exceed that target.
+        # Floor the fee-adjusted live claim, then keep the largest indivisible
+        # share balance whose exact post-state floored claim does not exceed the
+        # target: claim(postShares) <= target < claim(postShares + 1).
         targetClaim: uint256 = claimBefore * (HUNDRED_PERCENT - exitFee) // HUNDRED_PERCENT
         claimCeiling: uint256 = targetClaim + 1
         # ceil((target + 1) * (remaining actual shares + virtual shares)

@@ -2,10 +2,21 @@ import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS
+from tests.vaults.ripe_gov_exit_fee_model import (
+    DECIMAL_OFFSET,
+    UINT256_MAX,
+    UInt256Overflow,
+    assert_exact_exit_claim,
+    checked_amount_to_shares,
+    checked_closed_form_retained_shares,
+    checked_shares_to_amount,
+    checked_target_claim,
+    claim,
+    maximal_retained_shares,
+    target_claim,
+)
 
 
-DECIMAL_OFFSET = 10**8
-HUNDRED_PERCENT = 100_00
 VAULT_ID = 2
 LOCK_TERMS = (100, 1_000, 200_00, True, 10_00)
 
@@ -40,16 +51,6 @@ def _deposit(vault, token, funder, user, amount, teller, lock_duration=500):
     )
 
 
-def _claim(shares, total_shares, total_balance):
-    return shares * (total_balance + 1) // (total_shares + DECIMAL_OFFSET)
-
-
-def _target_claim(claim_before, exit_fee):
-    # Independent oracle convention: retain the fee-adjusted percentage of the
-    # exact floored live pre-release claim, rounding the target down.
-    return claim_before * (HUNDRED_PERCENT - exit_fee) // HUNDRED_PERCENT
-
-
 def _point_tuple(points):
     return tuple(points)
 
@@ -68,17 +69,28 @@ def _atomic_snapshot(vault, token, user, ledger):
 
 
 @pytest.mark.parametrize(
-    ("exiter_amount", "remaining_amount", "holder_case"),
+    ("exiter_amount", "remaining_amount"),
     (
-        (1 * EIGHTEEN_DECIMALS, 99 * EIGHTEEN_DECIMALS, "small"),
-        (50 * EIGHTEEN_DECIMALS, 50 * EIGHTEEN_DECIMALS, "half"),
-        (90 * EIGHTEEN_DECIMALS, 10 * EIGHTEEN_DECIMALS, "dominant"),
+        pytest.param(
+            1 * EIGHTEEN_DECIMALS,
+            99 * EIGHTEEN_DECIMALS,
+            id="small-holder",
+        ),
+        pytest.param(
+            50 * EIGHTEEN_DECIMALS,
+            50 * EIGHTEEN_DECIMALS,
+            id="equal-holders",
+        ),
+        pytest.param(
+            90 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            id="dominant-holder",
+        ),
     ),
 )
 def test_early_exit_fee_matches_exact_live_claim_for_normal_holder_sizes(
     exiter_amount,
     remaining_amount,
-    holder_case,
     ripe_gov_vault,
     ripe_token,
     whale,
@@ -102,28 +114,31 @@ def test_early_exit_fee_matches_exact_live_claim_for_normal_holder_sizes(
     total_before = ripe_gov_vault.totalBalances(ripe_token)
     bob_before = ripe_gov_vault.userBalances(bob, ripe_token)
     alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
-    bob_claim_before = _claim(bob_before, total_before, custody_before)
-    alice_claim_before = _claim(alice_shares, total_before, custody_before)
-    target = _target_claim(bob_claim_before, 10_00)
+    bob_claim_before = claim(bob_before, total_before, custody_before)
+    alice_claim_before = claim(alice_shares, total_before, custody_before)
+    target = target_claim(bob_claim_before, 10_00)
+    expected_after = maximal_retained_shares(
+        bob_before,
+        total_before - bob_before,
+        custody_before,
+        target,
+    )
     ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
     total_after = ripe_gov_vault.totalBalances(ripe_token)
     burn = bob_before - bob_after
-    claim_after = _claim(bob_after, total_after, custody_before)
+    claim_after = claim(bob_after, total_after, custody_before)
     assert ripe_token.balanceOf(ripe_gov_vault) == custody_before
     assert total_after == total_before - burn
     assert ripe_gov_vault.userBalances(alice, ripe_token) == alice_shares
-    assert claim_after <= target
-    assert target - claim_after <= 1
-    assert _claim(alice_shares, total_after, custody_before) > alice_claim_before
-
-    if holder_case == "small":
-        simple_burn = bob_before * 10_00 // HUNDRED_PERCENT
-        assert simple_burn <= burn <= simple_burn + simple_burn // 50
-    elif holder_case == "dominant":
-        assert bob_claim_before == 90 * EIGHTEEN_DECIMALS
-        assert claim_after <= 81 * EIGHTEEN_DECIMALS
+    assert bob_after == expected_after
+    assert claim_after <= target < claim(
+        bob_after + 1,
+        total_after + 1,
+        custody_before,
+    )
+    assert claim(alice_shares, total_after, custody_before) > alice_claim_before
 
 
 def test_early_exit_fee_benefits_multiple_remaining_holders_pro_rata(
@@ -147,14 +162,14 @@ def test_early_exit_fee_benefits_multiple_remaining_holders_pro_rata(
     total_before = ripe_gov_vault.totalBalances(ripe_token)
     alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
     sally_shares = ripe_gov_vault.userBalances(sally, ripe_token)
-    alice_before = _claim(alice_shares, total_before, custody)
-    sally_before = _claim(sally_shares, total_before, custody)
+    alice_before = claim(alice_shares, total_before, custody)
+    sally_before = claim(sally_shares, total_before, custody)
 
     ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     total_after = ripe_gov_vault.totalBalances(ripe_token)
-    alice_gain = _claim(alice_shares, total_after, custody) - alice_before
-    sally_gain = _claim(sally_shares, total_after, custody) - sally_before
+    alice_gain = claim(alice_shares, total_after, custody) - alice_before
+    sally_gain = claim(sally_shares, total_after, custody) - sally_before
     assert alice_gain > 0
     assert sally_gain > 0
     assert abs(alice_gain * sally_shares - sally_gain * alice_shares) <= (
@@ -190,6 +205,48 @@ def test_sole_actual_holder_early_exit_reverts_atomically(
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     assert _atomic_snapshot(ripe_gov_vault, ripe_token, bob, ledger) == before
+
+
+def test_remaining_holder_guard_is_address_level_not_beneficial_owner_level(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    """Two addresses can recapture a same-pool fee for one economic owner."""
+    _configure_asset(mission_control, setAssetConfig, switchboard_alpha, ripe_token)
+    _deposit(ripe_gov_vault, ripe_token, whale, bob, 90 * EIGHTEEN_DECIMALS, teller)
+    _deposit(ripe_gov_vault, ripe_token, whale, alice, 10 * EIGHTEEN_DECIMALS, teller)
+
+    custody = ripe_token.balanceOf(ripe_gov_vault)
+    total_before = ripe_gov_vault.totalBalances(ripe_token)
+    bob_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
+    bob_before = claim(bob_shares, total_before, custody)
+    alice_before = claim(alice_shares, total_before, custody)
+    target = target_claim(bob_before, 10_00)
+
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+
+    total_after = ripe_gov_vault.totalBalances(ripe_token)
+    bob_after = claim(
+        ripe_gov_vault.userBalances(bob, ripe_token),
+        total_after,
+        custody,
+    )
+    alice_after = claim(alice_shares, total_after, custody)
+    alice_gain = alice_after - alice_before
+    aggregate_rounding_loss = bob_before + alice_before - bob_after - alice_after
+
+    assert bob_after <= target
+    assert alice_gain > 0
+    assert bob_before - bob_after == alice_gain + aggregate_rounding_loss
+    assert bob_after + alice_after > target + alice_before
 
 
 def test_economically_empty_dust_early_exit_reverts_atomically(
@@ -302,7 +359,7 @@ def test_full_exit_fee_removes_position_and_checkpoints_post_burn_balance(
     total_before = ripe_gov_vault.totalBalances(ripe_token)
     bob_shares = ripe_gov_vault.userBalances(bob, ripe_token)
     alice_shares = ripe_gov_vault.userBalances(alice, ripe_token)
-    alice_claim_before = _claim(alice_shares, total_before, custody)
+    alice_claim_before = claim(alice_shares, total_before, custody)
     points_before = ledger.userDepositPoints(bob, VAULT_ID, ripe_token)
     gov_before = ripe_gov_vault.userGovData(bob, ripe_token)
     boa.env.time_travel(blocks=17)
@@ -323,7 +380,7 @@ def test_full_exit_fee_removes_position_and_checkpoints_post_burn_balance(
     assert ripe_gov_vault.userBalances(bob, ripe_token) == 0
     assert ripe_gov_vault.totalBalances(ripe_token) == total_before - bob_shares
     assert ripe_gov_vault.userBalances(alice, ripe_token) == alice_shares
-    assert _claim(
+    assert claim(
         alice_shares,
         ripe_gov_vault.totalBalances(ripe_token),
         custody,
@@ -431,17 +488,20 @@ def test_exit_fee_boundaries_obey_exact_claim_invariant(
     custody = ripe_token.balanceOf(ripe_gov_vault)
     total_before = ripe_gov_vault.totalBalances(ripe_token)
     bob_before = ripe_gov_vault.userBalances(bob, ripe_token)
-    target = _target_claim(_claim(bob_before, total_before, custody), exit_fee)
-
     ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
     total_after = ripe_gov_vault.totalBalances(ripe_token)
-    claim_after = _claim(bob_after, total_after, custody)
     assert ripe_token.balanceOf(ripe_gov_vault) == custody
     assert total_before - total_after == bob_before - bob_after
-    assert claim_after <= target
-    assert target - claim_after <= 1
+    assert_exact_exit_claim(
+        bob_before,
+        total_before,
+        custody,
+        exit_fee,
+        bob_after,
+        total_after,
+    )
 
 
 def test_donation_heavy_state_uses_closest_attainable_claim_below_target(
@@ -463,21 +523,28 @@ def test_donation_heavy_state_uses_closest_attainable_claim_below_target(
     custody = ripe_token.balanceOf(ripe_gov_vault)
     total_before = ripe_gov_vault.totalBalances(ripe_token)
     bob_before = ripe_gov_vault.userBalances(bob, ripe_token)
-    claim_before = _claim(bob_before, total_before, custody)
-    target = _target_claim(claim_before, 10_00)
+    claim_before = claim(bob_before, total_before, custody)
+    target = target_claim(claim_before, 10_00)
 
     ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
     bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
     total_after = ripe_gov_vault.totalBalances(ripe_token)
-    claim_after = _claim(bob_after, total_after, custody)
-    assert claim_after <= target
+    claim_after = claim(bob_after, total_after, custody)
+    assert_exact_exit_claim(
+        bob_before,
+        total_before,
+        custody,
+        10_00,
+        bob_after,
+        total_after,
+    )
     assert target - claim_after > 1
-    # Burning one fewer share is the next larger attainable state. Its distinct
-    # claim exceeds the target, proving the larger-than-one-unit overpayment is
-    # forced by this high share-price state.
-    next_claim = _claim(bob_after + 1, total_after + 1, custody)
-    assert next_claim > target
+    # The invariant is maximality, not one-asset-unit fee accuracy: burning one
+    # fewer indivisible share is the next larger attainable state, and its
+    # distinct claim exceeds the target.
+    next_claim = claim(bob_after + 1, total_after + 1, custody)
+    assert claim_after <= target < next_claim
 
 
 def test_decimal_offset_significant_state_obeys_exact_claim_target(
@@ -503,11 +570,54 @@ def test_decimal_offset_significant_state_obeys_exact_claim_target(
 
     bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
     total_after = ripe_gov_vault.totalBalances(ripe_token)
-    target = _target_claim(_claim(bob_before, total_before, custody), 10_00)
-    claim_after = _claim(bob_after, total_after, custody)
-    assert claim_after <= target
-    assert target - claim_after <= 1
-    assert total_before - total_after == bob_before - bob_after
+    assert_exact_exit_claim(
+        bob_before,
+        total_before,
+        custody,
+        10_00,
+        bob_after,
+        total_after,
+    )
+
+
+def test_non_full_fee_zero_target_keeps_maximal_zero_claim_balance(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    mission_control,
+    setAssetConfig,
+    switchboard_alpha,
+):
+    _configure_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        exit_fee=99_99,
+    )
+    _deposit(ripe_gov_vault, ripe_token, whale, bob, 2, teller)
+    _deposit(ripe_gov_vault, ripe_token, whale, alice, 1, teller)
+    custody = ripe_token.balanceOf(ripe_gov_vault)
+    total_before = ripe_gov_vault.totalBalances(ripe_token)
+    bob_before = ripe_gov_vault.userBalances(bob, ripe_token)
+    assert target_claim(claim(bob_before, total_before, custody), 99_99) == 0
+
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+
+    bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
+    total_after = ripe_gov_vault.totalBalances(ripe_token)
+    assert_exact_exit_claim(
+        bob_before,
+        total_before,
+        custody,
+        99_99,
+        bob_after,
+        total_after,
+    )
+    assert bob_after > 0
 
 
 def test_early_exit_isolated_to_released_asset(
@@ -569,14 +679,96 @@ def test_repeated_early_releases_remain_economically_coherent(
         custody = ripe_token.balanceOf(ripe_gov_vault)
         total_before = ripe_gov_vault.totalBalances(ripe_token)
         bob_before = ripe_gov_vault.userBalances(bob, ripe_token)
-        target = _target_claim(_claim(bob_before, total_before, custody), 10_00)
         ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
         bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
         total_after = ripe_gov_vault.totalBalances(ripe_token)
-        assert _claim(bob_after, total_after, custody) <= target
-        assert target - _claim(bob_after, total_after, custody) <= 1
+        assert_exact_exit_claim(
+            bob_before,
+            total_before,
+            custody,
+            10_00,
+            bob_after,
+            total_after,
+        )
         assert ripe_gov_vault.userGovData(bob, ripe_token).lastShares == bob_after
 
         if release_number == 0:
             ripe_gov_vault.adjustLock(bob, ripe_token, 500, sender=teller.address)
+
+
+def test_independent_oracle_covers_virtual_term_denominator_boundary():
+    user_shares = 2 * DECIMAL_OFFSET
+    remaining_shares = DECIMAL_OFFSET
+    total_balance = 3
+    fee = 10_00
+    pre_claim = claim(
+        user_shares,
+        user_shares + remaining_shares,
+        total_balance,
+    )
+    target = target_claim(pre_claim, fee)
+
+    expected = maximal_retained_shares(
+        user_shares,
+        remaining_shares,
+        total_balance,
+        target,
+    )
+    checked_result = checked_closed_form_retained_shares(
+        user_shares,
+        user_shares + remaining_shares,
+        total_balance,
+        fee,
+    )
+
+    assert checked_result == expected
+    assert claim(
+        expected,
+        remaining_shares + expected,
+        total_balance,
+    ) <= target < claim(
+        expected + 1,
+        remaining_shares + expected + 1,
+        total_balance,
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "args"),
+    (
+        pytest.param(
+            checked_shares_to_amount,
+            (1, 1, UINT256_MAX),
+            id="asset-virtual-term-addition",
+        ),
+        pytest.param(
+            checked_shares_to_amount,
+            (2, 2, UINT256_MAX - 1),
+            id="claim-numerator-multiplication",
+        ),
+        pytest.param(
+            checked_shares_to_amount,
+            (1, UINT256_MAX, 0),
+            id="share-denominator-addition",
+        ),
+        pytest.param(
+            checked_target_claim,
+            (UINT256_MAX, 1),
+            id="target-numerator-multiplication",
+        ),
+        pytest.param(
+            checked_amount_to_shares,
+            (2, UINT256_MAX - DECIMAL_OFFSET, 0, False),
+            id="inverse-numerator-multiplication",
+        ),
+        pytest.param(
+            checked_closed_form_retained_shares,
+            (1, UINT256_MAX, 0, 1),
+            id="closed-form-denominator-boundary",
+        ),
+    ),
+)
+def test_checked_uint256_model_rejects_extreme_arithmetic_overflow(operation, args):
+    with pytest.raises(UInt256Overflow):
+        operation(*args)

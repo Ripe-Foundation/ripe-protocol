@@ -4,30 +4,11 @@ from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import assert_reverted_call
-
-
-DECIMAL_OFFSET = 10 ** 8
-HUNDRED_PERCENT = 100_00
-
-
-def _claim(shares, total_shares, total_balance):
-    return shares * (total_balance + 1) // (total_shares + DECIMAL_OFFSET)
-
-
-def _assert_exact_exit_claim(
-    user_shares_before,
-    total_shares_before,
-    total_balance,
-    exit_fee,
-    user_shares_after,
-    total_shares_after,
-):
-    claim_before = _claim(user_shares_before, total_shares_before, total_balance)
-    target = claim_before * (HUNDRED_PERCENT - exit_fee) // HUNDRED_PERCENT
-    claim_after = _claim(user_shares_after, total_shares_after, total_balance)
-    assert claim_after <= target
-    assert target - claim_after <= 1
-    assert total_shares_before - total_shares_after == user_shares_before - user_shares_after
+from tests.vaults.ripe_gov_exit_fee_model import (
+    DECIMAL_OFFSET,
+    HUNDRED_PERCENT,
+    assert_exact_exit_claim,
+)
 
 
 def _add_remaining_holder(vault, token, funder, holder, amount, teller):
@@ -1101,7 +1082,7 @@ def test_ripe_gov_vault_release_lock_successful_with_exit_fee(
     assert unlock_after == 0
     
     # 2. The exact post-state claim must charge the economic 10% fee
-    _assert_exact_exit_claim(
+    assert_exact_exit_claim(
         shares_before,
         total_shares_before,
         custody_before,
@@ -1163,7 +1144,7 @@ def test_ripe_gov_vault_release_lock_state_changes(
     assert userData_after.unlock == 0
     
     # 2. The exact post-state claim must charge the economic 5% fee
-    _assert_exact_exit_claim(
+    assert_exact_exit_claim(
         shares_before,
         total_shares_before,
         custody_before,
@@ -2573,7 +2554,7 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     
     # Verify the exact economic 8% claim reduction
-    _assert_exact_exit_claim(
+    assert_exact_exit_claim(
         initial_shares,
         total_shares_before,
         custody_before,
@@ -2630,7 +2611,7 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     total_shares_after = ripe_gov_vault.totalBalances(ripe_token)
     
     # Verify the exact economic 12% claim reduction
-    _assert_exact_exit_claim(
+    assert_exact_exit_claim(
         initial_shares,
         total_shares_before,
         custody_before,
@@ -3161,7 +3142,6 @@ def test_core_pointer_rotation_preserves_legacy_position_points_and_explicit_exi
 
 # (minLockDuration, maxLockDuration, maxLockBoost, canExit, exitFee)
 NO_BOOST_TERMS = (0, 0, 0, False, 0)
-HUNDRED_PERCENT = 100_00
 
 
 def _weighted_points(vault, weight, *, shares=1_000 * EIGHTEEN_DECIMALS, blocks=10):

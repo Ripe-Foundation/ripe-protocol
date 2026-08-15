@@ -244,6 +244,9 @@ built were extracted from the active tree; both remain recoverable from
 - [`credit-engine.md`](credit-engine.md) — zero-backing debt-term containment;
 - [`ledger.md`](ledger.md) — portable action-block identity;
 - [`lootbox.md`](lootbox.md) — per-deployment reward interval floor;
+- [`ripe-gov.md`](ripe-gov.md) — SC-12 early-release accounting,
+  governance-point lifecycle, address-level redistribution limitation, and
+  cross-lane rollout consequences;
 - [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) — Morpho V2 yield
   pricing and compatibility;
 - [`erc20-token.md`](erc20-token.md) — shared `getCCIPAdmin()` source change,
