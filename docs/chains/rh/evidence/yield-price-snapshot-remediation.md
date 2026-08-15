@@ -69,9 +69,11 @@ Confirmation distinguishes structural invalidity from a transient seed read:
 
 ## Delay and freshness configuration
 
-The adapters intentionally permit `0 < staleTime < minSnapshotDelay`. This
-configuration may create a fail-closed interval: this source returns zero after
-the inclusive freshness deadline and before the next snapshot is eligible;
+The adapters intentionally permit `0 < staleTime < minSnapshotDelay`. For
+snapshot-backed feeds, this configuration deterministically creates a
+fail-closed interval after each snapshot: the source returns zero after the
+inclusive freshness deadline and before a replacement becomes eligible. Aave
+V3 and Compound V3 are snapshotless and are not affected by this interval.
 PriceDesk may use a later healthy source or leave the asset unpriced.
 
 The pre-expiry-refresh predicate is
@@ -182,16 +184,24 @@ PriceDesk-to-BlueChip source frame in the worst supported ring state, account
 for nested lookup and caller overhead, add a documented margin, and apply the
 EIP-150 63/64 forwarding rule before selecting a stipend.
 
+The final aggregate 15-claim StabilityPool path measured 6,974,789 gas on the
+exact merged prerequisite base and 7,013,069 gas on the final candidate, an
+increase of 38,280 gas (approximately 0.55%). Its local-EVM regression ceiling
+is 7,200,000. This is a complete bounded-path measurement across repeated
+PriceDesk lookups; it is not a PriceDesk source-call stipend and does not
+replace the source-frame measurement required for SC-06.
+
 ## Integration handoffs
 
 - Before promotion onto `rh`, regenerate
   `docs/chains/rh/smart-contract-changes/blue-chip-yield-prices.md` against the
   final `rh` commit and tree, source blob and SHA-256, optimizer, creation and
   runtime identities, deployed runtime, and EIP-170 headroom.
-- PR #142 has no CI checks because the workflow currently targets only `rh`.
-  The owner must either land the recommended branch-trigger prerequisite and
-  require final-head green checks, or record an explicit CI exception and a
-  named closure point.
-- The pre-existing Deleverage 23,241-versus-23,261 size assertion is unrelated
-  to this remediation and is tracked separately in GitHub issue #148; PR #142
-  must not change that contract or test.
+- PR #149 merged before PR #142's final integration and supplied the required
+  remediation-branch triggers plus the explicit snapshot-gas gate. Final head
+  `9a4701832e54fe2daafb80eed9993a2003160110` passed Solidity, core,
+  vaults/tokens, supporting, deployment controls, snapshot gas, and aggregate
+  `rh-pr-gate`. No CI exception was required.
+- PR #155 reconciled the stale Deleverage deployed-runtime assertion from
+  23,241 bytes to 23,261 bytes and its headroom from 1,335 bytes to 1,315
+  bytes. Issue #148 is closed; this is no longer an open baseline failure.
