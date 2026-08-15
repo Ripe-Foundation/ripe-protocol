@@ -2886,7 +2886,7 @@ def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     EIP170_LIMIT = 24_576
     expected = {
         "AuctionHouse": (24_554, 22),
-        "Deleverage": (23_261, 1_315),
+        "Deleverage": (24_309, 267),
     }
     actual = {
         "AuctionHouse": len(boa.env.get_code(auction_house.address)),

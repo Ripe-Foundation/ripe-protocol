@@ -642,21 +642,21 @@
         "committed_path": "scripts/abis/Deleverage.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "61f3b528adf261ee4dc97c45f2e3362397f8e8d52043b02eb53cb796f29d2de4",
-        "creation_executable_prefix_size": 23525,
-        "creation_metadata_sha256": "dcf20cd1a1f2955452ae1ac51a86fcbdcc9eb98570abc780419fe7a8d74332b8",
+        "creation_executable_prefix_sha256": "5d375b836bd47002b2af448c7d7e839f168e361304a2cffec50e346cdf1d70ba",
+        "creation_executable_prefix_size": 24540,
+        "creation_metadata_sha256": "a94f3c8812dab9caf3f279b8bb49b5abbb5b51c1152dcc9c1ddb91805efdb87d",
         "creation_metadata_size": 61,
-        "creation_sha256": "fffbeb2f7ec01c594ba6219f1130418ffd29b0078d9abbaf4bb27716f232105c",
-        "creation_size": 23586,
-        "deployed_eip170_headroom": 1315,
+        "creation_sha256": "c2f1006f2eeefc00ba742f7637e8fc7e511cbaafc877d8c20f499b2bea738e98",
+        "creation_size": 24601,
+        "deployed_eip170_headroom": 300,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "52d89ce7e224a395fecc0dacfc52f0aac2dc838dbe993a47693e1586d69d3294",
-        "deployed_runtime_size": 23261,
-        "eip170_headroom": 1411,
-        "runtime_template_sha256": "49916998de97dab79e1314248551f0a18f7d87ee193ae81f3ce5af21d3399364",
-        "runtime_template_size": 23165
+        "deployed_runtime_sha256": "d4e85537337d80c62fd0fac537bae633c47cc1dfc5a19d3481db2efce602a644",
+        "deployed_runtime_size": 24276,
+        "eip170_headroom": 396,
+        "runtime_template_sha256": "7f96a69ffd77f64fad4fe49612f6f550bf55cabe947b7db00f55b60a7eb5b9d0",
+        "runtime_template_size": 24180
       },
       "code_layout": {
         "addys": {
@@ -738,9 +738,9 @@
         "canonical_sha256": "8d85266d2a525641a2edcb36d8fbd1e39e4e00bc530aa14f28013260b15436ef",
         "count": 32
       },
-      "source_git_blob": "f1c6d590666e9bd030326dabfc628721fd59a6d5",
+      "source_git_blob": "b56d3491bc6546397b26a8be7102eb0864c96146",
       "source_path": "contracts/core/Deleverage.vy",
-      "source_sha256": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
+      "source_sha256": "57d95a9ff9ce2c0aa5c1f9edab2bdc2cfc5e176be9930577ca1ec4688b4a1648",
       "storage_layout": {
         "deleverageBuffer": {
           "n_slots": 1,
@@ -796,6 +796,11 @@
         }
       },
       "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        },
         "assetLiqConfig": {
           "n_slots": 1,
           "slot": 2,
@@ -822,7 +827,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "37f9b243daa959f8bd4d7e2f0c38ec1211550d95930d8f2b32f90411614f7469"
+      "transitive_compiler_input_integrity": "46f86e6b913139fa498f6f097ec4cf297bb84c125f9b2f2944fa7d137b92eaf0"
     },
     "Ledger": {
       "abi": {
