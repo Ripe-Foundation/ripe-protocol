@@ -1284,20 +1284,39 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 
 **Status:** Owner-granted on 14 August 2026 for the exact combined SC-11
 repayment-liveness and SC-15 zero-asset stale-vault candidate on
-`codex/rh-creditengine-repayment-stale-vault`. This replaces RH-D029 for the
-CreditEngine identity below; the waivers are not cumulative.
+`codex/rh-creditengine-repayment-stale-vault`, with the registration-capacity
+residual and recovery boundary amended and confirmed by the owner on 15 August
+2026. This replaces RH-D029 for the CreditEngine identity below; the waivers are
+not cumulative.
 
 The candidate makes a full payoff independent of collateral prices, with zero
 collateral-value and maximum-debt fields in the existing `RepayDebt` event. A
 partial standard repayment uses conservative non-strict valuation, retains
 healthy collateral value and capacity, and preserves prior debt terms when a
 positive-amount position lacks a usable price. Other partial repayment types
-remain strict. CreditEngine and Lootbox additionally skip zero-asset live vault
-replacements; Lootbox leaves the stale Ledger registration and any stored point
-records intact for pointer rollback or conditional department recovery. The
-external quarantine model, custody-shortfall policy,
+continue to use strict PriceDesk mode and revert for configured-source failures
+or configured-source zero prices; valid no-feed remains a conservative zero
+under existing PriceDesk semantics. CreditEngine and Lootbox additionally skip
+zero-asset live vault replacements; Lootbox leaves the stale Ledger registration
+and any stored point records intact for pointer rollback or conditional
+department recovery. The external quarantine model, custody-shortfall policy,
 CreditRedeem borrower-wide price isolation, ABI, selectors, events,
 constructors, and storage layouts remain unchanged.
+
+**15 August 2026 owner amendment.** The owner reaffirmed the exact 21-byte,
+zero-growth CreditEngine waiver and noncumulative supersession of RH-D029. The
+owner also accepted that a zero-asset replacement preserves the user's Ledger
+registration, continues to count toward `numUserVaults`, consumes one of the
+user's `perUserMaxVaults` slots (five under the RH defaults), and adds traversal
+work in CreditEngine and Lootbox until recovery. An authorized department can
+settle a known reward record for the stale user, vault, and asset, but settlement
+alone cannot reclaim the registration or slot because Lootbox continues to skip
+the zero-asset replacement before ordinary cleanup. Complete cleanup requires
+pointer rollback to the original enumerable vault, followed by ordinary
+Lootbox cleanup. This amendment also confirms the D033-D041 allocation with
+PR #145 at RH-D038 and PR #147 at RH-D039-RH-D041, confirms that PRs #152 and
+#157 introduce no new decision, and authorizes the corresponding `status.yaml`
+synchronization dated 15 August 2026.
 
 **What exactly is waived.** One CreditEngine source and compiler-output
 identity under the repository's pinned Vyper toolchain:
@@ -1324,11 +1343,14 @@ before EIP-170. Intermediate refactor-only measurements were not preserved and
 are not part of this decision.
 
 **Residual risk accepted.** This waiver permits **0 bytes of further growth**.
-Any CreditEngine source, compiler-input, ABI, selector, event, creation-bytecode,
-runtime-template, immutable suffix, or complete deployed-runtime identity change
-invalidates the pinned identity and reopens this decision. A future change must
-restore at least 200 bytes of headroom or receive another exact owner waiver;
-refreshing these values merely to make a test pass is prohibited.
+Any CreditEngine source, compiler-input, ABI, selector, event,
+creation-bytecode, runtime-template, immutable suffix, or complete
+deployed-runtime identity change invalidates the pinned identity and reopens
+this decision. A future change must restore at least 200 bytes of headroom or
+receive another exact owner waiver; refreshing these values merely to make a
+test pass is prohibited. The preserved stale registration's slot consumption
+and added traversal are also accepted until pointer rollback and ordinary
+cleanup; department reward settlement does not mitigate that capacity residual.
 
 The owner separately authorized recording this decision, updating its exact
 test citation, committing the validated batch, pushing the feature branch, and

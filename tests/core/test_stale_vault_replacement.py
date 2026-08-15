@@ -22,14 +22,44 @@ def deregisterUserAsset(_user: address, _asset: address) -> bool:
 """
 
 
-def _install_zero_asset_replacement(vault_book, vault_id, governance):
-    replacement = boa.loads(
-        ZERO_ASSET_VAULT_SOURCE,
-        name="zero_asset_replacement_vault",
-    )
+SETTLEABLE_ZERO_ASSET_VAULT_SOURCE = """
+# @version 0.4.3
+
+@view
+@external
+def doesVaultHaveAnyFunds() -> bool:
+    return False
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    return 0
+
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    return 0
+
+@view
+@external
+def doesUserHaveBalance(_user: address, _asset: address) -> bool:
+    return False
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    return 0
+
+@external
+def deregisterUserAsset(_user: address, _asset: address) -> bool:
+    raise "unexpected deregistration"
+"""
+
+
+def _set_vault_pointer(vault_book, vault_id, vault, governance):
     assert vault_book.startAddressUpdateToRegistry(
         vault_id,
-        replacement,
+        vault,
         sender=governance.address,
     )
     boa.env.time_travel(blocks=vault_book.registryChangeTimeLock())
@@ -37,7 +67,28 @@ def _install_zero_asset_replacement(vault_book, vault_id, governance):
         vault_id,
         sender=governance.address,
     )
-    assert vault_book.getAddr(vault_id) == replacement.address
+    assert vault_book.getAddr(vault_id) == vault.address
+
+
+def _install_zero_asset_replacement(vault_book, vault_id, governance):
+    replacement = boa.loads(
+        ZERO_ASSET_VAULT_SOURCE,
+        name="zero_asset_replacement_vault",
+    )
+    _set_vault_pointer(vault_book, vault_id, replacement, governance)
+    return replacement
+
+
+def _install_settleable_zero_asset_replacement(
+    vault_book,
+    vault_id,
+    governance,
+):
+    replacement = boa.loads(
+        SETTLEABLE_ZERO_ASSET_VAULT_SOURCE,
+        name="settleable_zero_asset_replacement_vault",
+    )
+    _set_vault_pointer(vault_book, vault_id, replacement, governance)
     return replacement
 
 
@@ -587,6 +638,149 @@ def test_claiming_healthy_peer_preserves_stale_points_and_registration(
     assert ledger.numUserVaults(bob) == num_vaults_before
     assert ledger.isParticipatingInVault(bob, stale_vault_id)
     assert ledger.isParticipatingInVault(bob, healthy_vault_id)
+
+
+def test_stale_registration_blocks_capacity_until_pointer_rollback_cleanup(
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    teller,
+    ledger,
+    lootbox,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    governance,
+):
+    max_vaults = 5
+    setGeneralConfig(_perUserMaxVaults=max_vaults)
+    setAssetConfig(
+        alpha_token,
+        _stakersPointsAlloc=100,
+        _voterPointsAlloc=0,
+    )
+    setRipeRewardsConfig(
+        _arePointsEnabled=True,
+        _ripePerBlock=10 * EIGHTEEN_DECIMALS,
+        _borrowersAlloc=0,
+        _stakersAlloc=100_00,
+        _votersAlloc=0,
+        _genDepositorsAlloc=0,
+    )
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+    )
+    stale_vault_id = vault_book.getRegId(simple_erc20_vault)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(
+        bob,
+        stale_vault_id,
+        simple_erc20_vault,
+        alpha_token,
+        sender=teller.address,
+    )
+    assert teller.withdraw(
+        alpha_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert ledger.getDepositPointsBundle(
+        bob,
+        stale_vault_id,
+        alpha_token,
+    ).userPoints.balancePoints > 0
+
+    for index in range(max_vaults - 1):
+        filler = boa.loads(
+            ZERO_ASSET_VAULT_SOURCE,
+            name=f"zero_asset_slot_filler_{index}",
+        )
+        filler_id = _register_vault(
+            vault_book,
+            governance,
+            filler,
+            f"zero asset slot filler {index}",
+        )
+        ledger.addVaultToUser(
+            bob,
+            filler_id,
+            sender=teller.address,
+        )
+
+    replacement = _install_settleable_zero_asset_replacement(
+        vault_book,
+        stale_vault_id,
+        governance,
+    )
+    assert replacement.numUserAssets(bob) == 0
+    assert ledger.getNumUserVaults(bob) == max_vaults
+
+    target_vault_id = vault_book.getRegId(rebase_erc20_vault)
+    assert not ledger.isParticipatingInVault(bob, target_vault_id)
+    setAssetConfig(alpha_token, _vaultIds=[target_vault_id])
+    with boa.reverts("reached max vaults"):
+        performDeposit(
+            bob,
+            amount,
+            alpha_token,
+            alpha_token_whale,
+            rebase_erc20_vault,
+        )
+
+    claimed = lootbox.claimDepositLootForAsset(
+        bob,
+        stale_vault_id,
+        alpha_token,
+        sender=teller.address,
+    )
+    assert claimed > 0
+    assert ledger.getDepositPointsBundle(
+        bob,
+        stale_vault_id,
+        alpha_token,
+    ).userPoints.balancePoints == 0
+    assert ledger.isParticipatingInVault(bob, stale_vault_id)
+    assert ledger.getNumUserVaults(bob) == max_vaults
+
+    with boa.reverts("reached max vaults"):
+        performDeposit(
+            bob,
+            amount,
+            alpha_token,
+            alpha_token_whale,
+            rebase_erc20_vault,
+        )
+
+    _set_vault_pointer(
+        vault_book,
+        stale_vault_id,
+        simple_erc20_vault,
+        governance,
+    )
+    assert teller.claimLoot(bob, False, sender=bob) == 0
+    assert not ledger.isParticipatingInVault(bob, stale_vault_id)
+    assert ledger.getNumUserVaults(bob) == max_vaults - 1
+
+    performDeposit(
+        bob,
+        amount,
+        alpha_token,
+        alpha_token_whale,
+        rebase_erc20_vault,
+    )
+    assert ledger.isParticipatingInVault(bob, target_vault_id)
+    assert ledger.getNumUserVaults(bob) == max_vaults
 
 
 def test_empty_vault_book_entry_keeps_existing_skip_and_no_cleanup_behavior(
