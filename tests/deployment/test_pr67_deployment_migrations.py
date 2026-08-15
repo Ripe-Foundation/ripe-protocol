@@ -4,13 +4,11 @@ import ast
 import importlib.util
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from web3 import Web3 as RealWeb3
 
-from config.price_source_admission import PriceSourceAdmissionError
-from scripts.utils import ledger_deployment, price_source_preflight
+from scripts.utils import ledger_deployment
 from scripts.utils.migration import PromotionSpec
 
 
@@ -77,111 +75,6 @@ class _Registry(_Contract):
         return self.count
 
 
-class _MissionControlTopology(_Contract):
-    def __init__(
-        self,
-        address,
-        priorities=(1, 2),
-        max_vaults=5,
-        max_assets_per_vault=15,
-    ):
-        super().__init__(address)
-        self.priorities = tuple(priorities)
-        self.max_vaults = max_vaults
-        self.max_assets_per_vault = max_assets_per_vault
-
-    def getPriorityPriceSourceIds(self):
-        return self.priorities
-
-    def genConfig(self):
-        return SimpleNamespace(
-            perUserMaxVaults=self.max_vaults,
-            perUserMaxAssetsPerVault=self.max_assets_per_vault,
-        )
-
-
-class _ChainlinkTopology(_Contract):
-    def __init__(self, address, usdg, feed):
-        super().__init__(address)
-        self.usdg = usdg
-        self.feed = feed
-
-    def feedConfig(self, asset):
-        return SimpleNamespace(
-            feed=self.feed if asset == self.usdg else ZERO_ADDRESS,
-        )
-
-    def hasPriceFeed(self, asset):
-        return asset == self.usdg and self.feed != ZERO_ADDRESS
-
-
-class _CurveTopology(_Contract):
-    def __init__(self, address, green, savings_green, usdg, pool):
-        super().__init__(address)
-        self.green = green
-        self.savings_green = savings_green
-        self.usdg = usdg
-        self.routes = {
-            green: SimpleNamespace(
-                pool=pool,
-                numUnderlying=2,
-                underlying=(usdg, green, ZERO_ADDRESS, ZERO_ADDRESS),
-            )
-        }
-        self.priced_assets_override = None
-        self.usdg_has_feed = False
-
-    @property
-    def pool(self):
-        return self.routes[self.green].pool
-
-    @pool.setter
-    def pool(self, value):
-        self.routes[self.green].pool = value
-
-    @property
-    def num_underlying(self):
-        return self.routes[self.green].numUnderlying
-
-    @num_underlying.setter
-    def num_underlying(self, value):
-        self.routes[self.green].numUnderlying = value
-
-    @property
-    def underlying(self):
-        return self.routes[self.green].underlying
-
-    @underlying.setter
-    def underlying(self, value):
-        self.routes[self.green].underlying = value
-
-    def getPricedAssets(self):
-        if self.priced_assets_override is not None:
-            return self.priced_assets_override
-        return tuple(self.routes)
-
-    def GREEN(self):
-        return self.green
-
-    def SGREEN(self):
-        return self.savings_green
-
-    def curveConfig(self, asset):
-        return self.routes.get(
-            asset,
-            SimpleNamespace(
-                pool=ZERO_ADDRESS,
-                numUnderlying=0,
-                underlying=(ZERO_ADDRESS,) * 4,
-            ),
-        )
-
-    def hasPriceFeed(self, asset):
-        if asset == self.usdg:
-            return self.usdg_has_feed
-        return asset in self.routes or asset == self.savings_green
-
-
 class _GovernedCandidate(_Contract):
     def __init__(self, address, account, minimum):
         super().__init__(address)
@@ -189,7 +82,6 @@ class _GovernedCandidate(_Contract):
         self._minimum = minimum
         self._timelock = 0
         self._governance = account
-        self.has_price_feed = False
 
     def actionTimeLock(self):
         return self._timelock
@@ -209,9 +101,6 @@ class _GovernedCandidate(_Contract):
 
     def governance(self):
         return self._governance
-
-    def hasPriceFeed(self, _asset):
-        return self.has_price_feed
 
 
 class _VaultMigratorCandidate(_Contract):
@@ -266,7 +155,6 @@ class _FakeMigration:
         addresses=None,
         account=None,
         manifest_contracts=None,
-        deployed_codes=None,
         rpc="boa",
     ):
         self.contracts = dict(contracts or {})
@@ -280,21 +168,9 @@ class _FakeMigration:
         self.promotion_specs = []
         self.promotion_batch_sizes = []
         self._next_address = 1_000
-        self.bluechip_has_price_feed = False
-        self.deployed_codes = dict(deployed_codes or {})
 
-    def get_contract(self, name, address=None):
-        if address is not None:
-            for contract in self.contracts.values():
-                if (
-                    str(getattr(contract, "address", "")).lower()
-                    == str(address).lower()
-                ):
-                    return contract
+    def get_contract(self, name):
         return self.contracts[name]
-
-    def get_deployed_code(self, address):
-        return self.deployed_codes.get(str(address).lower(), b"")
 
     def get_address(self, name):
         if name in self.addresses:
@@ -326,15 +202,13 @@ class _FakeMigration:
             minimum = (
                 REDEPLOY.HR_MIN_TIMELOCK
                 if name == "HumanResources"
-                else REDEPLOY.SWITCHBOARD_MIN_TIMELOCK
+                else BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
             )
             contract = _GovernedCandidate(
                 address,
                 self._account,
                 minimum,
             )
-            if name == "BlueChipYieldPrices":
-                contract.has_price_feed = self.bluechip_has_price_feed
         else:
             contract = _Contract(address)
         self.deployments.append((name, label, args, contract))
@@ -462,7 +336,7 @@ def test_safe_calldata_helpers_bind_the_expected_registry_calls():
     assert setup[:4] == Web3.keccak(text="setActionTimeLockAfterSetup(uint256)")[:4]
     assert decode(["uint256"], setup[4:]) == (REDEPLOY.HR_MIN_TIMELOCK,)
 
-    for module in (VAULT_MIGRATOR,):
+    for module in (BLUECHIP, VAULT_MIGRATOR):
         start, confirm = module._add_calldata(candidate, "candidate")
         start_bytes = bytes.fromhex(start)
         confirm_bytes = bytes.fromhex(confirm)
@@ -530,7 +404,9 @@ def test_uniswap_deploys_stateless_monitor_with_inert_price_source_interface(
     ripe = _Contract(_addr(2))
     weth = _addr(3)
     monkeypatch.setattr(UNISWAP, "address", lambda key: weth)
-    migration = _FakeMigration(contracts={"RipeHq": hq, "RipeToken": ripe})
+    migration = _FakeMigration(
+        contracts={"RipeHq": hq, "RipeToken": ripe}
+    )
 
     UNISWAP.migrate(migration)
 
@@ -862,266 +738,54 @@ def test_0010_defaults_dependency_mismatch_fails_before_any_write():
     assert migration.deployments == []
 
 
-def _bluechip_topology_migration(monkeypatch):
-    selected_chainlink = _addr(35)
-    selected_curve = _addr(36)
-    green = _addr(37)
-    usdg = _addr(38)
-    pool = _addr(39)
-    usdg_feed = _addr(40)
-    savings_green = _addr(42)
-    selected_addresses = {
-        "USDG": usdg,
-        "CHAINLINK_USDG_USD": usdg_feed,
-    }
+def test_0011_promotes_0010_and_prepares_slot_three_without_registering(
+    monkeypatch,
+):
+    selected_morpho_v2_factory = _addr(33)
     monkeypatch.setattr(
-        price_source_preflight,
+        BLUECHIP,
         "address",
-        selected_addresses.__getitem__,
+        lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
     )
-    price_desk = _Registry(
-        _addr(30),
-        slots={1: selected_chainlink, 2: selected_curve},
-        count=3,
-    )
-    mission_control = _MissionControlTopology(_addr(41))
-    chainlink = _ChainlinkTopology(selected_chainlink, usdg, usdg_feed)
-    curve = _CurveTopology(selected_curve, green, savings_green, usdg, pool)
-    hq = _Registry(_addr(31), slots={7: price_desk.address})
+    price_desk = _Registry(_addr(30), count=3)
     migration = _FakeMigration(
         contracts={
-            "RipeHq": hq,
+            "RipeHq": _Registry(_addr(31)),
             "VaultBook": _Registry(_addr(32)),
             "PriceDesk": price_desk,
-            "MissionControl": mission_control,
-            "ChainlinkPrices": chainlink,
-            "CurvePrices": curve,
         },
-        addresses={
-            "DefaultsRobinhoodLive": _addr(34),
-            "ChainlinkPrices": selected_chainlink,
-            "CurvePrices": selected_curve,
-            "GreenToken": green,
-            "SavingsGreen": savings_green,
-            "GreenUsdgPool": pool,
-        },
-        deployed_codes={price_desk.address.lower(): b"governed-pricedesk"},
-    )
-    monkeypatch.setattr(
-        price_source_preflight,
-        "require_hardened_price_desk_runtime",
-        lambda runtime: (
-            None
-            if runtime == b"governed-pricedesk"
-            else (_ for _ in ()).throw(
-                PriceSourceAdmissionError(
-                    "active PriceDesk runtime is not the governed hardened artifact"
-                )
-            )
-        ),
+        addresses={"DefaultsRobinhoodLive": _addr(34)},
     )
     messages = []
     monkeypatch.setattr(BLUECHIP.log, "info", messages.append)
-    return SimpleNamespace(
-        migration=migration,
-        hq=hq,
-        price_desk=price_desk,
-        mission_control=mission_control,
-        chainlink=chainlink,
-        curve=curve,
-        messages=messages,
-        usdg=usdg,
-        savings_green=savings_green,
-        selected_chainlink=selected_chainlink,
-        selected_curve=selected_curve,
+
+    BLUECHIP.migrate(migration)
+
+    assert len(migration.promotions) == 4
+    assert migration.promotion_batch_sizes == [4]
+    intents = {spec.canonical_name: spec for spec in migration.promotion_specs}
+    assert set(intents) == {"Ledger", "Lootbox", "Teller", "RipeGov"}
+    assert {
+        name: spec.expected_source_path for name, spec in intents.items()
+    } == BLUECHIP.CANONICAL_SOURCE_PATHS
+    assert all(
+        spec.registry_name in {"RipeHq", "VaultBook"} for spec in intents.values()
     )
-
-
-def test_0011_exact_runtime_and_graph_reach_explicit_deferral_without_writes(
-    monkeypatch,
-):
-    live = _bluechip_topology_migration(monkeypatch)
-    migration = live.migration
-
-    with pytest.raises(PriceSourceAdmissionError, match="activation is deferred"):
-        BLUECHIP.migrate(migration)
-
-    assert migration.promotions == []
-    assert migration.deployments == []
-    assert migration.executions == []
-    assert live.price_desk.slots == {
-        1: live.selected_chainlink,
-        2: live.selected_curve,
-    }
-    assert not any("[1] 0x" in message for message in live.messages)
-    assert not any("[2] 0x" in message for message in live.messages)
-
-
-@pytest.mark.parametrize(
-    "drift",
-    (
-        "reordered_priorities",
-        "unexpected_source_count",
-        "unexpected_source_address",
-        "wrong_green_pool",
-        "changed_curve_underlying",
-        "additional_curve_underlying",
-        "usdg_without_chainlink_feed",
-        "curve_over_undy",
-        "curve_over_snapshot_source",
-        "extra_flat_curve_route",
-        "duplicate_curve_asset",
-        "reordered_curve_assets",
-        "missing_sgreen_route",
-        "vault_asset_envelope",
-    ),
-)
-def test_0011_live_topology_drift_produces_no_candidate_or_safe_calldata(
-    monkeypatch,
-    drift,
-):
-    live = _bluechip_topology_migration(monkeypatch)
-    if drift == "reordered_priorities":
-        live.mission_control.priorities = (2, 1)
-    elif drift == "unexpected_source_count":
-        live.price_desk.count = 4
-    elif drift == "unexpected_source_address":
-        live.price_desk.slots[2] = _addr(998)
-    elif drift == "wrong_green_pool":
-        live.curve.pool = _addr(997)
-    elif drift == "changed_curve_underlying":
-        live.curve.underlying = (
-            live.usdg,
-            _addr(995),
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
-        )
-    elif drift == "additional_curve_underlying":
-        live.curve.num_underlying = 3
-        live.curve.underlying = (
-            live.usdg,
-            live.curve.green,
-            _addr(996),
-            ZERO_ADDRESS,
-        )
-    elif drift == "usdg_without_chainlink_feed":
-        live.chainlink.feed = ZERO_ADDRESS
-    elif drift in {
-        "curve_over_undy",
-        "curve_over_snapshot_source",
-        "extra_flat_curve_route",
-    }:
-        extra_asset = _addr(994)
-        nested_underlying = _addr(993)
-        live.curve.routes[extra_asset] = SimpleNamespace(
-            pool=_addr(992),
-            numUnderlying=2,
-            underlying=(
-                nested_underlying,
-                extra_asset,
-                ZERO_ADDRESS,
-                ZERO_ADDRESS,
-            ),
-        )
-    elif drift == "duplicate_curve_asset":
-        live.curve.priced_assets_override = (live.curve.green, live.curve.green)
-    elif drift == "reordered_curve_assets":
-        extra_asset = _addr(994)
-        live.curve.routes[extra_asset] = SimpleNamespace(
-            pool=_addr(992),
-            numUnderlying=1,
-            underlying=(extra_asset, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS),
-        )
-        live.curve.priced_assets_override = (extra_asset, live.curve.green)
-    elif drift == "missing_sgreen_route":
-        live.curve.savings_green = _addr(991)
-    elif drift == "vault_asset_envelope":
-        live.mission_control.max_assets_per_vault = 16
-    else:
-        raise AssertionError(f"unhandled drift: {drift}")
-
-    with pytest.raises(PriceSourceAdmissionError):
-        BLUECHIP.migrate(live.migration)
-
-    assert live.migration.promotions == []
-    assert live.migration.deployments == []
-    assert live.migration.executions == []
-    assert not any("[1] 0x" in message for message in live.messages)
-    assert not any("[2] 0x" in message for message in live.messages)
-
-
-@pytest.mark.parametrize(
-    "resolver_semantic",
-    ("BlueChipYieldPrices", "UndyVaultPrices", "generic_snapshot_source"),
-)
-def test_complete_curve_graph_records_pending_snapshot_resolution_and_rejects_it(
-    monkeypatch,
-    resolver_semantic,
-):
-    live = _bluechip_topology_migration(monkeypatch)
-    extra_asset = _addr(980)
-    nested_underlying = _addr(981)
-    live.curve.routes[extra_asset] = SimpleNamespace(
-        pool=_addr(982),
-        numUnderlying=2,
-        underlying=(
-            nested_underlying,
-            extra_asset,
-            ZERO_ADDRESS,
-            ZERO_ADDRESS,
-        ),
+    assert intents["Ledger"].expected_constructor_args == (
+        migration.contracts["RipeHq"],
+        migration.addresses["DefaultsRobinhoodLive"],
+        BLUECHIP.LEDGER_ACTION_BLOCK_SOURCE,
     )
-    pending_source = _GovernedCandidate(_addr(983), _addr(900), 1)
-    pending_source.has_price_feed = True
-
-    observed = price_source_preflight.observe_live_topology(
-        live.migration,
-        live.price_desk,
-        pending_source,
-    )
-    assert observed.curve_routes[1].underlying_price_source_ids == (
-        (nested_underlying, (3,)),
-    ), resolver_semantic
-    with pytest.raises(PriceSourceAdmissionError, match="Curve priced-asset set"):
-        price_source_preflight.require_live_topology(
-            live.migration,
-            live.price_desk,
-            pending_source,
-        )
-
-    assert live.migration.promotions == []
-    assert live.migration.deployments == []
-    assert live.migration.executions == []
-
-
-def test_0011_wrong_active_price_desk_runtime_fails_before_any_write(monkeypatch):
-    live = _bluechip_topology_migration(monkeypatch)
-    live.migration.deployed_codes[live.price_desk.address.lower()] = b"old-pricedesk"
-
-    with pytest.raises(
-        PriceSourceAdmissionError,
-        match="governed hardened artifact",
-    ):
-        BLUECHIP.migrate(live.migration)
-
-    assert live.migration.promotions == []
-    assert live.migration.deployments == []
-    assert live.migration.executions == []
-
-
-def test_0011_wrong_hq_price_desk_reference_fails_before_any_write(monkeypatch):
-    live = _bluechip_topology_migration(monkeypatch)
-    live.hq.slots[7] = _addr(979)
-
-    with pytest.raises(
-        PriceSourceAdmissionError,
-        match="RipeHq does not reference the selected active PriceDesk",
-    ):
-        BLUECHIP.migrate(live.migration)
-
-    assert live.migration.promotions == []
-    assert live.migration.deployments == []
-    assert live.migration.executions == []
+    assert [row[0] for row in migration.deployments] == ["BlueChipYieldPrices"]
+    name, label, args, candidate = migration.deployments[0]
+    assert name == "BlueChipYieldPrices"
+    assert label == BLUECHIP.BLUECHIP_CANDIDATE
+    assert args[-1] == selected_morpho_v2_factory
+    assert candidate.actionTimeLock() == BLUECHIP.PRICE_CHANGE_MIN_TIMELOCK
+    assert candidate.governance() == ZERO_ADDRESS
+    assert price_desk.slots == {}
+    assert sum("[1] 0x" in message for message in messages) == 1
+    assert sum("[2] 0x" in message for message in messages) == 1
 
 
 def test_mock_governance_fixture_is_bound_to_the_session_environment():
@@ -1137,25 +801,44 @@ def test_mock_governance_fixture_is_bound_to_the_session_environment():
     assert [argument.arg for argument in governance.args.args] == ["env"]
 
 
-def test_0012_rechecks_runtime_and_graph_then_defers_without_promotion(monkeypatch):
-    live = _bluechip_topology_migration(monkeypatch)
+def test_0012_only_promotes_after_price_desk_readback(monkeypatch):
+    selected_morpho_v2_factory = _addr(43)
+    monkeypatch.setattr(
+        PROMOTE_BLUECHIP,
+        "address",
+        lambda key: selected_morpho_v2_factory if key == "MORPHO_V2_FACTORY" else None,
+    )
+    price_desk = _Registry(_addr(40), {3: _addr(41)}, count=3)
+    migration = _FakeMigration(
+        contracts={"PriceDesk": price_desk, "RipeHq": _Contract(_addr(42))}
+    )
 
-    with pytest.raises(PriceSourceAdmissionError, match="promotion is deferred"):
-        PROMOTE_BLUECHIP.migrate(live.migration)
+    PROMOTE_BLUECHIP.migrate(migration)
 
-    assert live.migration.deployments == []
-    assert live.migration.promotions == []
-    assert live.migration.executions == []
-
-
-def test_0012_rejects_wrong_price_desk_runtime_before_promotion(monkeypatch):
-    live = _bluechip_topology_migration(monkeypatch)
-    live.migration.deployed_codes[live.price_desk.address.lower()] = b"wrong"
-
-    with pytest.raises(PriceSourceAdmissionError, match="governed hardened artifact"):
-        PROMOTE_BLUECHIP.migrate(live.migration)
-
-    assert live.migration.promotions == []
+    assert migration.deployments == []
+    assert migration.promotions == [
+        (
+            "BlueChipYieldPrices",
+            "BlueChipYieldPricesCandidate0011",
+            price_desk.address,
+            3,
+            None,
+            None,
+        )
+    ]
+    assert migration.promotion_specs[0].registry_name == "PriceDesk"
+    assert (
+        migration.promotion_specs[0].expected_source_path
+        == "contracts/priceSources/BlueChipYieldPrices.vy"
+    )
+    assert (
+        migration.promotion_specs[0].expected_constructor_args[0]
+        is (migration.contracts["RipeHq"])
+    )
+    assert (
+        migration.promotion_specs[0].expected_constructor_args[-1]
+        == selected_morpho_v2_factory
+    )
 
 
 def test_0013_prepares_unpaused_vault_migrator_for_exact_hq_id_25(

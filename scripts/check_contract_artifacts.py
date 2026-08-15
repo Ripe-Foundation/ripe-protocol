@@ -46,7 +46,6 @@ GOVERNED_SOURCES: Mapping[str, str] = {
     "Ledger": "contracts/data/Ledger.vy",
     "Lootbox": "contracts/core/Lootbox.vy",
     "MissionControl": "contracts/data/MissionControl.vy",
-    "PriceDesk": "contracts/registries/PriceDesk.vy",
     "RipeGov": "contracts/vaults/RipeGov.vy",
     "SimpleErc20": "contracts/vaults/SimpleErc20.vy",
     "StabilityPool": "contracts/vaults/StabilityPool.vy",

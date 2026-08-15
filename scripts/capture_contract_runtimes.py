@@ -40,7 +40,6 @@ TRAINING_WHEELS = "0x987DEa46AEfA442B67Faa5Db6F71024e5be01406"
 RIPE_WETH_POOL = "0xba6F6CBa1a4104000847d4fdccB676E99166CEcE"
 MORPHO_V2 = "0x0FBad98595b0186dA120E41f77C102beb49f803c"
 ARB_SYS = "0x0000000000000000000000000000000000000064"
-NATIVE_ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
 
 def _input(name: str, abi_type: str, value: Any) -> Mapping[str, Any]:
@@ -98,13 +97,6 @@ CONSTRUCTOR_INPUTS: Mapping[str, Sequence[Mapping[str, Any]]] = {
     "MissionControl": [
         _input("_ripeHq", "address", HQ),
         _input("_defaults", "address", DEFAULTS),
-    ],
-    "PriceDesk": [
-        _input("_ripeHq", "address", HQ),
-        _input("_tempGov", "address", ZERO),
-        _input("_ethAddr", "address", NATIVE_ETH),
-        _input("_minRegistryTimeLock", "uint256", 3_600),
-        _input("_maxRegistryTimeLock", "uint256", 50_400),
     ],
     "RipeGov": [_input("_ripeHq", "address", HQ)],
     "SimpleErc20": [_input("_ripeHq", "address", HQ)],
@@ -217,22 +209,6 @@ PROSPECTIVE_STATE: Mapping[str, Mapping[str, Any]] = {
         required_readbacks=(
             f"getRipeHq()=={HQ}",
             "Defaults-derived configuration equals the approved live snapshot",
-        ),
-    ),
-    "PriceDesk": _prospective(
-        initial={
-            "governance": ZERO,
-            "registryChangeTimeLock": 0,
-            "ETH": NATIVE_ETH,
-            "numAddrs": 1,
-        },
-        post_deploy_actions=(
-            "RipeHq governance sets registryChangeTimeLock to 3600",
-        ),
-        required_readbacks=(
-            f"getRipeHq()=={HQ}",
-            f"ETH()=={NATIVE_ETH}",
-            "getNumAddrs()==0",
         ),
     ),
     "RipeGov": _prospective(required_readbacks=(f"getRipeHq()=={HQ}",)),

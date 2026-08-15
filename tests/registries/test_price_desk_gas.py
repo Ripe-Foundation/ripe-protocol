@@ -9,11 +9,8 @@ from constants import (
     EIGHTEEN_DECIMALS,
     ZERO_ADDRESS,
 )
-from config.artifact_expectations import load_artifact_expectations
-from scripts import check_contract_artifacts as artifact_checker
-
-
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+EIP_170_LIMIT = 24_576
 PRODUCTION_PRICE_SOURCES = {
     "AeroRipePrices.vy",
     "BlueChipYieldPrices.vy",
@@ -175,45 +172,13 @@ def _configure_max_bluechip_feed(
 
 
 @pytest.mark.gas
-def test_price_desk_governed_artifact_and_fixture_runtime_size(price_desk):
-    results = artifact_checker.check(
-        artifact_checker.DEFAULT_EXPECTATIONS,
-        ("PriceDesk",),
-        {},
-    )
-    assert len(results) == 1
-
-    expectations = load_artifact_expectations(
-        artifact_checker.DEFAULT_EXPECTATIONS,
-        root=artifact_checker.ROOT,
-    )["contracts"]["PriceDesk"]
-    source = Path("contracts/registries/PriceDesk.vy")
-    compiled = artifact_checker._compile(
-        source,
-        artifact_checker._vyper_path(),
-    )
+def test_price_desk_complete_deployed_runtime_is_below_eip170(price_desk):
     deployed_runtime = bytes(boa.env.get_code(price_desk.address))
-    binding = artifact_checker._extract_deployed_runtime_binding(
-        compiled,
-        deployed_runtime,
-    )
-    artifacts = expectations["artifacts"]
-    assert compiled.source_sha256 == expectations["source_sha256"]
-    assert len(compiled.runtime_template) == artifacts["runtime_template_size"]
-    assert len(binding.runtime) == artifacts["deployed_runtime_size"]
-    assert len(binding.runtime) < artifact_checker.EIP_170_LIMIT
+    assert len(deployed_runtime) < EIP_170_LIMIT
     print(
-        "PRICEDESK_GOVERNED_ARTIFACT",
-        f"source_sha256={expectations['source_sha256']}",
-        f"optimizer={expectations['effective_optimization']}",
-        f"runtime_template_size={artifacts['runtime_template_size']}",
-        f"runtime_template_sha256={artifacts['runtime_template_sha256']}",
-        f"production_immutable_size={artifacts['deployed_runtime_immutable_data_size']}",
-        f"production_immutable_sha256={artifacts['deployed_runtime_immutable_data_sha256']}",
-        f"production_deployed_runtime_size={artifacts['deployed_runtime_size']}",
-        f"production_deployed_runtime_sha256={artifacts['deployed_runtime_sha256']}",
-        f"fixture_deployed_runtime_size={len(binding.runtime)}",
-        f"creation_size={artifacts['creation_size']}",
+        "PRICEDESK_DEPLOYED_RUNTIME",
+        f"size={len(deployed_runtime)}",
+        f"headroom={EIP_170_LIMIT - len(deployed_runtime)}",
     )
 
 

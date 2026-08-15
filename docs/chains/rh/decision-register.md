@@ -1279,46 +1279,6 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 
 **Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
-### RH-D042 — PriceDesk source isolation uses bounded policy-only admission
-
-**Status:** Proposed candidate policy boundary pending explicit owner approval.
-
-PriceDesk isolates the three source channels with exact compile-time
-allowances of 250,000 gas for price, 75,000 for feed presence, and 150,000 for
-snapshot updates. The selected Robinhood activation plan is limited to the
-exact ID 1 Chainlink, ID 2 Curve, ID 3 BlueChip list, priorities `[1, 2]`, and
-the exact enumerated GREEN/USDG route plus derived sGREEN conversion bound in
-the admission manifest.
-The S=10 source, four-underlying Curve, 25-snapshot, 5-vault by 15-asset
-(75-position), and separate 20-active-claim / 15-maintenance-batch
-qualification boundaries remain controlling.
-
-This candidate proposes policy-only enforcement under RH-D001. The recorded
-Robinhood PriceDesk predates the hardening, so migrations 0011 and 0012 bind
-the active RipeHq pointer and deployed runtime to the exact governed artifact,
-validate the complete enumerated Curve graph, and then deliberately stop. They
-perform no promotion, deployment, candidate finalization, or governance-
-calldata production. A hardened PriceDesk replacement and approved atomic or
-fresh post-timelock activation/rollback workflow remain separately required.
-No on-chain topology guard is added.
-Governance can bypass that preflight and create an availability-breaking
-configuration. No stable approval provenance currently establishes owner
-acceptance of that residual or of the proposed operating policy.
-
-Before this status may be upgraded, an identified owner must explicitly approve
-the policy-only rather than on-chain boundary; all three exact stipends; the
-selected topology and operating envelope; governance's ability to bypass the
-preflight; the monitoring and disable requirements; and the composition
-availability residual. The decision record must link stable provenance to that
-exact approval. Any stipend, topology, source-count, vault/asset-limit, source,
-compiler, or dependency change reopens qualification. A stipend change also
-requires a new PriceDesk artifact and redeployment. This proposal grants no
-deployment, registry mutation, configuration, activation, or release authority.
-
-**Source:**
-[`evidence/pricedesk-source-isolation.md`](evidence/pricedesk-source-isolation.md),
-`config/robinhood-price-source-admission.json`, and
-`tests/registries/test_price_desk_gas.py`.
 ## Maintenance rule
 
 When an owner decision changes, update:

@@ -71,7 +71,7 @@ source review and test update.
     "contracts/core/AuctionHouse.vy": "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e",
     "contracts/core/CreditEngine.vy": "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f",
     "contracts/core/CreditRedeem.vy": "c8c7f5f8c3323fbe56d6307840a44ca1aa7ddb775438a9a1b31794af2a9b3017",
-    "contracts/core/Deleverage.vy": "3b47aef7fa02d46d15d1a74a95049e5b80f7361d89b3f3258c6725db3dac0a6f",
+    "contracts/core/Deleverage.vy": "b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1",
     "contracts/core/HumanResources.vy": "3a08959aea7ca59dda77b6aebcf1a1653239b4114a6b1390dc087e56ecf5c70d",
     "contracts/core/Lootbox.vy": "30a08f661271fe29a29ce52480d94dc8e5891ee1f038e09fe1dced72665d0e6f",
     "contracts/core/Teller.vy": "1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049",
