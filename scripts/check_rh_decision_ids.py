@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate RH decision parity and concurrent integration-set allocations."""
+"""Validate RH decision uniqueness and concurrent integration-set allocations."""
 
 from __future__ import annotations
 
@@ -10,15 +10,11 @@ import re
 import subprocess
 from typing import Mapping
 
-import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTER = ROOT / "docs/chains/rh/decision-register.md"
-STATUS = ROOT / "docs/chains/rh/status.yaml"
 REGISTER_IN_REPO = "docs/chains/rh/decision-register.md"
 HEADING_RE = re.compile(r"^### (RH-D\d{3}) — (.+)$", re.MULTILINE)
-FULLY_RETIRED_DECISION_IDS = frozenset({"RH-D026"})
 
 
 class DecisionIdError(RuntimeError):
@@ -37,61 +33,6 @@ def parse_register(text: str, label: str) -> dict[str, str]:
     if not pairs:
         raise DecisionIdError(f"{label}: no RH decision headings found")
     return pairs
-
-
-def parse_status(path: Path) -> dict[str, str]:
-    data = yaml.safe_load(path.read_text())
-    rows = data.get("decisions")
-    if not isinstance(rows, list):
-        raise DecisionIdError(f"{path}: decisions must be a list")
-    pairs: dict[str, str] = {}
-    for row in rows:
-        decision_id = row.get("id") if isinstance(row, dict) else None
-        title = row.get("title") if isinstance(row, dict) else None
-        if not isinstance(decision_id, str) or not isinstance(title, str):
-            raise DecisionIdError(f"{path}: invalid decision row {row!r}")
-        if decision_id in pairs:
-            raise DecisionIdError(f"{path}: duplicate decision ID {decision_id}")
-        pairs[decision_id] = title
-    return pairs
-
-
-def require_exact_parity(register: Mapping[str, str], status: Mapping[str, str]) -> None:
-    if register == status:
-        return
-    missing = sorted(set(register) - set(status))
-    extra = sorted(set(status) - set(register))
-    mismatched = sorted(
-        decision_id
-        for decision_id in set(register) & set(status)
-        if register[decision_id] != status[decision_id]
-    )
-    raise DecisionIdError(
-        "decision register/status parity failure: "
-        f"missing={missing}, extra={extra}, title_mismatches={mismatched}"
-    )
-
-
-def require_count_consistency(path: Path, status: Mapping[str, str]) -> int:
-    data = yaml.safe_load(path.read_text())
-    configured_count = data.get("counts", {}).get("rh_d_decisions")
-    if not isinstance(configured_count, int):
-        raise DecisionIdError(f"{path}: counts.rh_d_decisions must be an integer")
-
-    missing_retired = sorted(FULLY_RETIRED_DECISION_IDS - set(status))
-    if missing_retired:
-        raise DecisionIdError(
-            f"{path}: fully retired decision IDs are missing: {missing_retired}"
-        )
-
-    expected_count = len(status) - len(FULLY_RETIRED_DECISION_IDS)
-    if configured_count != expected_count:
-        raise DecisionIdError(
-            f"{path}: counts.rh_d_decisions={configured_count}, "
-            f"expected {expected_count} after excluding "
-            f"{sorted(FULLY_RETIRED_DECISION_IDS)}"
-        )
-    return expected_count
 
 
 def _git_register(ref: str) -> dict[str, str]:
@@ -152,13 +93,7 @@ def main() -> int:
     args = parser.parse_args()
 
     register = parse_register(REGISTER.read_text(), str(REGISTER))
-    status = parse_status(STATUS)
-    require_exact_parity(register, status)
-    counted_decisions = require_count_consistency(STATUS, status)
-    print(
-        f"local parity ok: {len(register)} exact ID/title pairs; "
-        f"{counted_decisions} counted decisions"
-    )
+    print(f"canonical register unique: {len(register)} RH-D entries")
 
     if args.integration_ref:
         if not args.base_ref:

@@ -150,6 +150,8 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 @internal
 def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddr(_vaultId)
+    if vaultAddr == empty(address):
+        return False
     return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
 
 

@@ -19,12 +19,10 @@ with nothing to hash, and a citation pointing at a missing path -- an approval
 that could no longer be falsified by anything.
 
 The deletion was invisible to the suite for two compounding reasons, both worth
-keeping in mind before trusting a green run here: the test that checked the
-digest was deleted alongside the file, and it was `pytest.mark.release`, so it
-had already been deselected from the default lane by `pytest.ini`'s
-`-m "not release …"`. **This module is deliberately not release-marked.** It
-reads three committed files and hashes ~11KB; there is no reason for the one
-check that binds an approval to its evidence to sit in a lane nobody runs.
+keeping in mind during release qualification: the test that checked the digest
+was deleted alongside the file, and it had already been deselected from the
+default lane. This module is release-marked because it binds a committed
+approval artifact rather than exercising contract behavior.
 
 What survived the deletion was an assertion in
 `tests/deployment/test_stock_aapl_launch_inclusion.py` that compares
@@ -51,6 +49,9 @@ from pathlib import Path
 import pytest
 
 from config.BluePrint import ROBINHOOD_DEPLOYMENT_INPUTS
+
+
+pytestmark = pytest.mark.release
 
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -2416,13 +2416,8 @@ def test_green_stabilizer_rejects_worsening_solvent_positions(
         assert pool.addCallCount() == 0
 
 
-def test_calc_profit_for_stabilizer_preserves_public_view_semantics(
-    endaoment,
-    endaoment_funds,
-    curve_prices,
-    ledger,
-    green_token,
-):
+@pytest.mark.artifact
+def test_calc_profit_for_stabilizer_abi_is_current(endaoment):
     abi = endaoment.abi
     assert abi == json.loads(Path("scripts/abis/Endaoment.json").read_text())
     assert next(
@@ -2435,6 +2430,14 @@ def test_calc_profit_for_stabilizer_preserves_public_view_semantics(
         "outputs": [{"name": "", "type": "uint256"}],
     }
 
+
+def test_calc_profit_for_stabilizer_preserves_public_view_semantics(
+    endaoment,
+    endaoment_funds,
+    curve_prices,
+    ledger,
+    green_token,
+):
     cases = [
         # label, LP in EndaomentFunds, GREEN in EndaomentFunds, debt, result,
         # expected signed position
