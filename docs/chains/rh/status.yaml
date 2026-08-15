@@ -1,13 +1,26 @@
-schema_version: 14
+schema_version: 15
 
 snapshot:
   title: Robinhood deployment-owner readiness
-  as_of: 2026-08-14
+  as_of: 2026-08-11
   timezone: America/Denver
   repository: Ripe-Foundation/ripe-protocol
   branch: rh
   program_subject_commit: 0372d48680c281ddaafe2f1982f0bcfa851071c9
   program_subject_tree: 79fdc69de22eb8cfa2be3a2067c596d5fed92963
+  program_snapshot_state: stale_pending_full_reconciliation
+  program_snapshot_scope: broad_program_rows_counts_and_lifecycle_as_of_2026_08_11
+  later_scoped_evidence:
+    sc12_policy_recorded_on: 2026-08-14
+    namespace_rechecked_on: 2026-08-15
+    scope: canonical_decision_mirror_parity_through_rh_d035_and_pr_144_sc12_namespace_evidence_only
+    broad_program_snapshot_refreshed: false
+  observed_live_rh:
+    checked_on: 2026-08-15
+    commit: 36ee0db42482c3e7d6c43d045fc02655b90bebf4
+    tree: b052d53505fe5f4f834497326e7e6f9dc0cf3797
+    commits_after_program_subject: 195
+    reconciled_into_program_snapshot: false
   migration_candidate_parent_commit: 0372d48680c281ddaafe2f1982f0bcfa851071c9
   migration_candidate_parent_tree: 79fdc69de22eb8cfa2be3a2067c596d5fed92963
   migration_candidate_branch: codex/rh-production-vyper-remediation-integration
@@ -20,11 +33,17 @@ snapshot:
   origin_commits_after_subject: build_derived
   build_worktree_clean: build_derived
   reconciliation: >
-    This status reconciles the reviewed production-remediation candidate above
-    against its exact integrated rh parent. Documentation authority and
-    publication lifecycle are derived at build time, never hardcoded. Earlier
-    launch and transaction-executor records remain historical evidence; this
-    file is the sole current machine-readable lifecycle authority.
+    The broad program snapshot remains bound to the exact subject and candidate
+    identities above as of 2026-08-11. It has not been reconciled to the live rh
+    observation from 2026-08-15 and is not current authority for later repository
+    state. The later RH-D032 through RH-D035 mirror entries and SC-12 namespace
+    evidence are a scoped overlay only; they do not refresh any other count, row,
+    blocker, residual, deadline, narrative, or lifecycle statement.
+  terminology_scope: >
+    Except for later_scoped_evidence and decision_namespace.in_flight_coordination,
+    every unqualified use of current or current state below means current only
+    at the broad 2026-08-11 snapshot. It is historical wording, not a claim
+    about the unreconciled live rh observation.
   posture: "Repository launch-remediation configuration remains pre-execution; separately, the GREEN/RIPE CCIP topology is confirmed live on Base and Robinhood mainnet."
   hero_lead: "Ready to begin deployment preparation."
   hero_emphasis: Launch-remediation repository configuration is prepared; separately, the GREEN/RIPE CCIP topology is confirmed live.
@@ -35,12 +54,14 @@ snapshot:
   freshness_rule: >
     Reconcile this file in the same commit whenever an integrated change closes,
     reopens, or materially changes a row, decision, blocker, residual, deadline,
-    next action, or authorization boundary.
+    next action, or authorization boundary. A scoped decision or namespace
+    overlay does not satisfy that broad-program reconciliation requirement.
 
 counts:
+  scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 34 entries.
-  rh_d_decisions: 33
+  # Counts decisions not fully retired; RH-D026 is excluded from 35 entries.
+  rh_d_decisions: 34
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -67,7 +88,8 @@ migration_readiness:
     The former 86-key declarative-plan census is retired with its removed
     runner. The eight-file imperative migration candidate remains
     non-executable and unauthorized; the 64 source/configuration blockers are
-    current but are not a substitute executable-plan census.
+    broad-snapshot values as of 2026-08-11, not current values, and are not a
+    substitute executable-plan census.
 
 ccip_live_state:
   status: live_topology_confirmed_operational_gates_open
@@ -310,14 +332,19 @@ decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
   mirror_contract: Every integrated entry in this file must match the canonical register's identifier and title exactly and cannot be silently closed.
   in_flight_coordination:
-    checked_on: 2026-08-14
+    checked_on: 2026-08-15
     sc12_reserved_id: RH-D035
-    external_open_pr_claims: { RH-D033: [142, 146, 147], RH-D034: [147] }
-    external_collision: RH-D033 is claimed by three open PRs and must be resolved by the integration owner before those records are combined.
-    scope: PR 144 records the collision read-only and does not edit or renumber another branch.
+    integrated_allocations: { PR_142: [RH-D033, RH-D034] }
+    open_pr_allocations: { PR_144: [RH-D035], PR_143: [RH-D036], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042] }
+    qualified_coordination_intent: { PR_145: { intended: RH-D038, actual_head_adds: RH-D033, state: collides_with_integrated_pr_142_allocation } }
+    inherited_not_new: { PR_152: [RH-D033, RH-D034] }
+    external_collision: PR 145 intends RH-D038 but its current head still adds RH-D033, which is integrated from PR 142. RH-D035 remains PR 144's uncollided SC-12 allocation. PR 152 now introduces RH-D042 in addition to inheriting RH-D033 and RH-D034.
+    scope: PR 144 records the claims observed immediately before its 2026-08-15 rebase and does not edit or renumber another branch.
 
 document_roles:
-  - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
+  # These roles are themselves part of the stale broad-program snapshot unless
+  # a row explicitly identifies the later scoped overlay.
+  - { file: docs/chains/rh/status.yaml, role: "Historical broad-program machine-readable snapshot as of 2026-08-11 with a scoped RH-D032-through-RH-D035 and SC-12 namespace overlay; full live-rh reconciliation is pending."}
   - { file: docs/chains/rh/current-owner-priorities.md, role: "Dated owner-priority overlay for active, parked, and excluded work."}
   - { file: docs/chains/rh/deployment-owner-quickstart.md, role: "Sole canonical human handoff for the deployment owner and deployment agents."}
   - { file: docs/chains/rh/START-HERE.md, role: "Audience and phase router only."}

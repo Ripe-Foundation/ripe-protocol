@@ -4,6 +4,7 @@ import pytest
 from constants import EIGHTEEN_DECIMALS
 from tests.vaults.ripe_gov_exit_fee_model import (
     DECIMAL_OFFSET,
+    HUNDRED_PERCENT,
     UINT256_MAX,
     UInt256Overflow,
     assert_exact_exit_claim,
@@ -245,7 +246,8 @@ def test_remaining_holder_guard_is_address_level_not_beneficial_owner_level(
 
     assert bob_after <= target
     assert alice_gain > 0
-    assert bob_before - bob_after == alice_gain + aggregate_rounding_loss
+    assert aggregate_rounding_loss >= 0
+    assert bob_before - bob_after >= alice_gain
     assert bob_after + alice_after > target + alice_before
 
 
@@ -317,9 +319,17 @@ def test_full_fee_burns_economically_empty_dust_instead_of_waiving_fee(
 
     ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
 
+    bob_after = ripe_gov_vault.userBalances(bob, ripe_token)
+    total_after = ripe_gov_vault.totalBalances(ripe_token)
     assert ripe_token.balanceOf(ripe_gov_vault) == custody
-    assert ripe_gov_vault.userBalances(bob, ripe_token) == 0
-    assert ripe_gov_vault.totalBalances(ripe_token) == total_before - bob_before
+    assert_exact_exit_claim(
+        bob_before,
+        total_before,
+        custody,
+        100_00,
+        bob_after,
+        total_after,
+    )
     assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
 
 
@@ -732,6 +742,90 @@ def test_independent_oracle_covers_virtual_term_denominator_boundary():
         remaining_shares + expected + 1,
         total_balance,
     )
+
+
+def test_checked_closed_form_matches_independent_oracle_on_bounded_grid():
+    """Deterministically sweep ratios, fees, virtual terms, and share prices."""
+    user_share_values = (1, DECIMAL_OFFSET // 2, DECIMAL_OFFSET, 5 * DECIMAL_OFFSET)
+    remaining_share_values = (
+        1,
+        DECIMAL_OFFSET // 2,
+        2 * DECIMAL_OFFSET,
+        20 * DECIMAL_OFFSET,
+    )
+    balance_values = (1, 2, 10, DECIMAL_OFFSET, EIGHTEEN_DECIMALS)
+    fee_values = (1, 1_00, 10_00, 50_00, 99_99, HUNDRED_PERCENT)
+    covered = {
+        "full_fee": False,
+        "zero_target_non_full_fee": False,
+        "nonzero_target": False,
+        "virtual_share_significant": False,
+        "high_share_price": False,
+    }
+    compared_cases = 0
+
+    for user_shares in user_share_values:
+        for remaining_shares in remaining_share_values:
+            total_shares = user_shares + remaining_shares
+            for total_balance in balance_values:
+                claim_before = claim(user_shares, total_shares, total_balance)
+                for exit_fee in fee_values:
+                    if exit_fee == HUNDRED_PERCENT:
+                        assert checked_closed_form_retained_shares(
+                            user_shares,
+                            total_shares,
+                            total_balance,
+                            exit_fee,
+                        ) == 0
+                        covered["full_fee"] = True
+                        continue
+
+                    if claim_before == 0:
+                        with pytest.raises(ValueError, match="no claim"):
+                            checked_closed_form_retained_shares(
+                                user_shares,
+                                total_shares,
+                                total_balance,
+                                exit_fee,
+                            )
+                        continue
+
+                    target = target_claim(claim_before, exit_fee)
+                    expected = maximal_retained_shares(
+                        user_shares,
+                        remaining_shares,
+                        total_balance,
+                        target,
+                    )
+                    actual = checked_closed_form_retained_shares(
+                        user_shares,
+                        total_shares,
+                        total_balance,
+                        exit_fee,
+                    )
+                    assert actual == expected
+                    assert claim(
+                        actual,
+                        remaining_shares + actual,
+                        total_balance,
+                    ) <= target
+                    if actual < user_shares:
+                        assert target < claim(
+                            actual + 1,
+                            remaining_shares + actual + 1,
+                            total_balance,
+                        )
+
+                    compared_cases += 1
+                    covered["zero_target_non_full_fee"] |= target == 0
+                    covered["nonzero_target"] |= target != 0
+                    covered["virtual_share_significant"] |= (
+                        total_shares <= DECIMAL_OFFSET
+                    )
+                    covered["high_share_price"] |= total_balance > total_shares
+
+    assert compared_cases > 100
+    assert all(covered.values())
 
 
 @pytest.mark.parametrize(

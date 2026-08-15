@@ -1084,15 +1084,22 @@ because it could conceal a genuine vault loss.
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
-## In-flight namespace coordination note — 14 August 2026
+## Namespace coordination note — 15 August 2026
 
-A read-only live check immediately before this PR's allocation found that open
-PRs #142, #146, and #147 each claim `RH-D033`; PR #147 additionally claims
-`RH-D034`. PR #144 does not edit, renumber, or otherwise dispose those other
-branches. `RH-D035` had no open-PR claim and is reserved below for SC-12. The
-integration owner must resolve the pre-existing `RH-D033` collision before
-combining the affected decision records. This note records namespace state; it
-does not approve or reject another PR's decision.
+A read-only live check immediately before PR #144's rebase found that merged PR
+#142 owns the integrated `RH-D033` and `RH-D034` entries, while PR #144 uniquely
+adds `RH-D035`. Open PR #143 adds `RH-D036`, PR #146 adds `RH-D037`, and PR #147
+adds `RH-D039` through `RH-D041`. PR #145's coordination intent is `RH-D038`,
+but its current head still actually adds a conflicting `RH-D033`; it must not be
+described as cleanly occupying `RH-D038` until that source is corrected. PR
+#152 inherits integrated `RH-D033`/`RH-D034` and, at its current head, also
+introduces `RH-D042`. This supersedes an earlier snapshot in which PR #152 had
+not yet allocated a decision.
+
+`RH-D035` remains uncollided. PR #144 records this namespace state read-only and
+does not edit, renumber, approve, or reject another branch's decision. The
+integration owner must resolve PR #145's actual `RH-D033` collision before that
+branch is combined with the integrated register.
 
 ### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 

@@ -54,7 +54,12 @@ def assert_exact_exit_claim(
     user_shares_after,
     total_shares_after,
 ):
-    """Assert the exact maximal-retained-shares exit invariant."""
+    """Assert production early-exit accounting, including full-fee complete burn."""
+    if exit_fee == HUNDRED_PERCENT:
+        assert user_shares_after == 0
+        assert total_shares_after == total_shares_before - user_shares_before
+        return
+
     claim_before = claim(user_shares_before, total_shares_before, total_balance)
     target = target_claim(claim_before, exit_fee)
     remaining_shares = total_shares_before - user_shares_before
