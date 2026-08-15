@@ -39,7 +39,7 @@ snapshot:
 
 counts:
   workstreams: 28
-  rh_d_decisions: 31
+  rh_d_decisions: 34
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -307,7 +307,7 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: RH-D001 through RH-D023 must match this register exactly and cannot be silently closed.
+  mirror_contract: Every RH-D identifier and title in decisions must match this register exactly and cannot be silently closed.
 
 document_roles:
   - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
@@ -1151,6 +1151,9 @@ decisions:
   - { id: RH-D029, title: "CreditEngine carries an exact combined waiver at 10 bytes", status: "owner_granted_replacement_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact combined B-AUD-008, B-OBS-045 / AUD-010, and CreditRedeem price-isolation artifact, CreditEngine deploys at 24,566 bytes including immutables, leaving 10 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and a deterministic immutable-bound deployed hash are pinned, and the replacement waiver permits zero growth and reopens on any source or compiler-output change.", source: "docs/chains/rh/evidence/basic-vault-reward-suppression-waiver.md"}
   - { id: RH-D030, title: "SwitchboardAlpha carries a replacement exact waiver at 108 bytes", status: "owner_granted_replacement_exact_zero_growth_waiver", summary: "The prior 2-byte identity reopened when SwitchboardAlpha changed. The exact trimmed artifact preserves priority-vault validation while removing the single-consumer MissionControl flags getter and deploying at 24,468 bytes including seven immutable words, leaving 108 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and a deterministic immutable-bound deployed hash are pinned, and the replacement waiver permits zero growth and reopens on any source or compiler-output change.", source: "docs/chains/rh/evidence/switchboard-alpha-headroom-waiver.md"}
   - { id: RH-D031, title: "Teller carries an exact third-party-touch waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact Teller third-party-touch remediation, Teller deploys at 24,556 bytes including immutables, leaving 20 bytes. The owner accepted that technically deployable margin; source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D032, title: "Teller bond minimum-payout protection exact waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The exact caller-specified minimum-payout artifact deploys at 24,556 bytes including immutables, leaving 20 bytes. It removes the one-argument purchase selector, retains arities two through four, adds an opt-in five-argument minimum, and permits zero further growth. Deployment, registry mutation, activation, and release remain unauthorized.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D033, title: "Endaoment stabilizer removal is StableSwap-NG-only and fails closed", status: "owner_approved_fail_closed_compatibility_boundary", summary: "Endaoment sizes one-sided GREEN removal through the exact StableSwap-NG calc_token_amount quote and fails closed to a state-preserving zero removal when the selector, call, or return shape is unsupported. Any pool or implementation change requires fresh exact-cap and execution qualification; no deployment or activation is authorized.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D034, title: "Endaoment stabilizer accepts the unbounded max-LP-burn residual", status: "owner_accepted_residual_separate_hardening_open", summary: "The exact SC-19 candidate proves quote-plus-one executability but continues to pass max uint256 as the execution burn bound. LP approval, approval cleanup, and the profitability invariant remain, while an explicit quote-bound max burn is deferred to separate hardening. No deployment or activation is authorized.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
