@@ -299,6 +299,10 @@ def _claimLoot(
 
         assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            if len(vaultsToRemove) < MAX_VAULTS_TO_CLEAN:
+                vaultsToRemove.append(vaultId)
+            continue
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
             hasBalance: bool = False
@@ -356,6 +360,8 @@ def getClaimableLoot(_user: address) -> uint256:
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            continue
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
             if asset == empty(address):

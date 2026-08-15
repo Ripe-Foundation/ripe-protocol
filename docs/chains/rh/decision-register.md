@@ -1279,6 +1279,67 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 
 **Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
+### RH-D037 — CreditEngine repayment-liveness and stale-vault exact waiver at 21 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact combined SC-11
+repayment-liveness and SC-15 zero-asset stale-vault candidate on
+`codex/rh-creditengine-repayment-stale-vault`. This replaces RH-D029 for the
+CreditEngine identity below; the waivers are not cumulative.
+
+The candidate makes a full payoff independent of collateral prices, with zero
+collateral-value and maximum-debt fields in the existing `RepayDebt` event. A
+partial standard repayment uses conservative non-strict valuation, retains
+healthy collateral value and capacity, and preserves prior debt terms when a
+positive-amount position lacks a usable price. Other partial repayment types
+remain strict. CreditEngine and Lootbox additionally skip zero-asset live vault
+replacements; Lootbox routes stale vault IDs through its existing bounded
+Ledger cleanup. The external quarantine model, custody-shortfall policy,
+CreditRedeem borrower-wide price isolation, ABI, selectors, events,
+constructors, and storage layouts remain unchanged.
+
+**What exactly is waived.** One CreditEngine source and compiler-output
+identity under the repository's pinned Vyper toolchain:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/CreditEngine.vy` SHA-256 | `506efeaa9e6c4ac16b5462b044ce3c0033099fbdc1f608a1e76c945b85bb48cb` |
+| Source Git blob | `25c53fa3fb53d552281c4b1b94b1e3f68865ac16` |
+| Runtime-template SHA-256 | `2897887d02772092a9211cb548bcc05d310f700cfca54f0abb08192588340d6e` |
+| Runtime-template bytes | 24,459 |
+| Immutable-data bytes | 96 |
+| Deployed runtime bytes, including immutables | 24,555 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A1` | `fad9a048b57869a34844508914675e4fbd0e5107e3767e8e17c324e59b7fc759` |
+| Complete deployed-runtime SHA-256 at production-capture inputs | `8dd538c75d9f8491dd788d6555afebc612212c5a51e8a619e98757a535873446` |
+| Canonical ABI SHA-256 | `61eae96416d3c1828a2a98d483cbd832ee16e898664bd84bd033d1a83474bdb9` |
+| Selector-set canonical SHA-256 / count | `4fd29412b11eab9b8406f18f7209bb4022902293893e17c6cf1f0429735a4c38` / 51 |
+| Event-set canonical SHA-256 / count | `ec7065e372f9482ed13689519ee9057dfa620ee91b70a34b4c1bfc92e8e35e56` / 6 |
+
+**Baseline and delta.** RH-D029 covered source SHA-256
+`98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f`
+at 24,470 runtime-template bytes and 24,566 complete deployed-runtime bytes.
+This candidate is therefore 11 deployed bytes smaller, leaving **21 bytes**
+before EIP-170. Intermediate refactor-only measurements were not preserved and
+are not part of this decision.
+
+**Residual risk accepted.** This waiver permits **0 bytes of further growth**.
+Any CreditEngine source, compiler-input, ABI, selector, event, creation-bytecode,
+runtime-template, immutable suffix, or complete deployed-runtime identity change
+invalidates the pinned identity and reopens this decision. A future change must
+restore at least 200 bytes of headroom or receive another exact owner waiver;
+refreshing these values merely to make a test pass is prohibited.
+
+The owner separately authorized recording this decision, updating its exact
+test citation, committing the validated batch, pushing the feature branch, and
+opening a pull request against `rh-audit-remediation`. This does not authorize
+merge, deployment, registry mutation, configuration, activation, or release.
+
+**Source:** `contracts/core/CreditEngine.vy`, `contracts/core/Lootbox.vy`,
+`tests/core/creditEngine/test_credit_repay.py`,
+`tests/core/creditEngine/test_credit_repay_refunds.py`,
+`tests/core/test_stale_vault_replacement.py`,
+`tests/test_vault_pointer_runtime_sizes.py`, and
+`config/contract-artifact-expectations.json`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:
