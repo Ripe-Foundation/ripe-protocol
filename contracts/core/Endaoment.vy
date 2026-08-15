@@ -740,6 +740,7 @@ def _removeLiquidity(
 ####################
 
 
+@nonreentrant
 @external
 def stabilizeGreenRefPool() -> bool:
     assert not deptBasics.isPaused # dev: contract paused
@@ -950,8 +951,6 @@ def _getGreenAmountToRemove(
         if low >= high:
             break
         midpoint: uint256 = high - (high - low) // 2
-        didQuote = False
-        lpQuote = 0
         didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
         if didQuote and lpQuote < _lpBalance:
             low = midpoint
@@ -1053,6 +1052,7 @@ def _calcProfitForStabilizer(
 #####################
 
 
+@nonreentrant
 @external
 def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
@@ -1066,6 +1066,7 @@ def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = 
     return greenMinted
 
 
+@nonreentrant
 @external
 def addPartnerLiquidity(
     _legoId: uint256,
@@ -1088,8 +1089,8 @@ def addPartnerLiquidity(
     greenAmount: uint256 = 0
     greenMinted: uint256 = 0
     partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
-    partnerCustodyBefore: uint256 = staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(endaoFunds)
-    greenCustodyBefore: uint256 = staticcall IERC20(a.greenToken).balanceOf(self) + staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
+    partnerCustodyBefore: uint256 = self._getCombinedBalance(_asset, endaoFunds)
+    greenCustodyBefore: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
 
     # add liquidity (LP goes here so only the current action's delta is split)
     lpBefore: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
@@ -1107,12 +1108,10 @@ def addPartnerLiquidity(
     # Qualified Legos report net venue contributions. Match those reports to
     # the protocol's custody decrease so downstream fees or inventory top-ups
     # cannot be attributed to this partner action. Partial fills remain valid.
-    partnerCustodyAfter: uint256 = staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(endaoFunds)
-    greenCustodyAfter: uint256 = staticcall IERC20(a.greenToken).balanceOf(self) + staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
-    assert partnerCustodyBefore >= partnerCustodyAfter # dev: partner asset accounting
-    assert greenCustodyBefore >= greenCustodyAfter # dev: green accounting
-    assert partnerCustodyBefore - partnerCustodyAfter == liqAmountA # dev: partner asset accounting
-    assert greenCustodyBefore - greenCustodyAfter == liqAmountB # dev: green accounting
+    partnerCustodyAfter: uint256 = self._getCombinedBalance(_asset, endaoFunds)
+    greenCustodyAfter: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
+    assert partnerCustodyBefore - liqAmountA == partnerCustodyAfter # dev: partner asset accounting
+    assert greenCustodyBefore - liqAmountB == greenCustodyAfter # dev: green accounting
     assert liqAmountA <= partnerAmount # dev: partner asset accounting
     assert liqAmountB <= greenAmount # dev: green accounting
 
@@ -1155,6 +1154,12 @@ def addPartnerLiquidity(
 
 
 # utils
+
+
+@view
+@internal
+def _getCombinedBalance(_asset: address, _endaoFunds: address) -> uint256:
+    return staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(_endaoFunds)
 
 
 @internal

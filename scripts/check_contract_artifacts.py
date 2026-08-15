@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed artifact checks for the reviewed RH production contracts."""
+"""Fail-closed checks for reviewed RH and explicitly scoped artifacts."""
 
 from __future__ import annotations
 
@@ -60,6 +60,13 @@ GOVERNED_SOURCES: Mapping[str, str] = {
 }
 GOVERNED_CONTRACTS = frozenset(GOVERNED_SOURCES)
 DEPLOYED_RUNTIME_CONTRACTS = GOVERNED_CONTRACTS - {"DefaultsRobinhoodLive"}
+BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS = frozenset({"Endaoment"})
+RH_CAPTURED_RUNTIME_CONTRACTS = (
+    DEPLOYED_RUNTIME_CONTRACTS - BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS
+)
+BASE_ENDAOMENT_MANIFEST = (
+    ROOT / "migration_history" / "base-mainnet" / "v1" / "current-manifest.json"
+)
 
 
 class ArtifactCheckError(RuntimeError):
@@ -109,6 +116,85 @@ def _canonical_json_bytes(value: Any) -> bytes:
 
 def _json_sha256(value: Any) -> str:
     return _sha256(_canonical_json_bytes(value))
+
+
+def base_endaoment_deployed_runtime_authority() -> Mapping[str, Any]:
+    """Derive the prospective Base binding from its two repository authorities."""
+    from config.BluePrint import ADDYS
+
+    manifest = json.loads(BASE_ENDAOMENT_MANIFEST.read_bytes())
+    base_addys = ADDYS["base"]
+    inputs = [
+        {
+            "name": "_ripeHq",
+            "type": "address",
+            "value": manifest["contracts"]["RipeHq"]["address"],
+        },
+        {
+            "name": "_weth",
+            "type": "address",
+            "value": base_addys["WETH"],
+        },
+        {
+            "name": "_eth",
+            "type": "address",
+            "value": base_addys["ETH"],
+        },
+    ]
+    return {
+        "authorities": [
+            {
+                "input": "_ripeHq",
+                "path": BASE_ENDAOMENT_MANIFEST.relative_to(ROOT).as_posix(),
+                "selector": "contracts.RipeHq.address",
+            },
+            {
+                "input": "_weth",
+                "path": "config/BluePrint.py",
+                "selector": 'ADDYS["base"]["WETH"]',
+            },
+            {
+                "input": "_eth",
+                "path": "config/BluePrint.py",
+                "selector": 'ADDYS["base"]["ETH"]',
+            },
+        ],
+        "binding_kind": "prospective_base_constructor_artifact",
+        "chain": "base",
+        "chain_id": 8453,
+        "constructor_inputs": inputs,
+        "constructor_inputs_sha256": _json_sha256(inputs),
+        "robinhood_constructor_binding_satisfied": False,
+        "robinhood_open_inputs": [
+            "deployment-produced RipeHq",
+            "externally verified DP-21 WETH",
+            "native-ETH sentinel",
+        ],
+    }
+
+
+def base_endaoment_immutable_data() -> bytes:
+    """Encode the current Endaoment immutables for the Base authority above."""
+    authority = base_endaoment_deployed_runtime_authority()
+    values = {
+        entry["name"]: entry["value"]
+        for entry in authority["constructor_inputs"]
+    }
+
+    def address_word(value: str) -> bytes:
+        if not isinstance(value, str) or re.fullmatch(r"0x[0-9A-Fa-f]{40}", value) is None:
+            raise ArtifactCheckError(f"invalid Base Endaoment address authority: {value!r}")
+        return bytes.fromhex(value[2:]).rjust(32, b"\x00")
+
+    return b"".join(
+        (
+            address_word(values["_ripeHq"]),
+            (1).to_bytes(32, "big"),  # canMintGreen
+            (0).to_bytes(32, "big"),  # canMintRipe
+            address_word(values["_weth"]),
+            address_word(values["_eth"]),
+        )
+    )
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
@@ -639,9 +725,38 @@ def _check_contract(
         name, "immutable/code layout", compiled.code_layout, expected["code_layout"]
     )
 
+    runtime_authority = expected.get("deployed_runtime_authority")
+    if name in BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS:
+        _assert_equal(
+            name,
+            "Base-scoped deployed-runtime authority",
+            runtime_authority,
+            base_endaoment_deployed_runtime_authority(),
+        )
+        if deployed_binding is None:
+            raise ArtifactCheckError(
+                f"{name}: Base-scoped deployed runtime binding is missing"
+            )
+        _assert_equal(
+            name,
+            "Base-scoped constructor immutable data",
+            deployed_binding.immutable_data,
+            base_endaoment_immutable_data(),
+        )
+    elif runtime_authority is not None:
+        raise ArtifactCheckError(
+            f"{name}: unexpected chain-scoped deployed-runtime authority"
+        )
+
     runtime_label = "runtime template"
     if deployed_binding is not None:
-        runtime_label += " (full deployed-runtime identity bound)"
+        if name in BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS:
+            runtime_label += (
+                " (prospective Base deployed-runtime identity bound; "
+                "Robinhood constructor binding open)"
+            )
+        else:
+            runtime_label += " (full RH deployed-runtime identity bound)"
     elif expected.get("constructor_bound_runtime_template"):
         runtime_label += " (not a deployed-runtime identity; constructor immutables)"
     return (

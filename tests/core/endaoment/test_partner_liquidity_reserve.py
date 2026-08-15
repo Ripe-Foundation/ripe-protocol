@@ -91,6 +91,113 @@ def addLiquidity(
 """
 
 
+# Minimal executable model of the deployed Base Underscore Curve Lego's
+# contribution accounting at 0x4e0C4B96FAdc84D41144C1aE868aA1411c1d0743.
+# Its manifest-embedded Curve.vy source SHA-256 is
+# aaadabed405acd96ce34c186a570b5684f8b015d7e83938412c75d05ffa701c9.
+# The load-bearing behavior is preserved: amounts are selected before the
+# Lego transferFrom, only balance above the pre-call inventory is refunded,
+# and the remaining gross amount is reported without measuring venue receipt.
+GROSS_REPORTING_CURVE_LEGO_SOURCE = """
+# @version 0.4.3
+
+from ethereum.ercs import IERC20
+
+interface Venue:
+    def addLiquidity(_tokenA: address, _tokenB: address, _amountA: uint256, _amountB: uint256, _recipient: address) -> uint256: nonpayable
+
+LP_TOKEN: immutable(address)
+
+lastReportedA: public(uint256)
+lastReportedB: public(uint256)
+
+@deploy
+def __init__(_lpToken: address):
+    LP_TOKEN = _lpToken
+
+@external
+def addLiquidity(
+    _pool: address,
+    _tokenA: address,
+    _tokenB: address,
+    _amountA: uint256,
+    _amountB: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _minLpAmount: uint256,
+    _extraData: bytes32,
+    _recipient: address,
+) -> (address, uint256, uint256, uint256, uint256):
+    preBalanceA: uint256 = staticcall IERC20(_tokenA).balanceOf(self)
+    preBalanceB: uint256 = staticcall IERC20(_tokenB).balanceOf(self)
+
+    liqAmountA: uint256 = min(_amountA, staticcall IERC20(_tokenA).balanceOf(msg.sender))
+    liqAmountB: uint256 = min(_amountB, staticcall IERC20(_tokenB).balanceOf(msg.sender))
+    if liqAmountA != 0:
+        assert extcall IERC20(_tokenA).transferFrom(msg.sender, self, liqAmountA)
+        assert extcall IERC20(_tokenA).approve(_pool, liqAmountA)
+    if liqAmountB != 0:
+        assert extcall IERC20(_tokenB).transferFrom(msg.sender, self, liqAmountB)
+        assert extcall IERC20(_tokenB).approve(_pool, liqAmountB)
+
+    lpAmount: uint256 = extcall Venue(_pool).addLiquidity(_tokenA, _tokenB, liqAmountA, liqAmountB, _recipient)
+    assert lpAmount >= _minLpAmount
+
+    if liqAmountA != 0:
+        assert extcall IERC20(_tokenA).approve(_pool, 0)
+        currentBalanceA: uint256 = staticcall IERC20(_tokenA).balanceOf(self)
+        if currentBalanceA > preBalanceA:
+            refundA: uint256 = currentBalanceA - preBalanceA
+            assert extcall IERC20(_tokenA).transfer(msg.sender, refundA)
+            liqAmountA -= refundA
+    if liqAmountB != 0:
+        assert extcall IERC20(_tokenB).approve(_pool, 0)
+        currentBalanceB: uint256 = staticcall IERC20(_tokenB).balanceOf(self)
+        if currentBalanceB > preBalanceB:
+            refundB: uint256 = currentBalanceB - preBalanceB
+            assert extcall IERC20(_tokenB).transfer(msg.sender, refundB)
+            liqAmountB -= refundB
+
+    self.lastReportedA = liqAmountA
+    self.lastReportedB = liqAmountB
+    return LP_TOKEN, lpAmount, liqAmountA, liqAmountB, 0
+"""
+
+
+PARTIAL_FILL_VENUE_SOURCE = """
+# @version 0.4.3
+
+from ethereum.ercs import IERC20
+
+interface Mintable:
+    def mint(_to: address, _amount: uint256): nonpayable
+
+LP_TOKEN: immutable(address)
+fillBps: public(uint256)
+
+@deploy
+def __init__(_lpToken: address):
+    LP_TOKEN = _lpToken
+    self.fillBps = 10_000
+
+@external
+def setFillBps(_fillBps: uint256):
+    assert _fillBps <= 10_000
+    self.fillBps = _fillBps
+
+@external
+def addLiquidity(_tokenA: address, _tokenB: address, _amountA: uint256, _amountB: uint256, _recipient: address) -> uint256:
+    amountA: uint256 = _amountA * self.fillBps // 10_000
+    amountB: uint256 = _amountB * self.fillBps // 10_000
+    if amountA != 0:
+        assert extcall IERC20(_tokenA).transferFrom(msg.sender, self, amountA)
+    if amountB != 0:
+        assert extcall IERC20(_tokenB).transferFrom(msg.sender, self, amountB)
+    extcall Mintable(LP_TOKEN).mint(_recipient, 2)
+    return 2
+"""
+
+
 CONTROLLED_DELTA_TOKEN_SOURCE = """
 # @version 0.4.3
 
@@ -155,6 +262,55 @@ def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
 """
 
 
+REENTRANT_SWITCHBOARD_TOKEN_SOURCE = """
+# @version 0.4.3
+
+interface Endaoment:
+    def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256) -> uint256: nonpayable
+
+TARGET: immutable(address)
+
+balances: HashMap[address, uint256]
+allowances: HashMap[address, HashMap[address, uint256]]
+entered: bool
+
+@deploy
+def __init__(_target: address):
+    TARGET = _target
+
+@external
+def mint(_to: address, _amount: uint256):
+    self.balances[_to] += _amount
+
+@view
+@external
+def balanceOf(_owner: address) -> uint256:
+    return self.balances[_owner]
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowances[msg.sender][_spender] = _amount
+    return True
+
+@external
+def transfer(_to: address, _amount: uint256) -> bool:
+    self.balances[msg.sender] -= _amount
+    self.balances[_to] += _amount
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _amount: uint256) -> bool:
+    if msg.sender != _from:
+        self.allowances[_from][msg.sender] -= _amount
+    if not self.entered:
+        self.entered = True
+        extcall Endaoment(TARGET).mintPartnerLiquidity(self, self, 1)
+    self.balances[_from] -= _amount
+    self.balances[_to] += _amount
+    return True
+"""
+
+
 ONE_ASSET = 10**6
 ONE_GREEN = EIGHTEEN_DECIMALS
 LEGO_ID = 1
@@ -166,6 +322,7 @@ def partner_liquidity_env(
     endaoment_funds,
     mission_control,
     switchboard_alpha,
+    switchboard,
     switchboard_delta,
     switchboard_echo,
     charlie_token,
@@ -254,6 +411,7 @@ def partner_liquidity_env(
         endaoment=endaoment,
         endaoment_funds=endaoment_funds,
         switchboard_delta=switchboard_delta,
+        switchboard=switchboard,
         switchboard_echo=switchboard_echo,
         asset=charlie_token,
         green=green_token,
@@ -295,6 +453,23 @@ def _controlled_delta_token(ctx, mode, delta):
     )
     ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
     return token
+
+
+def _use_gross_reporting_curve_lego(ctx):
+    venue = boa.loads(PARTIAL_FILL_VENUE_SOURCE, ctx.lp.address)
+    lego = boa.loads(GROSS_REPORTING_CURVE_LEGO_SOURCE, ctx.lp.address)
+    ctx.lp.setMinter(venue.address, True, sender=ctx.governance.address)
+    ctx.lego_book.startAddressUpdateToRegistry(
+        LEGO_ID,
+        lego.address,
+        sender=ctx.governance.address,
+    )
+    boa.env.time_travel(blocks=ctx.lego_book.registryChangeTimeLock())
+    assert ctx.lego_book.confirmAddressUpdateToRegistry(
+        LEGO_ID,
+        sender=ctx.governance.address,
+    )
+    return lego, venue
 
 
 def test_sc18_mint_partner_liquidity_values_actual_received_amount(
@@ -436,6 +611,48 @@ def test_sc18_positive_overdelivery_is_valued_consistently(
     assert log.greenMinted == expected_value
 
 
+def test_sc18_dual_role_switchboard_token_cannot_reenter(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    token = boa.loads(REENTRANT_SWITCHBOARD_TOKEN_SOURCE, ctx.endaoment.address)
+    nominal = 100 * ONE_ASSET
+    token.mint(alice, nominal)
+    token.approve(ctx.endaoment.address, nominal, sender=alice)
+    ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+
+    ctx.switchboard.startAddNewAddressToRegistry(
+        token.address,
+        "Dual-role callback token",
+        sender=ctx.governance.address,
+    )
+    boa.env.time_travel(blocks=ctx.switchboard.registryChangeTimeLock())
+    ctx.switchboard.confirmNewAddressToRegistry(
+        token.address,
+        sender=ctx.governance.address,
+    )
+    assert ctx.switchboard.isSwitchboardAddr(token.address)
+
+    before = (
+        token.balanceOf(alice),
+        token.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    )
+    with boa.reverts():
+        ctx.endaoment.mintPartnerLiquidity(
+            alice,
+            token.address,
+            nominal,
+            sender=ctx.switchboard_delta.address,
+        )
+    assert (
+        token.balanceOf(alice),
+        token.balanceOf(ctx.endaoment_funds.address),
+        ctx.green.totalSupply(),
+    ) == before
+
+
 def test_sc18_self_partner_uses_only_endaoment_controlled_balance(
     partner_liquidity_env,
 ):
@@ -569,6 +786,97 @@ def test_sc18_composed_fee_route_reverts_with_preexisting_inventory(
         ctx.lp.balanceOf(alice),
         ctx.lp.balanceOf(ctx.endaoment_funds.address),
     ) == before
+
+
+def test_sc18_upstream_curve_gross_report_is_not_net_venue_receipt(
+    partner_liquidity_env,
+    alice,
+):
+    """Lock the counterexample that keeps RH Lego/asset configuration blocked."""
+    ctx = partner_liquidity_env
+    lego, venue = _use_gross_reporting_curve_lego(ctx)
+    gross = 100 * ONE_ASSET
+    downstream_fee = 10 * ONE_ASSET
+    inventory = 25 * ONE_ASSET
+    token = boa.loads(
+        CONTROLLED_DELTA_TOKEN_SOURCE,
+        venue.address,
+        1,
+        downstream_fee,
+        name="sc18_venue_fee_asset",
+    )
+    token.mint(alice, gross)
+    token.mint(lego.address, inventory)
+    token.approve(ctx.endaoment.address, gross, sender=alice)
+    ctx.price_source.setPrice(token.address, EIGHTEEN_DECIMALS)
+    supply_before = ctx.green.totalSupply()
+
+    result = ctx.endaoment.addPartnerLiquidity(
+        LEGO_ID,
+        venue.address,
+        alice,
+        token.address,
+        gross,
+        0,
+        ctx.lp.address,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    green_contribution = gross * 10**12
+    assert result == (2, gross, green_contribution)
+    assert lego.lastReportedA() == gross
+    assert token.balanceOf(venue.address) == gross - downstream_fee
+    assert token.balanceOf(venue.address) < lego.lastReportedA()
+    assert token.balanceOf(lego.address) == inventory
+    assert token.balanceOf(ctx.endaoment_funds.address) == 0
+    assert ctx.green.balanceOf(venue.address) == green_contribution
+    assert ctx.green.totalSupply() - supply_before == green_contribution
+    assert ctx.ledger.greenPoolDebt(venue.address) == green_contribution
+    assert ctx.lp.balanceOf(alice) == 1
+    assert ctx.lp.balanceOf(ctx.endaoment_funds.address) == 1
+
+
+def test_sc18_upstream_curve_legitimate_partial_fill_refunds_and_accounts_net(
+    partner_liquidity_env,
+    alice,
+):
+    ctx = partner_liquidity_env
+    lego, venue = _use_gross_reporting_curve_lego(ctx)
+    gross = 100 * ONE_ASSET
+    fill_bps = 6_000
+    contributed_asset = gross * fill_bps // 10_000
+    contributed_green = 100 * ONE_GREEN * fill_bps // 10_000
+    inventory = 25 * ONE_ASSET
+    venue.setFillBps(fill_bps)
+    ctx.asset.mint(lego.address, inventory, sender=ctx.governance.address)
+    _fund_partner(ctx, alice, gross)
+    supply_before = ctx.green.totalSupply()
+
+    result = ctx.endaoment.addPartnerLiquidity(
+        LEGO_ID,
+        venue.address,
+        alice,
+        ctx.asset.address,
+        gross,
+        0,
+        ctx.lp.address,
+        sender=ctx.switchboard_delta.address,
+    )
+
+    assert result == (2, contributed_asset, contributed_green)
+    assert lego.lastReportedA() == contributed_asset
+    assert lego.lastReportedB() == contributed_green
+    assert ctx.asset.balanceOf(venue.address) == contributed_asset
+    assert ctx.green.balanceOf(venue.address) == contributed_green
+    assert ctx.asset.balanceOf(lego.address) == inventory
+    assert ctx.asset.balanceOf(ctx.endaoment_funds.address) == (
+        gross - contributed_asset
+    )
+    assert ctx.green.balanceOf(ctx.endaoment_funds.address) == 0
+    assert ctx.green.totalSupply() - supply_before == contributed_green
+    assert ctx.ledger.greenPoolDebt(venue.address) == contributed_green
+    assert ctx.lp.balanceOf(alice) == 1
+    assert ctx.lp.balanceOf(ctx.endaoment_funds.address) == 1
 
 
 @pytest.mark.parametrize(

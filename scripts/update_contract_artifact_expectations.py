@@ -23,6 +23,7 @@ EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
 GOVERNED_SOURCES = checker.GOVERNED_SOURCES
 GOVERNED_CONTRACTS = checker.GOVERNED_CONTRACTS
 DEPLOYED_RUNTIME_CONTRACTS = checker.DEPLOYED_RUNTIME_CONTRACTS
+RH_CAPTURED_RUNTIME_CONTRACTS = checker.RH_CAPTURED_RUNTIME_CONTRACTS
 
 
 def _source_for(name: str) -> Path:
@@ -53,7 +54,7 @@ def _record(
     if constructor_bound != expected_constructor_bound:
         raise checker.ArtifactCheckError(
             f"{name}: deployed-runtime capture classification changed; "
-            "review the exact 18-contract capture policy"
+            "review the constructor-bound artifact policy"
         )
     creation_binding = checker._creation_binding(
         compiled.creation,
@@ -105,6 +106,12 @@ def _record(
         "deployed_runtime_immutable_data_size",
         "deployed_runtime_sha256",
     }.intersection(prior_artifacts)
+    runtime_authority = None
+    if name in checker.BASE_SCOPED_DEPLOYED_RUNTIME_CONTRACTS:
+        runtime_authority = checker.base_endaoment_deployed_runtime_authority()
+        deployed_runtime = (
+            compiled.runtime_template + checker.base_endaoment_immutable_data()
+        )
     if deployed_runtime is None and deployed_runtime_size != len(
         compiled.runtime_template
     ) and prior_binding_fields:
@@ -157,7 +164,7 @@ def _record(
     constructors = [
         entry for entry in compiled.abi if entry.get("type") == "constructor"
     ]
-    return {
+    record = {
         "abi": {
             "canonical_sha256": checker._json_sha256(compiled.abi),
             "committed_file_sha256": checker._sha256(abi_bytes),
@@ -186,6 +193,9 @@ def _record(
         "transient_storage_layout": compiled.transient_storage_layout,
         "transitive_compiler_input_integrity": compiled.integrity,
     }
+    if runtime_authority is not None:
+        record["deployed_runtime_authority"] = runtime_authority
+    return record
 
 
 def _parse_runtime_paths(values: list[str]) -> dict[str, Path]:
@@ -240,7 +250,7 @@ def _validate_capture_manifest(
 
     expected_files = {
         runtime_capture.CAPTURE_MANIFEST,
-        *(f"{name}.runtime" for name in DEPLOYED_RUNTIME_CONTRACTS),
+        *(f"{name}.runtime" for name in RH_CAPTURED_RUNTIME_CONTRACTS),
     }
     actual_files = {path.name for path in manifest_path.parent.iterdir()}
     if actual_files != expected_files:
@@ -294,16 +304,22 @@ def _validate_capture_manifest(
         raise checker.ArtifactCheckError("capture toolchain provenance mismatch")
     if manifest.get("governed_contracts") != sorted(GOVERNED_CONTRACTS):
         raise checker.ArtifactCheckError("capture governed-contract census mismatch")
-    if manifest.get("runtime_contracts") != sorted(DEPLOYED_RUNTIME_CONTRACTS):
+    if manifest.get("runtime_contracts") != sorted(RH_CAPTURED_RUNTIME_CONTRACTS):
         raise checker.ArtifactCheckError("capture runtime-contract census mismatch")
+    if manifest.get("separately_bound_runtime_contracts") != (
+        runtime_capture.separately_bound_runtime_contracts()
+    ):
+        raise checker.ArtifactCheckError(
+            "capture separately-bound runtime census mismatch"
+        )
     if manifest.get("template_identity_contracts") != ["DefaultsRobinhoodLive"]:
         raise checker.ArtifactCheckError("capture template-identity census mismatch")
 
     records = manifest.get("contracts")
-    if not isinstance(records, dict) or set(records) != DEPLOYED_RUNTIME_CONTRACTS:
+    if not isinstance(records, dict) or set(records) != RH_CAPTURED_RUNTIME_CONTRACTS:
         raise checker.ArtifactCheckError("capture contract-record census mismatch")
     expected_provenance = runtime_capture.expected_capture_provenance()
-    for name in sorted(DEPLOYED_RUNTIME_CONTRACTS):
+    for name in sorted(RH_CAPTURED_RUNTIME_CONTRACTS):
         record = records[name]
         if not isinstance(record, dict):
             raise checker.ArtifactCheckError(f"{name}: invalid capture record")
@@ -403,10 +419,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.require_deployed_runtime_bindings:
         supplied_runtime_names = set(runtime_paths)
         missing_runtime_names = sorted(
-            DEPLOYED_RUNTIME_CONTRACTS - supplied_runtime_names
+            RH_CAPTURED_RUNTIME_CONTRACTS - supplied_runtime_names
         )
         unexpected_runtime_names = sorted(
-            supplied_runtime_names - DEPLOYED_RUNTIME_CONTRACTS
+            supplied_runtime_names - RH_CAPTURED_RUNTIME_CONTRACTS
         )
         if missing_runtime_names or unexpected_runtime_names:
             raise checker.ArtifactCheckError(

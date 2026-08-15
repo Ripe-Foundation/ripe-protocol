@@ -397,6 +397,22 @@ ROBINHOOD_ADDRESS_STATUS = {
     "UNDERSCORE_REGISTRY": "approved_semantic_absence",
 }
 
+# Endaoment remains a candidate, not a deployment or partner-liquidity
+# configuration authority. The constructor binding and every Lego/asset pair
+# must be qualified together before either gate can be opened.
+ROBINHOOD_ENDAOMENT_QUALIFICATION = {
+    "deployment_allowed": False,
+    "partner_liquidity_configuration_allowed": False,
+    "qualified_legos": (),
+    "qualified_partner_assets": (),
+    "blockers": (
+        "Robinhood RipeHq is deployment-produced",
+        "DP-21 WETH remains an externally unverified fact",
+        "no Lego net-venue-contribution semantics are qualified",
+        "no partner-asset transfer semantics are qualified",
+    ),
+}
+
 ROBINHOOD_DEFAULTS_CONSTRUCTOR = (
     ("contributorTemplate", "CONTRIBUTOR_TEMPLATE"),
     ("trainingWheels", "TRAINING_WHEELS"),
