@@ -1,10 +1,10 @@
 # Robinhood smart-contract change rationale
 
-This directory is the contract-centric explanation of every Vyper and Solidity
-contract-language source change represented by the current Robinhood (`rh`)
-branch. It separates current `master..rh` production deltas from configuration,
-non-admitted candidates, supporting/test-only sources, documentation examples, and
-historical changes whose source bytes are now shared by `master` and `rh`.
+This directory is the contract-centric rationale inventory for Robinhood Vyper
+and Solidity changes. This README combines a current page router and scoped
+SC-12 overlay with an older, exact-identity candidate snapshot. Sections marked
+historical are not a current `master..rh` census, status authority, or artifact
+identity authority.
 
 > [!IMPORTANT]
 > Source integration, selected repository configuration, deployment,
@@ -12,20 +12,42 @@ historical changes whose source bytes are now shared by `master` and `rh`.
 > in this directory authorizes an RPC call, signer, deployment, migration,
 > onchain configuration, registration, activation, or release.
 
+> [!NOTE]
+> Except for **Current scoped SC-12 overlay** and **Complete rationale page
+> inventory**, repository-state, candidate, artifact, CI, lifecycle, and census
+> wording in this README belongs to the exact historical baseline recorded
+> below. Any use of “current” inside those archived sections means current at
+> that old baseline, not current at PR #144 or live `rh`.
+
 ## Documentation standard
 
-Each page distinguishes current integrated facts from dated historical
-validation, current local artifact evidence, unresolved risks, and later
-deployment or release gates. Historical commits, counts, and hashes remain
-dated evidence; a current rebind is added rather than rewriting their original
-meaning. Source rationale does not expand owner authority.
+Each page distinguishes integrated facts from dated historical validation,
+scoped artifact evidence, unresolved risks, and later deployment or release
+gates. Historical commits, counts, and hashes retain their original meaning;
+they do not become current merely because a new rationale page is indexed.
+Source rationale does not expand owner authority.
 
-## Current review-candidate authority and ancestry
+## Current scoped SC-12 overlay
 
-This uncommitted review candidate is based on the following independently
-verified repository identities. Its Teller source and artifact rows include
-the direct typed-balance candidate and therefore are not claims about the
-unchanged `rh` ref.
+PR #144 changes the production source path `contracts/vaults/RipeGov.vy`; its
+current rationale is [`ripe-gov.md`](ripe-gov.md). The exact PR-head authority
+is [`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json),
+not the historical tables below:
+
+- source SHA-256: `d02808b846c3beb51464d27cac8417657375ee3cec00c45f5aa46ab2c53b5d41`;
+- runtime template: 23,120 bytes with SHA-256
+  `b8792ef11088f84e61d691756a6f5006799f9b74866aae0bb231d81d86c294d5`;
+- deployed runtime: 23,152 bytes with 1,424 bytes of EIP-170 headroom.
+
+RipeGov is intentionally absent from the archived production-delta table below
+because that table predates SC-12. This scoped overlay does not rebind the old
+candidate, status, or artifact census.
+
+## Historical review-candidate authority and ancestry
+
+This archived uncommitted review candidate was bound to the following exact
+repository identities. Its Teller source and artifact rows included the direct
+typed-balance candidate and are not claims about current `rh` or PR #144.
 
 | Ref or role | Commit | Tree | Meaning |
 | --- | --- | --- | --- |
@@ -34,30 +56,28 @@ unchanged `rh` ref.
 | Configuration-source ancestor | `e4473ce6485888f1b747761a5ee8693443108877` | `33b705690007bda9b11900b5775bd9230e79f09e` | Ancestor that last changed `DefaultsRobinhood.vy`; not the current `rh` tip |
 | Shared-source import ancestor | `ad831669943ccfe7b9ed57454995dfce51630a66` | `3467f4a75aa37203d615407d5baf9c5fc9035639` | Historical `rh` import of corrected Deleverage work |
 
-### Related authority drift outside this directory
+### Historical authority-drift observation
 
-[`status.yaml`](../status.yaml#L6-L15) remains dated 1 August and binds its
-program subject to `5f5d22b7…`. Later edits updated its candidate metadata, but
-its H-05 workstream still labels the transaction executor
-[`candidate_not_integrated`](../status.yaml#L778-L789), even though
-`27f21ccc…` is now an ancestor of current `rh`. The file remains consistent on
-the controlling lifecycle boundary—80 source/configuration blockers, 100
-executable-plan blockers, and no deployment, migration execution,
-configuration, activation, or release—but it is not current for post-snapshot
-source/integration identity. This directory therefore binds current source
-claims directly to the verified Git identities above. Reconciliation of the
-separate dashboard authority is outside this folder refresh.
+At this archived candidate snapshot, [`status.yaml`](../status.yaml) was dated
+1 August, bound `5f5d22b7…`, and reported 80 source/configuration blockers.
+Those values are retained only as a historical observation and must not be
+read as current status. The status file now preserves a broad 11 August
+snapshot bound to `0372d486…`, reports 64 snapshot-scoped blockers, and carries
+a later SC-12/namespace-only overlay while explicitly marking full live-`rh`
+reconciliation pending. Consult that file's scope fields rather than this
+archived paragraph for its exact authority boundary.
 
 The live ref checks establish repository identity only. They do not establish a
 Robinhood deployment or live protocol state.
 
-## Complete review-candidate production-source delta
+## Historical review-candidate production-source delta
 
-The following feature-candidate production source paths include the current
-Robinhood delta plus the BasicVault fail-closed changes in this worktree. The
-shared ERC-20 modules alter their transitive compiled artifacts:
+The following paths are the archived candidate's production-source delta plus
+its BasicVault fail-closed changes. This is not a current production-source
+inventory; the shared ERC-20 modules changed that snapshot's transitive
+compiled artifacts:
 
-| Contract | Rationale | Git blob | SHA-256 | Source bytes | Current source disposition |
+| Contract | Rationale | Git blob | SHA-256 | Source bytes | Snapshot disposition |
 | --- | --- | --- | --- | ---: | --- |
 | `contracts/core/Teller.vy` | [`teller.md`](teller.md) | `dea818cde0901b02248e3824158e5c422ed02a80` | `f2e01e1cc9cf4cdfca380f329836732fd2d6d0201565828093257a0df8451b9a` | 40,786 | Exact call-local receipt and vault-return policy with typed balance observations |
 | `contracts/vaults/modules/BasicVault.vy` | [`basic-vault-fail-closed.md`](basic-vault-fail-closed.md) | `a5a51ee20c598e9bf40908fc6c38f1c0634bf665` | `6a6abdde4887fb5339125c7268e0258175e3b66c9f060b6ab6e8262f58269ea8` | 5,552 | Shared nominal-vault fail-closed backing and exact delivery |
@@ -70,10 +90,10 @@ shared ERC-20 modules alter their transitive compiled artifacts:
 | `contracts/priceSources/BlueChipYieldPrices.vy` | [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) | `cafd177ef601186b0a6a30863ba5b8973d8dd92e` | `abe188bf7edd973f6d68e58e39767e948471542030f6c2447ab98616c303e8be` | 38,730 | Adds fail-closed Morpho V2 support while preserving existing yield protocols |
 | `contracts/tokens/modules/Erc20Token.vy` | [`erc20-token.md`](erc20-token.md) | `e9ec81672ed5ea973487d3ae44a633c13b06b572` | `6593a28f791f9e6b3fdaf0ff14abd7379894833d62026a9092237de7033398c1` | 17,668 | Adds governance-backed `getCCIPAdmin()` discovery to GREEN, RIPE, and sGREEN compiler outputs; deterministic ABIs and direct behavior tests are current, while owner authorization, Base live-version policy, and the missing final LF remain unresolved |
 
-All rows other than Teller record integrated source facts. The Teller row is
-the uncommitted review candidate described above. No row proves that the
+At that snapshot, all rows other than Teller recorded integrated source facts;
+Teller was the uncommitted candidate described above. No row proves that the
 corresponding contract has been deployed, registered, configured, or activated
-on Robinhood.
+on Robinhood, and no row is a current artifact identity claim.
 
 ## Configuration contract
 
@@ -121,11 +141,13 @@ Their integration history and current shared bytes are established. Robinhood
 deployment, parameter selection, timelock action, configuration, activation,
 and release remain separate.
 
-## Relevant current artifact identities
+## Historical artifact identities for the archived candidate
 
-The repository-health remediation reran the complete central artifact checker.
-These are the authoritative values in
-[`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json):
+The repository-health remediation recorded the table below for the archived
+candidate. Twelve rows have since drifted, so these values are historical and
+non-authoritative. Current identities must be read mechanically from
+[`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json);
+the table is retained only to bind the older candidate evidence.
 
 | Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
@@ -147,11 +169,11 @@ These are the authoritative values in
 Runtime templates with constructor-bound immutables are compiler artifacts,
 not final deployed-runtime identities.
 
-The tightest EIP-170 margins are therefore the constructor-bound deployed
-values: Deleverage has 7 bytes, AuctionHouse 20, RipeGov 64, and CreditEngine
-184 under its exact owner-granted waiver. The corresponding 103-, 116-, 96-,
-and 280-byte values are runtime-template margins and must not be described as
-the final deployed headroom.
+At that archived snapshot, the listed constructor-bound deployed margins were
+Deleverage 7 bytes, AuctionHouse 20, RipeGov 64, and CreditEngine 184. They are
+not current margins. In the scoped SC-12 overlay above, RipeGov instead deploys
+at 23,152 bytes with 1,424 bytes of EIP-170 headroom; runtime-template headroom
+must not be described as final deployed headroom.
 
 The health remediation also regenerated all 53 committed ABI outputs. The
 repository-wide deterministic ABI export check now covers the token artifacts,
@@ -244,6 +266,9 @@ built were extracted from the active tree; both remain recoverable from
 - [`credit-engine.md`](credit-engine.md) — zero-backing debt-term containment;
 - [`ledger.md`](ledger.md) — portable action-block identity;
 - [`lootbox.md`](lootbox.md) — per-deployment reward interval floor;
+- [`ripe-gov.md`](ripe-gov.md) — SC-12 early-release accounting,
+  governance-point lifecycle, address-level redistribution limitation, and
+  cross-lane rollout consequences;
 - [`blue-chip-yield-prices.md`](blue-chip-yield-prices.md) — Morpho V2 yield
   pricing and compatibility;
 - [`erc20-token.md`](erc20-token.md) — shared `getCCIPAdmin()` source change,
