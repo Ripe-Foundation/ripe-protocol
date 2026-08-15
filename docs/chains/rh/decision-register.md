@@ -1084,6 +1084,93 @@ because it could conceal a genuine vault loss.
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
+## Namespace coordination note — 15 August 2026
+
+A read-only live check immediately before PR #144's rebase found that merged PR
+#142 owns the integrated `RH-D033` and `RH-D034` entries, while PR #144 uniquely
+adds `RH-D035`. Open PR #143 adds `RH-D036`, PR #146 adds `RH-D037`, and PR #147
+adds `RH-D039` through `RH-D041`. PR #145's coordination intent is `RH-D038`,
+but its current head still actually adds a conflicting `RH-D033`; it must not be
+described as cleanly occupying `RH-D038` until that source is corrected. PR
+#152 inherits integrated `RH-D033`/`RH-D034` and, at its current head, also
+introduces `RH-D042`. This supersedes an earlier snapshot in which PR #152 had
+not yet allocated a decision.
+
+`RH-D035` remains uncollided. PR #144 records this namespace state read-only and
+does not edit, renumber, approve, or reject another branch's decision. The
+integration owner must resolve PR #145's actual `RH-D033` collision before that
+branch is combined with the integrated register.
+
+### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
+
+**Status:** Owner-accepted SC-12 policy recorded on 14 August 2026; source and
+focused evidence are candidate-complete. A nonzero Underscore registry is
+blocked on issue #161, while integration, deployment, activation,
+governance-power consumption, migration, and release remain separately gated.
+
+RipeGov keeps an early-release fee inside the same asset pool and burns enough
+of the exiting address's shares to retain the largest indivisible post-release
+balance satisfying:
+
+```text
+claim(postShares) <= target < claim(postShares + 1)
+target = floor(claim(preShares) * (100% - exitFee))
+```
+
+The exact SharesVault claim includes virtual shares, the virtual asset term,
+and integer flooring. Indivisible-share granularity can therefore charge more
+than one asset base unit above the ideal target; maximal retained shares, not a
+one-unit fee-error bound, is the accepted invariant.
+
+At least one other address must hold actual shares. A genuine single-address
+holder cannot release early until another address holds shares. This is an
+address-level guard only: permissionless addresses do not prove distinct
+beneficial ownership, and a controller of multiple addresses can recapture
+redistributed value through another controlled position. Same-pool
+redistribution is not an unrecapturable economic penalty.
+
+Early release accrues governance points through the release block and preserves
+all saved points while burning shares. An equivalent enabled ordinary partial
+withdrawal proportionally reduces saved points, so the early-release route is
+more points-favorable until a complete withdrawal. A 100%-fee release can leave
+`lastShares == 0` with nonzero `govPoints`; that record accrues no new points and
+cannot migrate, a later same-asset deposit reattaches the points, and a later
+complete ordinary withdrawal clears them from the asset, user, and global
+totals. Boardroom and any future governance-power consumer must treat this
+zero-share point stock as live.
+
+The Teller authorization used by the public release route has a separate,
+unaccepted activation blocker. `isUnderscoreOwnerOrLego` accepts any registered
+Underscore address or Lego without binding that registered caller to the target
+user. If `underscoreRegistry` is nonzero and such a contract exposes or makes
+the call, it can force an unrelated user's release; a caller holding pool shares
+can receive part of the victim's redistributed fee. The initial Robinhood
+default keeps this path dormant by returning the zero address. A nonzero
+registry must not be configured until issue #161 either binds authorization to
+the actual wallet/user relationship with negative unrelated-Lego tests, or
+records explicit owner and security-reviewer acceptance covering exact
+contracts, callable surfaces, monitoring, and incident controls. RH-D035 does
+not accept the broad authorization and PR #144 does not redesign Teller.
+
+RipeGov's `adjustLock` and `releaseLock` lack local `@nonreentrant` decorators,
+but both accept only the exact Teller and their Teller entry points are already
+`@nonreentrant`; Boardroom and Lootbox callbacks cannot impersonate Teller.
+This is reviewed with no action under the existing registered-component trust
+model. Any defense-in-depth decorator is a separate authorized bytecode change
+requiring size, artifact, callback, and full-regression review.
+
+The Base migration candidate has an independent source/artifact identity. Its
+pre-SC-12 RipeGov size evidence is stale; issue #150 must rebase and remeasure
+that exact candidate before it relies on the SC-12 source. This decision grants
+no deployment, configuration, migration, activation, or release authority.
+
+**Source:**
+[`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md),
+[`issue #161`](https://github.com/Ripe-Foundation/ripe-protocol/issues/161),
+`contracts/vaults/RipeGov.vy`,
+`tests/vaults/ripe_gov_exit_fee_model.py`,
+`tests/vaults/test_ripe_gov_exit_fee.py`, and
+`tests/vaults/test_ripe_gov_controls_and_migration.py`.
 
 ## Maintenance rule
 

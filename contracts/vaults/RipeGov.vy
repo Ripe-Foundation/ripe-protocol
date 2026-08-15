@@ -210,7 +210,7 @@ def _depositTokensInRipeGovVault(
     depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
 
     # handle gov data/points
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
     lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
     lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
     self._handleGovDataOnDeposit(_user, _asset, newShares, lockDuration, 0, config)
@@ -301,7 +301,7 @@ def _withdrawTokensFromVault(
     withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
 
     # handle gov data/points
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(_a.missionControl).ripeGovVaultConfig(_asset)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, _a.missionControl)
     self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, _shouldCheckRestrictions, config, _a.ledger)
     self._updateUserGovPoints(_user, _asset, _a.missionControl, _a.boardroom)
 
@@ -394,7 +394,7 @@ def transferBalanceWithinVault(
     transferAmount, transferShares, isFromUserDepleted = sharesVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)
 
     # handle gov data/points
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
     self._handleGovDataOnTransfer(_fromUser, _toUser, _asset, transferShares, config.lockTerms.minLockDuration, False, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeGovVaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
@@ -451,7 +451,7 @@ def transferContributorRipeTokens(
     a: addys.Addys = addys._getAddys(_a)
 
     # config
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(a.ripeToken, a.missionControl)
 
     # transfer tokens (using shares module)
     ripeAmount: uint256 = 0
@@ -736,7 +736,7 @@ def _updateGovPointsForUserAsset(
     _missionControl: address,
     _shouldRefreshTerms: bool,
 ):
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, _missionControl)
 
     userData: GovData = self.userGovData[_user][_asset]
     shouldUpdatePoints: bool = not self._isGovPointAccrualDisabled(_user)
@@ -790,8 +790,7 @@ def adjustLock(
     assert userData.lastShares != 0 # dev: no position
 
     # update lootbox points
-    vaultId: uint256 = staticcall VaultBook(a.vaultBook).getRegId(self) # dev: invalid vault addr
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, vaultId, self, _asset, a)
+    self._updateDepositPoints(_user, _asset, a)
 
     # update lock duration
     lockDuration: uint256 = max(_newLockDuration, userData.lastTerms.minLockDuration)
@@ -816,7 +815,7 @@ def releaseLock(
 
     # they are probably wanting to exit early because of bad debt, crisis of confidence
     # if they won't be able to withdraw anyway, don't let them exit early (it will cost them for no reason!)
-    config: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+    config: cs.RipeGovVaultConfig = self._getRipeGovVaultConfig(_asset, a.missionControl)
     if staticcall Ledger(a.ledger).badDebt() != 0:
         assert not config.shouldFreezeWhenBadDebt # dev: saving user money
 
@@ -829,25 +828,66 @@ def releaseLock(
     assert userData.lastTerms.canExit # dev: cannot exit
     assert userData.lastShares != 0 # dev: no position
 
-    # update lootbox points
-    vaultId: uint256 = staticcall VaultBook(a.vaultBook).getRegId(self) # dev: invalid vault addr
-    extcall Lootbox(a.lootbox).updateDepositPoints(_user, vaultId, self, _asset, a)
-
     # handle payment
     exitFee: uint256 = userData.lastTerms.exitFee
     assert exitFee != 0 # dev: no exit fee
 
     # remove shares (cost to exit early)
     userShares: uint256 = vaultData.userBalances[_user][_asset]
-    sharesToRemove: uint256 = min(userShares, userShares * exitFee // HUNDRED_PERCENT)
-    vaultData._reduceBalanceOnWithdrawal(_user, _asset, sharesToRemove, True)
-    userData.lastShares -= sharesToRemove
+    totalShares: uint256 = vaultData.totalBalances[_asset]
+    # This guard requires a remaining holder address; permissionless addresses
+    # cannot prove distinct beneficial ownership, so same-owner fee recapture
+    # through another address remains possible by accepted policy.
+    assert totalShares > userShares # dev: no remaining holders
 
-    # update lock duration
+    sharesToRemove: uint256 = userShares
+    if exitFee != HUNDRED_PERCENT:
+        totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+        claimBefore: uint256 = sharesVault._sharesToAmount(userShares, totalShares, totalBalance, False)
+        assert claimBefore != 0 # dev: no fee-bearing claim
+
+        # Floor the fee-adjusted live claim, then keep the largest indivisible
+        # share balance whose exact post-state floored claim does not exceed the
+        # target: claim(postShares) <= target < claim(postShares + 1).
+        targetClaim: uint256 = claimBefore * (HUNDRED_PERCENT - exitFee) // HUNDRED_PERCENT
+        claimCeiling: uint256 = targetClaim + 1
+        # ceil((target + 1) * (remaining actual shares + virtual shares)
+        #      / (assets - target)) - 1
+        # is exactly floor((numerator - 1) / denominator), including the strict
+        # boundary needed by the floored post-state claim inequality.
+        maxPostShares: uint256 = sharesVault._amountToShares(
+            claimCeiling,
+            totalShares - userShares,
+            totalBalance - claimCeiling,
+            True,
+        ) - 1
+        sharesToRemove = userShares - maxPostShares
+
+    vaultData._reduceBalanceOnWithdrawal(_user, _asset, sharesToRemove, True)
+    userData.lastShares = vaultData.userBalances[_user][_asset]
+
+    # release the lock before the external checkpoint so the vault reports the
+    # final post-burn, unboosted Lootbox balance
     userData.unlock = 0
     self.userGovData[_user][_asset] = userData
 
+    # accrue elapsed deposit points with the previous checkpoint, then store the
+    # live post-burn balance for future accrual
+    self._updateDepositPoints(_user, _asset, a)
+
     log LockReleased(user=_user, asset=_asset, exitFee=exitFee)
+
+
+@internal
+def _updateDepositPoints(_user: address, _asset: address, _a: addys.Addys):
+    vaultId: uint256 = staticcall VaultBook(_a.vaultBook).getRegId(self) # dev: invalid vault addr
+    extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, self, _asset, _a)
+
+
+@view
+@internal
+def _getRipeGovVaultConfig(_asset: address, _missionControl: address) -> cs.RipeGovVaultConfig:
+    return staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
 
 
 ################
