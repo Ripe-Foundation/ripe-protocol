@@ -9,13 +9,20 @@
 > `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
 > remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`, with the
 > AuctionHouse consumer rows refreshed for the SC-01/SC-02/SC-08 conservation
-> candidate on draft PR #143. The package does not modify an
-> immutable deployed vault, configure an asset, or activate a launch route.
+> candidate on draft PR #143. The package does not modify an immutable deployed
+> vault, configure an asset, or activate a launch route.
 >
 > **15 August 2026 base reconciliation:** source pins and line locators were
 > refreshed at `1148f89f5cd28f91ae4ee06b463b64625094b7ee` after independently reviewed
 > Deleverage, Lootbox, and Teller changes. The discovered getter set, containing
 > functions, and safety classifications are unchanged.
+>
+> **15 August 2026 PR #145 reconciliation:** PR #145 refreshes Deleverage's
+> source identity and call-site rows on top of the merged AuctionHouse record.
+> It preserves the inherited AuctionHouse, Lootbox, and Teller classifications
+> without claiming to re-review those upstream deltas. The complete enforcement
+> test passes. This package does not modify an immutable deployed vault,
+> configure an asset, or activate a launch route.
 
 This is the G4 inventory rooted at feature baseline
 `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`
@@ -64,7 +71,7 @@ source review and test update.
     "contracts/core/AuctionHouse.vy": "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e",
     "contracts/core/CreditEngine.vy": "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f",
     "contracts/core/CreditRedeem.vy": "c8c7f5f8c3323fbe56d6307840a44ca1aa7ddb775438a9a1b31794af2a9b3017",
-    "contracts/core/Deleverage.vy": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
+    "contracts/core/Deleverage.vy": "a9effe5fe5a30560e6c575112b8b29ccba86782b8e2923d1a51aec1dd49c1f37",
     "contracts/core/HumanResources.vy": "3a08959aea7ca59dda77b6aebcf1a1653239b4114a6b1390dc087e56ecf5c70d",
     "contracts/core/Lootbox.vy": "30a08f661271fe29a29ce52480d94dc8e5891ee1f038e09fe1dced72665d0e6f",
     "contracts/core/Teller.vy": "1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049",
@@ -203,9 +210,9 @@ source review and test update.
       "evidence_test": "test_credit_redeem_many_suppresses_all_entries_for_quarantined_user"
     },
     {
-      "id": "DL-563",
+      "id": "DL-583",
       "path": "contracts/core/Deleverage.vy",
-      "line": 563,
+      "line": 583,
       "function": "deleverageForWithdrawal",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -213,9 +220,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-807",
+      "id": "DL-863",
       "path": "contracts/core/Deleverage.vy",
-      "line": 807,
+      "line": 863,
       "function": "_performDeleveragePhases",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -223,9 +230,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-882",
+      "id": "DL-945",
       "path": "contracts/core/Deleverage.vy",
-      "line": 882,
+      "line": 945,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -233,9 +240,19 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-895",
+      "id": "DL-972",
       "path": "contracts/core/Deleverage.vy",
-      "line": 895,
+      "line": 972,
+      "function": "_iterateThruAssetsWithinVault",
+      "getter": "getUserAssetAndAmountAtIndex",
+      "classification": "value_backing_required",
+      "reason": "Fail-soft availability and backing-aware value gate optional Stability Pool participation before collateral processing.",
+      "evidence_test": "test_sc09_phase1_skips_unavailable_cohort_processes_healthy"
+    },
+    {
+      "id": "DL-978",
+      "path": "contracts/core/Deleverage.vy",
+      "line": 978,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -243,9 +260,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1057",
+      "id": "DL-1140",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1057,
+      "line": 1140,
       "function": "_getDeleverageInfo",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -253,19 +270,29 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1065",
+      "id": "DL-1153",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1065,
+      "line": 1153,
+      "function": "_getDeleverageInfo",
+      "getter": "getUserAssetAndAmountAtIndex",
+      "classification": "value_backing_required",
+      "reason": "Excludes unavailable Stability Pool cohorts from maximum deleverage value and weighted LTV preflight.",
+      "evidence_test": "test_sc09_withdrawal_preflight_skips_unavailable_stab_cohort"
+    },
+    {
+      "id": "DL-1156",
+      "path": "contracts/core/Deleverage.vy",
+      "line": 1156,
       "function": "_getDeleverageInfo",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
-      "reason": "Discovers a nominal position before the backing-aware amount read.",
+      "reason": "Discovers an ordinary-vault nominal position before its backing-aware amount read.",
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1070",
+      "id": "DL-1158",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1070,
+      "line": 1158,
       "function": "_getDeleverageInfo",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -353,7 +380,7 @@ source review and test update.
       "evidence_test": "test_shortfall_checkpoints_each_normalized_user_share_and_leaves_healthy_asset_untouched"
     },
     {
-      "id": "TL-408",
+      "id": "TL-410",
       "path": "contracts/core/Teller.vy",
       "line": 410,
       "function": "_withdraw",

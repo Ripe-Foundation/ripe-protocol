@@ -1246,6 +1246,32 @@ authorize deployment, registry mutation, configuration, activation, or release.
 `tests/test_vault_pointer_runtime_sizes.py`,
 `tests/core/deleverage/test_deleverage_phase2.py`, and
 `config/contract-artifact-expectations.json`.
+### RH-D038 — SC-07/SC-09 Deleverage remediation is reopened and bounded
+
+**Status:** Owner-authorized on 14 August 2026 for the exact remediation and
+review follow-through in draft PR #145. Integration, deployment,
+configuration, activation, and release remain unauthorized.
+
+SC-07 refreshes the complete live debt and current interest after collateral
+interactions, rejects a changed debt amount atomically, and uses one shared
+Deleverage reentrancy domain across the four debt-writing routes and
+`swapCollateral`.
+
+SC-09 treats a Stability Pool cohort as unavailable for optional broad
+Deleverage and withdrawal-assist preflight when the pool's existing fail-soft
+probe reports zero because of a price outage, pause, or aggregate claim-custody
+deficit. Healthy ordinary collateral remains usable. Ordinary-vault failures
+and all failures after real processing starts still propagate; direct claims,
+withdrawals, deposits, explicit redemptions, and strict requested handling
+remain fail-closed.
+
+This decision reopens no cooldown, Underscore, deferred control, fork,
+deployment, configuration, activation, or release work. Robinhood deployment
+verification must establish `MissionControl.isStabVaultId(1) == true`. The
+recorded Base MissionControl is incompatible until separately upgraded and
+populated, so this Deleverage must not replace Base Deleverage as-is.
+
+**Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
 
 ## Maintenance rule
 

@@ -28,7 +28,7 @@ from config.artifact_expectations import load_artifact_expectations  # noqa: E40
 DEFAULT_EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
 EIP_170_LIMIT = 24_576
 SCHEMA_VERSION = 1
-PRAGMA_OPTIMIZE_RE = re.compile(r"^# pragma optimize ([a-z]+)$", re.MULTILINE)
+PRAGMA_OPTIMIZE_RE = re.compile(r"^#[ \t]*pragma optimize ([a-z]+)$", re.MULTILINE)
 COMPILER_ENVELOPE = {
     "artifact_recipe": "vyper -p . -f bytecode,bytecode_runtime <file>",
     "integrity_recipe": "vyper -p . -f integrity <file>",

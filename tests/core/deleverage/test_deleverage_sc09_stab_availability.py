@@ -407,6 +407,188 @@ def test_sc09_custody_deficit_skips_broad_but_strict_reverts(
         teller.withdraw(savings_green, 10 * EIGHTEEN_DECIMALS, bob, stability_pool, sender=bob)
 
 
+@pytest.mark.parametrize("unavailable", ["price", "pause", "custody"])
+def test_sc09_withdrawal_preflight_skips_unavailable_stab_cohort(
+    unavailable,
+    sc09_setup,
+    deleverage,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    stability_pool,
+    savings_green,
+    alpha_token,
+    claim_token,
+    claim_token_whale,
+    mock_price_source,
+    green_token,
+    endaoment_funds,
+    auction_house,
+    governance,
+    bob,
+    switchboard_alpha,
+):
+    """Views and withdrawal assist use the same fail-soft cohort probe."""
+    borrow_amount = 300 * EIGHTEEN_DECIMALS
+    withdraw_amount = 100 * EIGHTEEN_DECIMALS
+    sc09_setup(borrow_amount=borrow_amount)
+    mock_price_source.setPrice(savings_green, 1 * EIGHTEEN_DECIMALS)
+
+    if unavailable == "price":
+        _seed_broken_claim(
+            stability_pool, auction_house, savings_green, claim_token,
+            claim_token_whale, mock_price_source, green_token, savings_green,
+            governance,
+        )
+    elif unavailable == "custody":
+        _seed_custody_deficit(
+            stability_pool, auction_house, savings_green, claim_token,
+            claim_token_whale, mock_price_source, green_token, savings_green,
+            governance,
+        )
+    else:
+        stability_pool.pause(True, sender=switchboard_alpha.address)
+
+    stab_vault_id = vault_book.getRegId(stability_pool)
+    simple_vault_id = vault_book.getRegId(simple_erc20_vault)
+    before_stab = _stab_snapshot(
+        stability_pool, savings_green, claim_token, bob, ledger, stab_vault_id,
+    )
+    before_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    before_endao = alpha_token.balanceOf(endaoment_funds)
+
+    # Unavailable sGREEN contributes neither repayment liquidity nor weighted
+    # LTV. Healthy ordinary collateral remains visible and strictly valued.
+    assert deleverage.getDeleverageInfo(bob) == (before_alpha, 50_00)
+
+    # The same unavailable condition is never softened for a direct withdrawal.
+    with boa.reverts():
+        teller.withdraw(
+            savings_green,
+            10 * EIGHTEEN_DECIMALS,
+            bob,
+            stability_pool,
+            sender=bob,
+        )
+    assert _stab_snapshot(
+        stability_pool, savings_green, claim_token, bob, ledger, stab_vault_id,
+    ) == before_stab
+
+    # Withdrawal assistance skips the cohort and uses healthy alpha. With a
+    # 50% LTV, debt=300, capacity=500, and a $100 projected withdrawal, the
+    # required repayment is floor(300 * 50 / (500 - 300 * 50%)).
+    expected_repayment = (
+        borrow_amount * (withdraw_amount * 50_00 // 100_00)
+        // (before_alpha * 50_00 // 100_00 - borrow_amount * 50_00 // 100_00)
+    )
+    assert deleverage.deleverageForWithdrawal(
+        bob,
+        simple_vault_id,
+        alpha_token,
+        withdraw_amount,
+        sender=teller.address,
+    ) is True
+    assert _debt(credit_engine, bob) == borrow_amount - expected_repayment
+    assert before_alpha - simple_erc20_vault.getTotalAmountForUser(
+        bob, alpha_token,
+    ) == expected_repayment
+    assert alpha_token.balanceOf(endaoment_funds) - before_endao == expected_repayment
+    assert _stab_snapshot(
+        stability_pool, savings_green, claim_token, bob, ledger, stab_vault_id,
+    ) == before_stab
+
+    # Restore only the failed availability condition. The fail-soft probe and
+    # public sizing view immediately include the cohort again.
+    if unavailable == "price":
+        mock_price_source.setShouldRevert(claim_token, False)
+    elif unavailable == "custody":
+        deficit = (
+            stability_pool.totalClaimableBalances(claim_token)
+            - claim_token.balanceOf(stability_pool)
+        )
+        claim_token.mint(stability_pool, deficit, sender=governance.address)
+    else:
+        stability_pool.pause(False, sender=switchboard_alpha.address)
+
+    remaining_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    available_stab = stability_pool.getUserAssetAndAmountAtIndex(bob, 1)[1]
+    assert available_stab > 0
+    expected_max = remaining_alpha + available_stab
+    expected_ltv = remaining_alpha * 50_00 // expected_max
+    assert deleverage.getDeleverageInfo(bob) == (expected_max, expected_ltv)
+
+
+def test_sc09_withdrawal_preflight_unavailable_only_makes_no_progress(
+    sc09_setup,
+    setAssetConfig,
+    createDebtTerms,
+    deleverage,
+    teller,
+    credit_engine,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    stability_pool,
+    savings_green,
+    alpha_token,
+    claim_token,
+    claim_token_whale,
+    mock_price_source,
+    green_token,
+    endaoment_funds,
+    auction_house,
+    governance,
+    bob,
+):
+    """An unavailable-only repayment set returns false without mutation."""
+    sc09_setup()
+    mock_price_source.setPrice(savings_green, 1 * EIGHTEEN_DECIMALS)
+    alpha_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=alpha_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+    _seed_broken_claim(
+        stability_pool, auction_house, savings_green, claim_token,
+        claim_token_whale, mock_price_source, green_token, savings_green,
+        governance,
+    )
+
+    stab_vault_id = vault_book.getRegId(stability_pool)
+    simple_vault_id = vault_book.getRegId(simple_erc20_vault)
+    before_stab = _stab_snapshot(
+        stability_pool, savings_green, claim_token, bob, ledger, stab_vault_id,
+    )
+    before_debt = _debt(credit_engine, bob)
+    before_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    before_endao = alpha_token.balanceOf(endaoment_funds)
+
+    assert deleverage.getDeleverageInfo(bob) == (0, 0)
+    assert deleverage.deleverageForWithdrawal(
+        bob,
+        simple_vault_id,
+        alpha_token,
+        100 * EIGHTEEN_DECIMALS,
+        sender=teller.address,
+    ) is False
+    assert _debt(credit_engine, bob) == before_debt
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == before_alpha
+    assert alpha_token.balanceOf(endaoment_funds) == before_endao
+    assert _stab_snapshot(
+        stability_pool, savings_green, claim_token, bob, ledger, stab_vault_id,
+    ) == before_stab
+
+
 # ---------------------------------------------------------------------------
 # Processing-time failures: a healthy probe is not converted into a skip
 # ---------------------------------------------------------------------------

@@ -462,3 +462,97 @@ def test_sc07_cross_entry_deleverage_reentrancy_blocked(
     repaid = teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
     assert repaid > 0
     assert _stored_debt(ledger, bob).amount < before.amount
+
+
+def test_sc07_swap_collateral_blocks_cross_vault_deleverage_reentry(
+    sc07_setup,
+    deleverage,
+    teller,
+    ledger,
+    reenter_token,
+    bravo_token,
+    bravo_token_whale,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    governance,
+    bob,
+):
+    """swapCollateral shares the Deleverage lock with debt-writing routes."""
+    amount = 400 * EIGHTEEN_DECIMALS
+    ctx = sc07_setup(
+        reenter_deposit=amount,
+        bravo_deposit=amount,
+        borrow_amount=300 * EIGHTEEN_DECIMALS,
+        bravo_vault="rebase",
+    )
+    simple_id = ctx["simple_id"]
+    rebase_id = ctx["rebase_id"]
+
+    bravo_token.transfer(governance, amount * 2, sender=bravo_token_whale)
+    bravo_token.approve(deleverage.address, amount * 2, sender=governance.address)
+    reenter_token.configureReenterDeleverage(
+        teller.address,
+        bob,
+        sender=reenter_token.hq(),
+    )
+
+    before_debt = ledger.userDebt(bob)
+    before_withdraw = _vault_position_snapshot(
+        simple_erc20_vault, bob, reenter_token,
+    )
+    before_fallback = _vault_position_snapshot(
+        rebase_erc20_vault, bob, bravo_token,
+    )
+    before_gov_withdraw = reenter_token.balanceOf(governance)
+    before_gov_deposit = bravo_token.balanceOf(governance)
+
+    # The callback fires while the simple-vault leg is in flight. Its processable
+    # fallback is deliberately in the unlocked rebase vault, so the vault-local
+    # mutex cannot mask whether Deleverage's contract-wide lock is held.
+    with boa.reverts():
+        deleverage.swapCollateral(
+            bob,
+            simple_id,
+            reenter_token,
+            rebase_id,
+            bravo_token,
+            amount,
+            sender=governance.address,
+        )
+
+    _assert_debt_struct_unchanged(ledger, bob, before_debt)
+    assert _vault_position_snapshot(
+        simple_erc20_vault, bob, reenter_token,
+    ) == before_withdraw
+    assert _vault_position_snapshot(
+        rebase_erc20_vault, bob, bravo_token,
+    ) == before_fallback
+    assert reenter_token.balanceOf(governance) == before_gov_withdraw
+    assert bravo_token.balanceOf(governance) == before_gov_deposit
+    assert len(filter_logs(deleverage, "CollateralSwapped")) == 0
+    assert len(filter_logs(teller, "DeleverageUser")) == 0
+
+    # The identical cross-vault swap succeeds with the callback disarmed,
+    # proving trusted deposit and housekeeping remain compatible with the lock.
+    reenter_token.disableAttack(sender=reenter_token.hq())
+    withdrawn, deposited = deleverage.swapCollateral(
+        bob,
+        simple_id,
+        reenter_token,
+        rebase_id,
+        bravo_token,
+        amount,
+        sender=governance.address,
+    )
+    assert withdrawn == amount
+    assert deposited == amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, reenter_token) == 0
+    assert (
+        rebase_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+        == before_fallback["user_amount"] + amount
+    )
+    _assert_debt_struct_unchanged(ledger, bob, before_debt)
+    logs = filter_logs(deleverage, "CollateralSwapped")
+    assert len(logs) == 1
+    assert logs[0].withdrawVaultId == simple_id
+    assert logs[0].depositVaultId == rebase_id

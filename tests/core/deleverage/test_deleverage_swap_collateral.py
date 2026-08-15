@@ -13,7 +13,7 @@ def test_deleverage_source_abi_and_vault_interface_hashes_are_current():
     repo_root = Path(__file__).resolve().parents[3]
     expected = {
         "contracts/core/Deleverage.vy": (
-            "57d95a9ff9ce2c0aa5c1f9edab2bdc2cfc5e176be9930577ca1ec4688b4a1648"
+            "a9effe5fe5a30560e6c575112b8b29ccba86782b8e2923d1a51aec1dd49c1f37"
         ),
         "scripts/abis/Deleverage.json": (
             "e1d03ccd37548984f2c0a0b016cdb3c2730549793676f6172f3a70670cb43b3e"

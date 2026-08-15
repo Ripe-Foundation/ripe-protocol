@@ -1,0 +1,86 @@
+# SC-07/SC-09 Deleverage security decision
+
+**Decision date:** 14 August 2026
+
+**Status:** owner-authorized bounded remediation implemented in draft PR #145;
+independent review, integration, deployment, configuration, activation, and
+release remain separate gates
+
+**Authority:** explicit owner instruction for the SC-07/SC-09 task and explicit
+follow-up instruction to address every PR review finding
+
+## Decision
+
+The owner reopened the parked Deleverage lane only for the bounded SC-07 and
+SC-09 remediation in draft PR #145.
+
+SC-07 requires every capture-interact-settle path to refresh the complete debt
+struct and current interest immediately before settlement, revert atomically
+when the planned debt amount changed, and settle from the refreshed values when
+the amount did not change. The shared Deleverage reentrancy domain covers the
+four debt-writing external routes and `swapCollateral`; it is defense in depth
+and does not replace the refresh invariant.
+
+SC-09 adopts the existing Stability Pool liquidation-availability boundary:
+
+- optional broad Deleverage and withdrawal-assist preflight classify Stability
+  Pool vaults with `MissionControl.isStabVaultId`;
+- they probe a cohort with `getUserAssetAndAmountAtIndex` and skip a zero amount;
+- a zero caused by a claim-price outage, a paused pool, or aggregate claim
+  custody deficit means that cohort is unavailable for optional participation;
+- healthy ordinary collateral remains usable and is valued strictly;
+- any error after actual cohort processing begins propagates and reverts the
+  complete transaction; and
+- direct Stability Pool claim, withdrawal, deposit, explicit redemption, and
+  explicitly requested strict processing paths remain fail-closed.
+
+This is not a general catch-all for vault errors. Malformed registration,
+ordinary-vault price failure, transfer failure, burn or redeem failure, and
+accounting failure are not converted into skips.
+
+## Scope retained outside the reopening
+
+RH-D011's zero-cooldown launch posture remains unchanged. This decision does
+not authorize a nonzero cooldown, Underscore inclusion, any of the four
+zero-valued controls, the provisional H-09 fork path, another Deleverage feature,
+or deployment, configuration, activation, or release. All such work remains
+parked unless separately reopened.
+
+The only production source authorized by this decision is
+`contracts/core/Deleverage.vy`. Test mocks, focused regressions, governed
+artifact records, the BasicVault consumer inventory, and this decision/status
+record are supporting evidence rather than additional production scope.
+
+## Deployability and chain compatibility
+
+The reviewed candidate compiles to a 24,436-byte runtime template plus 96 bytes
+of immutable data: 24,532 deployed bytes, 44 bytes below the EIP-170 limit. The
+task's controlling size rule is strictly less than 24,576 bytes; no historical
+minimum-headroom target is imported into this bounded decision. Any further
+production growth requires a fresh measurement and review.
+
+The candidate is compatible with the recorded Robinhood MissionControl, where
+the Stability Pool classifier is present and populated. Before changing the
+Robinhood Deleverage registry pointer, deployment verification must establish
+`MissionControl.isStabVaultId(1) == true` against the intended addresses.
+
+The recorded Base MissionControl predates this classifier. This Deleverage must
+not replace Base Deleverage unless Base MissionControl is first upgraded to
+expose and correctly populate `isStabVaultId`. This record grants no such Base
+upgrade authority.
+
+## Evidence and lifecycle boundary
+
+The candidate evidence is maintained in:
+
+- `contracts/core/Deleverage.vy`;
+- `tests/core/deleverage/test_deleverage_sc07_reentrancy.py`;
+- `tests/core/deleverage/test_deleverage_sc09_stab_availability.py`;
+- `tests/core/deleverage/test_deleverage_swap_collateral.py`;
+- `docs/chains/rh/hardening/basic-vault-consumer-inventory.md`;
+- `config/contract-artifact-expectations.json`; and
+- `tests/inventory/test_contract_artifacts.py`.
+
+Local and CI validation qualify repository bytes only. Neither passing tests nor
+the owner decision authorizes a registry mutation, deployment, configuration,
+activation, or release.
