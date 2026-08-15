@@ -5,6 +5,11 @@
 > `f9152f27ab8b14ede0ce562974430d57168960b0` and rebased for PR publication onto
 > remediation commit `c3bc780d5b3b59193389c917fd6543312f5ee6c3`. The package does not modify an
 > immutable deployed vault, configure an asset, or activate a launch route.
+>
+> **15 August 2026 base reconciliation:** source pins and line locators were
+> refreshed at `1148f89f5cd28f91ae4ee06b463b64625094b7ee` after independently reviewed
+> Deleverage, Lootbox, and Teller changes. The discovered getter set, containing
+> functions, and safety classifications are unchanged.
 
 This is the G4 inventory rooted at feature baseline
 `1e36c0c3dd168dbf292456eb5760b02d1f1e4a80`. It covers every `Vault`
@@ -36,7 +41,7 @@ are included but no longer classified as nominal: BasicVault suppresses
 `getUserLootBoxShare` during a custody shortfall, while the already
 backing-aware `getTotalAmountForVault` refreshes the vault's reward USD value to
 zero. Neither getter supplies CreditEngine collateral value
-([Lootbox source](../../../../contracts/core/Lootbox.vy#L892),
+([Lootbox source](../../../../contracts/core/Lootbox.vy#L893),
 [CreditEngine source](../../../../contracts/core/CreditEngine.vy#L753)).
 
 ## Frozen machine inventory
@@ -53,10 +58,10 @@ source review and test update.
     "contracts/core/AuctionHouse.vy": "2e46101cac996dc8fe17a37420f23057887a751cf7039ad14565fd80d791f949",
     "contracts/core/CreditEngine.vy": "98001bce0f07992bdc51e4dede81fce5fbccbdaf9862c3ecef7694f6a2bd4f3f",
     "contracts/core/CreditRedeem.vy": "c8c7f5f8c3323fbe56d6307840a44ca1aa7ddb775438a9a1b31794af2a9b3017",
-    "contracts/core/Deleverage.vy": "4e33874007f46a369e901c17aaaf00ff96c80a4e52b7ce8e81d1f4824f32b26c",
+    "contracts/core/Deleverage.vy": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
     "contracts/core/HumanResources.vy": "3a08959aea7ca59dda77b6aebcf1a1653239b4114a6b1390dc087e56ecf5c70d",
-    "contracts/core/Lootbox.vy": "18ad4dbe47920da1d50d5dd0c9ef93344335f56c863aa3486b0f8e54e980f535",
-    "contracts/core/Teller.vy": "5cb7d059299cacfde30a3e45ee860a6f150bc7f37d361d363f946a662e9945ac",
+    "contracts/core/Lootbox.vy": "30a08f661271fe29a29ce52480d94dc8e5891ee1f038e09fe1dced72665d0e6f",
+    "contracts/core/Teller.vy": "1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049",
     "contracts/core/VaultMigrator.vy": "4836fc22e4645eb6008126a3295001286d3e3f2ad216d67c9c3cf63183b6d8e7"
   },
   "getter_scope": [
@@ -192,9 +197,9 @@ source review and test update.
       "evidence_test": "test_credit_redeem_many_suppresses_all_entries_for_quarantined_user"
     },
     {
-      "id": "DL-561",
+      "id": "DL-563",
       "path": "contracts/core/Deleverage.vy",
-      "line": 561,
+      "line": 563,
       "function": "deleverageForWithdrawal",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -202,9 +207,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-805",
+      "id": "DL-807",
       "path": "contracts/core/Deleverage.vy",
-      "line": 805,
+      "line": 807,
       "function": "_performDeleveragePhases",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -212,9 +217,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-880",
+      "id": "DL-882",
       "path": "contracts/core/Deleverage.vy",
-      "line": 880,
+      "line": 882,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -222,9 +227,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-893",
+      "id": "DL-895",
       "path": "contracts/core/Deleverage.vy",
-      "line": 893,
+      "line": 895,
       "function": "_iterateThruAssetsWithinVault",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -232,9 +237,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1055",
+      "id": "DL-1057",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1055,
+      "line": 1057,
       "function": "_getDeleverageInfo",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -242,9 +247,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1063",
+      "id": "DL-1065",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1063,
+      "line": 1065,
       "function": "_getDeleverageInfo",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -252,9 +257,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "DL-1068",
+      "id": "DL-1070",
       "path": "contracts/core/Deleverage.vy",
-      "line": 1068,
+      "line": 1070,
       "function": "_getDeleverageInfo",
       "getter": "getTotalAmountForUser",
       "classification": "value_backing_required",
@@ -272,9 +277,9 @@ source review and test update.
       "evidence_test": "test_hr_has_ripe_balance_no_balance"
     },
     {
-      "id": "LB-300",
+      "id": "LB-301",
       "path": "contracts/core/Lootbox.vy",
-      "line": 300,
+      "line": 301,
       "function": "_claimLoot",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -282,9 +287,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "LB-304",
+      "id": "LB-305",
       "path": "contracts/core/Lootbox.vy",
-      "line": 304,
+      "line": 305,
       "function": "_claimLoot",
       "getter": "getUserAssetAtIndexAndHasBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -292,9 +297,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "LB-357",
+      "id": "LB-358",
       "path": "contracts/core/Lootbox.vy",
-      "line": 357,
+      "line": 358,
       "function": "getClaimableLoot",
       "getter": "numUserAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -302,9 +307,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "LB-359",
+      "id": "LB-360",
       "path": "contracts/core/Lootbox.vy",
-      "line": 359,
+      "line": 360,
       "function": "getClaimableLoot",
       "getter": "userAssets",
       "classification": "position_discovery_nominal_allowed",
@@ -312,9 +317,9 @@ source review and test update.
       "evidence_test": "test_basic_vault_consumer_inventory_enforces_amount_policy"
     },
     {
-      "id": "LB-438",
+      "id": "LB-439",
       "path": "contracts/core/Lootbox.vy",
-      "line": 438,
+      "line": 439,
       "function": "_getDepositLootData",
       "getter": "doesUserHaveBalance",
       "classification": "position_discovery_nominal_allowed",
@@ -322,9 +327,9 @@ source review and test update.
       "evidence_test": "test_exited_funded_dust_gets_one_wei_and_inactive_category_exhausts"
     },
     {
-      "id": "LB-892",
+      "id": "LB-893",
       "path": "contracts/core/Lootbox.vy",
-      "line": 892,
+      "line": 893,
       "function": "_getLatestDepositPoints",
       "getter": "getUserLootBoxShare",
       "classification": "reward_accounting_backing_aware",
@@ -332,9 +337,9 @@ source review and test update.
       "evidence_test": "test_zero_ltv_shortfall_suppresses_user_rewards_without_debt_quarantine"
     },
     {
-      "id": "LB-912",
+      "id": "LB-913",
       "path": "contracts/core/Lootbox.vy",
-      "line": 912,
+      "line": 913,
       "function": "_refreshAssetUsdValue",
       "getter": "getTotalAmountForVault",
       "classification": "reward_accounting_backing_aware",
