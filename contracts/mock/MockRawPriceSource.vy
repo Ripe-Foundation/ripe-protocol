@@ -2,7 +2,8 @@
 
 # Test-only PriceSource with independently configurable raw return shapes.
 # Modes: 0 canonical, 1 revert, 2 empty, 3 short, 4 oversized by one byte,
-# 5 noncanonical Boolean word, 6 oversized to 96 bytes (price/feed channels).
+# 5 noncanonical Boolean word, 6 oversized to 96 bytes (price/feed channels)
+# or canonical false (snapshot channel).
 
 price: public(uint256)
 hasFeed: public(bool)
@@ -22,7 +23,7 @@ def configure(
 ):
     assert _priceResponseMode <= 6
     assert _hasFeedResponseMode <= 6
-    assert _snapshotResponseMode <= 5
+    assert _snapshotResponseMode <= 6
     self.price = _price
     self.hasFeed = _hasFeed
     self.priceResponseMode = _priceResponseMode
@@ -90,7 +91,7 @@ def addPriceSnapshot(_asset: address) -> Bytes[33]:
     if mode == 2:
         return b""
 
-    resultWord: uint256 = 2 if mode == 5 else 1
+    resultWord: uint256 = 2 if mode == 5 else (0 if mode == 6 else 1)
     response: bytes32 = convert(resultWord, bytes32)
     if mode == 3:
         return slice(response, 0, 31)
