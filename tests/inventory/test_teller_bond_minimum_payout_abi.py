@@ -6,6 +6,9 @@ import pytest
 from scripts import check_contract_artifacts as artifact_checker
 
 
+pytestmark = pytest.mark.artifact
+
+
 ROOT = Path(__file__).resolve().parents[2]
 TELLER = ROOT / "contracts/core/Teller.vy"
 COMMITTED_ABI = ROOT / "scripts/abis/Teller.json"

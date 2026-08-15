@@ -8,6 +8,9 @@ from pathlib import Path
 import pytest
 
 
+pytestmark = pytest.mark.artifact
+
+
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = (
     ROOT / "docs/chains/rh/hardening/basic-vault-consumer-inventory.md"

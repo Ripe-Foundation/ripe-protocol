@@ -7,6 +7,7 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
 
 
+@pytest.mark.artifact
 def test_deleverage_source_abi_and_vault_interface_hashes_are_current():
     """Pin the approved quarantine implementation and its exported ABI."""
 
