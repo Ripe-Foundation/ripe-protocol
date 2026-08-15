@@ -1085,6 +1085,59 @@ because it could conceal a genuine vault loss.
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
 
+### RH-D039 — Endaoment stabilizer removal is StableSwap-NG-only and fails closed
+
+**Status:** Owner-approved on 14 August 2026 for the exact SC-19 Endaoment
+value-conservation candidate on `codex/rh-sc-18-sc-19-endaoment`.
+
+Endaoment derives the maximum executable one-sided GREEN removal from the
+configured pool's exact `calc_token_amount(uint256[],bool)` quote. The
+supported StableSwap-NG implementation burns that quote plus one wei of LP for
+`remove_liquidity_imbalance`, so the candidate selects the largest GREEN amount
+whose quote is strictly below the LP balance. Missing code, a missing selector,
+a reverting quote, or malformed return data fails closed to zero removal. The
+external stabilizer call then returns `False` without changing LP custody,
+GREEN balances, pool debt, approvals, or events.
+
+The configured Base production pool
+`0xd6c283655B42FA0eb2685F7AB819784F071459dc` was attached directly at block
+34,471,929 and qualified at the exact executable cap and cap plus one. This
+acceptance does not generalize to a legacy Curve pool or any implementation
+whose quote/burn relationship differs. Any configured-pool or implementation
+change must requalify the selector, return shape, monotonicity, fee and rounding
+semantics, exact cap, cap plus one, and real removal execution before use.
+
+This decision accepts the fail-closed compatibility boundary. It does not
+authorize pool configuration, deployment, activation, or release.
+
+**Source:** `contracts/core/Endaoment.vy` and
+`tests/core/endaoment/test_endao_stabilizer.py`.
+
+### RH-D040 — Endaoment stabilizer accepts the unbounded max-LP-burn residual
+
+**Status:** Owner-approved on 14 August 2026 for the exact SC-19 Endaoment
+value-conservation candidate on `codex/rh-sc-18-sc-19-endaoment`.
+
+The candidate proves that the selected GREEN amount has
+`calc_token_amount(amounts, False) + 1 <= lpBalance`, and direct production-pool
+qualification proves that the cap executes while cap plus one does not. The
+subsequent `remove_liquidity_imbalance` call nevertheless continues to pass
+`max_value(uint256)` as `_maxLpBurnAmount`. The pool approval limits collection
+to Endaoment's held LP balance, approval is cleared after the call, and the
+existing post-operation profitability invariant reverts the whole transaction
+when the position worsens. There is still no explicit execution-time burn bound
+equal to the quote plus one, so a state-sensitive or nonconforming pool could
+attempt to consume more held LP than the sizing quote anticipated.
+
+The owner accepts that residual for this minimized value-conservation batch.
+Bounding `_maxLpBurnAmount` remains a separately scoped hardening opportunity
+and must be reconsidered before changing the supported pool or quote semantics.
+This acceptance does not authorize deployment, configuration, activation, or
+release.
+
+**Source:** `contracts/core/Endaoment.vy` and
+`tests/core/endaoment/test_endao_stabilizer.py`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:

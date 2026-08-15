@@ -39,8 +39,8 @@ snapshot:
 
 counts:
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 34 entries.
-  rh_d_decisions: 33
+  # Counts decisions not fully retired; RH-D026 is excluded from 36 entries.
+  rh_d_decisions: 35
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -308,7 +308,7 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: RH-D001 through RH-D023 must match this register exactly and cannot be silently closed.
+  mirror_contract: Every RH-D identifier and title in decisions must match this register exactly and cannot be silently closed.
 
 document_roles:
   - { file: docs/chains/rh/status.yaml, role: "Sole current machine-readable dashboard authority."}
@@ -1155,6 +1155,8 @@ decisions:
   - { id: RH-D032, title: "Teller bond minimum-payout protection exact waiver at 20 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The exact caller-specified minimum-payout candidate deploys at 24,556 bytes including immutables, leaving 20 bytes. It removes the one-argument purchase selector, requires the payment amount, and adds an opt-in realized-payout floor. The waiver permits zero growth and reopens on any source or compiler-output change; SDK, UI, deployment, activation, and release gates remain separate.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D033, title: "BlueChip SC-05/SC-17/SC-23 uses the codesize optimizer", status: "owner_approved_candidate_compiler_profile", summary: "The owner selected Vyper codesize after independent comparison: +255 gas on each of three measured top-level paths saves 1,076 deployed bytes versus gas optimization. The candidate deploys at 22,739 bytes with 1,837 bytes of EIP-170 headroom, so the ordinary 200-byte floor applies and no waiver is granted. RH-D034 separately accepts the SC-17 residual; this compiler decision does not authorize deployment or activation.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
   - { id: RH-D034, title: "SC-17 timing residual is conditionally accepted", status: "owner_conditionally_accepted_candidate_residual", summary: "The owner accepted retaining observation-interval TWAP with its documented snapshot-timing residual. Every snapshot-backed feed remains inactive until it has finite nonzero freshness, minSnapshotDelay no greater than staleTime, vault-specific downward-PPS manipulation qualification, monitored honest refresh before expiry, and tested alert/pause/disable procedures. Undy and all deployment, registration, activation, release, vault, and exact-parameter decisions remain separately gated.", source: "docs/chains/rh/evidence/yield-price-snapshot-remediation.md"}
+  - { id: RH-D039, title: "Endaoment stabilizer removal is StableSwap-NG-only and fails closed", status: "owner_approved_fail_closed_compatibility_boundary", summary: "Endaoment sizes one-sided GREEN removal through the exact StableSwap-NG calc_token_amount quote and fails closed to a state-preserving zero removal when the selector, call, or return shape is unsupported. Any pool or implementation change requires fresh exact-cap and execution qualification; no deployment or activation is authorized.", source: "docs/chains/rh/decision-register.md"}
+  - { id: RH-D040, title: "Endaoment stabilizer accepts the unbounded max-LP-burn residual", status: "owner_accepted_residual_separate_hardening_open", summary: "The exact SC-19 candidate proves quote-plus-one executability but continues to pass max uint256 as the execution burn bound. LP approval, approval cleanup, and the profitability invariant remain, while an explicit quote-bound max burn is deferred to separate hardening. No deployment or activation is authorized.", source: "docs/chains/rh/decision-register.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}
