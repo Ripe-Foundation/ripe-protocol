@@ -1286,8 +1286,9 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 
 ### RH-D043 — Curve snapshot remediation uses confirmation-anchored continuity
 
-**Status:** Candidate policy recorded 15 August 2026; exact-head owner
-ratification remains required before review readiness or integration.
+**Status:** Owner accepted ancestor `block.number` semantics on 15 August 2026
+for the unchanged Curve source; merge review may proceed. Deployment,
+configuration, activation, and release remain separately unauthorized.
 
 The candidate selects chronological block-duration weighting and accepts its
 rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
@@ -1298,17 +1299,14 @@ successful write is allowed per selected clock unit; the actual ten-observation
 time horizon therefore depends on qualifying Teller activity and must be
 monitored rather than presented as a fixed wall-clock window.
 
-Exact-head owner ratification must additionally select the Robinhood Curve
-clock domain. The unchanged candidate uses EVM `block.number`, which Robinhood
+The owner selected the Robinhood Curve clock domain as EVM `block.number`, which Robinhood
 exposes as the repeating/jumping ancestor/L1-number domain. A pinned 16-child
 block packet observed one contract `NUMBER` while ArbSys tracked every child.
-If the owner accepts ancestor semantics, the candidate calibration is
+The accepted ancestor-semantics calibration is
 `staleBlocks=7,200`, the same 7,200-unit recovery duration, capacity 10, and a
-target successful write at least every 720 ancestor numbers. If child semantics
-are required, `RB-CLOCK-CURVE` stops before production edits and returns a
-shared immutable native/ArbSys-source design packet. In either case,
+target successful write at least every 720 ancestor numbers.
 `GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain inactive pending
-the decision and separate activation authority.
+separate activation authority.
 
 For any `dangerTrigger` or `staleBlocks` change, the ring and accumulated
 `numBlocksInDanger` survive, all three continuity anchors are cleared, and the
@@ -1328,8 +1326,8 @@ a fully empty pool can be proposed, but confirmation revalidates and reverts
 atomically if it cannot seed a nonzero snapshot. The duplicate internal
 validator arguments are retained to minimize unrelated bytecode churn.
 
-Activation requires exact-head owner ratification, a selected clock domain, a
-finite operating cadence, the selected capacity-ten bound, direct
+Activation requires separate exact-head authority, a finite operating cadence,
+the selected capacity-ten bound, direct
 capacity-ten, cold maximum-ring, and PriceDesk composition evidence,
 snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
 The remediated Curve source SHA-256 is recorded in the Robinhood launch-input
@@ -1344,10 +1342,9 @@ retains the historical 24-failed/8-passed fail-first result. No production
 freshness check was weakened. This decision grants no deployment,
 registration, configuration, activation, or release authority.
 
-Exact-final-head owner checklist (all remain unchecked):
+Clock decision and separate activation checklist:
 
-- [ ] select ancestor semantics with the recorded 7,200/720 calibration, or
-  select child semantics and stop `RB-CLOCK-CURVE` for a design packet;
+- [x] select ancestor semantics with the recorded 7,200/720 calibration;
 - [ ] accept rolling danger-entry lag and `maxNumSnapshots=10` with its
   cadence-dependent horizon;
 - [ ] accept still-fresh `staleBlocks` shrink, expired-history revival only for
@@ -1359,7 +1356,8 @@ Exact-final-head owner checklist (all remain unchecked):
 - [ ] verify the Base green 72/72 and asset/LP 32/32 evidence, including the
   exact target's retained 24-failed/8-passed harness fail-first artifact; and
 - [ ] accept the monitoring, pause/disable, reopen, and feature-inactivity
-  controls without treating merge approval as deployment or activation.
+  controls before activation, without treating merge approval as deployment or
+  activation.
 
 **Source:**
 [`evidence/curve-snapshot-remediation.md`](evidence/curve-snapshot-remediation.md),

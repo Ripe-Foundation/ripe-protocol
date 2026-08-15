@@ -9,8 +9,8 @@ governed runtime identity, and the downstream SC-06 PriceDesk composition
 surface in `CurvePrices`.
 
 **Lifecycle boundary:** this record binds candidate behavior and reproducible
-review evidence. RH-D043 remains a recommendation until the owner ratifies the
-exact final head. Nothing here authorizes deployment, registration,
+review evidence. The owner accepted RH-D043's ancestor-`block.number` clock
+semantics on 15 August 2026. Nothing here authorizes deployment, registration,
 configuration, activation, release, or a merge into `rh`.
 
 ## Candidate Git binding
@@ -58,7 +58,7 @@ deployed runtimes plus its sealed manifest.
 
 ## RH-D043 candidate decision
 
-### Robinhood clock domain: owner decision still required
+### Robinhood clock domain: ancestor `block.number` accepted
 
 The selected `CurvePrices` bytes use EVM `block.number` for freshness,
 same-number suppression, duration weighting, danger accumulation, and recovery.
@@ -72,10 +72,10 @@ are retained in `robinhood-clock-packet.json` and
 `scripts/capture_robinhood_curve_clock.py`.
 
 `GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain explicit inactive
-Robinhood capabilities. RH-D043 must not be ratified and neither capability may
-be configured until the owner chooses one of these mutually exclusive paths:
+Robinhood capabilities pending separate activation authority. The owner selected
+the first of these paths for the unchanged contract and merge-review candidate:
 
-1. **Accept ancestor-block semantics.** Every configured "block" means contract
+1. **Selected: ancestor-block semantics.** Every configured "block" means contract
    `NUMBER`; many child blocks may be suppressed as one snapshot block. The
    candidate operating calibration is `staleBlocks=7,200`, which is also the
    recovery duration, using the existing approximately 12-second planning
@@ -84,14 +84,14 @@ be configured until the owner chooses one of these mutually exclusive paths:
    21.6-to-24-hour ten-observation horizon when activity is regular. This is an
    alerting/operating target, not a protocol guarantee: quiet periods shorten
    observation density and ancestor jumps consume multiple units at once.
-2. **Require child-block semantics.** Stop `RB-CLOCK-CURVE`; do not activate or
+2. **Not selected: child-block semantics.** This would stop `RB-CLOCK-CURVE`; do not activate or
    edit production code under this decision. Return an owner design packet for
    the smallest shared-source immutable native/ArbSys selection analogous to
    Ledger, then regenerate constructor bindings, artifacts, runtime identities,
    ABI if affected, gas, migrations, SC-06 composition, and all fork evidence.
 
-The current PR qualifies the first path's actual unchanged bytes but does not
-self-select it. `R-REP128`, `R-PLUS1`, `R-J2-J4`, `BOUNDARY-OPEN`,
+The current PR qualifies the selected first path's actual unchanged bytes.
+`R-REP128`, `R-PLUS1`, `R-J2-J4`, `BOUNDARY-OPEN`,
 `BOUNDARY-WINDOW`, and `R-STRESS60` regressions pin repeated suppression, exact
 +1/+2/+4/+60 duration arithmetic, inclusive freshness crossing, stale recovery
 restart, and the real Teller housekeeping route.
@@ -374,5 +374,5 @@ unavailable/fallback state; gas approaching the selected margin; a threshold
 or pool-equilibrium change; a new caller, consumer, or registry topology; any
 change to freshness-revival or post-confirmation anchoring semantics; or drift
 in the selected clock domain or pinned Base results. Owner ratification of
-RH-D043 must name the exact final head, choose ancestor or child semantics, and
-does not waive any of these controls.
+RH-D043 selects ancestor semantics for the unchanged Curve source. That clock
+decision does not waive any activation control above.
