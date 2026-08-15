@@ -33,6 +33,11 @@ EVIDENCE_PATH = ROOT / "docs/chains/rh/evidence/ccip-live-snapshot-20260811.json
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Keep configuration and evidence checks independent of protocol deployment."""
+
+
 def _evidence():
     return json.loads(EVIDENCE_PATH.read_bytes())
 
@@ -53,6 +58,7 @@ def _python_constant(path, name):
     return int(match.group(1))
 
 
+@pytest.mark.release
 def test_every_registry_id_copy_matches_confirmed_live_topology():
     assert CCIP_POOL_HQ_IDS == {"RIPE": 23, "GREEN": 24}
     assert _evidence()["ripe_hq_registry_ids"] == CCIP_POOL_HQ_IDS
@@ -95,6 +101,7 @@ def test_every_registry_id_copy_matches_confirmed_live_topology():
     assert set(promotion.blocker_ids) == {"B-T1-CCIP", "B-T1-TOOLCHAIN"}
 
 
+@pytest.mark.release
 def test_machine_inputs_describe_live_mint_topology_without_authorizing_sgreen():
     assert CCIP_LIVE_POOL_CAPABILITIES == {
         "RIPE": {"canMintGreen": False, "canMintRipe": True},
@@ -118,6 +125,7 @@ def test_machine_inputs_describe_live_mint_topology_without_authorizing_sgreen()
     )
 
 
+@pytest.mark.release
 def test_live_snapshot_matches_config_and_current_manifests():
     evidence = _evidence()
     manifest_keys = {
@@ -155,8 +163,7 @@ def test_live_snapshot_matches_config_and_current_manifests():
             assert contracts[pool_key]["address"].lower() == pool["pool"].lower()
 
 
-def test_live_pool_capabilities_wiring_and_unresolved_policy_are_explicit(monkeypatch):
-    evidence = _evidence()
+def test_unresolved_ccip_policy_gates_fail_closed(monkeypatch):
     assert tuple(CCIP_OWNER_DISPOSITION_GATES) == CCIP_REQUIRED_POLICY_BINDINGS
     assert all(value is None for value in CCIP_OWNER_DISPOSITION_GATES.values())
     assert set(CCIP_EVIDENCE_GATES) == {
@@ -189,6 +196,10 @@ def test_live_pool_capabilities_wiring_and_unresolved_policy_are_explicit(monkey
     with pytest.raises(RuntimeError, match="CCIP_EVIDENCE_REQUIRED"):
         require_ccip_wiring_gates(*binding)
 
+
+@pytest.mark.release
+def test_live_pool_capabilities_and_wiring_are_explicit():
+    evidence = _evidence()
     for chain, chain_evidence in evidence["chains"].items():
         remote = evidence["chains"][chain_evidence["remote_chain"]]
         for label, pool in chain_evidence["pools"].items():
@@ -219,6 +230,7 @@ def test_live_pool_capabilities_wiring_and_unresolved_policy_are_explicit(monkey
         assert not chain_evidence["pools"]["GREEN"]["can_mint_ripe"]
 
 
+@pytest.mark.release
 def test_live_snapshot_keeps_known_provenance_gaps_visible():
     evidence = _evidence()
     repository_source = evidence["repository_pool_source"]
@@ -262,6 +274,7 @@ def test_live_snapshot_keeps_known_provenance_gaps_visible():
         assert overclaim not in combined
 
 
+@pytest.mark.release
 def test_machine_status_counts_one_live_package_and_keeps_identity_gates_open():
     status = (ROOT / "docs/chains/rh/status.yaml").read_text()
     assert "live_actions_completed: 1" in status
