@@ -18,6 +18,7 @@ REGISTER = ROOT / "docs/chains/rh/decision-register.md"
 STATUS = ROOT / "docs/chains/rh/status.yaml"
 REGISTER_IN_REPO = "docs/chains/rh/decision-register.md"
 HEADING_RE = re.compile(r"^### (RH-D\d{3}) — (.+)$", re.MULTILINE)
+FULLY_RETIRED_DECISION_IDS = frozenset({"RH-D026"})
 
 
 class DecisionIdError(RuntimeError):
@@ -69,6 +70,28 @@ def require_exact_parity(register: Mapping[str, str], status: Mapping[str, str])
         "decision register/status parity failure: "
         f"missing={missing}, extra={extra}, title_mismatches={mismatched}"
     )
+
+
+def require_count_consistency(path: Path, status: Mapping[str, str]) -> int:
+    data = yaml.safe_load(path.read_text())
+    configured_count = data.get("counts", {}).get("rh_d_decisions")
+    if not isinstance(configured_count, int):
+        raise DecisionIdError(f"{path}: counts.rh_d_decisions must be an integer")
+
+    missing_retired = sorted(FULLY_RETIRED_DECISION_IDS - set(status))
+    if missing_retired:
+        raise DecisionIdError(
+            f"{path}: fully retired decision IDs are missing: {missing_retired}"
+        )
+
+    expected_count = len(status) - len(FULLY_RETIRED_DECISION_IDS)
+    if configured_count != expected_count:
+        raise DecisionIdError(
+            f"{path}: counts.rh_d_decisions={configured_count}, "
+            f"expected {expected_count} after excluding "
+            f"{sorted(FULLY_RETIRED_DECISION_IDS)}"
+        )
+    return expected_count
 
 
 def _git_register(ref: str) -> dict[str, str]:
@@ -131,7 +154,11 @@ def main() -> int:
     register = parse_register(REGISTER.read_text(), str(REGISTER))
     status = parse_status(STATUS)
     require_exact_parity(register, status)
-    print(f"local parity ok: {len(register)} exact ID/title pairs")
+    counted_decisions = require_count_consistency(STATUS, status)
+    print(
+        f"local parity ok: {len(register)} exact ID/title pairs; "
+        f"{counted_decisions} counted decisions"
+    )
 
     if args.integration_ref:
         if not args.base_ref:
