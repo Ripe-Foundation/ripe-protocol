@@ -26,11 +26,10 @@ distinguish an address-only read from a `load_partial`, and a `LOADABLE` record
 must name a file that actually resolves.
 
 These tests are offline: they read committed JSON and touch no network, RPC, or
-private key. They live at `tests/` root rather than `tests/deployment/` because
-`pytest.ini` passes `--ignore=tests/deployment`; root placement keeps the guard
-in the lean lane as well as the comprehensive lane. Numbered step manifests are
-deliberately not required; only the current manifest of each supported
-chain/environment pair.
+private key. They are artifact inventory checks and run during explicit or
+comprehensive qualification rather than ordinary contract PR CI. Numbered step
+manifests are deliberately not required; only the current manifest of each
+supported chain/environment pair.
 """
 
 from __future__ import annotations
@@ -42,6 +41,9 @@ from pathlib import Path
 import pytest
 from eth_utils import is_address
 from scripts.utils.migration import Migration
+
+
+pytestmark = pytest.mark.artifact
 
 
 @pytest.fixture(scope="session")

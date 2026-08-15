@@ -13,7 +13,7 @@ snapshot:
   later_scoped_evidence:
     sc12_policy_recorded_on: 2026-08-14
     namespace_rechecked_on: 2026-08-15
-    scope: canonical_decision_mirror_parity_through_rh_d036_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
+    scope: historical_decision_snapshot_through_rh_d036_plus_pr_144_sc12_namespace_and_underscore_activation_gate_evidence_only
     broad_program_snapshot_refreshed: false
   observed_live_rh:
     checked_on: 2026-08-15
@@ -36,7 +36,7 @@ snapshot:
     The broad program snapshot remains bound to the exact subject and candidate
     identities above as of 2026-08-11. It has not been reconciled to the live rh
     observation from 2026-08-15 and is not current authority for later repository
-    state. The later RH-D032 through RH-D036 mirror entries and SC-12 namespace
+    state. The later RH-D032 through RH-D036 snapshot entries and SC-12 namespace
     evidence are a scoped overlay only; they do not refresh any other count, row,
     blocker, residual, deadline, narrative, or lifecycle statement.
   terminology_scope: >
@@ -52,16 +52,14 @@ snapshot:
   live_action_counting_unit: externally_completed_packages_not_transactions
   status_owner: Robinhood deployment owner
   freshness_rule: >
-    Reconcile this file in the same commit whenever an integrated change closes,
-    reopens, or materially changes a row, decision, blocker, residual, deadline,
-    next action, or authorization boundary. A scoped decision or namespace
-    overlay does not satisfy that broad-program reconciliation requirement.
+    Refresh this historical snapshot intentionally when program status needs a
+    new published view and reconcile it once during final release preparation.
+    Ordinary contract bug fixes and RH-D additions do not require same-PR mirror
+    maintenance here.
 
 counts:
-  scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
+  scope: broad_program_snapshot_as_of_2026_08_11
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 37 entries.
-  rh_d_decisions: 36
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -311,18 +309,20 @@ repository_ci:
     execution: the merged branch reports 13 failed, 3392 passed, 25 errors both
     in CI and locally, with node-for-node identical failure sets.
   known_red: >
-    The lean lane is not green, and that condition is inherited rather than
-    introduced. All 13 failures and 25 errors reproduce on a pristine rh
-    checkout: BlueChip Morpho constructor arity, switchboard pointer lifecycle,
-    deleverage oracle cases, and the basic-vault consumer inventory. Two
-    artifact gates are separately red on rh - export_abis.py --check and the
-    manifest handoff test (the latter's H06 machinery and test are now
-    removed by this cleanup, not fixed). check_contract_artifacts.py
-    MissionControl source_sha256 is no longer one of them: all 53
-    tests/inventory/test_contract_artifacts.py nodes and all 7
-    test_bluechip_yield_prices_artifacts.py nodes pass against the current
-    tree (verified 2026-08-12), so this cleanup restores the checker as a
-    required check rather than reintroducing a known-red gate.
+    Separate from the historical default-lane counts above, the deferred manual
+    release-qualification lane has nine reported red nodes against the frozen
+    artifact baseline. Four are currently vacuous tamper
+    proofs, not independent evidence that the intended field is checked:
+    test_new_contract_tampered_expectation_fails_closed[Deleverage] and the
+    three test_deleverage_compiler_and_runtime_identity_drift_fails_closed
+    cases for transitive_compiler_input_integrity, compiler_settings, and
+    runtime_template_sha256. Each short-circuits on Deleverage source_sha256:
+    the frozen expectation is b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1,
+    while the current source is 3b47aef7fa02d46d15d1a74a95049e5b80f7361d89b3f3258c6725db3dac0a6f.
+    The checker therefore never evaluates the ABI or the three specifically
+    mutated compiler/runtime fields. These four proofs remain invalid until
+    final-release reconciliation regenerates and deliberately rebinds the
+    baseline; this ordinary remediation-policy PR must not refresh it.
   interpretation: >
     Enabling CI made an existing red state visible; it did not create it. A
     first green build requires the inherited failures to be addressed on their
@@ -330,7 +330,7 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: Every integrated entry in this file must match the canonical register's identifier and title exactly and cannot be silently closed.
+  snapshot_contract: This list is a historical or intentionally refreshed snapshot; the canonical register controls, exact per-PR parity is not required, and final release preparation reconciles the snapshot once.
   in_flight_coordination:
     checked_on: 2026-08-15
     sc12_reserved_id: RH-D035

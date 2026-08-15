@@ -9,11 +9,16 @@ reconciliation
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
-This register is the canonical `RH-D` identifier and title namespace for
-controlling owner decisions and accepted risks. The `decisions` list in
-[`status.yaml`](status.yaml) must mirror every identifier and title here
-exactly. This register does not replace the linked decision records, authorize
-a new phase, or convert an approved direction into implementation, integration,
+This register is the canonical `RH-D` source for controlling owner decisions,
+explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
+require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
+is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
+is not required, and it may be reconciled once during final release preparation.
+Historical headroom-waiver entries remain accepted-risk evidence for final
+release reconciliation; their former floor, zero-growth, and reopen-on-change
+controls are no longer ordinary PR gates.
+This register does not replace the linked decision records, authorize a new
+phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
@@ -1284,10 +1289,11 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 When an owner decision changes, update:
 
 1. the controlling decision/evidence record;
-2. this register;
-3. [`status.yaml`](status.yaml), preserving exact identifier/title parity; and
-4. the generated dashboard, when present. RH-D024 currently keeps the dashboard
-   extracted from the active tree, so there is no dashboard artifact to regenerate.
+2. this canonical register; and
+3. [`status.yaml`](status.yaml) and the generated dashboard when intentionally
+   refreshing the status snapshot or preparing the final release candidate.
+   RH-D024 currently keeps the dashboard extracted from the active tree, so
+   there is no dashboard artifact to regenerate.
 
 Keep the distinction between:
 

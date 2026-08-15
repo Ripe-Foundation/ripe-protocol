@@ -16,6 +16,7 @@ from conf_utils import (
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
 
+@pytest.mark.artifact
 def test_auction_house_source_abi_and_vault_interface_are_frozen():
     """The current backing-aware consumer source keeps its public boundaries exact."""
 
