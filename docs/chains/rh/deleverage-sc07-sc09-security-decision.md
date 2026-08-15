@@ -65,7 +65,7 @@ size change requires a fresh measurement and must continue to satisfy the
 ordinary floor unless a separate owner-authorized waiver is added.
 
 The final artifact identities are source SHA-256
-`b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1`,
+`3b47aef7fa02d46d15d1a74a95049e5b80f7361d89b3f3258c6725db3dac0a6f`,
 runtime-template SHA-256
 `25f605c232750990f9a0a66a14143a529d4303e79ce02d0a8d8f0c18329094e2`,
 and immutable-bound deployed-runtime SHA-256
