@@ -1270,7 +1270,7 @@ and all failures after real processing starts still propagate; direct claims,
 withdrawals, deposits, explicit redemptions, and strict requested handling
 remain fail-closed.
 
-The final deployed candidate is 24,287 bytes with 289 bytes of EIP-170
+The final deployed candidate is 24,309 bytes with 267 bytes of EIP-170
 headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
 headroom override or exact-identity waiver.
 

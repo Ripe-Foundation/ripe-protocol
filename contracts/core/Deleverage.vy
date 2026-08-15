@@ -3,8 +3,8 @@
 
 # @version 0.4.3
 #pragma optimize codesize
-# At this source revision, the deployed runtime is 24,287 bytes including
-# Vyper's 96-byte immutables section: 289 bytes of EIP-170 headroom.
+# At this source revision, the deployed runtime is 24,309 bytes including
+# Vyper's 96-byte immutables section: 267 bytes of EIP-170 headroom.
 # Re-measure the actual deployed code before making any runtime-affecting change.
 
 implements: Department
@@ -835,7 +835,7 @@ def _performDeleveragePhases(
 
             # Phase 1 vaults are Stability Pool cohorts by construction, so apply
             # the SC-09 fail-soft availability gate.
-            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, True, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
             if self.vaultAddrs[stabPool.vaultId] == empty(address):
                 self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
@@ -908,7 +908,8 @@ def _iterateThruAllUserVaults(
         # same fail-soft availability gate applies here. The didHandleVaultId
         # transient guard inside _iterateThruAssetsWithinVault prevents a second
         # probe of a cohort already handled in phase 1.
-        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
+        isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(vaultId)
+        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, isStabVault, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
 
     return remainingToRepay
 
@@ -922,6 +923,7 @@ def _iterateThruAssetsWithinVault(
     _vaultId: uint256,
     _vaultAddr: address,
     _remainingToRepay: uint256,
+    _isStabVault: bool,
     _endaoFunds: address,
     _endaomentPsm: address,
     _psmYieldPositionToken: address,
@@ -938,8 +940,6 @@ def _iterateThruAssetsWithinVault(
     if numUserAssets == 0:
         return _remainingToRepay
 
-    isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(_vaultId)
-
     # totals
     remainingToRepay: uint256 = _remainingToRepay
     for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
@@ -948,7 +948,7 @@ def _iterateThruAssetsWithinVault(
 
         asset: address = empty(address)
         availableAmount: uint256 = 0
-        asset, availableAmount = self._getBroadTraversalAsset(_user, _vaultAddr, y, isStabVault)
+        asset, availableAmount = self._getBroadTraversalAsset(_user, _vaultAddr, y, _isStabVault)
         if asset == empty(address) or availableAmount == 0:
             continue
 

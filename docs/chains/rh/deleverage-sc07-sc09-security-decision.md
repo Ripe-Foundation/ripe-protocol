@@ -56,8 +56,8 @@ record are supporting evidence rather than additional production scope.
 
 ## Deployability and chain compatibility
 
-The final candidate compiles to a 24,191-byte runtime template plus 96 bytes of
-immutable data: 24,287 deployed bytes, 289 bytes below the EIP-170 limit. It
+The final candidate compiles to a 24,213-byte runtime template plus 96 bytes of
+immutable data: 24,309 deployed bytes, 267 bytes below the EIP-170 limit. It
 therefore satisfies the repository's ordinary 200-byte minimum-headroom policy;
 no Deleverage override, exact-identity waiver, or residual-risk exception is
 used. Any later source, compiler, dependency, constructor, runtime identity, or
@@ -65,7 +65,7 @@ size change requires a fresh measurement and must continue to satisfy the
 ordinary floor unless a separate owner-authorized waiver is added.
 
 The final artifact identities are source SHA-256
-`b6b610666454e318bb988792bd00b0e49ada8dfe99c3a4650f04a6f8f0607f00`,
+`b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1`,
 runtime-template SHA-256
 `d5aee8fefddc488dc2325f4bb384f72af6e059d7eb8521543f1f254bb4c7c49e`,
 and immutable-bound deployed-runtime SHA-256
