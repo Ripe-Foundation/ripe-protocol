@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "decision": {
     "id": "RH-D042",
     "title": "PriceDesk source isolation uses bounded policy-only admission"
@@ -38,14 +38,21 @@
       "pool": "GREEN/USDG",
       "underlyings": [
         {
-          "asset": "GREEN",
-          "resolution": "target_asset"
-        },
-        {
           "asset": "USDG",
           "resolution": "ChainlinkPrices"
+        },
+        {
+          "asset": "GREEN",
+          "resolution": "target_asset"
         }
       ]
+    }
+  ],
+  "derived_curve_routes": [
+    {
+      "feed_asset": "sGREEN",
+      "base_asset": "GREEN",
+      "conversion": "SavingsGreen.convertToAssets"
     }
   ],
   "forbidden_curve_underlying_sources": [
@@ -63,5 +70,17 @@
     "max_user_valuation_positions": 75,
     "max_active_claim_assets": 20,
     "max_claim_maintenance_batch": 15
+  },
+  "qualification_controls": {
+    "source_allowances": "deployed_runtime_code_hash_bound",
+    "selected_registered_sources": "live_state_readback",
+    "max_qualified_registered_sources": "committed_test_qualification_only",
+    "max_curve_underlyings": "prospective_source_artifact_bound",
+    "max_snapshot_observations": "prospective_source_artifact_bound",
+    "max_vaults_per_user": "live_state_readback",
+    "max_assets_per_vault": "live_state_readback",
+    "max_user_valuation_positions": "live_state_readback",
+    "max_active_claim_assets": "committed_test_qualification_only",
+    "max_claim_maintenance_batch": "committed_test_qualification_only"
   }
 }

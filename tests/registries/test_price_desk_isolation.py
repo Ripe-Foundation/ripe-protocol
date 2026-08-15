@@ -110,6 +110,14 @@ def _register_sources(price_desk, governance, sources):
     return ids
 
 
+def _count_calls(computation, address, selector):
+    expected = bytes.fromhex(str(address)[2:])
+    return sum(
+        child.msg.code_address == expected and bytes(child.msg.data[:4]) == selector
+        for child in computation.children
+    ) + sum(_count_calls(child, address, selector) for child in computation.children)
+
+
 def test_reverting_priority_source_falls_through_to_healthy_source(
     ripe_hq,
     deploy3r,
@@ -138,6 +146,70 @@ def test_reverting_non_priority_source_falls_through_to_healthy_source(
     _set_priorities(mission_control, switchboard_alpha, [])
 
     assert desk.getPrice(alpha_token, True) == 3 * EIGHTEEN_DECIMALS
+
+
+def test_disabled_middle_slot_falls_through_across_all_traversal_channels(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+    teller,
+):
+    first = _raw_source(0, False)
+    disabled = _raw_source(99 * EIGHTEEN_DECIMALS, True)
+    healthy = _raw_source(12 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(
+        ripe_hq,
+        deploy3r,
+        [first, disabled, healthy],
+    )
+    assert desk.startAddressDisableInRegistry(2, sender=deploy3r)
+    assert desk.confirmAddressDisableInRegistry(2, sender=deploy3r)
+    assert desk.getAddr(2) == "0x" + "0" * 40
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+
+    assert desk.getPrice(alpha_token, False) == 12 * EIGHTEEN_DECIMALS
+    assert desk.getPrice(alpha_token, True) == 12 * EIGHTEEN_DECIMALS
+    assert desk.hasPriceFeed(alpha_token)
+    assert desk.addPriceSnapshot(alpha_token, sender=teller.address)
+    assert first.snapshotCount() == 0
+    assert disabled.snapshotCount() == 0
+    assert healthy.snapshotCount() == 1
+
+
+def test_priority_source_is_not_repeated_in_general_registry_traversal(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    priority_no_feed = _raw_source(0, False)
+    healthy = _raw_source(13 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(
+        ripe_hq,
+        deploy3r,
+        [priority_no_feed, healthy],
+    )
+    _set_priorities(mission_control, switchboard_alpha, [1])
+
+    assert desk.getPrice(alpha_token, True) == 13 * EIGHTEEN_DECIMALS
+    selector = bytes(
+        priority_no_feed.getPriceAndHasFeed.prepare_calldata(
+            alpha_token,
+            0,
+            desk,
+        )[:4]
+    )
+    assert (
+        _count_calls(
+            desk._computation,
+            priority_no_feed.address,
+            selector,
+        )
+        == 1
+    )
 
 
 @pytest.mark.parametrize(

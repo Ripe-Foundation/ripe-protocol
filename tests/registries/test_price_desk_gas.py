@@ -3,7 +3,12 @@ from pathlib import Path
 import boa
 import pytest
 
-from constants import BLUE_CHIP_PROTOCOL_MORPHO, EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import (
+    BLUE_CHIP_PROTOCOL_MORPHO,
+    BLUE_CHIP_PROTOCOL_MORPHO_V2,
+    EIGHTEEN_DECIMALS,
+    ZERO_ADDRESS,
+)
 from config.artifact_expectations import load_artifact_expectations
 from scripts import check_contract_artifacts as artifact_checker
 
@@ -235,7 +240,9 @@ def test_price_source_inventory_and_flat_operation_gas(
     pyth_id = bytes.fromhex(
         "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
     )
-    assert pyth_prices.addNewPriceFeed(alpha_token, pyth_id, 0, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(
+        alpha_token, pyth_id, 0, sender=governance.address
+    )
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
     _set_priorities(mission_control, switchboard_alpha, [4])
@@ -246,7 +253,9 @@ def test_price_source_inventory_and_flat_operation_gas(
     stork_id = bytes.fromhex(
         "7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c"
     )
-    assert stork_prices.addNewPriceFeed(bravo_token, stork_id, 0, sender=governance.address)
+    assert stork_prices.addNewPriceFeed(
+        bravo_token, stork_id, 0, sender=governance.address
+    )
     boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmNewPriceFeed(bravo_token, sender=governance.address)
     _set_priorities(mission_control, switchboard_alpha, [5])
@@ -444,6 +453,118 @@ def test_bluechip_and_undy_max_snapshot_nested_price_and_snapshot_gas(
 
 
 @pytest.mark.gas
+def test_selected_morpho_v2_full_ring_nested_pricedesk_gas(
+    ripe_hq,
+    deploy3r,
+    governance,
+    teller,
+    chainlink,
+    curve_prices,
+    mission_control,
+    switchboard_alpha,
+    alpha_token,
+    mock_chainlink_feed_one,
+):
+    assert chainlink.addNewPriceFeed(
+        alpha_token,
+        mock_chainlink_feed_one,
+        0,
+        False,
+        False,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+    assert chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
+    factory = boa.load(
+        "contracts/mock/MockMorphoV2Factory.vy",
+        name="pricedesk_gas_morpho_v2_factory",
+    )
+    vault = boa.load(
+        "contracts/mock/MockMorphoV2Vault.vy",
+        alpha_token,
+        18,
+        100 * EIGHTEEN_DECIMALS,
+        125 * EIGHTEEN_DECIMALS // 100,
+        name="pricedesk_gas_morpho_v2_vault",
+    )
+    factory.setVault(vault, True)
+    blue_chip = boa.load(
+        "contracts/priceSources/BlueChipYieldPrices.vy",
+        ripe_hq,
+        deploy3r,
+        1,
+        2,
+        [ZERO_ADDRESS, ZERO_ADDRESS],
+        [ZERO_ADDRESS, ZERO_ADDRESS],
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        factory,
+        name="pricedesk_gas_selected_morpho_v2",
+    )
+    assert blue_chip.addNewPriceFeed(
+        vault,
+        BLUE_CHIP_PROTOCOL_MORPHO_V2,
+        0,
+        25,
+        0,
+        100,
+        sender=deploy3r,
+    )
+    assert blue_chip.confirmNewPriceFeed(vault, sender=deploy3r)
+    for _ in range(24):
+        boa.env.time_travel(seconds=1)
+        assert blue_chip.addPriceSnapshot(vault, sender=teller.address)
+    config = blue_chip.priceConfigs(vault)
+    assert config.protocol == BLUE_CHIP_PROTOCOL_MORPHO_V2
+    assert config.underlyingAsset == alpha_token.address
+    assert config.maxNumSnapshots == 25
+    assert config.nextIndex == 0
+
+    desk = _isolated_price_desk(
+        ripe_hq,
+        deploy3r,
+        [chainlink, curve_prices, blue_chip],
+    )
+    # Candidate snapshot authorization accepts any registered Ripe department.
+    # Register this isolated three-slot desk solely for the test transaction.
+    assert ripe_hq.startAddNewAddressToRegistry(
+        desk,
+        "Morpho V2 gas desk",
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock() + 1)
+    assert ripe_hq.confirmNewAddressToRegistry(desk, sender=governance.address)
+    # The registry timelock advances past the configured feed/snapshot stale
+    # windows; refresh both without changing the already-filled ring capacity.
+    mock_chainlink_feed_one.setMockData(10**8)
+    assert blue_chip.addPriceSnapshot(vault, sender=teller.address)
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+    assert desk.numAddrs() - 1 == 3
+    assert tuple(mission_control.getPriorityPriceSourceIds()) == (1, 2)
+
+    expected = 125 * EIGHTEEN_DECIMALS // 100
+    price_gas = _measure_price(desk, vault, expected)
+    feed_gas = _measure_has_feed(desk, vault)
+    boa.env.time_travel(seconds=1)
+    assert desk.addPriceSnapshot(vault, sender=teller.address)
+    snapshot_gas = desk._computation.get_gas_used()
+    print(
+        "PRICEDESK_MORPHO_V2_GAS",
+        f"price_25_nested={price_gas}",
+        f"has_feed={feed_gas}",
+        f"registry_snapshot={snapshot_gas}",
+        "source_slots=3",
+        "priority_source_ids=(1,2)",
+        "snapshot_capacity=25",
+    )
+    assert price_gas < 250_000
+    assert feed_gas < 75_000
+    assert snapshot_gas < 150_000
+
+
+@pytest.mark.gas
 def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
     ripe_hq,
     deploy3r,
@@ -535,10 +656,7 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
     )
     _set_priorities(mission_control, switchboard_alpha, [6, 1, 2, 3])
     assert hostile_desk.numAddrs() - 1 == 10
-    assert (
-        hostile_desk.getPrice(curve_system, True, gas=6_000_000)
-        == EIGHTEEN_DECIMALS
-    )
+    assert hostile_desk.getPrice(curve_system, True, gas=6_000_000) == EIGHTEEN_DECIMALS
     hostile_curve_gas = hostile_desk._computation.get_gas_used()
 
     one_hostile_desk = _isolated_price_desk(
@@ -562,11 +680,14 @@ def test_four_coin_curve_nested_price_succeeds_in_final_registry_position(
             [*no_feed_sources, mock_price_source, curve],
             price_limit=price_limit,
         )
-        boundary_results[price_limit] = boundary_desk.getPrice(
-            curve_system,
-            False,
-            gas=6_000_000,
-        ) == EIGHTEEN_DECIMALS
+        boundary_results[price_limit] = (
+            boundary_desk.getPrice(
+                curve_system,
+                False,
+                gas=6_000_000,
+            )
+            == EIGHTEEN_DECIMALS
+        )
     minimum_success = min(
         limit for limit, succeeded in boundary_results.items() if succeeded
     )
@@ -674,12 +795,15 @@ def test_four_coin_curve_over_max_snapshot_bluechip_admission_boundary(
             [mock_price_source, blue_chip_prices, curve],
             price_limit=price_limit,
         )
-        boundary_results[price_limit] = boundary_desk.getPrice(
-            curve_system,
-            False,
-            gas=3_000_000,
-        ) == EIGHTEEN_DECIMALS
-    # The selected 250k allowance qualifies the approved flat-underlying Curve
+        boundary_results[price_limit] = (
+            boundary_desk.getPrice(
+                curve_system,
+                False,
+                gas=3_000_000,
+            )
+            == EIGHTEEN_DECIMALS
+        )
+    # The selected 250k allowance qualifies the approved direct-underlying Curve
     # graph, not a future Curve-over-snapshot-source graph. Keep that admission
     # boundary explicit until governance requalifies this composition.
     assert current_price == 0

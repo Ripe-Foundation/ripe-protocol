@@ -48,10 +48,12 @@ register real production sources or adversarial raw-return/gas-burning mocks,
 and measure top-level local-EVM gas. Stipend-sweep variants change only the
 single PriceDesk allowance under test. The evidence covers:
 
-- flat Chainlink, Pyth, Stork, RedStone, and wsuperOETHb paths;
-- BlueChip and Undy feeds at 25 snapshots for price, feed-presence, and
+- direct Chainlink, Pyth, and Stork adapters plus selected nested RedStone and
+  wrapped-yield conversion paths;
+- BlueChip Morpho, selected Morpho V2, and Undy feeds at 25 snapshots for price, feed-presence, and
   snapshot channels;
-- a four-underlying flat-source Curve route in registry position 10;
+- a four-underlying Curve route over direct underlying sources in registry
+  position 10, distinct from recursive and snapshot-backed compositions;
 - the final healthy source behind nine allowance-exhausting sources; and
 - the separate StabilityPool 20-active-claim / 15-maintenance-batch ceiling.
 
@@ -59,7 +61,7 @@ The focused tests do not execute a 5-vault by 15-asset borrower scan. The
 75-position figures below are explicitly derived projections from committed
 per-lookup measurements and selected stipends.
 
-For the supported four-underlying flat Curve topology, a 10,000-gas-resolution
+For the supported four-underlying direct-source Curve topology, a 10,000-gas-resolution
 sweep fails at 90,000 and first succeeds at 100,000 forwarded gas. The selected
 250,000 price allowance is 2.5 times that upper boundary, retaining at least
 150,000 gas or 150% headroom. The highest supported real-source top-level feed
@@ -74,19 +76,20 @@ the selected 250,000 allowance, still fails at 350,000, and first succeeds at
 400,000 in a 50,000-gas-resolution sweep. That is an admission boundary, not a
 reason to enlarge the general allowance.
 
-The affected StabilityPool node was rerun and instrumented on exact merged
-PR #142 parent `348f8c1ed5b95be7d44b8458ab499c61c5b65660` and on the
-PriceDesk head under isolated local-EVM environments:
+The affected StabilityPool node was rerun and instrumented on exact current
+target `e7b6eeab768a009469a38a7ce8a35bb7e8d8f4bc` and on the PriceDesk head
+under isolated local-EVM environments. The current target reproduces the
+earlier `348f8c1` values exactly:
 
-| Ceiling case | Parent `348f8c1` | PriceDesk head | Delta | New ceiling |
+| Ceiling case | Parent `e7b6eea` | PriceDesk head | Delta | New ceiling |
 | --- | ---: | ---: | ---: | ---: |
 | Deposit | 508,587 | 513,480 | +4,893 | 530,000 |
 | Withdrawal | 446,932 | 451,825 | +4,893 | 470,000 |
 
-The current target `9a6d5d0` advances `348f8c1` only by the PR #158
-`yield-price-snapshot-remediation.md` evidence correction, which does not enter
-this execution. The earlier historical `f563cbb` measurement reference is
-superseded; no tree-equivalence claim is made for it.
+The parent rerun used an instrumentation-only print addition to the test; the
+contracts and execution path were exact `e7b6eea`. The earlier historical
+`f563cbb` measurement reference is superseded; no tree-equivalence claim is
+made for it.
 
 The repeated 4,893-gas delta is the guarded PriceDesk source-call path. Removing
 that work would remove the isolation behavior being remediated, and no cheaper
@@ -129,25 +132,58 @@ The selected Robinhood activation plan is exact:
 3. PriceDesk ID 3: `BlueChipYieldPrices` candidate;
 4. priority order `[1, 2]`; and
 5. one Curve feed for GREEN through the GREEN/USDG pool, with USDG resolving
-   through Chainlink and no snapshot-backed underlying.
+   through Chainlink and no snapshot-backed underlying;
+6. the complete enumerated `CurvePrices.getPricedAssets()` result is exactly
+   `[GREEN]`; and
+7. sGREEN is an explicit derived route through GREEN plus
+   `SavingsGreen.convertToAssets`, not a second stored Curve configuration.
 
-`config/robinhood-price-source-admission.json` binds that list, order, route,
-the selected three-source state, the S=10 qualification maximum, four Curve
-underlyings, 25 snapshot observations, five vaults by 15 assets (75 valuation
-positions), 20 active claim assets, and a 15-asset maintenance batch. Migration
-0011 reads the live PriceDesk slots/count, MissionControl priorities and vault
-limits, GREEN Curve configuration/pool/underlyings, and USDG Chainlink feed and
-resolution. It validates those observations before any promotion or candidate
-deployment, then re-reads the topology and validates the finalized candidate's
-live USDG feed state while slot 3 remains empty before producing Safe calldata.
-Negative migration
-tests reject source count/address drift, priority reordering, wrong pool,
-changed/additional underlyings, missing USDG Chainlink resolution, envelope
-growth, and Curve-over-BlueChip, Curve-over-Undy, or generic
-Curve-over-snapshot graphs. Every initial-preflight negative proves no
-promotion, candidate deployment, finalization execution, or slot-3 calldata is
-produced. A separate post-deployment drift test proves the second live read
-blocks slot-3 calldata even after the candidate has been finalized.
+`config/robinhood-price-source-admission.json` binds that list, order, complete
+stored/derived route set, and qualification envelope. Its controls are not all
+described as live-bound:
+
+| Field | Control classification |
+| --- | --- |
+| 250k / 75k / 150k allowances | exact active PriceDesk deployed-runtime hash |
+| selected three-source slots and priorities | live state readback |
+| five vaults, 15 assets, and derived 75 positions | live MissionControl readback |
+| S=10 maximum | committed-test qualification only |
+| four Curve underlyings | prospective Curve source-artifact bound; selected live routes are read in full |
+| 25 snapshot observations | prospective BlueChip source-artifact bound and committed test |
+| 20 active claims / 15 maintenance batch | committed StabilityPool test qualification only |
+
+The current Robinhood manifest points RipeHq ID 7 to PriceDesk
+`0x694a1F8525483cFf3142770395Ec310bf954b0C0`. Its embedded PriceDesk source hash
+is `7611139b85f93d042fcf7ddf964052909166b4bd98bdd4b7ee8c685c54641d2a`, not the
+hardened source hash
+`7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c`.
+Attaching the current ABI to that address is not runtime proof. Migrations 0011
+and 0012 now compare the live deployed bytes with the exact governed hardened
+runtime size/hash and verify the RipeHq pointer before any promotion,
+deployment, finalization, execution, or calldata generation. The current
+record therefore fails closed.
+
+The activation path is deliberately deferred: 0011 and 0012 emit no slot-3
+start or confirmation calldata and perform no BlueChip promotion. A separately
+governed PriceDesk replacement must deploy the exact hardened artifact,
+reconstruct and verify Chainlink/Curve registry IDs, descriptions, priorities,
+governance, and timelocks, update RipeHq ID 7, and repeat the runtime check.
+Activation tooling must then either atomically assert runtime, complete graph,
+empty slot/resulting ID, and confirmation, or run a fresh post-timelock
+preflight in an exclusive Safe window with a named operator and tested
+rollback/disable steps. Until that package and owner acceptance exist, there is
+no preflight-to-activation race because this repository produces no actionable
+activation call.
+
+The live observer enumerates `getPricedAssets()`, reads every returned
+`curveConfig`, resolves every non-target underlying against all current sources
+and a pending candidate when supplied, and checks the derived sGREEN behavior.
+Negative migration tests reject source count/address drift, priority
+reordering, wrong pool, changed/additional underlyings, missing USDG Chainlink
+resolution, envelope growth, extra/reordered/duplicate Curve assets, missing
+sGREEN derivation, and extra Curve-over-BlueChip, Curve-over-Undy, generic
+snapshot-backed, or otherwise-direct routes. Each negative proves no promotion,
+candidate deployment, finalization, execution, or slot-3 calldata occurs.
 
 This candidate proposes policy-only enforcement under the
 minimum-production-change direction. There is no on-chain source-count or
@@ -158,6 +194,16 @@ policy-only boundary, exact stipends, selected topology and envelope, bypass
 ability, monitoring/disable requirements, and composition residual, with stable
 approval provenance linked here. An on-chain guard is a separately scoped
 contract change and is not authorized by this record.
+
+The selected Morpho V2 local qualification uses the Morpho V2 protocol flag,
+fills all 25 observations, places BlueChip at slot 3 behind priorities `[1,2]`,
+and exercises its nested underlying PriceDesk lookup for price, feed presence,
+and snapshot update. The measured top-level local-EVM values are 74,625 gas for
+price, 4,515 for feed presence, and 18,761 for registry-mediated snapshot
+update, each below its respective stipend. Before any future production
+activation, the exact selected external Morpho V2 factory and representative
+vault must repeat this qualification on a fork; the local mock result is not
+external-factory proof.
 
 ## Reopen conditions
 
@@ -198,8 +244,8 @@ python -m pytest -m gas \
   tests/priceSources/blueChip/test_bluechip_local.py
 ```
 
-It collects seven PriceDesk tests and one BlueChip benchmark. It is not the
-repository-wide 18-node gas collection, the unmarked StabilityPool consumer
+It collects eight PriceDesk tests and one BlueChip benchmark. It is not the
+repository-wide gas collection, the unmarked StabilityPool consumer
 test, or a full repository-suite run. The affected consumer is reproduced
 separately with:
 
@@ -208,8 +254,8 @@ python -m pytest -q \
   tests/vaults/modules/test_stab_vault_hardening.py::test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling
 ```
 
-The manifest, live-observation validator, two-stage migration ordering, and all
-0011 drift/no-calldata negatives are reproduced with:
+The manifest, exact-runtime binding, complete live-graph observer, deferred
+migration gates, and all drift/no-write negatives are reproduced with:
 
 ```sh
 python -m pytest -q \

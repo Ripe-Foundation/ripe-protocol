@@ -10,9 +10,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 REGISTER = ROOT / "docs" / "chains" / "rh" / "decision-register.md"
 STATUS = ROOT / "docs" / "chains" / "rh" / "status.yaml"
-RESERVATIONS = (
-    ROOT / "docs" / "chains" / "rh" / "open-decision-id-reservations.yaml"
-)
+RESERVATIONS = ROOT / "docs" / "chains" / "rh" / "open-decision-id-reservations.yaml"
 HEADING = re.compile(r"^### (RH-D\d{3}) — (.+)$", re.MULTILINE)
 FULLY_RETIRED_STATUSES = {"retired_default_floor_restored"}
 D042_TITLE = "PriceDesk source isolation uses bounded policy-only admission"
@@ -34,17 +32,13 @@ def test_decision_register_and_status_have_exact_unique_id_title_parity():
     # the exact collision this guard is intended to detect.
     register_entries = HEADING.findall(REGISTER.read_text())
     status = yaml.safe_load(STATUS.read_text())
-    status_entries = [
-        (item["id"], item["title"])
-        for item in status["decisions"]
-    ]
+    status_entries = [(item["id"], item["title"]) for item in status["decisions"]]
     _assert_unique("register decision ids", [item[0] for item in register_entries])
     _assert_unique("status decision ids", [item[0] for item in status_entries])
     assert set(register_entries) == set(status_entries)
 
     counted = sum(
-        item["status"] not in FULLY_RETIRED_STATUSES
-        for item in status["decisions"]
+        item["status"] not in FULLY_RETIRED_STATUSES for item in status["decisions"]
     )
     assert status["counts"]["rh_d_decisions"] == counted
 
@@ -52,7 +46,11 @@ def test_decision_register_and_status_have_exact_unique_id_title_parity():
 def test_rh_d042_authority_status_is_proposed_in_register_and_status():
     register = REGISTER.read_text()
     start = register.index(f"### RH-D042 — {D042_TITLE}")
-    end = register.index("\n### ", start + 1) if "\n### " in register[start + 1 :] else len(register)
+    end = (
+        register.index("\n### ", start + 1)
+        if "\n### " in register[start + 1 :]
+        else len(register)
+    )
     assert D042_REGISTER_STATUS in register[start:end]
 
     status = yaml.safe_load(STATUS.read_text())
@@ -72,6 +70,9 @@ def test_decision_reservation_lifecycle_is_current_unique_and_complete():
     assert value["schema_version"] == 2
     assert value["integrated_target"]["branch"] == "rh-audit-remediation"
     assert "commit" not in value["integrated_target"]
+    assert value["reservation_scope"] == (
+        "identifiers_only_titles_are_coordination_hints"
+    )
 
     reservations = value["open_pr_reservations"]
     reserved_ids = [item["id"] for item in reservations]
@@ -85,7 +86,7 @@ def test_decision_reservation_lifecycle_is_current_unique_and_complete():
     ]
     _assert_unique("recent integrated decision ids", integrated_ids)
     assert set(integrated_ids) <= {item[0] for item in register_entries}
-    assert {"RH-D033", "RH-D034"} <= set(integrated_ids)
+    assert {"RH-D033", "RH-D034", "RH-D035", "RH-D036"} <= set(integrated_ids)
 
     candidate_ids = [
         decision_id
@@ -96,13 +97,12 @@ def test_decision_reservation_lifecycle_is_current_unique_and_complete():
     assert set(candidate_ids) <= {item[0] for item in register_entries}
     assert set(candidate_ids).isdisjoint(integrated_ids)
 
-    integrated_register_ids = {
-        item[0] for item in register_entries
-    } - set(candidate_ids)
+    integrated_register_ids = {item[0] for item in register_entries} - set(
+        candidate_ids
+    )
     highest = value["integrated_target"]["highest_decision_id"]
     assert _decision_number(highest) == max(
-        _decision_number(decision_id)
-        for decision_id in integrated_register_ids
+        _decision_number(decision_id) for decision_id in integrated_register_ids
     )
 
     all_live_ids = [item[0] for item in register_entries] + reserved_ids

@@ -822,9 +822,13 @@ class Migration:
         except Exception:
             raise RuntimeError("MIGRATION_CANDIDATE_CODE_READ_FAILED") from None
 
+    def get_deployed_code(self, address):
+        """Read exact deployed runtime bytes for migration preflight gates."""
+        return self._get_deployed_code(address)
+
     def _validate_deployed_code(self, record, *, activation=False):
         kind = "ACTIVATION_CANDIDATE" if activation else "CANDIDATE"
-        deployed_code = self._get_deployed_code(record.address)
+        deployed_code = self.get_deployed_code(record.address)
         if not deployed_code:
             raise RuntimeError(f"MIGRATION_{kind}_DEPLOYED_CODE_MISSING")
         if len(deployed_code) != record.deployed_runtime_size:
