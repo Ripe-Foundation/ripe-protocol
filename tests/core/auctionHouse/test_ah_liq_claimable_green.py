@@ -1,5 +1,7 @@
 import boa
 import pytest
+from eth_utils import keccak
+
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs, redeem_from_stability_pool
 
@@ -423,10 +425,22 @@ def test_unhealthy_stability_pool_falls_back_to_ordinary_auction(
     else:
         # Current deposits prevent this overlap, but migrated/legacy state can
         # reserve the raw stabilization-asset custody for another cohort.
+        # Write the compiler-pinned mapping slot directly: contract.eval() is
+        # order-sensitive under the pinned Boa/Vyper toolchain in the full suite.
         reserved = bravo_token.balanceOf(stability_pool)
-        stability_pool.eval(
-            f"stabVault.totalClaimableBalances[{bravo_token.address}] = {reserved}"
+        total_claimable_slot = int.from_bytes(
+            keccak(
+                (10).to_bytes(32, "big")
+                + int(bravo_token.address, 16).to_bytes(32, "big")
+            ),
+            "big",
         )
+        boa.env.set_storage(
+            stability_pool.address,
+            total_claimable_slot,
+            reserved,
+        )
+        assert stability_pool.totalClaimableBalances(bravo_token) == reserved
         assert stability_pool.getTotalValue(bravo_token) == 20 * EIGHTEEN_DECIMALS
     assert not stability_pool.canAcceptLiquidationAsset(bravo_token, alpha_token)
     assert stability_pool.getUserAssetAndAmountAtIndex(bob, 1) == (

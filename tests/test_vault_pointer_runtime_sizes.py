@@ -136,7 +136,7 @@ WAIVED_CONTRACT_IDENTITIES = {
         "fixture": "auction_house",
         "source": "contracts/core/AuctionHouse.vy",
         "source_sha256": (
-            "83a8ab12a2355ef7055e753597b96e86b6a8de607a9f7ba19c19242300a36089"
+            "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e"
         ),
         "runtime_sha256": (
             "0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2"
@@ -361,7 +361,16 @@ def test_rh_decision_register_status_and_waiver_ids_have_exact_parity():
     ]
     status_decisions = dict(status_rows)
     assert len(status_decisions) == len(status_rows), "duplicate status RH decision ID"
-    assert status["counts"]["rh_d_decisions"] == len(status_rows)
+    fully_retired = {
+        row["id"]
+        for row in status["decisions"]
+        if row["id"].startswith("RH-D")
+        and row["status"] == "retired_default_floor_restored"
+    }
+    assert fully_retired == {"RH-D026"}
+    assert status["counts"]["rh_d_decisions"] == (
+        len(status_rows) - len(fully_retired)
+    )
     assert status_decisions == register
 
     waiver_decisions = {

@@ -1104,7 +1104,7 @@ CPython 3.12.0, Vyper `0.4.3+commit.bff19ea2`, and titanoboa 0.2.7:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/core/AuctionHouse.vy` SHA-256 | `83a8ab12a2355ef7055e753597b96e86b6a8de607a9f7ba19c19242300a36089` |
+| `contracts/core/AuctionHouse.vy` SHA-256 | `e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e` |
 | Runtime-template SHA-256 (immutable-free) | `0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2` |
 | Runtime-template bytes | 24,458 |
 | Immutable data bytes | 96 |
