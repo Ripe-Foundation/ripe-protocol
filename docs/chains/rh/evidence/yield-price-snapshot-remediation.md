@@ -69,10 +69,10 @@ Confirmation distinguishes structural invalidity from a transient seed read:
 
 ## Delay and freshness configuration
 
-The adapters intentionally permit `0 < staleTime < minSnapshotDelay`. The
-resulting interval is fail-closed: this source returns zero after the inclusive
-freshness deadline and before the next snapshot is eligible; PriceDesk may use
-a later healthy source or leave the asset unpriced.
+The adapters intentionally permit `0 < staleTime < minSnapshotDelay`. This
+configuration may create a fail-closed interval: this source returns zero after
+the inclusive freshness deadline and before the next snapshot is eligible;
+PriceDesk may use a later healthy source or leave the asset unpriced.
 
 The pre-expiry-refresh predicate is
 `staleTime == 0 or minSnapshotDelay <= staleTime`. For a finite freshness
