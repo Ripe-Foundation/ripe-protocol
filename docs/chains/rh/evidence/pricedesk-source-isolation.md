@@ -77,19 +77,21 @@ the selected 250,000 allowance, still fails at 350,000, and first succeeds at
 reason to enlarge the general allowance.
 
 The affected StabilityPool node was rerun and instrumented on exact current
-target `e7b6eeab768a009469a38a7ce8a35bb7e8d8f4bc` and on the PriceDesk head
+target `72a02acea5322f03fec5a6c0d8f0e914495bad5e` and on the PriceDesk head
 under isolated local-EVM environments. The current target reproduces the
 earlier `348f8c1` values exactly:
 
-| Ceiling case | Parent `e7b6eea` | PriceDesk head | Delta | New ceiling |
+| Ceiling case | Parent `72a02ac` | PriceDesk head | Delta | New ceiling |
 | --- | ---: | ---: | ---: | ---: |
 | Deposit | 508,587 | 513,480 | +4,893 | 530,000 |
 | Withdrawal | 446,932 | 451,825 | +4,893 | 470,000 |
 
 The parent rerun used an instrumentation-only print addition to the test; the
-contracts and execution path were exact `e7b6eea`. The earlier historical
-`f563cbb` measurement reference is superseded; no tree-equivalence claim is
-made for it.
+contracts and execution path were exact `72a02ac`. That target advances
+`400d6eb` through PR #143 AuctionHouse production, artifact, documentation,
+fixture, and test changes. The exact rerun confirms those changes do not alter
+the three reported values. The earlier historical `f563cbb` measurement
+reference is superseded; no tree-equivalence claim is made for it.
 
 The repeated 4,893-gas delta is the guarded PriceDesk source-call path. Removing
 that work would remove the isolation behavior being remediated, and no cheaper

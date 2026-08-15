@@ -334,11 +334,10 @@ decision_namespace:
   mirror_contract: Every RH-D identifier and title must match the canonical register exactly; duplicate, missing, or reserved identifiers fail closed.
   in_flight_coordination:
     checked_on: 2026-08-15
-    sc12_reserved_id: RH-D035
     integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036], PR_145: [RH-D038] }
     open_pr_allocations: { PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
     open_prs_with_no_new_decision: [PR_163]
-    inherited_not_new: { PR_152: [RH-D033, RH-D034] }
+    inherited_not_new: { PR_152: [RH-D033, RH-D034, RH-D035, RH-D036, RH-D038] }
     external_collision: none_detected_by_fail_closed_integration_allocator
     scope: PR 152 preserves the integrated PR 145 allocation and the current open-PR reservations; it introduces only RH-D042 and does not edit or renumber another branch.
 
