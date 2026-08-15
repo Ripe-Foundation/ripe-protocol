@@ -64,6 +64,16 @@ used. Any later source, compiler, dependency, constructor, runtime identity, or
 size change requires a fresh measurement and must continue to satisfy the
 ordinary floor unless a separate owner-authorized waiver is added.
 
+The final artifact identities are source SHA-256
+`b6b610666454e318bb988792bd00b0e49ada8dfe99c3a4650f04a6f8f0607f00`,
+runtime-template SHA-256
+`d5aee8fefddc488dc2325f4bb384f72af6e059d7eb8521543f1f254bb4c7c49e`,
+and immutable-bound deployed-runtime SHA-256
+`ee69abbd02494ce3b64f7e1e9e8bb9c8b43ccee04541c4286679280810aa88ce`.
+They use Vyper `0.4.3+commit.bff19ea2`, the source `codesize` pragma, and the
+constructor/immutable values frozen by `capture_contract_runtimes.py` and
+`config/contract-artifact-expectations.json`.
+
 The candidate is compatible with the recorded Robinhood MissionControl, where
 the Stability Pool classifier is present and populated. Before changing the
 Robinhood Deleverage registry pointer, deployment verification must establish

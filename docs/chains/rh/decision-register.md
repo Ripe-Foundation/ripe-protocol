@@ -1270,6 +1270,10 @@ and all failures after real processing starts still propagate; direct claims,
 withdrawals, deposits, explicit redemptions, and strict requested handling
 remain fail-closed.
 
+The final deployed candidate is 24,287 bytes with 289 bytes of EIP-170
+headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
+headroom override or exact-identity waiver.
+
 This decision reopens no cooldown, Underscore, deferred control, fork,
 deployment, configuration, activation, or release work. Robinhood deployment
 verification must establish `MissionControl.isStabVaultId(1) == true`. The
