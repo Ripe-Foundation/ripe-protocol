@@ -125,11 +125,12 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
     # monotonic matrix proves the cap bounds the linear NAV traversal.
     assert all(a < b for a, b in zip(deposit_gas, deposit_gas[1:]))
     assert all(a < b for a, b in zip(withdrawal_gas, withdrawal_gas[1:]))
-    # PriceDesk's guarded raw-call boundary raises the measured ceiling case to
-    # 506,004 gas. Keep ~2.8% local-EVM regression headroom for that accepted
-    # source-isolation cost without weakening the monotonic traversal checks.
-    assert deposit_gas[-1] < 520_000
-    assert withdrawal_gas[-1] < 450_000
+    # At the exact focused parent, the ceiling cases were 508,587 deposit and
+    # 446,932 withdrawal. PriceDesk's guarded raw-call boundary adds 4,893 gas
+    # to each (513,480 and 451,825). These deliberate ceilings retain 3.2% and
+    # 4.0% local-EVM headroom without weakening the traversal checks.
+    assert deposit_gas[-1] < 530_000
+    assert withdrawal_gas[-1] < 470_000
 
     gas_before = boa.env.get_gas_used()
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, claim_tokens[0])
@@ -214,16 +215,26 @@ def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(
         ) != 0
         claim_many_gas = boa.env.get_gas_used() - gas_before
 
+    print(
+        "STABILITY_ACTIVE_CLAIM_CEILING_GAS",
+        f"deposit={deposit_gas[-1]}",
+        f"withdrawal={withdrawal_gas[-1]}",
+        f"claim_many={claim_many_gas}",
+        f"active_claim_assets={MAX_ACTIVE_CLAIM_ASSETS}",
+        f"maintenance_batch={MAX_CLAIM_ASSET_MAINTENANCE}",
+    )
+
     # Local-EVM regression ceilings for the other public bounded paths. They
     # are not production gas estimates or assertions about a chain gas limit.
     assert existing_receipt_gas < 50_000
     assert prune_gas < 500_000
     assert activation_gas < 1_200_000
     assert single_claim_gas < 500_000
-    # The SC-05/17/23 source-dispatch changes raise repeated PriceDesk no-feed
-    # probes in this 15-claim path from 6,974,789 to 7,013,069 gas. Preserve
-    # ~2.7% local-EVM regression headroom without weakening the bounded cap.
-    assert claim_many_gas < 7_200_000
+    # PR142 separately rebaselined its measured 7,013,069 parent value from the
+    # obsolete 7,000,000 cap to 7,200,000. PriceDesk head is 7,089,959; this
+    # final ceiling keeps ~2.3% local-EVM headroom and must not be conflated
+    # with the 4,893-gas single deposit/withdrawal call delta.
+    assert claim_many_gas < 7_250_000
     # Preflight and iteration each traverse the bounded claim set once. The
     # iterator must not repeat the strict NAV traversal after readiness passes.
     assert liquidation_preflight_gas < 600_000

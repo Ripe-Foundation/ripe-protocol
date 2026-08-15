@@ -334,7 +334,7 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
 
-    step = _step(job, "Require successful snapshot gas budgets")
+    step = _step(job, "Require successful PriceDesk and BlueChip gas budgets")
     assert step["env"]["GAS_RESULT"] == "${{ needs.snapshot-gas.result }}"
     assert 'if [ "$GAS_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
@@ -345,6 +345,24 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     )
     assert 'if [ "$CONTROLS_RESULT" != "success" ]' in controls["run"]
     assert "exit 1" in controls["run"]
+
+
+def test_python_workflow_runs_exact_focused_gas_surfaces_with_addopts():
+    job = _workflow()["jobs"]["snapshot-gas"]
+    assert job["name"] == "Python 3.12.0 / snapshot-gas"
+    assert job["timeout-minutes"] == "30"
+
+    command = _step(
+        job,
+        "Enforce the focused PriceDesk and BlueChip gas budgets",
+    )["run"]
+    assert "-o addopts=''" not in command
+    assert command.count("-m gas") == 1
+    assert command.count("tests/registries/test_price_desk_gas.py") == 1
+    assert command.count(
+        "tests/priceSources/blueChip/test_bluechip_local.py"
+    ) == 1
+    assert "grep -q" not in command
 
 
 def test_python_workflow_runs_ignored_deployment_controls_credential_free():

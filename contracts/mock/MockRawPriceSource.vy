@@ -1,9 +1,10 @@
 # @version 0.4.3
 
 # Test-only PriceSource with independently configurable raw return shapes.
-# Modes: 0 canonical, 1 revert, 2 empty, 3 short, 4 oversized by one byte,
-# 5 noncanonical Boolean word, 6 oversized to 96 bytes (price/feed channels)
-# or canonical false (snapshot channel).
+# Shared modes: 0 canonical, 1 revert, 2 empty, 3 short,
+# 4 oversized by one byte, 5 noncanonical Boolean word, 6 oversized to 96 bytes.
+# Snapshot-only mode 7 returns canonical false. Keeping it distinct prevents a
+# response-shape mode from acquiring channel-dependent Boolean semantics.
 
 price: public(uint256)
 hasFeed: public(bool)
@@ -23,7 +24,7 @@ def configure(
 ):
     assert _priceResponseMode <= 6
     assert _hasFeedResponseMode <= 6
-    assert _snapshotResponseMode <= 6
+    assert _snapshotResponseMode <= 7
     self.price = _price
     self.hasFeed = _hasFeed
     self.priceResponseMode = _priceResponseMode
@@ -82,7 +83,7 @@ def hasPriceFeed(_asset: address) -> Bytes[96]:
 
 @external
 @raw_return
-def addPriceSnapshot(_asset: address) -> Bytes[33]:
+def addPriceSnapshot(_asset: address) -> Bytes[96]:
     self.snapshotCount += 1
 
     mode: uint256 = self.snapshotResponseMode
@@ -91,10 +92,12 @@ def addPriceSnapshot(_asset: address) -> Bytes[33]:
     if mode == 2:
         return b""
 
-    resultWord: uint256 = 2 if mode == 5 else (0 if mode == 6 else 1)
+    resultWord: uint256 = 2 if mode == 5 else (0 if mode == 7 else 1)
     response: bytes32 = convert(resultWord, bytes32)
     if mode == 3:
         return slice(response, 0, 31)
     if mode == 4:
         return concat(response, b"x")
+    if mode == 6:
+        return concat(response, empty(bytes32), empty(bytes32))
     return slice(response, 0, 32)

@@ -277,21 +277,16 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
-      - name: Enforce snapshot gas budgets when present
+      - name: Enforce the focused PriceDesk and BlueChip gas budgets
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-          test_file=tests/priceSources/blueChip/test_bluechip_local.py
-          if grep -q '^def test_sc05_sc17_bluechip_gas_measurements' "$test_file"; then
-            /usr/bin/time -p python -m pytest \
-              -o addopts='' \
-              -o cache_dir="$RUNNER_TEMP/pytest-cache" \
-              --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-              -m gas \
-              "$test_file"
-          else
-            echo "Snapshot gas benchmark not present on this prerequisite head."
-          fi
+          /usr/bin/time -p python -m pytest \
+            -o cache_dir="$RUNNER_TEMP/pytest-cache" \
+            --basetemp="$RUNNER_TEMP/pytest-basetemp" \
+            -m gas \
+            tests/registries/test_price_desk_gas.py \
+            tests/priceSources/blueChip/test_bluechip_local.py
 
   rh-pr-gate:
     name: rh-pr-gate
@@ -321,11 +316,11 @@ jobs:
             exit 1
           fi
 
-      - name: Require successful snapshot gas budgets
+      - name: Require successful PriceDesk and BlueChip gas budgets
         env:
           GAS_RESULT: ${{ needs.snapshot-gas.result }}
         run: |
           if [ "$GAS_RESULT" != "success" ]; then
-            echo "Snapshot gas lane did not succeed: $GAS_RESULT"
+            echo "Focused PriceDesk/BlueChip gas lane did not succeed: $GAS_RESULT"
             exit 1
           fi

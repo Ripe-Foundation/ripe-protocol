@@ -60,8 +60,8 @@ snapshot:
 counts:
   scope: broad_program_snapshot_as_of_2026_08_11_except_rh_d_decision_mirror_overlay
   workstreams: 28
-  # Counts decisions not fully retired; RH-D026 is excluded from 37 entries.
-  rh_d_decisions: 36
+  # Counts decisions not fully retired; RH-D026 is excluded from 38 entries.
+  rh_d_decisions: 37
   h03_blockers: 28
   h04_rows: 22
   h04_approved_operative: 21
@@ -330,16 +330,17 @@ repository_ci:
 
 decision_namespace:
   canonical_file: docs/chains/rh/decision-register.md
-  mirror_contract: Every integrated entry in this file must match the canonical register's identifier and title exactly and cannot be silently closed.
+  open_pr_reservations: docs/chains/rh/open-decision-id-reservations.yaml
+  mirror_contract: Every RH-D identifier and title must match the canonical register exactly; duplicate, missing, or reserved identifiers fail closed.
   in_flight_coordination:
     checked_on: 2026-08-15
     sc12_reserved_id: RH-D035
-    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036] }
-    open_pr_allocations: { PR_145: [RH-D038], PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
+    integrated_allocations: { PR_142: [RH-D033, RH-D034], PR_144: [RH-D035], PR_143: [RH-D036], PR_145: [RH-D038] }
+    open_pr_allocations: { PR_146: [RH-D037], PR_147: [RH-D039, RH-D040, RH-D041], PR_152: [RH-D042], PR_157: [RH-D043] }
     open_prs_with_no_new_decision: [PR_163]
     inherited_not_new: { PR_152: [RH-D033, RH-D034] }
     external_collision: none_detected_by_fail_closed_integration_allocator
-    scope: PR 145 records the live target and six open remediation PR heads checked on 2026-08-15; it does not edit, renumber, approve, or reject another branch.
+    scope: PR 152 preserves the integrated PR 145 allocation and the current open-PR reservations; it introduces only RH-D042 and does not edit or renumber another branch.
 
 sc12_activation_state:
   source: docs/chains/rh/smart-contract-changes/ripe-gov.md
@@ -366,6 +367,8 @@ document_roles:
   - { file: docs/chains/rh/AGENT-HANDOFF.md, role: "Compatibility redirect to the canonical quick-start."}
   - { file: docs/chains/rh/deployment-owner-readiness.md, role: "Compatibility redirect to the canonical quick-start."}
   - { file: docs/chains/rh/decision-register.md, role: "Canonical RH-D namespace and accepted-risk index."}
+  - { file: docs/chains/rh/open-decision-id-reservations.yaml, role: "Collision-free RH-D reservations for still-open sibling PRs; reservations are removed atomically on integration."}
+  - { file: docs/chains/rh/evidence/pricedesk-source-isolation.md, role: "Controlling PriceDesk stipend, topology, preflight, monitoring, and requalification policy record."}
   - { file: docs/chains/rh-summary.md, role: "Stable architecture and launch checklist; not live status authority."}
   - { file: docs/chains/rh/rh-production-vyper-remediation.md, role: "Current correction record for the production-remediation candidate, including active assets, source IDs, reward availability, migration topology, and lifecycle boundaries."}
   - { file: docs/chains/rh/reassessment-and-qualification-synthesis.md, role: "Historical pre-remediation launch synthesis; retained for design provenance, not current configuration or migration authority."}
@@ -1207,6 +1210,7 @@ decisions:
   - { id: RH-D035, title: "RipeGov early-release redistribution and governance-point lifecycle", status: "owner_accepted_sc12_candidate_complete_underscore_activation_blocked", summary: "SC-12 keeps the fee in-pool and retains the maximal indivisible share balance under the exact post-state claim bound. Address-level common-owner recapture and the governance-point lifecycle remain accepted policy. The pre-existing registered Underscore or Lego caller path is not user-bound and is not accepted: issue #161 blocks any nonzero Underscore registry until user-bound authorization is proven or exact owner/security acceptance is recorded. RipeGov-local nonreentrancy is reviewed with no action because exact-Teller access is protected by Teller's nonreentrant routes. Base rebind issue #150, integration, deployment, activation, governance-power use, migration, and release remain separate gates.", source: "docs/chains/rh/smart-contract-changes/ripe-gov.md"}
   - { id: RH-D036, title: "AuctionHouse conservation exact waiver at 22 bytes", status: "owner_granted_exact_zero_growth_waiver", summary: "The 200-byte floor remains controlling. For the exact SC-01, SC-02, and SC-08 conservation artifact, AuctionHouse deploys at 24,554 bytes including 96 immutable bytes, leaving 22 bytes. The owner accepted that technically deployable margin and the explicit SC-08 policy: the Stability spread is a legacy discount rate, an empty first pass permanently waives episode fees, and fee-free retry liveness depends on a bound protocol-operated monitor or keeper. Source, runtime template, exact deployed size, and deterministic immutable-bound deployed hashes are pinned. The waiver permits zero growth and reopens on any source, compiler, dependency, constructor-input, or compiler-output change; it does not authorize deployment or activation.", source: "docs/chains/rh/decision-register.md"}
   - { id: RH-D038, title: "SC-07/SC-09 Deleverage remediation is reopened and bounded", status: "owner_authorized_draft_pr_145_candidate", summary: "The owner reopened only the exact SC-07 stale-settlement and SC-09 optional Stability Pool availability remediation in draft PR #145. Broad and withdrawal-assist probes skip unavailable cohorts while direct and processing-time paths remain fail-closed. The final 24,309-byte deployed runtime leaves 267 bytes and uses the ordinary 200-byte floor without a waiver; all cooldown, Underscore, deferred-control, fork, deployment, configuration, activation, and release work remains parked.", source: "docs/chains/rh/deleverage-sc07-sc09-security-decision.md"}
+  - { id: RH-D042, title: "PriceDesk source isolation uses bounded policy-only admission", status: "proposed_candidate_policy_boundary_pending_owner_approval", summary: "PriceDesk uses exact compile-time 250,000/75,000/150,000 source allowances bound by the governed deployed-runtime hash. Live readback covers the selected slots/priorities, complete enumerated GREEN/USDG Curve graph with derived sGREEN, and 5x15 MissionControl limits; S=10, four-underlying, 25-snapshot, and StabilityPool claim limits are separately classified as source-artifact or committed-test qualifications. The recorded Robinhood PriceDesk is pre-hardening, so 0011/0012 fail closed and emit no activation calldata or promotion. A governed replacement and approved activation/rollback workflow remain required. Governance can bypass policy-only controls; explicit owner approval of that residual, the exact stipends, topology, operating envelope, monitoring, and timelocked disable requirements is not yet established. Any allowance, topology, source-count, vault/asset-limit, source, compiler, or dependency change reopens qualification. No deployment or activation is authorized.", source: "docs/chains/rh/evidence/pricedesk-source-isolation.md"}
 
 deadlines:
   - { id: H01-EXCEPTION-REVIEW, label: "Review both retained dependency-security exceptions", due_at: "2026-08-15", kind: "scheduled_review", plain_language_scope: "Re-review pytest and Pymdown b64 reachability, controls, ownership, and retirement paths.", why_it_matters: "A dated exception becomes stale if its facts and controls are not revalidated.", owner: "H-01 owner and independent security reviewer", consequence: "Missing review blocks affected exception use for rehearsal.", source: "docs/chains/rh/evidence/dependency-security-gate.md"}

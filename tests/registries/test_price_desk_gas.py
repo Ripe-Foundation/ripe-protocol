@@ -1,10 +1,10 @@
-import hashlib
 from pathlib import Path
 
 import boa
 import pytest
 
 from constants import BLUE_CHIP_PROTOCOL_MORPHO, EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from config.artifact_expectations import load_artifact_expectations
 from scripts import check_contract_artifacts as artifact_checker
 
 
@@ -170,7 +170,18 @@ def _configure_max_bluechip_feed(
 
 
 @pytest.mark.gas
-def test_price_desk_final_runtime_size_and_hashes(price_desk):
+def test_price_desk_governed_artifact_and_fixture_runtime_size(price_desk):
+    results = artifact_checker.check(
+        artifact_checker.DEFAULT_EXPECTATIONS,
+        ("PriceDesk",),
+        {},
+    )
+    assert len(results) == 1
+
+    expectations = load_artifact_expectations(
+        artifact_checker.DEFAULT_EXPECTATIONS,
+        root=artifact_checker.ROOT,
+    )["contracts"]["PriceDesk"]
     source = Path("contracts/registries/PriceDesk.vy")
     compiled = artifact_checker._compile(
         source,
@@ -181,20 +192,24 @@ def test_price_desk_final_runtime_size_and_hashes(price_desk):
         compiled,
         deployed_runtime,
     )
-    sha256 = lambda value: hashlib.sha256(value).hexdigest()
-    print(
-        "PRICEDESK_ARTIFACT",
-        f"source_sha256={compiled.source_sha256}",
-        f"optimizer={compiled.effective_optimization}",
-        f"runtime_template_size={len(compiled.runtime_template)}",
-        f"runtime_template_sha256={sha256(compiled.runtime_template)}",
-        f"immutable_size={len(binding.immutable_data)}",
-        f"immutable_sha256={sha256(binding.immutable_data)}",
-        f"deployed_runtime_size={len(binding.runtime)}",
-        f"deployed_runtime_sha256={sha256(binding.runtime)}",
-        f"creation_size={len(compiled.creation)}",
-    )
+    artifacts = expectations["artifacts"]
+    assert compiled.source_sha256 == expectations["source_sha256"]
+    assert len(compiled.runtime_template) == artifacts["runtime_template_size"]
+    assert len(binding.runtime) == artifacts["deployed_runtime_size"]
     assert len(binding.runtime) < artifact_checker.EIP_170_LIMIT
+    print(
+        "PRICEDESK_GOVERNED_ARTIFACT",
+        f"source_sha256={expectations['source_sha256']}",
+        f"optimizer={expectations['effective_optimization']}",
+        f"runtime_template_size={artifacts['runtime_template_size']}",
+        f"runtime_template_sha256={artifacts['runtime_template_sha256']}",
+        f"production_immutable_size={artifacts['deployed_runtime_immutable_data_size']}",
+        f"production_immutable_sha256={artifacts['deployed_runtime_immutable_data_sha256']}",
+        f"production_deployed_runtime_size={artifacts['deployed_runtime_size']}",
+        f"production_deployed_runtime_sha256={artifacts['deployed_runtime_sha256']}",
+        f"fixture_deployed_runtime_size={len(binding.runtime)}",
+        f"creation_size={artifacts['creation_size']}",
+    )
 
 
 @pytest.mark.gas

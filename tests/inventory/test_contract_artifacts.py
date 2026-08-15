@@ -37,6 +37,7 @@ REQUIRED_CONTRACTS = frozenset(
         "Ledger",
         "Lootbox",
         "MissionControl",
+        "PriceDesk",
         "RipeGov",
         "SwitchboardAlpha",
         "SwitchboardDelta",
@@ -60,6 +61,7 @@ NEW_CONTRACT_SOURCES = {
     ),
     "SwitchboardDelta": ROOT / "contracts" / "config" / "SwitchboardDelta.vy",
     "MissionControl": ROOT / "contracts" / "data" / "MissionControl.vy",
+    "PriceDesk": ROOT / "contracts" / "registries" / "PriceDesk.vy",
     "RipeGov": ROOT / "contracts" / "vaults" / "RipeGov.vy",
     "StabilityPool": ROOT / "contracts" / "vaults" / "StabilityPool.vy",
     "SwitchboardAlpha": ROOT / "contracts" / "config" / "SwitchboardAlpha.vy",
@@ -77,6 +79,7 @@ DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_554, "headroom": 22},
     "CreditEngine": {"size": 24_566, "headroom": 10},
     "Deleverage": {"size": 24_309, "headroom": 267},
+    "PriceDesk": {"size": 16_784, "headroom": 7_792},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (

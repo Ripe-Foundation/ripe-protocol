@@ -6,6 +6,14 @@ from constants import EIGHTEEN_DECIMALS
 
 
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+RAW_CANONICAL = 0
+RAW_REVERT = 1
+RAW_EMPTY = 2
+RAW_SHORT = 3
+RAW_OVERSIZED_ONE = 4
+RAW_NONCANONICAL_BOOL = 5
+RAW_OVERSIZED_96 = 6
+RAW_SNAPSHOT_FALSE = 7
 
 
 def _raw_source(
@@ -134,7 +142,13 @@ def test_reverting_non_priority_source_falls_through_to_healthy_source(
 
 @pytest.mark.parametrize(
     "mode",
-    (2, 3, 4, 5, 6),
+    (
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("empty", "short", "oversized_65", "noncanonical_bool", "oversized_96"),
 )
 def test_malformed_price_response_falls_through_to_healthy_source(
@@ -341,7 +355,14 @@ def test_all_sources_failed_preserves_strict_and_non_strict_intent(
 
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5, 6),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("revert", "empty", "short", "oversized_33", "noncanonical_bool", "oversized_96"),
 )
 def test_malformed_has_price_feed_falls_through_to_healthy_source(
@@ -359,7 +380,14 @@ def test_malformed_has_price_feed_falls_through_to_healthy_source(
 
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5, 6),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("revert", "empty", "short", "oversized_33", "noncanonical_bool", "oversized_96"),
 )
 def test_all_failed_has_price_feed_queries_return_false(
@@ -448,8 +476,22 @@ def test_final_feed_wins_behind_nine_has_feed_allowance_exhausting_sources(
 
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5),
-    ids=("revert", "empty", "short", "oversized", "noncanonical_bool"),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
+    ids=(
+        "revert",
+        "empty",
+        "short",
+        "oversized_33",
+        "noncanonical_bool",
+        "oversized_96",
+    ),
 )
 def test_failed_snapshot_source_does_not_block_later_healthy_source(
     mode,
@@ -497,7 +539,7 @@ def test_canonical_false_snapshot_does_not_report_an_update(
     false_only = _raw_source(
         EIGHTEEN_DECIMALS,
         has_feed=True,
-        snapshot_mode=6,
+        snapshot_mode=RAW_SNAPSHOT_FALSE,
     )
     desk = _isolated_price_desk(ripe_hq, deploy3r, [false_only])
 
@@ -514,7 +556,7 @@ def test_canonical_false_snapshot_does_not_mask_later_true_update(
     false_source = _raw_source(
         EIGHTEEN_DECIMALS,
         has_feed=True,
-        snapshot_mode=6,
+        snapshot_mode=RAW_SNAPSHOT_FALSE,
     )
     true_source = _raw_source(EIGHTEEN_DECIMALS, has_feed=True)
     desk = _isolated_price_desk(ripe_hq, deploy3r, [false_source, true_source])

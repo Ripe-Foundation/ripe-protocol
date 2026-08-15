@@ -17,6 +17,9 @@ given.
 from scripts.utils import log
 from scripts.utils.migration import Migration, PromotionSpec
 
+from config.price_source_admission import (
+    require_selected_bluechip_slot_3_plan,
+)
 from config.robinhood_launch import (
     BLUECHIP_AAVE_PROVIDER,
     BLUECHIP_COMPOUND_CONFIGURATOR,
@@ -112,6 +115,12 @@ def migrate(migration: Migration):
     # rows. Chainlink and Curve occupy ids 1 and 2, so the required pre-state
     # is numAddrs == 3 with an empty readback at the next id.
     assert int(price_desk.numAddrs()) == 3, "PriceDesk next id is not slot 3"
+    assert price_desk.getAddr(1) == migration.get_address("ChainlinkPrices"), (
+        "PriceDesk slot 1 is not the selected Chainlink source"
+    )
+    assert price_desk.getAddr(2) == migration.get_address("CurvePrices"), (
+        "PriceDesk slot 2 is not the selected Curve source"
+    )
     assert price_desk.getAddr(3) == ZERO_ADDRESS, "PriceDesk slot 3 is occupied"
 
     # This selected external fact is not established merely by appearing in
@@ -149,6 +158,25 @@ def migrate(migration: Migration):
     migration.execute(blue_chip.relinquishGov)
     assert blue_chip.governance() == ZERO_ADDRESS
 
+    # This is a required policy preflight, not an on-chain topology guard.
+    # Governance can still bypass the generator, so RH-D042 binds review,
+    # monitoring, and disable procedures around the exact admitted graph.
+    require_selected_bluechip_slot_3_plan(
+        registered_sources=(
+            "ChainlinkPrices",
+            "CurvePrices",
+            "BlueChipYieldPrices",
+        ),
+        priority_source_ids=(1, 2),
+        curve_routes=(
+            (
+                "GREEN",
+                "GREEN/USDG",
+                (("GREEN", "target_asset"), ("USDG", "ChainlinkPrices")),
+            ),
+        ),
+        candidate_address=blue_chip.address,
+    )
     start, confirm = _add_calldata(
         blue_chip.address,
         "BlueChipYieldPrices",

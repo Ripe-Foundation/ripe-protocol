@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "decision": {
+    "id": "RH-D042",
+    "title": "PriceDesk source isolation uses bounded policy-only admission"
+  },
+  "enforcement": {
+    "boundary": "policy_only_with_required_preflight",
+    "on_chain_topology_guard": false,
+    "governance_can_bypass_preflight": true
+  },
+  "source_allowances": {
+    "get_price_and_has_feed": 250000,
+    "has_price_feed": 75000,
+    "add_price_snapshot": 150000
+  },
+  "selected_registry": [
+    {
+      "id": 1,
+      "semantic": "ChainlinkPrices",
+      "source_path": "contracts/priceSources/ChainlinkPrices.vy"
+    },
+    {
+      "id": 2,
+      "semantic": "CurvePrices",
+      "source_path": "contracts/priceSources/CurvePrices.vy"
+    },
+    {
+      "id": 3,
+      "semantic": "BlueChipYieldPrices",
+      "source_path": "contracts/priceSources/BlueChipYieldPrices.vy"
+    }
+  ],
+  "priority_source_ids": [1, 2],
+  "supported_curve_routes": [
+    {
+      "feed_asset": "GREEN",
+      "pool": "GREEN/USDG",
+      "underlyings": [
+        {
+          "asset": "GREEN",
+          "resolution": "target_asset"
+        },
+        {
+          "asset": "USDG",
+          "resolution": "ChainlinkPrices"
+        }
+      ]
+    }
+  ],
+  "forbidden_curve_underlying_sources": [
+    "BlueChipYieldPrices",
+    "UndyVaultPrices",
+    "snapshot_source"
+  ],
+  "qualification_envelope": {
+    "selected_registered_sources": 3,
+    "max_qualified_registered_sources": 10,
+    "max_curve_underlyings": 4,
+    "max_snapshot_observations": 25,
+    "max_vaults_per_user": 5,
+    "max_assets_per_vault": 15,
+    "max_user_valuation_positions": 75,
+    "max_active_claim_assets": 20,
+    "max_claim_maintenance_batch": 15
+  }
+}

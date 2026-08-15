@@ -53,7 +53,8 @@ def _record(
     if constructor_bound != expected_constructor_bound:
         raise checker.ArtifactCheckError(
             f"{name}: deployed-runtime capture classification changed; "
-            "review the exact 18-contract capture policy"
+            f"review the exact {len(DEPLOYED_RUNTIME_CONTRACTS)}-contract "
+            "capture policy"
         )
     creation_binding = checker._creation_binding(
         compiled.creation,
