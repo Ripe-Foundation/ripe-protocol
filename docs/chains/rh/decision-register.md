@@ -1092,20 +1092,17 @@ because it could conceal a genuine vault loss.
 
 ## Namespace coordination note — 15 August 2026
 
-A read-only live check immediately before PR #144's rebase found that merged PR
-#142 owns the integrated `RH-D033` and `RH-D034` entries, while PR #144 uniquely
-adds `RH-D035`. Open PR #143 adds `RH-D036`, PR #146 adds `RH-D037`, and PR #147
-adds `RH-D039` through `RH-D041`. PR #145's coordination intent is `RH-D038`,
-but its current head still actually adds a conflicting `RH-D033`; it must not be
-described as cleanly occupying `RH-D038` until that source is corrected. PR
-#152 inherits integrated `RH-D033`/`RH-D034` and, at its current head, also
-introduces `RH-D042`. This supersedes an earlier snapshot in which PR #152 had
-not yet allocated a decision.
+A read-only live check after PR #143 merged found that the target owns
+`RH-D033` through `RH-D036`. The intended open integration set then adds unique
+claims: PR #146 adds `RH-D037`, PR #145 adds `RH-D038`, PR #147 adds `RH-D039`
+through `RH-D041`, PR #152 adds `RH-D042`, and PR #157 adds `RH-D043`. PR #163
+adds no decision. The fail-closed integration allocator passed across these six
+open PR heads and the live target; no duplicate or base-conflicting claim
+remains.
 
-`RH-D035` remains uncollided. PR #144 records this namespace state read-only and
-does not edit, renumber, approve, or reject another branch's decision. The
-integration owner must resolve PR #145's actual `RH-D033` collision before that
-branch is combined with the integrated register.
+This snapshot records allocation only. It does not edit, renumber, approve, or
+reject another branch's decision, and it does not grant integration,
+deployment, configuration, activation, or release authority.
 
 ### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 
