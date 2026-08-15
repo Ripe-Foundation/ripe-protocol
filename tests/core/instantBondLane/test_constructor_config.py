@@ -205,7 +205,14 @@ def test_valid_config_boundaries(lane_env):
             decayBps=1,
         ),
         lane_env.make_config(maxUpBps=10_000),
-        lane_env.make_config(decayBps=9_999),
+        lane_env.make_config(decayBps=909),
+        lane_env.make_config(
+            minUpBps=10_000,
+            maxUpBps=10_000,
+            minDownBps=1,
+            maxDownBps=1,
+            decayBps=5_000,
+        ),
         lane_env.make_config(maxDecayEpochs=1),
         lane_env.make_config(maxDecayEpochs=32),
         lane_env.make_config(minPaymentAmount=scale),
@@ -247,6 +254,7 @@ def test_invalid_config_matrix_is_total_and_returns_false(lane_env):
         lane_env.make_config(maxDownBps=1_000, minUpBps=1_000),
         lane_env.make_config(decayBps=0),
         lane_env.make_config(decayBps=10_000),
+        lane_env.make_config(decayBps=910),
         lane_env.make_config(maxDownBps=501, decayBps=500),
         lane_env.make_config(
             minUpBps=1,

@@ -308,7 +308,9 @@ def test_randomized_controller_matches_contract(
     )
     max_down_bps = data.draw(st.integers(min_value=1, max_value=max_down_limit))
     min_down_bps = data.draw(st.integers(min_value=1, max_value=max_down_bps))
-    decay_bps = data.draw(st.integers(min_value=max_down_bps, max_value=9_999))
+    decay_bps = data.draw(
+        st.integers(min_value=max_down_bps, max_value=max_down_limit)
+    )
     accepted_units = data.draw(st.integers(min_value=1, max_value=cap_units))
 
     with boa.env.anchor():
@@ -411,7 +413,7 @@ def test_worst_case_valid_config_payout_across_decimal_counts(
                 1_000,
                 500,
                 500,
-                1_000,
+                900,
                 32,
                 max_bonus,
             )
@@ -558,7 +560,7 @@ def test_fuzz_valid_worst_case_payout_never_overflows_and_respects_floor(
             1_000,
             500,
             500,
-            1_000,
+            900,
             32,
             max_bonus,
         )

@@ -396,7 +396,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 st.integers(min_value=1, max_value=max_down_bps)
             )
             decay_bps = data.draw(
-                st.integers(min_value=max_down_bps, max_value=9_999)
+                st.integers(min_value=max_down_bps, max_value=max_down_limit)
             )
 
             cap = cap_units * self.ctx.scale

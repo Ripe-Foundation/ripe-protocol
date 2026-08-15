@@ -1,4 +1,4 @@
-"""Revision-20 mechanism evidence; calibration and deployment are not approved."""
+"""Revision-22 current-RH mechanism evidence; calibration is not approved."""
 
 import json
 from dataclasses import replace
@@ -153,6 +153,18 @@ def test_parameter_boundaries_remove_degenerate_thresholds():
         validate_params(replace(p, u_high_bps=BPS))
     with pytest.raises(AssertionError):
         validate_params(replace(p, max_decay_epochs=MAX_DECAY_EPOCHS + 1))
+    with pytest.raises(AssertionError):
+        validate_params(replace(p, decay_bps=197))
+
+
+def test_minimum_up_then_empty_decay_cannot_lower_unclamped_price():
+    p = Params()
+    minimum_up = signal_for(((p.epoch_length - 1, p.payment_cap),), p)
+    after_up = apply_signal(p.initial_rate, minimum_up, p)
+    after_decay = apply_decay(after_up, 1, p)
+
+    assert minimum_up.effective_step_bps == p.min_up_bps
+    assert after_decay <= p.initial_rate
 
 
 def test_preclamp_floor_ceiling_and_bounded_decay():

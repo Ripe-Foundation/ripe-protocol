@@ -1,18 +1,19 @@
 # Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
 
-**Status:** Owner-approved revision-20 design with revision-21 reviewer remediation
-implemented and locally validated. Contract, test, model, ABI, and branch-only feature
-gate work is complete, and the owner approved the revision-20 project-size ceilings
-recorded below. Economic calibration is explicitly **not approved**. This document is
-not merge, rebase, push, pull-request, deployment, configuration, or activation
-authority.
+**Status:** Owner-approved revision-20 design with revision-21 remediation and
+revision-22 current-RH integration implemented and locally validated. Contract, test,
+model, ABI, and feature-gate work is complete, and the owner approved the project-size
+ceilings recorded below. Economic calibration is explicitly **not approved**. The
+owner authorized revision-22 commit, branch push, and a draft pull request targeting
+`rh`; this document is not deployment, configuration, or activation authority.
 
 **Starting baselines:** revision 20 began at
 `ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`; revision 21 begins from the
 committed and pushed `instant-bond-lane` checkpoint
-`79917dd8ca1abc5fc915777fd80e95d4005b4747` without merging or rebasing RH.
+`79917dd8ca1abc5fc915777fd80e95d4005b4747`. Revision 22 integrates current
+`origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4`.
 
-The revision-21 [`implementation-spec.md`](implementation-spec.md) is authoritative.
+The revision-22 [`implementation-spec.md`](implementation-spec.md) is authoritative.
 This document records the controller rationale and the implemented design at
 `contracts/core/InstantBondLane.vy` and
 `contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
@@ -273,15 +274,17 @@ remaining payment, rate, bonus, budget, and arithmetic bounds):
 0 < minDownBps <= maxDownBps <= decayBps < B
 maxDownBps < minUpBps
 (B + minUpBps) * (B - maxDownBps) >= B * B
+(B + minUpBps) * (B - decayBps) >= B * B
 0 < maxDecayEpochs <= 32
 ```
 
-The round-trip inequality ensures that, away from rate bounds and integer saturation,
-the strongest configured positive low-utilization price-down factor cannot erase the
-weakest configured high-utilization price-up factor. It is not an unconditional
-state-level monotonicity guarantee: if the price-up transition saturates at
-`MIN_BASE_RATE`, a later price-down step can and should move the rate up from that
-floor. The model tests both the interior factor and this documented bound exception.
+The two factor inequalities ensure that, away from rate bounds and integer saturation,
+neither the strongest configured positive low-utilization price-down factor nor one
+empty-decay factor can erase the weakest configured high-utilization price-up factor.
+This is not an unconditional state-level monotonicity guarantee: if the price-up
+transition saturates at `MIN_BASE_RATE`, a later price-down or decay step can and should
+move the rate up from that floor. The model tests the interior factors and documents
+the bound exception.
 
 Collapsing each range (`min==max`) reproduces the revision-19 positive-epoch
 transition for configs that satisfy the stricter v2 validation, including exact rate
@@ -469,7 +472,7 @@ The deterministic model is
 `controller-simulation-v2.json` in this directory.
 
 Canonical artifact SHA-256:
-`f8a528bf61d1605d4f90b3a5fa8806d139b783ce2c7c22e918299073998cbde4`.
+`ea164d04a8156f18a8e03e99bf367dfa95f507fa205397e61a4e622b51a226dc`.
 
 The checked-in pure Python companion model demonstrates:
 
@@ -488,7 +491,7 @@ The checked-in pure Python companion model demonstrates:
 - byte-identical canonical JSON across repeated runs.
 
 This model is not a Lane, Foxtrot, Boa, EVM, authorization, storage, event, or
-settlement simulator. Revision-21 contract and test sources now implement the related
+settlement simulator. Revision-22 contract and test sources now implement the related
 paths, including stale Foxtrot actions, TimeLock boundaries, failed-settlement rollback,
 the partially exposed first initialization, pause/disable/budget intervals, config
 execution, ABI/event reconstruction, and stateful reference-model parity. Their final
@@ -500,11 +503,11 @@ The illustrative fixture intentionally exposes calibration risk:
 - full first/mid/last-block demand selects `800/500/200` bps;
 - +30% price catch-up takes `4/6/14` such epochs;
 - 2x takes `10/15/36`, and 10x takes `30/48/117`;
-- one fast-full 8% price-up epoch followed by one 2% empty decay epoch still nets a
-  `1.0584x` price multiplier per pair;
-- sixteen such alternating pairs reach a `2.4796x` price index;
-- one late-full 2% price-up epoch followed by one 2% empty decay epoch nets `0.9996x`
-  per pair, with sixteen alternating pairs reaching `0.9936x`; and
+- one fast-full 8% price-up epoch followed by one 1.5% empty decay epoch nets a
+  `1.0638x` price multiplier per pair;
+- sixteen such alternating pairs reach a `2.6900x` price index;
+- one late-full 2% price-up epoch followed by one 1.5% empty decay epoch still nets
+  `1.0047x` per pair, with sixteen alternating pairs reaching `1.0779x`; and
 - 32 consecutive fast-full epochs reach `11.7370x`.
 
 Those figures are mechanism evidence and a warning, not a parameter recommendation.
@@ -530,10 +533,10 @@ The working candidate includes:
 
 Historical revision 19 measured 8,669 bytes for Lane against its 9,000-byte project
 regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Revision 20
-measured 10,564 bytes for Lane and 6,051 bytes for Foxtrot. Revision-21 Boa
-deployments measure 10,679 and 6,051 bytes. The owner-approved revision-20 local
-anti-creep ceilings remain 11,000 and 6,500 bytes, leaving current headroom of 321 and
-449 bytes. Both deployments remain below EIP-170 by 13,897 and 18,525 bytes. This
+measured 10,564 bytes for Lane and 6,051 bytes for Foxtrot. Revision-22 Boa
+deployments measure 10,758 and 6,051 bytes. The owner-approved revision-20 local
+anti-creep ceilings remain 11,000 and 6,500 bytes, leaving current headroom of 242 and
+449 bytes. Both deployments remain below EIP-170 by 13,818 and 18,525 bytes. This
 rebaseline is a source-size policy decision, not deployment or economic-calibration
 approval.
 
@@ -542,19 +545,20 @@ approval.
 Completed in the working candidate:
 
 1. owner selection of the dynamic controller and next-successful-rollover semantics;
-2. authoritative revision-21 specification reconciliation;
+2. authoritative revision-22 specification reconciliation;
 3. atomic Lane and Foxtrot implementation;
 4. controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 5. deterministic ABI regeneration;
-6. fresh revision-21 local validation and a branch-only automatic feature gate; and
+6. current-RH integration, fresh revision-22 local validation, and an automatic
+   feature gate for branch pushes and pull requests targeting `rh`; and
 7. the owner-approved 11,000-byte Lane and 6,500-byte Foxtrot project ceilings.
 
-Revision 20's bounded branch commit and push completed at `79917dd`. For revision 21,
-the owner authorized one local commit in the dedicated branch and worktree. Its Git
-identity belongs in the external handoff because a commit cannot include its own
-identity; branch push remains separately unauthorized.
+Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
+reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner
+authorized revision 22 to merge current `origin/rh`, commit the reconciliation, push
+`instant-bond-lane`, and publish a draft pull request targeting `rh`. Exact Git and PR
+identities belong in the external handoff because a commit cannot include itself.
 
 Economic calibration remains `not_approved` and is required before any deployment or
-configuration proposal, not before completing source validation. Merge, rebase,
-branch push, pull-request publication, deployment, configuration, RIPE minting, and
-activation remain outside the current authorization.
+configuration proposal, not before completing source validation or review. Deployment,
+configuration, RIPE minting, and activation remain outside the current authorization.

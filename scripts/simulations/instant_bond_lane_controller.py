@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""REVISION 20 WORKING CANDIDATE — mechanism evidence; calibration not approved.
+"""REVISION 22 CURRENT-RH CANDIDATE — mechanism evidence; calibration not approved.
 
 Deterministic integer model for the proposed Instant Bond Lane v2 controller. This
 model is mechanism evidence only. It does not select production parameters and does
@@ -20,13 +20,14 @@ BPS = 10_000
 RATE_SCALE = 10**18
 SCHEMA = "ripe.instant-bond-lane.controller-simulation.v2"
 STATUS = (
-    "REVISION 20 WORKING CANDIDATE — implemented and mechanism-validated; "
+    "REVISION 22 CURRENT-RH CANDIDATE — implemented and mechanism-validated; "
     "calibration and deployment not approved"
 )
 BOUND_IMPLEMENTATION = {
-    "starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+    "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+    "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
     "instant_bond_lane_source_sha256": (
-        "39cb6ac4df0870f224c84b97b93521b9f565d0a7842c0f5c500c03315c560d7b"
+        "16e7133f9b6a5b72914f8e33c138af99feacc0725e0528840477300ffbefdb71"
     ),
     "switchboard_foxtrot_source_sha256": (
         "42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa"
@@ -46,7 +47,7 @@ class Params:
     max_up_bps: int = 800
     min_down_bps: int = 50
     max_down_bps: int = 150
-    decay_bps: int = 200
+    decay_bps: int = 150
     max_decay_epochs: int = 4
     min_rate: int = 10_000
     rate_ceiling: int = 2 * RATE_SCALE
@@ -100,6 +101,7 @@ def validate_params(p: Params) -> None:
     assert 0 < p.min_down_bps <= p.max_down_bps <= p.decay_bps < BPS
     assert p.max_down_bps < p.min_up_bps
     assert (BPS + p.min_up_bps) * (BPS - p.max_down_bps) >= BPS * BPS
+    assert (BPS + p.min_up_bps) * (BPS - p.decay_bps) >= BPS * BPS
     assert 0 < p.max_decay_epochs <= MAX_DECAY_EPOCHS
     assert 0 < p.min_rate <= p.initial_rate <= p.rate_ceiling
 
@@ -707,6 +709,9 @@ def mechanism_checks(p: Params) -> dict:
     rate = apply_signal(rate, min_up_signal, p)
     rate = apply_signal(rate, max_down_signal, p)
     assert rate <= p.initial_rate
+    min_up_then_decay_rate = apply_signal(p.initial_rate, min_up_signal, p)
+    min_up_then_decay_rate = apply_decay(min_up_then_decay_rate, 1, p)
+    assert min_up_then_decay_rate <= p.initial_rate
     floor_bound_rate = apply_signal(p.min_rate, min_up_signal, p)
     floor_bound_rate = apply_signal(floor_bound_rate, max_down_signal, p)
     assert floor_bound_rate > p.min_rate
@@ -745,6 +750,7 @@ def mechanism_checks(p: Params) -> dict:
         "conditional_collapsed_transition_mismatches": collapsed_mismatches,
         "floor_ceiling_and_decay_cap_checks": 3,
         "unclamped_round_trip_factor_check": "pass",
+        "unclamped_min_up_then_decay_factor_check": "pass",
         "rate_bound_exception_check": "pass",
     }
 
@@ -896,11 +902,15 @@ def build_artifact() -> dict:
             "catch_up_epochs": catch_up,
             "price_down_half_life_epochs": half_life,
             "alternating_path_warning": {
-                "fast_full_then_empty_pair_price_multiplier_bps": 10_584,
+                "fast_full_then_empty_pair_price_multiplier_bps": alternating[
+                    "epochs"
+                ][1]["price_index_bps"],
                 "alternating_16_pairs_final_price_index_bps": alternating[
                     "final_price_index_bps"
                 ],
-                "late_full_then_empty_pair_price_multiplier_bps": 9_996,
+                "late_full_then_empty_pair_price_multiplier_bps": alternating_late[
+                    "epochs"
+                ][1]["price_index_bps"],
                 "alternating_late_16_pairs_final_price_index_bps": (
                     alternating_late["final_price_index_bps"]
                 ),
@@ -908,9 +918,10 @@ def build_artifact() -> dict:
                     "final_price_index_bps"
                 ],
                 "interpretation": (
-                    "With 2% empty decay, the illustrative 8% fast-up path "
-                    "ratchets upward while the 2% late-up path drifts slightly "
-                    "down; neither is calibrated or approved."
+                    "With 1.5% empty decay, both the illustrative 8% fast-up "
+                    "and 2% late-up alternating paths retain a net upward price "
+                    "response, as required by config validation; neither path "
+                    "is calibrated or approved."
                 ),
             },
             "parameter_acceptance_thresholds": "owner_not_pinned",

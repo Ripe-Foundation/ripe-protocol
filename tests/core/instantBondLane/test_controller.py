@@ -132,6 +132,37 @@ def test_sold_epoch_plus_skipped_empty_epochs_apply_bounded_decay(lane_env, elap
     assert event.newRate == expected_rate
 
 
+def test_minimum_up_step_followed_by_empty_decay_cannot_lower_price(lane_env):
+    cap = 100 * lane_env.scale
+    amount = 80 * lane_env.scale
+    config = lane_env.set_config(
+        paymentCapPerEpoch=cap,
+        maxLockBonus=0,
+        minUpBps=1_000,
+        maxUpBps=2_000,
+        minDownBps=500,
+        maxDownBps=500,
+        decayBps=900,
+    )
+    lane_env.buy(amount)
+    old_rate = lane_env.lane.epochRate()
+
+    boa.env.time_travel(blocks=2 * lane_env.epoch_length)
+    quote = lane_env.quote(lane_env.scale)
+    expected_rate, utilization, decay_steps = controller_rate(
+        old_rate,
+        amount,
+        cap,
+        2,
+        config,
+    )
+
+    assert utilization == config[6]
+    assert decay_steps == 1
+    assert quote.rate == expected_rate
+    assert quote.rate <= old_rate
+
+
 def test_paused_disabled_and_budget_exhausted_gaps_follow_same_decay(lane_env):
     cap = 100 * lane_env.scale
     amount = 50 * lane_env.scale
@@ -335,7 +366,7 @@ def test_full_epoch_upward_step_is_amount_weighted_by_block_offset(
         maxUpBps=800,
         minDownBps=100,
         maxDownBps=100,
-        decayBps=200,
+        decayBps=100,
     )
     lane_env.buy(50 * lane_env.scale)
 
@@ -382,7 +413,7 @@ def test_early_high_utilization_scales_from_minimum_to_midpoint(
         maxUpBps=800,
         minDownBps=100,
         maxDownBps=100,
-        decayBps=200,
+        decayBps=100,
     )
     amount = accepted_units * lane_env.scale
     lane_env.buy(amount)
@@ -405,7 +436,7 @@ def test_weighted_lateness_is_split_merge_and_same_block_order_invariant(lane_en
         maxUpBps=800,
         minDownBps=100,
         maxDownBps=100,
-        decayBps=200,
+        decayBps=100,
     )
     lane_env.buy(50 * lane_env.scale)
 
@@ -449,7 +480,7 @@ def test_partial_first_initialized_epoch_forces_minimum_up_step(lane_factory):
         maxUpBps=800,
         minDownBps=100,
         maxDownBps=100,
-        decayBps=200,
+        decayBps=100,
     )
     boa.env.time_travel(
         blocks=ctx.genesis + ctx.epoch_length // 2 - boa.env.evm.patch.block_number
@@ -477,7 +508,7 @@ def test_single_block_epoch_treats_all_demand_as_fully_early(lane_factory):
         maxUpBps=800,
         minDownBps=100,
         maxDownBps=100,
-        decayBps=200,
+        decayBps=100,
     )
     ctx.buy(cap)
     assert ctx.lane.epochWeightedLateness() == 0

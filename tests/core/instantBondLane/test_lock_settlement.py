@@ -364,23 +364,23 @@ def test_locked_settlement_after_user_position_migration_uses_new_core_vault(
 
     core_id = registerVault(alternate_ripe_gov_vault, "Migrated Instant Bond Core")
     setAssetConfig(lane_env.ripe_token, _vaultIds=[source_id, core_id])
+    lane_env.teller.pause(True, sender=lane_env.switchboard.address)
     lane_env.ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
     alternate_ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
-    assert lane_env.teller.migrateRipeGovPosition(
-        lane_env.bob,
-        lane_env.ripe_token,
-        source_id,
-        core_id,
-        sender=switchboard_echo.address,
-    ) == first_payout
-    assert lane_env.ripe_gov_vault.positionMigratedOut(
-        lane_env.bob, lane_env.ripe_token
-    )
-
     lane_env.mission_control.setCoreRipeGovVaultId(
         core_id,
         sender=lane_env.switchboard.address,
     )
+    assert switchboard_echo.migrateRipeGovPositions(
+        [lane_env.bob],
+        source_id,
+        sender=lane_env.governance.address,
+    ) == 1
+    assert lane_env.ripe_gov_vault.positionMigratedOut(
+        lane_env.bob, lane_env.ripe_token
+    )
+
+    lane_env.teller.pause(False, sender=lane_env.switchboard.address)
     alternate_ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
     second_payout = lane_env.buy(10 * lane_env.scale, requested_lock=500)
     purchase = filter_logs(lane_env.lane, "InstantBondPurchased")[0]

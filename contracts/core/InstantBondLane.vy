@@ -285,6 +285,8 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
         return False
     if (HUNDRED_PERCENT + _config.minUpBps) * (HUNDRED_PERCENT - _config.maxDownBps) < HUNDRED_PERCENT * HUNDRED_PERCENT:
         return False
+    if (HUNDRED_PERCENT + _config.minUpBps) * (HUNDRED_PERCENT - _config.decayBps) < HUNDRED_PERCENT * HUNDRED_PERCENT:
+        return False
     if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS:
         return False
 

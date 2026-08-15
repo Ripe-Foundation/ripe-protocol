@@ -1,21 +1,21 @@
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Economic rationale for the owner-approved revision-20 mechanism and its
-revision-21 reviewer remediation, now implemented in the working candidate. Contract,
-test, model, ABI, branch-only feature-gate work, and local validation are complete; the
-owner approved the revision-20 project-size ceilings recorded in the normative
-specification. Economic calibration is explicitly **not approved**.
+**Status:** Economic rationale for the owner-approved revision-20 mechanism, its
+revision-21 remediation, and revision-22 current-RH integration, now implemented in
+the working candidate. Contract, test, model, ABI, feature-gate work, and local
+validation are complete; the owner approved the project-size ceilings recorded in the
+normative specification. Economic calibration is explicitly **not approved**.
 
 > **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
 > source and supersedes this document wherever they differ. The companion
 > [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
-> controller and override derivation in more detail. This rationale does not authorize
-> deployment, configuration, RIPE minting, activation, merge, rebase, branch push, or
-> pull-request publication.
+> controller and override derivation in more detail. The owner separately authorized
+> revision-22 commit, branch push, and a draft pull request against `rh`; this rationale
+> does not authorize deployment, configuration, RIPE minting, or activation.
 
-**Prepared:** 5 August 2026 · **Revised:** 12 August 2026 for the implemented
-revision-20 controller, next-successful-rollover override, and revision-21 reviewer
-remediation.
+**Prepared:** 5 August 2026 · **Revised:** 15 August 2026 for the implemented
+revision-20 controller, next-successful-rollover override, revision-21 remediation,
+and revision-22 current-RH integration.
 
 **Purpose:** Explain how the Instant Bond Lane sets its Buy Now rate, why the mechanism
 uses these signals, and which economic risks remain for calibration and operations.
@@ -160,6 +160,18 @@ After a positive stored epoch, its utilization transition runs once and
 defensive zero-accepted stored-epoch branch that applies `min(elapsed,
 maxDecayEpochs)` steps, although current atomic purchase sequencing cannot commit such
 a stored epoch. Epochs before first initialization are ignored.
+
+Configuration validation requires both a weakest-up/strongest-positive-down factor
+and a weakest-up/empty-decay factor to be non-ratcheting away from explicit rate bounds:
+
+```text
+(B + minUpBps) * (B - maxDownBps) >= B * B
+(B + minUpBps) * (B - decayBps) >= B * B
+```
+
+Thus an alternating high-demand/empty pattern cannot make RIPE progressively cheaper
+merely because empty decay was configured slightly stronger than the weakest upward
+response. `MIN_BASE_RATE` saturation remains an intentional exception.
 
 Pause, `canBuyNow=false`, exhausted budget, frontend failure, and other unavailable
 time are not separately clocked. They decay like other empty time. This gives patient
@@ -501,23 +513,24 @@ Completed in the working candidate:
 - normative specification reconciliation;
 - controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 - deterministic ABI regeneration;
-- fresh revision-21 validation evidence and a branch-only automatic feature gate; and
+- current-RH integration, fresh revision-22 validation evidence, and an automatic
+  feature gate for branch pushes and pull requests targeting `rh`; and
 - the owner-approved Lane/Foxtrot project-size rebaseline.
 
-Revision 20's bounded branch commit and push completed at `79917dd`. For revision 21,
-the owner authorized one local commit in the dedicated branch and worktree. Its Git
-identity belongs in the external handoff because a commit cannot include its own
-identity; branch push remains separately unauthorized. Economic calibration remains
-pending before any deployment or configuration proposal.
+Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
+reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner
+authorized revision 22 to merge current `origin/rh`, commit the reconciliation, push
+`instant-bond-lane`, and publish a draft pull request targeting `rh`. Economic
+calibration remains pending before any deployment or configuration proposal.
 
 Historical revision-18/19/20 measurements are preserved only in
 `implementation-spec.md` and must not be presented as current evidence. The exact
-revision-21 runtime sizes, hashes, selectors, layouts, coverage, and test results are
+revision-22 runtime sizes, hashes, selectors, layouts, coverage, and test results are
 recorded in that specification's current-evidence block.
 
-The completed local checks satisfy the bounded local-commit prerequisite. Merge,
-rebase, branch push, pull-request publication, deployment, configuration, RIPE
-minting, and activation remain separately unauthorized.
+The completed local checks satisfy the current integration and draft-review
+prerequisites. Deployment, configuration, RIPE minting, and activation remain
+separately unauthorized.
 
 ---
 

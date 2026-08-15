@@ -1,17 +1,17 @@
 # Instant Bond Lane — Implementation Specification
 
-**Mechanism version:** v2 · **Specification revision:** 21
+**Mechanism version:** v2 · **Specification revision:** 22
 
 **Status:** Owner-approved implementation specification. Economic calibration remains
-a deployment input. The revision-20 feature was committed and pushed as `79917dd`.
-Revision-21 reviewer remediation and one local commit on the same feature branch are
-authorized as bounded in §20; merge, rebase with another branch, branch push,
-pull-request publication, deployment, production configuration, RIPE minting, and
-activation are not authorized by this cleanup pass.
+a deployment input. Revisions 20 and 21 were committed and pushed on the dedicated
+feature branch. Revision 22 integrates current `origin/rh`, closes the approved
+empty-decay anti-ratchet finding, and is authorized for commit, branch push, and a
+draft pull request targeting `rh` as bounded in §20. Deployment, production
+configuration, RIPE minting, and activation remain unauthorized.
 
-**Prepared:** 5 August 2026 · **Revised:** 12 August 2026 (locked-settlement
-postcondition, configuration-event indexing, reviewer-remediation evidence, and a
-branch-only automatic feature gate)
+**Prepared:** 5 August 2026 · **Revised:** 15 August 2026 (current-RH integration,
+empty-decay anti-ratchet validation, migration/API reconciliation, and draft-PR
+delivery evidence)
 
 **Companion:** pricing rationale in [`pricing-design.md`](pricing-design.md). This
 specification is authoritative wherever the documents differ.
@@ -22,8 +22,10 @@ Revision 20 began from committed feature baseline
 `dc64aab1a63c48ab311b9539f3043df7c17d3788`, which incorporates RH baseline
 `be6e4e9805e9b499b10f61cd219c555e62b43857`. Revision 21 begins from the
 committed and pushed feature checkpoint
-`79917dd8ca1abc5fc915777fd80e95d4005b4747`; it does not merge, rebase, or
-otherwise incorporate later RH work.
+`79917dd8ca1abc5fc915777fd80e95d4005b4747`. Revision 22 merges current
+`origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4` into the feature branch and
+reconciles the resulting contract, migration-test, ABI-inventory, workflow, model,
+and documentation surfaces.
 
 ## Owner-confirmed product decisions
 
@@ -105,8 +107,9 @@ otherwise incorporate later RH work.
 - A low-utilization step may not exceed the empty-epoch decay step:
   `maxDownBps <= decayBps`.
 - Dynamic up/down ranges satisfy the ordering and anti-round-trip constraints in
-  §3.3. For configurations admitted by the stricter revision-20 validation, equal
-  endpoints recover the revision-19 fixed-step arithmetic exactly.
+  §3.3, including the same bound against fixed empty-epoch decay. For configurations
+  admitted by the stricter validation, equal endpoints recover the revision-19
+  fixed-step arithmetic exactly.
 - Purchase timing uses integer, amount-weighted lateness. Splitting, merging, or
   reordering same-block purchases cannot change the signal.
 - The ordinary controller result is always computed at rollover. An installed rate
@@ -124,13 +127,12 @@ otherwise incorporate later RH work.
 - Governance uses a small dedicated `SwitchboardFoxtrot`; no pre-existing protocol
   contract outside the two feature contracts is modified. `Foxtrot` follows the
   repository's NATO phonetic sequence after the already-existing `SwitchboardEcho`.
-- Delivery remains owner-gated. Revision 20 was committed and pushed on the existing
-  `instant-bond-lane` branch. For revision 21, the owner authorized the bounded
-  reviewer-remediation source, documentation, tests, generated ABI update, dedicated
-  feature workflow, local validation, and one local commit in the same worktree. That
-  authority does not include merge, rebase with another branch, push, pull-request
-  publication, Phase 3 fork/testnet work, deployment, configuration, or activation.
-  The exact scope and validation evidence are recorded in §20.
+- Delivery remains owner-gated. Revisions 20 and 21 were committed and pushed on the
+  existing `instant-bond-lane` branch. For revision 22, the owner authorized merging
+  current `origin/rh` into that branch, bounded remediation, local validation, commit,
+  branch push, and a draft pull request targeting `rh`. That authority does not include
+  merging the pull request, Phase 3 fork/testnet work, deployment, configuration, or
+  activation. The exact scope and validation evidence are recorded in §20.
 
 ---
 
@@ -386,6 +388,7 @@ following on every config, including the first:
 0 < minDownBps <= maxDownBps <= decayBps < 10_000
 maxDownBps < minUpBps
 (10_000 + minUpBps) * (10_000 - maxDownBps) >= 10_000**2
+(10_000 + minUpBps) * (10_000 - decayBps) >= 10_000**2
 0 < maxDecayEpochs <= MAX_DECAY_EPOCHS
 
 0 < maxEffectiveRate <= max_value(uint256) / 10_000
@@ -767,7 +770,10 @@ low-utilization recovery step can increase a sub-ceiling rate. It is a liveness 
 not the treasury price floor. The `maxDownBps <= decayBps` constraint prevents a
 minimum-size low-utilization purchase from selecting a stronger individual price-down
 step than a fully empty epoch, while the governed minimum payment makes selecting that
-branch economically non-dust.
+branch economically non-dust. The two factor inequalities ensure that, away from the
+explicit rate bounds and integer saturation, neither the strongest configured
+positive-epoch price-down step nor one empty-decay step can erase the weakest
+configured price-up step.
 
 For each successful purchase, the lane computes:
 
@@ -1031,20 +1037,20 @@ bad debt, and does not write Bond Room/Ledger epoch state.
 
 ### 10.1 Source anchors at the reviewed RH-integrated baseline
 
-The following references were rebound and verified at revision 18's reviewed
-`c4ae637`/RH-integrated source. Rebind them again after dependency changes:
+The following references were rebound after merging current `origin/rh` at
+`36ee0db42482c3e7d6c43d045fc02655b90bebf4`:
 
-- RipeGov clamps deposits to live min/max lock terms: `RipeGov.vy:211-214`.
-- RipeGov early-exit permissions, bad-debt freeze, and fee: `RipeGov.vy:792-833`.
-- RipeGov weighted unlock calculation: `RipeGov.vy:936-961`.
-- Teller trusted-deposit authorization and signature: `Teller.vy:278-289`.
-- RipeHq RIPE-minter checks: `RipeHq.vy:389-399`.
-- Registered-switchboard authorization: `Addys.vy:183-189`.
-- Department pause/recovery behavior: `DeptBasics.vy:63-93`.
-- SwitchboardCharlie pause pass-through: `SwitchboardCharlie.vy:629-635`.
-- Bond Room's locked mint/approve/deposit/reset pattern: `BondRoom.vy:219-226`.
-- Shared TimeLock confirmation and expiration behavior: `TimeLock.vy:65-87` and
-  `TimeLock.vy:117-123`.
+- RipeGov clamps deposits to live min/max lock terms: `RipeGov.vy:213-216`.
+- RipeGov early-exit permissions, bad-debt freeze, and fee: `RipeGov.vy:807-853`.
+- RipeGov weighted unlock calculation: `RipeGov.vy:953-980`.
+- Teller trusted-deposit authorization and signature: `Teller.vy:265-276`.
+- RipeHq RIPE-minter checks: `RipeHq.vy:391-399`.
+- Registered-switchboard authorization: `Addys.vy:188-194`.
+- Department pause/recovery behavior: `DeptBasics.vy:64-93`.
+- SwitchboardCharlie pause pass-through: `SwitchboardCharlie.vy:644-650`.
+- Bond Room's locked mint/approve/deposit/reset pattern: `BondRoom.vy:219-227`.
+- Shared TimeLock confirmation and expiration behavior: `TimeLock.vy:82-87` and
+  `TimeLock.vy:117-142`.
 
 ---
 
@@ -1283,8 +1289,8 @@ SwitchboardEcho already exists and governs Endaoment and PSM operations. Adding 
 lane to Echo would mix governance domains and would still require replacing a live,
 nonupgradeable switchboard. A small `SwitchboardFoxtrot` is therefore the next
 repository-consistent name and the lowest-blast-radius architecture. Historical
-bytecode sizes are preserved in §20.3 and §20.4; current revision-21 size and
-project-ceiling results are recorded in §20.5.
+bytecode sizes are preserved in §20.3 and §20.4; current revision-22 size and
+project-ceiling results are recorded in §20.6.
 
 The lane intentionally uses the protocol-standard registered-switchboard check rather
 than pinning config or override mutators to the dedicated switchboard address. Pinning
@@ -1475,25 +1481,29 @@ Tests must prove:
     sub-ceiling rate.
 16. **Controller anti-dust:** the active minimum is at least one whole payment token,
     below-minimum purchases revert, and `maxDownBps <= decayBps` for every valid config.
-17. **Bonus-intermediate safety:** every valid config keeps
+17. **Controller anti-ratchet:** away from the explicit rate bounds and integer
+    saturation, one weakest high-utilization price-up step followed by either the
+    strongest positive low-utilization price-down step or one empty-decay step cannot
+    make RIPE cheaper than before the pair.
+18. **Bonus-intermediate safety:** every valid config keeps
     `maxBaseRipe * maxLockBonus` within `uint256` before bonus division, including for
     low-decimal payment tokens.
-18. **Stored-state visibility:** public epoch getters expose the last stored snapshot;
+19. **Stored-state visibility:** public epoch getters expose the last stored snapshot;
     after an unpurchased boundary they remain unchanged while `previewBuyNow` projects
     the current epoch and pricing.
-19. **Timing arithmetic:** weighted lateness never exceeds
+20. **Timing arithmetic:** weighted lateness never exceeds
     `epochAcceptedPayment * 10_000`; same-block split/merge and purchase-order
     permutations are exact invariants; first and last blocks map to exact endpoints.
-20. **First-epoch eligibility:** an offset-zero initialization is timing-eligible,
+21. **First-epoch eligibility:** an offset-zero initialization is timing-eligible,
     including `EPOCH_LENGTH == 1`; a later initialization is not. Every ordinary
     rolled epoch is eligible.
-21. **Collapsed-range compatibility:** when each min/max pair is equal to its
+22. **Collapsed-range compatibility:** when each min/max pair is equal to its
     revision-19 fixed step, the controller produces byte-for-byte identical rate
     arithmetic for every utilization, timing, and elapsed-epoch input.
-22. **Override lifecycle:** same-epoch purchase and preview retain an installed target;
+23. **Override lifecycle:** same-epoch purchase and preview retain an installed target;
     the first successful later rollover stores it exactly and consumes it once; the
     following rollover resumes ordinary control from that stored rate.
-23. **Override governance:** a full config write invalidates an installed target;
+24. **Override governance:** a full config write invalidates an installed target;
     installed cancellation is timelocked and version-bound; queued action cancellation
     or expiry does not mutate Lane override state or versions.
 
@@ -1637,7 +1647,7 @@ Tests must prove:
 - Revision 18 added `ripeGovVaultId` to the then-predeployment
   `InstantBondPurchased` signature and topic. Revision 20 additionally changes config,
   rollover, override, and Foxtrot ABI surfaces. Final ABI and indexer artifacts must be
-  regenerated from the current revision-21 source; `ripeGovVaultId` remains data-only
+  regenerated from the current revision-22 source; `ripeGovVaultId` remains data-only
   because the purchase event already uses the EVM's four-topic maximum.
 
 ### Complexity controls
@@ -1656,11 +1666,11 @@ Tests must prove:
 
 ## 17. Test plan
 
-> **Revision-21 local validation is complete and its evidence is recorded in §20.5.**
+> **Revision-22 local validation is complete and its evidence is recorded in §20.6.**
 > This section remains the acceptance checklist for the current implementation. It
 > does not authorize the deployment rehearsal subsection, remote-fork execution,
-> testnet work, merge, pull-request publication, deployment, configuration, or
-> activation. The current local-commit boundary is recorded in §20.
+> testnet work, pull-request merge, deployment, configuration, or activation. The
+> current commit/push/draft-PR boundary is recorded in §20.
 
 **Framework:** pytest + titanoboa + Vyper `0.4.3`. Tests live under
 `tests/core/instantBondLane/` with dedicated switchboard tests under the appropriate
@@ -1670,10 +1680,10 @@ multiple decimal counts.
 Hypothesis campaigns are marked `fuzz`, canonical ABI/runtime/simulation reproduction
 checks are marked `artifact`, and live-topology cases are marked
 `fork_qualification`. The lean default suite may exclude those categories because the
-branch-only `instant-bond-lane.yml` workflow runs the complete focused selection with
-repository marker exclusions disabled, including every artifact and fuzz test. Fork
-qualification remains an explicit credentialed gate and must never silently fall back
-to the transport-only test.
+`instant-bond-lane.yml` workflow runs the complete focused selection on feature-branch
+pushes and pull requests targeting `rh`, with repository marker exclusions disabled,
+including every artifact and fuzz test. Fork qualification remains an explicit
+credentialed gate and must never silently fall back to the transport-only test.
 
 ### Constructor and configuration
 
@@ -1681,7 +1691,7 @@ to the transport-only test.
   73, the registered RIPE token as payment, and zero epoch length reject;
 - 0-, 6-, and 18-decimal payment tokens derive the correct immutable scale;
 - every §3.3 boundary and invalid combination;
-- invalid min/max ordering, `maxDownBps > decayBps`, anti-round-trip failure,
+- invalid min/max ordering, `maxDownBps > decayBps`, either anti-ratchet factor failure,
   denominator boundaries, oversized decay cap, unsafe epoch-length/payment/timing
   multiplication bounds, minimum payment outside `[PAYMENT_SCALE, cap]`,
   ceiling below `MIN_BASE_RATE`, and seed outside `[MIN_BASE_RATE, ceiling]` reject;
@@ -1832,13 +1842,13 @@ to the transport-only test.
   per worker. The feature-specific slowdown does not apply to unrelated invocations;
 - keep artifacts from final Python, pytest, Hypothesis, Boa, and coverage commands
   outside the worktree. Pre-existing ignored caches are not part of the exact
-  revision-21 13-path checkpoint and are neither evidence nor authorization to delete
+  revision-22 24-path candidate and are neither evidence nor authorization to delete
   unrelated user state.
 
 ### Deployment rehearsal
 
 > **Phase 3 only — not authorized.** These cases remain specified and are not part of
-> revision-21 local validation.
+> revision-22 local validation.
 
 - rehearse every registry/config timelock phase on a pinned target-chain fork;
 - capture dynamic `regId` values;
@@ -2007,7 +2017,7 @@ otherwise modest cap into a high-frequency issuance allowance.
 
 ---
 
-## 20. Revision-20 delivery and revision-21 reviewer-remediation evidence
+## 20. Revision-20 delivery, revision-21 remediation, and revision-22 RH integration
 
 ### 20.1 Historical revision-20 authorization and changed-file scope
 
@@ -2259,9 +2269,9 @@ over-reports success while preserving any pre-existing dust. The remaining chang
 correct reviewer-identified tests and rationale, make compiler-cache isolation an
 explicit runner input rather than a Titanoboa-private hook, categorize expensive and
 artifact tests, reproduce integer simulation cases independently of the implementation,
-and add an automatic feature-only branch gate. That workflow runs only on pushes to
-`instant-bond-lane`, has no pull-request or dormant manual-dispatch trigger, pins
-Python 3.12.0, checks dependency health, and executes the entire 156-test focused
+and add an automatic feature gate. That workflow runs on pushes to
+`instant-bond-lane` and pull requests targeting `rh`, has no dormant manual-dispatch
+trigger, pins Python 3.12.0, checks dependency health, and executes the complete focused
 collection with marker exclusions disabled.
 
 Fresh revision-21 local validation produced the following evidence:
@@ -2321,17 +2331,102 @@ Fresh revision-21 local validation produced the following evidence:
 
 The local commit containing this subsection cannot include its own Git identity. The
 commit ID, tree, branch status, and proof that no other worktree changed belong in the
-external final handoff. No revision-21 validation or local commit authorizes branch
+external final handoff. No revision-21 validation or local commit authorized branch
 push, merge, rebase, pull-request publication, deployment, configuration, or
 activation.
 
-### 20.6 Later phases remain unauthorized
+### 20.6 Revision-22 current-RH integration, remediation, and evidence
 
-Remote-fork execution, testnet rehearsal, deployment, configuration, and activation
-remain outside revision-21 authorization. A later explicit owner instruction is
-required before following §17's deployment rehearsal or §18's production sequence.
-Merge, rebase with another branch, branch push, and pull-request publication likewise
-require separate authorization after the local revision-21 commit.
+On 15 August 2026, the owner authorized reconciliation with the live `origin/rh`,
+completion of the reviewer remediation, local validation, commit, branch push, and a
+draft pull request targeting `rh`. The feature branch merged exact RH commit
+`36ee0db42482c3e7d6c43d045fc02655b90bebf4` and then applied the bounded integration
+fixes. The two-parent merge commit is
+`901546b6a4e9f3feb41af4bf9af376bbbd6d234e`. Relative to that RH commit, the
+candidate contains exactly these 24 paths:
+
+1. `.coveragerc-instant-bond`
+2. `.github/workflows/instant-bond-lane.yml`
+3. `.gitignore`
+4. `contracts/config/SwitchboardFoxtrot.vy`
+5. `contracts/core/InstantBondLane.vy`
+6. `docs/instant-bond-lane/controller-simulation-v2.json`
+7. `docs/instant-bond-lane/dynamic-controller-proposal.md`
+8. `docs/instant-bond-lane/implementation-spec.md`
+9. `docs/instant-bond-lane/pricing-design.md`
+10. `scripts/abis/.abi-export-complete`
+11. `scripts/abis/InstantBondLane.json`
+12. `scripts/abis/SwitchboardFoxtrot.json`
+13. `scripts/simulations/instant_bond_lane_controller.py`
+14. `tests/config/test_switchboard_foxtrot.py`
+15. `tests/core/instantBondLane/conftest.py`
+16. `tests/core/instantBondLane/test_constructor_config.py`
+17. `tests/core/instantBondLane/test_controller.py`
+18. `tests/core/instantBondLane/test_lifecycle_purchase.py`
+19. `tests/core/instantBondLane/test_lock_settlement.py`
+20. `tests/core/instantBondLane/test_properties_abi.py`
+21. `tests/core/instantBondLane/test_robinhood_mainnet_fork.py`
+22. `tests/core/instantBondLane/test_simulation.py`
+23. `tests/core/instantBondLane/test_stateful_fuzz.py`
+24. `tests/deployment/test_abi_export.py`
+
+The integration reconciles current RH's SwitchboardEcho/VaultMigrator migration path,
+its three-contract pause requirement, its 57-contract ABI inventory, and its current
+GitHub Action pins. It also implements the owner-approved empty-decay anti-ratchet
+rule:
+
+```text
+(10_000 + minUpBps) * (10_000 - decayBps) >= 10_000 * 10_000
+```
+
+Contract validation, the independent simulator, randomized/stateful config generation,
+boundary fixtures, and both simulator and deployed-controller tests enforce that rule.
+Current RH deleted the former block-clock inventory, checker, and inventory test; the
+reviewer's historical unenrolled-path finding therefore has no live inventory surface
+to update. Deployment wiring and authority-record changes remain deliberately absent
+because this revision authorizes review, not deployment or activation.
+
+Fresh revision-22 validation produced the following evidence:
+
+- Python 3.12.0, pytest 8.4.2, and Vyper `0.4.3+commit.bff19ea2` were used;
+  `python -m pip check` reported no broken requirements;
+- the final cold-cache feature gate reported 156 passed and two explicit live-fork
+  skips in 669.88 seconds. Lane coverage was 395 statements, 27 missed, 90 branches,
+  46 partial branches, and 84.9%; Foxtrot coverage was 110 statements, none missed,
+  14 branches, seven partial branches, and 94.4%; combined coverage was 86.86% from
+  505 statements, 27 missed, 104 branches, and 53 partial branches, above the 85% gate;
+- a focused remediation selection reported 46 passed, and current RH's complete
+  `tests/vaults/test_vault_migration.py` reported 45 passed;
+- Boa deployed runtime measured 10,758 bytes for Lane and 6,051 bytes for Foxtrot,
+  leaving 242 and 449 bytes below the owner-approved project ceilings and 13,818 and
+  18,525 bytes below EIP-170;
+- the production source SHA-256 values are
+  `16e7133f9b6a5b72914f8e33c138af99feacc0725e0528840477300ffbefdb71`
+  for Lane and
+  `42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa`
+  for Foxtrot. Their generated ABI SHA-256 values are
+  `2af0abe9a3595f0c31872d9724103e2f35af9dc81b7e0c49ec571c44614090ab`
+  and `00c831a45f751c1af458b4de3e75916b508279e7fbb22d48f117320b10f37963`;
+- ABI export reported 57 current outputs and 43 intentionally excluded Vyper sources;
+  all nine ABI tests passed. Current-RH workflow-health tests reported 11 passed;
+- the deterministic simulator and artifact-current checks passed. The canonical
+  artifact SHA-256 is
+  `ea164d04a8156f18a8e03e99bf367dfa95f507fa205397e61a4e622b51a226dc`;
+  its mechanism checks include zero collapsed-transition mismatches and explicit
+  weakest-up/empty-decay factor coverage; and
+- `git diff --check`, Python syntax compilation with private cache output, exact
+  24-path comparison against `origin/rh`, and generated-artifact currentness passed.
+
+The remediation commit identity, pushed remote identity, and draft-PR URL belong in
+the external handoff because a commit cannot contain its own identity.
+
+### 20.7 Later phases remain unauthorized
+
+Revision 22 authorizes integration of current `origin/rh` into the feature branch,
+branch push, and a draft pull request targeting `rh`. It does not authorize merging
+that pull request, remote-fork execution, testnet rehearsal, deployment, configuration,
+RIPE minting, or activation. A later explicit owner instruction is required before
+following §17's deployment rehearsal or §18's production sequence.
 
 Accordingly, this candidate deliberately contains no migration, BluePrint,
 `robinhood-parameters.json`, or live `docs/chains/rh/status.yaml` integration. Those
@@ -2369,3 +2464,4 @@ actions.
 | 19 | 11 August 2026 | Normalized both feature contracts to repository Vyper conventions; reconciled constant, local, action-ID, invariant, and diagnostic notation; added canonical ABI exports; documented the Foxtrot ABI-metadata rename and Boa source-location coverage shift; and refreshed focused, coverage, runtime, ABI/layout, export, regression, and environment evidence without changing successful-path semantics or storage. |
 | 20 | 11 August 2026 | Added bounded utilization-and-timing controller ranges, first-partial-epoch eligibility, exact next-successful-rollover overrides with independent optimistic versioning, three-action Foxtrot dispatch, revised config/state/events/APIs, deterministic model artifacts, and expanded tests; recorded the exact owner-authorized source/document/model/test/ABI/commit/push scope while reserving merge, pull-request, deployment, configuration, and activation; owner-approved the revision-20 runtime ceilings; and recorded fresh focused, coverage, runtime, ABI/layout, simulator, regression, environment, and exact baseline-limitation evidence while preserving revisions 18/19 measurements as historical. |
 | 21 | 12 August 2026 | Closed the bounded reviewer-remediation pass: enforced exact locked-settlement RIPE balance restoration, indexed configuration versions, corrected fixture and deployment assumptions, added independent simulator and marker evidence, replaced the coverage-private-state hook with explicit cache isolation, added a branch-only complete feature workflow, rebound current hashes/runtime/coverage, and retained the feature in its dedicated branch and worktree without RH merge or rebase. |
+| 22 | 15 August 2026 | Merged current `origin/rh`; reconciled SwitchboardEcho/VaultMigrator migration fixtures, ABI inventory, workflow triggers and pins, and source anchors; enforced the weakest-up/empty-decay anti-ratchet factor in contract and independent model; refreshed simulation, runtime, coverage, ABI, migration, and exact-scope evidence; and authorized commit, branch push, and a draft pull request targeting `rh` while reserving deployment, configuration, minting, and activation. |

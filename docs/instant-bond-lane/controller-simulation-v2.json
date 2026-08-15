@@ -2,18 +2,19 @@
   "arithmetic": "uint256-style floor integer model; no floats",
   "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
   "bound_implementation": {
-    "instant_bond_lane_source_sha256": "39cb6ac4df0870f224c84b97b93521b9f565d0a7842c0f5c500c03315c560d7b",
-    "starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+    "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+    "instant_bond_lane_source_sha256": "16e7133f9b6a5b72914f8e33c138af99feacc0725e0528840477300ffbefdb71",
+    "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
     "switchboard_foxtrot_source_sha256": "42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa"
   },
   "calibration_status": "not_approved",
   "economic_metrics": {
     "alternating_path_warning": {
-      "alternating_16_pairs_final_price_index_bps": 24796,
-      "alternating_late_16_pairs_final_price_index_bps": 9936,
-      "fast_full_then_empty_pair_price_multiplier_bps": 10584,
-      "interpretation": "With 2% empty decay, the illustrative 8% fast-up path ratchets upward while the 2% late-up path drifts slightly down; neither is calibrated or approved.",
-      "late_full_then_empty_pair_price_multiplier_bps": 9996,
+      "alternating_16_pairs_final_price_index_bps": 26900,
+      "alternating_late_16_pairs_final_price_index_bps": 10779,
+      "fast_full_then_empty_pair_price_multiplier_bps": 10638,
+      "interpretation": "With 1.5% empty decay, both the illustrative 8% fast-up and 2% late-up alternating paths retain a net upward price response, as required by config validation; neither path is calibrated or approved.",
+      "late_full_then_empty_pair_price_multiplier_bps": 10047,
       "repeated_fast_full_32_epochs_final_price_index_bps": 117370
     },
     "catch_up_epochs": {
@@ -36,14 +37,14 @@
     "parameter_acceptance_thresholds": "owner_not_pinned",
     "price_down_half_life_epochs": {
       "at_uLow": 139,
-      "empty": 35,
+      "empty": 46,
       "half_uLow": 69,
       "max_configured_down_bound": 46,
       "minimum_reachable_positive": 47
     }
   },
   "fixture": {
-    "decay_bps": 200,
+    "decay_bps": 150,
     "epoch_length": 101,
     "initial_rate": 1000000000000000000,
     "max_decay_epochs": 4,
@@ -200,6 +201,7 @@
     "split_merge_and_order_checks": 2,
     "status": "pass",
     "timing_monotonic_rows": 20301,
+    "unclamped_min_up_then_decay_factor_check": "pass",
     "unclamped_round_trip_factor_check": "pass",
     "utilization_monotonic_rows": 20301
   },
@@ -1011,257 +1013,257 @@
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 1,
-          "new_rate": 944822373393801964,
+          "new_rate": 940026320736980634,
           "old_rate": 925925925925925925,
-          "price_index_bps": 10584
+          "price_index_bps": 10638
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 2,
-          "new_rate": 874835530920187003,
-          "old_rate": 944822373393801964,
-          "price_index_bps": 11430
+          "new_rate": 870394741423130216,
+          "old_rate": 940026320736980634,
+          "price_index_bps": 11489
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 3,
-          "new_rate": 892689317265496941,
-          "old_rate": 874835530920187003,
-          "price_index_bps": 11202
+          "new_rate": 883649483678304787,
+          "old_rate": 870394741423130216,
+          "price_index_bps": 11316
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 4,
-          "new_rate": 826564182653237908,
-          "old_rate": 892689317265496941,
-          "price_index_bps": 12098
+          "new_rate": 818193966368800728,
+          "old_rate": 883649483678304787,
+          "price_index_bps": 12222
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 5,
-          "new_rate": 843432839442079497,
-          "old_rate": 826564182653237908,
-          "price_index_bps": 11856
+          "new_rate": 830653772963249470,
+          "old_rate": 818193966368800728,
+          "price_index_bps": 12038
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 6,
-          "new_rate": 780956332816740275,
-          "old_rate": 843432839442079497,
-          "price_index_bps": 12804
+          "new_rate": 769123863854860620,
+          "old_rate": 830653772963249470,
+          "price_index_bps": 13001
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 7,
-          "new_rate": 796894217159939056,
-          "old_rate": 780956332816740275,
-          "price_index_bps": 12548
+          "new_rate": 780836410004934639,
+          "old_rate": 769123863854860620,
+          "price_index_bps": 12806
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 8,
-          "new_rate": 737865015888832459,
-          "old_rate": 796894217159939056,
-          "price_index_bps": 13552
+          "new_rate": 722996675930495036,
+          "old_rate": 780836410004934639,
+          "price_index_bps": 13831
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 9,
-          "new_rate": 752923485600849447,
-          "old_rate": 737865015888832459,
-          "price_index_bps": 13281
+          "new_rate": 734006777594411204,
+          "old_rate": 722996675930495036,
+          "price_index_bps": 13623
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 10,
-          "new_rate": 697151375556342080,
-          "old_rate": 752923485600849447,
-          "price_index_bps": 14344
+          "new_rate": 679635905180010374,
+          "old_rate": 734006777594411204,
+          "price_index_bps": 14713
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 11,
-          "new_rate": 711378954649328653,
-          "old_rate": 697151375556342080,
-          "price_index_bps": 14057
+          "new_rate": 689985690538081597,
+          "old_rate": 679635905180010374,
+          "price_index_bps": 14493
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 12,
-          "new_rate": 658684217267896900,
-          "old_rate": 711378954649328653,
-          "price_index_bps": 15181
+          "new_rate": 638875639387112589,
+          "old_rate": 689985690538081597,
+          "price_index_bps": 15652
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 13,
-          "new_rate": 672126752314180510,
-          "old_rate": 658684217267896900,
-          "price_index_bps": 14878
+          "new_rate": 648604710037677755,
+          "old_rate": 638875639387112589,
+          "price_index_bps": 15417
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 14,
-          "new_rate": 622339585476093064,
-          "old_rate": 672126752314180510,
-          "price_index_bps": 16068
+          "new_rate": 600559916701553476,
+          "old_rate": 648604710037677755,
+          "price_index_bps": 16651
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 15,
-          "new_rate": 635040393342952106,
-          "old_rate": 622339585476093064,
-          "price_index_bps": 15747
+          "new_rate": 609705499189394391,
+          "old_rate": 600559916701553476,
+          "price_index_bps": 16401
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 16,
-          "new_rate": 588000364206437135,
-          "old_rate": 635040393342952106,
-          "price_index_bps": 17006
+          "new_rate": 564542128879068880,
+          "old_rate": 609705499189394391,
+          "price_index_bps": 17713
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 17,
-          "new_rate": 600000371639221566,
-          "old_rate": 588000364206437135,
-          "price_index_bps": 16666
+          "new_rate": 573139217136110538,
+          "old_rate": 564542128879068880,
+          "price_index_bps": 17447
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 18,
-          "new_rate": 555555899665945894,
-          "old_rate": 600000371639221566,
-          "price_index_bps": 17999
+          "new_rate": 530684460311213461,
+          "old_rate": 573139217136110538,
+          "price_index_bps": 18843
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 19,
-          "new_rate": 566893775169332544,
-          "old_rate": 555555899665945894,
-          "price_index_bps": 17639
+          "new_rate": 538765949554531432,
+          "old_rate": 530684460311213461,
+          "price_index_bps": 18560
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 20,
-          "new_rate": 524901643675307911,
-          "old_rate": 566893775169332544,
-          "price_index_bps": 19051
+          "new_rate": 498857360698640214,
+          "old_rate": 538765949554531432,
+          "price_index_bps": 20045
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 21,
-          "new_rate": 535613922117661133,
-          "old_rate": 524901643675307911,
-          "price_index_bps": 18670
+          "new_rate": 506454173298111892,
+          "old_rate": 498857360698640214,
+          "price_index_bps": 19745
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 22,
-          "new_rate": 495938816775612160,
-          "old_rate": 535613922117661133,
-          "price_index_bps": 20163
+          "new_rate": 468939049350103603,
+          "old_rate": 506454173298111892,
+          "price_index_bps": 21324
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 23,
-          "new_rate": 506060017117971591,
-          "old_rate": 495938816775612160,
-          "price_index_bps": 19760
+          "new_rate": 476080253147313302,
+          "old_rate": 468939049350103603,
+          "price_index_bps": 21004
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 24,
-          "new_rate": 468574089924047769,
-          "old_rate": 506060017117971591,
-          "price_index_bps": 21341
+          "new_rate": 440815049210475279,
+          "old_rate": 476080253147313302,
+          "price_index_bps": 22685
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 25,
-          "new_rate": 478136826453109968,
-          "old_rate": 468574089924047769,
-          "price_index_bps": 20914
+          "new_rate": 447527968741599268,
+          "old_rate": 440815049210475279,
+          "price_index_bps": 22344
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 26,
-          "new_rate": 442719283752879600,
-          "old_rate": 478136826453109968,
-          "price_index_bps": 22587
+          "new_rate": 414377748834814137,
+          "old_rate": 447527968741599268,
+          "price_index_bps": 24132
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 27,
-          "new_rate": 451754371176407755,
-          "old_rate": 442719283752879600,
-          "price_index_bps": 22135
+          "new_rate": 420688069883060037,
+          "old_rate": 414377748834814137,
+          "price_index_bps": 23770
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 28,
-          "new_rate": 418291084422599773,
-          "old_rate": 451754371176407755,
-          "price_index_bps": 23906
+          "new_rate": 389525990632462997,
+          "old_rate": 420688069883060037,
+          "price_index_bps": 25672
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 29,
-          "new_rate": 426827637165918135,
-          "old_rate": 418291084422599773,
-          "price_index_bps": 23428
+          "new_rate": 395457858510114717,
+          "old_rate": 389525990632462997,
+          "price_index_bps": 25287
         },
         {
           "direction": "up",
           "effective_step_bps": 800,
           "epoch": 30,
-          "new_rate": 395210775153627902,
-          "old_rate": 426827637165918135,
-          "price_index_bps": 25302
+          "new_rate": 366164683805661775,
+          "old_rate": 395457858510114717,
+          "price_index_bps": 27310
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 31,
-          "new_rate": 403276301177171328,
-          "old_rate": 395210775153627902,
-          "price_index_bps": 24796
+          "new_rate": 371740795741788604,
+          "old_rate": 366164683805661775,
+          "price_index_bps": 26900
         }
       ],
-      "final_price_index_bps": 24796,
-      "final_rate": 403276301177171328,
-      "max_price_index_bps": 25302,
-      "min_price_index_bps": 10584,
+      "final_price_index_bps": 26900,
+      "final_rate": 371740795741788604,
+      "max_price_index_bps": 27310,
+      "min_price_index_bps": 10638,
       "name": "alternating_fast_full_and_empty"
     },
     {
@@ -1276,257 +1278,257 @@
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 1,
-          "new_rate": 1000400160064025610,
+          "new_rate": 995321986662685378,
           "old_rate": 980392156862745098,
-          "price_index_bps": 9996
+          "price_index_bps": 10047
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 2,
-          "new_rate": 980784470651005500,
-          "old_rate": 1000400160064025610,
-          "price_index_bps": 10195
+          "new_rate": 975805869277142527,
+          "old_rate": 995321986662685378,
+          "price_index_bps": 10247
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 3,
-          "new_rate": 1000800480256128061,
-          "old_rate": 980784470651005500,
-          "price_index_bps": 9992
+          "new_rate": 990665857134154849,
+          "old_rate": 975805869277142527,
+          "price_index_bps": 10094
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 4,
-          "new_rate": 981176941427576530,
-          "old_rate": 1000800480256128061,
-          "price_index_bps": 10191
+          "new_rate": 971241036406034165,
+          "old_rate": 990665857134154849,
+          "price_index_bps": 10296
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 5,
-          "new_rate": 1001200960640384214,
-          "old_rate": 981176941427576530,
-          "price_index_bps": 9988
+          "new_rate": 986031509041659050,
+          "old_rate": 971241036406034165,
+          "price_index_bps": 10141
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 6,
-          "new_rate": 981569569255278641,
-          "old_rate": 1001200960640384214,
-          "price_index_bps": 10187
+          "new_rate": 966697557883979460,
+          "old_rate": 986031509041659050,
+          "price_index_bps": 10344
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 7,
-          "new_rate": 1001601601280896572,
-          "old_rate": 981569569255278641,
-          "price_index_bps": 9984
+          "new_rate": 981418840491349705,
+          "old_rate": 966697557883979460,
+          "price_index_bps": 10189
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 8,
-          "new_rate": 981962354196957423,
-          "old_rate": 1001601601280896572,
-          "price_index_bps": 10183
+          "new_rate": 962175333815048730,
+          "old_rate": 981418840491349705,
+          "price_index_bps": 10393
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 9,
-          "new_rate": 1002002402241793288,
-          "old_rate": 981962354196957423,
-          "price_index_bps": 9980
+          "new_rate": 976827750066039319,
+          "old_rate": 962175333815048730,
+          "price_index_bps": 10237
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 10,
-          "new_rate": 982355296315483615,
-          "old_rate": 1002002402241793288,
-          "price_index_bps": 10179
+          "new_rate": 957674264770626783,
+          "old_rate": 976827750066039319,
+          "price_index_bps": 10441
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 11,
-          "new_rate": 1002403363587228178,
-          "old_rate": 982355296315483615,
-          "price_index_bps": 9976
+          "new_rate": 972258136822971353,
+          "old_rate": 957674264770626783,
+          "price_index_bps": 10285
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 12,
-          "new_rate": 982748395673753115,
-          "old_rate": 1002403363587228178,
-          "price_index_bps": 10175
+          "new_rate": 953194251787226816,
+          "old_rate": 972258136822971353,
+          "price_index_bps": 10491
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 13,
-          "new_rate": 1002804485381380729,
-          "old_rate": 982748395673753115,
-          "price_index_bps": 9972
+          "new_rate": 967709900291600828,
+          "old_rate": 953194251787226816,
+          "price_index_bps": 10333
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 14,
-          "new_rate": 983141652334686989,
-          "old_rate": 1002804485381380729,
-          "price_index_bps": 10171
+          "new_rate": 948735196364314537,
+          "old_rate": 967709900291600828,
+          "price_index_bps": 10540
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 15,
-          "new_rate": 1003205767688456111,
-          "old_rate": 983141652334686989,
-          "price_index_bps": 9968
+          "new_rate": 963182940471385316,
+          "old_rate": 948735196364314537,
+          "price_index_bps": 10382
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 16,
-          "new_rate": 983535066361231481,
-          "old_rate": 1003205767688456111,
-          "price_index_bps": 10167
+          "new_rate": 944297000462142466,
+          "old_rate": 963182940471385316,
+          "price_index_bps": 10589
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 17,
-          "new_rate": 1003607210572685184,
-          "old_rate": 983535066361231481,
-          "price_index_bps": 9964
+          "new_rate": 958677157829586259,
+          "old_rate": 944297000462142466,
+          "price_index_bps": 10431
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 18,
-          "new_rate": 983928637816358023,
-          "old_rate": 1003607210572685184,
-          "price_index_bps": 10163
+          "new_rate": 939879566499594371,
+          "old_rate": 958677157829586259,
+          "price_index_bps": 10639
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 19,
-          "new_rate": 1004008814098324513,
-          "old_rate": 983928637816358023,
-          "price_index_bps": 9960
+          "new_rate": 954192453299080579,
+          "old_rate": 939879566499594371,
+          "price_index_bps": 10480
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 20,
-          "new_rate": 984322366763063248,
-          "old_rate": 1004008814098324513,
-          "price_index_bps": 10159
+          "new_rate": 935482797352039783,
+          "old_rate": 954192453299080579,
+          "price_index_bps": 10689
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 21,
-          "new_rate": 1004410578329656375,
-          "old_rate": 984322366763063248,
-          "price_index_bps": 9956
+          "new_rate": 949728728276182520,
+          "old_rate": 935482797352039783,
+          "price_index_bps": 10529
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 22,
-          "new_rate": 984716253264368995,
-          "old_rate": 1004410578329656375,
-          "price_index_bps": 10155
+          "new_rate": 931106596349198549,
+          "old_rate": 949728728276182520,
+          "price_index_bps": 10739
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 23,
-          "new_rate": 1004812503330988770,
-          "old_rate": 984716253264368995,
-          "price_index_bps": 9952
+          "new_rate": 945285884618475684,
+          "old_rate": 931106596349198549,
+          "price_index_bps": 10578
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 24,
-          "new_rate": 985110297383322323,
-          "old_rate": 1004812503330988770,
-          "price_index_bps": 10151
+          "new_rate": 926750867273015376,
+          "old_rate": 945285884618475684,
+          "price_index_bps": 10790
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 25,
-          "new_rate": 1005214589166655431,
-          "old_rate": 985110297383322323,
-          "price_index_bps": 9948
+          "new_rate": 940863824642655204,
+          "old_rate": 926750867273015376,
+          "price_index_bps": 10628
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 26,
-          "new_rate": 985504499182995520,
-          "old_rate": 1005214589166655431,
-          "price_index_bps": 10147
+          "new_rate": 922415514355544317,
+          "old_rate": 940863824642655204,
+          "price_index_bps": 10841
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 27,
-          "new_rate": 1005616835901015836,
-          "old_rate": 985504499182995520,
-          "price_index_bps": 9944
+          "new_rate": 936462451122380017,
+          "old_rate": 922415514355544317,
+          "price_index_bps": 10678
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 28,
-          "new_rate": 985898858726486113,
-          "old_rate": 1005616835901015836,
-          "price_index_bps": 10143
+          "new_rate": 918100442276843153,
+          "old_rate": 936462451122380017,
+          "price_index_bps": 10892
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 29,
-          "new_rate": 1006019243598455217,
-          "old_rate": 985898858726486113,
-          "price_index_bps": 9940
+          "new_rate": 932081667286135180,
+          "old_rate": 918100442276843153,
+          "price_index_bps": 10728
         },
         {
           "direction": "up",
           "effective_step_bps": 200,
           "epoch": 30,
-          "new_rate": 986293376076916879,
-          "old_rate": 1006019243598455217,
-          "price_index_bps": 10138
+          "new_rate": 913805556162877627,
+          "old_rate": 932081667286135180,
+          "price_index_bps": 10943
         },
         {
           "direction": "decay",
-          "effective_step_bps": 200,
+          "effective_step_bps": 150,
           "epoch": 31,
-          "new_rate": 1006421812323384570,
-          "old_rate": 986293376076916879,
-          "price_index_bps": 9936
+          "new_rate": 927721376815104189,
+          "old_rate": 913805556162877627,
+          "price_index_bps": 10779
         }
       ],
-      "final_price_index_bps": 9936,
-      "final_rate": 1006421812323384570,
-      "max_price_index_bps": 10200,
-      "min_price_index_bps": 9936,
+      "final_price_index_bps": 10779,
+      "final_rate": 927721376815104189,
+      "max_price_index_bps": 10943,
+      "min_price_index_bps": 10047,
       "name": "alternating_late_full_and_empty"
     }
   ],
@@ -1836,11 +1838,11 @@
       "demand_strength_bps": 0,
       "direction": "decay",
       "earliness_bps": 0,
-      "effective_step_bps": 200,
+      "effective_step_bps": 150,
       "name": "empty_epoch_decay",
-      "new_rate": 1020408163265306122,
+      "new_rate": 1015228426395939086,
       "old_rate": 1000000000000000000,
-      "price_index_bps": 9800,
+      "price_index_bps": 9850,
       "purchases": [],
       "timing_eligible": true,
       "utilization_bps": 0,
@@ -1848,5 +1850,5 @@
       "weakness_bps": 0
     }
   ],
-  "status": "REVISION 20 WORKING CANDIDATE \u2014 implemented and mechanism-validated; calibration and deployment not approved"
+  "status": "REVISION 22 CURRENT-RH CANDIDATE \u2014 implemented and mechanism-validated; calibration and deployment not approved"
 }

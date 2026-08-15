@@ -24,7 +24,7 @@ def make_config(scale, **overrides):
         "maxUpBps": 1_000,
         "minDownBps": 500,
         "maxDownBps": 500,
-        "decayBps": 1_000,
+        "decayBps": 900,
         "maxDecayEpochs": 4,
         "maxLockBonus": 5_000,
     }
