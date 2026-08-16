@@ -8,10 +8,10 @@ lifecycle:
     release, merge, or owner-policy authority is granted.
 
 source_binding:
-  remediation_base_commit: 6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b
-  remediation_base_tree: ab26dc7b3efd2b8977011c17b100030d12f81bcc
-  candidate_test_commit: feb77f1e6303b1cafe738318e4ddbb2f9d41434c
-  candidate_test_tree: 535a1693eb01f6b98ffc442ed375de609e5d3edc
+  remediation_base_commit: 81832e8564bdb7912bed2b26d01d2abe40ee2811
+  remediation_base_tree: 97d580d7a0ab50453e62c2ada7f19bee6361f870
+  candidate_test_commit: b60fb8dba07f6c94d4cf43b1cb64bf336000305c
+  candidate_test_tree: cae169071c5f2903ab0f0f40208141f1feb70927
   curve_source_sha256: 8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050
   curve_source_git_blob: 76233779bb34059de16a5a6740233fc4dc0f59ca
   green_ref_pool_test_sha256: 4fa89141c2be7d536cde3d087764759b1246fa82c247c83c0887fc7b9767407f
@@ -22,7 +22,8 @@ source_binding:
   fail_first_overlay_sha256: fcd4e9dd5080a57ae13cae6d4465a78a2bc9c9414458609dec5a51f023e3539a
   clock_capture_script_sha256: 38eddce9f176e9612dbd096a8ebe1666730102f535657c873f3cd273217a970e
   price_desk_pr: 152
-  price_desk_commit: 6634d73fd797f03b57501fcc1513b2e9ba1bd2b1
+  price_desk_commit: 81832e8564bdb7912bed2b26d01d2abe40ee2811
+  price_desk_pr_head_at_refresh: bc8e38032a75607f78568900e6e7a49e26b66207
   price_desk_source_sha256: 7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c
   price_desk_source_git_blob: aa80c659535db7debce6d444025c2ba34dc51c24
   note: >-
@@ -99,8 +100,9 @@ commands:
     python -m pytest -o addopts='' -q -s -p no:cacheprovider
     --basetemp=<private-temp>
     --junitxml=<evidence>/pricedesk-curve-composition-junit.xml
-    tests/priceSources/curve/test_robinhood_launch_route.py, in a detached
-    candidate worktree whose PriceDesk.vy is restored from price_desk_commit.
+    tests/priceSources/curve/test_robinhood_launch_route.py on the rebased
+    candidate. price_desk_commit is the target integration commit containing
+    PR #152; price_desk_pr_head_at_refresh records that PR's branch head.
   robinhood_clock_capture: >-
     python scripts/capture_robinhood_curve_clock.py
     --rpc-url https://rpc.mainnet.chain.robinhood.com --sample-size 16
@@ -123,23 +125,23 @@ commands:
 
 artifacts:
   - file: base-green-ref-pool-junit.xml
-    sha256: d4ec49e8789804f0c0a7eb63d14ce74930b2936ebb771edf9da46700c77b6ddb
+    sha256: 826e2a33acf61a2963391e3b3b93869f1d7b6c7f150c8b0167729e083f5822ca
     bytes: 10773
     tests: 75
     passed: 75
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 226.37
+    duration_seconds: 227.54
   - file: base-curve-prices-candidate-junit.xml
-    sha256: 2c3d58ba18c961abe277aeb7464bce5e317c4173b3bcc99df840293c0b154760
+    sha256: beb1488d12f03d830379d6273669f6de80ba3087f12359bd4dc20060d51bb1f1
     bytes: 3990
     tests: 32
     passed: 32
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 126.17
+    duration_seconds: 128.78
   - file: base-curve-prices-target-junit.xml
     sha256: 9162cdeb88063219c2689fce0c875dd7c946ebb6ca091c4e80faa6d20f4bf170
     bytes: 76334
@@ -164,14 +166,14 @@ artifacts:
       - capacity regrowth returned 8046 instead of the fresh 8500 seed
       - extreme staleBlocks overflowed the view at safeadd
   - file: pricedesk-curve-composition-junit.xml
-    sha256: c34b560325a9e99d7a73408bd92f0475d8769d36a292c0e213e2cc491b4cae61
+    sha256: b7bd074a31cecc8ec03b9b447159ed3f28c05cfd054338a7d51ab80febfdc002
     bytes: 2089
     tests: 11
     passed: 11
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 135.15
+    duration_seconds: 127.30
     measurements:
       nested_green_route_gas: 25700
       worst_honest_route_gas: 127922

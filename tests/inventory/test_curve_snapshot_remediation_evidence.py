@@ -108,7 +108,10 @@ def test_curve_source_and_fail_first_overlay_hashes_match_manifest():
         "clock_capture_script_sha256"
     ]
     assert MANIFEST["source_binding"]["price_desk_commit"] == (
-        "6634d73fd797f03b57501fcc1513b2e9ba1bd2b1"
+        "81832e8564bdb7912bed2b26d01d2abe40ee2811"
+    )
+    assert MANIFEST["source_binding"]["price_desk_pr_head_at_refresh"] == (
+        "bc8e38032a75607f78568900e6e7a49e26b66207"
     )
     assert MANIFEST["source_binding"]["price_desk_source_sha256"] == (
         "7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c"

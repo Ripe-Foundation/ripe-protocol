@@ -24,8 +24,8 @@ to be regenerated.
 
 | Identity | Bound value |
 | --- | --- |
-| Live remediation base / tree | `6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b` / `ab26dc7b3efd2b8977011c17b100030d12f81bcc` |
-| Final contract-and-test commit / tree | `feb77f1e6303b1cafe738318e4ddbb2f9d41434c` / `535a1693eb01f6b98ffc442ed375de609e5d3edc` |
+| Live remediation base / tree | `81832e8564bdb7912bed2b26d01d2abe40ee2811` / `97d580d7a0ab50453e62c2ada7f19bee6361f870` |
+| Final contract-and-test commit / tree | `b60fb8dba07f6c94d4cf43b1cb64bf336000305c` / `cae169071c5f2903ab0f0f40208141f1feb70927` |
 | Unfixed source commit | `4a72a1f` |
 | Unfixed Curve source SHA-256 | `f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c` |
 | Candidate Curve source SHA-256 | `8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050` |
@@ -200,9 +200,10 @@ are top-level deterministic Boa measurements, not raw-call stipends. The CI
 workflow-health regression fails if either the BlueChip or Curve gas file is
 removed from the snapshot-gas job.
 
-PR #157 owns the retained downstream SC-06 composition qualification. It
-replaced PriceDesk with exact PR #152 commit
-`6634d73fd797f03b57501fcc1513b2e9ba1bd2b1` and source SHA-256
+PR #157 owns the retained downstream SC-06 composition qualification. The
+rebased candidate includes PR #152 through target integration commit
+`81832e8564bdb7912bed2b26d01d2abe40ee2811`; PR #152's branch head was
+`bc8e38032a75607f78568900e6e7a49e26b66207` when refreshed. Its source SHA-256 is
 `7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c`
 while retaining this exact Curve source. All eleven route nodes passed. The
 bounded PriceDesk added 142 gas to the normal route (25,700 total) and 1,741
@@ -332,13 +333,12 @@ and merge candidate, command, selected nodes, and all pass/fail/skip/deselect
 counts.
 
 The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 75
-green-ring cases in 226.37 seconds. The current integration base is
-`6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b`; its only change after the retained
-`400d6ebefebc9a51f1544f4c59ad7c8d31b8168b` target fail-first run is the
-unrelated VaultBook disabled-slot recovery. That retained target run reproduced
+green-ring cases in 227.54 seconds. The current integration base is
+`81832e8564bdb7912bed2b26d01d2abe40ee2811`. The retained historical target run
+at `400d6ebefebc9a51f1544f4c59ad7c8d31b8168b` reproduced
 the historical `test_curve_prices.py` result of 24 failed / 8 passed. Final
-contract-and-test commit `feb77f1e6303b1cafe738318e4ddbb2f9d41434c`
-repairs the harness and passes all 32 nodes in 126.17 seconds.
+contract-and-test commit `b60fb8dba07f6c94d4cf43b1cb64bf336000305c`
+repairs the harness and passes all 32 nodes in 128.78 seconds.
 
 At the pinned block, timestamp 1,755,733,205, the USDC Chainlink round was
 updated at 1,755,702,597. Its initial age was 30,608 seconds. The Chainlink
