@@ -21,6 +21,9 @@ from scripts import export_abis as abi_exporter
 from scripts import update_contract_artifact_expectations as artifact_updater
 
 
+pytestmark = pytest.mark.artifact
+
+
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts" / "check_contract_artifacts.py"
 EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"

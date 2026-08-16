@@ -11,6 +11,9 @@ from scripts import check_contract_artifacts as artifact_checker
 from utils.blueprint_policy import blueprint_policy
 
 
+pytestmark = pytest.mark.artifact
+
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "contracts" / "priceSources" / "BlueChipYieldPrices.vy"
 COMMITTED_ABI = ROOT / "scripts" / "abis" / "BlueChipYieldPrices.json"

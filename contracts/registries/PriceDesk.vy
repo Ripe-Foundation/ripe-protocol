@@ -55,6 +55,9 @@ struct PriceConfig:
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
+PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000
+PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
+PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
 
 
 @deploy
@@ -197,6 +200,7 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
             method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
         ),
         max_outsize=65,
+        gas=PRICE_SOURCE_PRICE_GAS,
         is_static_call=True,
         revert_on_failure=False,
     )
@@ -207,6 +211,8 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
     hasFeedWord: uint256 = 0
     price, hasFeedWord = abi_decode(response, (uint256, uint256))
     if hasFeedWord > 1:
+        return 0, 2
+    if price != 0 and hasFeedWord == 0:
         return 0, 2
     return price, hasFeedWord
 
@@ -268,6 +274,7 @@ def _safeHasPriceFeed(_priceSource: address, _asset: address) -> (bool, bool):
         _priceSource,
         abi_encode(_asset, method_id=method_id("hasPriceFeed(address)")),
         max_outsize=33,
+        gas=PRICE_SOURCE_HAS_FEED_GAS,
         is_static_call=True,
         revert_on_failure=False,
     )
@@ -387,13 +394,14 @@ def _safeAddPriceSnapshot(_priceSource: address, _asset: address) -> bool:
         _priceSource,
         abi_encode(_asset, method_id=method_id("addPriceSnapshot(address)")),
         max_outsize=33,
+        gas=PRICE_SOURCE_SNAPSHOT_GAS,
         revert_on_failure=False,
     )
     if not success or len(response) != 32:
         return False
 
     resultWord: uint256 = abi_decode(response, uint256)
-    return resultWord <= 1
+    return resultWord == 1
 
 
 @view
