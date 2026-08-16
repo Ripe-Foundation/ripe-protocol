@@ -147,9 +147,9 @@ and release remain separate.
 
 The repository-health remediation recorded the table below for the archived
 candidate. Twelve rows have since drifted, so these values are historical and
-non-authoritative. Current identities must be read mechanically from
-`contract-artifact-expectations.json` (retired);
-the table is retained only to bind the older candidate evidence.
+non-authoritative. There is no committed identity file to consult: measure the
+source tree directly when a current identity is needed. The table is retained
+only to bind the older candidate evidence.
 
 | Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |
 | --- | ---: | ---: | ---: | ---: | --- | --- |

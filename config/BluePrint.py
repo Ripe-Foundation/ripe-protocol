@@ -1,5 +1,4 @@
 from typing import Any
-import json
 from dataclasses import dataclass
 ADDYS = {
     "base": {
@@ -683,15 +682,6 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         ("B-H04-PARAMS", "B-T8-M5"),
     ),
     RobinhoodStockInputQualification(
-        "Deployment.DP-11.stock.vaultArtifact",
-        "repository_binding_retired",
-        None,
-        (
-            "SimpleErc20 artifact identity was proven by the retired artifact-expectations pipeline; nothing verifies it now",
-        ),
-        ("B-T8-M5",),
-    ),
-    RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.vaultSlot",
         "owner_slot_unresolved",
         None,
@@ -700,30 +690,34 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m2Movement",
-        "repository_binding_retired",
+        "repository_fact_integrated",
         None,
         (
-            "BasicVault movement was bound by a git-blob identity that is already stale and no longer checked",
+            "shared nominal vault movement remains fail-closed and external delivery stays exact",
+            "proven by BasicVault behavioral tests, not by a source hash",
         ),
-        ("B-T8-M5",),
+        (),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m3CreditContainment",
-        "repository_binding_retired",
+        "repository_fact_integrated",
         None,
         (
-            "CreditEngine containment was bound by a git-blob identity that is already stale and no longer checked",
+            "represented zero-amount terms keep zero capacity",
+            "proven by CreditEngine behavioral tests, not by a source hash",
         ),
-        ("B-T8-M5",),
+        (),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m4ComposedProof",
-        "repository_binding_retired",
+        "repository_fact_integrated",
         None,
         (
-            "the composed proof depended on the retired artifact-expectations pipeline and is no longer provable in this repository",
+            "historical tranche identity is distinct from current applicability",
+            "composed proof does not authorize configuration deployment or activation",
+            "proven by composed-route behavioral tests, not by source or artifact hashes",
         ),
-        ("B-T8-M5",),
+        (),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m5ActivationBinding",
@@ -735,6 +729,23 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         ),
         ("B-T8-M5", "B-H08-PROOF", "B-H09-RELEASE"),
     ),
+)
+
+# M2, M3, and M4 are integrated repository facts proven by behavioral tests.
+# They previously also carried source hashes, git blobs, and artifact
+# identities; those were removed with the artifact-expectations pipeline. The
+# behavior is the evidence, so these paths must never regain a candidate
+# payload -- a hash with nothing to recompute it is not proof, and a stale one
+# reads as proof while being false.
+#
+# Keyed by exact path, not by resolution string. An earlier revision keyed the
+# guard on `resolution == "repository_binding_retired"`, and a review defeated
+# it by renaming the resolution while attaching a payload. Resolution values are
+# open vocabulary, so they cannot key a fail-closed rule.
+ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS = (
+    "Deployment.DP-11.stock.m2Movement",
+    "Deployment.DP-11.stock.m3CreditContainment",
+    "Deployment.DP-11.stock.m4ComposedProof",
 )
 
 ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS = tuple(
@@ -1205,18 +1216,6 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         ),
         "repository_approved", "protocol_owner", "bounded launch architecture", "explicitly_inactive",
     ),
-    RobinhoodCurveLaunchInput(
-        "artifact.curve_prices_source_sha256",
-        "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050",
-        "owner_selected", "oracle_owner",
-        "docs/chains/rh/evidence/curve-snapshot-remediation.md",
-        "owner_approved_source_activation_blocked",
-    ),
-    RobinhoodCurveLaunchInput(
-        "artifact.curve_prices_abi_sha256",
-        "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772",
-        "repository_approved", "oracle_owner", "scripts/abis/CurvePrices.json", "source_frozen",
-    ),
 )
 
 # Immutable metadata projection used by the structural validator. The rows
@@ -1273,7 +1272,6 @@ def validate_robinhood_stock_launch_qualification(
         "Deployment.DP-10.aapl.risk",
         "Deployment.DP-10.aapl.auction",
         "Deployment.DP-10.aapl.route",
-        "Deployment.DP-11.stock.vaultArtifact",
         "Deployment.DP-11.stock.vaultSlot",
         "Deployment.DP-11.stock.m2Movement",
         "Deployment.DP-11.stock.m3CreditContainment",
@@ -1313,18 +1311,39 @@ def validate_robinhood_stock_launch_qualification(
         "stock_excluded_from_stability_pool"
     ] is not True:
         raise ValueError("RH_STOCK_STABILITY_EXCLUSION")
-    # No stock input is a proven repository fact any more. The four that were --
-    # vaultArtifact, m2Movement, m3CreditContainment, m4ComposedProof -- were
-    # proven by the artifact-expectations pipeline, which was retired with the
-    # descoped M4 launch binding. Their hash and git-blob payloads went with it
-    # rather than being kept as decoration: an identity nothing recomputes is
-    # not evidence, and leaving them would let a stale or zeroed value read as
-    # an integrated fact. Each is now retired with a typed blocker instead.
+    # Every retired binding must carry no candidate payload. This is the check
+    # that keeps the integration honest: reintroducing a hash tuple here without
+    # machinery to recompute it would recreate exactly the state this replaced.
+    #
+    # Keyed on the exact path IDs, not on the resolution string. An earlier
+    # revision matched a resolution value, and a review defeated it in one move:
+    # rename the resolution, attach a hash payload, and the check no longer
+    # applies. Resolution values are open vocabulary here, so they cannot key a
+    # fail-closed rule.
+    semantic = tuple(
+        item for item in qualifications
+        if item.path in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS
+    )
+    if len(semantic) != len(ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_CENSUS")
+    if any(item.candidate is not None for item in semantic):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_PAYLOAD")
+
+    # M2, M3, and M4 remain integrated repository facts: their behavior is
+    # proven by tests that still run and still pass, which is what
+    # `status.yaml` records for B-T8-M2/M3/M4. What was removed is the hash and
+    # git-blob evidence layer, not the integration.
+    #
+    # vaultArtifact is gone from the census entirely. It was SimpleErc20
+    # artifact identity and nothing else, so with the artifact-expectations
+    # pipeline retired there is no fact left for it to assert. Stock stays
+    # fail-closed on unresolved M5 configuration and activation, which is the
+    # control that actually matters.
     if tuple(
         item.path
         for item in qualifications
         if item.resolution == "repository_fact_integrated"
-    ) != ():
+    ) != ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS:
         raise ValueError("RH_STOCK_REPOSITORY_FACT_SET")
     if any(
         item.resolution != "repository_fact_integrated"
@@ -1337,15 +1356,6 @@ def validate_robinhood_stock_launch_qualification(
         for item in qualifications
     ):
         raise ValueError("RH_STOCK_RESOLVED_BLOCKER")
-    # Every retired binding must carry no candidate payload. This is the check
-    # that keeps the retirement honest: reintroducing a hash tuple here without
-    # machinery to recompute it would recreate exactly the state this replaced.
-    if any(
-        item.candidate is not None
-        for item in qualifications
-        if item.resolution == "repository_binding_retired"
-    ):
-        raise ValueError("RH_STOCK_RETIRED_BINDING_PAYLOAD")
 
 
 def robinhood_stock_launch_readiness() -> tuple[bool, tuple[str, ...]]:

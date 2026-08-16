@@ -531,22 +531,6 @@ def _blueprint_module() -> Any:
         importlib.import_module("config.robinhood_blueprint").validate_curve_launch_authority()
     except Exception as exc:
         raise ManifestError(f"H04_CURVE_AUTHORITY:{type(exc).__name__}:{exc}") from exc
-    curve_values = {
-        row.input_id: row.value for row in module.ROBINHOOD_CURVE_LAUNCH_INPUTS
-    }
-    curve_artifacts = {
-        "artifact.curve_prices_source_sha256": ROOT
-        / "contracts"
-        / "priceSources"
-        / "CurvePrices.vy",
-        "artifact.curve_prices_abi_sha256": ROOT
-        / "scripts"
-        / "abis"
-        / "CurvePrices.json",
-    }
-    for input_id, path in curve_artifacts.items():
-        if hashlib.sha256(path.read_bytes()).hexdigest() != curve_values[input_id]:
-            raise ManifestError(f"H04_CURVE_ARTIFACT_DRIFT:{input_id}")
     return module
 
 

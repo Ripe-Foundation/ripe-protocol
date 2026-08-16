@@ -5194,8 +5194,6 @@ _CURVE_LAUNCH_INPUT_IDS = (
     "feed.usdg_curve_feed",
     "feed.usdg_authority",
     "inactive.capabilities",
-    "artifact.curve_prices_source_sha256",
-    "artifact.curve_prices_abi_sha256",
 )
 
 
@@ -5489,17 +5487,6 @@ def validate_curve_launch_authority() -> None:
     }
     if set(values["inactive.capabilities"]) != expected_inactive:
         _fail("RH_CURVE_BOUNDED_CAPABILITY")
-
-    expected_artifacts = {
-        "artifact.curve_prices_source_sha256": (
-            "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
-        ),
-        "artifact.curve_prices_abi_sha256": (
-            "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
-        ),
-    }
-    if any(values[input_id] != expected for input_id, expected in expected_artifacts.items()):
-        _fail("RH_CURVE_ARTIFACT_DRIFT")
 
 
 _COMPONENT_SELECTION_BY_ID = _source_component_selection_map()

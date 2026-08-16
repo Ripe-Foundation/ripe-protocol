@@ -51,12 +51,11 @@
   prohibits rewriting 69 as 95
   ([ledger.md, recommended hardening](../smart-contract-changes/ledger.md#recommended-hardening),
   [ledger.md, independently reproduced audit evidence](../smart-contract-changes/ledger.md#independently-reproduced-audit-evidence)).
-- [ ] Label the current block-clock inventory independently. At the present
-  hardening snapshot the checker/test requires `vyper_paths=95`; the inventory
-  document separately reports 95 matching production lines, 100 occurrences,
-  and 17 files for its dated snapshot
-  (`test_block_clock_inventory.py:124`,
-  [block-number-inventory.md, exact occurrence coverage](../block-number-inventory.md#exact-occurrence-coverage-ledger)).
+- [ ] ~~Label the current block-clock inventory independently.~~
+  **Retired.** `check_block_clock_inventory.py` and
+  `test_block_clock_inventory.py` were removed by the simplification branch, so
+  there is no checker to run and no `vyper_paths` count to reconcile. The
+  inventory document's figures are a dated historical snapshot.
 - [ ] For every pytest invocation record passed, failed, skipped, xfailed,
   xpassed, warnings, errors, and deselected counts exactly as emitted; do not
   infer absent categories from a green exit code.

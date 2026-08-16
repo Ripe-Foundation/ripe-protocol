@@ -105,8 +105,9 @@ silently promoted to present-day chain facts.
 8. **Is the checked-in ABI correct?** Yes for the integrated source. It is not a
    claim that the old deployed Base runtime implements the new getter.
 9. **Is source integration release readiness?** No. Configuration, migration,
-   artifact binding, authority, disabled-state, monitoring, and release-time clock
-   revalidation remain gates.
+   authority, disabled-state, monitoring, and release-time clock revalidation
+   remain gates. (Static artifact binding was retired with the
+   artifact-expectations pipeline.)
 10. **Was a source defect found?** No defect was found in the approved narrow
     design. Important configuration and test gaps are recorded below.
 
@@ -698,5 +699,5 @@ remains a deployment input, not a deployed fact.
 The integrated source and current focused validation are strong enough to explain
 the change. They are not enough to deploy or release it. The next legitimate
 owner decision is the separately gated deployment/configuration package with exact
-constructor inputs, artifact binding, disabled-state proof, authority sequencing,
+constructor inputs, disabled-state proof, authority sequencing,
 monitoring, and release-time cadence revalidation—not another Lootbox source edit.

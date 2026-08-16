@@ -222,10 +222,11 @@ jobs:
           # each line as rh repairs it.
           #   test_operator_chain_guards -> prepare_defaults has no
           #     _require_robinhood_chain_id / _safe_constant_name
-          # The former test_stock_aapl_launch_inclusion deselects are gone: those
-          # nodes now carry release/artifact markers and the -m expression below
-          # excludes them, and the M4 binding tests were deleted with the
-          # descoped artifact-expectations pipeline.
+          # The former test_stock_aapl_launch_inclusion deselects are gone: the
+          # M2/M3/M4 binding tests they named were deleted with the descoped
+          # artifact-expectations pipeline, and the remaining stock-launch tests
+          # assert qualification policy rather than source or artifact hashes,
+          # so they pass in this gate unmodified.
           /usr/bin/time -p python -m pytest \
             -o addopts='' \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \

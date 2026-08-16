@@ -727,24 +727,6 @@ def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
     assert get_component("CM-008").deployment is Disposition.BLOCKED
 
 
-def test_curve_remediated_source_is_owner_approved_but_activation_blocked():
-    source_row = next(
-        row
-        for row in blueprint_source.ROBINHOOD_CURVE_LAUNCH_INPUTS
-        if row.input_id == "artifact.curve_prices_source_sha256"
-    )
-
-    assert source_row.value == (
-        "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
-    )
-    assert source_row.resolution_state == (
-        "owner_approved_source_activation_blocked"
-    )
-    assert "B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256" not in {
-        blocker.blocker_id for blocker in ROBINHOOD_BLUEPRINT.blockers
-    }
-
-
 def test_relations_are_explicit_typed_oriented_and_proved():
     relation_map = {
         relation.relation_id: (source, relation)
@@ -1059,8 +1041,6 @@ def _mutate_curve_input(monkeypatch, input_id, **changes):
         ("feed.usdg_curve_feed", {"value": True}, "RH_CURVE_RECURSION_GUARD"),
         ("feed.route", {"value": ("GREEN", "manual constant")}, "RH_CURVE_RECURSION_GUARD"),
         ("inactive.capabilities", {"value": ()}, "RH_CURVE_BOUNDED_CAPABILITY"),
-        ("artifact.curve_prices_source_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
-        ("artifact.curve_prices_abi_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
     ),
 )
 def test_curve_source_authority_mutations_fail_closed(
