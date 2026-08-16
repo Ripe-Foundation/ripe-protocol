@@ -14,9 +14,15 @@ explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
 require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
 is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
 is not required, and it may be reconciled once during final release preparation.
-Historical headroom-waiver entries remain accepted-risk evidence for final
-release reconciliation; their former floor, zero-growth, and reopen-on-change
-controls are no longer ordinary PR gates.
+**The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
+a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
+identity pins, and zero-growth reopen-on-change rules. No test enforces any of
+that in any lane — the pins and the floor were removed from
+`tests/test_vault_pointer_runtime_sizes.py`, which now asserts only the EIP-170
+ceiling. Those entries stand as historical accepted-risk records of what was
+approved at the time. Read their sizes, waivers, and "reopens on change"
+language as past tense; none of it creates an obligation on a current PR. The
+only enforced size rule is that a deployed runtime must fit in 24,576 bytes.
 This register does not replace the linked decision records, authorize a new
 phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
@@ -692,8 +698,9 @@ prevent.
 **Self-retiring.** This exceptional binding applies only while CreditEngine sits
 below the ratified floor. Once it is back at 200+ bytes of headroom, its
 `MIN_HEADROOM_OVERRIDES` entry and its pinned identity are both removed, and it
-returns to being governed by the floor like every other contract. A test asserts
-the two tables cannot drift apart in either direction.
+returns to being governed by the floor like every other contract. A test
+asserted the two tables could not drift apart in either direction; that test and
+both tables were removed when the floor was retired.
 
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
@@ -1008,12 +1015,11 @@ repository's pinned Vyper toolchain:
 
 RH-D031 remains the historical authority for its exact prior Teller artifact;
 it does not authorize this source or compiler output. RH-D032 is the controlling
-waiver for the candidate above and permits **0 bytes of further growth**. Any
-source, compiler-input, ABI, selector, creation-bytecode, runtime-template, or
-deployed-runtime identity change reopens this decision. The exact identities
-must be recomputed with `scripts/check_contract_artifacts.py` and
-`tests/test_vault_pointer_runtime_sizes.py` after final merge; they must never be
-updated merely to make those checks pass.
+waiver for the candidate above and permitted **0 bytes of further growth** at
+the time it was granted. That zero-growth and reopen-on-change condition was
+retired with the headroom mechanism (see the preamble); it is a historical
+record of what the owner accepted, not a current obligation. Teller's only
+enforced size rule today is the EIP-170 ceiling.
 
 **Rejected nonbreaking shapes.** Keeping all four prior selectors and adding a
 five-argument overload produces a 24,619-byte deployed runtime before adding

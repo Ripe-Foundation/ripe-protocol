@@ -24,9 +24,20 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_deployed_runtime_fits_eip170(stability_pool):
+    """Assert the ceiling, not an exact size.
+
+    This previously pinned `== 24_002`, which made any legitimate StabilityPool
+    change a default-lane failure requiring a hand-refreshed constant. The
+    property that protects a deployment is that the runtime fits.
+    """
     runtime = boa.env.get_code(stability_pool.address)
-    assert len(runtime) == 24_002
-    assert 24_576 - len(runtime) == 574
+    EIP170_LIMIT = 24_576
+    print(
+        "STABILITY_POOL_RUNTIME",
+        f"size={len(runtime)}",
+        f"headroom={EIP170_LIMIT - len(runtime)}",
+    )
+    assert len(runtime) <= EIP170_LIMIT
 
 
 def test_value_and_maintenance_gas_remain_bounded_at_active_claim_ceiling(

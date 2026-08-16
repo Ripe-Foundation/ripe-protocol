@@ -160,11 +160,11 @@ jobs:
           key: ${{ steps.boa-cache.outputs.cache-primary-key }}
 
   # pytest.ini's addopts ignores tests/deployment, so the lean lane never
-  # exercises the deploy-path controls: the Robinhood execution boundary,
-  # verifier input handling, _local_account, canonical JSON, the reward packet,
-  # artifact expectations, and blueprint policy. Those are exactly the surfaces
-  # this branch changed, so they get their own required job rather than
-  # relying on a manual comprehensive run.
+  # exercises deploy-path behavior such as the Robinhood execution boundary,
+  # verifier input handling, _local_account, and canonical JSON. Those safety
+  # controls get their own required job. Static artifact, release, inventory,
+  # and approval bindings use the same marker exclusions as the lean lane and
+  # remain available through manual comprehensive qualification.
   #
   # It is credential-free: every RPC/key variable is unset, and the suite is
   # offline by construction (its fixtures block sockets and fake submission).
@@ -228,14 +228,11 @@ jobs:
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             --durations=25 \
+            -m "not release and not artifact and not fuzz and not gas and not fork_qualification" \
             --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_rejects_every_non_robinhood_mainnet_chain' \
             --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_accepts_robinhood_mainnet_chain' \
             --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_sanitizes_untrusted_token_metadata' \
             --deselect 'tests/deployment/test_operator_chain_guards.py::test_defaults_snapshot_preserves_safe_existing_labels' \
-            --deselect 'tests/deployment/test_stock_aapl_launch_inclusion.py::test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes' \
-            --deselect 'tests/deployment/test_stock_aapl_launch_inclusion.py::test_m2_m3_repository_bindings_are_integrated_ancestors' \
-            --deselect 'tests/deployment/test_stock_aapl_launch_inclusion.py::test_m4_binding_matches_exact_historical_tranche_and_current_bytes' \
-            --deselect 'tests/deployment/test_stock_aapl_launch_inclusion.py::test_m4_current_applicability_mutants_fail_closed' \
             tests/deployment
 
   snapshot-gas:

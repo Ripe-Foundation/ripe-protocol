@@ -8,6 +8,12 @@
 - **Artifact alignment:** commit `6646dec` refreshes the governed identities required by the formatting-only SwitchboardBravo and Lootbox commits.
 - **Classification:** remediation index, not a final audit report, readiness decision, deployment plan, or release authorization.
 
+> **Current process note:** the artifact-identity and headroom-waiver
+> dispositions below are historical. The headroom floor and its exact-identity
+> pins were retired; the only enforced size rule is the EIP-170 ceiling, and
+> what a PR must pass is defined by root `pytest.ini` and
+> `.github/workflows/python-tests.yml`. Nothing below creates a per-PR gate.
+
 The original Auditor B guide mixed confirmed findings, operationally sensitive
 proof detail, uncompiled fix sketches, historical bytecode measurements, and
 references to three companion reports that are not present in this repository.
@@ -27,13 +33,9 @@ released. The audit completion rules in
 - unresolved exposure and unchecked surfaces remain explicit;
 - a green test suite is not a security certification.
 
-Current artifact sizes and hashes must come from
-[`config/contract-artifact-expectations.json`](../../config/contract-artifact-expectations.json),
-not from historical prose. Below-floor exact identities and owner dispositions
-must agree with
-[`docs/chains/rh/decision-register.md`](../chains/rh/decision-register.md),
-[`docs/chains/rh/status.yaml`](../chains/rh/status.yaml), and
-[`tests/test_vault_pointer_runtime_sizes.py`](../../tests/test_vault_pointer_runtime_sizes.py).
+Sizes and hashes quoted below are historical measurements from the audit
+snapshot. Do not carry one into a new decision; measure the current tree
+instead.
 
 ## Confirmed finding disposition map
 
@@ -100,9 +102,10 @@ applicable, state rollback, and the positive path that must remain available.
 ### Runtime size
 
 Use measured deployed runtime, including immutable code data. Never carry a
-historical size from this index into a new decision. Contracts below the
-ratified 200-byte floor require an exact source, runtime-template, immutable-
-bound deployed-byte identity, owner disposition, and zero-growth reopening rule.
+historical size from this index into a new decision. The enforced rule is
+EIP-170: the deployed runtime must fit in 24,576 bytes. The former 200-byte
+headroom floor and its per-contract exact-identity waivers were retired; sizes
+recorded in the dispositions below are historical, not gates.
 
 ### Operational findings
 

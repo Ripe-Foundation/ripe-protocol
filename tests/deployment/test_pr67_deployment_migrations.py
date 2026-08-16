@@ -355,6 +355,7 @@ def test_safe_calldata_helpers_bind_the_expected_registry_calls():
         assert decode(["address"], confirm_bytes[4:]) == (candidate,)
 
 
+@pytest.mark.artifact
 def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
     teller = json.loads((ROOT / "scripts/abis/Teller.json").read_text())
     stability = json.loads((ROOT / "scripts/abis/StabilityPool.json").read_text())

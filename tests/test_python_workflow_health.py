@@ -364,12 +364,14 @@ def test_python_workflow_enforces_bluechip_and_curve_snapshot_gas_budgets():
     assert "if grep" not in command
 
 
-def test_python_workflow_runs_ignored_deployment_controls_credential_free():
+def test_python_workflow_runs_behavioral_deployment_controls_credential_free():
     """The lean lane cannot see tests/deployment, so a required job must.
 
     pytest.ini ignores that tree, which is exactly where this branch's
-    deploy-path controls live. The job has to run it with addopts cleared and
-    with every credential unset, or it proves nothing about an offline gate.
+    deploy-path controls live. The job clears the directory ignore while
+    retaining the default marker policy, and explicitly unsets every
+    credential, so static release bindings stay out without weakening the
+    offline behavioral gate.
     """
     job = _workflow()["jobs"]["deployment-controls"]
     assert job["runs-on"] == "ubuntu-latest"
@@ -377,6 +379,11 @@ def test_python_workflow_runs_ignored_deployment_controls_credential_free():
     command = _step(job, "Run deployment control suites")["run"]
     assert "-o addopts=''" in command
     assert "tests/deployment" in command
+    assert (
+        '-m "not release and not artifact and not fuzz and not gas and '
+        'not fork_qualification"'
+    ) in command
+    assert "test_stock_aapl_launch_inclusion.py" not in command
     # Substring checks passed as soon as the script contained any `unset` and
     # the name appeared anywhere -- an env: declaration or a comment satisfied
     # them. Parse the unset commands and require the names to be actual

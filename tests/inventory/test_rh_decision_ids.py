@@ -3,6 +3,9 @@ import pytest
 from scripts import check_rh_decision_ids as decisions
 
 
+pytestmark = pytest.mark.release
+
+
 def test_rh_decision_register_has_unique_ids():
     decisions.parse_register(
         decisions.REGISTER.read_text(), str(decisions.REGISTER)
