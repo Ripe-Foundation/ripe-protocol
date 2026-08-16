@@ -1356,7 +1356,7 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050",
         "owner_selected", "oracle_owner",
         "docs/chains/rh/evidence/curve-snapshot-remediation.md",
-        "research_candidate_owner_approval_unresolved",
+        "owner_approved_source_activation_blocked",
     ),
     RobinhoodCurveLaunchInput(
         "artifact.curve_prices_abi_sha256",
@@ -1386,7 +1386,8 @@ ROBINHOOD_CURVE_AUTHORITY_CLASSES = frozenset(
 ROBINHOOD_CURVE_RESOLUTION_STATES = frozenset(
     {
         "resolved_repository_fact", "selected_launch", "selected_external_fact_unverified",
-        "research_candidate_owner_approval_unresolved", "test_vector_only",
+        "research_candidate_owner_approval_unresolved",
+        "owner_approved_source_activation_blocked", "test_vector_only",
         "deployment_produced_unresolved", "resolved_no_predeployment_value",
         "resolved_reference_to_unverified_binding",
         "owner_choice_unresolved", "external_observation_unverified", "explicitly_inactive",

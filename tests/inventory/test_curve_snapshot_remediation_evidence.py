@@ -81,16 +81,38 @@ def test_curve_asset_lp_harness_fix_closes_candidate_and_retains_target_set():
 
 def test_curve_source_and_fail_first_overlay_hashes_match_manifest():
     curve_source = ROOT / "contracts" / "priceSources" / "CurvePrices.vy"
+    green_tests = ROOT / "tests" / "priceSources" / "curve" / "test_green_ref_pool.py"
+    curve_tests = ROOT / "tests" / "priceSources" / "curve" / "test_curve_prices.py"
+    route_tests = (
+        ROOT
+        / "tests"
+        / "priceSources"
+        / "curve"
+        / "test_robinhood_launch_route.py"
+    )
     fail_first_overlay = EVIDENCE / "fail-first-overlay.patch"
     clock_script = ROOT / "scripts" / "capture_robinhood_curve_clock.py"
 
     assert _sha256(curve_source) == MANIFEST["source_binding"]["curve_source_sha256"]
+    assert _sha256(green_tests) == MANIFEST["source_binding"][
+        "green_ref_pool_test_sha256"
+    ]
+    assert _sha256(curve_tests) == MANIFEST["source_binding"][
+        "curve_prices_test_sha256"
+    ]
+    assert _sha256(route_tests) == MANIFEST["source_binding"]["route_test_sha256"]
     assert _sha256(fail_first_overlay) == MANIFEST["source_binding"][
         "fail_first_overlay_sha256"
     ]
     assert _sha256(clock_script) == MANIFEST["source_binding"][
         "clock_capture_script_sha256"
     ]
+    assert MANIFEST["source_binding"]["price_desk_commit"] == (
+        "6634d73fd797f03b57501fcc1513b2e9ba1bd2b1"
+    )
+    assert MANIFEST["source_binding"]["price_desk_source_sha256"] == (
+        "7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c"
+    )
 
 
 def test_robinhood_clock_packet_binds_distinct_child_and_contract_domains():

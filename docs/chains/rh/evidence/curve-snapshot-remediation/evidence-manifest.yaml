@@ -2,24 +2,29 @@ schema_version: 1
 as_of: 2026-08-15
 lifecycle:
   decision: RH-D043
-  status: candidate_owner_ratification_required
+  status: owner_accepted_ancestor_clock_review_ready_activation_blocked
   authority: >-
     Evidence only; no deployment, registration, configuration, activation,
     release, merge, or owner-policy authority is granted.
 
 source_binding:
-  remediation_base_commit: 400d6ebefebc9a51f1544f4c59ad7c8d31b8168b
-  remediation_base_tree: fb0d56a777ab4989389adbf7f84a63cbdf1a1f73
-  candidate_test_commit: 4ed1afddcb67253011a48270407ade3f5528e9e9
-  candidate_test_tree: f6ce53a0ca4946a92693011df214f04e5f02346e
+  remediation_base_commit: 6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b
+  remediation_base_tree: ab26dc7b3efd2b8977011c17b100030d12f81bcc
+  candidate_test_commit: feb77f1e6303b1cafe738318e4ddbb2f9d41434c
+  candidate_test_tree: 535a1693eb01f6b98ffc442ed375de609e5d3edc
   curve_source_sha256: 8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050
+  curve_source_git_blob: 76233779bb34059de16a5a6740233fc4dc0f59ca
+  green_ref_pool_test_sha256: 4fa89141c2be7d536cde3d087764759b1246fa82c247c83c0887fc7b9767407f
+  curve_prices_test_sha256: 7fc24ac1d961f9fbcc91bd1ce94fe1854bf5ca0f2ea68003f5f54383e737a1e0
+  route_test_sha256: 3c1238ec1a14897ff9cbfeede015d643da9c1ce2bc085ba0634ee9dd40ee395d
   unfixed_commit: 4a72a1f
   unfixed_curve_source_sha256: f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c
   fail_first_overlay_sha256: fcd4e9dd5080a57ae13cae6d4465a78a2bc9c9414458609dec5a51f023e3539a
   clock_capture_script_sha256: 38eddce9f176e9612dbd096a8ebe1666730102f535657c873f3cd273217a970e
   price_desk_pr: 152
-  price_desk_commit: 11af6c8de5a5a70fd6efa1572adf9331ad1610e5
+  price_desk_commit: 6634d73fd797f03b57501fcc1513b2e9ba1bd2b1
   price_desk_source_sha256: 7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c
+  price_desk_source_git_blob: aa80c659535db7debce6d444025c2ba34dc51c24
   note: >-
     The retained test commit contains the final Curve behavior, clock, gas, and
     Base-harness tests and precedes only generated evidence and decision text.
@@ -118,23 +123,23 @@ commands:
 
 artifacts:
   - file: base-green-ref-pool-junit.xml
-    sha256: b7086f8163792f6fa96b6974a12d465d9dfa0c002b1da2911c1199d7ffa4ccd8
-    bytes: 10344
-    tests: 72
-    passed: 72
+    sha256: d4ec49e8789804f0c0a7eb63d14ce74930b2936ebb771edf9da46700c77b6ddb
+    bytes: 10773
+    tests: 75
+    passed: 75
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 218.38
+    duration_seconds: 226.37
   - file: base-curve-prices-candidate-junit.xml
-    sha256: b06e1c8929d20d9b5ca4c7f456c09dfaec3361919d536a0bd2c173eaf24566de
+    sha256: 2c3d58ba18c961abe277aeb7464bce5e317c4173b3bcc99df840293c0b154760
     bytes: 3990
     tests: 32
     passed: 32
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 129.11
+    duration_seconds: 126.17
   - file: base-curve-prices-target-junit.xml
     sha256: 9162cdeb88063219c2689fce0c875dd7c946ebb6ca091c4e80faa6d20f4bf170
     bytes: 76334
@@ -159,14 +164,14 @@ artifacts:
       - capacity regrowth returned 8046 instead of the fresh 8500 seed
       - extreme staleBlocks overflowed the view at safeadd
   - file: pricedesk-curve-composition-junit.xml
-    sha256: d7ac96c3c985f86ac321573fdb89a1297ae23a14c14a556f799cbe9c6fefbaf7
-    bytes: 1919
-    tests: 10
-    passed: 10
+    sha256: c34b560325a9e99d7a73408bd92f0475d8769d36a292c0e213e2cc491b4cae61
+    bytes: 2089
+    tests: 11
+    passed: 11
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 141.76
+    duration_seconds: 135.15
     measurements:
       nested_green_route_gas: 25700
       worst_honest_route_gas: 127922

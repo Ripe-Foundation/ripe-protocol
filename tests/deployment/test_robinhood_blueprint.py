@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import re
-import socket
 import subprocess
 import sys
 from collections import Counter
@@ -490,7 +489,7 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.EXTERNAL_ARTIFACT: 2,
     }
     assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 50
-    assert len(ROBINHOOD_BLUEPRINT.blockers) == 29
+    assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
         RegistryDomain.RIPE_HQ: 24,
@@ -683,7 +682,7 @@ def test_lookup_api_returns_canonical_records_and_rejects_unknowns():
         assert error.value.code == code
 
 
-def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
+def test_all_28_remaining_blockers_are_open_and_morpho_gate_is_closed():
     expected_core = {
         "B-S5-LEDGER",
         "B-H04-PARAMS",
@@ -715,7 +714,7 @@ def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
         if row.resolution_state
         in blueprint_source.ROBINHOOD_CURVE_BLOCKING_STATES
     }
-    assert len(expected_curve) == 10
+    assert len(expected_curve) == 9
     blockers = {blocker.blocker_id: blocker for blocker in ROBINHOOD_BLUEPRINT.blockers}
     assert set(blockers) == expected_core | expected_curve
     assert "B-H02-AUDIT" not in blockers
@@ -728,7 +727,7 @@ def test_all_29_remaining_blockers_are_open_and_morpho_gate_is_closed():
     assert get_component("CM-008").deployment is Disposition.BLOCKED
 
 
-def test_curve_remediated_source_remains_owner_ratification_blocked():
+def test_curve_remediated_source_is_owner_approved_but_activation_blocked():
     source_row = next(
         row
         for row in blueprint_source.ROBINHOOD_CURVE_LAUNCH_INPUTS
@@ -739,9 +738,9 @@ def test_curve_remediated_source_remains_owner_ratification_blocked():
         "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
     )
     assert source_row.resolution_state == (
-        "research_candidate_owner_approval_unresolved"
+        "owner_approved_source_activation_blocked"
     )
-    assert "B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256" in {
+    assert "B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256" not in {
         blocker.blocker_id for blocker in ROBINHOOD_BLUEPRINT.blockers
     }
 

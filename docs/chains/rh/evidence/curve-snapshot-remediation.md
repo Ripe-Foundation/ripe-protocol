@@ -24,6 +24,8 @@ to be regenerated.
 
 | Identity | Bound value |
 | --- | --- |
+| Live remediation base / tree | `6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b` / `ab26dc7b3efd2b8977011c17b100030d12f81bcc` |
+| Final contract-and-test commit / tree | `feb77f1e6303b1cafe738318e4ddbb2f9d41434c` / `535a1693eb01f6b98ffc442ed375de609e5d3edc` |
 | Unfixed source commit | `4a72a1f` |
 | Unfixed Curve source SHA-256 | `f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c` |
 | Candidate Curve source SHA-256 | `8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050` |
@@ -40,11 +42,12 @@ to be regenerated.
 
 `config/BluePrint.py` binds the same candidate source SHA-256 as
 `owner_selected` with resolution state
-`research_candidate_owner_approval_unresolved`. That row deliberately adds
-`B-CURVE-ARTIFACT-CURVE-PRICES-SOURCE-SHA256`, making the scoped candidate 29
-H-03 blockers and 65 deployment-readiness blockers until the owner ratifies
-RH-D043 against the exact final head. The 28/64 values elsewhere in
-`status.yaml` remain an explicitly historical 11 August broad snapshot.
+`owner_approved_source_activation_blocked`. The source is therefore no longer
+an unresolved H-03 input, while the inactive feature flags and the remaining
+nine Curve launch-input blockers continue to prevent deployment and
+activation. This approval binds only the source SHA-256 and Git blob above; it
+does not resolve external identities, deployment-produced values, or operating
+authority.
 
 The constructor-bound runtime uses the Robinhood RipeHQ, zero temporary
 governance as specified by migration `0003`, the selected Curve AddressProvider
@@ -197,10 +200,11 @@ are top-level deterministic Boa measurements, not raw-call stipends. The CI
 workflow-health regression fails if either the BlueChip or Curve gas file is
 removed from the snapshot-gas job.
 
-The downstream SC-06 requalification replaced PriceDesk with exact PR #152
-commit `11af6c8de5a5a70fd6efa1572adf9331ad1610e5` and source SHA-256
+PR #157 owns the retained downstream SC-06 composition qualification. It
+replaced PriceDesk with exact PR #152 commit
+`6634d73fd797f03b57501fcc1513b2e9ba1bd2b1` and source SHA-256
 `7fd7e8eedd883a10ee7a225cb666896324d7b9b47de3a136175f62e00267561c`
-while retaining this exact Curve source. All ten route nodes passed. The
+while retaining this exact Curve source. All eleven route nodes passed. The
 bounded PriceDesk added 142 gas to the normal route (25,700 total) and 1,741
 gas to the worst honest route (127,922 total); both remain below the same
 50,000 and 200,000 ceilings. The active, full capacity-ten GREEN ring's real
@@ -267,7 +271,8 @@ and an arithmetic revert in the view at `snapshot.update + staleBlocks`. The
 overlay changes only the observation sequence/assertion point needed to make
 those values visible; its resulting test-file SHA-256 and exact preparation
 recipe are recorded in `evidence-manifest.yaml`. The fixed Base run executes
-all four permanent regressions as part of its 59 passing nodes.
+all four permanent regressions plus the checked-arithmetic and Robinhood-clock
+coverage as part of its 75 passing cases.
 
 The final focused behavior recipe is:
 
@@ -326,12 +331,14 @@ values are logged or committed. Retained JUnit must bind the exact final head
 and merge candidate, command, selected nodes, and all pass/fail/skip/deselect
 counts.
 
-The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 72
-green-ring nodes in 218.38 seconds. The refreshed live target
-`400d6ebefebc9a51f1544f4c59ad7c8d31b8168b` reproduced the inherited
-`test_curve_prices.py` result of 24 failed / 8 passed. Candidate test commit
-`4ed1afddcb67253011a48270407ade3f5528e9e9` repairs the harness and passes all
-32 nodes in 129.11 seconds.
+The exact credentialed Base-through-Anvil run at block 34,471,929 passed all 75
+green-ring cases in 226.37 seconds. The current integration base is
+`6d5e1fce86873a976e265b00cd0fbb9e64eb0b1b`; its only change after the retained
+`400d6ebefebc9a51f1544f4c59ad7c8d31b8168b` target fail-first run is the
+unrelated VaultBook disabled-slot recovery. That retained target run reproduced
+the historical `test_curve_prices.py` result of 24 failed / 8 passed. Final
+contract-and-test commit `feb77f1e6303b1cafe738318e4ddbb2f9d41434c`
+repairs the harness and passes all 32 nodes in 126.17 seconds.
 
 At the pinned block, timestamp 1,755,733,205, the USDC Chainlink round was
 updated at 1,755,702,597. Its initial age was 30,608 seconds. The Chainlink
@@ -368,11 +375,11 @@ Before activation, operators must bind:
    2 disable procedure; and
 5. a repair, fresh-observation, verification, and ordered re-enable runbook.
 
-Qualification reopens on any Curve source, compiler, dependency, constructor,
+Qualification reopens on any Curve source, test source, compiler, dependency, constructor,
 registry, or immutable change; capacity above 10; missed refresh or sustained
 unavailable/fallback state; gas approaching the selected margin; a threshold
 or pool-equilibrium change; a new caller, consumer, or registry topology; any
 change to freshness-revival or post-confirmation anchoring semantics; or drift
 in the selected clock domain or pinned Base results. Owner ratification of
-RH-D043 selects ancestor semantics for the unchanged Curve source. That clock
+RH-D043 selects ancestor semantics for the exact reviewed Curve source. That clock
 decision does not waive any activation control above.

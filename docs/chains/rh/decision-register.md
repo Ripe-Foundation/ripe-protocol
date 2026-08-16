@@ -1287,8 +1287,14 @@ populated, so this Deleverage must not replace Base Deleverage as-is.
 ### RH-D043 — Curve snapshot remediation uses confirmation-anchored continuity
 
 **Status:** Owner accepted ancestor `block.number` semantics on 15 August 2026
-for the unchanged Curve source; merge review may proceed. Deployment,
+for the exact reviewed Curve source; merge review may proceed. Deployment,
 configuration, activation, and release remain separately unauthorized.
+
+This decision binds production source SHA-256
+`8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050`
+and Git blob `76233779bb34059de16a5a6740233fc4dc0f59ca`. Final
+contract-and-test commit `feb77f1e6303b1cafe738318e4ddbb2f9d41434c`
+adds only focused test coverage after the production source was frozen.
 
 The candidate selects chronological block-duration weighting and accepts its
 rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
@@ -1353,7 +1359,7 @@ Clock decision and separate activation checklist:
 - [ ] accept inclusive `>=` danger classification and equilibrium guidance;
 - [ ] accept capacity-ten, fixed-100-slot reset, maximum-ring, Teller, and
   PriceDesk gas methodology and margins;
-- [ ] verify the Base green 72/72 and asset/LP 32/32 evidence, including the
+- [ ] verify the Base green 75/75 and asset/LP 32/32 evidence, including the
   exact target's retained 24-failed/8-passed harness fail-first artifact; and
 - [ ] accept the monitoring, pause/disable, reopen, and feature-inactivity
   controls before activation, without treating merge approval as deployment or

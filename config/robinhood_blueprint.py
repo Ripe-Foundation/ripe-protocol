@@ -5680,7 +5680,7 @@ def _component_blockers(component_id: str) -> tuple[str, ...]:
     }
     values.update(
         blocker_id
-        for row in _surfaces.get(component_id, ())
+        for row in _surfaces.get(component_id, ())  # noqa: F821
         for blocker_id in row[6]
     )
     return tuple(sorted(values))
@@ -5695,7 +5695,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
         downstream,
         evidence_ids,
     ) = row
-    selection = _COMPONENT_SELECTION_BY_ID[component_id]
+    selection = _COMPONENT_SELECTION_BY_ID[component_id]  # noqa: F821
     return ComponentRecord(
         component_id=component_id,
         name=selection.semantic_name,
@@ -5708,7 +5708,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 evidence_id,
             )
             for _, path, path_kind, path_state, source_class, evidence_id
-            in _sources.get(component_id, ())
+            in _sources.get(component_id, ())  # noqa: F821
         ),
         deployment=Disposition(selection.deployment_disposition),
         registry_expectations=tuple(
@@ -5727,7 +5727,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 authority,
                 registry_component_id,
                 registry_disposition,
-            ) in _registries.get(component_id, ())
+            ) in _registries.get(component_id, ())  # noqa: F821
         ),
         surfaces=tuple(
             SurfaceRecord(
@@ -5749,7 +5749,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 lifecycle_phase,
                 blocker_ids,
                 surface_assertion_ids,
-            ) in _surfaces.get(component_id, ())
+            ) in _surfaces.get(component_id, ())  # noqa: F821
         ),
         relations=tuple(
             ComponentRelation(
@@ -5770,7 +5770,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 proof_refs,
                 basis,
                 relation_evidence_ids,
-            ) in _relations.get(component_id, ())
+            ) in _relations.get(component_id, ())  # noqa: F821
         ),
         blocker_ids=_component_blockers(component_id),
         primary_owner_id=primary,
@@ -5994,14 +5994,14 @@ def validate_blueprint(
         for item in blueprint.symbolic_inputs
     ):
         _fail("H03_SYMBOLIC_FIELD")
-    # 19 base blockers + 10 curve blockers. Was 42: the owner approved the Base
+    # 19 base blockers + 9 curve blockers. Was 42: the owner approved the Base
     # GREEN pool configuration (8 params), the Base seed path (5 funding
     # inputs), and the withdrawal authority (the Safe, which governs the
     # EndaomentFunds custodian holding the LP), leaving address-provider
     # verification, the deployment-produced pool address, and the
     # slippage/retained-liquidity policy rows.
     blocker_ids = tuple(item.blocker_id for item in blueprint.blockers)
-    if len(blocker_ids) != 29 or len(set(blocker_ids)) != 29:
+    if len(blocker_ids) != 28 or len(set(blocker_ids)) != 28:
         _fail("H03_BLOCKER")
     if "B-H02-AUDIT" in blocker_ids:
         _fail("H03_BLOCKER", "B-H02-AUDIT")
