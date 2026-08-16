@@ -1,8 +1,24 @@
+"""Curve snapshot remediation evidence.
+
+Every test here but one compares committed evidence artifacts, contract source
+hashes, and captured packets against a frozen manifest. Those are release
+qualification, not contract behavior: they go stale on any legitimate
+`CurvePrices.vy` or curve-test edit and must be hand-rebound, so each is
+`artifact`-marked and deferred out of ordinary PR CI. The marks are per-test
+rather than module-level precisely so the one exception below stays in.
+
+The exception is the secret-leak scan, which is a property rather than a
+record -- committed evidence must never contain a key, mnemonic, or local
+path, and that stays true across every rebinding. It is split out below and
+runs in the default lane.
+"""
+
 import hashlib
 import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import pytest
 import yaml
 
 
@@ -44,7 +60,8 @@ def _failed_names(path: Path) -> set[str]:
     }
 
 
-def test_curve_evidence_artifacts_match_manifest_and_are_sanitized():
+@pytest.mark.artifact
+def test_curve_evidence_artifacts_match_manifest():
     for record in MANIFEST["artifacts"]:
         path = EVIDENCE / record["file"]
         assert path.stat().st_size == record["bytes"]
@@ -58,6 +75,16 @@ def test_curve_evidence_artifacts_match_manifest_and_are_sanitized():
         assert skipped == record["skipped"]
         assert len(cases) - failures - skipped == record["passed"]
 
+
+@pytest.mark.parametrize("forbidden", FORBIDDEN_EVIDENCE_TEXT)
+def test_curve_evidence_never_contains_secrets_or_local_paths(forbidden):
+    """Committed evidence must not leak a key, mnemonic, or local path.
+
+    Deliberately NOT artifact-marked. Unlike the hash bindings in this module,
+    this cannot go stale from a contract change -- it fails only if a secret is
+    actually committed -- so it belongs in ordinary PR CI. Parametrized so the
+    failure names the exact string that leaked.
+    """
     scanned = [
         EVIDENCE / "evidence-manifest.yaml",
         EVIDENCE_DOCUMENT,
@@ -65,10 +92,12 @@ def test_curve_evidence_artifacts_match_manifest_and_are_sanitized():
         *(EVIDENCE / record["file"] for record in MANIFEST["artifacts"]),
     ]
     for path in scanned:
-        contents = path.read_text()
-        assert all(value not in contents for value in FORBIDDEN_EVIDENCE_TEXT)
+        assert forbidden not in path.read_text(), (
+            f"{path.relative_to(ROOT)} contains {forbidden!r}"
+        )
 
 
+@pytest.mark.artifact
 def test_curve_asset_lp_harness_fix_closes_candidate_and_retains_target_set():
     candidate = EVIDENCE / "base-curve-prices-candidate-junit.xml"
     target = EVIDENCE / "base-curve-prices-target-junit.xml"
@@ -79,6 +108,7 @@ def test_curve_asset_lp_harness_fix_closes_candidate_and_retains_target_set():
     assert _failed_names(target) == expected
 
 
+@pytest.mark.artifact
 def test_curve_source_and_fail_first_overlay_hashes_match_manifest():
     curve_source = ROOT / "contracts" / "priceSources" / "CurvePrices.vy"
     green_tests = ROOT / "tests" / "priceSources" / "curve" / "test_green_ref_pool.py"
@@ -118,6 +148,7 @@ def test_curve_source_and_fail_first_overlay_hashes_match_manifest():
     )
 
 
+@pytest.mark.artifact
 def test_robinhood_clock_packet_binds_distinct_child_and_contract_domains():
     record = MANIFEST["clock_packet"]
     path = EVIDENCE / record["file"]

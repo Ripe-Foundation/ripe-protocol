@@ -312,20 +312,20 @@ repository_ci:
     artifact marker exclusions as the lean lane. Manual comprehensive dispatch
     clears those exclusions for deferred qualification.
   known_red: >
-    Separate from the historical default-lane counts above, the deferred manual
-    release-qualification lane has nine reported red nodes against the frozen
-    artifact baseline. Four are currently vacuous tamper
-    proofs, not independent evidence that the intended field is checked:
-    test_new_contract_tampered_expectation_fails_closed[Deleverage] and the
-    three test_deleverage_compiler_and_runtime_identity_drift_fails_closed
-    cases for transitive_compiler_input_integrity, compiler_settings, and
-    runtime_template_sha256. Each short-circuits on Deleverage source_sha256:
-    the frozen expectation is b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1,
-    while the current source is 3b47aef7fa02d46d15d1a74a95049e5b80f7361d89b3f3258c6725db3dac0a6f.
-    The checker therefore never evaluates the ABI or the three specifically
-    mutated compiler/runtime fields. These four proofs remain invalid until
-    final-release reconciliation regenerates and deliberately rebinds the
-    baseline; this ordinary remediation-policy PR must not refresh it.
+    The deferred manual artifact/release lane is red against the frozen artifact
+    baseline and drifts further with every merged contract change, because those
+    tests compare committed source and ABI hashes to the current tree. This is
+    expected and carries no information: the release procedure regenerates the
+    baseline wholesale and diffs it against the merged contract history, so the
+    stale nodes are discarded rather than repaired. Note that hash staleness
+    also makes the pipeline's tamper-detection tests vacuous while it persists
+    -- they short-circuit on the source hash before reaching the field they
+    exercise -- so a green artifact lane is a precondition for those proofs to
+    mean anything. No count is recorded here on purpose: an enumeration of red
+    nodes goes stale faster than it can be maintained, which is the same failure
+    this policy exists to remove. Run the lane to see the current state:
+    python -m pytest -o addopts='' -m artifact
+
   interpretation: >
     Enabling CI made an existing red state visible; it did not create it. A
     first green build requires the inherited failures to be addressed on their
