@@ -24,8 +24,8 @@ def test_aapl_is_the_only_initial_stock_and_every_input_is_traced():
 
     `Deployment.DP-11.stock.vaultArtifact` was removed: it asserted SimpleErc20
     artifact identity and nothing else, so with the artifact-expectations
-    pipeline retired there is no fact left for it to carry. Its deployment input
-    still exists and remains blocked; only the qualification claim is gone.
+    pipeline retired there is no fact left for it to carry. Its deployment
+    input and parameter-ledger record were removed with it.
     """
     assert source_authority.ROBINHOOD_INITIAL_STOCK_SYMBOLS == ("AAPL",)
     assert len(source_authority.ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS) == 15

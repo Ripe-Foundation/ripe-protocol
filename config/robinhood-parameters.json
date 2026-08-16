@@ -248,7 +248,7 @@
       "closure_artifacts": [
         "cannot close under current authority",
         "reopening requires a new owner decision",
-        "exact M2-M5 artifacts",
+        "unresolved M5 configuration and activation and the vault slot",
         "AAPL identity/feed/decimals/P8/caps/vault/risk/auction/routes",
         "composed proofs",
         "separate treatment of parked settlement, loss and bad-debt questions"

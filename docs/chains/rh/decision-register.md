@@ -558,7 +558,7 @@ The two retained and operative H-01 dependency-security exceptions
 affected exception stale for deployment rehearsal; expiry blocks rehearsal and
 merge unless the exception has been retired or valid replacement authority
 exists. See
-[`evidence/dependency-security-gate.md`](evidence/dependency-security-gate.md).
+`evidence/dependency-security-gate.md` (retired with the dependency gate).
 
 ## External and live-action decisions still open
 
