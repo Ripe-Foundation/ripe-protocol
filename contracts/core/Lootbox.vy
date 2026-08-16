@@ -882,26 +882,34 @@ def _getLatestDepositPoints(
     # Update holder lastBalance before lastUsdValue so gen-reward funding only
     # includes value represented by normalized holder points.
     userPoints: UserDepositPoints = empty(UserDepositPoints)
+    rawLootShare: uint256 = 0
     if _user != empty(address):
         userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
-        userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+        rawLootShare = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+        userLootShare: uint256 = rawLootShare
         if userLootShare != 0 and not isRipeGovVault:
             userLootShare = userLootShare // assetPoints.precision
         assetPoints.lastBalance -= userPoints.lastBalance
         assetPoints.lastBalance += userLootShare
         userPoints.lastBalance = userLootShare
 
-    # Staked assets are not eligible for gen deposit rewards. Non-RipeGov
-    # funding uses the aggregate normalized holder balance so sub-precision
-    # residuals cannot fill a bucket they cannot claim. RipeGov keeps vault
-    # totals because its share is already normalized in a different unit.
+    # Staked assets are not eligible for gen deposit rewards. RipeGov keeps
+    # vault totals because its share is already normalized. Other vaults fund
+    # from attributable underlying: convert aggregate normalized loot share
+    # through the current user's share-to-asset rate so rebasing vaults keep
+    # yield while sub-precision residuals still cannot fill the bucket.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
         assetAmount: uint256 = 0
         if isRipeGovVault:
             assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-        else:
-            assetAmount = assetPoints.lastBalance * assetPoints.precision
+        elif assetPoints.lastBalance != 0:
+            if rawLootShare != 0:
+                userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
+                eligibleShare: uint256 = assetPoints.lastBalance * assetPoints.precision
+                assetAmount = eligibleShare * userAmount // rawLootShare
+            else:
+                assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
         newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
 
     if newAssetUsdValue != assetPoints.lastUsdValue:

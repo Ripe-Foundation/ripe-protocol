@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
@@ -5,6 +7,37 @@ from conf_utils import filter_logs, redeem_collateral
 
 
 PRECISION_18 = 10 ** 9
+
+
+def _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+    source = Path("contracts/core/Lootbox.vy").read_text()
+    needle = """@external
+def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    assert source.count(needle) == 1
+    source = source.replace(
+        needle,
+        needle + f"    assert _user != {blocked_user} # dev: recipient checkpoint blocked\n",
+        1,
+    )
+    mutant = boa.loads(
+        source,
+        ripe_hq.address,
+        43_200,
+        43_200,
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        name="lootbox_recipient_trap",
+    )
+    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
 
 
 def _normalized(amount):
@@ -394,6 +427,78 @@ def test_sc14_redeem_checkpoint_revert_rolls_back_state(
     assert alpha_token.balanceOf(alice) == state["alice_wallet"]
     assert alpha_token.balanceOf(simple_erc20_vault) == state["vault_tokens"]
     assert ledger.isParticipatingInVault(alice, vault_id) == state["alice_participating"]
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token) == state["bob_points"]
+    assert ledger.userDepositPoints(alice, vault_id, alpha_token) == state["alice_points"]
+    assert ledger.assetDepositPoints(vault_id, alpha_token) == state["asset_points"]
+    assert ledger.globalDepositPoints() == state["global_points"]
+    assert ledger.userDebt(bob).amount == state["debt"]
+    assert filter_logs(teller, "CollateralRedeemed") == []
+
+
+def test_sc14_redeem_recipient_checkpoint_revert_rolls_back_registration(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    lootbox,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    ripe_hq,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+):
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    _make_redeemable(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        setRipeRewardsConfig,
+        createDebtTerms,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        deposit_amount,
+        100 * EIGHTEEN_DECIMALS,
+        70 * EIGHTEEN_DECIMALS // 100,
+    )
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    state = {
+        "bob_vault": simple_erc20_vault.userBalances(bob, alpha_token),
+        "alice_vault": simple_erc20_vault.userBalances(alice, alpha_token),
+        "alice_wallet": alpha_token.balanceOf(alice),
+        "vault_tokens": alpha_token.balanceOf(simple_erc20_vault),
+        "alice_participating": ledger.isParticipatingInVault(alice, vault_id),
+        "bob_points": ledger.userDepositPoints(bob, vault_id, alpha_token),
+        "alice_points": ledger.userDepositPoints(alice, vault_id, alpha_token),
+        "asset_points": ledger.assetDepositPoints(vault_id, alpha_token),
+        "global_points": ledger.globalDepositPoints(),
+        "debt": ledger.userDebt(bob).amount,
+    }
+    green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
+    _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, alice)
+    with boa.reverts():
+        _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
+    assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
+    assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
+    assert alpha_token.balanceOf(alice) == state["alice_wallet"]
+    assert alpha_token.balanceOf(simple_erc20_vault) == state["vault_tokens"]
+    assert ledger.isParticipatingInVault(alice, vault_id) == state["alice_participating"]
+    assert not ledger.isParticipatingInVault(alice, vault_id)
     assert ledger.userDepositPoints(bob, vault_id, alpha_token) == state["bob_points"]
     assert ledger.userDepositPoints(alice, vault_id, alpha_token) == state["alice_points"]
     assert ledger.assetDepositPoints(vault_id, alpha_token) == state["asset_points"]

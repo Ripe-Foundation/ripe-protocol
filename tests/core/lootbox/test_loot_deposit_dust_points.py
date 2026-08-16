@@ -145,8 +145,9 @@ def test_sc24_splitting_cannot_increase_aggregate_reward_weight(
     performDeposit(bob, whole, alpha_token, alpha_token_whale, simple_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     whole_balance = ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance
+    unsplit_usd = ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue
     assert whole_balance == 2
-    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue > 0
+    assert unsplit_usd > 0
 
     performDeposit(alice, PRECISION_18, alpha_token, alpha_token_whale, simple_erc20_vault)
     performDeposit(sally, PRECISION_18, alpha_token, alpha_token_whale, simple_erc20_vault)
@@ -157,6 +158,10 @@ def test_sc24_splitting_cannot_increase_aggregate_reward_weight(
         + ledger.userDepositPoints(sally, vault_id, alpha_token).lastBalance
     )
     assert split_exact == whole_balance
+    split_usd = (
+        ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue - unsplit_usd
+    )
+    assert split_usd == unsplit_usd
 
     dust_a = boa.env.generate_address("sc24-dust-a")
     dust_b = boa.env.generate_address("sc24-dust-b")
@@ -171,6 +176,8 @@ def test_sc24_splitting_cannot_increase_aggregate_reward_weight(
     assert split_round <= whole_balance
     assert ledger.userDepositPoints(dust_a, vault_id, alpha_token).lastBalance == 0
     assert ledger.userDepositPoints(dust_b, vault_id, alpha_token).lastBalance == 1
+    after_dust_usd = ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue
+    assert after_dust_usd == unsplit_usd + split_usd + (unsplit_usd // 2)
 
 
 def test_sc24_normalization_boundaries_and_multi_block_claim(
@@ -334,3 +341,124 @@ def test_sc24_ripegov_already_normalized_share_and_vault_total_usd(
     vault_amount = alternate_ripe_gov_vault.getTotalAmountForVault(ripe_token)
     assert ap.lastUsdValue == _usd_dollars(price_desk, ripe_token, vault_amount)
     assert ap.lastUsdValue != (user_points.lastBalance * PRECISION_18) // EIGHTEEN_DECIMALS
+
+
+def test_sc24_shares_vault_positive_rebase_funds_underlying_value(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    price_desk,
+):
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == (
+        rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token) // EIGHTEEN_DECIMALS
+    )
+
+    alpha_token.transfer(rebase_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    user_amount = rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    vault_amount = rebase_erc20_vault.getTotalAmountForVault(alpha_token)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert user_amount > deposit_amount
+    assert ap.lastUsdValue == user_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, user_amount)
+    assert ap.lastUsdValue != deposit_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, vault_amount) or (
+        ap.lastUsdValue == user_amount // EIGHTEEN_DECIMALS
+    )
+
+
+def test_sc24_shares_vault_negative_rebase_reduces_funded_value(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    loss = deposit_amount // 2
+    alpha_token.transfer(alpha_token_whale, loss, sender=rebase_erc20_vault.address)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    user_amount = rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert user_amount < deposit_amount
+    assert ap.lastUsdValue == user_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue < deposit_amount // EIGHTEEN_DECIMALS
+
+
+def test_sc24_shares_vault_multiple_holders_rebase_and_split_do_not_inflate(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_alpha,
+):
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    ledger.setRipeAvailForRewards(1_000 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    performDeposit(alice, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    alpha_token.transfer(rebase_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    vault_amount = rebase_erc20_vault.getTotalAmountForVault(alpha_token)
+    assert ap.lastUsdValue == vault_amount // EIGHTEEN_DECIMALS or ap.lastUsdValue == (
+        rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+        + rebase_erc20_vault.getTotalAmountForUser(alice, alpha_token)
+    ) // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue > (2 * deposit_amount) // EIGHTEEN_DECIMALS - 2
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance > 0
+    assert ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance > 0
+    assert (
+        ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance
+        + ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
+        == ap.lastBalance
+    )

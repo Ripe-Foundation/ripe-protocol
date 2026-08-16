@@ -349,27 +349,108 @@ def test_sc30_duration_one_uses_max_discount_on_only_purchasable_block(
     assert not ledger.hasFungibleAuction(bob, auction.vaultId, alpha_token)
 
 
-def test_sc30_max_duration_and_rounding_never_exceed_max_discount():
-    start_discount = 1
-    max_discount = 99_00
-    start_block = 10
+def test_sc30_max_duration_and_rounding_never_exceed_max_discount(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    auction_house,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+    sally,
+):
+    # Switchboard rejects only duration 0 and max_value(uint256). 1_000_000 is
+    # a large governance-valid duration above the live 43,200-block default.
+    start_discount = 1_00
+    max_discount = 50_00
     duration = 1_000_000
-    end_block = start_block + duration
-    seen = []
-    for block in (
-        start_block,
-        start_block + 1,
-        start_block + duration // 3,
-        start_block + duration // 2,
-        end_block - 2,
-        end_block - 1,
-    ):
-        discount = _new_discount(block, start_block, end_block, start_discount, max_discount)
-        assert start_discount <= discount <= max_discount
-        seen.append(discount)
-    assert seen[0] == start_discount
-    assert seen[-1] == max_discount
-    assert seen == sorted(seen)
+    auction = _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        start_discount,
+        max_discount,
+        duration,
+    )
+    price = 40 * EIGHTEEN_DECIMALS // 100
+    green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
+    spend = 4 * EIGHTEEN_DECIMALS
+
+    _advance_to_block(auction.startBlock)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction.vaultId,
+        alpha_token,
+        spend,
+        False,
+        sender=alice,
+    )
+    _assert_discount(
+        _discount_from_purchase(spent, alpha_token.balanceOf(alice) - before, price),
+        start_discount,
+    )
+
+    mid = auction.startBlock + duration // 2
+    _advance_to_block(mid)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction.vaultId,
+        alpha_token,
+        spend,
+        False,
+        sender=alice,
+    )
+    mid_discount = _discount_from_purchase(
+        spent,
+        alpha_token.balanceOf(alice) - before,
+        price,
+    )
+    assert start_discount <= mid_discount <= max_discount
+
+    _advance_to_block(auction.endBlock - 1)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction.vaultId,
+        alpha_token,
+        spend,
+        False,
+        sender=alice,
+    )
+    _assert_discount(
+        _discount_from_purchase(spent, alpha_token.balanceOf(alice) - before, price),
+        max_discount,
+    )
+    assert not auction_house.removeExpiredFungibleAuction(
+        bob,
+        auction.vaultId,
+        alpha_token,
+        sender=alice,
+    )
 
 
 def test_sc30_max_discount_purchase_preserves_live_debt_cap(

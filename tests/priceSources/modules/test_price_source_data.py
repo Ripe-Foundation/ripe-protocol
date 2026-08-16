@@ -401,6 +401,38 @@ def test_price_source_data_rejects_51st_asset_atomically(price_source_mock):
     assert assets == tokens
 
 
+def test_price_source_data_zero_address_and_duplicate_behavior_unchanged(
+    price_source_mock,
+    alpha_token,
+):
+    price_source_mock.setPrice(ZERO_ADDRESS, 111)
+    assert price_source_mock.numAssets() == 2
+    assert price_source_mock.indexOfAsset(ZERO_ADDRESS) == 1
+    assert price_source_mock.assets(1) == ZERO_ADDRESS
+    assert price_source_mock.hasPriceFeed(ZERO_ADDRESS)
+    assert price_source_mock.price(ZERO_ADDRESS) == 111
+
+    price_source_mock.setPrice(ZERO_ADDRESS, 222)
+    assert price_source_mock.numAssets() == 2
+    assert price_source_mock.indexOfAsset(ZERO_ADDRESS) == 1
+    assert price_source_mock.price(ZERO_ADDRESS) == 222
+
+    price_source_mock.setPrice(alpha_token, 100)
+    price_source_mock.setPrice(alpha_token, 200)
+    assert price_source_mock.numAssets() == 3
+    assert price_source_mock.indexOfAsset(alpha_token) == 2
+    assert len(price_source_mock.getPricedAssets()) == 2
+
+    filled = _fill_priced_assets(price_source_mock, 48)
+    assert len(price_source_mock.getPricedAssets()) == 50
+    rejected = boa.env.generate_address("invalid-overflow")
+    with boa.reverts("too many assets"):
+        price_source_mock.setPrice(rejected, 1)
+    assert price_source_mock.indexOfAsset(rejected) == 0
+    assert not price_source_mock.hasPriceFeed(rejected)
+    assert filled[-1] in price_source_mock.getPricedAssets()
+
+
 def test_price_source_data_can_add_after_removing_one_at_capacity(price_source_mock):
     tokens = _fill_priced_assets(price_source_mock, 50)
     removed = tokens[7]
