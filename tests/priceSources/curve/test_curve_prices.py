@@ -6,6 +6,12 @@ from config.BluePrint import CORE_TOKENS, CURVE_PARAMS, ADDYS, WHALES
 from conf_utils import filter_logs
 
 
+def _advance_timelock_blocks(blocks):
+    """Advance governance NUMBER without aging historical fork oracles."""
+
+    boa.env.evm.patch.block_number += blocks
+
+
 ##############
 # Green Pool #
 ##############
@@ -82,7 +88,7 @@ def test_add_curve_price_green_single_asset(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -112,7 +118,7 @@ def test_get_price_green_single_asset(
 ):
     # setup
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
 
     price = curve_prices.getPrice(green_token)
@@ -136,7 +142,7 @@ def test_add_curve_price_green_lp(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(deployed_green_pool, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_green_pool, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -171,7 +177,7 @@ def test_get_price_green_lp(
 
     # setup
     assert curve_prices.addNewPriceFeed(deployed_green_pool, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_green_pool, sender=governance.address)
 
     price = curve_prices.getPrice(deployed_green_pool)
@@ -195,12 +201,12 @@ def test_green_pool_imbalanced(
 
     # setup green price
     assert curve_prices.addNewPriceFeed(green_token, green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
 
     # setup green lp price
     assert curve_prices.addNewPriceFeed(green_pool, green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_pool, sender=governance.address)
 
     # initial prices
@@ -298,7 +304,7 @@ def test_add_curve_price_ripe_single_asset(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(ripe_token, deployed_ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(ripe_token, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -328,7 +334,7 @@ def test_get_price_ripe_single_asset(
 ):
     # setup
     assert curve_prices.addNewPriceFeed(ripe_token, deployed_ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(ripe_token, sender=governance.address)
 
     price = curve_prices.getPrice(ripe_token)
@@ -350,7 +356,7 @@ def test_add_curve_price_ripe_lp(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(deployed_ripe_pool, deployed_ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_ripe_pool, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -382,7 +388,7 @@ def test_get_price_ripe_lp(
 
     # setup
     assert curve_prices.addNewPriceFeed(deployed_ripe_pool, deployed_ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(deployed_ripe_pool, sender=governance.address)
 
     price = curve_prices.getPrice(deployed_ripe_pool)
@@ -406,12 +412,12 @@ def test_ripe_pool_imbalanced(
 
     # setup ripe price
     assert curve_prices.addNewPriceFeed(ripe_token, ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(ripe_token, sender=governance.address)
 
     # setup ripe lp price
     assert curve_prices.addNewPriceFeed(ripe_pool, ripe_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(ripe_pool, sender=governance.address)
 
     # initial prices
@@ -455,7 +461,7 @@ def usdc_token(fork, chainlink, governance):
     if not chainlink.hasPriceFeed(usdc):
         # Use staleTime=0 for forked tests since historical Chainlink data may be stale
         assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
-        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        _advance_timelock_blocks(chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
 
@@ -472,7 +478,7 @@ def test_add_curve_price_stable_ng(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(scrvusd_token, base_usdc_scrvusd_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(scrvusd_token, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -502,7 +508,7 @@ def test_get_price_stable_ng(
 ):
     # setup
     assert curve_prices.addNewPriceFeed(scrvusd_token, base_usdc_scrvusd_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(scrvusd_token, sender=governance.address)
 
     price = curve_prices.getPrice(scrvusd_token)
@@ -540,7 +546,7 @@ def test_add_curve_price_two_crypto(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(cbeth_token, base_cbeth_weth_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(cbeth_token, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -572,7 +578,7 @@ def test_get_price_two_crypto(
 ):
     # setup
     assert curve_prices.addNewPriceFeed(cbeth_token, base_cbeth_weth_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(cbeth_token, sender=governance.address)
 
     price = curve_prices.getPrice(cbeth_token)
@@ -608,7 +614,7 @@ def test_add_curve_price_two_crypto_ng(
 
     # add new price feed
     assert curve_prices.addNewPriceFeed(frok_token, base_frok_weth_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(frok_token, sender=governance.address)
 
     log = filter_logs(curve_prices, "NewCurvePriceAdded")[0]
@@ -639,7 +645,7 @@ def test_get_price_two_crypto_ng(
 ):
     # setup
     assert curve_prices.addNewPriceFeed(frok_token, base_frok_weth_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(frok_token, sender=governance.address)
 
     price = curve_prices.getPrice(frok_token)
@@ -674,7 +680,7 @@ def test_invalid_pool_edge_cases(curve_prices, governance, green_token, deployed
     """Test validation edge cases with real pool but different scenarios"""
     # Test with asset that's already configured
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # Now trying to add the same asset again should be invalid
@@ -689,7 +695,7 @@ def test_disable_feed_validation_logic(curve_prices, governance, green_token, de
     
     # Add a feed first
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # Now disabling should be valid
@@ -706,7 +712,7 @@ def test_update_price_feed_same_pool(
     """Test updating feed with same pool should fail"""
     # Add initial feed
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # Try to update with same pool - should be invalid
@@ -774,7 +780,7 @@ def test_complete_feed_lifecycle(
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
     assert curve_prices.hasPendingPriceFeedUpdate(green_token)
     
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     assert curve_prices.hasPriceFeed(green_token)
     assert not curve_prices.hasPendingPriceFeedUpdate(green_token)
@@ -783,7 +789,7 @@ def test_complete_feed_lifecycle(
     assert curve_prices.disablePriceFeed(green_token, sender=governance.address)
     assert curve_prices.hasPendingPriceFeedUpdate(green_token)
     
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmDisablePriceFeed(green_token, sender=governance.address)
     assert not curve_prices.hasPriceFeed(green_token)
     assert not curve_prices.hasPendingPriceFeedUpdate(green_token)
@@ -824,7 +830,7 @@ def test_price_desk_integration(
     """Test integration with price desk"""
     # Add feed
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # Test with explicit price desk parameter
@@ -846,7 +852,7 @@ def test_add_existing_asset_feed(
     """Test that adding feed for existing asset fails with isValidNewFeed"""
     # Add initial feed
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # Try to add again with different pool
@@ -869,7 +875,7 @@ def test_all_events_emitted(
     assert pending_logs[0].pool == deployed_green_pool
     
     # Confirm - should emit NewCurvePriceAdded
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     added_logs = filter_logs(curve_prices, "NewCurvePriceAdded")
     assert len(added_logs) == 1
@@ -879,7 +885,7 @@ def test_all_events_emitted(
     disable_pending_logs = filter_logs(curve_prices, "DisableCurvePricePending")
     assert len(disable_pending_logs) == 1
     
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     curve_prices.confirmDisablePriceFeed(green_token, sender=governance.address) 
     disabled_logs = filter_logs(curve_prices, "CurvePriceDisabled")
     assert len(disabled_logs) == 1
@@ -947,7 +953,7 @@ def test_savings_green_price(
 
     # setup green price
     assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
-    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    _advance_timelock_blocks(curve_prices.actionTimeLock() + 1)
     assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
     
     # initial prices

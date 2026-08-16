@@ -33,6 +33,7 @@ REQUIRED_CONTRACTS = frozenset(
         "AuctionHouse",
         "BlueChipYieldPrices",
         "CreditEngine",
+        "CurvePrices",
         "Deleverage",
         "DefaultsRobinhood",
         "DefaultsRobinhoodLive",
@@ -56,6 +57,7 @@ NEW_CONTRACT_SOURCES = {
     "BlueChipYieldPrices": (
         ROOT / "contracts" / "priceSources" / "BlueChipYieldPrices.vy"
     ),
+    "CurvePrices": ROOT / "contracts" / "priceSources" / "CurvePrices.vy",
     "Deleverage": ROOT / "contracts" / "core" / "Deleverage.vy",
     "DefaultsRobinhood": ROOT / "contracts" / "config" / "DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": (
@@ -79,11 +81,12 @@ NEW_CONTRACT_SOURCES = {
 DEPLOYED_RUNTIME_FACTS = {
     "AuctionHouse": {"size": 24_554, "headroom": 22},
     "CreditEngine": {"size": 24_566, "headroom": 10},
+    "CurvePrices": {"size": 23_131, "headroom": 1_445},
     "Deleverage": {"size": 24_309, "headroom": 267},
 }
 CURVE_LAUNCH_ARTIFACTS = {
     ROOT / "contracts" / "priceSources" / "CurvePrices.vy": (
-        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
+        "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
     ),
     ROOT / "scripts" / "abis" / "CurvePrices.json": (
         "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"

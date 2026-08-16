@@ -347,6 +347,23 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert "exit 1" in controls["run"]
 
 
+def test_python_workflow_enforces_bluechip_and_curve_snapshot_gas_budgets():
+    job = _workflow()["jobs"]["snapshot-gas"]
+    step = _step(job, "Enforce snapshot gas budgets")
+    command = step["run"]
+
+    assert "python -m pytest" in command
+    assert "-o addopts=''" in command
+    assert "-m gas" in command
+    assert command.count(
+        "tests/priceSources/blueChip/test_bluechip_local.py"
+    ) == 1
+    assert command.count(
+        "tests/priceSources/curve/test_robinhood_launch_route.py"
+    ) == 1
+    assert "if grep" not in command
+
+
 def test_python_workflow_runs_ignored_deployment_controls_credential_free():
     """The lean lane cannot see tests/deployment, so a required job must.
 
