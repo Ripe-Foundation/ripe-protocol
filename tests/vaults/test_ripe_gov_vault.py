@@ -2703,14 +2703,38 @@ def test_depositIntoGovVault_with_lock_duration(
 
 
 def test_depositIntoGovVault_underscore_can_deposit_for_others_with_lock(
-    teller, ripe_gov_vault, ripe_token, whale, bob, mock_undy_v2, mission_control, switchboard_alpha, setupRipeGovVaultConfig, setGeneralConfig
+    teller,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    mock_undy_v2,
+    mission_control,
+    switchboard_alpha,
+    setupRipeGovVaultConfig,
+    setGeneralConfig,
+    setUserConfig,
+    setUserDelegation,
 ):
-    """Test that underscore addresses can deposit for other users with lock duration"""
+    """Test that a user-authorized Underscore address can deposit with a lock."""
     setupRipeGovVaultConfig()
     setGeneralConfig()  # Enable general deposits
     
     # Set mock_undy_v2 as the underscore registry
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    setUserConfig(
+        bob,
+        _canAnyoneDeposit=True,
+        _canAnyoneRepayDebt=True,
+    )
+    setUserDelegation(
+        bob,
+        mock_undy_v2.address,
+        _canWithdraw=True,
+        _canBorrow=True,
+        _canClaimFromStabPool=True,
+        _canClaimLoot=True,
+    )
     
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     lock_duration = 500  # blocks - a specific lock duration between min and max

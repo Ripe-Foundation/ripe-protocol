@@ -549,18 +549,11 @@ def test_earn_vault_position_owner_disables_full_payoff_extras(
 
 
 @pytest.mark.parametrize("underscore_caller_type", ("earn_vault", "lego"))
-def test_recognized_cross_user_underscore_caller_is_untrusted_for_healthy_user(
+def test_recognized_cross_user_underscore_caller_without_delegation_reverts(
     deleverage,
-    credit_engine,
-    simple_erc20_vault,
     bob,
     alice,
-    auction_house,
     alpha_token,
-    charlie_token,
-    green_token,
-    savings_green,
-    endaoment_funds,
     build_position,
     switchboard_alpha,
     mission_control,
@@ -568,7 +561,7 @@ def test_recognized_cross_user_underscore_caller_is_untrusted_for_healthy_user(
     ripe_hq,
     underscore_caller_type,
 ):
-    """Only the caller/user trust relationship differs from the Ripe control."""
+    """Registration alone cannot admit a third party for a healthy user."""
     build_position(bob)
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
@@ -590,101 +583,24 @@ def test_recognized_cross_user_underscore_caller_is_untrusted_for_healthy_user(
         assert mock_undy_v2.isValidAddr(alice) is True
     assert bob != alice
     assert mission_control.userDelegation(bob, alice).canBorrow is False
-    debt, borrow_terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, True)
-    formula = _expected_target(
-        400 * EIGHTEEN_DECIMALS,
-        bob,
-        deleverage=deleverage,
-        credit_engine=credit_engine,
-        simple_erc20_vault=simple_erc20_vault,
-        alpha_token=alpha_token,
-    )
-    assert debt.amount != 0
-    assert borrow_terms.hasQuarantinedAsset is False
-    assert deleverage.deleverageCooldown() == 0
-    assert formula["lost_capacity"] != 0
-    assert formula["max_deleveragable"] != 0
-    assert formula["denominator"] != 0
-    assert formula["target"] != 0
-    assert deleverage.minDeleverageBps() == 0
     assert deleverage.getMaxDeleverageAmount(bob) == 0
 
-    amount = 400 * EIGHTEEN_DECIMALS
-    action_block = boa.env.evm.patch.block_number
-    with boa.env.anchor():
-        trusted = _call_and_measure(
-            amount,
+    with boa.reverts("no perms"):
+        deleverage.deleverageForWithdrawal(
             bob,
-            auction_house.address,
-            deleverage=deleverage,
-            credit_engine=credit_engine,
-            simple_erc20_vault=simple_erc20_vault,
-            alpha_token=alpha_token,
-            charlie_token=charlie_token,
-            endaoment_funds=endaoment_funds,
+            3,
+            alpha_token,
+            400 * EIGHTEEN_DECIMALS,
+            sender=alice,
         )
 
-    with boa.env.anchor():
-        caller_before = (
-            alpha_token.balanceOf(alice),
-            charlie_token.balanceOf(alice),
-            green_token.balanceOf(alice),
-            savings_green.balanceOf(alice),
-        )
-        untrusted = _call_and_measure(
-            amount,
-            bob,
-            alice,
-            deleverage=deleverage,
-            credit_engine=credit_engine,
-            simple_erc20_vault=simple_erc20_vault,
-            alpha_token=alpha_token,
-            charlie_token=charlie_token,
-            endaoment_funds=endaoment_funds,
-        )
-        caller_after = (
-            alpha_token.balanceOf(alice),
-            charlie_token.balanceOf(alice),
-            green_token.balanceOf(alice),
-            savings_green.balanceOf(alice),
-        )
 
-    assert trusted["action_block"] == untrusted["action_block"] == action_block
-    assert trusted["amount"] == untrusted["amount"] == amount
-    assert trusted["formula"] == untrusted["formula"]
-    assert trusted["result"] is True
-    assert trusted["event_count"] == 1
-    assert trusted["debt_cleared"] > 0
-    assert trusted["collateral_consumed"] > 0
-    assert trusted["endaoment_delta"] == trusted["collateral_consumed"]
-    assert trusted["last_before"] == 0
-    assert trusted["last_after"] == action_block
-
-    assert untrusted["result"] is False
-    assert untrusted["event_count"] == 0
-    assert untrusted["debt_cleared"] == 0
-    assert untrusted["collateral_consumed"] == 0
-    assert untrusted["endaoment_delta"] == 0
-    assert untrusted["last_before"] == untrusted["last_after"] == 0
-    assert caller_after == caller_before
-    _print_measurements(
-        f"CROSS_USER_UNDERSCORE_{underscore_caller_type.upper()}",
-        {"trusted": trusted, "untrusted": untrusted},
-    )
-
-
-def test_cross_user_underscore_redemption_zone_is_capped_without_payoff_extras(
+def test_cross_user_underscore_without_delegation_reverts_in_redemption_zone(
     deleverage,
     credit_engine,
-    simple_erc20_vault,
     bob,
     alice,
-    auction_house,
     alpha_token,
-    charlie_token,
-    green_token,
-    savings_green,
-    endaoment_funds,
     build_position,
     switchboard_alpha,
     mission_control,
@@ -692,7 +608,7 @@ def test_cross_user_underscore_redemption_zone_is_capped_without_payoff_extras(
     mock_price_source,
     ripe_hq,
 ):
-    """A recognized cross-user caller retains only the redemption safety path."""
+    """The withdrawal entry gate rejects an ungranted caller before safety logic."""
     deleverage.setDeleverageBuffer(30_00, sender=switchboard_alpha.address)
     set_full_payoff_params(
         deleverage,
@@ -726,67 +642,14 @@ def test_cross_user_underscore_redemption_zone_is_capped_without_payoff_extras(
     assert untrusted_cap > 0
     assert untrusted_cap < debt.amount
 
-    amount = 10_000 * EIGHTEEN_DECIMALS
-    action_block = boa.env.evm.patch.block_number
-    with boa.env.anchor():
-        trusted = _call_and_measure(
-            amount,
+    with boa.reverts("no perms"):
+        deleverage.deleverageForWithdrawal(
             bob,
-            auction_house.address,
-            deleverage=deleverage,
-            credit_engine=credit_engine,
-            simple_erc20_vault=simple_erc20_vault,
-            alpha_token=alpha_token,
-            charlie_token=charlie_token,
-            endaoment_funds=endaoment_funds,
+            3,
+            alpha_token,
+            10_000 * EIGHTEEN_DECIMALS,
+            sender=alice,
         )
-
-    with boa.env.anchor():
-        caller_before = (
-            alpha_token.balanceOf(alice),
-            charlie_token.balanceOf(alice),
-            green_token.balanceOf(alice),
-            savings_green.balanceOf(alice),
-        )
-        untrusted = _call_and_measure(
-            amount,
-            bob,
-            alice,
-            deleverage=deleverage,
-            credit_engine=credit_engine,
-            simple_erc20_vault=simple_erc20_vault,
-            alpha_token=alpha_token,
-            charlie_token=charlie_token,
-            endaoment_funds=endaoment_funds,
-        )
-        caller_after = (
-            alpha_token.balanceOf(alice),
-            charlie_token.balanceOf(alice),
-            green_token.balanceOf(alice),
-            savings_green.balanceOf(alice),
-        )
-
-    assert trusted["action_block"] == untrusted["action_block"] == action_block
-    assert trusted["amount"] == untrusted["amount"] == amount
-    assert trusted["formula"] == untrusted["formula"]
-    assert trusted["event_target"] == debt.amount
-    assert trusted["event_target_with_buffer"] == debt.amount + 10**15
-    assert trusted["collateral_consumed"] * 10**12 > trusted["debt_cleared"]
-
-    assert untrusted["result"] is True
-    assert untrusted["event_count"] == 1
-    assert untrusted["event_target"] == untrusted_cap
-    assert untrusted["event_target"] < debt.amount
-    assert untrusted["event_target_with_buffer"] == untrusted["event_target"]
-    assert untrusted["event_collateral_value"] == untrusted["event_debt_clear"]
-    assert untrusted["event_debt_clear"] < debt.amount
-    assert untrusted["last_before"] == 0
-    assert untrusted["last_after"] == action_block
-    assert caller_after == caller_before
-    _print_measurements(
-        "CROSS_USER_UNDERSCORE_REDEMPTION_CAP",
-        {"trusted": trusted, "untrusted": untrusted, "cap": untrusted_cap},
-    )
 
 
 def test_cross_user_underscore_can_borrow_delegation_preserves_trusted_payoff(
@@ -856,7 +719,7 @@ def test_cross_user_underscore_can_borrow_delegation_preserves_trusted_payoff(
     assert measurement["collateral_consumed"] * 10**12 > measurement["debt_cleared"]
 
 
-def test_cross_user_underscore_withdraw_delegation_does_not_grant_trust(
+def test_registered_underscore_without_can_borrow_reverts_at_withdrawal_entry(
     deleverage,
     credit_engine,
     simple_erc20_vault,
@@ -892,10 +755,8 @@ def test_cross_user_underscore_withdraw_delegation_does_not_grant_trust(
     assert delegation.canBorrow is False
     assert deleverage.getMaxDeleverageAmount(bob) == 0
 
-    measurement = _call_and_measure(
-        400 * EIGHTEEN_DECIMALS,
+    before = _state(
         bob,
-        alice,
         deleverage=deleverage,
         credit_engine=credit_engine,
         simple_erc20_vault=simple_erc20_vault,
@@ -903,15 +764,28 @@ def test_cross_user_underscore_withdraw_delegation_does_not_grant_trust(
         charlie_token=charlie_token,
         endaoment_funds=endaoment_funds,
     )
-    assert measurement["result"] is False
-    assert measurement["event_count"] == 0
-    assert measurement["debt_cleared"] == 0
-    assert measurement["collateral_consumed"] == 0
-    assert measurement["endaoment_delta"] == 0
-    assert measurement["last_before"] == measurement["last_after"] == 0
+    with boa.reverts("no perms"):
+        deleverage.deleverageForWithdrawal(
+            bob,
+            3,
+            alpha_token,
+            400 * EIGHTEEN_DECIMALS,
+            sender=alice,
+        )
+    assert filter_logs(deleverage, "DeleverageUser") == []
+    after = _state(
+        bob,
+        deleverage=deleverage,
+        credit_engine=credit_engine,
+        simple_erc20_vault=simple_erc20_vault,
+        alpha_token=alpha_token,
+        charlie_token=charlie_token,
+        endaoment_funds=endaoment_funds,
+    )
+    assert after == before
 
 
-def test_trusted_caller_cross_user_model_is_shared_by_both_sibling_routes(
+def test_registered_underscore_sibling_routes_require_can_borrow(
     deleverage,
     teller,
     credit_engine,
@@ -926,8 +800,9 @@ def test_trusted_caller_cross_user_model_is_shared_by_both_sibling_routes(
     mission_control,
     mock_undy_v2,
     ripe_hq,
+    setUserDelegation,
 ):
-    """Ripe/Underscore trust bypasses victim delegation on all three routes."""
+    """Registration identifies the integration; canBorrow authorizes the user."""
     build_position(bob)
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
@@ -935,13 +810,55 @@ def test_trusted_caller_cross_user_model_is_shared_by_both_sibling_routes(
     )
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setEarnVault(alice, True)
-    mock_undy_v2.setBasicEarnVault(alice, False)
-    mock_undy_v2.setEarnVault(bob, False)
 
     assert ripe_hq.isValidAddr(alice) is False
-    assert mock_undy_v2.isEarnVault(alice) is True
+    assert mock_undy_v2.isValidAddr(alice) is True
     assert mission_control.userDelegation(bob, alice).canBorrow is False
 
+    for route in ("many", "specific"):
+        with boa.env.anchor():
+            before = _state(
+                bob,
+                deleverage=deleverage,
+                credit_engine=credit_engine,
+                simple_erc20_vault=simple_erc20_vault,
+                alpha_token=alpha_token,
+                charlie_token=charlie_token,
+                endaoment_funds=endaoment_funds,
+            )
+            if route == "many":
+                with boa.reverts("nobody deleveraged"):
+                    teller.deleverageManyUsers(
+                        [(bob, 100 * EIGHTEEN_DECIMALS)],
+                        sender=alice,
+                    )
+            else:
+                with boa.reverts("not allowed"):
+                    teller.deleverageWithSpecificAssets(
+                        [(3, charlie_token.address, 100 * EIGHTEEN_DECIMALS)],
+                        bob,
+                        sender=alice,
+                    )
+            assert filter_logs(teller, "DeleverageUser") == []
+            after = _state(
+                bob,
+                deleverage=deleverage,
+                credit_engine=credit_engine,
+                simple_erc20_vault=simple_erc20_vault,
+                alpha_token=alpha_token,
+                charlie_token=charlie_token,
+                endaoment_funds=endaoment_funds,
+            )
+            assert after == before
+
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
+    )
     measurements = []
     for route in ("many", "specific"):
         with boa.env.anchor():
@@ -1015,7 +932,188 @@ def test_trusted_caller_cross_user_model_is_shared_by_both_sibling_routes(
         assert measurement["caller_direct_delta"] == (0, 0)
         assert measurement["event_target"] == 100 * EIGHTEEN_DECIMALS
         assert measurement["event_debt_clear"] == 100 * EIGHTEEN_DECIMALS
-    _print_measurements("SIBLING_CROSS_USER_TRUST", measurements)
+    _print_measurements("SIBLING_AUTHORIZED_DELEGATE", measurements)
+
+
+def test_deleverage_many_users_does_not_leak_delegation_across_batch(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    sally,
+    alpha_token,
+    charlie_token,
+    endaoment_funds,
+    build_position,
+    switchboard_alpha,
+    mission_control,
+    mock_undy_v2,
+    setUserDelegation,
+):
+    build_position(alice)
+    build_position(bob)
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(sally, True)
+    setUserDelegation(
+        alice,
+        sally,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
+    )
+    assert mission_control.userDelegation(alice, sally).canBorrow is True
+    assert mission_control.userDelegation(bob, sally).canBorrow is False
+    alice_before = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+    bob_before = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    repaid = teller.deleverageManyUsers(
+        [
+            (alice, 100 * EIGHTEEN_DECIMALS),
+            (bob, 100 * EIGHTEEN_DECIMALS),
+        ],
+        sender=sally,
+    )
+    logs = filter_logs(teller, "DeleverageUser")
+    alice_after = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+    bob_after = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    assert repaid == 100 * EIGHTEEN_DECIMALS
+    assert alice_before - alice_after == repaid
+    assert bob_after == bob_before
+    assert [event.user for event in logs] == [alice]
+
+
+def test_deleverage_many_users_preserves_registered_self_trust_without_batch_leak(
+    deleverage,
+    teller,
+    credit_engine,
+    bob,
+    alice,
+    build_position,
+    switchboard_alpha,
+    mission_control,
+    mock_undy_v2,
+):
+    build_position(alice)
+    build_position(bob)
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alice, True)
+    assert mission_control.userDelegation(alice, alice).canBorrow is False
+    assert mission_control.userDelegation(bob, alice).canBorrow is False
+    assert deleverage.getMaxDeleverageAmount(alice) == 0
+
+    alice_before = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+    bob_before = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    repaid = teller.deleverageManyUsers(
+        [
+            (alice, 100 * EIGHTEEN_DECIMALS),
+            (bob, 100 * EIGHTEEN_DECIMALS),
+        ],
+        sender=alice,
+    )
+    events = filter_logs(teller, "DeleverageUser")
+
+    assert repaid == 100 * EIGHTEEN_DECIMALS
+    alice_after = credit_engine.getLatestUserDebtAndTerms(alice, False)[0].amount
+    assert alice_before - alice_after == repaid
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == bob_before
+    assert [event.user for event in events] == [alice]
+
+
+def test_withdrawal_can_borrow_delegate_stays_trusted_and_revocation_is_immediate(
+    deleverage,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    alpha_token,
+    charlie_token,
+    endaoment_funds,
+    build_position,
+    switchboard_alpha,
+    mission_control,
+    mock_undy_v2,
+    setUserDelegation,
+):
+    build_position(bob)
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alice, True)
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
+    )
+
+    measurement = _call_and_measure(
+        400 * EIGHTEEN_DECIMALS,
+        bob,
+        alice,
+        deleverage=deleverage,
+        credit_engine=credit_engine,
+        simple_erc20_vault=simple_erc20_vault,
+        alpha_token=alpha_token,
+        charlie_token=charlie_token,
+        endaoment_funds=endaoment_funds,
+    )
+    assert measurement["result"] is True
+    assert measurement["target_delta"] == 0
+    assert measurement["debt_cleared"] > 0
+    assert measurement["event_count"] == 1
+
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=False,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
+    )
+    before = _state(
+        bob,
+        deleverage=deleverage,
+        credit_engine=credit_engine,
+        simple_erc20_vault=simple_erc20_vault,
+        alpha_token=alpha_token,
+        charlie_token=charlie_token,
+        endaoment_funds=endaoment_funds,
+    )
+    with boa.reverts("no perms"):
+        deleverage.deleverageForWithdrawal(
+            bob,
+            3,
+            alpha_token,
+            1,
+            sender=alice,
+        )
+    assert filter_logs(deleverage, "DeleverageUser") == []
+    after = _state(
+        bob,
+        deleverage=deleverage,
+        credit_engine=credit_engine,
+        simple_erc20_vault=simple_erc20_vault,
+        alpha_token=alpha_token,
+        charlie_token=charlie_token,
+        endaoment_funds=endaoment_funds,
+    )
+    assert after == before
 
 
 def test_registered_ripe_address_can_select_undelegated_victim(
@@ -1070,6 +1168,27 @@ def test_completely_unregistered_caller_reverts_no_perms(
             alpha_token,
             400 * EIGHTEEN_DECIMALS,
             sender=alice,
+        )
+
+
+def test_unregistered_ordinary_self_caller_still_reverts_no_perms(
+    deleverage,
+    bob,
+    alpha_token,
+    build_position,
+    ripe_hq,
+    mission_control,
+):
+    build_position(bob)
+    assert ripe_hq.isValidAddr(bob) is False
+    assert mission_control.underscoreRegistry() == ZERO_ADDRESS
+    with boa.reverts("no perms"):
+        deleverage.deleverageForWithdrawal(
+            bob,
+            3,
+            alpha_token,
+            400 * EIGHTEEN_DECIMALS,
+            sender=bob,
         )
 
 

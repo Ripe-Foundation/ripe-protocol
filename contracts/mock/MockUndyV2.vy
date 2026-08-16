@@ -15,9 +15,13 @@ UNDY_REGISTRY: public(immutable(address))
 
 useThisLegoId: public(uint256)
 _isUserWallet: public(bool)
+_userWallets: public(HashMap[address, bool])
 _earnVaults: public(HashMap[address, bool])
 _basicEarnVaults: public(HashMap[address, bool])
 _allAddressesAreVaults: public(bool)
+_validAddresses: public(HashMap[address, bool])
+_allAddressesAreValid: public(bool)
+_missingRegId: public(uint256)
 _vaultCheckRevertAddress: public(address)
 
 
@@ -25,29 +29,55 @@ _vaultCheckRevertAddress: public(address)
 def __init__(_undyLegacy: address):
     UNDY_REGISTRY = _undyLegacy
     self._allAddressesAreVaults = True  # default behavior for backwards compatibility
+    self._allAddressesAreValid = True  # default behavior for backwards compatibility
+    self._missingRegId = max_value(uint256)
 
 
 @view
 @external
 def getAddr(_regId: uint256) -> address:
+    if _regId == self._missingRegId:
+        return empty(address)
     return self
 
 
 @view
 @external
 def isValidAddr(_addr: address) -> bool:
-    return True
+    if self._allAddressesAreValid:
+        return True
+    return self._validAddresses[_addr]
 
 
 @view
 @external
 def isUserWallet(_addr: address) -> bool:
-    return self._isUserWallet
+    return self._isUserWallet or self._userWallets[_addr]
 
 
 @external
 def setIsUserWallet(_isUserWallet: bool):
     self._isUserWallet = _isUserWallet
+
+
+@external
+def setUserWallet(_addr: address, _isUserWallet: bool):
+    self._userWallets[_addr] = _isUserWallet
+
+
+@external
+def setAllAddressesAreValid(_allAreValid: bool):
+    self._allAddressesAreValid = _allAreValid
+
+
+@external
+def setValidAddress(_addr: address, _isValid: bool):
+    self._validAddresses[_addr] = _isValid
+
+
+@external
+def setMissingRegId(_regId: uint256):
+    self._missingRegId = _regId
 
 
 @view
