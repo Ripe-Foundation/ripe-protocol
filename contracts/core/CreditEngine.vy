@@ -779,8 +779,10 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # lowest ltv
-            bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
+            # Only an asset with nonzero debt capacity may set the unwind target.
+            # Zero-capacity dust must not pull lowestLtv below the meaningful book.
+            if maxDebt != 0:
+                bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
             # highest ltv
             bt.highestLtv = max(bt.highestLtv, debtTerms.ltv)

@@ -875,35 +875,39 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # latest asset value (staked assets not eligible for gen deposit rewards)
+    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
+    # core id because old positions and rewards can remain claimable after the core pointer moves.
+    isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
+
+    # Update holder lastBalance before lastUsdValue so gen-reward funding only
+    # includes value represented by normalized holder points.
+    userPoints: UserDepositPoints = empty(UserDepositPoints)
+    if _user != empty(address):
+        userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
+        userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+        if userLootShare != 0 and not isRipeGovVault:
+            userLootShare = userLootShare // assetPoints.precision
+        assetPoints.lastBalance -= userPoints.lastBalance
+        assetPoints.lastBalance += userLootShare
+        userPoints.lastBalance = userLootShare
+
+    # Staked assets are not eligible for gen deposit rewards. Non-RipeGov
+    # funding uses the aggregate normalized holder balance so sub-precision
+    # residuals cannot fill a bucket they cannot claim. RipeGov keeps vault
+    # totals because its share is already normalized in a different unit.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
+        assetAmount: uint256 = 0
+        if isRipeGovVault:
+            assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+        else:
+            assetAmount = assetPoints.lastBalance * assetPoints.precision
+        newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
 
-    # update `lastUsdValue` for global + asset
     if newAssetUsdValue != assetPoints.lastUsdValue:
         globalPoints.lastUsdValue -= assetPoints.lastUsdValue
         globalPoints.lastUsdValue += newAssetUsdValue
         assetPoints.lastUsdValue = newAssetUsdValue
-
-    # nothing else to do here
-    if _user == empty(address):
-        return empty(UserDepositPoints), assetPoints, globalPoints
-
-    # latest user points
-    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
-
-    # get user loot share
-    userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
-    # core id because old positions and rewards can remain claimable after the core pointer moves.
-    if userLootShare != 0 and not staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId):
-        userLootShare = userLootShare // assetPoints.precision
-
-    # update `lastBalance`
-    assetPoints.lastBalance -= userPoints.lastBalance
-    assetPoints.lastBalance += userLootShare
-    userPoints.lastBalance = userLootShare
 
     return userPoints, assetPoints, globalPoints
 
@@ -913,11 +917,10 @@ def _getLatestDepositPoints(
 
 @view
 @internal
-def _refreshAssetUsdValue(_asset: address, _vaultAddr: address, _priceDesk: address) -> uint256:
-    assetAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-    if assetAmount == 0:
+def _refreshAssetUsdValue(_asset: address, _amount: uint256, _priceDesk: address) -> uint256:
+    if _amount == 0:
         return 0
-    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, assetAmount)
+    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount)
     if newUsdValue != 0:
         newUsdValue = newUsdValue // EIGHTEEN_DECIMALS # reduce risk of integer overflow
     return newUsdValue

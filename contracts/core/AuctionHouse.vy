@@ -1188,9 +1188,15 @@ def _buyFungibleAuction(
     if greenAmount == 0:
         return 0
 
-    # calculate discount
-    auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)
-    discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
+    # Progress spans first..last purchasable block (end-1), not the expired endBlock.
+    # A one-block auction has only that purchasable block and uses maxDiscount.
+    discount: uint256 = auc.maxDiscount
+    if auc.endBlock > auc.startBlock + 1:
+        auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock - 1)
+        if auctionProgress == 0 or auc.startDiscount == auc.maxDiscount:
+            discount = auc.startDiscount
+        else:
+            discount = auc.startDiscount + auctionProgress * (auc.maxDiscount - auc.startDiscount) // HUNDRED_PERCENT
 
     # get vault addr
     liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)
@@ -1233,14 +1239,6 @@ def _buyFungibleAuction(
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
     return greenSpent
-
-
-@pure
-@internal
-def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxDiscount: uint256) -> uint256:
-    if _progress == 0 or _startDiscount == _maxDiscount:
-        return _startDiscount
-    return _startDiscount + _progress * (_maxDiscount - _startDiscount) // HUNDRED_PERCENT
 
 
 #############

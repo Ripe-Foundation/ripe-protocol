@@ -731,13 +731,16 @@ def test_ah_auction_time_boundary_edge_cases(
     boa.env.time_travel(blocks=blocks_to_move)
     assert boa.env.evm.patch.block_number == end_block - 1
     
+    alice_before = alpha_token.balanceOf(alice)
     green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    # At end of auction, should get some discount (spend less than at start)
-    # The exact amount depends on collateral availability and pricing
-    assert green_spent > 0  # Should successfully purchase
-    assert green_spent < 10 * EIGHTEEN_DECIMALS  # Should spend less due to discount
+    # Last purchasable block reaches maxDiscount. Requested GREEN is still
+    # spent when collateral remains; the buyer receives more than face value.
+    assert green_spent > 0
+    assert green_spent <= 10 * EIGHTEEN_DECIMALS
+    collateral_received = alpha_token.balanceOf(alice) - alice_before
+    assert collateral_received * new_price // EIGHTEEN_DECIMALS > green_spent
     
     # Test 4: Exactly at end block (should fail)
     boa.env.time_travel(blocks=1)  # Move to end block
