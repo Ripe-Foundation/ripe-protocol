@@ -10,6 +10,7 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+MAX_TRANSFER_DELTA: constant(uint256) = 2
 
 
 @deploy
@@ -56,40 +57,6 @@ def _withdrawTokensFromVault(
 ) -> (uint256, uint256, bool):
     assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
-
-    # calc shares + amount to withdraw
-    withdrawalShares: uint256 = 0
-    withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
-
-    # check pre withdrawal values
-    vaultBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
-
-    # reduce balance on withdrawal
-    isDepleted: bool = False
-    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
-
-    # move tokens to recipient
-    assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
-
-    # check post withdrawal values
-    assert vaultBefore - staticcall IERC20(_asset).balanceOf(self) == withdrawalAmount # dev: invalid vault outflow
-    assert staticcall IERC20(_asset).balanceOf(_recipient) - recipientBefore == withdrawalAmount # dev: invalid recipient delivery
-
-    return withdrawalAmount, withdrawalShares, isDepleted
-
-
-@internal
-def _withdrawTokensFromVaultWithTolerance(
-    _user: address,
-    _asset: address,
-    _amount: uint256,
-    _recipient: address,
-    _maxTransferDelta: uint256,
-) -> (uint256, uint256, bool):
-    assert not vaultData.isPaused # dev: contract paused
-    assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
     assert _recipient != self # dev: invalid recipient
 
     requestedShares: uint256 = 0
@@ -110,27 +77,21 @@ def _withdrawTokensFromVaultWithTolerance(
 
     actualOutflow: uint256 = vaultBefore - vaultAfter
     actualDelivery: uint256 = recipientAfter - recipientBefore
-    assert self._isWithinTransferDelta(actualOutflow, requestedAmount, _maxTransferDelta) # dev: invalid vault outflow
-    assert self._isWithinTransferDelta(actualDelivery, requestedAmount, _maxTransferDelta) # dev: invalid recipient delivery
+    assert self._isWithinTransferDelta(actualOutflow, requestedAmount) # dev: invalid vault outflow
+    assert self._isWithinTransferDelta(actualDelivery, requestedAmount) # dev: invalid recipient delivery
 
     withdrawalShares: uint256 = requestedShares
     if actualOutflow != requestedAmount:
-        withdrawalShares = min(
-            userSharesBefore,
-            self._amountToShares(
-                actualOutflow,
-                totalSharesBefore,
-                vaultBefore,
-                True,
-            ),
+        withdrawalShares = self._amountToShares(
+            actualOutflow,
+            totalSharesBefore,
+            vaultBefore,
+            True,
         )
+        if withdrawalShares > userSharesBefore:
+            assert userSharesBefore == totalSharesBefore # dev: remaining holder loss
+            withdrawalShares = userSharesBefore
     assert withdrawalShares != 0 # dev: cannot withdraw 0 shares
-    assert self._preservesRemainingClaim(
-        withdrawalShares,
-        totalSharesBefore,
-        vaultBefore,
-        actualOutflow,
-    ) # dev: remaining holder loss
 
     isDepleted: bool = False
     withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(
@@ -148,39 +109,10 @@ def _withdrawTokensFromVaultWithTolerance(
 def _isWithinTransferDelta(
     _actual: uint256,
     _requested: uint256,
-    _maxTransferDelta: uint256,
 ) -> bool:
     if _actual >= _requested:
-        return _actual - _requested <= _maxTransferDelta
-    return _requested - _actual <= _maxTransferDelta
-
-
-@view
-@internal
-def _preservesRemainingClaim(
-    _withdrawalShares: uint256,
-    _totalShares: uint256,
-    _vaultBalance: uint256,
-    _vaultOutflow: uint256,
-) -> bool:
-    assert _withdrawalShares <= _totalShares # dev: invalid withdrawal shares
-    assert _vaultOutflow <= _vaultBalance # dev: invalid vault outflow
-    remainingShares: uint256 = _totalShares - _withdrawalShares
-    if remainingShares == 0:
-        return True
-    remainingClaimBefore: uint256 = self._sharesToAmount(
-        remainingShares,
-        _totalShares,
-        _vaultBalance,
-        False,
-    )
-    remainingClaimAfter: uint256 = self._sharesToAmount(
-        remainingShares,
-        remainingShares,
-        _vaultBalance - _vaultOutflow,
-        False,
-    )
-    return remainingClaimAfter >= remainingClaimBefore
+        return _actual - _requested <= MAX_TRANSFER_DELTA
+    return _requested - _actual <= MAX_TRANSFER_DELTA
 
 
 @internal

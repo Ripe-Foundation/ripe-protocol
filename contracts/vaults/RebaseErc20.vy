@@ -84,7 +84,7 @@ def withdrawTokensFromVault(
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
     isDepleted: bool = False
-    withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVaultWithTolerance(_user, _asset, _amount, _recipient, 2)
+    withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
     log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
     return withdrawalAmount, isDepleted
 
