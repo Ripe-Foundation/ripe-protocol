@@ -882,6 +882,7 @@ def _getLatestDepositPoints(
 
     # Update holder lastBalance before lastUsdValue so gen-reward funding only
     # includes value represented by normalized holder points.
+    prevAssetBalance: uint256 = assetPoints.lastBalance
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     rawLootShare: uint256 = 0
     if _user != empty(address):
@@ -902,9 +903,12 @@ def _getLatestDepositPoints(
     # vaultTotal == 0 is the custody-shortfall circuit breaker.
     # Cap the conversion at vaultTotal so a stale lastBalance (accepted
     # historical drift; no reset on deploy) and a small holder's floored
-    # rate cannot inflate funding above custody.
-    # Full-exit / empty-user checkpoints have no live rate; use vaultTotal
-    # (unit-correct for every module) rather than lastBalance * precision.
+    # rate cannot inflate funding above custody. A well-chosen dust size
+    # can still understate the book by up to ~50% until a larger holder
+    # checkpoints (BasicVault rate is 1, so this is latent).
+    # No live rate (full exit / resetAssetPoints): scale the previous USD
+    # by lastBalance so already-excluded dust stays excluded. Cap at live
+    # vault USD so a shrinking book cannot keep stale value.
     # StabVault: getTotalAmountForVault and getTotalAmountForUser each walk
     # the claimable-asset NAV loop when stakersPointsAlloc == 0.
     # eligibleShare * userAmount is ≈ total² and stays below uint256
@@ -912,20 +916,22 @@ def _getLatestDepositPoints(
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
         vaultTotal: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-        assetAmount: uint256 = 0
         if vaultTotal == 0:
-            assetAmount = 0
+            newAssetUsdValue = 0
         elif isRipeGovVault:
-            assetAmount = vaultTotal
+            newAssetUsdValue = self._getUsdValueForAmount(_asset, vaultTotal, _a.priceDesk)
         elif assetPoints.lastBalance != 0:
             if rawLootShare != 0:
                 userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
                 eligibleShare: uint256 = assetPoints.lastBalance * assetPoints.precision
-                assetAmount = eligibleShare * userAmount // rawLootShare
-            else:
-                assetAmount = vaultTotal
-            assetAmount = min(assetAmount, vaultTotal)
-        newAssetUsdValue = self._getUsdValueForAmount(_asset, assetAmount, _a.priceDesk)
+                assetAmount: uint256 = eligibleShare * userAmount // rawLootShare
+                if assetAmount > vaultTotal:
+                    assetAmount = vaultTotal
+                newAssetUsdValue = self._getUsdValueForAmount(_asset, assetAmount, _a.priceDesk)
+            elif prevAssetBalance != 0:
+                vaultUsd: uint256 = self._getUsdValueForAmount(_asset, vaultTotal, _a.priceDesk)
+                carried: uint256 = assetPoints.lastUsdValue * assetPoints.lastBalance // prevAssetBalance
+                newAssetUsdValue = min(carried, vaultUsd)
 
     if newAssetUsdValue != assetPoints.lastUsdValue:
         globalPoints.lastUsdValue -= assetPoints.lastUsdValue

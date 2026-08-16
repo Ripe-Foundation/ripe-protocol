@@ -797,7 +797,10 @@ def _getUserBorrowTerms(
 
             # Meaningful capacity sets the unwind target.
             # amount == 0 and no remaining balance is a withdrawn-to-zero
-            # registration and keeps the conservative floor.
+            # registration and keeps the conservative floor. That floor is
+            # BasicVault-specific: SharesVault returns empty(address) when
+            # shares are 0, so a fully withdrawn rebase registration is
+            # skipped entirely and never contributes a floor.
             # amount == 0 with a remaining balance is share-rounding dust
             # and must not drag lowestLtv. Positive-amount dust with
             # maxDebt == 0 also does not participate.

@@ -473,3 +473,99 @@ def test_sc26_share_rounding_dust_does_not_set_lowest_ltv(
     assert terms.lowestLtv != low_ltv
     assert terms.collateralVal == meaningful
     assert terms.totalMaxDebt == meaningful * high_ltv // HUNDRED_PERCENT
+
+
+def test_sc26_consumers_follow_share_rounding_lowest_ltv(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    credit_redeem,
+    deleverage,
+    auction_house,
+    teller,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    createDebtTerms,
+):
+    """Share-rounding dust must not change liquidation, redeem, or deleverage targets."""
+    high_ltv = 50_00
+    low_ltv = 10_00
+    rebase_id = vault_book.getRegId(rebase_erc20_vault)
+    simple_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0, _keeperFeeRatio=0, _minKeeperFee=0)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[simple_id],
+        _debtTerms=createDebtTerms(
+            _ltv=high_ltv,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _shouldTransferToEndaoment=False,
+        _shouldBurnAsPayment=False,
+    )
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[rebase_id],
+        _debtTerms=createDebtTerms(
+            _ltv=low_ltv,
+            _redemptionThreshold=70_00,
+            _liqThreshold=80_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+        _shouldTransferToEndaoment=True,
+        _shouldBurnAsPayment=False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    meaningful = 100 * EIGHTEEN_DECIMALS
+    performDeposit(alice, meaningful, bravo_token, bravo_token_whale, rebase_erc20_vault)
+    performDeposit(bob, meaningful, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(bob, 1, bravo_token, bravo_token_whale, rebase_erc20_vault)
+    leftover = 1
+    drain = bravo_token.balanceOf(rebase_erc20_vault) - leftover
+    bravo_token.transfer(bravo_token_whale, drain, sender=rebase_erc20_vault.address)
+    assert rebase_erc20_vault.getUserAssetAndAmountAtIndex(
+        bob,
+        rebase_erc20_vault.indexOfUserAsset(bob, bravo_token),
+    ) == (bravo_token.address, 0)
+    assert rebase_erc20_vault.doesUserHaveBalance(bob, bravo_token)
+
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 60 * EIGHTEEN_DECIMALS // 100)
+
+    terms = credit_engine.getUserBorrowTerms(bob, False)
+    assert terms.lowestLtv == high_ltv
+    debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    expected = auction_house.calcTargetRepayAmount(debt, terms.collateralVal, high_ltv)
+    dust_expected = auction_house.calcTargetRepayAmount(debt, terms.collateralVal, low_ltv)
+    assert expected != dust_expected
+    assert credit_redeem.getMaxRedeemValue(bob) == expected
+    assert deleverage.getMaxDeleverageAmount(bob) == expected
+    assert credit_engine.canLiquidateUser(bob)
+
+    teller.liquidateUser(bob, False, sender=sally)
+    liq_log = filter_logs(teller, "LiquidateUser")[0]
+    assert liq_log.targetRepayAmount == expected
+    assert liq_log.targetRepayAmount != dust_expected

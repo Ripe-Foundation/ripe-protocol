@@ -515,11 +515,78 @@ def test_sc24_full_exit_funds_remaining_vault_not_share_units(
         * ap.precision
     )
     assert remaining > deposit_amount
-    assert ap.lastUsdValue == vault_amount // EIGHTEEN_DECIMALS
-    assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, vault_amount)
-    assert ap.lastUsdValue <= remaining // EIGHTEEN_DECIMALS + 1
+    assert ap.lastUsdValue <= vault_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue >= remaining // EIGHTEEN_DECIMALS - 1
+    assert ap.lastUsdValue > deposit_amount // EIGHTEEN_DECIMALS
     assert share_unit_guess // EIGHTEEN_DECIMALS == deposit_amount // EIGHTEEN_DECIMALS
     assert ap.lastUsdValue != share_unit_guess // EIGHTEEN_DECIMALS
+
+
+def test_sc24_full_exit_does_not_reinclude_subprecision_dust(
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """A no-rate checkpoint must not restore dust the last holder pass excluded."""
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, charlie_token, vault_id)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+
+    whole = 10 ** 6
+    dust = whole - 1
+    performDeposit(alice, 100 * whole, charlie_token, charlie_token_whale)
+    performDeposit(bob, 5 * whole, charlie_token, charlie_token_whale)
+    dust_users = [boa.env.generate_address(f"sc24-dust-{i}") for i in range(10)]
+    for user in dust_users:
+        performDeposit(user, dust, charlie_token, charlie_token_whale)
+
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, charlie_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, charlie_token, sender=teller.address)
+    for user in dust_users:
+        lootbox.updateDepositPoints(user, vault_id, simple_erc20_vault, charlie_token, sender=teller.address)
+
+    before = ledger.assetDepositPoints(vault_id, charlie_token)
+    vault_before = simple_erc20_vault.getTotalAmountForVault(charlie_token)
+    assert before.precision == whole
+    assert before.lastBalance == 105
+    assert before.lastUsdValue == 105
+    assert vault_before > 105 * whole
+    assert before.lastUsdValue < vault_before // whole
+
+    withdrawn = teller.withdraw(
+        charlie_token,
+        simple_erc20_vault.getTotalAmountForUser(alice, charlie_token),
+        alice,
+        simple_erc20_vault,
+        sender=alice,
+    )
+    assert withdrawn == 100 * whole
+
+    after_exit = ledger.assetDepositPoints(vault_id, charlie_token)
+    vault_after = simple_erc20_vault.getTotalAmountForVault(charlie_token)
+    assert after_exit.lastBalance == 5
+    assert after_exit.lastUsdValue == 5
+    assert after_exit.lastUsdValue != vault_after // whole
+    assert after_exit.lastUsdValue < vault_after // whole
+
+    lootbox.resetAssetPoints(charlie_token, vault_id, sender=switchboard_delta.address)
+    after_reset = ledger.assetDepositPoints(vault_id, charlie_token)
+    assert after_reset.lastUsdValue == 5
+    assert after_reset.lastUsdValue < (
+        simple_erc20_vault.getTotalAmountForVault(charlie_token) // whole
+    )
 
 
 def test_sc24_custody_shortfall_zeros_reward_usd_on_first_checkpoint(
