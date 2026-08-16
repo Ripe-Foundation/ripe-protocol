@@ -1,8 +1,5 @@
 from typing import Any
-import subprocess
-from pathlib import Path
 import json
-import hashlib
 from dataclasses import dataclass
 ADDYS = {
     "base": {
@@ -305,40 +302,6 @@ class RobinhoodStockInputQualification:
     blocker_ids: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class RobinhoodHistoricalTrancheIdentity:
-    integration_commit: str
-    changed_paths: tuple[tuple[str, str], ...]
-
-
-@dataclass(frozen=True)
-class RobinhoodGitPathIdentity:
-    path: str
-    git_blob: str
-    sha256: str
-
-
-@dataclass(frozen=True)
-class RobinhoodArtifactApplicabilityIdentity:
-    contract: str
-    source_path: str
-    source_git_blob: str
-    source_sha256: str
-    creation_sha256: str
-    runtime_template_sha256: str
-    abi_canonical_sha256: str
-    selectors_canonical_sha256: str
-
-
-@dataclass(frozen=True)
-class RobinhoodStockM4Binding:
-    historical_tranche: RobinhoodHistoricalTrancheIdentity
-    current_test_identities: tuple[RobinhoodGitPathIdentity, ...]
-    current_artifact_identities: tuple[
-        RobinhoodArtifactApplicabilityIdentity, ...
-    ]
-
-
 # Selected external facts remain deployment-readiness blocked until their
 # separately retained verification metadata is closed.
 ROBINHOOD_USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
@@ -620,109 +583,6 @@ ROBINHOOD_STOCK_ACTIVATION_POLICY = (
     ("defaultsPosture", "absent_until_atomic_packet_accepted"),
 )
 
-ROBINHOOD_STOCK_ARTIFACT_BINDING = (
-    ("contract", "SimpleErc20"),
-    ("sourcePath", "contracts/vaults/SimpleErc20.vy"),
-    ("sourceGitBlob", "7525765d45f00aa9ef6b5a98857ce048db0cdc62"),
-    (
-        "sourceSha256",
-        "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-    ),
-    (
-        "creationSha256",
-        "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
-    ),
-    (
-        "runtimeTemplateSha256",
-        "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
-    ),
-    (
-        "abiCanonicalSha256",
-        "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
-    ),
-    (
-        "selectorsCanonicalSha256",
-        "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
-    ),
-    ("selectorCount", 34),
-    ("runtimeTemplateSize", 9_368),
-)
-
-ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
-    historical_tranche=RobinhoodHistoricalTrancheIdentity(
-        integration_commit="a2d6b940c9b90d9ff1c78560ad61b2dd546f1760",
-        changed_paths=(
-            ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
-            (
-                "A",
-                "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            ),
-            (
-                "A",
-                "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            ),
-            (
-                "M",
-                "tests/core/deleverage/test_deleverage_swap_collateral.py",
-            ),
-        ),
-    ),
-    current_test_identities=(
-        RobinhoodGitPathIdentity(
-            "tests/core/auctionHouse/test_ah_auctions.py",
-            "77f1222861917511bf5bd7adae7a1ff215b9afbc",
-            "f869490832929bf6d206d5a888831bad3f1fe32e98a5d9e009458a8ba9648f83",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            "c04a618f48c3e3e5e8b85b3e78f558db80f527e6",
-            "adfd4961288f1b3d8dfa6e40c8dc2987f95ae8c8c8417f6d26dd7380b8632306",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            "fc8ff200e5eef7678a9da207d5c1723f1bc4afbe",
-            "68fabc844d43d5a0f5a1f119f698837549787e458194a595a710973c07948348",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/deleverage/test_deleverage_swap_collateral.py",
-            "bb0560048f91a89b7c413ff177360bb4ae0a759f",
-            "3b900a98eb348fa5db94a0090974bb47c7cab3e5e86d951569a978b8181632b9",
-        ),
-    ),
-    current_artifact_identities=(
-        RobinhoodArtifactApplicabilityIdentity(
-            "AuctionHouse",
-            "contracts/core/AuctionHouse.vy",
-            "73c2239ea9af646ec79ce2a8a59349a25f6a79df",
-            "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
-            "31b858e2b36a4210ecd23c94421303569b158721b30865dff8fc3cf7c86bcca6",
-            "6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa",
-            "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
-            "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
-        ),
-        RobinhoodArtifactApplicabilityIdentity(
-            "Deleverage",
-            "contracts/core/Deleverage.vy",
-            "b43d373039b352d6eab240be714134764901b947",
-            "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
-            "aab99ede7492d5f7f4769493c55ba04f28478caccbe9f32075dd9ef9b8c2acc7",
-            "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
-            "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
-            "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
-        ),
-        RobinhoodArtifactApplicabilityIdentity(
-            "SimpleErc20",
-            "contracts/vaults/SimpleErc20.vy",
-            "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
-            "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "ec9daa8c14f70bacf1e83f0061e6865d27641a151090917f2d1f82ba2503ffe5",
-            "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
-            "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
-            "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
-        ),
-    ),
-)
-
 ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     RobinhoodStockInputQualification(
         "Deployment.DP-10.aapl.identity",
@@ -824,12 +684,12 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.vaultArtifact",
-        "repository_fact_integrated",
-        ROBINHOOD_STOCK_ARTIFACT_BINDING,
+        "repository_binding_retired",
+        None,
         (
-            "canonical SimpleErc20 selectors and persistent transient and immutable layouts are frozen",
+            "SimpleErc20 artifact identity was proven by the retired artifact-expectations pipeline; nothing verifies it now",
         ),
-        (),
+        ("B-T8-M5",),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.vaultSlot",
@@ -840,36 +700,30 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m2Movement",
-        "repository_fact_integrated",
+        "repository_binding_retired",
+        None,
         (
-            ("source", "contracts/vaults/modules/BasicVault.vy"),
-            ("gitBlob", "a5a51ee20c598e9bf40908fc6c38f1c0634bf665"),
-            ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
+            "BasicVault movement was bound by a git-blob identity that is already stale and no longer checked",
         ),
-        ("shared nominal vault movement remains fail-closed and external delivery stays exact",),
-        (),
+        ("B-T8-M5",),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m3CreditContainment",
-        "repository_fact_integrated",
+        "repository_binding_retired",
+        None,
         (
-            ("source", "contracts/core/CreditEngine.vy"),
-            ("gitBlob", "800cc44bcb13439f5007d79143e545b4c3357014"),
-            ("integrationCommit", "4c26d7d73bb02f7eae2e5df02314db77a426aced"),
+            "CreditEngine containment was bound by a git-blob identity that is already stale and no longer checked",
         ),
-        ("preserve represented zero-amount terms with zero capacity",),
-        (),
+        ("B-T8-M5",),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m4ComposedProof",
-        "repository_fact_integrated",
-        ROBINHOOD_STOCK_M4_BINDING,
+        "repository_binding_retired",
+        None,
         (
-            "historical tranche identity is distinct from current applicability",
-            "current applicability is pinned to exact test and production/artifact identities",
-            "composed proof does not authorize configuration deployment or activation",
+            "the composed proof depended on the retired artifact-expectations pipeline and is no longer provable in this repository",
         ),
-        (),
+        ("B-T8-M5",),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m5ActivationBinding",
@@ -1459,16 +1313,18 @@ def validate_robinhood_stock_launch_qualification(
         "stock_excluded_from_stability_pool"
     ] is not True:
         raise ValueError("RH_STOCK_STABILITY_EXCLUSION")
+    # No stock input is a proven repository fact any more. The four that were --
+    # vaultArtifact, m2Movement, m3CreditContainment, m4ComposedProof -- were
+    # proven by the artifact-expectations pipeline, which was retired with the
+    # descoped M4 launch binding. Their hash and git-blob payloads went with it
+    # rather than being kept as decoration: an identity nothing recomputes is
+    # not evidence, and leaving them would let a stale or zeroed value read as
+    # an integrated fact. Each is now retired with a typed blocker instead.
     if tuple(
         item.path
         for item in qualifications
         if item.resolution == "repository_fact_integrated"
-    ) != (
-        "Deployment.DP-11.stock.vaultArtifact",
-        "Deployment.DP-11.stock.m2Movement",
-        "Deployment.DP-11.stock.m3CreditContainment",
-        "Deployment.DP-11.stock.m4ComposedProof",
-    ):
+    ) != ():
         raise ValueError("RH_STOCK_REPOSITORY_FACT_SET")
     if any(
         item.resolution != "repository_fact_integrated"
@@ -1481,13 +1337,15 @@ def validate_robinhood_stock_launch_qualification(
         for item in qualifications
     ):
         raise ValueError("RH_STOCK_RESOLVED_BLOCKER")
-    m4_candidate = next(
-        item.candidate
+    # Every retired binding must carry no candidate payload. This is the check
+    # that keeps the retirement honest: reintroducing a hash tuple here without
+    # machinery to recompute it would recreate exactly the state this replaced.
+    if any(
+        item.candidate is not None
         for item in qualifications
-        if item.path == "Deployment.DP-11.stock.m4ComposedProof"
-    )
-    if not isinstance(m4_candidate, RobinhoodStockM4Binding):
-        raise ValueError("RH_STOCK_M4_BINDING_SHAPE")
+        if item.resolution == "repository_binding_retired"
+    ):
+        raise ValueError("RH_STOCK_RETIRED_BINDING_PAYLOAD")
 
 
 def robinhood_stock_launch_readiness() -> tuple[bool, tuple[str, ...]]:

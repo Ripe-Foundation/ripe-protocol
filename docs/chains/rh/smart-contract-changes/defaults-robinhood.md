@@ -110,7 +110,7 @@ The principal current evidence paths are:
 | [`tests/config/test_defaults_robinhood.py`](../../../../tests/config/test_defaults_robinhood.py) | `c5e8995cabcdc2ac7a8247861af5a713603b8253` | `730086ae75a138913ba1a27805190ad308cf2951799fccfb688095c581125c29` | Source derivation, compiler extraction, authority split, deterministic ledger, current launch inputs, unresolved-input and mutation failures |
 | [`tests/deployment/test_robinhood_blueprint.py`](../../../../tests/deployment/test_robinhood_blueprint.py) | `b7d6234f346fbc9ad68a644d65e37b5d377dae19` | `3b6a179fd3f7d4be9485e5e020901b3f75d7ed5de3e0cf58386d8a05f49ccd72` | Current component, registry, constructor, launch-input, and lifecycle topology |
 | [`tests/deployment/test_robinhood_omissions.py`](../../../../tests/deployment/test_robinhood_omissions.py) | `187454dee85fe69f964324479f068f66ce7bca99` | `9d807dce53c3f135baf1fe772f2e9a8e25b2a9c976be78e25ae07200efaa320a` | Required omissions and fail-closed capability/activation surfaces, including deferred CCIP promotion |
-| [`tests/inventory/test_contract_artifacts.py`](../../../../tests/inventory/test_contract_artifacts.py) | `30e56a30e803e6030abb321b7dd593f08ac83f04` | `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` | Frozen source, compiler, ABI, layout, and bytecode identity for the central contract set |
+| `tests/inventory/test_contract_artifacts.py` (retired) | `30e56a30e803e6030abb321b7dd593f08ac83f04` | `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` | Frozen source, compiler, ABI, layout, and bytecode identity for the central contract set |
 
 The central nine-contract artifact checker reconciles the frozen Defaults and
 other covered contract identities. The repository-wide ABI export check is not

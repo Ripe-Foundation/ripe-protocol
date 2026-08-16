@@ -71,13 +71,29 @@ def test_every_non_repository_fact_has_an_explicit_typed_blocker():
         source_authority.ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS
     )
     assert not resolved & unresolved
-    assert resolved == {
+    # No stock input is a proven repository fact any more. vaultArtifact,
+    # m2Movement, m3CreditContainment, and m4ComposedProof were, on the
+    # strength of the artifact-expectations pipeline; that pipeline was retired
+    # with the descoped M4 launch binding, so nothing recomputes their hashes.
+    # They are retired with typed blockers rather than left asserting an
+    # integration nothing can check.
+    assert resolved == set()
+    records = _qualification_map()
+    retired = {
+        path
+        for path, item in records.items()
+        if item.resolution == "repository_binding_retired"
+    }
+    assert retired == {
         "Deployment.DP-11.stock.vaultArtifact",
         "Deployment.DP-11.stock.m2Movement",
         "Deployment.DP-11.stock.m3CreditContainment",
         "Deployment.DP-11.stock.m4ComposedProof",
     }
-    records = _qualification_map()
+    # A retired binding must carry no candidate payload. A hash tuple here with
+    # nothing to recompute it is not evidence, and a stale or zeroed value
+    # would read as an integrated fact.
+    assert all(records[path].candidate is None for path in retired)
     assert all(records[path].blocker_ids for path in unresolved)
     assert all(not records[path].blocker_ids for path in resolved)
 

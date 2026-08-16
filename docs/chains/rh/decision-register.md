@@ -16,11 +16,17 @@ is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
 is not required, and it may be reconciled once during final release preparation.
 **The contract-artifact-expectations pipeline is retired.** Entries below cite
 `config/contract-artifact-expectations.json`, `scripts/check_contract_artifacts.py`,
-and per-contract source/creation/runtime/ABI/selector hash identities. Those
-files were deleted along with the Robinhood stock M4 launch binding they
-served, which the owner descoped on 16 August 2026. Their recorded hashes are
-historical evidence of what was measured at the time; nothing regenerates,
-checks, or rebinds them, and no PR or release step is expected to.
+and per-contract source/creation/runtime/ABI/selector hash identities. The
+owner descoped the Robinhood stock M4 launch binding on 16 August 2026, and
+those files — the JSON, both checker scripts, their tests, and the
+`validate_robinhood_stock_m4_binding` validator in `config/BluePrint.py` — were
+deleted with it. The M4, vault-artifact, m2, and m3 qualification records no
+longer carry hash payloads and are no longer resolved repository facts: each is
+`repository_binding_retired` with a typed blocker, because an identity nothing
+recomputes is not evidence. Recorded hashes in the entries below are historical
+measurements; nothing regenerates, checks, or rebinds them, and no PR or
+release step is expected to. The release-packet checklist has been updated to
+match.
 
 **The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
 a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed

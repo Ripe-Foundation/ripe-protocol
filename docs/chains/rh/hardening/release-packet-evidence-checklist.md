@@ -28,16 +28,15 @@
   worktree, and clean status; the hardening baseline demonstrates the required
   identity fields
   ([BASELINE.md](BASELINE.md)).
-- [ ] Record every source/artifact path and SHA-256 used by the packet; the S1
-  expectation file separates per-contract source, optimization mode,
-  creation/runtime artifacts, layout, and integrity
-  ([contract-artifact-expectations.json](../../../../config/contract-artifact-expectations.json)).
+- [ ] Record every source/artifact path and SHA-256 used by the packet.
+  **Retired tooling:** `config/contract-artifact-expectations.json` and
+  `scripts/check_contract_artifacts.py` were deleted with the descoped
+  Robinhood stock M4 launch binding. Compute these values from the release tree
+  at packet time; do not expect a committed expectation file to exist.
 - [ ] Record the exact interpreter, Vyper version, dependency manifest/hash,
   compiler command, environment variables, and cache isolation; the hardening
-  baseline pins the environment and the S1 checker pins source-governed
-  compilation
-  ([BASELINE.md](BASELINE.md),
-  [check_contract_artifacts.py](../../../../scripts/check_contract_artifacts.py)).
+  baseline pins the environment
+  ([BASELINE.md](BASELINE.md)).
 - [ ] Pin every command exactly, including selection paths, plugins/options,
   environment unsets, temporary directories, and working directory; the
   mutation protocol requires same-process isolated execution for mutation
@@ -106,16 +105,14 @@
 - [ ] Record every failed attempt or anomalous run, its root cause, whether the
   aggregate-failure protocol ran, and which later evidence supersedes it; never
   erase an inconvenient result from the packet.
-- [ ] Re-run the frozen artifact checker and negative self-tests; the checker
-  controls source-governed optimization, raw-byte hashing, layouts, integrity,
-  and runtime-template labeling
-  ([check_contract_artifacts.py](../../../../scripts/check_contract_artifacts.py),
-  [test_contract_artifacts.py](../../../../tests/inventory/test_contract_artifacts.py)).
-- [ ] Re-run the complete block-clock inventory and its tests; the checker
-  fails closed on unclassified production, test, mock, testing, cadence, and
-  timestamp drift
-  (`check_block_clock_inventory.py`,
-  `test_block_clock_inventory.py`).
+- [ ] ~~Re-run the frozen artifact checker and negative self-tests.~~
+  **Retired.** `scripts/check_contract_artifacts.py` and
+  `tests/inventory/test_contract_artifacts.py` were deleted with the descoped
+  M4 launch binding. There is no frozen artifact baseline to re-run against.
+- [ ] ~~Re-run the complete block-clock inventory and its tests.~~
+  **Retired earlier.** `check_block_clock_inventory.py` and
+  `test_block_clock_inventory.py` were removed by the simplification branch;
+  see [REMOVED.md](../../../simplification/REMOVED.md).
 
 ## 5. Deployment/profile evidence
 

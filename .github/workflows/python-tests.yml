@@ -214,15 +214,18 @@ jobs:
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
           unset ETHERSCAN_API_KEY BASESCAN_API_KEY
-          # 15 parametrized nodes across two suites fail identically on pristine
-          # origin/rh -- they are rh bugs, invisible there because pytest.ini
-          # ignores tests/deployment and the comprehensive lane is manual.
-          # Deselected individually rather than by file: those two files hold
-          # 58 nodes, so ignoring them whole would drop 44 passing checks out
-          # of the required gate as well. Remove each line as rh repairs it.
-          #   test_operator_chain_guards  -> prepare_defaults has no
+          # Seven parametrized nodes in test_operator_chain_guards fail
+          # identically on pristine origin/rh -- they are rh bugs, invisible
+          # there because pytest.ini ignores tests/deployment and the
+          # comprehensive lane is manual. Deselected individually rather than by
+          # file so the rest of that suite stays in the required gate. Remove
+          # each line as rh repairs it.
+          #   test_operator_chain_guards -> prepare_defaults has no
           #     _require_robinhood_chain_id / _safe_constant_name
-          #   test_stock_aapl_launch_inclusion -> RH_STOCK_M4_TEST_BLOB
+          # The former test_stock_aapl_launch_inclusion deselects are gone: those
+          # nodes now carry release/artifact markers and the -m expression below
+          # excludes them, and the M4 binding tests were deleted with the
+          # descoped artifact-expectations pipeline.
           /usr/bin/time -p python -m pytest \
             -o addopts='' \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \

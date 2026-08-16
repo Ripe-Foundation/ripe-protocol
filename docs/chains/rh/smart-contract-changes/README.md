@@ -30,9 +30,11 @@ Source rationale does not expand owner authority.
 ## Current scoped SC-12 overlay
 
 PR #144 changes the production source path `contracts/vaults/RipeGov.vy`; its
-current rationale is [`ripe-gov.md`](ripe-gov.md). The exact PR-head authority
-is [`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json),
-not the historical tables below:
+current rationale is [`ripe-gov.md`](ripe-gov.md). The authority is the source
+file itself — `config/contract-artifact-expectations.json` was deleted with the
+descoped M4 launch binding, so measure the tree rather than consulting a
+committed expectation file. The figures below are the historical measurement
+and are not current:
 
 - source SHA-256: `d02808b846c3beb51464d27cac8417657375ee3cec00c45f5aa46ab2c53b5d41`;
 - runtime template: 23,120 bytes with SHA-256
@@ -146,7 +148,7 @@ and release remain separate.
 The repository-health remediation recorded the table below for the archived
 candidate. Twelve rows have since drifted, so these values are historical and
 non-authoritative. Current identities must be read mechanically from
-[`contract-artifact-expectations.json`](../../../../config/contract-artifact-expectations.json);
+`contract-artifact-expectations.json` (retired);
 the table is retained only to bind the older candidate evidence.
 
 | Contract | Template bytes | Template headroom | Deployed bytes | Deployed headroom | Runtime-template SHA-256 | Canonical ABI SHA-256 |

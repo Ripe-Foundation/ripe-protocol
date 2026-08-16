@@ -37,7 +37,7 @@ validation results remain dated historical evidence below.
 | Runtime template | 21,569 bytes; SHA-256 `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097`; 3,007 bytes EIP-170 headroom |
 | [`test_underscore_rewards.py`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Git blob `b2b23f3b7683534c7a492d1461bc8991d0d65050`; SHA-256 `e670b36ae68f2ceeee1b3c0c6a0e663213172b1aa27b7203e02ab6a400e0b7d3` |
 | [Deployment-profile test](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Git blob `d082c315a12f4fdb6136b34925e335250fec9a91`; SHA-256 `e929e6c7f91e6d73ba0b2c96bd7cdb4d69d28db2ad0def700863190d86245a6c` |
-| [Contract-artifact test](../../../../tests/inventory/test_contract_artifacts.py) | Git blob `30e56a30e803e6030abb321b7dd593f08ac83f04`; SHA-256 `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` |
+| Contract-artifact test (retired) | Git blob `30e56a30e803e6030abb321b7dd593f08ac83f04`; SHA-256 `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` |
 
 Later integrated tests now pin exact five-argument manifest order, both local
 deployment postures and readbacks, historical Base arity incompatibility,
