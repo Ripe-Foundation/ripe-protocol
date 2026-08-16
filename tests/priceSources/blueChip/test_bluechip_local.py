@@ -3214,3 +3214,24 @@ def test_sc05_sc17_bluechip_gas_measurements(
     assert full_traversal_gas <= 75_000
     assert fallback_gas <= 50_000
     assert resize_confirmation_gas <= 165_000
+
+
+def test_blue_chip_deployed_runtime_fits_eip170(blue_chip_prices):
+    """BlueChipYieldPrices must fit under EIP-170 to be deployable.
+
+    Preserved from `tests/inventory/test_bluechip_yield_prices_artifacts.py`,
+    which was deleted with the artifact-expectations pipeline. That module mixed
+    a real deployability assertion in with exact source/creation/runtime/ABI
+    hash pins; only the hashes were bookkeeping. This keeps the property and
+    drops the identity: no exact size, no hash, and no minimum-headroom floor,
+    so it cannot go stale from a legitimate BlueChip change and fails only when
+    the contract genuinely will not deploy.
+    """
+    EIP170_LIMIT = 24_576
+    runtime = boa.env.get_code(blue_chip_prices.address)
+    print(
+        "BLUE_CHIP_RUNTIME",
+        f"size={len(runtime)}",
+        f"headroom={EIP170_LIMIT - len(runtime)}",
+    )
+    assert len(runtime) <= EIP170_LIMIT

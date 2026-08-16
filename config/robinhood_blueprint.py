@@ -314,18 +314,20 @@ _BLOCKER_ROWS = (('B-S5-LEDGER',
  ('B-T8-M2',
   'OWN-T8',
   ('OWN-H05',),
-  'protected Simple ERC20 vault source/artifact/ABI/runtime and registry placement unimplemented and '
-  'unauthorized',
+  'protected Simple ERC20 vault movement is integrated and proven by behavioral tests; '
+  'registry placement, deployment, and activation remain unauthorized',
   'before Track 8 M5 activation'),
  ('B-T8-M3',
   'OWN-T8',
   ('OWN-SECOPS',),
-  'CreditEngine containment change unimplemented and unauthorized',
-  'before Track 8 M4 composed proof'),
+  'CreditEngine containment is integrated and proven by behavioral tests; '
+  'deployment and activation remain unauthorized',
+  'before Track 8 M5 activation'),
  ('B-T8-M4',
   'OWN-T8',
   ('OWN-H09',),
-  'Composed local/adversarial/exact-token proof absent',
+  'Composed local/adversarial/exact-token proof is integrated and proven by '
+  'behavioral tests; deployment binding and activation remain unauthorized',
   'before Track 8 M5 activation'),
  ('B-T8-M5',
   'OWN-T8',
@@ -624,14 +626,6 @@ _SYMBOLIC_ROWS = (('I-GREEN',
   'before M5 activation',
   'blocked',
   ('B-H04-PARAMS', 'B-T8-FREEZE', 'B-T8-M5')),
- ('I-STOCK-VAULT-ARTIFACT',
-  'protected Simple ERC20 source/artifact/runtime',
-  ('CM-021', 'CM-026', 'CM-030', 'CM-034'),
-  'OWN-T8',
-  ('OWN-SECOPS',),
-  'before M2/M5',
-  'blocked',
-  ('B-T8-M2',)),
  ('I-STOCK-VAULT-SLOT',
   'approved VaultBook placement/name',
   ('CM-021',),
@@ -5194,8 +5188,6 @@ _CURVE_LAUNCH_INPUT_IDS = (
     "feed.usdg_curve_feed",
     "feed.usdg_authority",
     "inactive.capabilities",
-    "artifact.curve_prices_source_sha256",
-    "artifact.curve_prices_abi_sha256",
 )
 
 
@@ -5490,17 +5482,6 @@ def validate_curve_launch_authority() -> None:
     if set(values["inactive.capabilities"]) != expected_inactive:
         _fail("RH_CURVE_BOUNDED_CAPABILITY")
 
-    expected_artifacts = {
-        "artifact.curve_prices_source_sha256": (
-            "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
-        ),
-        "artifact.curve_prices_abi_sha256": (
-            "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
-        ),
-    }
-    if any(values[input_id] != expected for input_id, expected in expected_artifacts.items()):
-        _fail("RH_CURVE_ARTIFACT_DRIFT")
-
 
 _COMPONENT_SELECTION_BY_ID = _source_component_selection_map()
 _REGISTRY_ROWS = _source_registry_rows()
@@ -5558,7 +5539,6 @@ _SYMBOLIC_AUTHORITY_CLASSES = {
     "I-AAPL-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
     "I-AAPL-RISK": AuthorityClass.OWNER_SELECTED,
     "I-STOCK-VAULT-SLOT": AuthorityClass.OWNER_SELECTED,
-    "I-STOCK-VAULT-ARTIFACT": AuthorityClass.DEPLOYMENT_PRODUCED,
     "I-TELLER-INITIAL-PAUSE": AuthorityClass.OWNER_SELECTED,
     "I-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
     "I-USDG-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
@@ -5982,7 +5962,9 @@ def validate_blueprint(
             _fail("H03_ADDRESS_LITERAL")
 
     symbolic_ids = tuple(item.field_id for item in blueprint.symbolic_inputs)
-    if len(symbolic_ids) != 50 or len(set(symbolic_ids)) != 50:
+    # 49 after I-STOCK-VAULT-ARTIFACT was removed with the retired
+    # artifact-expectations pipeline.
+    if len(symbolic_ids) != 49 or len(set(symbolic_ids)) != 49:
         _fail("H03_SYMBOLIC_FIELD")
     if any(
         not isinstance(item.authority_class, AuthorityClass)
