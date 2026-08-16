@@ -1293,7 +1293,7 @@ configuration, activation, and release remain separately unauthorized.
 This decision binds production source SHA-256
 `8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050`
 and Git blob `76233779bb34059de16a5a6740233fc4dc0f59ca`. Final
-contract-and-test commit `b60fb8dba07f6c94d4cf43b1cb64bf336000305c`
+contract-and-test commit `f5442036983f278326919fae0939b33377c4c9f3`
 adds only focused test coverage after the production source was frozen.
 
 The candidate selects chronological block-duration weighting and accepts its

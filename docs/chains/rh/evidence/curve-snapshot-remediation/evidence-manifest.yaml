@@ -8,10 +8,10 @@ lifecycle:
     release, merge, or owner-policy authority is granted.
 
 source_binding:
-  remediation_base_commit: 81832e8564bdb7912bed2b26d01d2abe40ee2811
-  remediation_base_tree: 97d580d7a0ab50453e62c2ada7f19bee6361f870
-  candidate_test_commit: b60fb8dba07f6c94d4cf43b1cb64bf336000305c
-  candidate_test_tree: cae169071c5f2903ab0f0f40208141f1feb70927
+  remediation_base_commit: 3d4639830c9be36c9df3b71f1aa1b75a02ef087f
+  remediation_base_tree: c239a3d920a278fd963a6d087b52b3d91f421ea0
+  candidate_test_commit: f5442036983f278326919fae0939b33377c4c9f3
+  candidate_test_tree: 6de985c6f82cc5e44678a679c856b5b1cbaf2f48
   curve_source_sha256: 8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050
   curve_source_git_blob: 76233779bb34059de16a5a6740233fc4dc0f59ca
   green_ref_pool_test_sha256: 4fa89141c2be7d536cde3d087764759b1246fa82c247c83c0887fc7b9767407f
@@ -125,23 +125,23 @@ commands:
 
 artifacts:
   - file: base-green-ref-pool-junit.xml
-    sha256: 826e2a33acf61a2963391e3b3b93869f1d7b6c7f150c8b0167729e083f5822ca
+    sha256: ad7fb6f6513f51eecfca24f3788bd52c8e9c2692489a38e736b111fe70ce64d3
     bytes: 10773
     tests: 75
     passed: 75
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 227.54
+    duration_seconds: 218.70
   - file: base-curve-prices-candidate-junit.xml
-    sha256: beb1488d12f03d830379d6273669f6de80ba3087f12359bd4dc20060d51bb1f1
+    sha256: 0ad1e3db39d947d8c1fbf075b10ec252f50a611c551f0d98465ab669f2758bf4
     bytes: 3990
     tests: 32
     passed: 32
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 128.78
+    duration_seconds: 121.05
   - file: base-curve-prices-target-junit.xml
     sha256: 9162cdeb88063219c2689fce0c875dd7c946ebb6ca091c4e80faa6d20f4bf170
     bytes: 76334
@@ -166,16 +166,16 @@ artifacts:
       - capacity regrowth returned 8046 instead of the fresh 8500 seed
       - extreme staleBlocks overflowed the view at safeadd
   - file: pricedesk-curve-composition-junit.xml
-    sha256: b7bd074a31cecc8ec03b9b447159ed3f28c05cfd054338a7d51ab80febfdc002
+    sha256: 0d5f26d168c94a689589519cf952ad6bb057595a9d733e8fee3eff27f6f913d3
     bytes: 2089
     tests: 11
     passed: 11
     failed: 0
     skipped: 0
     deselected: 0
-    duration_seconds: 127.30
+    duration_seconds: 128.55
     measurements:
-      nested_green_route_gas: 25700
+      nested_green_route_gas: 25773
       worst_honest_route_gas: 127922
       full_capacity_ten_teller_housekeeping_gas: 86602
       nested_green_route_ceiling: 50000
