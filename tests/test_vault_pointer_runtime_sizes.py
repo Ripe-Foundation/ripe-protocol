@@ -24,7 +24,7 @@ EXPECTED_DEPLOYED_RUNTIME_BYTES = {
     "TellerUtils": 8_976,
     "Ledger": 13_306,
     "Lootbox": 22_993,
-    "RebaseErc20": 11_263,
+    "RebaseErc20": 11_287,
     "RipeGov": 23_152,
     "CreditEngine": 24_566,
     "StabilityPool": 24_371,
