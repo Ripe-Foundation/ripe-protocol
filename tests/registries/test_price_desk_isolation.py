@@ -6,6 +6,14 @@ from constants import EIGHTEEN_DECIMALS
 
 
 ETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+RAW_CANONICAL = 0
+RAW_REVERT = 1
+RAW_EMPTY = 2
+RAW_SHORT = 3
+RAW_OVERSIZED_ONE = 4
+RAW_NONCANONICAL_BOOL = 5
+RAW_OVERSIZED_96 = 6
+RAW_SNAPSHOT_FALSE = 7
 
 
 def _raw_source(
@@ -25,6 +33,33 @@ def _raw_source(
         price_mode,
         has_feed_mode,
         snapshot_mode,
+    )
+    return source
+
+
+def _gas_source(
+    price=0,
+    has_feed=False,
+    price_iterations=0,
+    has_feed_iterations=0,
+    snapshot_iterations=0,
+    exhaust_price=False,
+    exhaust_has_feed=False,
+    exhaust_snapshot=False,
+):
+    source = boa.load(
+        "contracts/mock/MockGasBurningPriceSource.vy",
+        name="gas_burning_price_source",
+    )
+    source.configure(
+        price,
+        has_feed,
+        price_iterations,
+        has_feed_iterations,
+        snapshot_iterations,
+        exhaust_price,
+        exhaust_has_feed,
+        exhaust_snapshot,
     )
     return source
 
@@ -75,6 +110,14 @@ def _register_sources(price_desk, governance, sources):
     return ids
 
 
+def _count_calls(computation, address, selector):
+    expected = bytes.fromhex(str(address)[2:])
+    return sum(
+        child.msg.code_address == expected and bytes(child.msg.data[:4]) == selector
+        for child in computation.children
+    ) + sum(_count_calls(child, address, selector) for child in computation.children)
+
+
 def test_reverting_priority_source_falls_through_to_healthy_source(
     ripe_hq,
     deploy3r,
@@ -105,9 +148,79 @@ def test_reverting_non_priority_source_falls_through_to_healthy_source(
     assert desk.getPrice(alpha_token, True) == 3 * EIGHTEEN_DECIMALS
 
 
+def test_disabled_middle_slot_falls_through_across_all_traversal_channels(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+    teller,
+):
+    first = _raw_source(0, False)
+    disabled = _raw_source(99 * EIGHTEEN_DECIMALS, True)
+    healthy = _raw_source(12 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(
+        ripe_hq,
+        deploy3r,
+        [first, disabled, healthy],
+    )
+    assert desk.startAddressDisableInRegistry(2, sender=deploy3r)
+    assert desk.confirmAddressDisableInRegistry(2, sender=deploy3r)
+    assert desk.getAddr(2) == "0x" + "0" * 40
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+
+    assert desk.getPrice(alpha_token, False) == 12 * EIGHTEEN_DECIMALS
+    assert desk.getPrice(alpha_token, True) == 12 * EIGHTEEN_DECIMALS
+    assert desk.hasPriceFeed(alpha_token)
+    assert desk.addPriceSnapshot(alpha_token, sender=teller.address)
+    assert first.snapshotCount() == 0
+    assert disabled.snapshotCount() == 0
+    assert healthy.snapshotCount() == 1
+
+
+def test_priority_source_is_not_repeated_in_general_registry_traversal(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    priority_no_feed = _raw_source(0, False)
+    healthy = _raw_source(13 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(
+        ripe_hq,
+        deploy3r,
+        [priority_no_feed, healthy],
+    )
+    _set_priorities(mission_control, switchboard_alpha, [1])
+
+    assert desk.getPrice(alpha_token, True) == 13 * EIGHTEEN_DECIMALS
+    selector = bytes(
+        priority_no_feed.getPriceAndHasFeed.prepare_calldata(
+            alpha_token,
+            0,
+            desk,
+        )[:4]
+    )
+    assert (
+        _count_calls(
+            desk._computation,
+            priority_no_feed.address,
+            selector,
+        )
+        == 1
+    )
+
+
 @pytest.mark.parametrize(
     "mode",
-    (2, 3, 4, 5, 6),
+    (
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("empty", "short", "oversized_65", "noncanonical_bool", "oversized_96"),
 )
 def test_malformed_price_response_falls_through_to_healthy_source(
@@ -156,6 +269,145 @@ def test_valid_zero_configured_feed_falls_through_to_healthy_source(
     assert desk.getPrice(alpha_token, True) == 7 * EIGHTEEN_DECIMALS
 
 
+def test_zero_without_feed_remains_valid_no_feed(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    no_feed = _raw_source(0, False)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [no_feed])
+    _set_priorities(mission_control, switchboard_alpha, [1])
+
+    assert desk.getPrice(alpha_token, False) == 0
+    assert desk.getPrice(alpha_token, True) == 0
+
+
+def test_positive_price_without_feed_is_malformed_and_falls_through(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    contradictory = _raw_source(99 * EIGHTEEN_DECIMALS, False)
+    healthy = _raw_source(8 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [contradictory, healthy])
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+
+    assert desk.getPrice(alpha_token, True) == 8 * EIGHTEEN_DECIMALS
+
+
+def test_gas_burning_priority_source_falls_through_to_healthy_source(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    burner = _gas_source(
+        price_iterations=1_000_000,
+        exhaust_price=True,
+    )
+    healthy = _gas_source(
+        9 * EIGHTEEN_DECIMALS,
+        True,
+        price_iterations=2_000,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+
+    assert desk.getPrice(alpha_token, True, gas=2_000_000) == 9 * EIGHTEEN_DECIMALS
+
+
+def test_gas_burning_non_priority_source_falls_through_to_healthy_source(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    burner = _gas_source(
+        price_iterations=1_000_000,
+        exhaust_price=True,
+    )
+    healthy = _raw_source(10 * EIGHTEEN_DECIMALS, True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
+    _set_priorities(mission_control, switchboard_alpha, [])
+
+    assert desk.getPrice(alpha_token, True, gas=1_000_000) == 10 * EIGHTEEN_DECIMALS
+
+
+def test_final_source_wins_in_three_source_selected_topology(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    burners = [
+        _gas_source(
+            price_iterations=1_000_000,
+            exhaust_price=True,
+        )
+        for _ in range(2)
+    ]
+    healthy = _gas_source(
+        11 * EIGHTEEN_DECIMALS,
+        True,
+        price_iterations=2_000,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [*burners, healthy])
+    _set_priorities(mission_control, switchboard_alpha, [1, 2])
+
+    assert desk.numAddrs() - 1 == 3
+    assert desk.getPrice(alpha_token, True, gas=2_000_000) == 11 * EIGHTEEN_DECIMALS
+    gas_used = desk._computation.get_gas_used()
+    print(
+        "PRICEDESK_SELECTED_BOUNDARY",
+        f"three_source_final_position={gas_used}",
+        "source_slots=3",
+        "outer_limit=2000000",
+    )
+    assert gas_used < 2_000_000
+
+
+def test_final_source_wins_behind_nine_allowance_exhausting_sources(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+):
+    burners = [
+        _gas_source(
+            price_iterations=1_000_000,
+            exhaust_price=True,
+        )
+        for _ in range(9)
+    ]
+    healthy = _gas_source(
+        11 * EIGHTEEN_DECIMALS,
+        True,
+        price_iterations=2_000,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [*burners, healthy])
+    _set_priorities(mission_control, switchboard_alpha, [1, 2, 3])
+
+    assert desk.numAddrs() - 1 == 10
+    assert desk.getPrice(alpha_token, True, gas=6_000_000) == 11 * EIGHTEEN_DECIMALS
+    gas_used = desk._computation.get_gas_used()
+    print(
+        "PRICEDESK_STRESS_BOUNDARY",
+        f"ten_source_final_position={gas_used}",
+        "priority_sources=3",
+        "fallback_sources=7",
+        "outer_limit=6000000",
+    )
+    assert gas_used < 6_000_000
+
+
 def test_all_sources_failed_preserves_strict_and_non_strict_intent(
     ripe_hq,
     deploy3r,
@@ -175,7 +427,14 @@ def test_all_sources_failed_preserves_strict_and_non_strict_intent(
 
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5, 6),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("revert", "empty", "short", "oversized_33", "noncanonical_bool", "oversized_96"),
 )
 def test_malformed_has_price_feed_falls_through_to_healthy_source(
@@ -193,7 +452,14 @@ def test_malformed_has_price_feed_falls_through_to_healthy_source(
 
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5, 6),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
     ids=("revert", "empty", "short", "oversized_33", "noncanonical_bool", "oversized_96"),
 )
 def test_all_failed_has_price_feed_queries_return_false(
@@ -208,10 +474,96 @@ def test_all_failed_has_price_feed_queries_return_false(
     assert not desk.hasPriceFeed(alpha_token)
 
 
+@pytest.mark.parametrize("has_feed", (False, True), ids=("false", "true"))
+def test_canonical_has_price_feed_response_is_preserved(
+    has_feed,
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+):
+    source = _raw_source(has_feed=has_feed)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [source])
+
+    assert desk.hasPriceFeed(alpha_token) is has_feed
+
+
+def test_gas_burning_has_feed_query_falls_through_to_healthy_source(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+):
+    burner = _gas_source(
+        has_feed=True,
+        has_feed_iterations=1_000_000,
+        exhaust_has_feed=True,
+    )
+    healthy = _raw_source(has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
+
+    assert desk.hasPriceFeed(alpha_token, gas=500_000)
+
+
+def test_all_gas_burning_has_feed_queries_return_false(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+):
+    burner = _gas_source(
+        has_feed=True,
+        has_feed_iterations=1_000_000,
+        exhaust_has_feed=True,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner])
+
+    assert not desk.hasPriceFeed(alpha_token, gas=250_000)
+
+
+def test_final_feed_wins_behind_nine_has_feed_allowance_exhausting_sources(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+):
+    burners = [
+        _gas_source(
+            has_feed=True,
+            has_feed_iterations=1_000_000,
+            exhaust_has_feed=True,
+        )
+        for _ in range(9)
+    ]
+    healthy = _raw_source(has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [*burners, healthy])
+
+    assert desk.numAddrs() - 1 == 10
+    assert desk.hasPriceFeed(alpha_token, gas=2_000_000)
+    gas_used = desk._computation.get_gas_used()
+    print(
+        "PRICEDESK_HAS_FEED_STRESS_BOUNDARY",
+        f"ten_source_final_position={gas_used}",
+        "outer_limit=2000000",
+    )
+    assert gas_used > 9 * 75_000
+    assert gas_used < 2_000_000
+
+
 @pytest.mark.parametrize(
     "mode",
-    (1, 2, 3, 4, 5),
-    ids=("revert", "empty", "short", "oversized", "noncanonical_bool"),
+    (
+        RAW_REVERT,
+        RAW_EMPTY,
+        RAW_SHORT,
+        RAW_OVERSIZED_ONE,
+        RAW_NONCANONICAL_BOOL,
+        RAW_OVERSIZED_96,
+    ),
+    ids=(
+        "revert",
+        "empty",
+        "short",
+        "oversized_33",
+        "noncanonical_bool",
+        "oversized_96",
+    ),
 )
 def test_failed_snapshot_source_does_not_block_later_healthy_source(
     mode,
@@ -248,6 +600,122 @@ def test_earlier_successful_snapshot_remains_when_later_source_fails(
     assert desk.addPriceSnapshot(alpha_token, sender=teller.address)
     assert healthy.snapshotCount() == 1
     assert failed.snapshotCount() == 0
+
+
+def test_canonical_false_snapshot_does_not_report_an_update(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    teller,
+):
+    false_only = _raw_source(
+        EIGHTEEN_DECIMALS,
+        has_feed=True,
+        snapshot_mode=RAW_SNAPSHOT_FALSE,
+    )
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [false_only])
+
+    assert not desk.addPriceSnapshot(alpha_token, sender=teller.address)
+    assert false_only.snapshotCount() == 1
+
+
+def test_canonical_false_snapshot_does_not_mask_later_true_update(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    teller,
+):
+    false_source = _raw_source(
+        EIGHTEEN_DECIMALS,
+        has_feed=True,
+        snapshot_mode=RAW_SNAPSHOT_FALSE,
+    )
+    true_source = _raw_source(EIGHTEEN_DECIMALS, has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [false_source, true_source])
+
+    assert desk.addPriceSnapshot(alpha_token, sender=teller.address)
+    assert false_source.snapshotCount() == 1
+    assert true_source.snapshotCount() == 1
+
+
+def test_gas_burning_snapshot_update_does_not_block_later_true_update(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    teller,
+):
+    burner = _gas_source(
+        has_feed=True,
+        has_feed_iterations=500,
+        snapshot_iterations=1_000_000,
+        exhaust_snapshot=True,
+    )
+    healthy = _raw_source(EIGHTEEN_DECIMALS, has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
+
+    assert desk.addPriceSnapshot(
+        alpha_token,
+        sender=teller.address,
+        gas=1_000_000,
+    )
+    assert healthy.snapshotCount() == 1
+
+
+def test_gas_burning_has_feed_check_skips_snapshot_and_reaches_later_update(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    teller,
+):
+    burner = _gas_source(
+        has_feed=True,
+        has_feed_iterations=1_000_000,
+        exhaust_has_feed=True,
+    )
+    healthy = _raw_source(EIGHTEEN_DECIMALS, has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [burner, healthy])
+
+    assert desk.addPriceSnapshot(
+        alpha_token,
+        sender=teller.address,
+        gas=700_000,
+    )
+    assert healthy.snapshotCount() == 1
+
+
+def test_final_snapshot_wins_behind_nine_snapshot_allowance_exhausting_sources(
+    ripe_hq,
+    deploy3r,
+    alpha_token,
+    teller,
+):
+    burners = [
+        _gas_source(
+            has_feed=True,
+            has_feed_iterations=500,
+            snapshot_iterations=1_000_000,
+            exhaust_snapshot=True,
+        )
+        for _ in range(9)
+    ]
+    healthy = _raw_source(EIGHTEEN_DECIMALS, has_feed=True)
+    desk = _isolated_price_desk(ripe_hq, deploy3r, [*burners, healthy])
+
+    assert desk.numAddrs() - 1 == 10
+    assert desk.addPriceSnapshot(
+        alpha_token,
+        sender=teller.address,
+        gas=3_000_000,
+    )
+    gas_used = desk._computation.get_gas_used()
+    print(
+        "PRICEDESK_SNAPSHOT_STRESS_BOUNDARY",
+        f"ten_source_final_position={gas_used}",
+        "outer_limit=3000000",
+    )
+    assert gas_used > 9 * 150_000
+    assert gas_used < 3_000_000
+    assert healthy.snapshotCount() == 1
 
 
 @pytest.mark.parametrize("mode", (1, 5), ids=("revert", "noncanonical_bool"))
