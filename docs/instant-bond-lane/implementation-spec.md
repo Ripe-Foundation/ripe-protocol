@@ -1,17 +1,15 @@
 # Instant Bond Lane — Implementation Specification
 
-**Mechanism version:** v2 · **Specification revision:** 22
+**Mechanism version:** v2 · **Specification revision:** 23
 
-**Status:** Owner-approved implementation specification. Economic calibration remains
-a deployment input. Revisions 20 and 21 were committed and pushed on the dedicated
-feature branch. Revision 22 integrates current `origin/rh`, closes the approved
-empty-decay anti-ratchet finding, and is authorized for commit, branch push, and a
-draft pull request targeting `rh` as bounded in §20. Deployment, production
-configuration, RIPE minting, and activation remain unauthorized.
+**Status:** Remediation candidate for draft PR #156. Revision 23 closes the current
+review findings under the dated owner decision below. It is authorized for commit and
+push to `instant-bond-lane`; it does not authorize merge, deployment, production
+configuration, RIPE minting, economic calibration, or activation. Activation remains
+fail-closed through `config/instant-bond-lane-activation.json`.
 
-**Prepared:** 5 August 2026 · **Revised:** 15 August 2026 (current-RH integration,
-empty-decay anti-ratchet validation, migration/API reconciliation, and draft-PR
-delivery evidence)
+**Prepared:** 5 August 2026 · **Revised:** 15 August 2026 (PR #156 review remediation,
+owner decisions, functional protections, and activation qualification)
 
 **Companion:** pricing rationale in [`pricing-design.md`](pricing-design.md). This
 specification is authoritative wherever the documents differ.
@@ -25,13 +23,17 @@ committed and pushed feature checkpoint
 `79917dd8ca1abc5fc915777fd80e95d4005b4747`. Revision 22 merges current
 `origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4` into the feature branch and
 reconciles the resulting contract, migration-test, ABI-inventory, workflow, model,
-and documentation surfaces.
+and documentation surfaces. Revision 23 begins from reviewed PR head
+`55a2ef9ec25412d2f7bf7a9e8547a6ccc414e0ae` and closes the review findings under
+the dated owner decision below.
 
 ## Owner-confirmed product decisions
 
 1. The lane has its own deterministic epoch clock; it does not follow Bond Room or
    Ledger epochs.
-2. A buyer may receive RIPE unlocked or request a flexible lock with a linear bonus.
+2. A buyer may receive RIPE unlocked or request a flexible lock. The contract retains
+   dormant linear-bonus arithmetic for compatibility and differential testing, but
+   production activation requires `maxLockBonus=0` until isolated lock lots exist.
 3. Fully empty epochs use bounded **DECAY**, including epochs in which the lane was
    paused, disabled, or out of mint budget.
 4. Economic parameters are governed through a timelocked switchboard, like the bonds.
@@ -63,8 +65,8 @@ and documentation surfaces.
     require explicit valuation-aware calibration and owner approval; v2 deliberately
     does not hardcode a chain-specific asset allowlist.
 16. Locked settlement follows the live `MissionControl.coreRipeGovVaultId()` rather
-    than a hardcoded vault number. Preview remains narrow and does not bind that
-    governance-controlled destination into the quote ABI.
+    than a hardcoded vault number. Preview discloses that ID, and a buyer may bind both
+    the expected vault ID and a minimum acceptable actual lock in `buyNow`.
 17. Payment settlement succeeds only when Endaoment Funds receives the exact requested
     amount. Nonexact transfer semantics fail closed and are not normalized or credited.
 18. High-utilization price increases use governed minimum and maximum steps. The step
@@ -89,6 +91,33 @@ and documentation surfaces.
     switchboard may call its governance mutators. Foxtrot is the intended timelocked
     route, not an immutable lane-side authorization pin. A Foxtrot-only binding would
     require a separate circular-deployment/bootstrap design.
+24. RIPE-blacklisted buyers are rejected before payment on both unlocked and locked
+    paths. Preview reports them unavailable.
+25. Mid-epoch pricing fields remain snapshot-based. Immediate emergency controls are
+    Department pause, `canBuyNow`, the live mint budget, and RipeHq mint authorization;
+    lowering `maxEffectiveRate` is prospective until rollover.
+26. Purchases retain full-fill-only semantics. Clients must re-preview and retry after
+    a capacity race; no reservation or implicit partial fill is introduced.
+27. `mintBudget` is per Lane instance. Replacement activation requires an external
+    aggregate issuance ledger that accounts for every retired Lane.
+28. Installed overrides persist until consumed or timelocked cancellation. Operators
+    must revalidate or cancel them before reopening after an extended halt.
+
+### Revision-23 owner decision record
+
+On **15 August 2026**, repository and product owner **@wigglez** approved the
+13,000-byte Lane ceiling and every recommended review disposition in the recorded
+[PR #156 decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427).
+That decision selects zero production lock bonus, strategically-selectable timing with
+calibration blocked until the last-block response is signed off, snapshot-only
+mid-epoch pricing, per-instance mint budgets with an aggregate replacement ledger,
+full-fill-only execution, persistence-until-consumed overrides, buyer-bound vault ID
+and minimum lock, non-callback payment-token qualification, operational depeg controls,
+and the existing broad switchboard authorization pattern with deployment-time selector
+inventory. It also raises only the Lane project ceiling from 11,000 to **13,000**
+bytes; Foxtrot remains 6,500 and EIP-170 remains 24,576. This is the decision evidence
+for those behaviors; the fail-closed deployment inputs remain deliberately blank until
+their named operational owners supply production values.
 
 ## Final engineering decisions
 
@@ -122,8 +151,9 @@ and documentation surfaces.
   utilization inputs.
 - Pricing config versions are indexed consistently across initialization, rollover,
   and purchase events for monitoring.
-- Preview remains a lane-side quote with a boolean availability signal. It does not add
-  a reason-code ABI or attempt to preflight every downstream dependency.
+- Preview remains a caller-specific quote with a boolean availability signal. It
+  preflights every deterministic same-state prerequisite reasonably exposed by the
+  current protocol interfaces, while ordinary transaction-order races remain possible.
 - Governance uses a small dedicated `SwitchboardFoxtrot`; no pre-existing protocol
   contract outside the two feature contracts is modified. `Foxtrot` follows the
   repository's NATO phonetic sequence after the already-existing `SwitchboardEcho`.
@@ -387,7 +417,6 @@ following on every config, including the first:
 0 < minUpBps <= maxUpBps <= MAX_PRICE_STEP_BPS
 0 < minDownBps <= maxDownBps <= decayBps < 10_000
 maxDownBps < minUpBps
-(10_000 + minUpBps) * (10_000 - maxDownBps) >= 10_000**2
 (10_000 + minUpBps) * (10_000 - decayBps) >= 10_000**2
 0 < maxDecayEpochs <= MAX_DECAY_EPOCHS
 
@@ -412,10 +441,11 @@ minimum above the epoch cap. The `10_000` minimum base rate prevents the inverse
 recovery formula from becoming an integer fixed point for any valid down step; it is
 still economically tiny and does not replace calibrated operator bounds or unit-aware
 tooling. The range ordering ensures that the strongest nonempty price-down step is no
-larger than empty decay and is smaller than the weakest price-up step. The product
-constraint prevents an unclamped minimum-up/maximum-down round trip from producing a
-net price decrease; the engineering floor and ceiling can still dominate arithmetic at
-their boundaries and are tested separately. The conservative
+larger than empty decay and is smaller than the weakest price-up step. Because
+`maxDownBps <= decayBps`, the retained minimum-up/decay product constraint strictly
+implies the former minimum-up/maximum-down product check; duplicating it in bytecode
+adds no protection. The engineering floor and ceiling can still dominate arithmetic
+at their boundaries and are tested separately. The conservative
 `paymentCapPerEpoch * maxEffectiveRate` bound makes the base
 payout multiplication safe before division. Variable-decimal payment tokens require a
 separate bound on `maxBaseRipe * maxLockBonus`, because the bonus multiplication occurs
@@ -908,6 +938,8 @@ diagnostics are normative where shown.
 5.  assert block.number <= deadlineBlock                       # dev: expired
 6.  a = addys._getAddys()
     assert RipeHq(a.hq).canMintRipe(self)                     # dev: mint unavailable
+    assert not RipeToken(a.ripeToken).isPaused()              # dev: ripe paused
+    assert not RipeToken(a.ripeToken).blacklisted(msg.sender) # dev: blacklisted buyer
 7.  endaoFunds = addys._getEndaomentFundsAddr()
     assert endaoFunds != empty(address)                        # dev: no destination
 
@@ -921,7 +953,8 @@ diagnostics are normative where shown.
 
 11. Read live RIPE gov-vault config once.
 12. Compute baseRipe, bonusRatio, bonusRipe, actualLock, totalRipe.
-    assert baseRipe != 0                                       # dev: zero payout
+    assert requestedLock == 0 or actualLock != 0               # dev: invalid lock
+    assert actualLock >= minActualLock                          # dev: lock below minimum
     assert totalRipe >= minRipeOut                             # dev: slippage
 
 13. budgetRemaining = cfg.mintBudget - cumulativeMinted
@@ -931,6 +964,11 @@ diagnostics are normative where shown.
     if actualLock != 0:
         coreRipeGovVaultId = MissionControl(a.missionControl).coreRipeGovVaultId()
         assert coreRipeGovVaultId != 0                          # dev: invalid vault id
+        assert expectedCoreRipeGovVaultId == 0 or
+               coreRipeGovVaultId == expectedCoreRipeGovVaultId
+                                                               # dev: vault id changed
+    else:
+        assert expectedCoreRipeGovVaultId == 0                  # dev: vault id changed
 
 15. paymentBalanceBefore = IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
 
@@ -1025,11 +1063,14 @@ The settlement path mirrors `BondRoom.vy`:
 Declare narrow inline interfaces for:
 
 - `RipeHq.canMintRipe`;
-- `RipeToken.mint`, using the bound implementation's `-> bool` return and asserting
-  success;
+- `RipeToken.mint`, `blacklisted`, and `isPaused`, using the bound implementation's
+  `mint -> bool` return and asserting success;
 - `Teller.depositFromTrusted`;
 - `MissionControl.ripeGovVaultConfig`, returning the existing
-  `cs.RipeGovVaultConfig`, and `MissionControl.coreRipeGovVaultId`;
+  `cs.RipeGovVaultConfig`, `coreRipeGovVaultId`, `isRipeGovVaultId`, and
+  `getTellerDepositConfig`;
+- the vault registry's `getAddr`/`isValidAddr` and the RipeGov vault's pause and
+  `positionMigratedOut` views, used only by caller-specific preview readiness;
 - `Ledger.badDebt`.
 
 The lane does not call `Ledger.didClearBadDebt`, does not reduce RIPE delivery during
@@ -1580,16 +1621,14 @@ Tests must prove:
   that floor while increasing `P`, so calibration must evaluate the entire epoch cap,
   not only one approximately 15-RIPE example.
 - Bond Room inherits the same behavior through the identical Teller-to-RipeGov path;
-  the lane does not create it. The lane can increase the available bonus budget,
-  however, so v2 consciously accepts the inherited exposure rather than describing it
-  only as a UI concern.
-- Full closure requires isolated positions or a RipeGov-level lock-accounting change,
-  both out of scope for this minimal lane. Launch bounds are a modest
-  `paymentCapPerEpoch`, modest `maxLockBonus`, the cumulative `mintBudget`, and monitoring
-  purchases that combine a maximum deposit lock with a large, short-duration or expired
-  prior RipeGov position. Calibration must use the closed form above and simulate
-  chunked purchases through the full epoch cap rather than assuming the new deposit's
-  requested duration becomes the account duration.
+  the lane does not create it. The Lane must nevertheless not subsidize the exposure.
+  The 15 August owner decision therefore requires production `maxLockBonus=0` until
+  isolated lock lots exist. `scripts/qualify_instant_bond_lane_activation.py` rejects
+  any activation manifest that departs from zero.
+- Dormant nonzero-bonus arithmetic remains in the contract and independent model so
+  its boundaries remain tested, but it is not deployment authority. Tests pin zero
+  bonus for active/expired and small/dominant existing positions. Same-account tests
+  are not represented as Sybil protection.
 - The purchase event identifies the buyer and deposit `actualLock`, but deliberately
   does not duplicate pre-existing RipeGov shares or unlock state. Monitoring must join
   the event with RipeGov state/history; those cross-contract values are live position
@@ -1607,8 +1646,8 @@ Tests must prove:
   newer config or override lifecycle state. Config writes deliberately invalidate any
   installed override.
 - Live RipeGov lock terms are governed on a different switchboard and can change
-  within an epoch. Buyer `minRipeOut`, the no-longer-than-requested rule, and the
-  all-in bonus ceiling bound the effect.
+  within an epoch. Buyer `minRipeOut`, `minActualLock`, the no-longer-than-requested
+  rule, optional expected core-vault ID, and the all-in bonus ceiling bound the effect.
 - Operations must monitor changes to RIPE gov-vault min/max duration, early-exit terms,
   and bad-debt freeze behavior because those live values affect quotes within an epoch.
 
@@ -1616,38 +1655,39 @@ Tests must prove:
 
 - Exact-amount, revert-on-cap-exceed purchases permit cap front-running. `expectedEpoch`,
   `minRipeOut`, and `deadlineBlock` protect price and timing but do not reserve capacity.
+  This full-fill-only behavior is explicit: clients re-preview the remaining capacity
+  and retry rather than receiving an implicit partial fill.
 - A locked buyer may have no early exit or may temporarily lose early exit during bad
   debt. Preview and UI disclosure are mandatory.
-- The lane is permissionless and has no lane-level buyer allowlist or per-buyer terms.
-  Locked purchases inherit MissionControl's deposit allowlist; unlocked purchases do
-  not. This is distinct from Bond Room's Teller-only and bond-allowlist workflow.
-- On the locked path RIPE is minted to the lane and deposited for the buyer. The RIPE
-  token therefore checks the lane/vault transfer path rather than the buyer as a token
-  recipient; a RIPE-blacklisted buyer can still acquire RipeGov vault exposure if the
-  MissionControl deposit allowlist permits them. Bond Room inherits the same pattern.
-- `available=true` is lane-side only. A locked quote can still revert because general
-  deposits are disabled, the buyer is not deposit-allowlisted, the current core-vault
-  pointer is zero or does not support RIPE, RipeGov is paused, or the RIPE token is
-  paused. An unlocked quote can still revert because the RIPE token is paused or the
-  buyer is token-blacklisted. Any quote can also precede a purchase revert if Endaoment
-  Funds id 21 resolves to the zero
-  address; preview intentionally does not add that registry lookup.
+- The lane is permissionless but explicitly rejects RIPE-blacklisted buyers before
+  collecting payment on both settlement paths. Locked purchases additionally inherit
+  MissionControl's deposit allowlist. This is distinct from Bond Room's Teller-only
+  and bond-allowlist workflow.
+- `available=true` means every deterministic prerequisite reasonably exposed in the
+  current same-state view passed: lane and mint controls, RIPE pause/blacklist,
+  destination, payment balance/allowance, current core-vault identity and topology,
+  protocol/asset/user deposit gates, vault pause, and migrated-position state.
+  Transaction ordering can still change any live dependency after preview.
 - Preview itself may revert if required registry, MissionControl, RipeHq, or Ledger
   calls revert or resolve to unusable addresses. Before configuration or genesis it
   returns a zeroed unavailable quote without making those calls; after that point it is
   a dependency-aware view, not a guaranteed no-revert health endpoint.
-- A quote does not include or bind the live core RipeGov vault ID. A timelocked pointer
-  rotation between quote and execution may change the canonical destination; this is
-  deliberate because it remains protocol-governed, while the purchase event records
-  the actual vault ID. v2 does not add `expectedVaultId`.
-- The mechanism assumes a canonical, dollar-denominated ERC-20 whose successful
+- A locked quote includes the live core RipeGov vault ID. Callers may bind it with
+  `expectedCoreRipeGovVaultId` and bind a lock floor with `minActualLock`; either live
+  change then reverts atomically. Callers may additionally inspect disclosed exit and
+  freeze terms, but revision 23 deliberately does not add max-exit-fee or freeze-term
+  transaction bindings under the dated product decision.
+- The mechanism assumes a qualified, non-callback, canonical dollar-denominated ERC-20 whose successful
   transfer delivers the exact requested amount. Its decimal count may vary and is
   snapshotted immutably at construction. The lane enforces exact receipt but has no
-  oracle and cannot verify the token's dollar value or detect a depeg.
+  oracle and cannot verify the token's dollar value or detect a depeg. Activation is
+  blocked until the manifest names the exact chain/address/code hash, price source,
+  deviation and confirmation thresholds, monitoring owner, pause authority/procedure,
+  and reopening requirements.
 - Revision 18 added `ripeGovVaultId` to the then-predeployment
   `InstantBondPurchased` signature and topic. Revision 20 additionally changes config,
   rollover, override, and Foxtrot ABI surfaces. Final ABI and indexer artifacts must be
-  regenerated from the current revision-22 source; `ripeGovVaultId` remains data-only
+  regenerated from the current revision-23 source; `ripeGovVaultId` remains data-only
   because the purchase event already uses the EVM's four-topic maximum.
 
 ### Complexity controls
@@ -1666,8 +1706,8 @@ Tests must prove:
 
 ## 17. Test plan
 
-> **Revision-22 local validation is complete and its evidence is recorded in §20.6.**
-> This section remains the acceptance checklist for the current implementation. It
+> **Revision-23 final validation for the frozen local candidate is recorded in §20.7.**
+> This section is the acceptance checklist for the current implementation. It
 > does not authorize the deployment rehearsal subsection, remote-fork execution,
 > testnet work, pull-request merge, deployment, configuration, or activation. The
 > current commit/push/draft-PR boundary is recorded in §20.
@@ -1691,7 +1731,7 @@ credentialed gate and must never silently fall back to the transport-only test.
   73, the registered RIPE token as payment, and zero epoch length reject;
 - 0-, 6-, and 18-decimal payment tokens derive the correct immutable scale;
 - every §3.3 boundary and invalid combination;
-- invalid min/max ordering, `maxDownBps > decayBps`, either anti-ratchet factor failure,
+- invalid min/max ordering, `maxDownBps > decayBps`, the retained minimum-up/decay anti-ratchet factor failure,
   denominator boundaries, oversized decay cap, unsafe epoch-length/payment/timing
   multiplication bounds, minimum payment outside `[PAYMENT_SCALE, cap]`,
   ceiling below `MIN_BASE_RATE`, and seed outside `[MIN_BASE_RATE, ceiling]` reject;
@@ -1759,8 +1799,14 @@ credentialed gate and must never silently fall back to the transport-only test.
 - economic adversarial case: a large short-duration prior position followed by one or
   many maximum-lock lane purchases; measure the resulting weighted unlock, normalized
   share rounding, bonus captured, and incremental share-block commitment;
-- pin the accepted expired-position case at a one-block effective duration for a
-  100,000-RIPE prior position and approximately 15-RIPE max-lock payout;
+- retain the expired-position one-block case as adverse dormant evidence, never as
+  production acceptance; prove production `maxLockBonus=0` for active/expired and
+  small/dominant prior positions;
+- compare independent published-model and contract arithmetic for zero, small,
+  boundary, and maximum bonus; equal lock bounds; requested duration below, at,
+  between, and above bounds; and the bonus-adjusted base-rate ceiling;
+- preview-then-execute term changes reject atomically when the expected core vault or
+  minimum actual lock is violated;
 - `canExit`, exit fee, no-exit, and bad-debt-freeze quote fields.
 
 ### Settlement and atomicity
@@ -1781,8 +1827,14 @@ credentialed gate and must never silently fall back to the transport-only test.
 - unregistered lane, HqConfig mint disabled, global mint disabled, lane disabled,
   paused, expired deadline, wrong epoch, cap exceed, budget exceed, and slippage;
 - zero Endaoment Funds address rejects before payment transfer;
-- preview remains narrowly scoped when Endaoment Funds is unset: it may quote available,
-  while `buyNow` rejects the missing destination before transferring payment;
+- preview reports unavailable for missing Endaoment destination, caller balance or
+  allowance, RIPE pause/blacklist, invalid or paused core vault, deposit gates, and
+  migrated positions; immediate execution agrees for each same-state prerequisite;
+- ordinary post-preview ordering races remain possible and are constrained through
+  epoch/slippage/deadline plus optional vault-ID and lock-floor bindings;
+- callback-capable token tests record the forward-written Lane state during
+  `transferFrom` and prove later failure restores all state; activation nevertheless
+  requires a qualified non-callback payment token;
 - anyone may buy only for self;
 - inherited recovery and pause permissions retain existing behavior.
 
@@ -1879,7 +1931,12 @@ Deployment is multi-phase and must honor live timelocks:
 2. Determine whether the payment token is upgradeable. If it is, record its proxy and
    implementation identity/code hash and establish implementation-slot monitoring.
    Re-verify exact transfer receipt after any implementation change.
-3. Deploy `InstantBondLane` paused and unconfigured.
+3. Populate the named activation manifest and run
+   `scripts/qualify_instant_bond_lane_activation.py --require-ready` at the approved
+   chain block. It must remain red unless calibration, aggregate issuance, payment-
+   token/depeg, constructor, deployed-switchboard, fork, override-reopen, retry, and
+   indexer inputs are complete. Deploy `InstantBondLane` only after that gate passes;
+   it starts paused and unconfigured.
 4. Deploy `SwitchboardFoxtrot` with the lane as immutable target and action
    timelock unset during setup.
 5. Before the switchboard is registered or can call the lane, call
@@ -1911,11 +1968,10 @@ Deployment is multi-phase and must honor live timelocks:
     install, preview the next rollover without consumption, execute a purchase that
     commits the exact target, and verify the following ordinary controller transition.
     Separately rehearse installed cancellation and config invalidation.
-14. Record an explicit owner sanctions/governance decision for the inherited locked
-    path: a RIPE-blacklisted buyer may still receive a RipeGov position because RIPE is
-    minted to the lane and deposited into the vault. Activation requires either
-    accepting that posture in writing or implementing an upstream restriction; silence
-    is not approval.
+14. Verify blacklisted buyers are unavailable and rejected before payment on both
+    unlocked and locked paths. Verify the deployed config has `maxLockBonus=0`, the
+    payment token matches its non-callback qualification/code hash, and the registered
+    switchboard inventory contains no unknown or generic selector route.
 
 Before any initial or replacement lane config is queued, the proposal must calculate
 and record, using arbitrary-precision off-chain arithmetic:
@@ -1980,7 +2036,8 @@ remaining inputs are economic calibration and final live-state discovery:
 - `minUpBps` / `maxUpBps` / `minDownBps` / `maxDownBps` / `decayBps`;
 - governed `maxDecayEpochs` (hard ceiling 32);
 - `maxEffectiveRate` and `seedRate`;
-- `maxLockBonus` (hard ceiling 1000%);
+- `maxLockBonus`, fixed to zero by the revision-23 activation policy until isolated
+  lock lots are separately designed and authorized;
 - live RipeGov min/max lock durations and their arithmetic plausibility; and
 - live registry identities and the dynamic core-vault pointer as nonbinding preflight
   assertions, never hardcoded execution inputs.
@@ -1993,11 +2050,10 @@ behavior but remains explicitly `calibration_status: not_approved`; its fixture 
 paths are not production recommendations. Production review must pin acceptable fast-
 demand catch-up, weak-demand decline, empty decay, oscillation, and override-deviation
 bounds before choosing the five adjustment parameters.
-Initial `maxLockBonus` and `paymentCapPerEpoch` must also bound the accepted weighted-lock
-exposure in §16. The calibration artifact must evaluate the closed-form one-block
-condition and repeated purchases through the full epoch cap against representative
-dormant RipeGov positions; scaling either parameter requires monitoring evidence from
-the limited launch.
+The dormant model continues to evaluate nonzero lock-bonus arithmetic and the
+closed-form one-block condition, but no such parameter may enter an activation
+manifest. A later nonzero bonus requires a new owner decision and isolated-lock-lot
+design; same-account controls would not be a complete Sybil defense.
 Governance validation does not impose a useful upper bound on RipeGov
 `maxLockDuration`; deployment review must reject values large enough to threaten the
 lane's lock-bonus multiplication even though such nonsense input fails closed.
@@ -2017,7 +2073,7 @@ otherwise modest cap into a high-frequency issuance allowance.
 
 ---
 
-## 20. Revision-20 delivery, revision-21 remediation, and revision-22 RH integration
+## 20. Revision-20 delivery through revision-23 PR remediation
 
 ### 20.1 Historical revision-20 authorization and changed-file scope
 
@@ -2420,13 +2476,130 @@ Fresh revision-22 validation produced the following evidence:
 The remediation commit identity, pushed remote identity, and draft-PR URL belong in
 the external handoff because a commit cannot contain its own identity.
 
-### 20.7 Later phases remain unauthorized
+### 20.7 Revision-23 PR #156 remediation authority and evidence
 
-Revision 22 authorizes integration of current `origin/rh` into the feature branch,
-branch push, and a draft pull request targeting `rh`. It does not authorize merging
-that pull request, remote-fork execution, testnet rehearsal, deployment, configuration,
-RIPE minting, or activation. A later explicit owner instruction is required before
-following §17's deployment rehearsal or §18's production sequence.
+Revision 23 begins at reviewed head
+`55a2ef9ec25412d2f7bf7a9e8547a6ccc414e0ae` on RH base
+`36ee0db42482c3e7d6c43d045fc02655b90bebf4`. The dated owner decision is the
+[15 August 2026 PR record](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427).
+It authorizes the review remediation, a 13,000-byte Lane project ceiling, commit, push,
+and substantive review-thread replies while keeping the PR draft. It does not authorize
+merge, deployment, configuration, calibration, minting, or activation.
+
+The remediation adds blacklisted-buyer enforcement, deterministic preview readiness,
+silent-lock-downgrade rejection, buyer-bound vault/lock terms, Foxtrot target identity
+and semantic-surface validation, permanent feature CI, exact source-bound simulator
+generation, per-contract coverage, explicit runtime evidence, boundary/differential
+tests, and the fail-closed activation manifest. The manifest makes the selected
+operational decisions enforceable and remains intentionally blocked on production
+calibration, aggregate issuance, payment-token/depeg, constructor, registered-
+switchboard, fork, retry, override-reopen, and indexer evidence.
+
+Fail-first execution against the unchanged reviewed production source demonstrated six
+new regression failures and five control passes. The failing nodes were the below-
+minimum lock-boundary case in `test_lock_boundaries_and_linear_bonus`,
+`test_zero_equal_and_invalid_live_lock_terms`,
+`test_deposit_gates_and_ripe_gov_pause_only_block_locked_path`,
+`test_ripe_pause_and_blacklist_block_both_settlement_paths_atomically`,
+`test_preview_is_unavailable_when_endaoment_destination_is_unset`, and
+`test_constructor_target_and_immutables`. They cover silent lock downgrade, invalid
+live lock terms, caller-specific settlement readiness, blacklist enforcement, missing
+destination, and Foxtrot target identity.
+
+The frozen local remediation candidate contains exactly these 23 paths relative to
+`55a2ef9`:
+
+1. `.github/workflows/instant-bond-lane.yml`
+2. `config/instant-bond-lane-activation.json`
+3. `contracts/config/SwitchboardFoxtrot.vy`
+4. `contracts/core/InstantBondLane.vy`
+5. `docs/instant-bond-lane/controller-simulation-v2.json`
+6. `docs/instant-bond-lane/dynamic-controller-proposal.md`
+7. `docs/instant-bond-lane/implementation-spec.md`
+8. `docs/instant-bond-lane/pricing-design.md`
+9. `scripts/abis/.abi-export-complete`
+10. `scripts/abis/InstantBondLane.json`
+11. `scripts/check_instant_bond_lane_coverage.py`
+12. `scripts/qualify_instant_bond_lane_activation.py`
+13. `scripts/simulations/instant_bond_lane_controller.py`
+14. `tests/config/test_switchboard_foxtrot.py`
+15. `tests/core/instantBondLane/conftest.py`
+16. `tests/core/instantBondLane/test_controller.py`
+17. `tests/core/instantBondLane/test_lifecycle_purchase.py`
+18. `tests/core/instantBondLane/test_lock_settlement.py`
+19. `tests/core/instantBondLane/test_properties_abi.py`
+20. `tests/core/instantBondLane/test_simulation.py`
+21. `tests/core/instantBondLane/test_stateful_fuzz.py`
+22. `tests/deployment/test_instant_bond_lane_activation.py`
+23. `tests/test_instant_bond_lane_workflow.py`
+
+Final local revision-23 evidence, bound to Lane source SHA-256
+`b8e3c9cd665dfe31edfcdc1b319d7fdc68d99b6ecccc89b77243e99af4242252` and
+Foxtrot source SHA-256
+`50e0a1baacfa5c20175b15596d27d842c9fad765bcfd6b89ca4307cff041bc9b`, is:
+
+- Python 3.12.0, pytest 8.4.2, Vyper import 0.4.3 and CLI
+  `0.4.3+commit.bff19ea2`; `python -m pip check` reported no broken requirements;
+- the complete cold-cache feature/activation/ABI/workflow selection reported 211
+  passed, two credential-gated fork skips, and three benign pre-import assertion-
+  rewrite warnings in 834.21 seconds;
+- per-contract branch-aware coverage passed without lowering either 85% threshold.
+  Lane reported 461 statements, 26 missed, 120 branches, 61 partial branches, and
+  85.03%. Foxtrot reported 117 statements, none missed, 16 branches, eight partial
+  branches, and 93.98%. Combined coverage was 86.69%;
+- the exact stateful differential campaign included in that selection exercised 50
+  examples times 20 lifecycle steps and passed against the independent model;
+- 1,178 directly affected VaultMigrator, BondRoom, RipeGov, Teller, Switchboard
+  Alpha-Echo, and TimeLock regressions passed in 700.43 seconds;
+- Boa deployed runtimes are 12,905 bytes for Lane and 6,075 bytes for Foxtrot. They
+  leave 95 and 425 bytes below the 13,000/6,500 project ceilings, and 11,671 and
+  18,501 bytes below EIP-170;
+- compared with the reviewed `55a2ef9` gas baseline, final Lane gas changed from
+  265,453 to 253,336 for initialization, 36,472 to 28,355 for same-epoch unlocked,
+  831,461 to 830,980 for same-epoch locked, 85,414 to 77,239 for ordinary rollover,
+  and 68,432 to 60,257 for override rollover. Foxtrot config execution changed from
+  379,484 to 372,672, override execution from 87,843 to 52,445, and override-action
+  cancellation from 39,833 to 4,427;
+- the PricingState lifecycle-field and empty-struct experiments were rejected because
+  they increased gas and did not reduce runtime. The retained payout helper removes
+  zero-value bonus work from unlocked purchases; action-aware Foxtrot cleanup and
+  narrow dynamic address loading are also retained because their measured gas results
+  improved;
+- the generated Lane/Foxtrot ABI file SHA-256 values are
+  `8bfee4d99cbe865fbb59538256978d5cd2c60939361e7054827efd4c3cb22754`
+  and `00c831a45f751c1af458b4de3e75916b508279e7fbb22d48f117320b10f37963`.
+  The controller artifact is current and source-bound at SHA-256
+  `46d045ad7820b33f02dbfcf5c116036edcda9d79647a0b60fb0502b0b7902922`;
+- canonical compact-JSON selector hashes are
+  `7cb685cb0b141421898d47b149223e7fcb8e0b33abd7bb5e6e4a68559830bbe2`
+  for Lane and `ab6a154a88c5ba9981c0656dcab620cf3aa63894b81d0e7ef2abe699eac191c7`
+  for Foxtrot. Storage-layout hashes are
+  `ef4149b7214497a89704e46b8d5afb199f3c1b647371d66a2b8322c0a0a1df08`
+  and `54c8649a06cbfff038df0862ba946d534a2fa5fe28e085e82fa5a0b5726250af`;
+  event-schema hashes are
+  `34268bc4a5430c0f1454e39d3d661f1ca0a052e62f9b4dfaba5fedd811ef9291`
+  and `ce37b4dc4bc3d8d03719835b6d2ba3fd7067b9be77ca1f04836a743be273ac5a`;
+- all 57 ABI exports were current, with 43 Vyper sources deliberately excluded;
+  simulation generation/checking, source-mutation binding tests, workflow-health
+  tests, activation-draft checks, private-cache Python compilation, and
+  `git diff --check` passed; and
+- activation readiness deliberately exited 1 on the still-empty calibration,
+  aggregate issuance, payment/depeg, deployment identity, switchboard inventory,
+  credentialed fork, retry, override-reopen, and indexer fields. The local fork result
+  remains one transport-safety pass and two explicit credential-gated skips.
+
+The remediation commit, pushed remote identity, branch-protection/ruleset evidence,
+PR-head equality, and review-thread reply URLs cannot be recorded until publication.
+Historical revision-22 numbers above must not be presented as revision-23 evidence.
+
+### 20.8 Later phases remain unauthorized
+
+Revision 23 authorizes remediation commit/push and substantive replies on the existing
+draft pull request. It does not authorize merging that pull request, testnet rehearsal,
+deployment, configuration, RIPE minting, calibration, or activation. Credentialed fork
+qualification is required by the activation gate but cannot itself authorize the later
+lifecycle steps. A later explicit owner instruction is required before following
+§17's deployment rehearsal or §18's production sequence.
 
 Accordingly, this candidate deliberately contains no migration, BluePrint,
 `robinhood-parameters.json`, or live `docs/chains/rh/status.yaml` integration. Those
@@ -2460,8 +2633,9 @@ actions.
 | 15 | 6 August 2026 | Added owner-authorized rule-based stateful differential fuzzing over mixed lifecycle, governance, settlement, and rollback sequences; reconciled the focused, coverage, and complete-suite evidence without changing contract code. |
 | 16 | 6 August 2026 | Rejected RIPE as the immutable payment token; made coverage cold-cache-safe; recorded owner-selected non-hard-coded issuance gates, epoch-frequency calibration, four-budget supply monitoring, and the pre-merge baseline requirement. |
 | 17 | 6 August 2026 | Recorded the owner-authorized local commit and pricing-rationale reconciliation; made the dedicated coverage gate platform-neutral, self-cleaning, fail-safe, and inert for unrelated coverage runs; added coverage-data ignores and a distinct RIPE-payment diagnostic. |
-| 18 | 7 August 2026 | Aligned locked settlement with RH's dynamic core-vault pointer; enforced exact Endaoment receipt; disclosed the actual settlement vault; reconciled migration/fork/adversarial tests; quantified the owner-accepted weighted-lock dilution; rebound RH source anchors; refreshed runbook, coverage, runtime, and authorization evidence; and incorporated the independent mutation/security review. |
+| 18 | 7 August 2026 | Aligned locked settlement with RH's dynamic core-vault pointer; enforced exact Endaoment receipt; disclosed the actual settlement vault; reconciled migration/fork/adversarial tests; quantified weighted-lock dilution (later superseded by revision 23's zero-bonus activation policy); rebound RH source anchors; refreshed runbook, coverage, runtime, and authorization evidence; and incorporated the independent mutation/security review. |
 | 19 | 11 August 2026 | Normalized both feature contracts to repository Vyper conventions; reconciled constant, local, action-ID, invariant, and diagnostic notation; added canonical ABI exports; documented the Foxtrot ABI-metadata rename and Boa source-location coverage shift; and refreshed focused, coverage, runtime, ABI/layout, export, regression, and environment evidence without changing successful-path semantics or storage. |
 | 20 | 11 August 2026 | Added bounded utilization-and-timing controller ranges, first-partial-epoch eligibility, exact next-successful-rollover overrides with independent optimistic versioning, three-action Foxtrot dispatch, revised config/state/events/APIs, deterministic model artifacts, and expanded tests; recorded the exact owner-authorized source/document/model/test/ABI/commit/push scope while reserving merge, pull-request, deployment, configuration, and activation; owner-approved the revision-20 runtime ceilings; and recorded fresh focused, coverage, runtime, ABI/layout, simulator, regression, environment, and exact baseline-limitation evidence while preserving revisions 18/19 measurements as historical. |
 | 21 | 12 August 2026 | Closed the bounded reviewer-remediation pass: enforced exact locked-settlement RIPE balance restoration, indexed configuration versions, corrected fixture and deployment assumptions, added independent simulator and marker evidence, replaced the coverage-private-state hook with explicit cache isolation, added a branch-only complete feature workflow, rebound current hashes/runtime/coverage, and retained the feature in its dedicated branch and worktree without RH merge or rebase. |
 | 22 | 15 August 2026 | Merged current `origin/rh`; reconciled SwitchboardEcho/VaultMigrator migration fixtures, ABI inventory, workflow triggers and pins, and source anchors; enforced the weakest-up/empty-decay anti-ratchet factor in contract and independent model; refreshed simulation, runtime, coverage, ABI, migration, and exact-scope evidence; and authorized commit, branch push, and a draft pull request targeting `rh` while reserving deployment, configuration, minting, and activation. |
+| 23 | 15 August 2026 | Remediated PR #156 review findings under the dated owner decision: enforced blacklist and deterministic preview readiness, rejected silent lock downgrade, added optional vault/lock transaction bindings, validated Foxtrot target identity, disabled production lock bonus through a fail-closed activation manifest, recorded timing/config/budget/fill/override/token/switchboard policies, added permanent CI/source/coverage/runtime gates and expanded differential/boundary tests, raised only the Lane local ceiling to 13,000 bytes, and preserved draft/no-merge/no-deploy/no-activation status. |

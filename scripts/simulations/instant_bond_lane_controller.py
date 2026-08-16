@@ -19,21 +19,36 @@ from typing import Sequence
 BPS = 10_000
 RATE_SCALE = 10**18
 SCHEMA = "ripe.instant-bond-lane.controller-simulation.v2"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+LANE_SOURCE = Path("contracts/core/InstantBondLane.vy")
+FOXTROT_SOURCE = Path("contracts/config/SwitchboardFoxtrot.vy")
 STATUS = (
     "REVISION 22 CURRENT-RH CANDIDATE — implemented and mechanism-validated; "
     "calibration and deployment not approved"
 )
-BOUND_IMPLEMENTATION = {
-    "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
-    "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
-    "instant_bond_lane_source_sha256": (
-        "16e7133f9b6a5b72914f8e33c138af99feacc0725e0528840477300ffbefdb71"
-    ),
-    "switchboard_foxtrot_source_sha256": (
-        "42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa"
-    ),
-}
 MAX_DECAY_EPOCHS = 32
+
+
+def source_sha256(repo_root: Path, source: Path) -> str:
+    """Hash the exact source bytes rooted at the checked repository."""
+
+    return hashlib.sha256((repo_root / source).read_bytes()).hexdigest()
+
+
+def bound_implementation(repo_root: Path = REPO_ROOT) -> dict[str, str]:
+    """Bind generated evidence to the contract sources, never copied constants."""
+
+    return {
+        "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
+        "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
+        "instant_bond_lane_source_sha256": source_sha256(repo_root, LANE_SOURCE),
+        "switchboard_foxtrot_source_sha256": source_sha256(
+            repo_root, FOXTROT_SOURCE
+        ),
+    }
+
+
+BOUND_IMPLEMENTATION = bound_implementation()
 
 
 @dataclass(frozen=True)
@@ -90,6 +105,42 @@ class OverrideProjection:
 
 
 Purchase = tuple[int, int]
+
+
+def project_lock_quote(
+    *,
+    payment_amount: int,
+    payment_scale: int,
+    rate: int,
+    max_lock_bonus_bps: int,
+    requested_lock: int,
+    min_lock: int,
+    max_lock: int,
+) -> dict[str, int | bool]:
+    """Independent integer model of the Lane's lock-bound payout."""
+
+    actual_lock = 0
+    bonus_ratio_bps = 0
+    if max_lock and max_lock >= min_lock and requested_lock >= min_lock:
+        actual_lock = min(requested_lock, max_lock)
+        if max_lock == min_lock:
+            bonus_ratio_bps = max_lock_bonus_bps
+        else:
+            bonus_ratio_bps = (
+                max_lock_bonus_bps
+                * (actual_lock - min_lock)
+                // (max_lock - min_lock)
+            )
+    base_ripe = payment_amount * rate // payment_scale
+    bonus_ripe = base_ripe * bonus_ratio_bps // BPS
+    return {
+        "valid_requested_lock": requested_lock == 0 or actual_lock != 0,
+        "actual_lock": actual_lock,
+        "bonus_ratio_bps": bonus_ratio_bps,
+        "base_ripe": base_ripe,
+        "bonus_ripe": bonus_ripe,
+        "total_ripe": base_ripe + bonus_ripe,
+    }
 
 
 def validate_params(p: Params) -> None:
@@ -246,7 +297,13 @@ def scenario(
     }
 
 
-def run_path(name: str, epochs: Sequence[Sequence[Purchase]], p: Params) -> dict:
+def run_committed_epoch_path(
+    name: str,
+    epochs: Sequence[Sequence[Purchase]],
+    p: Params,
+) -> dict:
+    """Run consecutive committed epochs; entries never represent wall-clock gaps."""
+
     rate = p.initial_rate
     rows = []
     for epoch, purchases in enumerate(epochs):
@@ -312,13 +369,9 @@ def project_installed_override(
     assert p.min_rate <= controller_rate <= p.rate_ceiling
     if not state.exists:
         return OverrideProjection("none", controller_rate, controller_rate, 0)
-    if state.bound_config_version != config_version:
-        return OverrideProjection(
-            "invalidated",
-            controller_rate,
-            controller_rate,
-            0,
-        )
+    # On chain, setConfig clears an installed override and increments its version
+    # atomically. A mismatched persisted state is therefore outside this model.
+    assert state.bound_config_version == config_version
     elapsed_epochs = projected_epoch - stored_epoch
     if elapsed_epochs == 0:
         return OverrideProjection("pending", controller_rate, controller_rate, 0)
@@ -755,7 +808,7 @@ def mechanism_checks(p: Params) -> dict:
     }
 
 
-def build_artifact() -> dict:
+def build_artifact(repo_root: Path = REPO_ROOT) -> dict:
     p = Params()
     validate_params(p)
 
@@ -790,11 +843,15 @@ def build_artifact() -> dict:
     late = ((100, 10_000),)
     empty: tuple[Purchase, ...] = ()
     paths = [
-        run_path("repeated_fast_full", [fast] * 32, p),
-        run_path("repeated_mid_full", [mid] * 32, p),
-        run_path("repeated_late_full", [late] * 32, p),
-        run_path("alternating_fast_full_and_empty", [fast, empty] * 16, p),
-        run_path("alternating_late_full_and_empty", [late, empty] * 16, p),
+        run_committed_epoch_path("repeated_fast_full", [fast] * 32, p),
+        run_committed_epoch_path("repeated_mid_full", [mid] * 32, p),
+        run_committed_epoch_path("repeated_late_full", [late] * 32, p),
+        run_committed_epoch_path(
+            "alternating_fast_full_and_empty", [fast, empty] * 16, p
+        ),
+        run_committed_epoch_path(
+            "alternating_late_full_and_empty", [late, empty] * 16, p
+        ),
     ]
 
     override_cases = []
@@ -867,7 +924,7 @@ def build_artifact() -> dict:
             "implemented mechanism evidence; not calibration, deployment, "
             "or integration authority"
         ),
-        "bound_implementation": BOUND_IMPLEMENTATION,
+        "bound_implementation": bound_implementation(repo_root),
         "calibration_status": "not_approved",
         "arithmetic": "uint256-style floor integer model; no floats",
         "fixture": asdict(p),

@@ -30,6 +30,9 @@ interface InstantBondLane:
     def isValidRateOverride(_targetRate: uint256, _expectedConfigVersion: uint256, _expectedOverrideVersion: uint256) -> bool: view
     def canCancelRateOverride(_expectedOverrideVersion: uint256) -> bool: view
     def configVersion() -> uint256: view
+    def overrideVersion() -> uint256: view
+    def getRipeHq() -> address: view
+    def EPOCH_LENGTH() -> uint256: view
 
 flag ActionType:
     INSTANT_BOND_CONFIG
@@ -134,6 +137,12 @@ def __init__(
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
     assert _instantBondLane != empty(address) and _instantBondLane.is_contract # dev: invalid lane
+    assert staticcall InstantBondLane(_instantBondLane).getRipeHq() == _ripeHq # dev: invalid lane
+    assert staticcall InstantBondLane(_instantBondLane).EPOCH_LENGTH() != 0 # dev: invalid lane
+    configVersion: uint256 = staticcall InstantBondLane(_instantBondLane).configVersion()
+    overrideVersion: uint256 = staticcall InstantBondLane(_instantBondLane).overrideVersion()
+    assert not staticcall InstantBondLane(_instantBondLane).isValidConfig(empty(InstantBondConfig)) # dev: invalid lane
+    assert not staticcall InstantBondLane(_instantBondLane).isValidRateOverride(0, configVersion, overrideVersion) # dev: invalid lane
     LANE = _instantBondLane
 
 
@@ -276,7 +285,7 @@ def executePendingAction(_aid: uint256) -> bool:
         c: PendingRateOverride = self.pendingRateOverride[_aid]
         newVersion = extcall InstantBondLane(lane).cancelRateOverride(c.expectedOverrideVersion)
 
-    self._clearPending(_aid)
+    self._clearPending(_aid, actionType)
     if actionType == ActionType.INSTANT_BOND_CONFIG:
         log InstantBondConfigExecuted(actionId=_aid, newVersion=newVersion)
     elif actionType == ActionType.RATE_OVERRIDE_SET:
@@ -302,7 +311,7 @@ def cancelPendingAction(_aid: uint256) -> bool:
 def _cancelPendingAction(_aid: uint256):
     actionType: ActionType = self.actionType[_aid]
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self._clearPending(_aid)
+    self._clearPending(_aid, actionType)
     if actionType == ActionType.INSTANT_BOND_CONFIG:
         log InstantBondConfigCancelled(actionId=_aid)
     else:
@@ -313,7 +322,9 @@ def _cancelPendingAction(_aid: uint256):
 
 
 @internal
-def _clearPending(_aid: uint256):
+def _clearPending(_aid: uint256, _actionType: ActionType):
+    if _actionType == ActionType.INSTANT_BOND_CONFIG:
+        self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
+    else:
+        self.pendingRateOverride[_aid] = empty(PendingRateOverride)
     self.actionType[_aid] = empty(ActionType)
-    self.pendingConfig[_aid] = empty(PendingInstantBondConfig)
-    self.pendingRateOverride[_aid] = empty(PendingRateOverride)

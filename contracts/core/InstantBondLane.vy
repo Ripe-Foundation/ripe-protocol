@@ -33,18 +33,41 @@ from ethereum.ercs import IERC20Detailed
 interface MissionControl:
     def ripeGovVaultConfig(_asset: address) -> cs.RipeGovVaultConfig: view
     def coreRipeGovVaultId() -> uint256: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
 
 interface RipeToken:
     def mint(_recipient: address, _amount: uint256) -> bool: nonpayable
+    def blacklisted(_addr: address) -> bool: view
+    def isPaused() -> bool: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Ledger:
     def badDebt() -> uint256: view
+
+interface AddressRegistry:
+    def getAddr(_regId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
+
+interface Vault:
+    def isPaused() -> bool: view
+
+struct TellerDepositConfig:
+    canDepositGeneral: bool
+    canDepositAsset: bool
+    doesVaultSupportAsset: bool
+    isUserAllowed: bool
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
+    canAnyoneDeposit: bool
+    minDepositBalance: uint256
 
 # NOTE: Keep this struct byte-for-byte aligned with SwitchboardFoxtrot.InstantBondConfig.
 # Guarded by test_instant_bond_config_struct_bodies_are_byte_for_byte_identical.
@@ -78,6 +101,7 @@ struct InstantBondQuote:
     bonusRatio: uint256
     bonusRipe: uint256
     actualLock: uint256
+    ripeGovVaultId: uint256
     totalRipe: uint256
     canExitEarly: bool
     exitFee: uint256
@@ -283,8 +307,6 @@ def _isValidConfig(_config: InstantBondConfig) -> bool:
         return False
     if _config.maxDownBps > _config.decayBps or _config.maxDownBps >= _config.minUpBps:
         return False
-    if (HUNDRED_PERCENT + _config.minUpBps) * (HUNDRED_PERCENT - _config.maxDownBps) < HUNDRED_PERCENT * HUNDRED_PERCENT:
-        return False
     if (HUNDRED_PERCENT + _config.minUpBps) * (HUNDRED_PERCENT - _config.decayBps) < HUNDRED_PERCENT * HUNDRED_PERCENT:
         return False
     if _config.maxDecayEpochs == 0 or _config.maxDecayEpochs > MAX_DECAY_EPOCHS:
@@ -448,6 +470,8 @@ def buyNow(
     _expectedEpoch: uint256,
     _minRipeOut: uint256,
     _deadlineBlock: uint256,
+    _expectedCoreRipeGovVaultId: uint256 = 0,
+    _minActualLock: uint256 = 0,
 ) -> uint256:
     # validate availability
     configVersion: uint256 = self.configVersion
@@ -459,8 +483,19 @@ def buyNow(
     assert config.canBuyNow # dev: disabled
     assert block.number <= _deadlineBlock # dev: expired
 
-    a: addys.Addys = addys._getAddys()
-    assert staticcall RipeHq(a.hq).canMintRipe(self) # dev: mint unavailable
+    a: addys.Addys = empty(addys.Addys)
+    ripeToken: address = empty(address)
+    missionControl: address = empty(address)
+    if _requestedLock == 0:
+        ripeToken = addys._getRipeToken()
+        missionControl = addys._getMissionControlAddr()
+    else:
+        a = addys._getAddys()
+        ripeToken = a.ripeToken
+        missionControl = a.missionControl
+    assert staticcall RipeHq(addys._getRipeHq()).canMintRipe(self) # dev: mint unavailable
+    assert not staticcall RipeToken(ripeToken).isPaused() # dev: ripe paused
+    assert not staticcall RipeToken(ripeToken).blacklisted(msg.sender) # dev: blacklisted buyer
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     assert endaoFunds != empty(address) # dev: no destination
@@ -474,7 +509,7 @@ def buyNow(
     assert _paymentAmount <= remainingPayment # dev: exceeds epoch cap
 
     # calculate payout and enforce mint budget
-    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
+    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(missionControl).ripeGovVaultConfig(ripeToken)
     payout: PayoutData = self._calculatePayout(
         _paymentAmount,
         pricing.rate,
@@ -483,7 +518,8 @@ def buyNow(
         vaultConfig,
     )
 
-    assert payout.baseRipe != 0 # dev: zero payout
+    assert _requestedLock == 0 or payout.actualLock != 0 # dev: invalid lock
+    assert payout.actualLock >= _minActualLock # dev: lock below minimum
     assert payout.totalRipe >= _minRipeOut # dev: slippage
 
     budgetRemaining: uint256 = config.mintBudget - self.cumulativeMinted
@@ -492,8 +528,11 @@ def buyNow(
     # resolve lock destination
     coreRipeGovVaultId: uint256 = 0
     if payout.actualLock != 0:
-        coreRipeGovVaultId = staticcall MissionControl(a.missionControl).coreRipeGovVaultId()
+        coreRipeGovVaultId = staticcall MissionControl(missionControl).coreRipeGovVaultId()
         assert coreRipeGovVaultId != 0 # dev: invalid vault id
+        assert _expectedCoreRipeGovVaultId == 0 or coreRipeGovVaultId == _expectedCoreRipeGovVaultId # dev: vault id changed
+    else:
+        assert _expectedCoreRipeGovVaultId == 0 # dev: vault id changed
 
     paymentBalanceBefore: uint256 = staticcall IERC20(PAYMENT_TOKEN).balanceOf(endaoFunds)
 
@@ -511,15 +550,15 @@ def buyNow(
 
     # mint ripe and settle lock
     if payout.actualLock == 0:
-        assert extcall RipeToken(a.ripeToken).mint(msg.sender, payout.totalRipe) # dev: mint failed
+        assert extcall RipeToken(ripeToken).mint(msg.sender, payout.totalRipe) # dev: mint failed
     else:
-        ripeBalanceBefore: uint256 = staticcall IERC20(a.ripeToken).balanceOf(self)
-        assert extcall RipeToken(a.ripeToken).mint(self, payout.totalRipe) # dev: mint failed
-        assert extcall IERC20(a.ripeToken).approve(a.teller, payout.totalRipe, default_return_value=True) # dev: ripe approval failed
-        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(msg.sender, coreRipeGovVaultId, a.ripeToken, payout.totalRipe, payout.actualLock, a)
+        ripeBalanceBefore: uint256 = staticcall IERC20(ripeToken).balanceOf(self)
+        assert extcall RipeToken(ripeToken).mint(self, payout.totalRipe) # dev: mint failed
+        assert extcall IERC20(ripeToken).approve(a.teller, payout.totalRipe, default_return_value=True) # dev: ripe approval failed
+        depositedAmount: uint256 = extcall Teller(a.teller).depositFromTrusted(msg.sender, coreRipeGovVaultId, ripeToken, payout.totalRipe, payout.actualLock, a)
         assert depositedAmount == payout.totalRipe # dev: deposit mismatch
-        assert staticcall IERC20(a.ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
-        assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
+        assert staticcall IERC20(ripeToken).balanceOf(self) == ripeBalanceBefore # dev: ripe settlement mismatch
+        assert extcall IERC20(ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     log InstantBondPurchased(
         buyer=msg.sender,
@@ -567,8 +606,17 @@ def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBo
     if _paymentAmount < pricing.minPaymentAmount or _paymentAmount > remainingPayment:
         return quote
 
-    a: addys.Addys = addys._getAddys()
-    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
+    a: addys.Addys = empty(addys.Addys)
+    ripeToken: address = empty(address)
+    missionControl: address = empty(address)
+    if _requestedLock == 0:
+        ripeToken = addys._getRipeToken()
+        missionControl = addys._getMissionControlAddr()
+    else:
+        a = addys._getAddys()
+        ripeToken = a.ripeToken
+        missionControl = a.missionControl
+    vaultConfig: cs.RipeGovVaultConfig = staticcall MissionControl(missionControl).ripeGovVaultConfig(ripeToken)
     payout: PayoutData = self._calculatePayout(
         _paymentAmount,
         pricing.rate,
@@ -583,7 +631,43 @@ def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBo
     quote.actualLock = payout.actualLock
     quote.totalRipe = payout.totalRipe
 
+    if _requestedLock != 0 and payout.actualLock == 0:
+        return quote
+
     if payout.actualLock != 0:
+        coreRipeGovVaultId: uint256 = staticcall MissionControl(missionControl).coreRipeGovVaultId()
+        quote.ripeGovVaultId = coreRipeGovVaultId
+        if coreRipeGovVaultId == 0:
+            return quote
+        if not staticcall MissionControl(missionControl).isRipeGovVaultId(coreRipeGovVaultId):
+            return quote
+        depositConfig: TellerDepositConfig = staticcall MissionControl(missionControl).getTellerDepositConfig(coreRipeGovVaultId, ripeToken, msg.sender)
+        if not depositConfig.canDepositGeneral or not depositConfig.canDepositAsset:
+            return quote
+        if not depositConfig.doesVaultSupportAsset or not depositConfig.isUserAllowed:
+            return quote
+        vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(coreRipeGovVaultId)
+        if vaultAddr == empty(address) or not staticcall AddressRegistry(a.vaultBook).isValidAddr(vaultAddr):
+            return quote
+        if staticcall Vault(vaultAddr).isPaused():
+            return quote
+        positionCallSuccess: bool = False
+        positionResult: Bytes[32] = b""
+        positionCallSuccess, positionResult = raw_call(
+            vaultAddr,
+            concat(
+                method_id("positionMigratedOut(address,address)"),
+                convert(msg.sender, bytes32),
+                convert(ripeToken, bytes32),
+            ),
+            max_outsize=32,
+            is_static_call=True,
+            revert_on_failure=False,
+        )
+        if not positionCallSuccess or len(positionResult) != 32:
+            return quote
+        if convert(positionResult, uint256) != 0:
+            return quote
         quote.canExitEarly = vaultConfig.lockTerms.canExit
         quote.exitFee = vaultConfig.lockTerms.exitFee
         if vaultConfig.shouldFreezeWhenBadDebt:
@@ -591,9 +675,19 @@ def previewBuyNow(_paymentAmount: uint256, _requestedLock: uint256) -> InstantBo
 
     if deptBasics.isPaused or not config.canBuyNow:
         return quote
-    if not staticcall RipeHq(a.hq).canMintRipe(self):
+    if not staticcall RipeHq(addys._getRipeHq()).canMintRipe(self):
         return quote
-    if payout.baseRipe == 0 or payout.totalRipe > budgetRemaining:
+    if staticcall RipeToken(ripeToken).isPaused():
+        return quote
+    if staticcall RipeToken(ripeToken).blacklisted(msg.sender):
+        return quote
+    if addys._getEndaomentFundsAddr() == empty(address):
+        return quote
+    if staticcall IERC20(PAYMENT_TOKEN).balanceOf(msg.sender) < _paymentAmount:
+        return quote
+    if staticcall IERC20(PAYMENT_TOKEN).allowance(msg.sender, self) < _paymentAmount:
+        return quote
+    if payout.totalRipe > budgetRemaining:
         return quote
 
     quote.available = True
@@ -821,19 +915,23 @@ def _calculatePayout(
     _requestedLock: uint256,
     _vaultConfig: cs.RipeGovVaultConfig,
 ) -> PayoutData:
-    actualLock: uint256 = 0
-    bonusRatio: uint256 = 0
+    baseRipe: uint256 = _paymentAmount * _rate // PAYMENT_SCALE
     minLock: uint256 = _vaultConfig.lockTerms.minLockDuration
     maxLock: uint256 = _vaultConfig.lockTerms.maxLockDuration
 
-    if maxLock != 0 and maxLock >= minLock and _requestedLock >= minLock:
-        actualLock = min(_requestedLock, maxLock)
-        if maxLock == minLock:
-            bonusRatio = _maxLockBonus
-        else:
-            bonusRatio = _maxLockBonus * (actualLock - minLock) // (maxLock - minLock)
+    if _requestedLock == 0 or maxLock == 0 or maxLock < minLock or _requestedLock < minLock:
+        return PayoutData(
+            baseRipe=baseRipe,
+            bonusRatio=0,
+            bonusRipe=0,
+            actualLock=0,
+            totalRipe=baseRipe,
+        )
 
-    baseRipe: uint256 = _paymentAmount * _rate // PAYMENT_SCALE
+    actualLock: uint256 = min(_requestedLock, maxLock)
+    bonusRatio: uint256 = _maxLockBonus
+    if maxLock != minLock:
+        bonusRatio = _maxLockBonus * (actualLock - minLock) // (maxLock - minLock)
     bonusRipe: uint256 = baseRipe * bonusRatio // HUNDRED_PERCENT
     return PayoutData(
         baseRipe=baseRipe,

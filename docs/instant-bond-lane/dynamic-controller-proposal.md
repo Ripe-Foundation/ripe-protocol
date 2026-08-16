@@ -1,19 +1,19 @@
 # Instant Bond Lane Dynamic Controller and Manual Rate Override Design Record
 
-**Status:** Owner-approved revision-20 design with revision-21 remediation and
-revision-22 current-RH integration implemented and locally validated. Contract, test,
-model, ABI, and feature-gate work is complete, and the owner approved the project-size
-ceilings recorded below. Economic calibration is explicitly **not approved**. The
-owner authorized revision-22 commit, branch push, and a draft pull request targeting
-`rh`; this document is not deployment, configuration, or activation authority.
+**Status:** Revision-23 PR #156 remediation candidate under the dated
+[owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427).
+Economic calibration is explicitly **not approved**. Commit/push and draft review are
+authorized; this document is not merge, deployment, configuration, minting, or
+activation authority.
 
 **Starting baselines:** revision 20 began at
 `ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`; revision 21 begins from the
 committed and pushed `instant-bond-lane` checkpoint
 `79917dd8ca1abc5fc915777fd80e95d4005b4747`. Revision 22 integrates current
-`origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4`.
+`origin/rh` commit `36ee0db42482c3e7d6c43d045fc02655b90bebf4`. Revision 23
+begins from reviewed PR head `55a2ef9ec25412d2f7bf7a9e8547a6ccc414e0ae`.
 
-The revision-22 [`implementation-spec.md`](implementation-spec.md) is authoritative.
+The revision-23 [`implementation-spec.md`](implementation-spec.md) is authoritative.
 This document records the controller rationale and the implemented design at
 `contracts/core/InstantBondLane.vy` and
 `contracts/config/SwitchboardFoxtrot.vy`; it does not replace the normative source or
@@ -42,6 +42,12 @@ that uncommitted projection.
 Purchase timing must be amount-weighted. Using only the final sellout block lets a
 buyer acquire almost the entire cap immediately and delay a marginal tail purchase to
 force the minimum upward adjustment.
+
+Timing is strategically selectable: a buyer can wait until the last block without
+paying a different active-epoch rate and select the weakest valid upward response.
+Production activation therefore remains blocked until signed calibration proves the
+approved `minUpBps..maxUpBps` spread—including repeated last-block full-cap paths—is
+safe. The mechanism does not claim that timing is costly or manipulation-proof.
 
 Governance can install one timelocked, one-shot exact rate for the next successful
 rollover. There is no direct or untimelocked admin setter, and an override never
@@ -491,11 +497,11 @@ The checked-in pure Python companion model demonstrates:
 - byte-identical canonical JSON across repeated runs.
 
 This model is not a Lane, Foxtrot, Boa, EVM, authorization, storage, event, or
-settlement simulator. Revision-22 contract and test sources now implement the related
+settlement simulator. Revision-23 contract and test sources implement the related
 paths, including stale Foxtrot actions, TimeLock boundaries, failed-settlement rollback,
 the partially exposed first initialization, pause/disable/budget intervals, config
 execution, ABI/event reconstruction, and stateful reference-model parity. Their final
-run results are recorded in §20.5 of `implementation-spec.md`; that normative evidence,
+run results are recorded in §20.7 of `implementation-spec.md`; that normative evidence,
 not this design record, governs validation claims.
 
 The illustrative fixture intentionally exposes calibration risk:
@@ -534,9 +540,11 @@ The working candidate includes:
 Historical revision 19 measured 8,669 bytes for Lane against its 9,000-byte project
 regression ceiling and 5,068 bytes for Foxtrot against 5,500 bytes. Revision 20
 measured 10,564 bytes for Lane and 6,051 bytes for Foxtrot. Revision-22 Boa
-deployments measure 10,758 and 6,051 bytes. The owner-approved revision-20 local
-anti-creep ceilings remain 11,000 and 6,500 bytes, leaving current headroom of 242 and
-449 bytes. Both deployments remain below EIP-170 by 13,818 and 18,525 bytes. This
+deployments measured 10,758 and 6,051 bytes. On 15 August 2026, the owner raised only
+the Lane project ceiling to 13,000 bytes; Foxtrot remains 6,500 and EIP-170 remains
+24,576. Final revision-23 Boa deployments measure 12,905 and 6,075 bytes, leaving 95
+and 425 bytes below the project ceilings and 11,671 and 18,501 bytes below EIP-170.
+Complete frozen evidence is recorded in §20.7 of `implementation-spec.md`. The
 rebaseline is a source-size policy decision, not deployment or economic-calibration
 approval.
 
@@ -545,19 +553,20 @@ approval.
 Completed in the working candidate:
 
 1. owner selection of the dynamic controller and next-successful-rollover semantics;
-2. authoritative revision-22 specification reconciliation;
+2. authoritative revision-23 specification reconciliation;
 3. atomic Lane and Foxtrot implementation;
 4. controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 5. deterministic ABI regeneration;
-6. current-RH integration, fresh revision-22 local validation, and an automatic
-   feature gate for branch pushes and pull requests targeting `rh`; and
-7. the owner-approved 11,000-byte Lane and 6,500-byte Foxtrot project ceilings.
+6. current-RH integration and a permanent feature gate for branch, PR, merge-queue,
+   and manual validation; and
+7. the dated 13,000-byte Lane and 6,500-byte Foxtrot project ceilings plus a fail-
+   closed activation manifest.
 
 Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
 reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner
-authorized revision 22 to merge current `origin/rh`, commit the reconciliation, push
-`instant-bond-lane`, and publish a draft pull request targeting `rh`. Exact Git and PR
-identities belong in the external handoff because a commit cannot include itself.
+authorized revision 23 remediation, commit, push, and substantive replies on the
+existing draft PR. Exact final Git and PR identities belong in the external handoff
+because a commit cannot include itself.
 
 Economic calibration remains `not_approved` and is required before any deployment or
 configuration proposal, not before completing source validation or review. Deployment,

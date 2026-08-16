@@ -1,21 +1,20 @@
 # Instant Bond Lane — On-Chain Pricing via a Demand Controller
 
-**Status:** Economic rationale for the owner-approved revision-20 mechanism, its
-revision-21 remediation, and revision-22 current-RH integration, now implemented in
-the working candidate. Contract, test, model, ABI, feature-gate work, and local
-validation are complete; the owner approved the project-size ceilings recorded in the
-normative specification. Economic calibration is explicitly **not approved**.
+**Status:** Economic rationale for the revision-23 PR #156 remediation candidate.
+The dated [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427)
+selects the operational policies and 13,000/6,500 project ceilings. Economic
+calibration is explicitly **not approved**.
 
 > **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
 > source and supersedes this document wherever they differ. The companion
 > [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
 > controller and override derivation in more detail. The owner separately authorized
-> revision-22 commit, branch push, and a draft pull request against `rh`; this rationale
-> does not authorize deployment, configuration, RIPE minting, or activation.
+> revision-23 remediation commit/push and continued draft review; this rationale does
+> not authorize merge, deployment, configuration, RIPE minting, or activation.
 
 **Prepared:** 5 August 2026 · **Revised:** 15 August 2026 for the implemented
 revision-20 controller, next-successful-rollover override, revision-21 remediation,
-and revision-22 current-RH integration.
+revision-22 current-RH integration, and revision-23 review remediation.
 
 **Purpose:** Explain how the Instant Bond Lane sets its Buy Now rate, why the mechanism
 uses these signals, and which economic risks remain for calibration and operations.
@@ -52,7 +51,8 @@ following rollover resumes ordinary control from the committed target.
 
 The fixed base rate does not make every locked quote identical. The epoch snapshots
 `maxLockBonus`, while live MissionControl lock terms and the buyer's requested duration
-determine the bonus within that ceiling. The buyer is always `msg.sender`.
+determine the bonus within that ceiling. Production activation fixes the ceiling at
+zero until isolated lock lots exist. The buyer is always `msg.sender`.
 
 ---
 
@@ -485,7 +485,8 @@ The deterministic model and canonical
 [`controller-simulation-v2.json`](controller-simulation-v2.json) exercise integer
 mechanism behavior. Their fixture remains marked `calibration_status: not_approved`.
 It is not a recommendation for production step ranges, thresholds, caps, budgets,
-epoch duration, rate ceiling, seed rate, or lock bonus.
+epoch duration, rate ceiling, or seed rate. The current production lock-bonus policy is
+zero; nonzero simulator cases are dormant arithmetic evidence only.
 
 Before deployment or any configuration proposal, the owner must approve limits for:
 
@@ -494,8 +495,7 @@ Before deployment or any configuration proposal, the owner must approve limits f
 - alternating-demand oscillation;
 - per-epoch and rolling-day issuance;
 - lifetime Lane budget across active and retired deployments;
-- lock-bonus exposure across the full epoch cap and representative dormant RipeGov
-  positions; and
+- confirmation that lock bonus remains zero until isolated lock lots exist; and
 - acceptable manual-target deviation from the ordinary controller.
 
 Calibration must use the configured token's actual decimal scale and target-chain
@@ -513,20 +513,21 @@ Completed in the working candidate:
 - normative specification reconciliation;
 - controller, lifecycle, governance, ABI, simulation, and stateful test/model updates;
 - deterministic ABI regeneration;
-- current-RH integration, fresh revision-22 validation evidence, and an automatic
-  feature gate for branch pushes and pull requests targeting `rh`; and
-- the owner-approved Lane/Foxtrot project-size rebaseline.
+- current-RH integration and a permanent branch/PR/merge-queue/manual feature gate;
+- a fail-closed activation manifest for calibration, issuance, payment/depeg,
+  constructor, switchboard, fork, override, retry, and indexer inputs; and
+- the dated 13,000-byte Lane and 6,500-byte Foxtrot project-size rebaseline.
 
 Revision 20's bounded branch commit and push completed at `79917dd`, and revision 21's
 reviewer-remediation checkpoint was committed and pushed as `d13203d`. The owner
-authorized revision 22 to merge current `origin/rh`, commit the reconciliation, push
-`instant-bond-lane`, and publish a draft pull request targeting `rh`. Economic
-calibration remains pending before any deployment or configuration proposal.
+authorized revision 23 remediation, commit, branch push, and continued draft review.
+Economic calibration remains pending before any deployment or configuration proposal.
 
 Historical revision-18/19/20 measurements are preserved only in
 `implementation-spec.md` and must not be presented as current evidence. The exact
-revision-22 runtime sizes, hashes, selectors, layouts, coverage, and test results are
-recorded in that specification's current-evidence block.
+revision-23 runtime sizes, hashes, selectors, layouts, coverage, and test results are
+recorded in §20.7 of `implementation-spec.md` for the frozen local remediation
+candidate.
 
 The completed local checks satisfy the current integration and draft-review
 prerequisites. Deployment, configuration, RIPE minting, and activation remain
@@ -536,7 +537,7 @@ separately unauthorized.
 
 ## 10. Summary
 
-The revision-20 Lane is a bounded, oracle-free cap-clearing controller. It raises price
+The revision-23 Lane is a bounded, oracle-free cap-clearing controller. It raises price
 when payment utilization is high, uses amount-weighted timing to distinguish early from
 late demand, lowers price on weak or empty demand, and keeps one base rate fixed within
 each stored epoch. A versioned, timelocked exact target gives governance a narrow

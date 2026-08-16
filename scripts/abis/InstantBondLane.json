@@ -867,6 +867,84 @@
     ]
   },
   {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "buyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedCoreRipeGovVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "buyNow",
+    "inputs": [
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_requestedLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedEpoch",
+        "type": "uint256"
+      },
+      {
+        "name": "_minRipeOut",
+        "type": "uint256"
+      },
+      {
+        "name": "_deadlineBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_expectedCoreRipeGovVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_minActualLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "view",
     "type": "function",
     "name": "previewBuyNow",
@@ -931,6 +1009,10 @@
           },
           {
             "name": "actualLock",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGovVaultId",
             "type": "uint256"
           },
           {

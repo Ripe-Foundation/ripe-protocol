@@ -3,9 +3,9 @@
   "authority": "implemented mechanism evidence; not calibration, deployment, or integration authority",
   "bound_implementation": {
     "feature_starting_commit": "ad782c80b2f4bfa73d7dcd8c9c4979903b767b96",
-    "instant_bond_lane_source_sha256": "16e7133f9b6a5b72914f8e33c138af99feacc0725e0528840477300ffbefdb71",
+    "instant_bond_lane_source_sha256": "b8e3c9cd665dfe31edfcdc1b319d7fdc68d99b6ecccc89b77243e99af4242252",
     "integrated_rh_commit": "36ee0db42482c3e7d6c43d045fc02655b90bebf4",
-    "switchboard_foxtrot_source_sha256": "42d33168684e0e5fd16c4c2591fc2534ceb6036fc24e63dc65c11e13b79109aa"
+    "switchboard_foxtrot_source_sha256": "50e0a1baacfa5c20175b15596d27d842c9fad765bcfd6b89ca4307cff041bc9b"
   },
   "calibration_status": "not_approved",
   "economic_metrics": {

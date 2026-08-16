@@ -326,6 +326,11 @@ def test_maximum_decay_loop_bound_executes_all_32_steps(lane_env):
     config = lane_env.set_config(
         paymentCapPerEpoch=cap,
         minPaymentAmount=lane_env.scale,
+        maxEffectiveRate=100 * 10**18,
+        maxLockBonus=0,
+        minDownBps=50,
+        maxDownBps=100,
+        decayBps=100,
         maxDecayEpochs=32,
     )
     lane_env.buy(amount)
@@ -343,6 +348,12 @@ def test_maximum_decay_loop_bound_executes_all_32_steps(lane_env):
     )
 
     assert decay_steps == 32
+    ceiling = config[4] * 10_000 // (10_000 + config[14])
+    trace = [old_rate]
+    for _ in range(32):
+        trace.append(trace[-1] * 10_000 // (10_000 - config[12]))
+    assert len(set(trace)) == 33
+    assert trace[-1] == expected_rate < ceiling
     assert quote.rate == expected_rate
     lane_env.buy(lane_env.scale, expected_epoch=quote.epoch)
     event = filter_logs(lane_env.lane, "EpochRolled")[0]

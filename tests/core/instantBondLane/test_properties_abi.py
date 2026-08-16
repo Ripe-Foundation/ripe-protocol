@@ -1,3 +1,5 @@
+import json
+import os
 import re
 from pathlib import Path
 
@@ -12,7 +14,8 @@ from constants import ZERO_ADDRESS
 
 
 EIP170_LIMIT = 24_576
-LANE_RUNTIME_MAX = 11_000
+# Dated owner decision: https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427
+LANE_RUNTIME_MAX = 13_000
 FOXTROT_RUNTIME_MAX = 6_500
 MAX_UINT256 = 2**256 - 1
 
@@ -24,6 +27,10 @@ def event_abi(contract_path, event_name):
         for item in build_abi_output(compiler_data)
         if item.get("type") == "event" and item.get("name") == event_name
     )
+
+
+def contract_abi(contract_path):
+    return build_abi_output(boa.load_partial(contract_path).compiler_data)
 
 
 def indexed_fields(event):
@@ -93,8 +100,78 @@ def test_runtime_sizes_have_large_eip170_headroom(lane_env, ripe_hq):
     assert 0 < lane_size < EIP170_LIMIT
     assert 0 < foxtrot_size < EIP170_LIMIT
     size_report = f"deployed runtime sizes: lane={lane_size}, foxtrot={foxtrot_size}"
+    print(size_report)
+    report_path = os.environ.get("INSTANT_BOND_SIZE_REPORT")
+    if report_path:
+        Path(report_path).write_text(
+            json.dumps(
+                {
+                    "instant_bond_lane": lane_size,
+                    "switchboard_foxtrot": foxtrot_size,
+                    "instant_bond_lane_local_ceiling": LANE_RUNTIME_MAX,
+                    "switchboard_foxtrot_local_ceiling": FOXTROT_RUNTIME_MAX,
+                    "eip170_ceiling": EIP170_LIMIT,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with Path(summary_path).open("a") as summary:
+            summary.write("## Instant Bond Lane deployed runtime sizes\n\n")
+            summary.write("| Contract | Bytes | Local gate | EIP-170 headroom |\n")
+            summary.write("| --- | ---: | ---: | ---: |\n")
+            summary.write(
+                f"| InstantBondLane | {lane_size} | {LANE_RUNTIME_MAX} | "
+                f"{EIP170_LIMIT - lane_size} |\n"
+            )
+            summary.write(
+                f"| SwitchboardFoxtrot | {foxtrot_size} | {FOXTROT_RUNTIME_MAX} | "
+                f"{EIP170_LIMIT - foxtrot_size} |\n"
+            )
     assert lane_size <= LANE_RUNTIME_MAX, size_report
     assert foxtrot_size <= FOXTROT_RUNTIME_MAX, size_report
+
+
+@pytest.mark.artifact
+def test_purchase_gas_benchmarks_are_reported(lane_env):
+    lane_env.set_config(maxLockBonus=0)
+    amount = lane_env.scale
+    gas = {}
+
+    lane_env.buy(amount)
+    gas["initialization_unlocked"] = lane_env.lane._computation.get_gas_used()
+
+    lane_env.buy(amount)
+    gas["same_epoch_unlocked"] = lane_env.lane._computation.get_gas_used()
+
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    lane_env.buy(amount, requested_lock=500)
+    gas["same_epoch_locked"] = lane_env.lane._computation.get_gas_used()
+
+    boa.env.time_travel(blocks=lane_env.epoch_length)
+    lane_env.buy(amount)
+    gas["rollover_unlocked"] = lane_env.lane._computation.get_gas_used()
+
+    lane_env.set_rate_override(9 * 10**17)
+    boa.env.time_travel(blocks=lane_env.epoch_length)
+    lane_env.buy(amount)
+    gas["override_rollover_unlocked"] = lane_env.lane._computation.get_gas_used()
+
+    assert all(value > 0 for value in gas.values())
+    print("instant bond lane gas: " + json.dumps(gas, sort_keys=True))
+    report_path = os.environ.get("INSTANT_BOND_GAS_REPORT")
+    if report_path:
+        Path(report_path).write_text(json.dumps(gas, indent=2, sort_keys=True) + "\n")
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with Path(summary_path).open("a") as summary:
+            summary.write("## Instant Bond Lane gas benchmarks\n\n")
+            summary.write("| Scenario | Gas |\n| --- | ---: |\n")
+            for scenario, value in gas.items():
+                summary.write(f"| {scenario} | {value} |\n")
 
 
 @pytest.mark.artifact
@@ -204,6 +281,67 @@ def test_event_abi_names_order_and_indexing():
     assert indexed_fields(override_events["RateOverrideInvalidated"]) == [
         "newVersion",
         "newConfigVersion",
+    ]
+
+
+@pytest.mark.artifact
+def test_quote_and_purchase_constraint_abi_is_explicit():
+    abi = contract_abi("contracts/core/InstantBondLane.vy")
+    buy_inputs = [
+        [item["name"] for item in function["inputs"]]
+        for function in abi
+        if function.get("type") == "function" and function.get("name") == "buyNow"
+    ]
+    assert buy_inputs == [
+        [
+            "_paymentAmount",
+            "_requestedLock",
+            "_expectedEpoch",
+            "_minRipeOut",
+            "_deadlineBlock",
+        ],
+        [
+            "_paymentAmount",
+            "_requestedLock",
+            "_expectedEpoch",
+            "_minRipeOut",
+            "_deadlineBlock",
+            "_expectedCoreRipeGovVaultId",
+        ],
+        [
+            "_paymentAmount",
+            "_requestedLock",
+            "_expectedEpoch",
+            "_minRipeOut",
+            "_deadlineBlock",
+            "_expectedCoreRipeGovVaultId",
+            "_minActualLock",
+        ],
+    ]
+    preview = next(
+        function
+        for function in abi
+        if function.get("type") == "function"
+        and function.get("name") == "previewBuyNow"
+    )
+    assert [component["name"] for component in preview["outputs"][0]["components"]] == [
+        "available",
+        "epoch",
+        "pricingConfigVersion",
+        "liveConfigVersion",
+        "rate",
+        "remainingPayment",
+        "minPaymentAmount",
+        "budgetRemaining",
+        "baseRipe",
+        "bonusRatio",
+        "bonusRipe",
+        "actualLock",
+        "ripeGovVaultId",
+        "totalRipe",
+        "canExitEarly",
+        "exitFee",
+        "isExitFrozen",
     ]
 
 

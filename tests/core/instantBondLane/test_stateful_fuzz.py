@@ -321,7 +321,7 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
 
             expected_available = (
                 self._operational()
-                and payout["base_ripe"] != 0
+                and (requested_lock == 0 or payout["actual_lock"] != 0)
                 and payout["total_ripe"] <= budget_remaining
             )
             assert quote.available == expected_available
@@ -610,6 +610,8 @@ def test_stateful_lifecycle_differential_fuzz(lane_env):
                 reason = "mint unavailable"
             elif payment_amount > remaining:
                 reason = "exceeds epoch cap"
+            elif requested_lock != 0 and payout["actual_lock"] == 0:
+                reason = "invalid lock"
             else:
                 reason = "mint budget"
 

@@ -1,6 +1,7 @@
 """Revision-22 current-RH mechanism evidence; calibration is not approved."""
 
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from scripts.simulations.instant_bond_lane_controller import (
     Params,
     apply_decay,
     apply_signal,
+    bound_implementation,
     build_artifact,
     cancel_override,
     canonical_bytes,
@@ -25,6 +27,7 @@ from scripts.simulations.instant_bond_lane_controller import (
     invalidate_override_for_config_change,
     lateness_bps,
     project_installed_override,
+    project_lock_quote,
     project_next_rollover_override,
     signal_for,
     validate_params,
@@ -70,6 +73,49 @@ def test_canonical_simulation_artifact_is_current():
         "skipped_epochs_preserve_exact_target"
     ] == "pass"
     assert "target_epoch" not in expected.decode()
+
+
+@pytest.mark.artifact
+def test_artifact_binding_hashes_exact_contract_source_bytes(tmp_path):
+    copied_root = tmp_path / "repo"
+    lane_source = copied_root / "contracts" / "core" / "InstantBondLane.vy"
+    foxtrot_source = (
+        copied_root / "contracts" / "config" / "SwitchboardFoxtrot.vy"
+    )
+    lane_source.parent.mkdir(parents=True)
+    foxtrot_source.parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / lane_source.relative_to(copied_root), lane_source)
+    shutil.copyfile(ROOT / foxtrot_source.relative_to(copied_root), foxtrot_source)
+
+    original = bound_implementation(copied_root)
+    assert original == BOUND_IMPLEMENTATION
+
+    lane_source.write_bytes(lane_source.read_bytes() + b"\n# mutation\n")
+    lane_mutation = bound_implementation(copied_root)
+    assert lane_mutation["instant_bond_lane_source_sha256"] != original[
+        "instant_bond_lane_source_sha256"
+    ]
+    assert lane_mutation["switchboard_foxtrot_source_sha256"] == original[
+        "switchboard_foxtrot_source_sha256"
+    ]
+    assert build_artifact(copied_root)["bound_implementation"] == lane_mutation
+
+    shutil.copyfile(ROOT / "contracts/core/InstantBondLane.vy", lane_source)
+    foxtrot_source.write_bytes(foxtrot_source.read_bytes() + b"\n# mutation\n")
+    foxtrot_mutation = bound_implementation(copied_root)
+    assert foxtrot_mutation["instant_bond_lane_source_sha256"] == original[
+        "instant_bond_lane_source_sha256"
+    ]
+    assert foxtrot_mutation["switchboard_foxtrot_source_sha256"] != original[
+        "switchboard_foxtrot_source_sha256"
+    ]
+
+
+@pytest.mark.artifact
+def test_source_binding_is_independent_of_invocation_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert bound_implementation() == BOUND_IMPLEMENTATION
+    assert build_artifact()["bound_implementation"] == BOUND_IMPLEMENTATION
 
 
 def test_upward_timing_and_utilization_endpoints():
@@ -397,16 +443,96 @@ def test_override_install_rejects_stale_or_impossible_inputs_without_clamping():
             _install_fixture(**changes)
 
     installed = _install_fixture()
-    stale_config = project_installed_override(
-        installed,
-        stored_epoch=4,
-        projected_epoch=5,
-        controller_rate=880_000_000_000_000_000,
-        config_version=8,
-        p=p,
+    with pytest.raises(AssertionError):
+        project_installed_override(
+            installed,
+            stored_epoch=4,
+            projected_epoch=5,
+            controller_rate=880_000_000_000_000_000,
+            config_version=8,
+            p=p,
+        )
+
+
+def test_repeated_first_midpoint_and_last_block_strategies_are_explicit():
+    paths = {
+        path["name"]: path for path in build_artifact()["path_scenarios"]
+    }
+    fast = paths["repeated_fast_full"]
+    midpoint = paths["repeated_mid_full"]
+    late = paths["repeated_late_full"]
+
+    assert len(fast["epochs"]) == len(midpoint["epochs"]) == len(late["epochs"]) == 32
+    assert fast["final_price_index_bps"] > midpoint["final_price_index_bps"]
+    assert midpoint["final_price_index_bps"] > late["final_price_index_bps"]
+    assert late["epochs"][0]["effective_step_bps"] == Params().min_up_bps
+    assert late["final_price_index_bps"] > BPS
+
+
+@pytest.mark.parametrize(
+    "max_bonus,min_lock,max_lock,requested_lock",
+    [
+        (0, 100, 1_000, 550),
+        (100, 100, 1_000, 550),
+        (5_000, 100, 1_000, 100),
+        (5_000, 100, 1_000, 550),
+        (100_000, 100, 1_000, 1_000),
+        (5_000, 500, 500, 499),
+        (5_000, 500, 500, 500),
+        (5_000, 100, 1_000, 5_000),
+    ],
+)
+def test_published_lock_bonus_model_matches_contract(
+    lane_factory,
+    max_bonus,
+    min_lock,
+    max_lock,
+    requested_lock,
+):
+    ctx = lane_factory()
+    config = ctx.set_config(
+        maxEffectiveRate=200 * 10**18,
+        maxLockBonus=max_bonus,
     )
-    assert stale_config.status == "invalidated"
-    assert stale_config.final_rate == stale_config.counterfactual_controller_rate
+    ctx.setup_lock_terms(min_lock=min_lock, max_lock=max_lock)
+    amount = 10 * ctx.scale
+    quote = ctx.quote(amount, requested_lock)
+    modeled = project_lock_quote(
+        payment_amount=amount,
+        payment_scale=ctx.scale,
+        rate=quote.rate,
+        max_lock_bonus_bps=max_bonus,
+        requested_lock=requested_lock,
+        min_lock=min_lock,
+        max_lock=max_lock,
+    )
+
+    assert quote.available == modeled["valid_requested_lock"]
+    assert quote.actualLock == modeled["actual_lock"]
+    assert quote.bonusRatio == modeled["bonus_ratio_bps"]
+    assert quote.baseRipe == modeled["base_ripe"]
+    assert quote.bonusRipe == modeled["bonus_ripe"]
+    assert quote.totalRipe == modeled["total_ripe"]
+    # Independent oracle for a nonzero interior case; this must not reuse the
+    # published helper's result to define the expected arithmetic.
+    if (max_bonus, min_lock, max_lock, requested_lock) == (5_000, 100, 1_000, 550):
+        assert quote.bonusRatio == 2_500
+        assert quote.bonusRipe == quote.baseRipe // 4
+    assert config[14] == max_bonus
+
+
+def test_bonus_adjusted_base_rate_ceiling_matches_contract(lane_factory):
+    ctx = lane_factory()
+    config = ctx.set_config(
+        maxEffectiveRate=3 * 10**18,
+        seedRate=2 * 10**18,
+        maxLockBonus=5_000,
+    )
+    ctx.setup_lock_terms(min_lock=100, max_lock=1_000)
+    quote = ctx.quote(ctx.scale, 1_000)
+    expected_ceiling = config[4] * BPS // (BPS + config[14])
+    assert quote.rate == expected_ceiling
+    assert quote.totalRipe * ctx.scale <= ctx.scale * config[4]
 
 
 @pytest.mark.parametrize(
@@ -470,7 +596,11 @@ def test_published_controller_model_matches_lane_rollover(
     assert event.newRate == quote.rate == expected_rate
 
 
-def test_published_decay_model_matches_lane_skipped_epochs(lane_factory):
+@pytest.mark.parametrize("elapsed", [1, 2, 4, 5, 1_000])
+def test_published_decay_model_matches_lane_skipped_epochs(
+    lane_factory,
+    elapsed,
+):
     ctx = lane_factory()
     cap = 100 * ctx.scale
     config = ctx.set_config(
@@ -489,16 +619,21 @@ def test_published_decay_model_matches_lane_skipped_epochs(lane_factory):
     old_rate = ctx.lane.epochRate()
     p = contract_params(ctx, config, old_rate)
     signal = signal_for(((0, accepted),), p)
-    expected_rate = apply_decay(apply_signal(old_rate, signal, p), 4, p)
+    expected_steps = min(elapsed - 1, p.max_decay_epochs)
+    expected_rate = apply_decay(
+        apply_signal(old_rate, signal, p),
+        expected_steps,
+        p,
+    )
 
-    boa.env.time_travel(blocks=5 * ctx.epoch_length)
+    boa.env.time_travel(blocks=elapsed * ctx.epoch_length)
     quote = ctx.quote(ctx.scale)
     ctx.buy(ctx.scale, expected_epoch=quote.epoch)
     event = filter_logs(ctx.lane, "EpochRolled")[-1]
 
     assert signal.direction == "hold"
     assert event.effectiveAdjustmentBps == 0
-    assert event.decaySteps == 4
+    assert event.decaySteps == expected_steps
     assert event.controllerRate == expected_rate
     assert event.newRate == quote.rate == expected_rate
 

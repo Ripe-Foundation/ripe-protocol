@@ -218,7 +218,7 @@ def test_lock_boundaries_and_linear_bonus(
     expected_base = amount * quote.rate // lane_env.scale
     expected_bonus = expected_base * expected_bonus_ratio // 10_000
 
-    assert quote.available
+    assert quote.available == (requested_lock == 0 or expected_lock != 0)
     assert quote.actualLock == expected_lock
     assert quote.bonusRatio == expected_bonus_ratio
     assert quote.baseRipe == expected_base
@@ -233,13 +233,23 @@ def test_zero_equal_and_invalid_live_lock_terms(lane_env):
 
     lane_env.setup_lock_terms(min_lock=0, max_lock=0)
     quote = lane_env.quote(amount, 1_000)
+    assert not quote.available
     assert quote.actualLock == 0
     assert quote.bonusRatio == 0
+    before = settlement_snapshot(lane_env)
+    with boa.reverts("invalid lock"):
+        lane_env.buy(
+            amount,
+            requested_lock=1_000,
+            expected_epoch=quote.epoch,
+        )
+    assert settlement_snapshot(lane_env) == before
 
     lane_env.setup_lock_terms(min_lock=500, max_lock=500)
     below = lane_env.quote(amount, 499)
     at = lane_env.quote(amount, 500)
     above = lane_env.quote(amount, 2_000)
+    assert not below.available
     assert below.actualLock == 0
     assert below.bonusRatio == 0
     assert at.actualLock == 500
@@ -249,7 +259,7 @@ def test_zero_equal_and_invalid_live_lock_terms(lane_env):
 
     lane_env.setup_lock_terms(min_lock=1_000, max_lock=500)
     invalid = lane_env.quote(amount, 1_000)
-    assert invalid.available
+    assert not invalid.available
     assert invalid.actualLock == 0
     assert invalid.bonusRatio == 0
     assert invalid.bonusRipe == 0
@@ -271,6 +281,55 @@ def test_live_lock_terms_change_within_epoch_without_changing_epoch_bonus(lane_e
     assert second.bonusRatio == 3_500
     assert second.actualLock == 550
     assert second.totalRipe * lane_env.scale <= amount * 2 * 10**18
+
+
+def test_locked_purchase_binds_vault_id_and_minimum_actual_lock(lane_env):
+    lane_env.set_config()
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    amount = lane_env.scale
+    quote = lane_env.quote(amount, 500)
+    assert quote.available
+    assert quote.ripeGovVaultId == lane_env.mission_control.coreRipeGovVaultId()
+    before = settlement_snapshot(lane_env)
+
+    lane_env.mission_control.eval(
+        f"self.coreRipeGovVaultId = {quote.ripeGovVaultId + 1}"
+    )
+    with boa.reverts("vault id changed"):
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+            min_ripe_out=quote.totalRipe,
+            expected_core_vault_id=quote.ripeGovVaultId,
+            min_actual_lock=quote.actualLock,
+        )
+    assert settlement_snapshot(lane_env) == before
+
+    lane_env.mission_control.eval(
+        f"self.coreRipeGovVaultId = {quote.ripeGovVaultId}"
+    )
+    lane_env.setup_lock_terms(min_lock=100, max_lock=400)
+    with boa.reverts("lock below minimum"):
+        lane_env.buy(
+            amount,
+            requested_lock=500,
+            expected_epoch=quote.epoch,
+            min_ripe_out=0,
+            expected_core_vault_id=quote.ripeGovVaultId,
+            min_actual_lock=quote.actualLock,
+        )
+    assert settlement_snapshot(lane_env) == before
+
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    payout = lane_env.buy(
+        amount,
+        requested_lock=500,
+        expected_epoch=quote.epoch,
+        expected_core_vault_id=quote.ripeGovVaultId,
+        min_actual_lock=quote.actualLock,
+    )
+    assert payout == quote.totalRipe
 
 
 def test_locked_settlement_exact_amount_lock_and_zero_residue(lane_env):
@@ -380,6 +439,30 @@ def test_locked_settlement_after_user_position_migration_uses_new_core_vault(
         lane_env.bob, lane_env.ripe_token
     )
 
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        source_id,
+        sender=lane_env.switchboard.address,
+    )
+    lane_env.ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
+    migrated_quote = lane_env.quote(10 * lane_env.scale, 500)
+    assert not migrated_quote.available
+    migrated_snapshot = settlement_snapshot(lane_env)
+    # Teller wraps the nested RipeGov diagnostic, but preview exposes the same
+    # deterministic rejection and the transaction remains fully atomic.
+    with boa.reverts():
+        lane_env.buy(
+            10 * lane_env.scale,
+            requested_lock=500,
+            expected_epoch=migrated_quote.epoch,
+        )
+    assert settlement_snapshot(lane_env) == migrated_snapshot
+
+    lane_env.ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
+    lane_env.mission_control.setCoreRipeGovVaultId(
+        core_id,
+        sender=lane_env.switchboard.address,
+    )
+
     lane_env.teller.pause(False, sender=lane_env.switchboard.address)
     alternate_ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
     second_payout = lane_env.buy(10 * lane_env.scale, requested_lock=500)
@@ -412,6 +495,7 @@ def test_locked_settlement_rejects_core_vault_without_ripe_support(
 
     amount = lane_env.scale
     quote = lane_env.quote(amount, 500)
+    assert not quote.available
     before = settlement_snapshot(lane_env)
     with boa.reverts("vault does not support asset"):
         lane_env.buy(
@@ -470,7 +554,7 @@ def test_locked_settlement_zero_core_pointer_fails_before_payment(
     quote = lane_env.quote(amount, 500)
     before = settlement_snapshot(lane_env)
 
-    assert quote.available
+    assert not quote.available
     assert quote.actualLock == 500
     with boa.reverts("invalid vault id"):
         lane_env.buy(
@@ -744,7 +828,7 @@ def test_repeated_max_lock_purchases_measure_rounding_bonus_and_share_blocks(lan
     assert observed_unlocks[-1] < boa.env.evm.patch.block_number + 1_000
 
 
-def test_accepted_expired_position_max_bonus_dilution_is_pinned(lane_env):
+def test_dormant_bonus_math_exposes_expired_position_dilution(lane_env):
     lane_env.set_config(maxLockBonus=5_000)
     lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
     prior_amount = 100_000 * 10**18
@@ -779,10 +863,52 @@ def test_accepted_expired_position_max_bonus_dilution_is_pinned(lane_env):
     assert quote.bonusRatio == 5_000
     assert quote.bonusRipe == quote.baseRipe // 2
     assert payout == quote.totalRipe
-    # Owner-accepted inherited RipeGov behavior: a dominant expired position can
-    # dilute a 1,000-block bonus-bearing deposit to the one-block floor (0.1%).
+    # This is intentionally adverse evidence, not accepted production behavior.
+    # The dated owner decision disables lock bonuses in the fail-closed activation
+    # manifest until isolated lock lots exist:
+    # https://github.com/Ripe-Foundation/ripe-protocol/pull/156#issuecomment-5304274427
     assert effective_duration == 1
     assert effective_duration * 1_000 == quote.actualLock
+
+
+@pytest.mark.parametrize("prior_amount", [10**18, 100_000 * 10**18])
+@pytest.mark.parametrize("expired", [False, True])
+def test_activation_bonus_zero_protects_active_and_expired_positions(
+    lane_env,
+    prior_amount,
+    expired,
+):
+    lane_env.set_config(maxLockBonus=0)
+    lane_env.setup_lock_terms(min_lock=100, max_lock=1_000)
+    lane_env.ripe_token.transfer(
+        lane_env.ripe_gov_vault,
+        prior_amount,
+        sender=lane_env.ripe_whale,
+    )
+    prior_lock = 100 if expired else 1_000
+    lane_env.ripe_gov_vault.depositTokensWithLockDuration(
+        lane_env.bob,
+        lane_env.ripe_token,
+        prior_amount,
+        prior_lock,
+        sender=lane_env.teller.address,
+    )
+    if expired:
+        boa.env.time_travel(blocks=101)
+
+    amount = 10 * lane_env.scale
+    quote = lane_env.quote(amount, 1_000)
+    assert quote.available
+    assert quote.actualLock == 1_000
+    assert quote.bonusRatio == 0
+    assert quote.bonusRipe == 0
+    assert quote.totalRipe == quote.baseRipe
+    assert lane_env.buy(
+        amount,
+        requested_lock=1_000,
+        expected_epoch=quote.epoch,
+        min_ripe_out=quote.totalRipe,
+    ) == quote.baseRipe
 
 
 def test_exit_disclosure_and_bad_debt_freeze(lane_env):
@@ -829,9 +955,17 @@ def test_deposit_gates_and_ripe_gov_pause_only_block_locked_path(lane_env):
     lane_env.set_config()
     amount = lane_env.scale
 
+    lane_env.setup_lock_terms()
+    assert not lane_env.mission_control.userConfig(
+        lane_env.bob
+    ).canAnyoneDeposit
+    # `depositFromTrusted` identifies the Lane as a registered RIPE department,
+    # so this ordinary-user delegation flag is intentionally irrelevant.
+    assert lane_env.quote(amount, 500).available
+
     lane_env.setup_lock_terms(can_deposit=False)
     locked = lane_env.quote(amount, 500)
-    assert locked.available
+    assert not locked.available
     before_minted = lane_env.lane.cumulativeMinted()
     with boa.reverts("protocol deposits disabled"):
         lane_env.buy(
@@ -846,7 +980,7 @@ def test_deposit_gates_and_ripe_gov_pause_only_block_locked_path(lane_env):
     lane_env.ripe_gov_vault.pause(True, sender=lane_env.switchboard.address)
     assert lane_env.ripe_gov_vault.isPaused()
     locked = lane_env.quote(amount, 500)
-    assert locked.available
+    assert not locked.available
     paused_snapshot = settlement_snapshot(lane_env)
     # Teller's outer deposit equality check exposes this stable reason rather than
     # the nested paused-vault diagnostic.
@@ -862,7 +996,7 @@ def test_deposit_gates_and_ripe_gov_pause_only_block_locked_path(lane_env):
     lane_env.ripe_gov_vault.pause(False, sender=lane_env.switchboard.address)
     lane_env.setup_lock_terms(asset_can_deposit=False)
     locked = lane_env.quote(amount, 500)
-    assert locked.available
+    assert not locked.available
     with boa.reverts("asset deposits disabled"):
         lane_env.buy(
             amount,
@@ -957,18 +1091,18 @@ def test_failed_rollover_settlement_restores_override_and_timing_state(lane_env)
     assert lane_env.lane.overrideVersion() == 2
 
 
-def test_ripe_pause_and_blacklist_asymmetry(lane_env):
+def test_ripe_pause_and_blacklist_block_both_settlement_paths_atomically(lane_env):
     lane_env.set_config()
     lane_env.setup_lock_terms()
     amount = lane_env.scale
 
     lane_env.ripe_token.pause(True, sender=lane_env.governance.address)
     unlocked = lane_env.quote(amount, 0)
-    assert unlocked.available
+    assert not unlocked.available
     with boa.reverts():
         lane_env.buy(amount, expected_epoch=unlocked.epoch)
     locked = lane_env.quote(amount, 500)
-    assert locked.available
+    assert not locked.available
     with boa.reverts():
         lane_env.buy(amount, requested_lock=500, expected_epoch=locked.epoch)
     assert lane_env.lane.cumulativeMinted() == 0
@@ -981,11 +1115,32 @@ def test_ripe_pause_and_blacklist_asymmetry(lane_env):
         sender=lane_env.switchboard.address,
     )
     unlocked = lane_env.quote(amount, 0)
+    locked = lane_env.quote(amount, 500)
+    assert not unlocked.available
+    assert not locked.available
+
+    for requested_lock, quote in ((0, unlocked), (500, locked)):
+        before = settlement_snapshot(lane_env)
+        with boa.reverts("blacklisted buyer"):
+            lane_env.buy(
+                amount,
+                requested_lock=requested_lock,
+                expected_epoch=quote.epoch,
+            )
+        assert settlement_snapshot(lane_env) == before
+
+    lane_env.switchboard_registry.setBlacklist(
+        lane_env.ripe_token,
+        lane_env.bob,
+        False,
+        sender=lane_env.switchboard.address,
+    )
+    unlocked = lane_env.quote(amount, 0)
     assert unlocked.available
-    with boa.reverts():
-        lane_env.buy(amount, expected_epoch=unlocked.epoch)
+    lane_env.buy(amount, expected_epoch=unlocked.epoch)
 
     locked = lane_env.quote(amount, 500)
+    assert locked.available
     payout = lane_env.buy(
         amount,
         requested_lock=500,

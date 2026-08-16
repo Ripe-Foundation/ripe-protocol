@@ -92,7 +92,6 @@ def lane_factory(
     endaoment_funds,
     setGeneralConfig,
     setAssetConfig,
-    setUserConfig,
 ):
     with boa.env.anchor():
         def factory(
@@ -214,7 +213,6 @@ def lane_factory(
                 freeze_on_bad_debt=False,
                 can_deposit=True,
                 asset_can_deposit=True,
-                anyone_can_deposit=True,
             ):
                 # Lane-unit tests write MissionControl directly so they can cover
                 # defensive states independently of governance validation. Dedicated
@@ -241,14 +239,14 @@ def lane_factory(
                     _vaultIds=[core_vault_id],
                     _canDeposit=asset_can_deposit,
                 )
-                setUserConfig(
-                    bob,
-                    _canAnyoneDeposit=anyone_can_deposit,
-                )
                 return lock_terms
 
-            def quote(payment_amount, requested_lock=0):
-                return lane.previewBuyNow(payment_amount, requested_lock)
+            def quote(payment_amount, requested_lock=0, sender=bob):
+                return lane.previewBuyNow(
+                    payment_amount,
+                    requested_lock,
+                    sender=sender,
+                )
 
             def buy(
                 payment_amount,
@@ -256,10 +254,16 @@ def lane_factory(
                 expected_epoch=None,
                 min_ripe_out=0,
                 deadline=None,
+                expected_core_vault_id=0,
+                min_actual_lock=0,
                 sender=bob,
             ):
                 if expected_epoch is None:
-                    expected_epoch = quote(payment_amount, requested_lock).epoch
+                    expected_epoch = quote(
+                        payment_amount,
+                        requested_lock,
+                        sender=sender,
+                    ).epoch
                 if deadline is None:
                     deadline = boa.env.evm.patch.block_number
                 return lane.buyNow(
@@ -268,6 +272,8 @@ def lane_factory(
                     expected_epoch,
                     min_ripe_out,
                     deadline,
+                    expected_core_vault_id,
+                    min_actual_lock,
                     sender=sender,
                 )
 
