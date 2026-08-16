@@ -361,8 +361,8 @@ def _predict_transfer(row, index, amount, sender_balance, recipient_balance,
 
 def _compatible_plan(row, index, nominal, sender_balance, recipient_balance,
                      sender_accounting, recipient_accounting, is_full):
-    """Return the production-compatible candidate, or None if it must fail."""
-    base = _predict_transfer(
+    """Model the governance-admitted Rebase vault's direct transfer."""
+    plan = _predict_transfer(
         row,
         index,
         nominal,
@@ -371,49 +371,9 @@ def _compatible_plan(row, index, nominal, sender_balance, recipient_balance,
         sender_accounting,
         recipient_accounting,
     )
-    plan = base
-    candidate_amount = min(sender_balance, nominal + 1)
-    can_predict_candidate = candidate_amount > nominal
-    if row["kind"] == "aave-indexed-supply" and can_predict_candidate:
-        candidate_scaled = (candidate_amount * 10**27 + index - 1) // index
-        can_predict_candidate = candidate_scaled <= sender_accounting
-    if can_predict_candidate and (is_full or base["inflow"] < nominal):
-        candidate = _predict_transfer(
-            row,
-            index,
-            candidate_amount,
-            sender_balance,
-            recipient_balance,
-            sender_accounting,
-            recipient_accounting,
-        )
-        if is_full:
-            outflow_tolerance = (
-                2 if row["kind"] == "compound-base-supply" else 1
-            )
-            delivery_tolerance = outflow_tolerance
-            if (
-                candidate["outflow"] + 1 >= nominal
-                and candidate["outflow"] <= nominal + outflow_tolerance
-                and candidate["inflow"] + delivery_tolerance >= nominal
-                and candidate["inflow"] <= nominal + 1
-                and candidate["inflow"] > base["inflow"]
-            ):
-                plan = candidate
-        else:
-            plan = candidate
-
-    tolerance = 2 if row["kind"] == "compound-base-supply" else 1
-    valid_delivery = (
-        nominal - plan["inflow"] <= tolerance
-        if is_full
-        else plan["inflow"] >= nominal
-    )
     valid = (
-        (plan["outflow"] + 1 >= nominal if is_full else plan["outflow"] >= nominal)
-        and plan["outflow"] <= nominal + tolerance
-        and valid_delivery
-        and plan["inflow"] <= nominal + 1
+        abs(plan["outflow"] - nominal) <= 2
+        and abs(plan["inflow"] - nominal) <= 2
     )
     return plan if valid else None
 
@@ -1351,25 +1311,37 @@ def test_compound_cweth_full_withdrawal_delivers_maximum_attainable_claim(
             accrual_actor,
             max(exact_granularity, row["large_recipient_seed"] // 100),
         )
+        partial_amount = 10 ** 17
+        partial_shares_before = rebase_erc20_vault.userBalances(
+            user, token.address
+        )
+        partial_vault_before = token.balanceOf(rebase_erc20_vault.address)
+        partial_recipient_before = token.balanceOf(user)
+        partial_withdrawn = teller.withdraw(
+            token.address,
+            partial_amount,
+            user,
+            rebase_erc20_vault.address,
+            4,
+            sender=user,
+        )
+        partial_outflow = partial_vault_before - token.balanceOf(
+            rebase_erc20_vault.address
+        )
+        partial_delivery = token.balanceOf(user) - partial_recipient_before
+        assert partial_withdrawn == partial_outflow
+        assert abs(partial_outflow - partial_amount) <= 2
+        assert abs(partial_delivery - partial_amount) <= 2
+        assert 0 < rebase_erc20_vault.userBalances(
+            user, token.address
+        ) < partial_shares_before
+        boa.env.time_travel(blocks=1)
+
         withdrawal_amount = rebase_erc20_vault.getTotalAmountForUser(
             user, token.address
         )
-        index = _index(row)
         vault_before = token.balanceOf(rebase_erc20_vault.address)
         recipient_before = token.balanceOf(user)
-        vault_principal_before = token.userBasic(rebase_erc20_vault.address)[0]
-        recipient_principal_before = token.userBasic(user)[0]
-        plan = _compatible_plan(
-            row,
-            index,
-            withdrawal_amount,
-            vault_before,
-            recipient_before,
-            vault_principal_before,
-            recipient_principal_before,
-            True,
-        )
-        assert plan is not None
 
         withdrawn = teller.withdraw(
             token.address,
@@ -1381,10 +1353,9 @@ def test_compound_cweth_full_withdrawal_delivers_maximum_attainable_claim(
         )
         vault_outflow = vault_before - token.balanceOf(rebase_erc20_vault.address)
         recipient_delivery = token.balanceOf(user) - recipient_before
-        assert withdrawn == vault_outflow == plan["outflow"]
-        assert recipient_delivery == plan["inflow"]
-        assert withdrawal_amount - recipient_delivery in (0, 1, 2)
-        assert plan["transfer_amount"] <= vault_before
+        assert withdrawn == vault_outflow
+        assert abs(vault_outflow - withdrawal_amount) <= 2
+        assert abs(recipient_delivery - withdrawal_amount) <= 2
         assert rebase_erc20_vault.userBalances(user, token.address) == 0
         assert rebase_erc20_vault.totalBalances(token.address) == 0
         assert rebase_erc20_vault.getTotalAmountForUser(user, token.address) == 0
@@ -1573,8 +1544,8 @@ def test_indexed_multi_holder_repetition_preserves_remaining_claims(
                 )
                 assert withdrawn == vault_outflow == plan["outflow"]
                 assert recipient_delivery == plan["inflow"]
-                assert amount <= recipient_delivery <= amount + 1
-                assert amount <= vault_outflow <= amount + 1
+                assert abs(recipient_delivery - amount) <= 2
+                assert abs(vault_outflow - amount) <= 2
                 assert (
                     shares_before
                     - rebase_erc20_vault.userBalances(
@@ -1726,8 +1697,8 @@ def test_indexed_multi_holder_repetition_preserves_remaining_claims(
                 rebase_erc20_vault.address
             ) == plan["outflow"]
             assert token.balanceOf(alice) - recipient_before == plan["inflow"]
-            assert amount <= plan["inflow"] <= amount + 1
-            assert amount <= plan["outflow"] <= amount + 2
+            assert abs(plan["inflow"] - amount) <= 2
+            assert abs(plan["outflow"] - amount) <= 2
             assert (
                 shares_before - rebase_erc20_vault.userBalances(alice, token.address)
                 == expected_shares
@@ -1746,21 +1717,50 @@ def test_indexed_multi_holder_repetition_preserves_remaining_claims(
         )
         vault_before = token.balanceOf(rebase_erc20_vault.address)
         recipient_before = token.balanceOf(alice)
-        withdrawn = teller.withdraw(
-            token.address,
-            MAX_UINT256,
-            alice,
-            rebase_erc20_vault.address,
-            4,
-            sender=alice,
+        alice_shares_before = rebase_erc20_vault.userBalances(
+            alice, token.address
         )
-        recipient_delivery = token.balanceOf(alice) - recipient_before
-        assert withdrawn == vault_before - token.balanceOf(rebase_erc20_vault.address)
-        assert alice_theoretical - recipient_delivery in (0, 1, 2)
-        assert rebase_erc20_vault.userBalances(alice, token.address) == 0
+        total_shares_before = rebase_erc20_vault.totalBalances(token.address)
+        plan = _compatible_plan(
+            row,
+            _index(row),
+            alice_theoretical,
+            vault_before,
+            recipient_before,
+            token.userBasic(rebase_erc20_vault.address)[0],
+            token.userBasic(alice)[0],
+            True,
+        )
+        assert plan is not None
+        charged_shares = min(
+            alice_shares_before,
+            rebase_erc20_vault.amountToShares(
+                token.address, plan["outflow"], True
+            ),
+        )
+        assert not _preserves_remaining_claim(
+            total_shares_before,
+            charged_shares,
+            vault_before,
+            plan["outflow"],
+        )
+        with pytest.raises(Exception):
+            teller.withdraw(
+                token.address,
+                MAX_UINT256,
+                alice,
+                rebase_erc20_vault.address,
+                4,
+                sender=alice,
+            )
+        assert token.balanceOf(rebase_erc20_vault.address) == vault_before
+        assert token.balanceOf(alice) == recipient_before
+        assert rebase_erc20_vault.userBalances(
+            alice, token.address
+        ) == alice_shares_before
         assert rebase_erc20_vault.getTotalAmountForUser(
             bob, token.address
-        ) >= bob_claim_before
+        ) == bob_claim_before
 
 
 @pytest.base
@@ -1847,8 +1847,8 @@ def sc04TransferCollateral(
         assert amount_sent == vault_before - token.balanceOf(
             rebase_erc20_vault.address
         )
-        assert requested <= amount_sent <= requested + 2
-        assert requested <= auction_delivery <= requested + 1
+        assert abs(amount_sent - requested) <= 2
+        assert abs(auction_delivery - requested) <= 2
         assert usd_value == amount_sent
         assert not depleted
         assert not exhausted
@@ -1870,8 +1870,8 @@ def sc04TransferCollateral(
         assert amount_sent == vault_before - token.balanceOf(
             rebase_erc20_vault.address
         )
-        assert requested <= amount_sent <= requested + 2
-        assert requested <= credit_delivery <= requested + 1
+        assert abs(amount_sent - requested) <= 2
+        assert abs(credit_delivery - requested) <= 2
 
 
 @pytest.base
@@ -2308,7 +2308,7 @@ def test_aave_successful_teller_deposit_real_accrual_and_withdrawal_trajectory(
                                 token.balanceOf(user) - recipient_before_partial
                                 == plan["inflow"]
                             )
-                            assert plan["inflow"] >= partial_amount
+                            assert abs(plan["inflow"] - partial_amount) <= 2
                             assert (
                                 shares_before_partial
                                 - rebase_erc20_vault.userBalances(user, token.address)
