@@ -1915,7 +1915,7 @@ def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
     [
         ([1], 325_000),
         ([100, 1], 360_000),
-        ([1] * 20, 3_425_000),
+        ([1] * 20, 4_260_000),
     ],
     ids=["single-success", "clear-then-skip", "twenty-successes"],
 )
@@ -2006,7 +2006,7 @@ def test_live_debt_cap_batch_gas_bounds(
     assert total_spent == expected_spent
     assert len(filter_logs(teller, "FungAuctionPurchased")) == expected_successes
     assert ledger.userDebt(bob).amount == 100 * EIGHTEEN_DECIMALS - expected_spent
-    # About 20% above the pinned 269,080 / 298,314 / 2,850,477 measurements.
+    # About 20% above the pinned 269,080 / 298,314 / 3,547,707 measurements.
     assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000
 

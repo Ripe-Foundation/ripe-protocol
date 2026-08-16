@@ -332,27 +332,7 @@ def _liquidateUser(
     baseLiqFee: uint256 = 0
     keeperFee: uint256 = 0
     if not userDebt.inLiquidation:
-        baseLiqFee = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
-
-        # keeper fee (for liquidator)
-        keeperFee = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
-        if keeperFee != 0 and _config.maxKeeperFee != 0:
-            keeperFee = min(keeperFee, _config.maxKeeperFee)
-
-        # cap fees based on collateral surplus over debt
-        # goal: liquidate everything possible, even if fees are reduced to zero
-        # additional constraint: ensure liqFeeRatio never exceeds 99% to prevent underflow in stability pool swap
-        maxAllowableFees: uint256 = 0
-        if bt.collateralVal > userDebt.amount:
-            maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
-
-        # adjust fees if necessary
-        if baseLiqFee + keeperFee > maxAllowableFees:
-            if baseLiqFee <= maxAllowableFees:
-                keeperFee = maxAllowableFees - baseLiqFee
-            else:
-                keeperFee = 0
-                baseLiqFee = maxAllowableFees
+        baseLiqFee, keeperFee = self._calcLiqFees(userDebt.amount, bt.debtTerms.liqFee, bt.collateralVal, _config)
 
     # liqFee is the legacy Stability discount rate, not an exact additive fee.
     # Gross-up spread can exceed baseLiqFee; settlement only credits at most the
@@ -1298,15 +1278,19 @@ def _transferCollateral(
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
 
-    # transfer balance within vault
     if _shouldTransferBalance:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
-        extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_toUser, _vaultId, _vaultAddr, _asset, _a)
-
-    # withdraw and transfer to recipient
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
+    # Post-mutation checkpoints: sender first, then in-vault recipient.
+    for i: uint256 in range(2):
+        user: address = _fromUser
+        if i != 0:
+            if not _shouldTransferBalance:
+                break
+            extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
+            user = _toUser
+        extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
@@ -1391,29 +1375,10 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     if userDebt.amount == 0 or bt.hasQuarantinedAsset:
         return 0
 
-    # liquidation fees
-    baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
-    totalLiqFees: uint256 = baseLiqFee
-
-    # keeper fee (for liquidator)
-    keeperFee: uint256 = max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
-    if keeperFee != 0 and config.maxKeeperFee != 0:
-        keeperFee = min(keeperFee, config.maxKeeperFee)
-
-    # cap fees based on collateral surplus over debt (match _liquidateUser logic)
-    maxAllowableFees: uint256 = 0
-    if bt.collateralVal > userDebt.amount:
-        maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
-
-    # adjust fees if necessary
-    if baseLiqFee + keeperFee > maxAllowableFees:
-        if baseLiqFee <= maxAllowableFees:
-            keeperFee = maxAllowableFees - baseLiqFee
-        else:
-            keeperFee = 0
-            baseLiqFee = maxAllowableFees
-
-    totalLiqFees = baseLiqFee + keeperFee
+    baseLiqFee: uint256 = 0
+    keeperFee: uint256 = 0
+    baseLiqFee, keeperFee = self._calcLiqFees(userDebt.amount, bt.debtTerms.liqFee, bt.collateralVal, config)
+    totalLiqFees: uint256 = baseLiqFee + keeperFee
 
     # target ltv
     targetLtv: uint256 = bt.lowestLtv
@@ -1430,6 +1395,30 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
 @external
 def calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
     return self._calcTargetRepayAmount(_debtAmount, _collateralValue, _targetLtv)
+
+
+@pure
+@internal
+def _calcLiqFees(
+    _debtAmount: uint256,
+    _liqFee: uint256,
+    _collateralVal: uint256,
+    _c: GenLiqConfig,
+) -> (uint256, uint256):
+    baseLiqFee: uint256 = _debtAmount * _liqFee // HUNDRED_PERCENT
+    keeperFee: uint256 = max(_c.minKeeperFee, _debtAmount * _c.keeperFeeRatio // HUNDRED_PERCENT)
+    if keeperFee != 0 and _c.maxKeeperFee != 0:
+        keeperFee = min(keeperFee, _c.maxKeeperFee)
+    maxAllowableFees: uint256 = 0
+    if _collateralVal > _debtAmount:
+        maxAllowableFees = min(_collateralVal - _debtAmount, _debtAmount * 99_00 // HUNDRED_PERCENT)
+    if baseLiqFee + keeperFee > maxAllowableFees:
+        if baseLiqFee <= maxAllowableFees:
+            keeperFee = maxAllowableFees - baseLiqFee
+        else:
+            keeperFee = 0
+            baseLiqFee = maxAllowableFees
+    return baseLiqFee, keeperFee
 
 
 @view

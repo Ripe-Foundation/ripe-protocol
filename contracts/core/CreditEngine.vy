@@ -392,10 +392,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     if not d.isUserBorrower and config.numAllowedBorrowers <= d.numBorrowers:
         return 0
 
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-
-    # avail debt based on collateral value / ltv
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, False, a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, False, 0, empty(address), a)
     if bt.hasQuarantinedAsset:
         return 0
     availDebtPerLtv: uint256 = 0
@@ -660,8 +657,7 @@ def getUserBorrowTerms(
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
     a: addys.Addys = addys._getAddys(_a)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, False, a)
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, a)
 
 
 @view
@@ -674,18 +670,36 @@ def getUserBorrowTermsWithNumVaults(
     _skipAsset: address = empty(address),
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
-    a: addys.Addys = addys._getAddys(_a)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    return self._getUserBorrowTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, False, a)
+    return self._userTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, addys._getAddys(_a))
 
 
 @view
 @external
 def getBorrowRate(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), False, 0, empty(address), isUndyVault, False, a)
-    return bt.debtTerms.borrowRate
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), False, 0, empty(address), a).debtTerms.borrowRate
+
+
+@view
+@internal
+def _userTerms(
+    _user: address,
+    _numUserVaults: uint256,
+    _shouldRaise: bool,
+    _skipVaultId: uint256,
+    _skipAsset: address,
+    _a: addys.Addys,
+) -> UserBorrowTerms:
+    return self._getUserBorrowTerms(
+        _user,
+        _numUserVaults,
+        _shouldRaise,
+        _skipVaultId,
+        _skipAsset,
+        self._isUnderscoreVault(_user, _a.missionControl),
+        False,
+        _a,
+    )
 
 
 @view
@@ -840,8 +854,7 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
     userDebt: UserDebt = empty(UserDebt)
     na: uint256 = 0
     userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, False, a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, False, 0, empty(address), a)
     return bt.collateralVal, userDebt.amount
 
 
@@ -849,9 +862,7 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
 @external
 def getCollateralValue(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), isUndyVault, False, a)
-    return bt.collateralVal
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), a).collateralVal
 
 
 ####################
@@ -895,9 +906,7 @@ def _getLatestUserDebtAndTerms(
     newInterest: uint256 = 0
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
-    # debt terms for user
-    isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), isUndyVault, False, _a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), _a)
 
     return userDebt, bt, newInterest
 
@@ -1169,11 +1178,17 @@ def transferOrWithdrawViaRedemption(
     na: bool = False
     if _shouldTransferBalance:
         amountSent, na = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _user, _recipient, _amount, _a)
-        extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_recipient, _vaultId, _vaultAddr, _asset, _a)
-
     else:
         amountSent, na = extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
+    # Post-mutation checkpoints: sender first, then in-vault recipient.
+    for i: uint256 in range(2):
+        ptsUser: address = _user
+        if i != 0:
+            if not _shouldTransferBalance:
+                break
+            extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
+            ptsUser = _recipient
+        extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset)
     return amountSent
 
 
@@ -1259,8 +1274,7 @@ def getMaxWithdrawableForAsset(
         return 0 # cannot determine value
 
     # get borrow terms excluding the asset to withdraw
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, isUndyVault, False, a)
+    btExcluding: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, True, _vaultId, _asset, a)
     if btExcluding.hasQuarantinedAsset:
         return 0
 
