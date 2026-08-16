@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import hashlib
 import json
 from pathlib import Path
-import subprocess
 
 import pytest
 
 import config.BluePrint as source_authority
-from config.artifact_expectations import load_artifact_expectations
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,25 +17,6 @@ def _qualification_map():
         item.path: item
         for item in source_authority.ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
     }
-
-
-def _m4_binding():
-    binding = _qualification_map()[
-        "Deployment.DP-11.stock.m4ComposedProof"
-    ].candidate
-    assert isinstance(binding, source_authority.RobinhoodStockM4Binding)
-    return binding
-
-
-def _head_blob(path: str) -> str:
-    result = subprocess.run(
-        ["/usr/bin/git", "rev-parse", f"HEAD:{path}"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    return result.stdout.strip()
 
 
 def test_aapl_is_the_only_initial_stock_and_all_16_inputs_are_traced():
@@ -115,202 +93,6 @@ def test_every_non_repository_fact_has_an_explicit_typed_blocker():
         all(path not in blocker for blocker in blockers)
         for path in resolved
     )
-
-
-@pytest.mark.artifact
-def test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes():
-    binding = dict(source_authority.ROBINHOOD_STOCK_ARTIFACT_BINDING)
-    expectations = load_artifact_expectations(
-        ROOT / "config/contract-artifact-expectations.json", root=ROOT
-    )["contracts"]["SimpleErc20"]
-    source = ROOT / binding["sourcePath"]
-
-    assert binding["contract"] == "SimpleErc20"
-    assert binding["sourceGitBlob"] == expectations["source_git_blob"]
-    assert binding["sourceGitBlob"] == _head_blob(binding["sourcePath"])
-    assert binding["sourceSha256"] == expectations["source_sha256"]
-    assert binding["sourceSha256"] == hashlib.sha256(
-        source.read_bytes()
-    ).hexdigest()
-    assert binding["creationSha256"] == expectations["artifacts"][
-        "creation_sha256"
-    ]
-    assert binding["runtimeTemplateSha256"] == expectations["artifacts"][
-        "runtime_template_sha256"
-    ]
-    assert binding["runtimeTemplateSize"] == expectations["artifacts"][
-        "runtime_template_size"
-    ]
-    assert binding["abiCanonicalSha256"] == expectations["abi"][
-        "canonical_sha256"
-    ]
-    assert binding["selectorsCanonicalSha256"] == expectations["selectors"][
-        "canonical_sha256"
-    ]
-    assert binding["selectorCount"] == expectations["selectors"]["count"]
-
-
-@pytest.mark.release
-def test_m2_m3_repository_bindings_are_integrated_ancestors():
-    records = _qualification_map()
-    for path in (
-        "Deployment.DP-11.stock.m2Movement",
-        "Deployment.DP-11.stock.m3CreditContainment",
-    ):
-        candidate = dict(records[path].candidate)
-        commit = candidate["integrationCommit"]
-        ancestry = subprocess.run(
-            ["/usr/bin/git", "merge-base", "--is-ancestor", commit, "HEAD"],
-            cwd=ROOT,
-            capture_output=True,
-            check=False,
-        )
-        assert ancestry.returncode == 0
-        assert candidate["gitBlob"] == _head_blob(candidate["source"])
-
-
-@pytest.mark.release
-def test_m4_binding_matches_exact_historical_tranche_and_current_bytes():
-    binding = _m4_binding()
-    assert binding.historical_tranche.changed_paths == (
-        ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
-        (
-            "A",
-            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-        ),
-        (
-            "A",
-            "tests/core/deleverage/test_deleverage_stock_delivery.py",
-        ),
-        (
-            "M",
-            "tests/core/deleverage/test_deleverage_swap_collateral.py",
-        ),
-    )
-    source_authority.validate_robinhood_stock_m4_binding(ROOT, binding)
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    ("remove_path", "unrelated_substitution", "extra_path", "status_drift"),
-)
-@pytest.mark.release
-def test_m4_historical_path_census_mutants_fail_closed(mutation):
-    binding = _m4_binding()
-    historical = binding.historical_tranche
-    paths = historical.changed_paths
-    if mutation == "remove_path":
-        mutant_paths = paths[:-1]
-    elif mutation == "unrelated_substitution":
-        mutant_paths = (
-            *paths[:-1],
-            ("M", "tests/vaults/test_basic_vault_safety.py"),
-        )
-    elif mutation == "extra_path":
-        mutant_paths = (*paths, ("A", "tests/vaults/test_basic_vault_safety.py"))
-    else:
-        mutant_paths = (("A", paths[0][1]), *paths[1:])
-    mutant = replace(
-        binding,
-        historical_tranche=replace(historical, changed_paths=mutant_paths),
-    )
-    with pytest.raises(
-        ValueError, match="RH_STOCK_M4_HISTORICAL_PATH_CENSUS"
-    ):
-        source_authority.validate_robinhood_stock_m4_binding(ROOT, mutant)
-
-
-@pytest.mark.release
-def test_m4_wrong_similar_commit_fails_closed():
-    binding = _m4_binding()
-    mutant = replace(
-        binding,
-        historical_tranche=replace(
-            binding.historical_tranche,
-            integration_commit="4f887207d344a1513d6c3a79d315c8315a10a9c8",
-        ),
-    )
-    with pytest.raises(ValueError, match="RH_STOCK_M4_COMMIT"):
-        source_authority.validate_robinhood_stock_m4_binding(ROOT, mutant)
-
-
-@pytest.mark.release
-def test_m4_exact_commit_missing_from_repository_fails_non_ancestor(tmp_path):
-    with pytest.raises(ValueError, match="RH_STOCK_M4_NON_ANCESTOR"):
-        source_authority.validate_robinhood_stock_m4_binding(
-            tmp_path, _m4_binding()
-        )
-
-
-@pytest.mark.parametrize(
-    ("mutation", "error"),
-    (
-        ("test_identity_omitted", "RH_STOCK_M4_TEST_IDENTITY_CENSUS"),
-        ("test_blob_drift", "RH_STOCK_M4_TEST_BLOB"),
-        ("test_sha256_drift", "RH_STOCK_M4_TEST_SHA256"),
-        (
-            "artifact_identity_omitted",
-            "RH_STOCK_M4_ARTIFACT_IDENTITY_CENSUS",
-        ),
-        ("source_path_substitution", "RH_STOCK_M4_ARTIFACT_IDENTITY_CENSUS"),
-        ("source_blob_drift", "RH_STOCK_M4_SOURCE_BLOB"),
-        ("artifact_identity_drift", "RH_STOCK_M4_ARTIFACT_EXPECTATION"),
-    ),
-)
-@pytest.mark.release
-def test_m4_current_applicability_mutants_fail_closed(mutation, error):
-    binding = _m4_binding()
-    tests = binding.current_test_identities
-    artifacts = binding.current_artifact_identities
-    if mutation == "test_identity_omitted":
-        mutant = replace(binding, current_test_identities=tests[:-1])
-    elif mutation == "test_blob_drift":
-        mutant = replace(
-            binding,
-            current_test_identities=(
-                replace(tests[0], git_blob="0" * 40),
-                *tests[1:],
-            ),
-        )
-    elif mutation == "test_sha256_drift":
-        mutant = replace(
-            binding,
-            current_test_identities=(
-                replace(tests[0], sha256="0" * 64),
-                *tests[1:],
-            ),
-        )
-    elif mutation == "artifact_identity_omitted":
-        mutant = replace(binding, current_artifact_identities=artifacts[:-1])
-    elif mutation == "source_path_substitution":
-        mutant = replace(
-            binding,
-            current_artifact_identities=(
-                    *artifacts[:-1],
-                    replace(
-                        artifacts[-1],
-                        source_path="contracts/vaults/RebaseErc20.vy",
-                    ),
-                ),
-            )
-    elif mutation == "source_blob_drift":
-        mutant = replace(
-            binding,
-            current_artifact_identities=(
-                replace(artifacts[0], source_git_blob="0" * 40),
-                *artifacts[1:],
-            ),
-        )
-    else:
-        mutant = replace(
-            binding,
-            current_artifact_identities=(
-                replace(artifacts[0], creation_sha256="0" * 64),
-                *artifacts[1:],
-            ),
-        )
-    with pytest.raises(ValueError, match=error):
-        source_authority.validate_robinhood_stock_m4_binding(ROOT, mutant)
 
 
 def test_atomic_policy_keeps_defaults_routes_and_rewards_fail_closed():

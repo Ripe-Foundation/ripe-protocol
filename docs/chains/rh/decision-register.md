@@ -14,6 +14,14 @@ explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
 require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
 is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
 is not required, and it may be reconciled once during final release preparation.
+**The contract-artifact-expectations pipeline is retired.** Entries below cite
+`config/contract-artifact-expectations.json`, `scripts/check_contract_artifacts.py`,
+and per-contract source/creation/runtime/ABI/selector hash identities. Those
+files were deleted along with the Robinhood stock M4 launch binding they
+served, which the owner descoped on 16 August 2026. Their recorded hashes are
+historical evidence of what was measured at the time; nothing regenerates,
+checks, or rebinds them, and no PR or release step is expected to.
+
 **The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
 a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
 identity pins, and zero-growth reopen-on-change rules. No test enforces any of
