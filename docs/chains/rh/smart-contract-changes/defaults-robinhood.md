@@ -78,7 +78,7 @@ reported:
 ```text
 H04_OK sha256=e5323f5e4eca86773c097a1e6e20c8f9df8dc96556f3d98cb79fb5e66915fea3
 configuration_consistent=true deployment_ready=false blockers=80
-# historical output; the current generator reports blockers=64
+# historical output; the current generator reports blockers=60
 ```
 
 `configuration_consistent=true` means the two readable authorities and their
@@ -87,7 +87,7 @@ unresolved identities remain blockers; the generator must not substitute zero,
 a placeholder, a Base address, or an inferred value merely to produce a ready
 status.
 
-The 80 rows are source/configuration-readiness blockers. The separately
+The 80 rows recorded at that baseline (the current generator reports 60) are source/configuration-readiness blockers. The separately
 integrated deterministic migration planner adds migration bindings and reports
 100 executable-plan blockers. The migration sources and deterministic
 transaction executor exist in the repository, but no plan has been made
@@ -102,9 +102,15 @@ This is the required fail-closed boundary:
 - a constructor schedule is not a transaction; and
 - a source value is not onchain configuration.
 
-## Current tests and artifact controls
+## Historical test and artifact controls (superseded)
 
-The principal current evidence paths are:
+> The git blobs and SHA-256 values below were current at the recorded
+> baseline and are stale now. They are retained as historical evidence.
+> There is no committed identity file to reconcile them against; measure
+> the tree if a current identity is needed.
+
+
+The principal evidence paths at that baseline were:
 
 | Path | Git blob | SHA-256 | Responsibility |
 | --- | --- | --- | --- |

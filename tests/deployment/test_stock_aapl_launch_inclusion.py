@@ -38,9 +38,20 @@ def test_aapl_is_the_only_initial_stock_and_every_input_is_traced():
         item.path
         for item in source_authority.ROBINHOOD_STOCK_INPUT_QUALIFICATIONS
     )
-    assert all(
-        path in source_authority.ROBINHOOD_DEPLOYMENT_INPUTS
+    # Only unresolved inputs are deployment inputs. M2/M3/M4 are integrated
+    # behavior with no value to bind, so they carry no deployment-input row and
+    # must not appear in the readiness blocker set.
+    semantic = set(source_authority.ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS)
+    bindable = [
+        path
         for path in source_authority.ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS
+        if path not in semantic
+    ]
+    assert all(
+        path in source_authority.ROBINHOOD_DEPLOYMENT_INPUTS for path in bindable
+    )
+    assert not any(
+        path in source_authority.ROBINHOOD_DEPLOYMENT_INPUTS for path in semantic
     )
     source_authority.validate_robinhood_stock_launch_qualification()
 
@@ -70,6 +81,7 @@ def test_selected_external_candidates_are_values_not_launch_approvals():
         and source_authority.ROBINHOOD_DEPLOYMENT_INPUTS[path].disposition
         == "blocked"
         for path in records
+        if path not in source_authority.ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS
     )
 
 

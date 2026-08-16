@@ -420,7 +420,9 @@ def _validate_shape(ledger: Mapping[str, Any], *, allow_legacy: bool) -> None:
         _expect_keys(entry, schedule_keys, "H04_SCHEDULE_KEYS")
 
     parameters = ledger.get("parameters")
-    valid_parameter_counts = {403, 436} if allow_legacy else {403}
+    # 399 after the four retired Stock artifact/M2/M3/M4 deployment inputs were
+    # removed; 436 remains the legacy pre-derivation count.
+    valid_parameter_counts = {399, 436} if allow_legacy else {399}
     if not isinstance(parameters, list) or len(parameters) not in valid_parameter_counts:
         raise ManifestError("H04_PARAMETER_CENSUS")
     expected_record_keys = (
@@ -833,7 +835,9 @@ def extract_deployment_values(
             raise ManifestError(f"H04_BLUEPRINT_VALUE_TYPE:{path}:{kind}")
         _reject_sensitive_or_placeholder_text(normalized)
         values[path] = normalized
-    if len(values) != 119:
+    # 115 after the four retired Stock artifact/M2/M3/M4 deployment inputs were
+    # removed from ROBINHOOD_DEPLOYMENT_INPUTS.
+    if len(values) != 115:
         raise ManifestError("H04_DEPLOYMENT_SOURCE_CENSUS")
     return values
 
@@ -1250,7 +1254,9 @@ def derive_assertion_values(
 def _validate_census(ledger: Mapping[str, Any]) -> None:
     records = ledger["parameters"]
     by_kind = Counter(record["destination"]["kind"] for record in records)
-    if by_kind != Counter(defaults_field=272, deployment_input=119, assertion=12):
+    # deployment_input is 115 after the four retired Stock artifact/M2/M3/M4
+    # rows were removed; defaults_field and assertion are unchanged.
+    if by_kind != Counter(defaults_field=272, deployment_input=115, assertion=12):
         raise ManifestError(f"H04_PARTITION:{dict(by_kind)}")
     defaults = [record for record in records if record["destination"]["kind"] == "defaults_field"]
     statuses = Counter(record["status"] for record in defaults)

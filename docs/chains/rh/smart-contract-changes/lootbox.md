@@ -36,7 +36,7 @@ validation results remain dated historical evidence below.
 | Creation artifact | 21,911 bytes; SHA-256 `0222bd8f06f226cff079c5798df5fe7fd5d97d722bc2132c454865c7c8853e09` |
 | Runtime template | 21,569 bytes; SHA-256 `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097`; 3,007 bytes EIP-170 headroom |
 | [`test_underscore_rewards.py`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Git blob `b2b23f3b7683534c7a492d1461bc8991d0d65050`; SHA-256 `e670b36ae68f2ceeee1b3c0c6a0e663213172b1aa27b7203e02ab6a400e0b7d3` |
-| [Deployment-profile test](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Git blob `d082c315a12f4fdb6136b34925e335250fec9a91`; SHA-256 `e929e6c7f91e6d73ba0b2c96bd7cdb4d69d28db2ad0def700863190d86245a6c` |
+| `Deployment-profile test` (retired) | Git blob `d082c315a12f4fdb6136b34925e335250fec9a91`; SHA-256 `e929e6c7f91e6d73ba0b2c96bd7cdb4d69d28db2ad0def700863190d86245a6c` |
 | Contract-artifact test (retired) | Git blob `30e56a30e803e6030abb321b7dd593f08ac83f04`; SHA-256 `e821112fe1c2ac6e1091605f0b20f6c498d0e8d41914d07e196d3fc1be6b6cf8` |
 
 Later integrated tests now pin exact five-argument manifest order, both local
@@ -438,7 +438,7 @@ policy. It does not make them forward-compatible.
 | Claims, deposit/borrow points, and RIPE rewards remain unchanged by the floor source change | [borrow points](../../../../tests/core/lootbox/test_loot_borrow_points.py#L6-L49), [claims](../../../../tests/core/lootbox/test_loot_claim.py#L7-L61), [deposit points](../../../../tests/core/lootbox/test_loot_deposit_points.py#L7-L64), [RIPE rewards](../../../../tests/core/lootbox/test_loot_ripe_rewards.py#L9-L56) | These suites do not isolate the new floor. They were included in the reviewed-snapshot 175-pass run; later reward-launch tests changed the current suite and were not rerun for this refresh. |
 | Inventory classifies and content-pins production source | `path/content pin`, BN-025 rows | Checker validates exact path/hash/occurrences. Current checker is green. |
 | Floor discovery fails on delete/rename/move | `exact pattern and mutations` | Explicit mutation-sensitive tests; all four cases passed within the reviewed-snapshot 95-test inventory run. |
-| Local deployment profile supplies five correct arguments | [`test_lootbox_deployment_profiles.py`](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py) | Tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. Current `rh` now also has a deterministic Robinhood migration source; no migration has executed. |
+| Local deployment profile supplies five correct arguments | ``test_lootbox_deployment_profiles.py`` (retired) | Tests pin canonical draft profiles, constructor ABI order, deployment/readback, and historical Base incompatibility. Current `rh` now also has a deterministic Robinhood migration source; no migration has executed. |
 | Max-minus-one interval overflows `last + interval` | [`test_x3_max_minus_one_interval_is_settable_but_gate_addition_overflows`](../../../../tests/core/lootbox/test_underscore_rewards.py) | Current test establishes the accepted fail-closed checked-addition boundary; a sane upper limit would require a separate source/configuration decision. |
 | General mutation testing | No mutation framework run | **Gap:** boundary and inventory tests are demonstrably mutation-sensitive, but there is no broad compiler/source mutation score. |
 

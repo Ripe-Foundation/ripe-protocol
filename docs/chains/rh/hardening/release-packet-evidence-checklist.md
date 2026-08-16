@@ -22,17 +22,27 @@
 > sign, publish, deploy, configure, activate, or release anything. Adoption into
 > the actual release process is **UNRESOLVED — owner decision**.
 
+> **Scope note (16 August 2026):** repository-wide static hashing was retired
+> with the artifact-expectations pipeline. This checklist covers **deployment
+> correctness** — what was actually deployed, constructor arguments and
+> post-deploy readback, permissions, and activation state. It does not ask for a
+> committed source-hash census, a frozen artifact baseline, or per-file digests
+> of the repository tree; those were bookkeeping and are gone. Where an item
+> below still names a digest, it means measure the artifact you are deploying,
+> not reconcile a stored one.
+
 ## 1. Snapshot identity
 
 - [ ] Record the exact 40-hex baseline commit, release commit/tree, branch,
   worktree, and clean status; the hardening baseline demonstrates the required
   identity fields
   ([BASELINE.md](BASELINE.md)).
-- [ ] Record every source/artifact path and SHA-256 used by the packet.
-  **Retired tooling:** `config/contract-artifact-expectations.json` and
-  `scripts/check_contract_artifacts.py` were deleted with the descoped
-  Robinhood stock M4 launch binding. Compute these values from the release tree
-  at packet time; do not expect a committed expectation file to exist.
+- [ ] Record the source and artifact identity of **the contracts being
+  deployed** — measured from the release tree at packet time, not reconciled
+  against a stored baseline. There is no committed expectation file:
+  `config/contract-artifact-expectations.json` and
+  `scripts/check_contract_artifacts.py` were deleted with the descoped M4
+  launch binding. Do not census the whole repository.
 - [ ] Record the exact interpreter, Vyper version, dependency manifest/hash,
   compiler command, environment variables, and cache isolation; the hardening
   baseline pins the environment
@@ -70,7 +80,7 @@
 - [ ] Label every result `historical`, `current release snapshot`, `local
   reproduction`, `fork`, or `live`; the Ledger artifact generator explicitly
   labels its output local reproduction rather than deployment evidence
-  ([build_ledger_artifact_bundle.py:1-7](../../../../scripts/proposals/build_ledger_artifact_bundle.py#L1)).
+  (`build_ledger_artifact_bundle.py:1-7` (retired)).
 
 ## 3. Scope and lifecycle
 
@@ -97,9 +107,8 @@
 - [ ] Run every focused family, static checker, created test, and the full
   serial repository suite in the exact environment; record each exact command
   and result.
-- [ ] For every S2/S3 claim record subject path, one replacement, mutant
-  SHA-256, baseline pass, named mutant rejection, intended invariant, and
-  criteria result
+- [ ] For every S2/S3 claim record subject path, one replacement, baseline
+  pass, named mutant rejection, intended invariant, and criteria result
   ([mutation-evidence-protocol.md](mutation-evidence-protocol.md)).
 - [ ] Record every failed attempt or anomalous run, its root cause, whether the
   aggregate-failure protocol ran, and which later evidence supersedes it; never
@@ -120,16 +129,16 @@
   post-deploy readback; the Ledger artifact bundle/test demonstrates those
   distinctions
   ([ledger-local-artifact-bundle.json](ledger-local-artifact-bundle.json),
-  [test_ledger_artifact_bundle.py](../../../../tests/deployment_profiles/test_ledger_artifact_bundle.py)).
+  `test_ledger_artifact_bundle.py` (retired)).
 - [ ] Label deterministic placeholder inputs as placeholders and local Boa
   results as local reproduction, never live deployment evidence
-  ([ledger_robinhood_profile.py:1-9](../../../../scripts/proposals/ledger_robinhood_profile.py#L1),
-  [lootbox_deployment_profiles.py:1-9](../../../../scripts/proposals/lootbox_deployment_profiles.py#L1)).
+  (`ledger_robinhood_profile.py:1-9` (retired),
+  `lootbox_deployment_profiles.py:1-9` (retired)).
 - [ ] For Lootbox, use the single canonical manifest and identify which future
   deployment paths actually exist; the current tests pin four historical Base
   call sites as arity-incompatible rather than treating them as runnable
   current paths
-  ([test_lootbox_deployment_profiles.py:83-172](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py#L83)).
+  (`test_lootbox_deployment_profiles.py:83-172` (retired)).
 - [ ] For Ledger, bind historical Base replay to the original two-argument
   artifact, require a new explicit-zero migration for future native
   deployments, and keep exact-`0x64` RH deployment separately controlled

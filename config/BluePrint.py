@@ -724,7 +724,7 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "atomic_binding_unresolved",
         None,
         (
-            "one reviewed packet must bind all 16 inputs and exact configuration bytes",
+            "one reviewed packet must bind every unresolved input and exact configuration bytes",
             "negative reachability must remain true before packet acceptance",
         ),
         ("B-T8-M5", "B-H08-PROOF", "B-H09-RELEASE"),
@@ -864,11 +864,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-10.aapl.auction': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_AUCTION'), 'blocked'),
     'Deployment.DP-10.aapl.route': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_ROUTE'), 'blocked'),
     # DP-11
-    'Deployment.DP-11.stock.vaultArtifact': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTARTIFACT'), 'blocked'),
     'Deployment.DP-11.stock.vaultSlot': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTSLOT'), 'blocked'),
-    'Deployment.DP-11.stock.m2Movement': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M2MOVEMENT'), 'blocked'),
-    'Deployment.DP-11.stock.m3CreditContainment': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M3CREDITCONTAINMENT'), 'blocked'),
-    'Deployment.DP-11.stock.m4ComposedProof': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M4COMPOSEDPROOF'), 'blocked'),
     'Deployment.DP-11.stock.m5ActivationBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M5ACTIVATIONBINDING'), 'blocked'),
     # DP-13
     'Deployment.DP-13.stability.specialStabPoolId': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_13_STABILITY_SPECIALSTABPOOLID'), 'blocked'),
@@ -1281,12 +1277,22 @@ def validate_robinhood_stock_launch_qualification(
     paths = tuple(item.path for item in qualifications)
     if paths != expected_paths or len(paths) != len(set(paths)):
         raise ValueError("RH_STOCK_INPUT_CENSUS")
-    if any(path not in ROBINHOOD_DEPLOYMENT_INPUTS for path in paths):
+    # Only unresolved inputs are deployment inputs. M2/M3/M4 are integrated
+    # behavior proven by tests -- there is no value to bind for them at
+    # deployment time, so they carry no ROBINHOOD_DEPLOYMENT_INPUTS row and must
+    # not appear in the readiness blocker set. Everything still awaiting a value
+    # must remain a blocked symbolic binding.
+    bindable = tuple(
+        path for path in paths if path not in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS
+    )
+    if any(path not in ROBINHOOD_DEPLOYMENT_INPUTS for path in bindable):
         raise ValueError("RH_STOCK_INPUT_AUTHORITY")
+    if any(path in ROBINHOOD_DEPLOYMENT_INPUTS for path in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_IS_NOT_AN_INPUT")
     if any(
         not isinstance(ROBINHOOD_DEPLOYMENT_INPUTS[path].value, SymbolicBinding)
         or ROBINHOOD_DEPLOYMENT_INPUTS[path].disposition != "blocked"
-        for path in paths
+        for path in bindable
     ):
         raise ValueError("RH_STOCK_PREMATURE_BINDING")
     if ROBINHOOD_INITIAL_STOCK_SYMBOLS != ("AAPL",):
@@ -1311,7 +1317,7 @@ def validate_robinhood_stock_launch_qualification(
         "stock_excluded_from_stability_pool"
     ] is not True:
         raise ValueError("RH_STOCK_STABILITY_EXCLUSION")
-    # Every retired binding must carry no candidate payload. This is the check
+    # Every integrated semantic fact must carry no candidate payload. This is the check
     # that keeps the integration honest: reintroducing a hash tuple here without
     # machinery to recompute it would recreate exactly the state this replaced.
     #
