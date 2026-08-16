@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
@@ -7,6 +9,16 @@ PRECISION_18 = 10 ** 9
 # Price that makes one normalization unit worth $2 so a sub-precision
 # residual still produced a nonzero pre-fix lastUsdValue.
 DUST_VISIBLE_PRICE = 2 * 10 ** 27
+
+
+def test_sc24_vault_share_offset_is_pinned_across_modules():
+    expected = "DECIMAL_OFFSET: constant(uint256) = 10 ** 8"
+    assert expected in Path("contracts/vaults/modules/SharesVault.vy").read_text()
+    assert expected in Path("contracts/vaults/modules/StabVault.vy").read_text()
+    assert (
+        "VAULT_SHARE_DECIMAL_OFFSET: constant(uint256) = 10 ** 8"
+        in Path("contracts/core/Lootbox.vy").read_text()
+    )
 
 
 def _usd_dollars(price_desk, asset, amount):
@@ -477,6 +489,60 @@ def test_sc24_shares_vault_multiple_holders_rebase_and_split_do_not_inflate(
         + ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
         == ap.lastBalance
     )
+
+
+def test_sc24_stability_pool_share_nav_conversion_survives_yield(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    stability_pool,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(stability_pool)
+    _configure_gen_rewards(
+        setGeneralConfig,
+        setAssetConfig,
+        setRipeRewardsConfig,
+        alpha_token,
+        vault_id,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        amount,
+        sender=teller.address,
+    )
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        stability_pool,
+        alpha_token,
+        sender=teller.address,
+    )
+
+    alpha_token.transfer(stability_pool, amount, sender=alpha_token_whale)
+    lootbox.updateDepositPoints(
+        bob,
+        vault_id,
+        stability_pool,
+        alpha_token,
+        sender=teller.address,
+    )
+
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap.lastUsdValue == 2 * amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue != amount // EIGHTEEN_DECIMALS
 
 
 def test_sc24_custody_shortfall_zeros_reward_usd_on_first_checkpoint(

@@ -237,7 +237,7 @@ def test_sc26_consumers_follow_meaningful_lowest_ltv(
     createDebtTerms,
 ):
     high_ltv = 50_00
-    meaningful_low_ltv = 20_00
+    dust_low_ltv = 10_00
     _configure_mixed_ltv(
         setGeneralConfig,
         setAssetConfig,
@@ -247,25 +247,26 @@ def test_sc26_consumers_follow_meaningful_lowest_ltv(
         alpha_token,
         bravo_token,
         high_ltv,
-        meaningful_low_ltv,
+        dust_low_ltv,
     )
 
     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, bravo_token, bravo_token_whale)
-    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    performDeposit(bob, 1, bravo_token, bravo_token_whale)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
 
     healthy = credit_engine.getUserBorrowTerms(bob, True)
-    assert healthy.lowestLtv == meaningful_low_ltv
+    assert healthy.lowestLtv == high_ltv
 
-    # Max debt is 70 (50% of 100 + 20% of 100). Drop value so 70/coll > 70%.
-    mock_price_source.setPrice(alpha_token, 45 * EIGHTEEN_DECIMALS // 100)
-    mock_price_source.setPrice(bravo_token, 45 * EIGHTEEN_DECIMALS // 100)
+    # The 1-wei low-LTV position has zero borrowing capacity. Drop the meaningful
+    # collateral so each unwind consumer must use the high-LTV target.
+    mock_price_source.setPrice(alpha_token, 60 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 60 * EIGHTEEN_DECIMALS // 100)
     terms = credit_engine.getUserBorrowTerms(bob, False)
-    assert terms.lowestLtv == meaningful_low_ltv
+    assert terms.lowestLtv == high_ltv
     debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    expected_target = _target_repay(debt, terms.collateralVal, meaningful_low_ltv)
-    high_ltv_target = _target_repay(debt, terms.collateralVal, high_ltv)
-    assert expected_target != high_ltv_target
+    expected_target = _target_repay(debt, terms.collateralVal, high_ltv)
+    dust_target = _target_repay(debt, terms.collateralVal, dust_low_ltv)
+    assert expected_target != dust_target
 
     assert credit_redeem.getMaxRedeemValue(bob) == expected_target
     assert deleverage.getMaxDeleverageAmount(bob) == expected_target

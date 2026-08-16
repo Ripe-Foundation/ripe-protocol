@@ -1293,6 +1293,7 @@ def _transferCollateral(
 
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
+    toUser: address = _toUser
 
     # transfer balance within vault
     if _shouldTransferBalance:
@@ -1302,9 +1303,9 @@ def _transferCollateral(
     # withdraw and transfer to recipient
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
-        _toUser = empty(address)
+        toUser = empty(address)
 
-    extcall LootBox(_a.lootbox).updateDepositPointsForTransfer(_fromUser, _toUser, _vaultId, _vaultAddr, _asset, _a)
+    extcall LootBox(_a.lootbox).updateDepositPointsForTransfer(_fromUser, toUser, _vaultId, _vaultAddr, _asset, _a)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted

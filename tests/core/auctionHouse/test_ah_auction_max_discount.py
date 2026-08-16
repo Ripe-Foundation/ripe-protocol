@@ -96,7 +96,7 @@ def _open_auction(
     return filter_logs(teller, "FungibleAuctionUpdated")[0]
 
 
-def test_sc30_fail_first_old_formula_misses_max_discount():
+def test_sc30_legacy_formula_model_documents_boundary_gap():
     start_discount = 0
     max_discount = 50_00
     start_block = 100

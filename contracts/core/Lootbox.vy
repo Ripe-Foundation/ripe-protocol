@@ -53,6 +53,7 @@ interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
     def coreRipeGovVaultId() -> uint256: view
     def underscoreRegistry() -> address: view
@@ -72,6 +73,10 @@ interface RipeToken:
 
 interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
+
+interface VaultAccounting:
+    def totalBalances(_asset: address) -> uint256: view
+    def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256: view
 
 struct RipeRewards:
     borrowers: uint256
@@ -187,7 +192,9 @@ undyYieldBonusAmount: public(uint256)
 
 UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-SHARES_VAULT_DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+# SharesVault and StabVault both normalize their Lootbox share getter by this offset.
+# Focused tests pin both module contracts to this cross-contract accounting assumption.
+VAULT_SHARE_DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
@@ -931,7 +938,8 @@ def _getLatestDepositPoints(
         elif assetPoints.lastBalance != 0:
             vaultAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
             if vaultAmount != 0:
-                assetAmount = min(vaultAmount, self._getEligibleAssetAmount(_vaultAddr, _asset, assetPoints.lastBalance * assetPoints.precision))
+                isStabVault: bool = staticcall MissionControl(_a.missionControl).isStabVaultId(_vaultId)
+                assetAmount = min(vaultAmount, self._getEligibleAssetAmount(_vaultAddr, _asset, assetPoints.lastBalance * assetPoints.precision, vaultAmount, isStabVault))
         newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
 
     if newAssetUsdValue != assetPoints.lastUsdValue:
@@ -958,19 +966,27 @@ def _refreshAssetUsdValue(_asset: address, _assetAmount: uint256, _priceDesk: ad
 
 @view
 @internal
-def _getEligibleAssetAmount(_vaultAddr: address, _asset: address, _lootShare: uint256) -> uint256:
-    success: bool = False
-    response: Bytes[33] = b""
-    success, response = raw_call(
-        _vaultAddr,
-        abi_encode(_asset, _lootShare * SHARES_VAULT_DECIMAL_OFFSET, False, method_id=method_id("sharesToAmount(address,uint256,bool)")),
-        max_outsize=33,
-        is_static_call=True,
-        revert_on_failure=False,
-    )
-    if success and len(response) == 32:
-        return abi_decode(response, uint256)
-    return _lootShare
+def _getEligibleAssetAmount(
+    _vaultAddr: address,
+    _asset: address,
+    _lootShare: uint256,
+    _vaultAmount: uint256,
+    _isStabVault: bool,
+) -> uint256:
+    totalShares: uint256 = staticcall VaultAccounting(_vaultAddr).totalBalances(_asset)
+    if totalShares == 0:
+        return 0
+
+    # StabilityPool shares represent a pro-rata claim on cohort NAV, not token units.
+    if _isStabVault:
+        return _lootShare * VAULT_SHARE_DECIMAL_OFFSET * _vaultAmount // totalShares
+
+    # The only other supported implementations are BasicVault and SharesVault. BasicVault's
+    # usable nominal total is its accounting total; SharesVault must expose the exact conversion.
+    # Any future implementation that satisfies neither contract fails closed at the typed call.
+    if totalShares == _vaultAmount:
+        return _lootShare
+    return staticcall VaultAccounting(_vaultAddr).sharesToAmount(_asset, _lootShare * VAULT_SHARE_DECIMAL_OFFSET, False)
 
 
 @view

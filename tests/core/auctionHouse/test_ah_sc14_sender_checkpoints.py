@@ -10,7 +10,7 @@ from conf_utils import buy_fungible_auction, filter_logs
 PRECISION_18 = 10 ** 9
 
 
-def _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+def _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
     source = Path("contracts/core/Lootbox.vy").read_text()
     needle = """@internal
 def _updateDepositPoints(
@@ -24,7 +24,7 @@ def _updateDepositPoints(
     assert source.count(needle) == 1
     source = source.replace(
         needle,
-        needle + f"    assert _user != {blocked_user} # dev: recipient checkpoint blocked\n",
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
         1,
     )
     mutant = boa.loads(
@@ -34,7 +34,7 @@ def _updateDepositPoints(
         43_200,
         100 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
-        name="lootbox_recipient_trap",
+        name="lootbox_user_checkpoint_trap",
     )
     boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
 
@@ -411,7 +411,7 @@ def test_sc14_ah_same_block_repeated_transfers(
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance == 0
 
 
-def test_sc14_ah_checkpoint_revert_rolls_back_transfer_state(
+def test_sc14_ah_sender_checkpoint_revert_rolls_back_transfer_state(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -425,7 +425,7 @@ def test_sc14_ah_checkpoint_revert_rolls_back_transfer_state(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -470,8 +470,10 @@ def test_sc14_ah_checkpoint_revert_rolls_back_transfer_state(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    # The trap is the first checkpoint statement, so this revert proves the flow
+    # reached the blocked user's checkpoint before completing the withdrawal.
+    with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
     assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
@@ -545,7 +547,9 @@ def test_sc14_ah_recipient_checkpoint_revert_rolls_back_registration(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, alice)
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, alice)
+    # The trap is the first checkpoint statement, so this revert proves the flow
+    # reached the blocked user's checkpoint before completing the withdrawal.
     with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
@@ -562,7 +566,7 @@ def test_sc14_ah_recipient_checkpoint_revert_rolls_back_registration(
     assert filter_logs(teller, "FungAuctionPurchased") == []
 
 
-def test_sc14_ah_withdrawal_checkpoint_revert_rolls_back_tokens(
+def test_sc14_ah_withdrawal_sender_checkpoint_revert_rolls_back_tokens(
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
@@ -576,7 +580,7 @@ def test_sc14_ah_withdrawal_checkpoint_revert_rolls_back_tokens(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -614,8 +618,10 @@ def test_sc14_ah_withdrawal_checkpoint_revert_rolls_back_tokens(
     global_points = ledger.globalDepositPoints()
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    # The trap is the first checkpoint statement, so this revert proves the flow
+    # reached the blocked user's checkpoint before completing the withdrawal.
+    with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, False)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == bob_vault
     assert alpha_token.balanceOf(alice) == alice_wallet

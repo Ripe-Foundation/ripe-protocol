@@ -1441,7 +1441,7 @@ def test_get_user_borrow_terms_asset_with_zero_amount(
     assert terms.debtTerms.daowry == 1_00
 
 
-def test_zero_balance_registered_asset_keeps_borrow_term_floor(
+def test_zero_balance_registered_asset_keeps_terms_but_not_unwind_floor(
     alpha_token,
     alpha_token_whale,
     bravo_token,
@@ -1457,7 +1457,7 @@ def test_zero_balance_registered_asset_keeps_borrow_term_floor(
     createDebtTerms,
     simple_erc20_vault,
 ):
-    """Withdrawing to zero must not silently remove configured debt terms."""
+    """Zero-capacity collateral keeps weighted terms but cannot set the unwind target."""
 
     setGeneralConfig()
     setGeneralDebtConfig()
@@ -1500,7 +1500,7 @@ def test_zero_balance_registered_asset_keeps_borrow_term_floor(
     terms = credit_engine.getUserBorrowTerms(bob, True)
     assert terms.collateralVal == amount
     assert terms.totalMaxDebt == amount // 2
-    assert terms.lowestLtv == 10_00
+    assert terms.lowestLtv == 50_00
     assert terms.debtTerms.liqThreshold == 79_99
 
 

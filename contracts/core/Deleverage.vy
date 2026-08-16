@@ -61,6 +61,9 @@ interface Registry:
 interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _preflightSafeConversion: bool, _a: addys.Addys) -> (uint256, bool): nonpayable
 
+interface LootBox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface UnderscoreVault:
     def convertToAssetsSafe(_shares: uint256) -> uint256: view
 
@@ -511,6 +514,7 @@ def swapCollateral(
         a,
     )
     assert withdrawnAmount != 0 # dev: no collateral withdrawn
+    extcall LootBox(a.lootbox).updateDepositPoints(_user, _withdrawVaultId, withdrawVaultAddr, _withdrawAsset, a)
 
     # calculate USD value of withdrawn amount
     usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_withdrawAsset, withdrawnAmount, True)
@@ -1034,7 +1038,7 @@ def _burnStabPoolAsset(
     usdValue: uint256 = 0
     amountReceived: uint256 = 0
     isPositionDepleted: bool = False
-    usdValue, amountReceived, isPositionDepleted = self._transferCollateral(_user, self, _vaultAddr, _stabAsset, _remainingToRepay, _a)
+    usdValue, amountReceived, isPositionDepleted = self._transferCollateral(_user, self, _vaultId, _vaultAddr, _stabAsset, _remainingToRepay, _a)
     if usdValue == 0:
         return _remainingToRepay
 
@@ -1072,7 +1076,7 @@ def _transferToEndaoment(
     collateralUsdValueSent: uint256 = 0
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, _recipient, _vaultAddr, _asset, _remainingToRepay, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, _recipient, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
     if collateralUsdValueSent == 0:
         return _remainingToRepay
 
@@ -1228,6 +1232,7 @@ def _canDeleverageUserDebtPosition(_userDebtAmount: uint256, _collateralVal: uin
 def _transferCollateral(
     _fromUser: address,
     _toUser: address,
+    _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
     _targetUsdValue: uint256,
@@ -1247,6 +1252,8 @@ def _transferCollateral(
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
     amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, isUnderscoreBasicEarnVault, _a)
+    if amountSent != 0:
+        extcall LootBox(_a.lootbox).updateDepositPoints(_fromUser, _vaultId, _vaultAddr, _asset, _a)
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
 
