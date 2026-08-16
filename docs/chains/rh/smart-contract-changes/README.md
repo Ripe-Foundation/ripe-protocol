@@ -229,22 +229,13 @@ dated exact-hash review evidence rather than a fresh current compilation.
 
 The repository currently contains one GitHub Actions workflow:
 [`python-tests.yml`](../../../../.github/workflows/python-tests.yml). Pull
-requests, plus pushes to `master` or `rh`, run both lean and comprehensive
-pytest lanes on exact Python 3.12.0; manual dispatch can select either lane.
-Checkout is full-history because release, M4, and manifest gates bind historical
-commits. Superseded runs are cancelled by pull-request number or branch ref,
-while manual lane selections remain separate. Jobs use task-private
-pytest/cache roots, verify the resolved environment with `pip check`, and
-preserve deterministic hashing. The comprehensive lane has a 180-minute limit
-and collects the repository's artifact, release, fuzz, gas, and offline fork
-gates in addition to the default suite.
-
-The Ubuntu comprehensive job intentionally skips the macOS/APFS-only H-06
-publication tests. A separate `manifest-promotion-macos` job runs
-`tests/deployment/test_current_manifest_promotion.py` on `macos-latest`,
-including both multiprocessing cleanup regressions. Local macOS comprehensive
-totals and Ubuntu CI totals are therefore platform-specific and must not be
-presented as identical expected counts.
+requests run the lean contract-focused lane on exact Python 3.12.0, plus
+behavioral deployment controls, Solidity checks, and the applicable snapshot-gas
+check. The deployment-control job applies the same release/artifact marker
+exclusions as lean pytest. Manual dispatch can select the comprehensive lane,
+which clears those exclusions and restores artifact, release, fuzz, gas, and
+offline fork qualification. Superseded runs are cancelled by pull-request
+number or branch ref, while manual lane selections remain separate.
 
 This makes repository CI execution automatic, but GitHub branch-protection and
 required-check policy remain external controls and must be configured on the

@@ -8,6 +8,12 @@
 - **Artifact alignment:** commit `6646dec` refreshes the governed identities required by the formatting-only SwitchboardBravo and Lootbox commits.
 - **Classification:** remediation index, not a final audit report, readiness decision, deployment plan, or release authorization.
 
+> **Current process note:** this index preserves historical artifact and
+> headroom dispositions. Ordinary remediation-PR policy is defined by root
+> `pytest.ini`, `.github/workflows/python-tests.yml`, and the opening policy in
+> [`decision-register.md`](../chains/rh/decision-register.md). Historical exact
+> identity or headroom-waiver language below does not create a per-PR gate.
+
 The original Auditor B guide mixed confirmed findings, operationally sensitive
 proof detail, uncompiled fix sketches, historical bytecode measurements, and
 references to three companion reports that are not present in this repository.

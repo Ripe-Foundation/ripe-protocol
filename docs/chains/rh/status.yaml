@@ -307,9 +307,10 @@ repository_ci:
     No automated test signal existed for the repository.
   current_state: >
     The context error is fixed and the workflow runs the lean lane on every pull
-    request and on pushes to master and rh. Runs are reproducible against local
-    execution: the merged branch reports 13 failed, 3392 passed, 25 errors both
-    in CI and locally, with node-for-node identical failure sets.
+    request and on pushes to master and rh. The deployment-controls job retains
+    deploy-path behavior and security checks while applying the same release and
+    artifact marker exclusions as the lean lane. Manual comprehensive dispatch
+    clears those exclusions for deferred qualification.
   known_red: >
     Separate from the historical default-lane counts above, the deferred manual
     release-qualification lane has nine reported red nodes against the frozen

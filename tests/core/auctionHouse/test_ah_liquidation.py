@@ -1,4 +1,3 @@
-import hashlib
 from pathlib import Path
 
 import boa
@@ -8,10 +7,6 @@ from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT
 from conf_utils import clear_transient_storage, filter_logs, get_boa_dev_reasons
 
 
-AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "450d4c954cc20ee262972f676c46cf031bb8eede2fcce33c89021fabcf17996a"
-)
-# AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
 # reuse can retain stale diagnostic type metadata across automatic anchors.
 AH_BATCH_USER_CACHE_MUTANT_ADDRESS = (
@@ -34,9 +29,8 @@ def _ah_batch_user_cache_mutant_source():
     for original, mutant in replacements:
         assert source.count(original) == 1
         source = source.replace(original, mutant, 1)
-    assert hashlib.sha256(source.encode()).hexdigest() == (
-        AH_BATCH_USER_CACHE_MUTANT_SHA256
-    )
+        assert original not in source
+        assert source.count(mutant) == 1
     return source
 
 

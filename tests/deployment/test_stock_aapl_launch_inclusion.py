@@ -117,6 +117,7 @@ def test_every_non_repository_fact_has_an_explicit_typed_blocker():
     )
 
 
+@pytest.mark.artifact
 def test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes():
     binding = dict(source_authority.ROBINHOOD_STOCK_ARTIFACT_BINDING)
     expectations = load_artifact_expectations(
@@ -149,6 +150,7 @@ def test_simple_artifact_binding_matches_frozen_artifacts_and_git_bytes():
     assert binding["selectorCount"] == expectations["selectors"]["count"]
 
 
+@pytest.mark.release
 def test_m2_m3_repository_bindings_are_integrated_ancestors():
     records = _qualification_map()
     for path in (
@@ -167,6 +169,7 @@ def test_m2_m3_repository_bindings_are_integrated_ancestors():
         assert candidate["gitBlob"] == _head_blob(candidate["source"])
 
 
+@pytest.mark.release
 def test_m4_binding_matches_exact_historical_tranche_and_current_bytes():
     binding = _m4_binding()
     assert binding.historical_tranche.changed_paths == (
@@ -191,6 +194,7 @@ def test_m4_binding_matches_exact_historical_tranche_and_current_bytes():
     "mutation",
     ("remove_path", "unrelated_substitution", "extra_path", "status_drift"),
 )
+@pytest.mark.release
 def test_m4_historical_path_census_mutants_fail_closed(mutation):
     binding = _m4_binding()
     historical = binding.historical_tranche
@@ -216,6 +220,7 @@ def test_m4_historical_path_census_mutants_fail_closed(mutation):
         source_authority.validate_robinhood_stock_m4_binding(ROOT, mutant)
 
 
+@pytest.mark.release
 def test_m4_wrong_similar_commit_fails_closed():
     binding = _m4_binding()
     mutant = replace(
@@ -229,6 +234,7 @@ def test_m4_wrong_similar_commit_fails_closed():
         source_authority.validate_robinhood_stock_m4_binding(ROOT, mutant)
 
 
+@pytest.mark.release
 def test_m4_exact_commit_missing_from_repository_fails_non_ancestor(tmp_path):
     with pytest.raises(ValueError, match="RH_STOCK_M4_NON_ANCESTOR"):
         source_authority.validate_robinhood_stock_m4_binding(
@@ -251,6 +257,7 @@ def test_m4_exact_commit_missing_from_repository_fails_non_ancestor(tmp_path):
         ("artifact_identity_drift", "RH_STOCK_M4_ARTIFACT_EXPECTATION"),
     ),
 )
+@pytest.mark.release
 def test_m4_current_applicability_mutants_fail_closed(mutation, error):
     binding = _m4_binding()
     tests = binding.current_test_identities
