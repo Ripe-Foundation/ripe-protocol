@@ -30,6 +30,7 @@ def __init__(_undyLegacy: address):
     UNDY_REGISTRY = _undyLegacy
     self._allAddressesAreVaults = True  # default behavior for backwards compatibility
     self._allAddressesAreValid = True  # default behavior for backwards compatibility
+    self._missingRegId = max_value(uint256)
 
 
 @view

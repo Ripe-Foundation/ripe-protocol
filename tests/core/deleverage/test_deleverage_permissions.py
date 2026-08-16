@@ -1978,11 +1978,10 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
 
 
-def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_leveraged_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,
@@ -2027,11 +2026,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_basic_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,

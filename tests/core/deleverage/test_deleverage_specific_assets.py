@@ -493,6 +493,7 @@ def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
     setupDeleverage,
     mission_control,
     mock_undy_v2,
+    setUserDelegation,
 ):
     """
     Caller classification must not suppress extras for an ordinary user.
@@ -518,6 +519,14 @@ def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
         deposit_amount=500 * EIGHTEEN_DECIMALS,
         borrow_amount=300 * EIGHTEEN_DECIMALS,
         get_sgreen=False,
+    )
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount

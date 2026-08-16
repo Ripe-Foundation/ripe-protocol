@@ -3877,6 +3877,7 @@ def test_full_payoff_extras_apply_for_ordinary_user_when_caller_is_earn_vault(
     deleverage,
     mock_undy_v2,
     switchboard_alpha,
+    setUserDelegation,
 ):
     """Caller classification must not suppress extras for an ordinary user."""
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
@@ -3900,6 +3901,14 @@ def test_full_payoff_extras_apply_for_ordinary_user_when_caller_is_earn_vault(
     setup_priority_configs(
         priority_stab_assets=[],
         priority_liq_assets=[(simple_erc20_vault, alpha_token)],
+    )
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -3940,6 +3949,7 @@ def test_full_payoff_extras_disabled_for_earn_vault_user_when_caller_is_non_earn
     deleverage,
     mock_undy_v2,
     switchboard_alpha,
+    setUserDelegation,
 ):
     """An earn-vault position owner suppresses extras regardless of caller type."""
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
@@ -3965,6 +3975,14 @@ def test_full_payoff_extras_disabled_for_earn_vault_user_when_caller_is_non_earn
     setup_priority_configs(
         priority_stab_assets=[],
         priority_liq_assets=[(simple_erc20_vault, alpha_token)],
+    )
+    setUserDelegation(
+        bob,
+        alice,
+        _canWithdraw=False,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,
+        _canClaimLoot=False,
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount

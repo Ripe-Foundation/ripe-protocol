@@ -1,7 +1,7 @@
 import boa
 
 from conf_utils import filter_logs
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 from tests.vaults.ripe_gov_exit_fee_model import claim
 
 
@@ -126,6 +126,15 @@ def test_teller_utils_lego_path_is_registered_user_bound_and_revocable(
     assert teller_utils.isUnderscoreOwnerOrLego(bob, alice) is True
     mock_undy_v2.setValidAddress(alice, False)
     assert teller_utils.isUnderscoreOwnerOrLego(bob, alice) is False
+
+
+def test_mock_undy_v2_missing_registry_id_sentinel_supports_zero(mock_undy_v2):
+    assert mock_undy_v2._missingRegId() == 2**256 - 1
+    assert mock_undy_v2.getAddr(0) == mock_undy_v2.address
+
+    mock_undy_v2.setMissingRegId(0)
+    assert mock_undy_v2._missingRegId() == 0
+    assert mock_undy_v2.getAddr(0) == ZERO_ADDRESS
 
 
 def test_teller_utils_owner_path_is_wallet_specific_and_missing_registry_fails_closed(

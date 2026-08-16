@@ -677,6 +677,11 @@ def _deleverageUser(
 ) -> uint256:
     isTrusted: bool = _isTrusted
 
+    # Preserve registered Underscore self-call trust without upgrading the
+    # caller for any other user in a multi-user batch.
+    if not isTrusted and _user == _caller:
+        isTrusted = self._getUnderscoreAddrType(_caller, _a.missionControl, False) != 0
+
     # check perms -- must also be able to borrow
     if not isTrusted and _user != _caller:
         delegation: cs.ActionDelegation = staticcall MissionControl(_a.missionControl).userDelegation(_user, _caller)
