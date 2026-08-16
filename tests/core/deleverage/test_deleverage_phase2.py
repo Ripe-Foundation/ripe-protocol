@@ -2884,15 +2884,27 @@ def _assert_deleverage_user_amounts(
 def test_actual_deployed_runtime_stays_under_eip170(deleverage, auction_house):
     """Measure on-chain code, including the 96 bytes absent from compiler_data."""
     EIP170_LIMIT = 24_576
-    deleverage_size = len(boa.env.get_code(deleverage.address))
-    auction_house_size = len(boa.env.get_code(auction_house.address))
+    expected = {
+        "AuctionHouse": (24_554, 22),
+        "Deleverage": (24_309, 267),
+    }
+    actual = {
+        "AuctionHouse": len(boa.env.get_code(auction_house.address)),
+        "Deleverage": len(boa.env.get_code(deleverage.address)),
+    }
 
-    # Pin the deployed measurements, not only the legal ceiling. This catches
-    # code-size creep before either contract silently consumes its final bytes.
-    assert deleverage_size == 23_261
-    assert auction_house_size == 24_440
-    assert EIP170_LIMIT - deleverage_size == 1_315
-    assert EIP170_LIMIT - auction_house_size == 136
+    # Aggregate exact mismatches so one stale contract cannot hide another.
+    mismatches = {
+        name: {
+            "actual_size": actual[name],
+            "expected_size": size,
+            "actual_headroom": EIP170_LIMIT - actual[name],
+            "expected_headroom": headroom,
+        }
+        for name, (size, headroom) in expected.items()
+        if actual[name] != size or EIP170_LIMIT - actual[name] != headroom
+    }
+    assert not mismatches, f"deployed runtime identities changed: {mismatches}"
 
 
 @pytest.mark.parametrize(

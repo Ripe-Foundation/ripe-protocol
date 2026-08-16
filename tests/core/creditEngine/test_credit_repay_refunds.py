@@ -698,6 +698,10 @@ def test_third_party_green_repayment_refunds_only_the_payer(
     assert logs[0].repayValue == debt
     assert logs[0].refundAmount == surplus
     assert not logs[0].refundWasSavingsGreen
+    assert logs[0].outstandingUserDebt == 0
+    assert logs[0].userCollateralVal == 0
+    assert logs[0].maxUserDebt == 0
+    assert logs[0].hasGoodDebtHealth
 
 
 def test_third_party_sgreen_payment_refunds_green_to_the_payer(
@@ -755,6 +759,10 @@ def test_third_party_sgreen_payment_refunds_green_to_the_payer(
     assert repay_log.repayValue == debt
     assert repay_log.refundAmount == refund
     assert not repay_log.refundWasSavingsGreen
+    assert repay_log.outstandingUserDebt == 0
+    assert repay_log.userCollateralVal == 0
+    assert repay_log.maxUserDebt == 0
+    assert repay_log.hasGoodDebtHealth
 
 
 def test_third_party_green_overpayment_refunds_sgreen_to_the_payer(

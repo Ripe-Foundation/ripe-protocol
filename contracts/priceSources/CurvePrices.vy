@@ -199,6 +199,11 @@ greenRefPoolData: public(GreenRefPoolData)
 snapShots: public(HashMap[uint256, RefPoolSnapshot]) # index -> snapshot
 pendingGreenRefPoolConfig: public(HashMap[uint256, GreenRefPoolConfig]) # actionId -> config
 
+# appended recovery state; existing public storage above remains in place
+greenRecoveryStartBlock: uint256
+greenRecoveryLastSafeBlock: uint256
+greenDangerLastBlock: uint256
+
 # curve
 CURVE_META_REGISTRY: public(immutable(address))
 CURVE_REGISTRIES: public(immutable(CurveRegistries))
@@ -212,6 +217,7 @@ STABLESWAP_NG_FACTORY_ID: constant(uint256) = 12
 TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
 MAX_POOLS: constant(uint256) = 50
+MAX_SNAPSHOTS: constant(uint256) = 100
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
@@ -247,6 +253,29 @@ def __init__(
             TwoCrypto= staticcall CurveAddressProvider(_curveAddressProvider).get_address(TWO_CRYPTO_FACTORY_ID),
             MetaPool= staticcall CurveAddressProvider(_curveAddressProvider).get_address(METAPOOL_FACTORY_ID),
         )
+
+
+######################
+# Checked Arithmetic #
+######################
+
+
+@pure
+@internal
+def _tryAdd(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a > max_value(uint256) - _b:
+        return False, 0
+    return True, unsafe_add(_a, _b)
+
+
+@pure
+@internal
+def _tryMul(_a: uint256, _b: uint256) -> (bool, uint256):
+    if _a == 0 or _b == 0:
+        return True, 0
+    if _a > max_value(uint256) // _b:
+        return False, 0
+    return True, unsafe_mul(_a, _b)
 
 
 ###############
@@ -878,20 +907,80 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    # validate again
+    # validate again against live pool metadata and the current block
     d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
     assert d.pool != empty(address) # dev: no pending update
+    poolConfig: CurvePriceConfig = self._getCurvePoolConfig(d.pool)
+    greenToken: address = addys._getGreenToken()
+    assert self._isValidGreenRefPoolConfig(poolConfig, d, d.maxNumSnapshots, d.dangerTrigger, d.staleBlocks, d.stabilizerAdjustWeight, d.stabilizerMaxPoolDebt, greenToken) # dev: invalid ref pool config
 
     # check time lock
     assert timeLock._confirmAction(_aid) # dev: time lock not reached
 
-    # save new ref pool config
+    prev: GreenRefPoolConfig = self.greenRefPoolConfig
+    meaningChanged: bool = (
+        prev.pool != d.pool
+        or prev.lpToken != d.lpToken
+        or prev.greenIndex != d.greenIndex
+        or prev.altAsset != d.altAsset
+        or prev.altAssetDecimals != d.altAssetDecimals
+    )
+    capacityChanged: bool = prev.maxNumSnapshots != d.maxNumSnapshots
+    classificationChanged: bool = (
+        prev.dangerTrigger != d.dangerTrigger
+        or prev.staleBlocks != d.staleBlocks
+    )
+    preservedDangerBlocks: uint256 = self.greenRefPoolData.numBlocksInDanger
+
+    # Meaning and capacity changes invalidate the physical ring. Persist the
+    # cleared state before seeding so same-block suppression sees update == 0.
+    if meaningChanged or capacityChanged:
+        self._clearGreenRefPoolSnapshots()
+        self.greenRefPoolData = empty(GreenRefPoolData)
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+        self.greenDangerLastBlock = 0
+
+    # save new ref pool config before the reset seed helper re-reads it
     self.greenRefPoolConfig = d
     self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
     log GreenRefPoolConfigUpdated(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks, stabilizerAdjustWeight=d.stabilizerAdjustWeight, stabilizerMaxPoolDebt=d.stabilizerMaxPoolDebt)
 
-    # add snapshot
-    self._addGreenRefPoolSnapshot()
+    if meaningChanged or capacityChanged:
+        assert self._addGreenRefPoolSnapshot() # dev: invalid snapshot
+
+        # Capacity changes preserve danger history but deliberately restart the
+        # recovery/danger anchor from the newly seeded observation.
+        if not meaningChanged:
+            data: GreenRefPoolData = self.greenRefPoolData
+            data.numBlocksInDanger = preservedDangerBlocks
+            self.greenRefPoolData = data
+            ratio: uint256 = self._getWeightedGreenRatio(d, data)
+            if preservedDangerBlocks != 0 and ratio != 0:
+                if ratio >= d.dangerTrigger:
+                    self.greenDangerLastBlock = block.number
+                else:
+                    self.greenRecoveryStartBlock = block.number
+                    self.greenRecoveryLastSafeBlock = block.number
+
+    # A classification/freshness change preserves the ring and accumulated
+    # counter, but continuity must restart under the new policy. Reclassify at
+    # confirmation so pre-confirmation time is never credited and valid
+    # post-confirmation danger or recovery time is not discarded.
+    elif classificationChanged:
+        self.greenDangerLastBlock = 0
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+
+        categoryData: GreenRefPoolData = self.greenRefPoolData
+        categoryRatio: uint256 = self._getWeightedGreenRatio(d, categoryData)
+        if categoryRatio != 0:
+            if categoryRatio >= d.dangerTrigger:
+                self.greenDangerLastBlock = block.number
+            elif categoryData.numBlocksInDanger != 0:
+                self.greenRecoveryStartBlock = block.number
+                self.greenRecoveryLastSafeBlock = block.number
+
     return True
 
 
@@ -928,16 +1017,37 @@ def _isValidGreenRefPoolConfig(
     _stabilizerMaxPoolDebt: uint256,
     _greenToken: address,
 ) -> bool:
+    if _poolConfig.pool != _refConfig.pool or _poolConfig.lpToken != _refConfig.lpToken:
+        return False
+
     if _greenToken not in _poolConfig.underlying:
         return False
 
     if _poolConfig.numUnderlying != 2: # only 2 underlying tokens
         return False
 
-    if _maxNumSnapshots == 0 or _maxNumSnapshots > 100: # 100 max
+    if _refConfig.greenIndex > 1:
+        return False
+
+    if _poolConfig.underlying[_refConfig.greenIndex] != _greenToken:
+        return False
+
+    if _poolConfig.underlying[1 - _refConfig.greenIndex] != _refConfig.altAsset:
+        return False
+
+    if _refConfig.altAssetDecimals > 18:
+        return False
+
+    if convert(staticcall IERC20Detailed(_refConfig.altAsset).decimals(), uint256) != _refConfig.altAssetDecimals:
+        return False
+
+    if _maxNumSnapshots == 0 or _maxNumSnapshots > MAX_SNAPSHOTS:
         return False
 
     if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
+        return False
+
+    if _staleBlocks != 0 and _staleBlocks > max_value(uint256) - block.number:
         return False
 
     if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
@@ -964,6 +1074,94 @@ def _isValidGreenRefPoolConfig(
 # get ref pool data
 
 
+@internal
+def _clearGreenRefPoolSnapshots():
+    for i: uint256 in range(MAX_SNAPSHOTS):
+        self.snapShots[i] = empty(RefPoolSnapshot)
+
+
+@view
+@internal
+def _isFreshGreenSnapshot(_update: uint256, _staleBlocks: uint256) -> bool:
+    if _update == 0 or _update > block.number:
+        return False
+    return _staleBlocks == 0 or block.number - _update <= _staleBlocks
+
+
+@view
+@internal
+def _getWeightedGreenRatio(_config: GreenRefPoolConfig, _data: GreenRefPoolData) -> uint256:
+    if _config.pool == empty(address) or _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > MAX_SNAPSHOTS:
+        return 0
+    if _data.nextIndex >= _config.maxNumSnapshots:
+        return 0
+
+    numerator: uint256 = 0
+    denominator: uint256 = 0
+    previous: RefPoolSnapshot = empty(RefPoolSnapshot)
+    hasPrevious: bool = False
+    lastSeenUpdate: uint256 = 0
+
+    # nextIndex is the oldest slot when full and precedes the live prefix when
+    # partially filled, so this traversal is chronological in both cases.
+    for offset: uint256 in range(_config.maxNumSnapshots, bound=MAX_SNAPSHOTS):
+        index: uint256 = _data.nextIndex + offset
+        if index >= _config.maxNumSnapshots:
+            index -= _config.maxNumSnapshots
+
+        snapShot: RefPoolSnapshot = self.snapShots[index]
+        if snapShot.greenBalance == 0 or snapShot.ratio == 0 or snapShot.update == 0:
+            continue
+        if snapShot.update > block.number or (lastSeenUpdate != 0 and snapShot.update <= lastSeenUpdate):
+            return 0
+        lastSeenUpdate = snapShot.update
+        if not self._isFreshGreenSnapshot(snapShot.update, _config.staleBlocks):
+            continue
+
+        if hasPrevious:
+            duration: uint256 = snapShot.update - previous.update
+            ok: bool = False
+            weightedValue: uint256 = 0
+            ok, weightedValue = self._tryMul(previous.ratio, duration)
+            if not ok:
+                return 0
+            ok, numerator = self._tryAdd(numerator, weightedValue)
+            if not ok:
+                return 0
+            ok, denominator = self._tryAdd(denominator, duration)
+            if not ok:
+                return 0
+        previous = snapShot
+        hasPrevious = True
+
+    if hasPrevious:
+        duration: uint256 = block.number - previous.update
+        if duration != 0:
+            ok: bool = False
+            weightedValue: uint256 = 0
+            ok, weightedValue = self._tryMul(previous.ratio, duration)
+            if not ok:
+                return 0
+            ok, numerator = self._tryAdd(numerator, weightedValue)
+            if not ok:
+                return 0
+            ok, denominator = self._tryAdd(denominator, duration)
+            if not ok:
+                return 0
+
+    if denominator != 0:
+        return numerator // denominator
+
+    # A lone seed has zero duration in its creation block. It is a valid
+    # fallback only while the actual last snapshot is still fresh.
+    lastSnapshot: RefPoolSnapshot = _data.lastSnapshot
+    if lastSnapshot.greenBalance == 0 or lastSnapshot.ratio == 0:
+        return 0
+    if not self._isFreshGreenSnapshot(lastSnapshot.update, _config.staleBlocks):
+        return 0
+    return lastSnapshot.ratio
+
+
 @view
 @external
 def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
@@ -973,31 +1171,8 @@ def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
 
     data: GreenRefPoolData = self.greenRefPoolData
 
-    # calculate weighted ratio using all valid snapshots
-    numerator: uint256 = 0
-    denominator: uint256 = 0
-    for i: uint256 in range(config.maxNumSnapshots, bound=max_value(uint256)):
-
-        snapShot: RefPoolSnapshot = self.snapShots[i]
-        if snapShot.greenBalance == 0 or snapShot.ratio == 0 or snapShot.update == 0:
-            continue
-
-        # too stale, skip
-        if config.staleBlocks != 0 and block.number > snapShot.update + config.staleBlocks:
-            continue
-
-        numerator += (snapShot.greenBalance * snapShot.ratio)
-        denominator += snapShot.greenBalance
-
-    # weighted ratio
-    weightedRatio: uint256 = 0
-    if numerator != 0:
-        weightedRatio = numerator // denominator
-    else:
-        weightedRatio = data.lastSnapshot.ratio
-
     return CurrentGreenPoolStatus(
-        weightedRatio=weightedRatio,
+        weightedRatio=self._getWeightedGreenRatio(config, data),
         dangerTrigger=config.dangerTrigger,
         numBlocksInDanger=data.numBlocksInDanger,
     )
@@ -1017,7 +1192,7 @@ def addGreenRefPoolSnapshot() -> bool:
 @internal 
 def _addGreenRefPoolSnapshot() -> bool:
     data: GreenRefPoolData = self.greenRefPoolData
-    if data.lastSnapshot.update == block.number:
+    if data.lastSnapshot.update != 0 and data.lastSnapshot.update == block.number:
         return False
 
     # balance data
@@ -1033,13 +1208,7 @@ def _addGreenRefPoolSnapshot() -> bool:
         return False
 
     inDanger: bool = greenRatio >= config.dangerTrigger
-    
-    # update danger data (using OLD snapshot before overwriting)
-    if not inDanger:
-        data.numBlocksInDanger = 0
-    elif data.lastSnapshot.inDanger and data.lastSnapshot.update != 0:
-        elapsedBlocks: uint256 = block.number - data.lastSnapshot.update
-        data.numBlocksInDanger += elapsedBlocks
+    previousUpdate: uint256 = data.lastSnapshot.update
 
     # create and store new snapshot
     newSnapshot: RefPoolSnapshot = RefPoolSnapshot(
@@ -1056,11 +1225,80 @@ def _addGreenRefPoolSnapshot() -> bool:
     if data.nextIndex >= config.maxNumSnapshots:
         data.nextIndex = 0
 
-    # save data
+    # The physical slot is already stored above; pass the updated in-memory
+    # cursor into the one canonical rolling-ratio implementation.
+    weightedRatio: uint256 = self._getWeightedGreenRatio(config, data)
+    data = self._updateGreenDangerState(data, config, weightedRatio, inDanger, previousUpdate)
     self.greenRefPoolData = data
 
     log GreenRefPoolSnapshotAdded(pool=config.pool, greenBalance=greenBalance, greenRatio=greenRatio, inDanger=inDanger)
     return True
+
+
+@internal
+def _updateGreenDangerState(
+    _data: GreenRefPoolData,
+    _config: GreenRefPoolConfig,
+    _weightedRatio: uint256,
+    _instantaneousDanger: bool,
+    _previousUpdate: uint256,
+) -> GreenRefPoolData:
+    data: GreenRefPoolData = _data
+    unavailableGap: bool = (
+        _previousUpdate == 0
+        or _previousUpdate > block.number
+        or (_config.staleBlocks != 0 and block.number - _previousUpdate > _config.staleBlocks)
+    )
+
+    # Unavailable is not safe or dangerous evidence. It invalidates active
+    # continuity anchors without changing accumulated history.
+    if _weightedRatio == 0:
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+        self.greenDangerLastBlock = 0
+        return data
+
+    if _weightedRatio >= _config.dangerTrigger:
+        if self.greenRecoveryStartBlock != 0 or unavailableGap:
+            self.greenRecoveryStartBlock = 0
+            self.greenRecoveryLastSafeBlock = 0
+            self.greenDangerLastBlock = block.number
+            return data
+
+        dangerLastBlock: uint256 = self.greenDangerLastBlock
+        if dangerLastBlock != 0 and dangerLastBlock <= block.number:
+            elapsedBlocks: uint256 = block.number - dangerLastBlock
+            if data.numBlocksInDanger <= max_value(uint256) - elapsedBlocks:
+                data.numBlocksInDanger += elapsedBlocks
+        self.greenDangerLastBlock = block.number
+        return data
+
+    # Rolling safety stops danger accumulation. An instantaneous dangerous spot
+    # may cancel recovery, but cannot add danger blocks or classify the rollup.
+    self.greenDangerLastBlock = 0
+    if data.numBlocksInDanger == 0:
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+        return data
+    if _instantaneousDanger:
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+        return data
+
+    recoveryStart: uint256 = self.greenRecoveryStartBlock
+    lastSafe: uint256 = self.greenRecoveryLastSafeBlock
+    if unavailableGap or recoveryStart == 0 or (_config.staleBlocks != 0 and (lastSafe == 0 or block.number - lastSafe > _config.staleBlocks)):
+        self.greenRecoveryStartBlock = block.number
+        self.greenRecoveryLastSafeBlock = block.number
+        return data
+
+    recoveryWindow: uint256 = max(_config.staleBlocks, 1)
+    self.greenRecoveryLastSafeBlock = block.number
+    if block.number - recoveryStart >= recoveryWindow:
+        data.numBlocksInDanger = 0
+        self.greenRecoveryStartBlock = 0
+        self.greenRecoveryLastSafeBlock = 0
+    return data
 
 
 # curve pool balance

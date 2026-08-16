@@ -3,7 +3,12 @@ import boa
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import assert_reverted_call, buy_fungible_auction, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    buy_fungible_auction,
+    clear_transient_storage,
+    filter_logs,
+)
 
 
 def _advance_to_block(block_number):
@@ -559,7 +564,7 @@ def test_final_expired_auction_cleanup_restores_liquidation_retry(
         caller=alice,
         liquidation_keeper=sally,
     )
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     assert teller.liquidateUser(bob, False, sender=sally) == 0
     assert _economic_state(
         bob,
@@ -619,7 +624,7 @@ def test_final_expired_auction_cleanup_restores_liquidation_retry(
     assert not ledger.hasFungibleAuctions(bob)
     assert credit_engine.canLiquidateUser(bob)
 
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     teller.liquidateUser(bob, False, sender=sally)
     new_alpha = ledger.getFungibleAuctionDuringPurchase(
         bob,

@@ -24,7 +24,10 @@
 implements: Department
 
 exports: addys.__interface__
-exports: deptBasics.__interface__
+exports: (
+    deptBasics.canMintGreen,
+    deptBasics.canMintRipe,
+)
 
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -162,6 +165,41 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     ETH = _eth
 
 
+######################
+# Department Controls #
+######################
+
+
+@nonreentrant
+@external
+def pause(_shouldPause: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _shouldPause != deptBasics.isPaused # dev: no change
+    deptBasics.isPaused = _shouldPause
+    log deptBasics.DepartmentPauseModified(isPaused=_shouldPause)
+
+
+@nonreentrant
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    deptBasics._recoverFunds(_recipient, _asset)
+
+
+@nonreentrant
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    for asset: address in _assets:
+        deptBasics._recoverFunds(_recipient, asset)
+
+
+@view
+@external
+def isPaused() -> bool:
+    return deptBasics.isPaused
+
+
 @payable
 @external
 def __default__():
@@ -173,6 +211,7 @@ def __default__():
 ##################
 
 
+@nonreentrant
 @external
 def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
@@ -201,6 +240,7 @@ def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -
     return amount, txUsdValue
 
 
+@nonreentrant
 @external
 def transferFundsToVault(_assets: DynArray[address, MAX_ASSETS]):
     assert not deptBasics.isPaused # dev: contract paused
@@ -242,6 +282,7 @@ def transferFundsToVault(_assets: DynArray[address, MAX_ASSETS]):
         )
 
 
+@nonreentrant
 @external
 def transferFundsToEndaomentPSM(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
@@ -740,6 +781,7 @@ def _removeLiquidity(
 ####################
 
 
+@nonreentrant
 @external
 def stabilizeGreenRefPool() -> bool:
     assert not deptBasics.isPaused # dev: contract paused
@@ -835,6 +877,8 @@ def _getGreenAmountToAdd(
     # only add green when green ratio < 50% (pool has excess other asset)
     if _data.greenRatio == 0 or _data.greenRatio >= FIFTY_PERCENT:
         return 0
+    if _data.greenIndex >= 2:
+        return 0
     
     totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
     targetBalance: uint256 = totalPoolBalance // 2
@@ -882,9 +926,15 @@ def _removeStabilizerGreenLiquidity(
 
     # remove liquidity
     assert extcall IERC20(_data.lpToken).approve(_data.pool, _lpBalance, default_return_value=True) # dev: approval failed
+    didQuote: bool = False
+    lpQuote: uint256 = 0
+    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, greenAmount)
+    if not didQuote or lpQuote >= _lpBalance:
+        assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
+        return False
     amounts: DynArray[uint256, 2] = [0, 0]
     amounts[_data.greenIndex] = greenAmount
-    lpBurned: uint256 = extcall CurvePool(_data.pool).remove_liquidity_imbalance(amounts, max_value(uint256), self)
+    lpBurned: uint256 = extcall CurvePool(_data.pool).remove_liquidity_imbalance(amounts, lpQuote + 1, self)
     assert extcall IERC20(_data.lpToken).approve(_data.pool, 0, default_return_value=True) # dev: approval failed
 
     # update pool debt
@@ -907,6 +957,8 @@ def _getGreenAmountToRemove(
     # only remove green when green ratio > 50% (pool has excess green)
     if _data.greenRatio <= FIFTY_PERCENT:
         return 0
+    if _lpBalance == 0 or _data.greenIndex >= 2:
+        return 0
     
     totalPoolBalance: uint256 = _data.greenBalance * HUNDRED_PERCENT // _data.greenRatio
     targetBalance: uint256 = totalPoolBalance // 2
@@ -922,7 +974,52 @@ def _getGreenAmountToRemove(
         return 0
 
     maxGreenToRemove: uint256 = max(_poolDebt, _data.greenBalance * _lpBalance // lpTotalSupply)
-    return min(greenAdjustWeighted, maxGreenToRemove)
+    requestedGreen: uint256 = min(greenAdjustWeighted, maxGreenToRemove)
+    if requestedGreen == 0:
+        return 0
+
+    didQuote: bool = False
+    lpQuote: uint256 = 0
+    didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, requestedGreen)
+    if didQuote and lpQuote < _lpBalance:
+        return requestedGreen
+
+    # StableSwap-NG burns calc_token_amount(amounts, False) + 1 LP token for
+    # remove_liquidity_imbalance. Find the largest executable Green amount.
+    low: uint256 = 0
+    high: uint256 = requestedGreen
+    for _i: uint256 in range(256):
+        if low >= high:
+            break
+        midpoint: uint256 = high - (high - low) // 2
+        didQuote, lpQuote = self._quoteGreenRemoval(_data.pool, _data.greenIndex, midpoint)
+        if didQuote and lpQuote < _lpBalance:
+            low = midpoint
+        else:
+            high = midpoint - 1
+
+    return low
+
+
+@view
+@internal
+def _quoteGreenRemoval(_pool: address, _greenIndex: uint256, _greenAmount: uint256) -> (bool, uint256):
+    amounts: DynArray[uint256, 2] = [0, 0]
+    amounts[_greenIndex] = _greenAmount
+    success: bool = False
+    response: Bytes[64] = b""
+    # The supported StableSwap-NG pool must expose this exact selector.
+    # Missing, reverting, short, or oversized quote surfaces fail closed.
+    success, response = raw_call(
+        _pool,
+        abi_encode(amounts, False, method_id=method_id("calc_token_amount(uint256[],bool)")),
+        max_outsize=64,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, 0
+    return True, abi_decode(response, uint256)
 
 
 @view
@@ -996,6 +1093,7 @@ def _calcProfitForStabilizer(
 #####################
 
 
+@nonreentrant
 @external
 def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
@@ -1009,6 +1107,7 @@ def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = 
     return greenMinted
 
 
+@nonreentrant
 @external
 def addPartnerLiquidity(
     _legoId: uint256,
@@ -1030,6 +1129,8 @@ def addPartnerLiquidity(
     greenAmount: uint256 = 0
     greenMinted: uint256 = 0
     partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
+    partnerCustodyBefore: uint256 = self._getCombinedBalance(_asset, endaoFunds)
+    greenCustodyBefore: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
 
     # add liquidity (LP goes here so only the current action's delta is split)
     lpBefore: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
@@ -1043,6 +1144,34 @@ def addPartnerLiquidity(
     assert lpAmountReceived != 0 # dev: no liquidity added
     lpAfter: uint256 = staticcall IERC20(_expectedLpToken).balanceOf(self)
     assert lpAfter - lpBefore == lpAmountReceived # dev: lp amount mismatch
+
+    # Qualified Legos report net venue contributions. Match those reports to
+    # the protocol's custody decrease so downstream fees or inventory top-ups
+    # cannot be attributed to this partner action. Partial fills remain valid.
+    partnerCustodyAfter: uint256 = self._getCombinedBalance(_asset, endaoFunds)
+    greenCustodyAfter: uint256 = self._getCombinedBalance(a.greenToken, endaoFunds)
+    assert partnerCustodyBefore - liqAmountA == partnerCustodyAfter # dev: partner asset accounting
+    assert greenCustodyBefore - liqAmountB == greenCustodyAfter # dev: green accounting
+    assert liqAmountA <= partnerAmount # dev: partner asset accounting
+    assert liqAmountB <= greenAmount # dev: green accounting
+
+    # Attribute pre-existing GREEN reserve first, then burn any provisional
+    # mint that a partial fill did not actually contribute to the venue.
+    greenReserve: uint256 = greenAmount - greenMinted
+    finalGreenMinted: uint256 = 0
+    if liqAmountB > greenReserve:
+        finalGreenMinted = liqAmountB - greenReserve
+    excessGreenMinted: uint256 = greenMinted - finalGreenMinted
+    if excessGreenMinted != 0:
+        greenBeforeBurn: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+        self._prepareEndaomentFunds(a.greenToken, excessGreenMinted, endaoFunds)
+        greenAfterPull: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+        assert greenAfterPull > greenBeforeBurn # dev: green refund accounting
+        assert greenAfterPull - greenBeforeBurn == excessGreenMinted # dev: green refund accounting
+        assert extcall GreenToken(a.greenToken).burn(excessGreenMinted) # dev: could not burn green
+    partnerAmount = liqAmountA
+    greenAmount = liqAmountB
+    greenMinted = finalGreenMinted
 
     # transfer partner's half
     partnerShare: uint256 = 0
@@ -1067,6 +1196,12 @@ def addPartnerLiquidity(
 # utils
 
 
+@view
+@internal
+def _getCombinedBalance(_asset: address, _endaoFunds: address) -> uint256:
+    return staticcall IERC20(_asset).balanceOf(self) + staticcall IERC20(_asset).balanceOf(_endaoFunds)
+
+
 @internal
 def _mintPartnerLiquidity(
     _partner: address,
@@ -1076,11 +1211,16 @@ def _mintPartnerLiquidity(
     _greenToken: address,
     _endaoFunds: address,
 ) -> (uint256, uint256, uint256):
+    assert _asset != _greenToken # dev: invalid partner asset
     partnerAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_partner))
     assert partnerAmount != 0 # dev: no asset to add
 
     if _partner != self:
+        balanceBefore: uint256 = staticcall IERC20(_asset).balanceOf(_endaoFunds)
         assert extcall IERC20(_asset).transferFrom(_partner, _endaoFunds, partnerAmount, default_return_value=True) # dev: transfer failed
+        balanceAfter: uint256 = staticcall IERC20(_asset).balanceOf(_endaoFunds)
+        assert balanceAfter > balanceBefore # dev: no asset received
+        partnerAmount = balanceAfter - balanceBefore
 
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, partnerAmount, True)
     assert usdValue != 0 # dev: invalid asset
@@ -1099,6 +1239,7 @@ def _mintPartnerLiquidity(
 #############
 
 
+@nonreentrant
 @external
 def repayPoolDebt(_pool: address, _amount: uint256 = max_value(uint256)) -> bool:
     assert not deptBasics.isPaused # dev: contract paused

@@ -13,21 +13,21 @@
         "committed_path": "scripts/abis/AuctionHouse.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "e7207cf3927aa18aae547bb00914728b630dbbc1ac0c29bc6b18f8a30794a82f",
-        "creation_executable_prefix_size": 24468,
-        "creation_metadata_sha256": "98f8a71f993ef0e6604a718612c733adf53acba494a93f5c4f45292bb46eab3c",
+        "creation_executable_prefix_sha256": "5c191f9fa83dd7e8e0a03d635742634556de7ef8c3e526bc79e4834d7d1facb5",
+        "creation_executable_prefix_size": 24582,
+        "creation_metadata_sha256": "4ef3230d2fb94e5a42fafcb68629b4fd31af428504cb1c73c43266d7aa32ebe7",
         "creation_metadata_size": 61,
-        "creation_sha256": "048d6651210f5485f3cd1ac274fb71c7de68af6ebb4c4ac5399840896de76441",
-        "creation_size": 24529,
-        "deployed_eip170_headroom": 136,
+        "creation_sha256": "05cee743b335f655b1a612543f95f93cac5bd2700c7fddbf929f49e345cec1d1",
+        "creation_size": 24643,
+        "deployed_eip170_headroom": 22,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "1b9cf730664267523f8b5b0aefd84a5ac07c356da586a8ae66334d8cb5c3bb68",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "79315c97662a42e2e7fd8eff9f7f469557c2855e780dc2b37b0179d56ac44888",
-        "deployed_runtime_size": 24440,
-        "eip170_headroom": 232,
-        "runtime_template_sha256": "87cba3d6a27a14ee6d41ecf08a6e2f13f3bc148be674ec6b177385b81b5b76a6",
-        "runtime_template_size": 24344
+        "deployed_runtime_sha256": "dec131999301b49ed3c85c7f53f9d785cb01a9b2204eeccdf05fb2e247c98965",
+        "deployed_runtime_size": 24554,
+        "eip170_headroom": 118,
+        "runtime_template_sha256": "0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2",
+        "runtime_template_size": 24458
       },
       "code_layout": {
         "addys": {
@@ -77,9 +77,9 @@
         "canonical_sha256": "c2187d4a9f2fea946e8e64972597c89b3fd358ca7ffbac76da03f403fa8c8332",
         "count": 29
       },
-      "source_git_blob": "5eabdac3c7f3fdacf06003b7854e0cd61869eb84",
+      "source_git_blob": "f9cbb2adec0706f80806c535d0ea7bf4cafc32d2",
       "source_path": "contracts/core/AuctionHouse.vy",
-      "source_sha256": "2e46101cac996dc8fe17a37420f23057887a751cf7039ad14565fd80d791f949",
+      "source_sha256": "e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e",
       "storage_layout": {
         "deptBasics": {
           "isPaused": {
@@ -121,7 +121,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "88ca2620138daca953b39ca360be96e6a2001c33dd88c6a92ca58e69bfe83ea4"
+      "transitive_compiler_input_integrity": "859f8c312f43b52f224b43ac4cfbc6e47b395c9dd55c6c86c5b3826a2be88595"
     },
     "BlueChipYieldPrices": {
       "abi": {
@@ -471,6 +471,262 @@
       "transient_storage_layout": {},
       "transitive_compiler_input_integrity": "10d8f5ad297f360152d5b873e3eeacae8b24adc90c10925d3c1e3ff6224bbba6"
     },
+    "CurvePrices": {
+      "abi": {
+        "canonical_sha256": "8a8f259d19103e7feb261ea5edf3bb14968d08c4200c3421a6621ba53ba1c62f",
+        "committed_file_sha256": "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772",
+        "committed_path": "scripts/abis/CurvePrices.json"
+      },
+      "artifacts": {
+        "creation_executable_prefix_sha256": "d982ab34d11038106b4ae0953a022f20e3be37874b885753c74fc91aeb7c08e7",
+        "creation_executable_prefix_size": 24658,
+        "creation_metadata_sha256": "40a20e8cef45f0325c7a4df6938e6feca6a8ea5e4fe6f416ff17cade60a2b113",
+        "creation_metadata_size": 57,
+        "creation_sha256": "615d3214330cce4a703d8bac42d67b37a019d74f0e72873180aff6c5588b9d87",
+        "creation_size": 24715,
+        "deployed_eip170_headroom": 1445,
+        "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000e10000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae66309400000000000000000000000000000000000000000000000000000000000000258000000000000000000000000000000000000000000000000000000000000c4e0000000000000000000000000e6da14500f0b5783e2325f9c5a7ee5d99da0fb420000000000000000000000008271e06e5887fe5ba05234f5315c19f3ec90e8ad000000000000000000000000e7fbd704b938cb8fe26313c3464d4b7b7348c88c0000000000000000000000006e28493348446503db04a49621d8e6c9a40015fb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000355bb7f0f6c730e4460d620420a300fa08ff82f3000000000000000000000000290a52380a88f743813b8c3e9f6b0e61db5fdf73",
+        "deployed_runtime_immutable_data_sha256": "1bb22cb4def89de539144e8b54d6c546e472fb4f685e58064a980ce4b930e08b",
+        "deployed_runtime_immutable_data_size": 448,
+        "deployed_runtime_sha256": "abd717d4382564b0bd8f10be288dc7dd51da3205d0bb291e23c9fde179331998",
+        "deployed_runtime_size": 23131,
+        "eip170_headroom": 1893,
+        "runtime_template_sha256": "01317cc59d46094f472d76c3a6160957885f2815dc310cc6f570986695db63dd",
+        "runtime_template_size": 22683
+      },
+      "code_layout": {
+        "CURVE_META_REGISTRY": {
+          "length": 32,
+          "offset": 192,
+          "type": "address"
+        },
+        "CURVE_REGISTRIES": {
+          "length": 160,
+          "offset": 224,
+          "type": "CurveRegistries"
+        },
+        "GREEN": {
+          "length": 32,
+          "offset": 384,
+          "type": "address"
+        },
+        "SGREEN": {
+          "length": 32,
+          "offset": 416,
+          "type": "address"
+        },
+        "addys": {
+          "RIPE_HQ_FOR_ADDYS": {
+            "length": 32,
+            "offset": 96,
+            "type": "address"
+          }
+        },
+        "gov": {
+          "MAX_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 64,
+            "type": "uint256"
+          },
+          "MIN_GOV_TIME_LOCK": {
+            "length": 32,
+            "offset": 32,
+            "type": "uint256"
+          },
+          "RIPE_HQ_FOR_GOV": {
+            "length": 32,
+            "offset": 0,
+            "type": "address"
+          }
+        },
+        "timeLock": {
+          "MAX_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 160,
+            "type": "uint256"
+          },
+          "MIN_ACTION_TIMELOCK": {
+            "length": 32,
+            "offset": 128,
+            "type": "uint256"
+          }
+        }
+      },
+      "compiler_settings": {
+        "experimental_codegen": false,
+        "optimize": "gas"
+      },
+      "constructor": [
+        {
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_tempGov",
+              "type": "address"
+            },
+            {
+              "name": "_curveAddressProvider",
+              "type": "address"
+            },
+            {
+              "name": "_green",
+              "type": "address"
+            },
+            {
+              "name": "_savingsGreen",
+              "type": "address"
+            },
+            {
+              "name": "_minPriceChangeTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxPriceChangeTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        }
+      ],
+      "constructor_bound_runtime_template": true,
+      "effective_optimization": "gas",
+      "events": {
+        "canonical_sha256": "68cf7e9dd23ef0d45fd35109bd1573cdcbb86086a6400ec6d2822615e737f411",
+        "count": 23
+      },
+      "qualification": {
+        "evidence_path": "docs/chains/rh/evidence/curve-snapshot-remediation.md",
+        "immutable_binding": "Robinhood candidate constructor values from migrations/robinhood-mainnet/0003_PriceSources.py and config/BluePrint.py; selected external Curve identities remain live-observation blockers",
+        "rationale": "SC-16/SC-23 remediated source with ordinary EIP-170 headroom; no exact-waiver policy"
+      },
+      "selectors": {
+        "canonical_sha256": "6e82d509c91a02bef0aeaa755f99710a9b300dd56bc2a40124bd049a6cc954e0",
+        "count": 86
+      },
+      "source_git_blob": "76233779bb34059de16a5a6740233fc4dc0f59ca",
+      "source_path": "contracts/priceSources/CurvePrices.vy",
+      "source_sha256": "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050",
+      "storage_layout": {
+        "curveConfig": {
+          "n_slots": 1,
+          "slot": 14,
+          "type": "HashMap[address, CurvePriceConfig]"
+        },
+        "gov": {
+          "govChangeTimeLock": {
+            "n_slots": 1,
+            "slot": 5,
+            "type": "uint256"
+          },
+          "governance": {
+            "n_slots": 1,
+            "slot": 0,
+            "type": "address"
+          },
+          "numGovChanges": {
+            "n_slots": 1,
+            "slot": 4,
+            "type": "uint256"
+          },
+          "pendingGov": {
+            "n_slots": 3,
+            "slot": 1,
+            "type": "PendingGovernance"
+          }
+        },
+        "greenDangerLastBlock": {
+          "n_slots": 1,
+          "slot": 36,
+          "type": "uint256"
+        },
+        "greenRecoveryLastSafeBlock": {
+          "n_slots": 1,
+          "slot": 35,
+          "type": "uint256"
+        },
+        "greenRecoveryStartBlock": {
+          "n_slots": 1,
+          "slot": 34,
+          "type": "uint256"
+        },
+        "greenRefPoolConfig": {
+          "n_slots": 10,
+          "slot": 16,
+          "type": "GreenRefPoolConfig"
+        },
+        "greenRefPoolData": {
+          "n_slots": 6,
+          "slot": 26,
+          "type": "GreenRefPoolData"
+        },
+        "pendingGreenRefPoolConfig": {
+          "n_slots": 1,
+          "slot": 33,
+          "type": "HashMap[uint256, GreenRefPoolConfig]"
+        },
+        "pendingUpdates": {
+          "n_slots": 1,
+          "slot": 15,
+          "type": "HashMap[address, PendingCurvePrice]"
+        },
+        "priceData": {
+          "assets": {
+            "n_slots": 1,
+            "slot": 7,
+            "type": "HashMap[uint256, address]"
+          },
+          "indexOfAsset": {
+            "n_slots": 1,
+            "slot": 8,
+            "type": "HashMap[address, uint256]"
+          },
+          "isPaused": {
+            "n_slots": 1,
+            "slot": 6,
+            "type": "bool"
+          },
+          "numAssets": {
+            "n_slots": 1,
+            "slot": 9,
+            "type": "uint256"
+          }
+        },
+        "snapShots": {
+          "n_slots": 1,
+          "slot": 32,
+          "type": "HashMap[uint256, RefPoolSnapshot]"
+        },
+        "timeLock": {
+          "actionId": {
+            "n_slots": 1,
+            "slot": 11,
+            "type": "uint256"
+          },
+          "actionTimeLock": {
+            "n_slots": 1,
+            "slot": 12,
+            "type": "uint256"
+          },
+          "expiration": {
+            "n_slots": 1,
+            "slot": 13,
+            "type": "uint256"
+          },
+          "pendingActions": {
+            "n_slots": 1,
+            "slot": 10,
+            "type": "HashMap[uint256, PendingAction]"
+          }
+        }
+      },
+      "transient_storage_layout": {},
+      "transitive_compiler_input_integrity": "51a487c1a48fa336e4c1b5a6e8a319f57410333fa8d336ea5d9f4c7a57a7fd60"
+    },
     "DefaultsRobinhood": {
       "abi": {
         "canonical_sha256": "6878e6b5bd5b34906a96ac60e03df7db322dc01d546de6385ec6a70fc9fae1a2",
@@ -642,21 +898,21 @@
         "committed_path": "scripts/abis/Deleverage.json"
       },
       "artifacts": {
-        "creation_executable_prefix_sha256": "61f3b528adf261ee4dc97c45f2e3362397f8e8d52043b02eb53cb796f29d2de4",
-        "creation_executable_prefix_size": 23525,
-        "creation_metadata_sha256": "dcf20cd1a1f2955452ae1ac51a86fcbdcc9eb98570abc780419fe7a8d74332b8",
+        "creation_executable_prefix_sha256": "503719ed8015a9041221f65674466af301bb9e4bf9b68068f95dcd177ff6d423",
+        "creation_executable_prefix_size": 24573,
+        "creation_metadata_sha256": "5e0c447d765edd532d23787d33c9275f49c523b5f64a8503e38afb05bd06ea47",
         "creation_metadata_size": 61,
-        "creation_sha256": "fffbeb2f7ec01c594ba6219f1130418ffd29b0078d9abbaf4bb27716f232105c",
-        "creation_size": 23586,
-        "deployed_eip170_headroom": 1315,
+        "creation_sha256": "0c1f0876dba45548f9e4490b4186740aa1fffa3084d10c08af992f40585db065",
+        "creation_size": 24634,
+        "deployed_eip170_headroom": 267,
         "deployed_runtime_immutable_data_hex": "000000000000000000000000d4e82ae1de673bba3b53386a2d2c630ae663094000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "deployed_runtime_immutable_data_sha256": "8e62c4f549fc631801e4467d49f11c730f3daa1cf32c90c6c40e06086ab9b884",
         "deployed_runtime_immutable_data_size": 96,
-        "deployed_runtime_sha256": "52d89ce7e224a395fecc0dacfc52f0aac2dc838dbe993a47693e1586d69d3294",
-        "deployed_runtime_size": 23261,
-        "eip170_headroom": 1411,
-        "runtime_template_sha256": "49916998de97dab79e1314248551f0a18f7d87ee193ae81f3ce5af21d3399364",
-        "runtime_template_size": 23165
+        "deployed_runtime_sha256": "2fb68a6f9c9a6b8789c5c7f4ba986b38281002834e9ca7d9fd8c21d4b232df5d",
+        "deployed_runtime_size": 24309,
+        "eip170_headroom": 363,
+        "runtime_template_sha256": "25f605c232750990f9a0a66a14143a529d4303e79ce02d0a8d8f0c18329094e2",
+        "runtime_template_size": 24213
       },
       "code_layout": {
         "addys": {
@@ -729,7 +985,7 @@
         }
       ],
       "constructor_bound_runtime_template": true,
-      "effective_optimization": "gas",
+      "effective_optimization": "codesize",
       "events": {
         "canonical_sha256": "53aa3231c6be94da3846b30f735e2b71483ada71ef5f3ce57a77c42ef36aa62b",
         "count": 12
@@ -738,9 +994,9 @@
         "canonical_sha256": "8d85266d2a525641a2edcb36d8fbd1e39e4e00bc530aa14f28013260b15436ef",
         "count": 32
       },
-      "source_git_blob": "f1c6d590666e9bd030326dabfc628721fd59a6d5",
+      "source_git_blob": "2e574c6d6c4dc7c06ccfddb164f23644bed9fb7b",
       "source_path": "contracts/core/Deleverage.vy",
-      "source_sha256": "43385a79420443ea7de197d8ee5f25fbfd1dbb7d078c1d319f246aa94fd3ec6e",
+      "source_sha256": "b035d9bb2ee20a4cab0575c468fe6a06e7e8e5a097f2ec9b00cc841e8bed44b1",
       "storage_layout": {
         "deleverageBuffer": {
           "n_slots": 1,
@@ -796,6 +1052,11 @@
         }
       },
       "transient_storage_layout": {
+        "$.nonreentrant_key": {
+          "n_slots": 1,
+          "slot": 0,
+          "type": "nonreentrant lock"
+        },
         "assetLiqConfig": {
           "n_slots": 1,
           "slot": 2,
@@ -822,7 +1083,7 @@
           "type": "HashMap[uint256, address]"
         }
       },
-      "transitive_compiler_input_integrity": "37f9b243daa959f8bd4d7e2f0c38ec1211550d95930d8f2b32f90411614f7469"
+      "transitive_compiler_input_integrity": "f6ef6b200049d9202dbdc9c942a81dec765af4b4cd7fb0b4a505289a07bb361b"
     },
     "Ledger": {
       "abi": {

@@ -28,7 +28,7 @@ from config.artifact_expectations import load_artifact_expectations  # noqa: E40
 DEFAULT_EXPECTATIONS = ROOT / "config" / "contract-artifact-expectations.json"
 EIP_170_LIMIT = 24_576
 SCHEMA_VERSION = 1
-PRAGMA_OPTIMIZE_RE = re.compile(r"^# pragma optimize ([a-z]+)$", re.MULTILINE)
+PRAGMA_OPTIMIZE_RE = re.compile(r"^#[ \t]*pragma optimize ([a-z]+)$", re.MULTILINE)
 COMPILER_ENVELOPE = {
     "artifact_recipe": "vyper -p . -f bytecode,bytecode_runtime <file>",
     "integrity_recipe": "vyper -p . -f integrity <file>",
@@ -40,6 +40,7 @@ GOVERNED_SOURCES: Mapping[str, str] = {
     "AuctionHouse": "contracts/core/AuctionHouse.vy",
     "BlueChipYieldPrices": "contracts/priceSources/BlueChipYieldPrices.vy",
     "CreditEngine": "contracts/core/CreditEngine.vy",
+    "CurvePrices": "contracts/priceSources/CurvePrices.vy",
     "DefaultsRobinhood": "contracts/config/DefaultsRobinhood.vy",
     "DefaultsRobinhoodLive": "contracts/config/DefaultsRobinhoodLive.vy",
     "Deleverage": "contracts/core/Deleverage.vy",

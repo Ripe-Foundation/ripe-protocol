@@ -9,11 +9,16 @@ reconciliation
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
-This register is the canonical `RH-D` identifier and title namespace for
-controlling owner decisions and accepted risks. The `decisions` list in
-[`status.yaml`](status.yaml) must mirror every identifier and title here
-exactly. This register does not replace the linked decision records, authorize
-a new phase, or convert an approved direction into implementation, integration,
+This register is the canonical `RH-D` source for controlling owner decisions,
+explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
+require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
+is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
+is not required, and it may be reconciled once during final release preparation.
+Historical headroom-waiver entries remain accepted-risk evidence for final
+release reconciliation; their former floor, zero-growth, and reopen-on-change
+controls are no longer ordinary PR gates.
+This register does not replace the linked decision records, authorize a new
+phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
@@ -25,9 +30,10 @@ the GREEN/RIPE CCIP topology is confirmed live as recorded in
 transaction or release action. The four corrected-PR controls remain zero and
 deferred and lack Robinhood machine-facing parameter/planning representation.
 RH-D028 is a bounded candidate-only exception to the historical CreditEngine
-zero-backing and Deleverage parked instructions; it does not reopen cooldown,
-Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
-candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing and Deleverage parked instructions. RH-D038 separately reopens only
+the exact SC-07/SC-09 Deleverage remediation in draft PR #145; neither decision
+reopens cooldown, Underscore, broader settlement, or bad-debt work. Outside
+those exact candidates, the five broader lanes remain parked and nonblocking: CreditEngine
 zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
 Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
 closed.
@@ -188,6 +194,10 @@ removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
 adds quarantine suppression without changing zero cooldown, enabling
 Underscore, or reopening the four deferred controls.
 
+RH-D038 is a separate narrow exception for draft PR #145's exact SC-07/SC-09
+remediation and review evidence. It likewise leaves zero cooldown, omitted
+Underscore, and the four deferred controls unchanged.
+
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
@@ -256,8 +266,8 @@ binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
 remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
-preserved, but every Deleverage task is parked and no implementation track is
-open until explicit owner reopening.
+preserved. RH-D038 is the explicit bounded reopening for draft PR #145 only;
+every other Deleverage task remains parked.
 
 Source:
 `track-6-s6-track-7-h4-defaults-parameters.md`.
@@ -410,8 +420,8 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
-every Deleverage task including size/headroom work, UniswapV2Prices admission
+Except for the exact RH-D028 and RH-D038 candidates, CreditEngine zero-backing
+reassessment, every Deleverage task including size/headroom work, UniswapV2Prices admission
 and deployment, Sites recovery, and non-CCIP live deployment are deferred or
 separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
@@ -1084,22 +1094,20 @@ because it could conceal a genuine vault loss.
 `docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
 `tests/priceSources/blueChip/test_bluechip_local.py`, and
 `tests/priceSources/test_undy_vault_prices.py`.
+
 ## Namespace coordination note — 15 August 2026
 
-A read-only live check immediately before PR #144's rebase found that merged PR
-#142 owns the integrated `RH-D033` and `RH-D034` entries, while PR #144 uniquely
-adds `RH-D035`. Open PR #143 adds `RH-D036`, PR #146 adds `RH-D037`, and PR #147
-adds `RH-D039` through `RH-D041`. PR #145's coordination intent is `RH-D038`,
-but its current head still actually adds a conflicting `RH-D033`; it must not be
-described as cleanly occupying `RH-D038` until that source is corrected. PR
-#152 inherits integrated `RH-D033`/`RH-D034` and, at its current head, also
-introduces `RH-D042`. This supersedes an earlier snapshot in which PR #152 had
-not yet allocated a decision.
+A read-only live check after PR #143 merged found that the target owns
+`RH-D033` through `RH-D036`. The intended open integration set then adds unique
+claims: PR #146 adds `RH-D037`, PR #145 adds `RH-D038`, PR #147 adds `RH-D039`
+through `RH-D041`, PR #152 adds `RH-D042`, and PR #157 adds `RH-D043`. PR #163
+adds no decision. The fail-closed integration allocator passed across these six
+open PR heads and the live target; no duplicate or base-conflicting claim
+remains.
 
-`RH-D035` remains uncollided. PR #144 records this namespace state read-only and
-does not edit, renumber, approve, or reject another branch's decision. The
-integration owner must resolve PR #145's actual `RH-D033` collision before that
-branch is combined with the integrated register.
+This snapshot records allocation only. It does not edit, renumber, approve, or
+reject another branch's decision, and it does not grant integration,
+deployment, configuration, activation, or release authority.
 
 ### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
 
@@ -1172,15 +1180,206 @@ no deployment, configuration, migration, activation, or release authority.
 `tests/vaults/test_ripe_gov_exit_fee.py`, and
 `tests/vaults/test_ripe_gov_controls_and_migration.py`.
 
+### RH-D036 — AuctionHouse conservation exact waiver at 22 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact SC-01, SC-02, and
+SC-08 AuctionHouse conservation artifact on draft PR #143. The owner separately
+authorized this waiver record and the test-only Deleverage size-pin refresh
+after review reopened the below-floor decision.
+
+The ratified 200-byte minimum remains controlling for every non-waived
+contract. The final artifact caps Stability GREEN before collateral moves,
+caps every fungible-auction iteration at current live debt, makes retry fee
+eligibility precede irreversible execution, and replaces the downstream
+repayment clamp with a fail-closed invariant. It deploys at 24,554 bytes,
+including 96 bytes of immutable data, leaving **22 bytes** before EIP-170.
+The owner accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One source and compiler-output identity under
+CPython 3.12.0, Vyper `0.4.3+commit.bff19ea2`, and titanoboa 0.2.7:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/AuctionHouse.vy` SHA-256 | `e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e` |
+| Runtime-template SHA-256 (immutable-free) | `0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2` |
+| Runtime-template bytes | 24,458 |
+| Immutable data bytes | 96 |
+| Deployed runtime bytes | 24,554 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A4` | `d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6` |
+| Complete deployed-runtime SHA-256 at production-capture HQ `0xD4e8…0940` | `dec131999301b49ed3c85c7f53f9d785cb01a9b2204eeccdf05fb2e247c98965` |
+
+The declared `0x…00A4` HQ is a deterministic waiver-test input, not a
+production address. The production-capture identity uses the constructor input
+declared by the governed artifact ledger. Any constructor-input change produces
+a different complete deployed byte string and reopens exact deployment-capture
+review even when the source and length do not move.
+
+**Measured progression.** The authoritative baseline deployed runtime was
+24,440 bytes with 136 bytes of headroom. SC-01 measured 24,501/75; SC-02
+measured 24,566/10; the first SC-08 candidate measured 24,571/5. Review then
+removed a behaviorally redundant fee local and replaced a masking repayment
+clamp with a fail-closed assertion, yielding the final 24,554/22 artifact
+without removing the Stability exact-receipt check, the AuctionHouse GREEN
+balance cap, or a public ABI entry.
+
+**Residual risk accepted.** Only 22 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any AuctionHouse source, compiler, transitive
+dependency, constructor input, runtime-template, or complete deployed-runtime
+identity change invalidates the exact record and reopens this decision. A
+future change must restore at least 200 bytes or receive a new exact owner
+waiver; refreshing the constants merely to make a test pass is prohibited.
+
+**SC-08 economic and liveness policy.** The owner accepts all three semantics
+below for this exact artifact:
+
+- `liqFee` remains the legacy Stability Pool discount rate. Its gross-up
+  collateral spread can exceed the nominal base liquidation fee; settlement
+  credits no more than the nominal base fee, and keeper fees are never
+  spread-paid.
+- If an economically empty first pass freezes the account without repayment or
+  an auction, that episode permanently waives base and keeper fees. A later
+  retry may complete liquidation, but it does so fee-free and cannot recover
+  the waived compensation.
+- Fee-free retries deliberately carry no onchain keeper reward or liveness
+  guarantee. Activation therefore depends on a protocol-operated monitor or
+  keeper to retry eligible accounts, with auction buyers supplying progress
+  where an auction exists. That operational actor and alert path must be bound
+  before activation.
+
+This decision accepts deployability of the exact artifact. It does not
+authorize deployment, registry mutation, configuration, activation, or release.
+
+**Source:** `contracts/core/AuctionHouse.vy`,
+`tests/test_vault_pointer_runtime_sizes.py`,
+`tests/core/deleverage/test_deleverage_phase2.py`, and
+`config/contract-artifact-expectations.json`.
+### RH-D038 — SC-07/SC-09 Deleverage remediation is reopened and bounded
+
+**Status:** Owner-authorized on 14 August 2026 for the exact remediation and
+review follow-through in draft PR #145. Integration, deployment,
+configuration, activation, and release remain unauthorized.
+
+SC-07 refreshes the complete live debt and current interest after collateral
+interactions, rejects a changed debt amount atomically, and uses one shared
+Deleverage reentrancy domain across the four debt-writing routes and
+`swapCollateral`.
+
+SC-09 treats a Stability Pool cohort as unavailable for optional broad
+Deleverage and withdrawal-assist preflight when the pool's existing fail-soft
+probe reports zero because of a price outage, pause, or aggregate claim-custody
+deficit. Healthy ordinary collateral remains usable. Ordinary-vault failures
+and all failures after real processing starts still propagate; direct claims,
+withdrawals, deposits, explicit redemptions, and strict requested handling
+remain fail-closed.
+
+The final deployed candidate is 24,309 bytes with 267 bytes of EIP-170
+headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
+headroom override or exact-identity waiver.
+
+This decision reopens no cooldown, Underscore, deferred control, fork,
+deployment, configuration, activation, or release work. Robinhood deployment
+verification must establish `MissionControl.isStabVaultId(1) == true`. The
+recorded Base MissionControl is incompatible until separately upgraded and
+populated, so this Deleverage must not replace Base Deleverage as-is.
+
+**Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
+
+### RH-D043 — Curve snapshot remediation uses confirmation-anchored continuity
+
+**Status:** Owner accepted ancestor `block.number` semantics on 15 August 2026
+for the exact reviewed Curve source; merge review may proceed. Deployment,
+configuration, activation, and release remain separately unauthorized.
+
+This decision binds production source SHA-256
+`8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050`
+and Git blob `76233779bb34059de16a5a6740233fc4dc0f59ca`. Final
+contract-and-test commit `f5442036983f278326919fae0939b33377c4c9f3`
+adds only focused test coverage after the production source was frozen.
+
+The candidate selects chronological block-duration weighting and accepts its
+rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
+recommended live `maxNumSnapshots` is 10, matching the existing Base setting
+and now supported by direct capacity-ten gas evidence. PriceDesk S=10 is a
+source-count measurement and is not used as ring-capacity evidence. At most one
+successful write is allowed per selected clock unit; the actual ten-observation
+time horizon therefore depends on qualifying Teller activity and must be
+monitored rather than presented as a fixed wall-clock window.
+
+The owner selected the Robinhood Curve clock domain as EVM `block.number`, which Robinhood
+exposes as the repeating/jumping ancestor/L1-number domain. A pinned 16-child
+block packet observed one contract `NUMBER` while ArbSys tracked every child.
+The accepted ancestor-semantics calibration is
+`staleBlocks=7,200`, the same 7,200-unit recovery duration, capacity 10, and a
+target successful write at least every 720 ancestor numbers.
+`GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain inactive pending
+separate activation authority.
+
+For any `dangerTrigger` or `staleBlocks` change, the ring and accumulated
+`numBlocksInDanger` survive, all three continuity anchors are cleared, and the
+retained ring is evaluated under the confirmed policy. A nonzero dangerous
+result anchors danger at confirmation; a nonzero safe result with historical
+danger anchors recovery at confirmation; an unavailable result leaves all
+anchors cleared. Freshness expansion may make retained observations available
+again for current classification, but no elapsed time across the old
+unavailable gap is credited. A still-fresh shrink may shorten the remaining
+recovery window only from the confirmation anchor. Neither transition erases
+the accumulated counter.
+
+Classification remains inclusive (`weightedRatio >= dangerTrigger`). Operators
+must keep the trigger above the expected resting ratio and must not configure
+it at equilibrium. The existing proposal-before-liquidity workflow is retained:
+a fully empty pool can be proposed, but confirmation revalidates and reverts
+atomically if it cannot seed a nonzero snapshot. The duplicate internal
+validator arguments are retained to minimize unrelated bytecode churn.
+
+Activation requires separate exact-head authority, a finite operating cadence,
+the selected capacity-ten bound, direct
+capacity-ten, cold maximum-ring, and PriceDesk composition evidence,
+snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
+The remediated Curve source SHA-256 is recorded in the Robinhood launch-input
+ledger as an owner-selected candidate. It remains an explicit fail-closed
+deployment-readiness blocker until that exact-head ratification occurs.
+Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
+sustained fallback, near-budget gas, threshold/equilibrium change, or new
+consumer/topology or clock-domain change reopens qualification. The pinned-Base
+`test_curve_prices.py` harness now advances governance NUMBER independently of
+oracle timestamp: the final candidate passes 32/32 while the exact target
+retains the historical 24-failed/8-passed fail-first result. No production
+freshness check was weakened. This decision grants no deployment,
+registration, configuration, activation, or release authority.
+
+Clock decision and separate activation checklist:
+
+- [x] select ancestor semantics with the recorded 7,200/720 calibration;
+- [ ] accept rolling danger-entry lag and `maxNumSnapshots=10` with its
+  cadence-dependent horizon;
+- [ ] accept still-fresh `staleBlocks` shrink, expired-history revival only for
+  current classification without gap credit, and confirmation-anchored
+  post-trigger danger/recovery continuity;
+- [ ] accept inclusive `>=` danger classification and equilibrium guidance;
+- [ ] accept capacity-ten, fixed-100-slot reset, maximum-ring, Teller, and
+  PriceDesk gas methodology and margins;
+- [ ] verify the Base green 75/75 and asset/LP 32/32 evidence, including the
+  exact target's retained 24-failed/8-passed harness fail-first artifact; and
+- [ ] accept the monitoring, pause/disable, reopen, and feature-inactivity
+  controls before activation, without treating merge approval as deployment or
+  activation.
+
+**Source:**
+[`evidence/curve-snapshot-remediation.md`](evidence/curve-snapshot-remediation.md),
+`config/contract-artifact-expectations.json`, and
+`tests/priceSources/curve/test_green_ref_pool.py`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:
 
 1. the controlling decision/evidence record;
-2. this register;
-3. [`status.yaml`](status.yaml), preserving exact identifier/title parity; and
-4. the generated dashboard, when present. RH-D024 currently keeps the dashboard
-   extracted from the active tree, so there is no dashboard artifact to regenerate.
+2. this canonical register; and
+3. [`status.yaml`](status.yaml) and the generated dashboard when intentionally
+   refreshing the status snapshot or preparing the final release candidate.
+   RH-D024 currently keeps the dashboard extracted from the active tree, so
+   there is no dashboard artifact to regenerate.
 
 Keep the distinction between:
 

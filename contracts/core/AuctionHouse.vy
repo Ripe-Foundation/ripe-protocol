@@ -64,6 +64,7 @@ interface StabilityPool:
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
+    def getUserDebtAmount(_user: address) -> uint256: view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface PriceDesk:
@@ -326,58 +327,60 @@ def _liquidateUser(
     if bt.collateralVal > collateralLiqThreshold:
         return 0
 
-    # liquidation fees
-    baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    # A liquidation episode charges fees once. Retry passes leave both fees at
+    # zero so their repayment ceiling and spread are fixed before collateral moves.
+    baseLiqFee: uint256 = 0
+    keeperFee: uint256 = 0
+    if not userDebt.inLiquidation:
+        baseLiqFee = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
 
-    # keeper fee (for liquidator)
-    keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
-    if keeperFee != 0 and _config.maxKeeperFee != 0:
-        keeperFee = min(keeperFee, _config.maxKeeperFee)
+        # keeper fee (for liquidator)
+        keeperFee = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
+        if keeperFee != 0 and _config.maxKeeperFee != 0:
+            keeperFee = min(keeperFee, _config.maxKeeperFee)
 
-    # cap fees based on collateral surplus over debt
-    # goal: liquidate everything possible, even if fees are reduced to zero
-    # additional constraint: ensure liqFeeRatio never exceeds 99% to prevent underflow in stability pool swap
-    maxAllowableFees: uint256 = 0
-    if bt.collateralVal > userDebt.amount:
-        maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
+        # cap fees based on collateral surplus over debt
+        # goal: liquidate everything possible, even if fees are reduced to zero
+        # additional constraint: ensure liqFeeRatio never exceeds 99% to prevent underflow in stability pool swap
+        maxAllowableFees: uint256 = 0
+        if bt.collateralVal > userDebt.amount:
+            maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
 
-    # adjust fees if necessary
-    if baseLiqFee + keeperFee > maxAllowableFees:
-        if baseLiqFee <= maxAllowableFees:
-            keeperFee = maxAllowableFees - baseLiqFee
-        else:
-            keeperFee = 0
-            baseLiqFee = maxAllowableFees
+        # adjust fees if necessary
+        if baseLiqFee + keeperFee > maxAllowableFees:
+            if baseLiqFee <= maxAllowableFees:
+                keeperFee = maxAllowableFees - baseLiqFee
+            else:
+                keeperFee = 0
+                baseLiqFee = maxAllowableFees
 
-    totalLiqFees: uint256 = baseLiqFee + keeperFee
+    # liqFee is the legacy Stability discount rate, not an exact additive fee.
+    # Gross-up spread can exceed baseLiqFee; settlement only credits at most the
+    # nominal base fee as paid.
     liqFeeRatio: uint256 = baseLiqFee * HUNDRED_PERCENT // userDebt.amount
 
     targetLtv: uint256 = bt.lowestLtv
     if _config.ltvPaybackBuffer != 0:
         targetLtv = targetLtv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    targetRepayAmount: uint256 = self._calcTargetRepayAmount(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
+    targetRepayAmount: uint256 = self._calcTargetRepayAmount(userDebt.amount + baseLiqFee + keeperFee, bt.collateralVal, targetLtv)
 
     # perform liquidation phases
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
-    repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
+    # Only the nominal base fee can be spread-paid, so full-repayment GREEN
+    # consumption cannot exceed live debt plus the keeper fee.
+    repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, min(targetRepayAmount, userDebt.amount + keeperFee), liqFeeRatio, _config, _a)
 
-    hasQueuedAuction: bool = self.numUserAssetsForAuction[_liqUser] != 0
+    # A first pass with neither repayment nor an auction is economically inert.
+    if repayValueIn == 0 and self.numUserAssetsForAuction[_liqUser] == 0:
+        baseLiqFee = 0
+        keeperFee = 0
 
     # Reaching the liquidation threshold freezes the whole account until debt
     # health is restored. This also locks protocol-held zero-LTV assets and
     # positive-LTV assets that policy does not permit the AuctionHouse to sell.
     # repayFromDept clears the flag below if this pass restores debt health.
     userDebt.inLiquidation = True
-
-    # Retryable no-progress calls must also be economically inert. Charging
-    # liquidation fees or minting a keeper reward when no debt was repaid and
-    # no asset was queued lets repeated calls increase debt without advancing
-    # liquidation.
-    if repayValueIn == 0 and not hasQueuedAuction:
-        baseLiqFee = 0
-        totalLiqFees = 0
-        keeperFee = 0
 
     # Stability pool collateral spread covers only the base liquidation fee.
     paidBaseFee: uint256 = 0
@@ -388,7 +391,7 @@ def _liquidateUser(
 
     # repayValueIn may be zero, but need to update debt
     userDebt.amount += liqFeesUnpaid
-    repayValueIn = min(repayValueIn, userDebt.amount)
+    assert repayValueIn <= userDebt.amount # dev: repayment exceeds creditable debt
     didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_liqUser, userDebt, repayValueIn, newInterest, 0, _a)
 
     # start auctions (if necessary)
@@ -398,7 +401,7 @@ def _liquidateUser(
 
     log LiquidateUser(
         user=_liqUser,
-        totalLiqFees=totalLiqFees,
+        totalLiqFees=baseLiqFee + keeperFee,
         targetRepayAmount=targetRepayAmount,
         repayAmount=repayValueIn,
         didRestoreDebtHealth=didRestoreDebtHealth,
@@ -746,8 +749,11 @@ def _swapAssetsWithStabPool(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
-    # max collateral usd value (to take from liq user)
-    maxCollateralUsdValue: uint256 = min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
+    # Callers enter only with both min inputs positive. Keep the size-sensitive
+    # n-1 form: textbook ceiling deploys at 24,575/1 and violates RH-D036's
+    # exact zero-growth waiver.
+    # It lets the spread's floor reach, but not exceed, creditable repayment.
+    maxCollateralUsdValue: uint256 = (min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT - 1) // (HUNDRED_PERCENT - _liqFeeRatio) + 1
     if maxCollateralUsdValue <= ONE_CENT:
         return remainingToRepay, collateralValueOut, False, False # return if it's too small amount
 
@@ -1146,7 +1152,8 @@ def _buyFungibleAuction(
     _a: addys.Addys,
 ) -> uint256:
 
-    # NOTE: faililng gracefully in case there are many purchases at same time
+    # Entries that cannot move collateral fail gracefully. Payment dust after a
+    # nonzero transfer deliberately reverts the batch so collateral cannot be free.
 
     # recipient cannot be user
     if _liqUser == _recipient:
@@ -1170,9 +1177,14 @@ def _buyFungibleAuction(
     if _recipient != _caller and not config.canAnyoneDeposit:
         assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
-    # finalize green amount
-    availGreen: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
-    greenAmount: uint256 = min(_maxGreenForAsset, availGreen)
+    # CreditEngine cannot recover discounted collateral after refunding excess
+    # GREEN, so this per-iteration live-debt cap is the conservation boundary.
+    # Intermediate locals deploy at 24,570/6 and violate RH-D036's exact
+    # zero-growth waiver, so keep the nested expression.
+    greenAmount: uint256 = min(
+        min(_maxGreenForAsset, min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))),
+        staticcall CreditEngine(_a.creditEngine).getUserDebtAmount(_liqUser),
+    )
     if greenAmount == 0:
         return 0
 
@@ -1410,6 +1422,9 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     if config.ltvPaybackBuffer != 0:
         targetLtv = targetLtv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
     
+    # This is a hypothetical fee-bearing risk target, not an executable quote.
+    # Per-pass events use current episode eligibility; execution also applies
+    # the pre-transfer conservation ceiling.
     return self._calcTargetRepayAmount(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
 
 

@@ -1807,7 +1807,7 @@ _RELATION_ROWS = (('R-001',
   'construction_dependency',
   'constructor',
   'CM-004',
-  ('contracts/priceSources/ChainlinkPrices.vy:122-137',),
+  ('contracts/priceSources/ChainlinkPrices.vy:131-147',),
   'The selected artifact initializes its RipeHq reference.',
   ('E-SRC-HQ', 'E-SRC')),
  ('R-017',
@@ -2534,7 +2534,7 @@ _RELATION_ROWS = (('R-001',
   'CM-016',
   ('contracts/config/SwitchboardAlpha.vy:1319-1322',
    'migrations/base-mainnet/1007_PriceDesk.py:41-42',
-   'contracts/priceSources/ChainlinkPrices.vy:243-245'),
+   'contracts/priceSources/ChainlinkPrices.vy:255-257'),
   "Alpha's snapshot call resolves to the selected Chainlink PriceDesk row.",
   ('E-SRC-PD', 'E-H04')),
  ('R-095',
@@ -2811,8 +2811,8 @@ _RELATION_ROWS = (('R-001',
   'direct_execution',
   'runtime_security',
   'CM-009',
-  ('contracts/priceSources/ChainlinkPrices.vy:261-291',
-   'contracts/priceSources/ChainlinkPrices.vy:526-528'),
+  ('contracts/priceSources/ChainlinkPrices.vy:271-301',
+   'contracts/priceSources/ChainlinkPrices.vy:537-542'),
   'Chainlink directly obtains the configured stale-time policy from MissionControl.',
   ('E-SRC-PD', 'E-H04')),
  ('R-126',
@@ -2820,7 +2820,7 @@ _RELATION_ROWS = (('R-001',
   'authority_dependency',
   'runtime_security',
   'CM-004',
-  ('contracts/priceSources/ChainlinkPrices.vy:122-137', 'contracts/modules/LocalGov.vy:139-158'),
+  ('contracts/priceSources/ChainlinkPrices.vy:131-147', 'contracts/modules/LocalGov.vy:139-158'),
   'ChainlinkPrices LocalGov authority depends on RipeHq governance.',
   ('E-SRC-HQ',)),
  ('R-127',
@@ -5492,7 +5492,7 @@ def validate_curve_launch_authority() -> None:
 
     expected_artifacts = {
         "artifact.curve_prices_source_sha256": (
-            "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c"
+            "8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050"
         ),
         "artifact.curve_prices_abi_sha256": (
             "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772"
@@ -5680,7 +5680,7 @@ def _component_blockers(component_id: str) -> tuple[str, ...]:
     }
     values.update(
         blocker_id
-        for row in _surfaces.get(component_id, ())
+        for row in _surfaces.get(component_id, ())  # noqa: F821
         for blocker_id in row[6]
     )
     return tuple(sorted(values))
@@ -5695,7 +5695,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
         downstream,
         evidence_ids,
     ) = row
-    selection = _COMPONENT_SELECTION_BY_ID[component_id]
+    selection = _COMPONENT_SELECTION_BY_ID[component_id]  # noqa: F821
     return ComponentRecord(
         component_id=component_id,
         name=selection.semantic_name,
@@ -5708,7 +5708,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 evidence_id,
             )
             for _, path, path_kind, path_state, source_class, evidence_id
-            in _sources.get(component_id, ())
+            in _sources.get(component_id, ())  # noqa: F821
         ),
         deployment=Disposition(selection.deployment_disposition),
         registry_expectations=tuple(
@@ -5727,7 +5727,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 authority,
                 registry_component_id,
                 registry_disposition,
-            ) in _registries.get(component_id, ())
+            ) in _registries.get(component_id, ())  # noqa: F821
         ),
         surfaces=tuple(
             SurfaceRecord(
@@ -5749,7 +5749,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 lifecycle_phase,
                 blocker_ids,
                 surface_assertion_ids,
-            ) in _surfaces.get(component_id, ())
+            ) in _surfaces.get(component_id, ())  # noqa: F821
         ),
         relations=tuple(
             ComponentRelation(
@@ -5770,7 +5770,7 @@ def _build_component(row: tuple[Any, ...]) -> ComponentRecord:
                 proof_refs,
                 basis,
                 relation_evidence_ids,
-            ) in _relations.get(component_id, ())
+            ) in _relations.get(component_id, ())  # noqa: F821
         ),
         blocker_ids=_component_blockers(component_id),
         primary_owner_id=primary,

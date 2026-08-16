@@ -159,6 +159,13 @@
 - [ ] Record live-gated evidence as not attempted unless a later instruction
   explicitly authorized network reads or transactions; local source/profile
   results do not satisfy live qualification.
+- [ ] For an AuctionHouse artifact governed by RH-D036, require
+  [issue #160](https://github.com/Ripe-Foundation/ripe-protocol/issues/160) to
+  be closed with a named retry actor and operational owner, monitoring and
+  alerting, stalled Stability-only retry handling, expired-auction recreation,
+  escalation/manual-intervention procedures, a representative pre-activation
+  exercise, and explicit release-owner acceptance. Merge approval is not
+  deployment or activation authority.
 
 ## 7. Packet sign-off
 
