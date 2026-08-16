@@ -735,12 +735,12 @@ def test_ah_auction_time_boundary_edge_cases(
     green_spent = buy_fungible_auction(teller,
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    # Last purchasable block reaches maxDiscount. Requested GREEN is still
-    # spent when collateral remains; the buyer receives more than face value.
-    assert green_spent > 0
-    assert green_spent <= 10 * EIGHTEEN_DECIMALS
+    # Last purchasable block is exactly maxDiscount (50%).
     collateral_received = alpha_token.balanceOf(alice) - alice_before
-    assert collateral_received * new_price // EIGHTEEN_DECIMALS > green_spent
+    collateral_usd = collateral_received * new_price // EIGHTEEN_DECIMALS
+    assert green_spent > 0
+    assert collateral_usd > 0
+    assert green_spent * HUNDRED_PERCENT == collateral_usd * (HUNDRED_PERCENT - 50_00)
     
     # Test 4: Exactly at end block (should fail)
     boa.env.time_travel(blocks=1)  # Move to end block
@@ -1913,9 +1913,9 @@ def test_batch_with_valid_then_zero_payment_dust_reverts_atomically(
 @pytest.mark.parametrize(
     ("purchase_amounts", "regression_ceiling"),
     [
-        ([1], 325_000),
-        ([100, 1], 360_000),
-        ([1] * 20, 4_260_000),
+        ([1], 355_000),
+        ([100, 1], 355_000),
+        ([1] * 20, 4_030_000),
     ],
     ids=["single-success", "clear-then-skip", "twenty-successes"],
 )
@@ -2006,7 +2006,7 @@ def test_live_debt_cap_batch_gas_bounds(
     assert total_spent == expected_spent
     assert len(filter_logs(teller, "FungAuctionPurchased")) == expected_successes
     assert ledger.userDebt(bob).amount == 100 * EIGHTEEN_DECIMALS - expected_spent
-    # About 20% above the pinned 269,080 / 298,314 / 3,547,707 measurements.
+    # About 20% above the pinned 294,949 / 293,637 / 3,355,507 measurements.
     assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000
 

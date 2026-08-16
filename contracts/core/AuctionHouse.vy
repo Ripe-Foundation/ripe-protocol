@@ -1169,14 +1169,13 @@ def _buyFungibleAuction(
         return 0
 
     # Progress spans first..last purchasable block (end-1), not the expired endBlock.
-    # A one-block auction has only that purchasable block and uses maxDiscount.
+    # Duration 1 is config-valid (Switchboard allows it) and has only that
+    # purchasable block, so it uses maxDiscount by spec. start==max is
+    # unreachable for governance-set params and is implied by the formula.
     discount: uint256 = auc.maxDiscount
     if auc.endBlock > auc.startBlock + 1:
         auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock - 1)
-        if auctionProgress == 0 or auc.startDiscount == auc.maxDiscount:
-            discount = auc.startDiscount
-        else:
-            discount = auc.startDiscount + auctionProgress * (auc.maxDiscount - auc.startDiscount) // HUNDRED_PERCENT
+        discount = auc.startDiscount + auctionProgress * (auc.maxDiscount - auc.startDiscount) // HUNDRED_PERCENT
 
     # get vault addr
     liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)
@@ -1282,7 +1281,9 @@ def _transferCollateral(
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
-    # Post-mutation checkpoints: sender first, then in-vault recipient.
+    # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
+    # Post-mutation: sender first so lastBalance writes the live share
+    # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
     for i: uint256 in range(2):
         user: address = _fromUser
         if i != 0:
@@ -1290,7 +1291,7 @@ def _transferCollateral(
                 break
             extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
             user = _toUser
-        extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset)
+        extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset, _a)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted

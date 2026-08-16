@@ -462,3 +462,80 @@ def test_sc24_shares_vault_multiple_holders_rebase_and_split_do_not_inflate(
         + ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
         == ap.lastBalance
     )
+
+
+def test_sc24_custody_shortfall_zeros_reward_usd_on_first_checkpoint(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    """A 1-wei custody deficit must stop gen-reward funding immediately."""
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    performDeposit(alice, 50 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue > 0
+    alice_balance_before = ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
+
+    alpha_token.transfer(alpha_token_whale, 1, sender=simple_erc20_vault.address)
+    assert simple_erc20_vault.getTotalAmountForVault(alpha_token) == 0
+
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap.lastUsdValue == 0
+    assert ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance == alice_balance_before
+
+
+def test_sc24_six_decimal_min_deposit_does_not_fund_rewards(
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    """6-dec assets have precision 1e6 (one token). A sub-token deposit is zero weight."""
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, charlie_token, vault_id)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+
+    dust = 10 ** 6 - 1
+    performDeposit(bob, dust, charlie_token, charlie_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, charlie_token, sender=teller.address)
+
+    ap = ledger.assetDepositPoints(vault_id, charlie_token)
+    up = ledger.userDepositPoints(bob, vault_id, charlie_token)
+    assert ap.precision == 10 ** 6
+    assert up.lastBalance == 0
+    assert ap.lastBalance == 0
+    assert ap.lastUsdValue == 0
+
+    whole = 10 ** 6
+    performDeposit(bob, whole, charlie_token, charlie_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, charlie_token, sender=teller.address)
+    ap = ledger.assetDepositPoints(vault_id, charlie_token)
+    assert ledger.userDepositPoints(bob, vault_id, charlie_token).lastBalance == 1
+    assert ap.lastBalance == 1
+    assert ap.lastUsdValue == 1

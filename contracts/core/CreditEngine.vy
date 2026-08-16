@@ -793,9 +793,11 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # Only an asset with nonzero debt capacity may set the unwind target.
-            # Zero-capacity dust must not pull lowestLtv below the meaningful book.
-            if maxDebt != 0:
+            # Meaningful capacity sets the unwind target. A zero-amount
+            # registration keeps the conservative floor so withdrawing to
+            # zero cannot silently drop configured terms. Positive-amount
+            # dust with maxDebt == 0 does not participate.
+            if maxDebt != 0 or amount == 0:
                 bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
             # highest ltv
@@ -1180,7 +1182,9 @@ def transferOrWithdrawViaRedemption(
         amountSent, na = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _user, _recipient, _amount, _a)
     else:
         amountSent, na = extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
-    # Post-mutation checkpoints: sender first, then in-vault recipient.
+    # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
+    # Post-mutation: sender first so lastBalance writes the live share
+    # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
     for i: uint256 in range(2):
         ptsUser: address = _user
         if i != 0:
@@ -1188,7 +1192,7 @@ def transferOrWithdrawViaRedemption(
                 break
             extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
             ptsUser = _recipient
-        extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset)
+        extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset, _a)
     return amountSent
 
 

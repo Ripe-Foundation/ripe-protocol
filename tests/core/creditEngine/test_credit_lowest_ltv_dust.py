@@ -340,3 +340,60 @@ def test_sc26_liquidation_target_uses_meaningful_not_dust_ltv(
     liq_log = filter_logs(teller, "LiquidateUser")[0]
     assert liq_log.targetRepayAmount == expected
     assert liq_log.targetRepayAmount != dust_expected
+
+
+def test_sc26_zero_balance_registration_keeps_borrow_term_floor(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+    simple_erc20_vault,
+):
+    """Withdraw-to-zero stays registered and still floors lowestLtv.
+
+    Dust with a positive leftover amount is ignored (see the fail-first
+    test). A fully withdrawn registration is the 2026-08-05 fail-closed
+    invariant and must not be treated as dust.
+    """
+    high_ltv = 50_00
+    low_ltv = 10_00
+    _configure_mixed_ltv(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        mock_price_source,
+        alpha_token,
+        bravo_token,
+        high_ltv,
+        low_ltv,
+    )
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, amount, bravo_token, bravo_token_whale)
+    assert teller.withdraw(
+        bravo_token,
+        amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    ) == amount
+    assert simple_erc20_vault.getUserAssetAndAmountAtIndex(bob, 2) == (
+        bravo_token.address,
+        0,
+    )
+
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == amount
+    assert terms.totalMaxDebt == amount * high_ltv // HUNDRED_PERCENT
+    assert terms.lowestLtv == low_ltv

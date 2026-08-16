@@ -875,8 +875,9 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
-    # core id because old positions and rewards can remain claimable after the core pointer moves.
+    # One MissionControl call serves both the share-normalize and funding
+    # branches. RipeGov shares are already normalized; MissionControl retains
+    # every historical core id because old positions can remain claimable.
     isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
 
     # Update holder lastBalance before lastUsdValue so gen-reward funding only
@@ -898,19 +899,27 @@ def _getLatestDepositPoints(
     # from attributable underlying: convert aggregate normalized loot share
     # through the current user's share-to-asset rate so rebasing vaults keep
     # yield while sub-precision residuals still cannot fill the bucket.
+    # A vault-total of zero is the custody-shortfall circuit breaker.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
+        vaultTotal: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
         assetAmount: uint256 = 0
-        if isRipeGovVault:
-            assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+        if vaultTotal == 0:
+            assetAmount = 0
+        elif isRipeGovVault:
+            assetAmount = vaultTotal
         elif assetPoints.lastBalance != 0:
             if rawLootShare != 0:
                 userAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForUser(_user, _asset)
                 eligibleShare: uint256 = assetPoints.lastBalance * assetPoints.precision
                 assetAmount = eligibleShare * userAmount // rawLootShare
             else:
-                assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
+                # No live share-to-asset rate. Cap the checkpointed
+                # normalized amount at vault custody; do not fall back to
+                # the unfiltered vault total (SC-24).
+                guessed: uint256 = assetPoints.lastBalance * assetPoints.precision
+                assetAmount = min(guessed, vaultTotal)
+        newAssetUsdValue = self._getUsdValueForAmount(_asset, assetAmount, _a.priceDesk)
 
     if newAssetUsdValue != assetPoints.lastUsdValue:
         globalPoints.lastUsdValue -= assetPoints.lastUsdValue
@@ -925,7 +934,7 @@ def _getLatestDepositPoints(
 
 @view
 @internal
-def _refreshAssetUsdValue(_asset: address, _amount: uint256, _priceDesk: address) -> uint256:
+def _getUsdValueForAmount(_asset: address, _amount: uint256, _priceDesk: address) -> uint256:
     if _amount == 0:
         return 0
     newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount)

@@ -18,13 +18,9 @@ def _old_discount(block_number, start_block, end_block, start_discount, max_disc
 
 
 def _new_discount(block_number, start_block, end_block, start_discount, max_discount):
-    if start_discount == max_discount:
-        return start_discount
     if end_block <= start_block + 1:
         return max_discount
     progress = (block_number - start_block) * HUNDRED_PERCENT // (end_block - start_block - 1)
-    if progress == 0:
-        return start_discount
     return start_discount + progress * (max_discount - start_discount) // HUNDRED_PERCENT
 
 
