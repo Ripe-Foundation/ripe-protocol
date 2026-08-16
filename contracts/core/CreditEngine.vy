@@ -62,7 +62,7 @@ interface Teller:
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface LootBox:
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def updateDepositPointsForTransfer(_fromUser: address, _toUser: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys): nonpayable
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface GreenToken:
@@ -709,7 +709,6 @@ def _getUserBorrowTerms(
 
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
-    bt.lowestLtv = max_value(uint256)
     ltvSum: uint256 = 0
     redemptionThresholdSum: uint256 = 0
     liqThresholdSum: uint256 = 0
@@ -779,8 +778,9 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # lowest ltv
-            bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
+            # zero-capacity collateral cannot set the unwind target
+            if maxDebt != 0 and (bt.lowestLtv == 0 or debtTerms.ltv < bt.lowestLtv):
+                bt.lowestLtv = debtTerms.ltv
 
             # highest ltv
             bt.highestLtv = max(bt.highestLtv, debtTerms.ltv)
@@ -789,10 +789,6 @@ def _getUserBorrowTerms(
             if not (hasSkip and asset == _skipAsset and vaultId == _skipVaultId):
                 bt.collateralVal += collateralVal
                 bt.totalMaxDebt += maxDebt
-
-    # edge case -- but safer to use
-    if bt.lowestLtv == max_value(uint256):
-        bt.lowestLtv = 0
 
     # finalize debt terms (weighted)
     if totalSum != 0:
@@ -1165,13 +1161,16 @@ def transferOrWithdrawViaRedemption(
 
     amountSent: uint256 = 0
     na: bool = False
+    toUser: address = empty(address)
     if _shouldTransferBalance:
+        toUser = _recipient
         amountSent, na = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _user, _recipient, _amount, _a)
         extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_recipient, _vaultId, _vaultAddr, _asset, _a)
 
     else:
         amountSent, na = extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
+
+    extcall LootBox(_a.lootbox).updateDepositPointsForTransfer(_user, toUser, _vaultId, _vaultAddr, _asset, _a)
     return amountSent
 
 

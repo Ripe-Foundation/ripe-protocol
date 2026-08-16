@@ -46,6 +46,7 @@ def _addPricedAsset(_asset: address):
     aid: uint256 = self.numAssets
     if aid == 0:
         aid = 1 # not using 0 index
+    assert aid <= MAX_ASSETS # dev: too many assets
     self.assets[aid] = _asset
     self.indexOfAsset[_asset] = aid
     self.numAssets = aid + 1

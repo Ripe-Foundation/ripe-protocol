@@ -187,6 +187,7 @@ undyYieldBonusAmount: public(uint256)
 
 UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+SHARES_VAULT_DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
@@ -654,18 +655,48 @@ def updateDepositPoints(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
+    self._updateDepositPoints(_user, _vaultId, _vaultAddr, _asset, a)
+
+
+@external
+def updateDepositPointsForTransfer(
+    _fromUser: address,
+    _toUser: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys,
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    self._updateDepositPoints(_fromUser, _vaultId, _vaultAddr, _asset, a)
+    if _toUser != empty(address) and _toUser != _fromUser:
+        self._updateDepositPoints(_toUser, _vaultId, _vaultAddr, _asset, a)
+
+
+@internal
+def _updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys,
+):
+
     # get latest global rewards
-    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
+    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _a)
 
     # update points
-    extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
+    extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
 
 
 # reset balance points
@@ -875,35 +906,38 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # latest asset value (staked assets not eligible for gen deposit rewards)
+    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
+    # core id because old positions and rewards can remain claimable after the core pointer moves.
+    isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
+
+    # Include the current holder's normalized balance before valuing the eligible aggregate.
+    userPoints: UserDepositPoints = empty(UserDepositPoints)
+    if _user != empty(address):
+        userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
+        userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+        if userLootShare != 0 and not isRipeGovVault:
+            userLootShare = userLootShare // assetPoints.precision
+        assetPoints.lastBalance -= userPoints.lastBalance
+        assetPoints.lastBalance += userLootShare
+        userPoints.lastBalance = userLootShare
+
+    # Staked assets are not eligible for general depositor rewards. Ordinary vaults fund only
+    # normalized holder units; SharesVault units are converted back through its live share price.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
+        assetAmount: uint256 = 0
+        if isRipeGovVault:
+            assetAmount = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+        elif assetPoints.lastBalance != 0:
+            vaultAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+            if vaultAmount != 0:
+                assetAmount = min(vaultAmount, self._getEligibleAssetAmount(_vaultAddr, _asset, assetPoints.lastBalance * assetPoints.precision))
+        newAssetUsdValue = self._refreshAssetUsdValue(_asset, assetAmount, _a.priceDesk)
 
-    # update `lastUsdValue` for global + asset
     if newAssetUsdValue != assetPoints.lastUsdValue:
         globalPoints.lastUsdValue -= assetPoints.lastUsdValue
         globalPoints.lastUsdValue += newAssetUsdValue
         assetPoints.lastUsdValue = newAssetUsdValue
-
-    # nothing else to do here
-    if _user == empty(address):
-        return empty(UserDepositPoints), assetPoints, globalPoints
-
-    # latest user points
-    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
-
-    # get user loot share
-    userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
-    # core id because old positions and rewards can remain claimable after the core pointer moves.
-    if userLootShare != 0 and not staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId):
-        userLootShare = userLootShare // assetPoints.precision
-
-    # update `lastBalance`
-    assetPoints.lastBalance -= userPoints.lastBalance
-    assetPoints.lastBalance += userLootShare
-    userPoints.lastBalance = userLootShare
 
     return userPoints, assetPoints, globalPoints
 
@@ -913,14 +947,30 @@ def _getLatestDepositPoints(
 
 @view
 @internal
-def _refreshAssetUsdValue(_asset: address, _vaultAddr: address, _priceDesk: address) -> uint256:
-    assetAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-    if assetAmount == 0:
+def _refreshAssetUsdValue(_asset: address, _assetAmount: uint256, _priceDesk: address) -> uint256:
+    if _assetAmount == 0:
         return 0
-    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, assetAmount)
+    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _assetAmount)
     if newUsdValue != 0:
         newUsdValue = newUsdValue // EIGHTEEN_DECIMALS # reduce risk of integer overflow
     return newUsdValue
+
+
+@view
+@internal
+def _getEligibleAssetAmount(_vaultAddr: address, _asset: address, _lootShare: uint256) -> uint256:
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _vaultAddr,
+        abi_encode(_asset, _lootShare * SHARES_VAULT_DECIMAL_OFFSET, False, method_id=method_id("sharesToAmount(address,uint256,bool)")),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if success and len(response) == 32:
+        return abi_decode(response, uint256)
+    return _lootShare
 
 
 @view

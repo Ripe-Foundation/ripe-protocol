@@ -415,3 +415,50 @@ def test_price_source_data_array_ordering(
     assert assets[0] == alpha_token.address
     assert assets[1] == charlie_token.address
     assert assets[2] == bravo_token.address
+
+
+def _fill_to_capacity(price_source_mock):
+    assets = [boa.env.generate_address(f"sc25-asset-{i}") for i in range(50)]
+    for i, asset in enumerate(assets):
+        price_source_mock.setPrice(asset, i + 1)
+    return assets
+
+
+def test_sc25_rejects_unique_asset_51_before_any_state_mutation(price_source_mock):
+    assets = _fill_to_capacity(price_source_mock)
+    assert price_source_mock.getPricedAssets() == assets
+    assert price_source_mock.numAssets() == 51
+
+    rejected = boa.env.generate_address("sc25-rejected")
+    with boa.reverts("too many assets"):
+        price_source_mock.setPrice(rejected, 999)
+
+    assert price_source_mock.getPricedAssets() == assets
+    assert price_source_mock.numAssets() == 51
+    assert price_source_mock.indexOfAsset(rejected) == 0
+    assert price_source_mock.price(rejected) == 0
+    assert not price_source_mock.hasPriceFeed(rejected)
+
+
+def test_sc25_existing_asset_updates_at_capacity(price_source_mock):
+    assets = _fill_to_capacity(price_source_mock)
+    target = assets[23]
+    price_source_mock.setPrice(target, 777)
+
+    assert price_source_mock.price(target) == 777
+    assert price_source_mock.indexOfAsset(target) == 24
+    assert price_source_mock.getPricedAssets() == assets
+
+
+def test_sc25_capacity_is_reusable_after_deregistration(price_source_mock):
+    assets = _fill_to_capacity(price_source_mock)
+    removed = assets[7]
+    assert price_source_mock.disablePriceFeed(removed)
+
+    replacement = boa.env.generate_address("sc25-replacement")
+    price_source_mock.setPrice(replacement, 321)
+    enumerated = price_source_mock.getPricedAssets()
+    assert len(enumerated) == 50
+    assert removed not in enumerated
+    assert replacement in enumerated
+    assert price_source_mock.indexOfAsset(replacement) != 0

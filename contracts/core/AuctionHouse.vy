@@ -76,7 +76,7 @@ interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
 
 interface LootBox:
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def updateDepositPointsForTransfer(_fromUser: address, _toUser: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys): nonpayable
 
 interface Teller:
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -1188,9 +1188,11 @@ def _buyFungibleAuction(
     if greenAmount == 0:
         return 0
 
-    # calculate discount
-    auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)
-    discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
+    # span the complete half-open purchase window; a one-block auction has only its maximum
+    discount: uint256 = auc.maxDiscount
+    duration: uint256 = auc.endBlock - auc.startBlock
+    if duration != 1:
+        discount = auc.startDiscount + (block.number - auc.startBlock) * (auc.maxDiscount - auc.startDiscount) // (duration - 1)
 
     # get vault addr
     liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)
@@ -1233,14 +1235,6 @@ def _buyFungibleAuction(
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
     return greenSpent
-
-
-@pure
-@internal
-def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxDiscount: uint256) -> uint256:
-    if _progress == 0 or _startDiscount == _maxDiscount:
-        return _startDiscount
-    return _startDiscount + _progress * (_maxDiscount - _startDiscount) // HUNDRED_PERCENT
 
 
 #############
@@ -1304,11 +1298,13 @@ def _transferCollateral(
     if _shouldTransferBalance:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
         extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_toUser, _vaultId, _vaultAddr, _asset, _a)
 
     # withdraw and transfer to recipient
     else:
         amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
+        _toUser = empty(address)
+
+    extcall LootBox(_a.lootbox).updateDepositPointsForTransfer(_fromUser, _toUser, _vaultId, _vaultAddr, _asset, _a)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
