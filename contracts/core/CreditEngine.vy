@@ -764,12 +764,14 @@ def _getUserBorrowTerms(
 
             # collateral value, max debt
             collateralVal: uint256 = 0
+            hasNominalBalance: bool = False
             if amount == 0:
-                # A zero usable amount is a quarantine only when the user still
-                # has a nominal balance and the whole vault has zero usable amount.
-                # The vault-wide condition excludes per-user share-rounding dust.
-                if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
-                    if staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset):
+                hasNominalBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
+                # Quarantine only when a remaining nominal balance has no
+                # vault-wide usable amount. Share-rounding dust keeps a
+                # nominal balance in a non-empty vault and is not quarantined.
+                if hasNominalBalance:
+                    if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
             else:
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
@@ -793,11 +795,13 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # Meaningful capacity sets the unwind target. A zero-amount
-            # registration keeps the conservative floor so withdrawing to
-            # zero cannot silently drop configured terms. Positive-amount
-            # dust with maxDebt == 0 does not participate.
-            if maxDebt != 0 or amount == 0:
+            # Meaningful capacity sets the unwind target.
+            # amount == 0 and no remaining balance is a withdrawn-to-zero
+            # registration and keeps the conservative floor.
+            # amount == 0 with a remaining balance is share-rounding dust
+            # and must not drag lowestLtv. Positive-amount dust with
+            # maxDebt == 0 also does not participate.
+            if maxDebt != 0 or (amount == 0 and not hasNominalBalance):
                 bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
             # highest ltv
@@ -1185,14 +1189,15 @@ def transferOrWithdrawViaRedemption(
     # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
     # Post-mutation: sender first so lastBalance writes the live share
     # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
-    for i: uint256 in range(2):
-        ptsUser: address = _user
-        if i != 0:
-            if not _shouldTransferBalance:
-                break
-            extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
-            ptsUser = _recipient
-        extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset, _a)
+    if amountSent != 0:
+        for i: uint256 in range(2):
+            ptsUser: address = _user
+            if i != 0:
+                if not _shouldTransferBalance:
+                    break
+                extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
+                ptsUser = _recipient
+            extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset, _a)
     return amountSent
 
 

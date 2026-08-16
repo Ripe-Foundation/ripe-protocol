@@ -380,9 +380,8 @@ def test_sc24_shares_vault_positive_rebase_funds_underlying_value(
     assert ap.lastUsdValue == user_amount // EIGHTEEN_DECIMALS
     assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, user_amount)
     assert ap.lastUsdValue != deposit_amount // EIGHTEEN_DECIMALS
-    assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, vault_amount) or (
-        ap.lastUsdValue == user_amount // EIGHTEEN_DECIMALS
-    )
+    assert ap.lastUsdValue <= vault_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue >= vault_amount // EIGHTEEN_DECIMALS - 1
 
 
 def test_sc24_shares_vault_negative_rebase_reduces_funded_value(
@@ -450,10 +449,12 @@ def test_sc24_shares_vault_multiple_holders_rebase_and_split_do_not_inflate(
 
     ap = ledger.assetDepositPoints(vault_id, alpha_token)
     vault_amount = rebase_erc20_vault.getTotalAmountForVault(alpha_token)
-    assert ap.lastUsdValue == vault_amount // EIGHTEEN_DECIMALS or ap.lastUsdValue == (
+    holder_sum = (
         rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
         + rebase_erc20_vault.getTotalAmountForUser(alice, alpha_token)
-    ) // EIGHTEEN_DECIMALS
+    )
+    assert ap.lastUsdValue <= vault_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue == min(holder_sum, vault_amount) // EIGHTEEN_DECIMALS
     assert ap.lastUsdValue > (2 * deposit_amount) // EIGHTEEN_DECIMALS - 2
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance > 0
     assert ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance > 0
@@ -462,6 +463,63 @@ def test_sc24_shares_vault_multiple_holders_rebase_and_split_do_not_inflate(
         + ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
         == ap.lastBalance
     )
+
+
+def test_sc24_full_exit_funds_remaining_vault_not_share_units(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    price_desk,
+):
+    """A fully exited holder must not switch funding back to share units."""
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    performDeposit(alice, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    alpha_token.transfer(rebase_erc20_vault, deposit_amount, sender=alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    both_usd = ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue
+    assert both_usd <= rebase_erc20_vault.getTotalAmountForVault(alpha_token) // EIGHTEEN_DECIMALS
+    assert both_usd > (2 * deposit_amount) // EIGHTEEN_DECIMALS - 2
+
+    withdrawn = teller.withdraw(
+        alpha_token,
+        rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        bob,
+        rebase_erc20_vault,
+        sender=bob,
+    )
+    assert withdrawn > 0
+    assert rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+
+    remaining = rebase_erc20_vault.getTotalAmountForUser(alice, alpha_token)
+    vault_amount = rebase_erc20_vault.getTotalAmountForVault(alpha_token)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    share_unit_guess = (
+        ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
+        * ap.precision
+    )
+    assert remaining > deposit_amount
+    assert ap.lastUsdValue == vault_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue == _usd_dollars(price_desk, alpha_token, vault_amount)
+    assert ap.lastUsdValue <= remaining // EIGHTEEN_DECIMALS + 1
+    assert share_unit_guess // EIGHTEEN_DECIMALS == deposit_amount // EIGHTEEN_DECIMALS
+    assert ap.lastUsdValue != share_unit_guess // EIGHTEEN_DECIMALS
 
 
 def test_sc24_custody_shortfall_zeros_reward_usd_on_first_checkpoint(

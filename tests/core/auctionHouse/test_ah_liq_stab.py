@@ -2155,7 +2155,18 @@ def test_ah_liquidation_with_stab_pool_both_assets(
     assert sgreen_swapped > 0, "Savings green must be swapped"
 
 
+@pytest.mark.parametrize(
+    ("user_count", "regression_ceiling"),
+    [
+        (1, 540_000),
+        (2, 840_000),
+        (5, 1_735_000),
+    ],
+    ids=["one-user", "two-users", "five-users"],
+)
 def test_stab_liq_batch_gas_bounds(
+    user_count,
+    regression_ceiling,
     setGeneralConfig,
     setGeneralDebtConfig,
     setAssetConfig,
@@ -2173,8 +2184,6 @@ def test_stab_liq_batch_gas_bounds(
     mission_control,
     switchboard_alpha,
     vault_book,
-    bob,
-    alice,
     sally,
 ):
     """Bound the stab-pool liquidation path this PR newly checkpoints."""
@@ -2205,7 +2214,7 @@ def test_stab_liq_batch_gas_bounds(
         [(stab_id, savings_green)], sender=switchboard_alpha.address
     )
 
-    pool_amount = 400 * EIGHTEEN_DECIMALS
+    pool_amount = 80 * EIGHTEEN_DECIMALS * user_count
     green_token.transfer(sally, pool_amount, sender=whale)
     green_token.approve(savings_green, pool_amount, sender=sally)
     pool_shares = savings_green.deposit(pool_amount, sally, sender=sally)
@@ -2214,21 +2223,22 @@ def test_stab_liq_batch_gas_bounds(
 
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     debt_amount = 50 * EIGHTEEN_DECIMALS
-    for user in (bob, alice):
+    users = [boa.env.generate_address(f"stab-liq-{i}") for i in range(user_count)]
+    for user in users:
         performDeposit(user, deposit_amount, alpha_token, alpha_token_whale)
         teller.borrow(debt_amount, user, False, sender=user)
 
     mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
-    assert credit_engine.canLiquidateUser(bob)
-    assert credit_engine.canLiquidateUser(alice)
+    for user in users:
+        assert credit_engine.canLiquidateUser(user)
 
     gas_before = boa.env.get_gas_used()
-    teller.liquidateManyUsers([bob, alice], False, sender=sally)
+    teller.liquidateManyUsers(users, False, sender=sally)
     gas_used = boa.env.get_gas_used() - gas_before
-    print("STAB_LIQ_BATCH_GAS", f"users=2", f"gas={gas_used}")
+    print("STAB_LIQ_BATCH_GAS", f"users={user_count}", f"gas={gas_used}")
 
-    assert credit_engine.getUserDebtAmount(bob) < debt_amount
-    assert credit_engine.getUserDebtAmount(alice) < debt_amount
-    # About 20% above the pinned 699,211 two-user stab-swap measurement.
-    assert gas_used <= 840_000
+    for user in users:
+        assert credit_engine.getUserDebtAmount(user) < debt_amount
+    # About 20% above the pinned 448,436 / 697,727 / 1,445,600 measurements.
+    assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000

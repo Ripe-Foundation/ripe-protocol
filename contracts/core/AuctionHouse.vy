@@ -1284,14 +1284,15 @@ def _transferCollateral(
     # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
     # Post-mutation: sender first so lastBalance writes the live share
     # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
-    for i: uint256 in range(2):
-        user: address = _fromUser
-        if i != 0:
-            if not _shouldTransferBalance:
-                break
-            extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
-            user = _toUser
-        extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset, _a)
+    if amountSent != 0:
+        for i: uint256 in range(2):
+            user: address = _fromUser
+            if i != 0:
+                if not _shouldTransferBalance:
+                    break
+                extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
+                user = _toUser
+            extcall LootBox(_a.lootbox).updateDepositPoints(user, _vaultId, _vaultAddr, _asset, _a)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted

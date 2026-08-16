@@ -93,7 +93,8 @@ def _open_auction(
     return filter_logs(teller, "FungibleAuctionUpdated")[0]
 
 
-def test_sc30_fail_first_old_formula_misses_max_discount():
+def test_sc30_progress_formula_identity_reaches_max_at_last_purchasable_block():
+    """Document the closed-form identity. Contract coverage is the live tests below."""
     start_discount = 0
     max_discount = 50_00
     start_block = 100

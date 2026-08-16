@@ -895,11 +895,20 @@ def _getLatestDepositPoints(
         userPoints.lastBalance = userLootShare
 
     # Staked assets are not eligible for gen deposit rewards. RipeGov keeps
-    # vault totals because its share is already normalized. Other vaults fund
-    # from attributable underlying: convert aggregate normalized loot share
-    # through the current user's share-to-asset rate so rebasing vaults keep
-    # yield while sub-precision residuals still cannot fill the bucket.
-    # A vault-total of zero is the custody-shortfall circuit breaker.
+    # vault totals because its share is already normalized. Other vaults
+    # convert the checkpointed holder book through the current user's
+    # share-to-asset rate so rebasing vaults keep yield. lastBalance == 0
+    # still cannot fill the bucket (SC-24).
+    # vaultTotal == 0 is the custody-shortfall circuit breaker.
+    # Cap the conversion at vaultTotal so a stale lastBalance (accepted
+    # historical drift; no reset on deploy) and a small holder's floored
+    # rate cannot inflate funding above custody.
+    # Full-exit / empty-user checkpoints have no live rate; use vaultTotal
+    # (unit-correct for every module) rather than lastBalance * precision.
+    # StabVault: getTotalAmountForVault and getTotalAmountForUser each walk
+    # the claimable-asset NAV loop when stakersPointsAlloc == 0.
+    # eligibleShare * userAmount is ≈ total² and stays below uint256
+    # (~1.15e77) for realistic supplies.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
         vaultTotal: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
@@ -914,11 +923,8 @@ def _getLatestDepositPoints(
                 eligibleShare: uint256 = assetPoints.lastBalance * assetPoints.precision
                 assetAmount = eligibleShare * userAmount // rawLootShare
             else:
-                # No live share-to-asset rate. Cap the checkpointed
-                # normalized amount at vault custody; do not fall back to
-                # the unfiltered vault total (SC-24).
-                guessed: uint256 = assetPoints.lastBalance * assetPoints.precision
-                assetAmount = min(guessed, vaultTotal)
+                assetAmount = vaultTotal
+            assetAmount = min(assetAmount, vaultTotal)
         newAssetUsdValue = self._getUsdValueForAmount(_asset, assetAmount, _a.priceDesk)
 
     if newAssetUsdValue != assetPoints.lastUsdValue:
