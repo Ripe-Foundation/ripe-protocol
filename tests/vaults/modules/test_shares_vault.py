@@ -128,6 +128,158 @@ def approve(_spender: address, _amount: uint256) -> bool:
 """
 
 
+BOUNDED_DELTA_TOKEN_SOURCE = """
+# pragma version ~=0.4.3
+
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+hq: public(address)
+
+@deploy
+def __init__(_hq: address):
+    self.hq = _hq
+    self.totalSupply = 1_000_000 * 10 ** 18
+    self.balanceOf[_hq] = self.totalSupply
+
+@view
+@external
+def decimals() -> uint8:
+    return 18
+
+# The token surface is intentionally irrelevant after governance admission.
+@view
+@external
+def UNDERLYING_ASSET_ADDRESS() -> address:
+    return self.hq
+
+@view
+@external
+def POOL() -> address:
+    return self.hq
+
+@view
+@external
+def scaledBalanceOf(_user: address) -> uint256:
+    return self.balanceOf[_user]
+
+@view
+@external
+def baseToken() -> address:
+    return self.hq
+
+@view
+@external
+def totalsBasic() -> (uint64, uint64, uint64, uint64, uint104, uint104, uint40, uint8):
+    return 10 ** 15, 0, 0, 0, 0, 0, 0, 0
+
+@view
+@external
+def userBasic(_user: address) -> (int104, uint64, uint64, uint16, uint8):
+    return 0, 0, 0, 0, 0
+
+@external
+def accrueAccount(_account: address):
+    pass
+
+@external
+def transfer(_recipient: address, _amount: uint256) -> bool:
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_recipient] += _amount + 2
+    self.totalSupply += 2
+    return True
+
+@external
+def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> bool:
+    self.allowance[_sender][msg.sender] -= _amount
+    self.balanceOf[_sender] -= _amount
+    self.balanceOf[_recipient] += _amount
+    return True
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _amount
+    return True
+"""
+
+
+CALLBACK_TOKEN_SOURCE = """
+# pragma version ~=0.4.3
+
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+hq: public(address)
+attackTarget: public(address)
+attackUser: public(address)
+attackVault: public(address)
+attackVaultId: public(uint256)
+attackEnabled: public(bool)
+attackAttempted: public(bool)
+attackSucceeded: public(bool)
+
+@deploy
+def __init__(_hq: address):
+    self.hq = _hq
+    self.totalSupply = 1_000_000 * 10 ** 18
+    self.balanceOf[_hq] = self.totalSupply
+
+@view
+@external
+def decimals() -> uint8:
+    return 18
+
+@external
+def configureAttack(_target: address, _user: address, _vault: address, _vaultId: uint256):
+    assert msg.sender == self.hq
+    self.attackTarget = _target
+    self.attackUser = _user
+    self.attackVault = _vault
+    self.attackVaultId = _vaultId
+    self.attackEnabled = True
+
+@internal
+def _attemptCallback():
+    if self.attackEnabled and not self.attackAttempted:
+        self.attackAttempted = True
+        payload: Bytes[164] = concat(
+            method_id("withdraw(address,uint256,address,address,uint256)"),
+            abi_encode(
+                self,
+                convert(1, uint256),
+                self.attackUser,
+                self.attackVault,
+                self.attackVaultId,
+            ),
+        )
+        self.attackSucceeded = raw_call(
+            self.attackTarget,
+            payload,
+            max_outsize=0,
+            revert_on_failure=False,
+        )
+
+@external
+def transfer(_recipient: address, _amount: uint256) -> bool:
+    self._attemptCallback()
+    self.balanceOf[msg.sender] -= _amount
+    self.balanceOf[_recipient] += _amount
+    return True
+
+@external
+def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> bool:
+    self.allowance[_sender][msg.sender] -= _amount
+    self.balanceOf[_sender] -= _amount
+    self.balanceOf[_recipient] += _amount
+    return True
+
+@external
+def approve(_spender: address, _amount: uint256) -> bool:
+    self.allowance[msg.sender][_spender] = _amount
+    return True
+"""
+
+
 def test_shares_vault_teller_zero_share_deposit_reverts_atomically(
     rebase_erc20_vault,
     alpha_token,
@@ -614,6 +766,56 @@ def test_shares_vault_short_recipient_delivery_reverts_atomically(
     ) == state_before
 
 
+def test_shares_vault_full_short_delivery_reverts_without_consuming_shares(
+    rebase_erc20_vault,
+    governance,
+    bob,
+    alice,
+    teller,
+):
+    """B-OBS-037: a full exit below attainable custody remains atomic."""
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance.address,
+        0,
+        name="shares_vault_full_short_delivery_token",
+    )
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    fee_token.transfer(
+        rebase_erc20_vault, deposit_amount, sender=governance.address
+    )
+    rebase_erc20_vault.depositTokensInVault(
+        bob, fee_token, deposit_amount, sender=teller.address
+    )
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    state_before = (
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        rebase_erc20_vault.totalBalances(fee_token),
+        rebase_erc20_vault.getTotalAmountForUser(bob, fee_token),
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(alice),
+        fee_token.balanceOf(governance),
+    )
+
+    with boa.reverts("invalid recipient delivery"):
+        rebase_erc20_vault.withdrawTokensFromVault(
+            bob,
+            fee_token,
+            MAX_UINT256,
+            alice,
+            sender=teller.address,
+        )
+
+    assert (
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        rebase_erc20_vault.totalBalances(fee_token),
+        rebase_erc20_vault.getTotalAmountForUser(bob, fee_token),
+        fee_token.balanceOf(rebase_erc20_vault),
+        fee_token.balanceOf(alice),
+        fee_token.balanceOf(governance),
+    ) == state_before
+
+
 def test_shares_vault_excess_vault_outflow_reverts_atomically(
     rebase_erc20_vault,
     governance,
@@ -680,6 +882,232 @@ def test_shares_vault_excess_vault_outflow_reverts_atomically(
     ) == state_before
 
 
+def test_governance_admitted_rebase_asset_accepts_bounded_delivery_delta(
+    rebase_erc20_vault,
+    governance,
+    bob,
+    alice,
+    teller,
+):
+    token = boa.loads(
+        BOUNDED_DELTA_TOKEN_SOURCE,
+        governance.address,
+        name="shares_vault_bounded_delta_token",
+    )
+    funding_amount = 100 * EIGHTEEN_DECIMALS
+    token.transfer(
+        rebase_erc20_vault.address,
+        funding_amount,
+        sender=governance.address,
+    )
+    admitted_amount = funding_amount + 2
+    rebase_erc20_vault.depositTokensInVault(
+        bob, token, admitted_amount, sender=teller.address
+    )
+    withdrawal_amount = 40 * EIGHTEEN_DECIMALS
+    shares_before = rebase_erc20_vault.userBalances(bob, token)
+    total_shares_before = rebase_erc20_vault.totalBalances(token)
+    expected_shares = rebase_erc20_vault.amountToShares(
+        token, withdrawal_amount, True
+    )
+    vault_before = token.balanceOf(rebase_erc20_vault.address)
+    recipient_before = token.balanceOf(alice)
+    supply_before = token.totalSupply()
+
+    withdrawn, is_depleted = rebase_erc20_vault.withdrawTokensFromVault(
+        bob,
+        token,
+        withdrawal_amount,
+        alice,
+        sender=teller.address,
+    )
+
+    assert withdrawn == withdrawal_amount
+    assert not is_depleted
+    assert vault_before - token.balanceOf(rebase_erc20_vault.address) == withdrawn
+    assert token.balanceOf(alice) - recipient_before == withdrawal_amount + 2
+    assert shares_before - rebase_erc20_vault.userBalances(bob, token) == expected_shares
+    assert total_shares_before - rebase_erc20_vault.totalBalances(token) == expected_shares
+    assert token.totalSupply() == supply_before + 2
+
+
+def test_governance_admitted_rebase_asset_charges_bounded_actual_outflow(
+    rebase_erc20_vault,
+    governance,
+    bob,
+    alice,
+    sally,
+    teller,
+):
+    token = boa.loads(
+        EXTRA_DEBIT_TOKEN_SOURCE,
+        governance.address,
+        sally,
+        name="shares_vault_bounded_outflow_token",
+    )
+    deposit_amount = 100
+    withdrawal_amount = 20
+    token.transfer(rebase_erc20_vault, deposit_amount, sender=governance.address)
+    rebase_erc20_vault.depositTokensInVault(
+        bob, token, deposit_amount, sender=teller.address
+    )
+    token.setExtraDebitBps(10_00, sender=governance.address)
+
+    expected_outflow = withdrawal_amount + 2
+    expected_shares = rebase_erc20_vault.amountToShares(
+        token, expected_outflow, True
+    )
+    shares_before = rebase_erc20_vault.userBalances(bob, token)
+    total_shares_before = rebase_erc20_vault.totalBalances(token)
+    vault_before = token.balanceOf(rebase_erc20_vault.address)
+    recipient_before = token.balanceOf(alice)
+    fee_before = token.balanceOf(sally)
+
+    withdrawn, is_depleted = rebase_erc20_vault.withdrawTokensFromVault(
+        bob,
+        token,
+        withdrawal_amount,
+        alice,
+        sender=teller.address,
+    )
+
+    assert withdrawn == expected_outflow
+    assert not is_depleted
+    assert vault_before - token.balanceOf(rebase_erc20_vault.address) == expected_outflow
+    assert token.balanceOf(alice) - recipient_before == withdrawal_amount
+    assert token.balanceOf(sally) - fee_before == 2
+    assert shares_before - rebase_erc20_vault.userBalances(bob, token) == expected_shares
+    assert total_shares_before - rebase_erc20_vault.totalBalances(token) == expected_shares
+
+
+def test_teller_callback_token_cannot_reenter_withdrawal(
+    rebase_erc20_vault,
+    vault_book,
+    governance,
+    bob,
+    teller,
+    ledger,
+    mock_price_source,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    callback_token = boa.loads(
+        CALLBACK_TOKEN_SOURCE,
+        governance.address,
+        name="shares_vault_callback_token",
+    )
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    withdrawal_amount = 40 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(callback_token, _vaultIds=[vault_id])
+    mock_price_source.setPrice(callback_token, EIGHTEEN_DECIMALS)
+    callback_token.transfer(bob, deposit_amount, sender=governance.address)
+    callback_token.approve(teller, deposit_amount, sender=bob)
+    teller.deposit(
+        callback_token,
+        deposit_amount,
+        bob,
+        rebase_erc20_vault,
+        vault_id,
+        sender=bob,
+    )
+    callback_token.configureAttack(
+        teller.address,
+        bob,
+        rebase_erc20_vault.address,
+        vault_id,
+        sender=governance.address,
+    )
+    shares_before = rebase_erc20_vault.userBalances(bob, callback_token)
+    expected_shares = rebase_erc20_vault.amountToShares(
+        callback_token, withdrawal_amount, True
+    )
+    vault_before = callback_token.balanceOf(rebase_erc20_vault.address)
+    recipient_before = callback_token.balanceOf(bob)
+
+    withdrawn = teller.withdraw(
+        callback_token,
+        withdrawal_amount,
+        bob,
+        rebase_erc20_vault,
+        vault_id,
+        sender=bob,
+    )
+
+    assert callback_token.attackAttempted()
+    assert not callback_token.attackSucceeded()
+    assert withdrawn == withdrawal_amount
+    assert vault_before - callback_token.balanceOf(rebase_erc20_vault.address) == withdrawn
+    assert callback_token.balanceOf(bob) - recipient_before == withdrawn
+    assert (
+        shares_before - rebase_erc20_vault.userBalances(bob, callback_token)
+        == expected_shares
+    )
+    assert ledger.isParticipatingInVault(bob, vault_id)
+
+
+def test_teller_fee_on_transfer_deposit_reverts_atomically(
+    rebase_erc20_vault,
+    vault_book,
+    governance,
+    bob,
+    teller,
+    ledger,
+    lootbox,
+    mock_price_source,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        governance.address,
+        0,
+        name="shares_vault_fee_deposit_token",
+    )
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(fee_token, _vaultIds=[vault_id])
+    mock_price_source.setPrice(fee_token, EIGHTEEN_DECIMALS)
+    fee_token.transfer(bob, deposit_amount, sender=governance.address)
+    fee_token.setTransferFee(5_00, sender=governance.address)
+    fee_token.approve(teller, deposit_amount, sender=bob)
+    state_before = (
+        fee_token.balanceOf(bob),
+        fee_token.balanceOf(rebase_erc20_vault.address),
+        fee_token.allowance(bob, teller.address),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        rebase_erc20_vault.totalBalances(fee_token),
+        rebase_erc20_vault.getNumUserAssets(bob),
+        ledger.isParticipatingInVault(bob, vault_id),
+        ledger.getDepositLedgerData(bob, vault_id),
+        lootbox.hasUnderscoreRewards(),
+    )
+
+    with boa.reverts("custody mismatch"):
+        teller.deposit(
+            fee_token,
+            deposit_amount,
+            bob,
+            rebase_erc20_vault,
+            vault_id,
+            sender=bob,
+        )
+
+    assert (
+        fee_token.balanceOf(bob),
+        fee_token.balanceOf(rebase_erc20_vault.address),
+        fee_token.allowance(bob, teller.address),
+        rebase_erc20_vault.userBalances(bob, fee_token),
+        rebase_erc20_vault.totalBalances(fee_token),
+        rebase_erc20_vault.getNumUserAssets(bob),
+        ledger.isParticipatingInVault(bob, vault_id),
+        ledger.getDepositLedgerData(bob, vault_id),
+        lootbox.hasUnderscoreRewards(),
+    ) == state_before
+
+
 def test_shares_vault_positive_self_recipient_reverts_atomically(
     rebase_erc20_vault,
     alpha_token,
@@ -703,7 +1131,7 @@ def test_shares_vault_positive_self_recipient_reverts_atomically(
         alpha_token.balanceOf(rebase_erc20_vault),
     )
 
-    with boa.reverts("invalid vault outflow"):
+    with boa.reverts("invalid recipient"):
         rebase_erc20_vault.withdrawTokensFromVault(
             bob,
             alpha_token,

@@ -13,6 +13,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     bond_room,
     ledger,
     lootbox,
+    rebase_erc20_vault,
     ripe_gov_vault,
     human_resources,
     auction_house,
@@ -40,6 +41,9 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "BondRoom": len(bond_room.env.get_code(bond_room.address)),
         "Ledger": len(ledger.env.get_code(ledger.address)),
         "Lootbox": len(lootbox.env.get_code(lootbox.address)),
+        "RebaseErc20": len(
+            rebase_erc20_vault.env.get_code(rebase_erc20_vault.address)
+        ),
         "RipeGov": len(ripe_gov_vault.env.get_code(ripe_gov_vault.address)),
         "HumanResources": len(
             human_resources.env.get_code(human_resources.address)

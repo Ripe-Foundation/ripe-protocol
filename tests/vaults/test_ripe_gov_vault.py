@@ -3,7 +3,7 @@ import boa
 from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS
-from conf_utils import assert_reverted_call
+from conf_utils import assert_reverted_call, filter_logs
 from tests.vaults.ripe_gov_exit_fee_model import (
     DECIMAL_OFFSET,
     HUNDRED_PERCENT,
@@ -2018,18 +2018,26 @@ def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_with_balance(
     assert user_balance == deposit_amount
     assert userData.unlock > boa.env.evm.patch.block_number  # Still locked
     
-    # Get HR initial balance
+    # Get exact strict-path pre-state.
     hr_initial_balance = ripe_token.balanceOf(human_resources.address)
+    vault_initial_balance = ripe_token.balanceOf(ripe_gov_vault.address)
+    user_shares_before = ripe_gov_vault.userBalances(bob, ripe_token)
     
     # Withdraw all tokens (should bypass unlock check)
     withdrawn = ripe_gov_vault.withdrawContributorTokensToBurn(
         bob, sender=human_resources.address
     )
+    event = filter_logs(ripe_gov_vault, "RipeGovVaultWithdrawal")[-1]
     
     # Verify withdrawal worked
     assert withdrawn == deposit_amount
+    assert vault_initial_balance - ripe_token.balanceOf(ripe_gov_vault.address) == withdrawn
     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0  # User depleted
+    assert ripe_gov_vault.userBalances(bob, ripe_token) == 0
+    assert user_shares_before > 0
     assert ripe_token.balanceOf(human_resources.address) == hr_initial_balance + deposit_amount
+    assert event.amount == withdrawn
+    assert event.shares == user_shares_before
 
 
 def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_governance_points_update(
