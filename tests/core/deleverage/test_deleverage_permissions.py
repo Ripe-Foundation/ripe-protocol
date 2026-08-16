@@ -2016,10 +2016,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    # alice calls deleverageForWithdrawal — should NOT revert with "no perms"
-    # Returns False because bob has no debt, but the earn vault permission check passed
+    # alice calls for its own leveraged vault — should NOT revert with "no perms"
+    # Returns False because alice has no debt, but the earn-vault entry check passed.
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt to deleverage, but permission was granted
 
@@ -2060,7 +2060,7 @@ def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
     # setEarnVault already sets basicEarnVault=True as backwards-compatible default
 
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt, but permission passed
 

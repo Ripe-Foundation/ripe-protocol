@@ -2626,6 +2626,8 @@ def test_m1_gov_vault_authorized_deposit_for_another_user(
     mission_control,
     switchboard_alpha,
     teller,
+    setUserConfig,
+    setUserDelegation,
 ):
     setGeneralConfig()
     token = _m1_token()
@@ -2638,6 +2640,19 @@ def test_m1_gov_vault_authorized_deposit_for_another_user(
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
         sender=switchboard_alpha.address,
+    )
+    setUserConfig(
+        bob,
+        _canAnyoneDeposit=True,
+        _canAnyoneRepayDebt=True,
+    )
+    setUserDelegation(
+        bob,
+        mock_undy_v2.address,
+        _canWithdraw=True,
+        _canBorrow=True,
+        _canClaimFromStabPool=True,
+        _canClaimLoot=True,
     )
     amount = 100 * EIGHTEEN_DECIMALS
     token.mint(mock_undy_v2, amount)

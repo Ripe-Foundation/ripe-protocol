@@ -673,6 +673,8 @@ def test_real_gov_vault_shared_deposit_self_vs_authorized_helper(
     setGeneralDebtConfig,
     setAssetConfig,
     performDeposit,
+    setUserConfig,
+    setUserDelegation,
 ):
     vault_id = _setup_victim(
         bob,
@@ -703,6 +705,19 @@ def test_real_gov_vault_shared_deposit_self_vs_authorized_helper(
     # enforcement and the self-call contrast would be a false negative.
     mock_undy_v2.setAllAddressesAreVaults(False)
     mock_undy_v2.setEarnVault(mock_undy_v2.address, True)
+    setUserConfig(
+        bob,
+        _canAnyoneDeposit=True,
+        _canAnyoneRepayDebt=True,
+    )
+    setUserDelegation(
+        bob,
+        mock_undy_v2.address,
+        _canWithdraw=True,
+        _canBorrow=True,
+        _canClaimFromStabPool=True,
+        _canClaimLoot=True,
+    )
     amount = EIGHTEEN_DECIMALS
     action_block = _start_fresh_action_block(
         mission_control,
