@@ -5,8 +5,10 @@ the mechanism does, how a purchase moves through the protocol, how the epoch
 controller changes the next rate, how governance intervenes, and which production
 decisions are still deliberately blocked.
 
-> **Current status — contract candidate, not an active product.** The production
-> source checkpoint is `5d12e60070d6892ce481813b27784bbe2dcfd43b` on branch
+> **Current status — contract candidate, not an active product.** The Instant Bond
+> branch contains feature checkpoint `5d12e60070d6892ce481813b27784bbe2dcfd43b`
+> and integrates `rh-audit-remediation@c9ae47e1854e676b5846c98baa40f5d0fdfaf324` through merge
+> checkpoint `428fa5ed15b396717f833f96cb961f5fb460c88e` on branch
 > `instant-bond-lane`, proposed by draft PR
 > [#156](https://github.com/Ripe-Foundation/ripe-protocol/pull/156) against `rh`.
 > The contracts, tests, generated ABIs, and deterministic controller model are
@@ -458,10 +460,12 @@ Anyone changing this feature should treat these as hard boundaries:
 - Foxtrot's nonzero action-timelock proposal guard; and
 - the registered-switchboard authority model plus deployment-time route inventory.
 
-Contract size is a practical constraint. At the production-source checkpoint, deployed
-runtime was 12,905 bytes for Lane against a 13,000-byte project ceiling and 6,075 bytes
-for Foxtrot against 6,500 bytes. Recompile and remeasure after every production-source
-change; do not weaken a safety check merely to recover bytes.
+Contract size is a practical constraint. Post-remediation-integration deployed runtime
+is 12,905 bytes for Lane against a 13,000-byte project ceiling and 6,163 bytes for
+Foxtrot against 6,500 bytes. The Foxtrot increase comes from the newly integrated
+shared governance modules; the complete feature gate remains green. Recompile and
+remeasure after every production-source or imported-module change, and do not weaken a
+safety check merely to recover bytes.
 
 ## What is deliberately not implemented
 
@@ -543,6 +547,12 @@ coverage caches outside the worktree when reproducing final evidence.
 
 Current production-source evidence is recorded in
 [`implementation-spec.md` §20.7](implementation-spec.md#207-revision-23-pr-156-remediation-authority-and-evidence).
+That section records the original revision-23 remediation checkpoint. The later
+17 August 2026 integration of `rh-audit-remediation@c9ae47e` was independently rerun
+against the merged tree: 211 tests passed, two credential-gated fork tests skipped,
+Lane coverage was 85.03%, Foxtrot coverage was 93.98%, all 57 ABI outputs and the
+source-bound controller artifact were current, and the activation draft remained
+valid and blocked.
 
 ## Agent change checklist
 
