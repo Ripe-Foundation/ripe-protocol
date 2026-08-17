@@ -20,6 +20,7 @@ SHARES_CHECKPOINT_CEILING = 66_000
 REDEMPTION_CEILING = 300_000
 AUCTION_CEILING = 295_000
 STAB_LIQ_CEILINGS = {1: 540_000, 2: 840_000, 5: 1_735_000}
+DELEVERAGE_MANY_CEILING = 400_000
 
 
 def _print_gas(label, gas_used, ceiling):
@@ -320,3 +321,59 @@ def test_gas_stab_liquidation(
     )
     for user in users:
         assert credit_engine.getUserDebtAmount(user) < debt_amount
+
+
+def test_gas_deleverage_many_users(
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    performDeposit,
+    mock_price_source,
+    teller,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_alpha,
+    bob,
+    credit_engine,
+):
+    # Trusted batch path that actually settles (endaoment transfer), so the
+    # per-user Addys re-resolution on _checkpointSender is measured.
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    setRipeRewardsConfig(True, 10, 0, 0, 0, 10_000)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _debtTerms=createDebtTerms(
+            _ltv=80_00,
+            _redemptionThreshold=85_00,
+            _liqThreshold=90_00,
+            _liqFee=0,
+            _borrowRate=0,
+        ),
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityLiqAssetVaults(
+        [(vault_id, alpha_token)], sender=switchboard_alpha.address
+    )
+    performDeposit(bob, 1_000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    teller.borrow(200 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    gas_before = boa.env.get_gas_used()
+    teller.deleverageManyUsers([(bob, 0)], sender=switchboard_alpha.address)
+    _print_gas("deleverage_many_one_user", boa.env.get_gas_used() - gas_before, DELEVERAGE_MANY_CEILING)
+    assert credit_engine.getUserDebtAmount(bob) < debt_before

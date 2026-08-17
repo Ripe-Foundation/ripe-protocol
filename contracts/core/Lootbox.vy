@@ -980,7 +980,18 @@ def _getEligibleUnderlying(
         if len(response) != 32:
             return 0
         return min(abi_decode(response, uint256), usable)
-    if staticcall VaultShareTotals(_vaultAddr).totalBalances(_asset) == usable:
+    # Fail closed: missing, reverting, short, or overlong totalBalances
+    # must fund zero. Do not use a typed staticcall here.
+    totalsOk: bool = False
+    totalsResponse: Bytes[33] = b""
+    totalsOk, totalsResponse = raw_call(
+        _vaultAddr,
+        abi_encode(_asset, method_id=method_id("totalBalances(address)")),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if totalsOk and len(totalsResponse) == 32 and abi_decode(totalsResponse, uint256) == usable:
         return min(eligibleNominal, usable)
     return 0
 

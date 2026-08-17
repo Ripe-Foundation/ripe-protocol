@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import MAX_UINT256, ZERO_ADDRESS
+from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -574,6 +574,16 @@ def test_auction_params_direct_validator_boundaries(switchboard_alpha):
     )
     assert not switchboard_alpha.areValidAuctionParams(
         (True, 10_00, 100_01, valid_delay, valid_duration)
+    )
+    max_safe_duration = MAX_UINT256 // HUNDRED_PERCENT
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, 0, max_safe_duration)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, 0, max_safe_duration + 1)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, MAX_UINT256 - max_safe_duration + 1, max_safe_duration)
     )
 
 

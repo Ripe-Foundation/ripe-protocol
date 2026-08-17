@@ -32,6 +32,39 @@ def assert_reverted_call(error, expected_reason, contract):
     assert computation.is_error
 
 
+def install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+    from pathlib import Path
+
+    source = Path("contracts/core/Lootbox.vy").read_text()
+    needle = """@external
+def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    assert source.count(needle) == 1
+    source = source.replace(
+        needle,
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
+        1,
+    )
+    mutant = boa.loads(
+        source,
+        ripe_hq.address,
+        43_200,
+        43_200,
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        name="lootbox_user_checkpoint_trap",
+    )
+    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
+
+
 @pytest.fixture
 def registerVault(vault_book, governance):
     def registerVault(vault, description):

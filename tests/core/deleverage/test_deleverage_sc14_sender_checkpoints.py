@@ -1,42 +1,12 @@
-from pathlib import Path
-
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256
+from conf_utils import filter_logs, install_lootbox_user_checkpoint_trap
 
 
 PRECISION_18 = 10 ** 9
 
-
-def _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
-    source = Path("contracts/core/Lootbox.vy").read_text()
-    needle = """@external
-def updateDepositPoints(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _a: addys.Addys = empty(addys.Addys),
-):
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
-"""
-    assert source.count(needle) == 1
-    source = source.replace(
-        needle,
-        needle + f'    assert _user != {blocked_user}, "sc14 trap"\n',
-        1,
-    )
-    mutant = boa.loads(
-        source,
-        ripe_hq.address,
-        43_200,
-        43_200,
-        100 * EIGHTEEN_DECIMALS,
-        100 * EIGHTEEN_DECIMALS,
-        name="lootbox_user_checkpoint_trap",
-    )
-    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
+_install_lootbox_user_checkpoint_trap = install_lootbox_user_checkpoint_trap
 
 
 def _enable_gen_rewards(setRipeRewardsConfig):
@@ -267,9 +237,13 @@ def test_sc14_swap_collateral_sender_checkpoint_revert_is_atomic(
         "user_points": ledger.userDepositPoints(bob, vault_id, alpha_token),
         "asset_points": ledger.assetDepositPoints(vault_id, alpha_token),
         "global_points": ledger.globalDepositPoints(),
+        "debt": ledger.userDebt(bob).amount,
+        "bravo_allowance": bravo_token.allowance(governance, deleverage.address),
+        "bravo_gov": bravo_token.balanceOf(governance),
+        "bravo_vault": simple_erc20_vault.userBalances(bob, bravo_token),
     }
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
-    with boa.reverts("sc14 trap"):
+    with boa.reverts():
         deleverage.swapCollateral(
             bob,
             vault_id,
@@ -285,6 +259,11 @@ def test_sc14_swap_collateral_sender_checkpoint_revert_is_atomic(
     assert ledger.userDepositPoints(bob, vault_id, alpha_token) == state["user_points"]
     assert ledger.assetDepositPoints(vault_id, alpha_token) == state["asset_points"]
     assert ledger.globalDepositPoints() == state["global_points"]
+    assert ledger.userDebt(bob).amount == state["debt"]
+    assert bravo_token.allowance(governance, deleverage.address) == state["bravo_allowance"]
+    assert bravo_token.balanceOf(governance) == state["bravo_gov"]
+    assert simple_erc20_vault.userBalances(bob, bravo_token) == state["bravo_vault"]
+    assert filter_logs(deleverage, "CollateralSwapped") == []
 
 
 def test_sc14_endaoment_sender_checkpoint_revert_is_atomic(
@@ -302,6 +281,8 @@ def test_sc14_endaoment_sender_checkpoint_revert_is_atomic(
     vault_book,
     simple_erc20_vault,
     ripe_hq,
+    deleverage,
+    endaoment_funds,
     alpha_token,
     alpha_token_whale,
     bob,
@@ -348,9 +329,10 @@ def test_sc14_endaoment_sender_checkpoint_revert_is_atomic(
         "asset_points": ledger.assetDepositPoints(vault_id, alpha_token),
         "global_points": ledger.globalDepositPoints(),
         "debt": ledger.userDebt(bob).amount,
+        "endaoment_tokens": alpha_token.balanceOf(endaoment_funds),
     }
     _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
-    with boa.reverts("sc14 trap"):
+    with boa.reverts():
         teller.deleverageManyUsers([(bob, 0)], sender=switchboard_alpha.address)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["user_balance"]
     assert alpha_token.balanceOf(simple_erc20_vault) == state["vault_tokens"]
@@ -358,3 +340,6 @@ def test_sc14_endaoment_sender_checkpoint_revert_is_atomic(
     assert ledger.assetDepositPoints(vault_id, alpha_token) == state["asset_points"]
     assert ledger.globalDepositPoints() == state["global_points"]
     assert ledger.userDebt(bob).amount == state["debt"]
+    assert alpha_token.balanceOf(endaoment_funds) == state["endaoment_tokens"]
+    assert filter_logs(deleverage, "DeleverageUser") == []
+    assert filter_logs(deleverage, "EndaomentTransferDuringDeleverage") == []

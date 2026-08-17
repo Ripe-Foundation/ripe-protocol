@@ -1960,7 +1960,12 @@ def test_lootbox_points_update_after_donation_and_total_loss(
     assert donated_user.balancePoints == expected_user_weight * 10
     assert donated_user.lastBalance == expected_user_weight
     assert donated_asset.lastBalance == expected_user_weight
-    assert donated_asset.lastUsdValue == (100 if vault_kind == "simple" else 200)
+    # SC-24 funds the holder-book conversion, not raw vault custody.
+    # After a same-size donation, SharesVault.sharesToAmount / getTotalAmountForUser
+    # is 200e18-1 wei (dead-share dilution). Lootbox stores whole USD, so
+    # rebase lastUsdValue is 199; a donation does not mint a reward dollar.
+    holder_claim = vault.getTotalAmountForUser(bob, stock_token)
+    assert donated_asset.lastUsdValue == holder_claim // EIGHTEEN_DECIMALS
 
     boa.env.time_travel(blocks=10)
     stock_token.adminBurn(vault, 2 * amount, sender=deploy3r)

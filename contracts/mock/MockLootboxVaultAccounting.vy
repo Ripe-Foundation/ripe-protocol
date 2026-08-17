@@ -37,13 +37,15 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 @view
 @external
 def totalBalances(_asset: address) -> uint256:
+    if self.mode == 5:
+        raise "reverting totals"
     return self.shares
 
 
 @view
 @external
 def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
-    if self.mode == 1:
+    if self.mode == 1 or self.mode == 5:
         raise "reverting conversion"
     if self.mode == 4:
         return 0

@@ -1221,6 +1221,7 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
 @view
 @internal
 def _canDeleverageUserDebtPosition(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
+    # Zero threshold cannot be inverted; treat it as not near redemption.
     if _redemptionThreshold == 0:
         return False
     return _collateralVal <= _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
@@ -1237,6 +1238,9 @@ def _checkpointSender(
     _asset: address,
     _lootbox: address,
 ):
+    # Post-mutation only: the wrapper has no vaultId, so checkpoint the
+    # sender against the live share after withdrawTokensFromVault. Callers
+    # omit Addys so Lootbox resolves protocol addresses itself.
     extcall LootBox(_lootbox).updateDepositPoints(_user, _vaultId, _vaultAddr, _asset)
 
 

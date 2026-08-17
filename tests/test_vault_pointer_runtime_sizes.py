@@ -21,6 +21,14 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     credit_redeem,
     deleverage,
     stability_pool,
+    blue_chip_prices,
+    chainlink,
+    curve_prices,
+    pyth_prices,
+    redstone,
+    stork_prices,
+    undy_vault_prices,
+    wsuper_oethb_prices,
 ):
     deployed_runtime_bytes = {
         "MissionControl": len(mission_control.env.get_code(mission_control.address)),
@@ -54,6 +62,14 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
         "Deleverage": len(deleverage.env.get_code(deleverage.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
+        "BlueChipYieldPrices": len(blue_chip_prices.env.get_code(blue_chip_prices.address)),
+        "ChainlinkPrices": len(chainlink.env.get_code(chainlink.address)),
+        "CurvePrices": len(curve_prices.env.get_code(curve_prices.address)),
+        "PythPrices": len(pyth_prices.env.get_code(pyth_prices.address)),
+        "RedStone": len(redstone.env.get_code(redstone.address)),
+        "StorkPrices": len(stork_prices.env.get_code(stork_prices.address)),
+        "UndyVaultPrices": len(undy_vault_prices.env.get_code(undy_vault_prices.address)),
+        "wsuperOETHbPrices": len(wsuper_oethb_prices.env.get_code(wsuper_oethb_prices.address)),
     }
     print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
 
@@ -65,6 +81,6 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     oversized = {
         name: size
         for name, size in deployed_runtime_bytes.items()
-        if size > EIP170_LIMIT
+        if size >= EIP170_LIMIT
     }
-    assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    assert not oversized, f"EIP-170 runtime limit reached or exceeded: {oversized}"

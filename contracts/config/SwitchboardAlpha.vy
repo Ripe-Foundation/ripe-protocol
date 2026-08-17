@@ -888,7 +888,10 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.delay == max_value(uint256):
         return False
-    if _params.duration == 0 or _params.duration == max_value(uint256):
+    # Cap so (duration-1)*(maxDiscount-startDiscount) cannot overflow.
+    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT:
+        return False
+    if _params.delay > max_value(uint256) - _params.duration:
         return False
     return True
 

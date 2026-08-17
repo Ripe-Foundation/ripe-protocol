@@ -1177,7 +1177,13 @@ def _buyFungibleAuction(
     # zero on a one-block auction.
     discount: uint256 = auc.maxDiscount
     if auc.endBlock > auc.startBlock + 1:
-        discount = auc.startDiscount + (block.number - auc.startBlock) * (auc.maxDiscount - auc.startDiscount) // (auc.endBlock - auc.startBlock - 1)
+        deltaBlocks: uint256 = block.number - auc.startBlock
+        deltaDisc: uint256 = auc.maxDiscount - auc.startDiscount
+        # Switchboard caps duration so this multiply cannot overflow for
+        # newly configured auctions. Keep maxDiscount (buyer-favorable)
+        # if a stored window would still overflow.
+        if deltaDisc == 0 or deltaBlocks <= max_value(uint256) // deltaDisc:
+            discount = auc.startDiscount + deltaBlocks * deltaDisc // (auc.endBlock - auc.startBlock - 1)
 
     # get vault addr
     liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)

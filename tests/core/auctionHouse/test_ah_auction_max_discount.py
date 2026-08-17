@@ -1,6 +1,6 @@
 import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ONE_YEAR
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, MAX_UINT256, ONE_YEAR
 from conf_utils import buy_fungible_auction, filter_logs
 
 
@@ -366,6 +366,67 @@ def test_sc30_duration_one_uses_max_discount_on_only_purchasable_block(
     assert not ledger.hasFungibleAuction(bob, auction.vaultId, alpha_token)
 
 
+def test_sc30_duration_two_starts_at_start_discount_and_ends_at_max(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    auction_house,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+    sally,
+):
+    start_discount = 10_00
+    max_discount = 40_00
+    auction = _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        start_discount,
+        max_discount,
+        2,
+    )
+    assert auction.endBlock == auction.startBlock + 2
+    price = 40 * EIGHTEEN_DECIMALS // 100
+    green_token.transfer(alice, 40 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 40 * EIGHTEEN_DECIMALS, sender=alice)
+    spend = 5 * EIGHTEEN_DECIMALS
+
+    _advance_to_block(auction.startBlock)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(teller, bob, auction.vaultId, alpha_token, spend, False, sender=alice)
+    _assert_discount(
+        _discount_from_purchase(spent, alpha_token.balanceOf(alice) - before, price),
+        start_discount,
+    )
+
+    _advance_to_block(auction.endBlock - 1)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(teller, bob, auction.vaultId, alpha_token, spend, False, sender=alice)
+    _assert_discount(
+        _discount_from_purchase(spent, alpha_token.balanceOf(alice) - before, price),
+        max_discount,
+    )
+
+
 def test_sc30_zero_length_window_cannot_be_purchased(
     setGeneralConfig,
     setAssetConfig,
@@ -437,6 +498,86 @@ def test_sc30_zero_length_window_cannot_be_purchased(
         )
 
 
+def test_sc30_stored_overflowing_window_purchases_at_max_discount(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    auction_house,
+    ledger,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+    sally,
+):
+    # Switchboard now rejects this duration. A stored auction in the old
+    # overflowing domain must still settle at maxDiscount instead of revert.
+    start_discount = 0
+    max_discount = 50_00
+    auction = _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        start_discount,
+        max_discount,
+        20,
+    )
+    overflowing_duration = MAX_UINT256 // max_discount + 2
+    stored = ledger.getFungibleAuction(bob, auction.vaultId, alpha_token)
+    assert ledger.setFungibleAuction(
+        bob,
+        auction.vaultId,
+        alpha_token,
+        (
+            stored.liqUser,
+            stored.vaultId,
+            stored.asset,
+            stored.startDiscount,
+            stored.maxDiscount,
+            stored.startBlock,
+            stored.startBlock + overflowing_duration,
+            stored.isActive,
+        ),
+        sender=auction_house.address,
+    )
+    overflow_block = stored.startBlock + MAX_UINT256 // max_discount + 1
+    boa.env.evm.patch.block_number = overflow_block
+    price = 40 * EIGHTEEN_DECIMALS // 100
+    green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
+    before = alpha_token.balanceOf(alice)
+    spent = buy_fungible_auction(
+        teller,
+        bob,
+        auction.vaultId,
+        alpha_token,
+        4 * EIGHTEEN_DECIMALS,
+        False,
+        sender=alice,
+    )
+    _assert_discount(
+        _discount_from_purchase(spent, alpha_token.balanceOf(alice) - before, price),
+        max_discount,
+    )
+
+
 def test_sc30_max_duration_and_rounding_never_exceed_max_discount(
     setGeneralConfig,
     setAssetConfig,
@@ -455,8 +596,9 @@ def test_sc30_max_duration_and_rounding_never_exceed_max_discount(
     alice,
     sally,
 ):
-    # Switchboard rejects only duration 0 and max_value(uint256). 1_000_000 is
-    # a large governance-valid duration above the live 43,200-block default.
+    # 1_000_000 is a large but ordinary governance-valid duration, not the
+    # interpolation overflow boundary. That bound is covered by
+    # areValidAuctionParams and the overflow-safe purchase path.
     start_discount = 1_00
     max_discount = 50_00
     duration = 1_000_000

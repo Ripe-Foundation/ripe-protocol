@@ -176,6 +176,119 @@ def test_sc24_unavailable_selector_with_mismatch_funds_zero_not_nominal(
     assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != NOMINAL_USD
 
 
+def test_sc24_missing_total_balances_funds_zero_without_revert(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    registerVault,
+    ledger,
+    lootbox,
+    teller,
+):
+    mock = boa.load("contracts/mock/MockLootboxVaultNoTotals.vy")
+    vault_id = registerVault(mock, "sc24 no totals")
+    _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock.configure(USABLE_TEN, LOOT_TEN_USD)
+    lootbox.updateDepositPoints(bob, vault_id, mock, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != NOMINAL_USD
+
+
+def test_sc24_reverting_total_balances_funds_zero_without_revert(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    registerVault,
+    ledger,
+    lootbox,
+    teller,
+):
+    mock, vault_id = _mock_vault(registerVault)
+    _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    # Mode 5 fails sharesToAmount and totalBalances so the fallback is reached
+    # and must fund zero instead of reverting the checkpoint.
+    mock.configure(USABLE_TEN, USABLE_TEN, LOOT_TEN_USD, 5, 0)
+    lootbox.updateDepositPoints(bob, vault_id, mock, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != NOMINAL_USD
+
+
+def test_sc24_short_total_balances_funds_zero_without_revert(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    registerVault,
+    ledger,
+    lootbox,
+    teller,
+):
+    mock = boa.load("contracts/mock/MockLootboxVaultTotalsVoid.vy")
+    vault_id = registerVault(mock, "sc24 totals void")
+    _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock.configure(USABLE_TEN, LOOT_TEN_USD)
+    lootbox.updateDepositPoints(bob, vault_id, mock, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != NOMINAL_USD
+
+
+def test_sc24_overlong_total_balances_funds_zero_without_revert(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    registerVault,
+    ledger,
+    lootbox,
+    teller,
+):
+    mock = boa.load("contracts/mock/MockLootboxVaultTotalsMalformed.vy")
+    vault_id = registerVault(mock, "sc24 totals overlong")
+    _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock.configure(USABLE_TEN, LOOT_TEN_USD, b"\xff" * 33)
+    lootbox.updateDepositPoints(bob, vault_id, mock, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue != NOMINAL_USD
+
+
+def test_sc24_checkpoint_then_basic_withdrawal_stays_live(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    _configure(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    amount = 10 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    withdrawn = teller.withdraw(alpha_token, amount // 2, bob, simple_erc20_vault, sender=bob)
+    assert withdrawn == amount // 2
+
+
 def test_sc24_reverting_conversion_with_equality_is_nominal_compatible(
     alpha_token,
     bob,

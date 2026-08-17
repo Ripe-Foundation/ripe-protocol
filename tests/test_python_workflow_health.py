@@ -38,6 +38,7 @@ LEAN_SHARD_ARGUMENTS = {
         "tests/core/auctionHouse",
         "tests/core/boardroom",
         "tests/core/test_stale_vault_replacement.py",
+        "tests/core/test_sc24_gas_matrix.py",
     ),
     "vaults": (
         "tests/vaults",
@@ -431,6 +432,7 @@ def test_python_workflow_enforces_bluechip_and_curve_snapshot_gas_budgets():
     assert command.count(
         "tests/priceSources/curve/test_robinhood_launch_route.py"
     ) == 1
+    assert command.count("tests/core/test_sc24_gas_matrix.py") == 1
     assert "if grep" not in command
 
 
