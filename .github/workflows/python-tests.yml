@@ -10,8 +10,17 @@ on:
       - rh
       - rh-audit-remediation
   push:
+    # Also runs on the integration branches, and not only for signal: a cache
+    # written during a pull_request run is scoped to that pull request, so PRs
+    # can never share one. Only a run on the base branch itself writes a cache
+    # that later PRs targeting it can restore. Without this the Titanoboa
+    # compiler cache never hits, every job recompiles every contract, and the
+    # lean lane pays roughly 1.7x (measured: 138s warm vs 235s cold on the
+    # vaults-gov shard).
     branches:
       - master
+      - rh
+      - rh-audit-remediation
   workflow_dispatch:
     inputs:
       lane:

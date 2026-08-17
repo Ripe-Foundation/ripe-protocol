@@ -225,7 +225,13 @@ def test_python_workflow_routes_automatic_events_to_one_lean_lane():
         "rh",
         "rh-audit-remediation",
     ]
-    assert workflow["on"]["push"]["branches"] == ["master"]
+    # Integration branches must be included: only a run on the base branch
+    # writes a Titanoboa cache that later PRs targeting it can restore.
+    assert workflow["on"]["push"]["branches"] == [
+        "master",
+        "rh",
+        "rh-audit-remediation",
+    ]
     assert workflow["permissions"] == {"contents": "read"}
 
     dispatch_lane = workflow["on"]["workflow_dispatch"]["inputs"]["lane"]
