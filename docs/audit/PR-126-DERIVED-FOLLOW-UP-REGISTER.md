@@ -4,9 +4,9 @@
 
 **Integration branch:** `rh-audit-remediation`
 
-**Source snapshot:** `cfdaa8a92e89b7cb78fd731787f9fcbf9c38a724`
+**Source snapshot:** `07c3c96cf9f8c0cdac7a78fcb3cdf837f56da9fc`
 
-**Checked:** 2026-08-16
+**Checked:** 2026-08-17
 
 **Purpose:** retain contract findings, conditional risks, test gaps, owner decisions,
 and live-configuration exposures discovered while remediating the original PR #126
@@ -34,22 +34,21 @@ being represented as an active exploit.
 
 | Issue | Classification | Current disposition |
 | --- | --- | --- |
-| [#161](https://github.com/Ripe-Foundation/ripe-protocol/issues/161) — Teller user-bound Underscore authorization | Activation gate / contract work | Active local SC-13 work binds registered Legos to a user-specific grant through `TellerUtils` and narrows Deleverage trust. This issue also owns the RipeGov forced-release/fee-harvest path; it is not a separate untracked finding. Do not enable a nonzero Underscore registry until the implementation is reviewed and merged. |
+| [#161](https://github.com/Ripe-Foundation/ripe-protocol/issues/161) — Teller user-bound Underscore authorization | Activation/deployment gate | The production-contract remediation merged into `rh-audit-remediation` through PR [#170](https://github.com/Ripe-Foundation/ripe-protocol/pull/170). Registered Underscore Legos are now bound to user grants on the affected Teller routes, and Deleverage no longer grants registry-only cross-user trust. The issue remains open while the aggregate is not on the default branch and Underscore remains disabled; do not activate a nonzero registry until the remediated contracts are deployed and the configuration is verified. |
 | [#160](https://github.com/Ripe-Foundation/ripe-protocol/issues/160) — AuctionHouse fee-free retry liveness | Activation gate | No on-chain keeper reward exists for fee-free retries. Require the protocol-operated monitor/keeper before activating the behavior. This is operational unless a later design requires an on-chain incentive. |
 | [#159](https://github.com/Ripe-Foundation/ripe-protocol/issues/159) — AuctionHouse provenance and optional test hardening | Test/release maintenance | Optional shared test helper and cold-key maximum-batch gas regression. No open production-contract defect. |
 | [#154](https://github.com/Ripe-Foundation/ripe-protocol/issues/154) — CreditEngine C2 gas identity | Test/release maintenance | Reassess after the artifact-process simplification and PR #146. No open production-contract defect established by this issue. |
-| [#153](https://github.com/Ripe-Foundation/ripe-protocol/issues/153) — CreditEngine auction repayment bound | Open — contract hardening | AuctionHouse currently caps repayment before collateral transfer, but `CreditEngine.repayDuringAuctionPurchase` does not independently reject a repayment above live debt. Add the defense-in-depth check when CreditEngine is already being changed if the complete deployed runtime remains below EIP-170; otherwise record a deliberate deferral. PR #169 does not include this issue. |
+| [#153](https://github.com/Ripe-Foundation/ripe-protocol/issues/153) — CreditEngine auction repayment bound | Open — contract hardening | AuctionHouse currently caps repayment before collateral transfer, but `CreditEngine.repayDuringAuctionPurchase` does not independently reject a repayment above live debt. PR #169 changes CreditEngine but does not add this defense-in-depth bound. Reassess against the final post-#169 runtime; implement only if the deployed contract remains below EIP-170, otherwise record a deliberate deferral. |
 | [#150](https://github.com/Ripe-Foundation/ripe-protocol/issues/150) — Base RipeGov migration rebind | Deployment/migration | Rebase and requalify the separate Base migration after SC-12. Not an RH production-contract defect. |
 
-## 2. Original finding work still open or in flight
+## 2. Original finding dispositions and work still in flight
 
 | Finding | Status at this snapshot | Required closure |
 | --- | --- | --- |
-| SC-03 — **High** — sGREEN first-depositor donation | Owner-selected operational containment; the unseeded contract behavior remains technically vulnerable | The owner chose not to add virtual/dead shares. Seed and retain the first governance-held shares before borrowing is enabled, verify them on-chain, and prevent the seed from being withdrawn. Treat this as the remaining High until that launch invariant is durably enforced and read back on-chain. |
-| SC-10 — account-wide quarantine / signal split | Owner decision; related experimental worktree exists | Decide whether one unsafe positive-LTV asset should quarantine the whole account or only that asset. The experimental issuer-burn/unwind work changes previously accepted RH-D028 behavior and overlaps CreditEngine/AuctionHouse work; do not merge it as a mechanical cleanup. |
-| SC-13 — Underscore cross-user authority | In progress | Finish and review the user-bound `TellerUtils`/Deleverage change, including unrelated-Lego negative tests and the RipeGov forced-release route. Issue #161 remains the activation blocker. |
-| SC-14 — reward checkpoint sender omission | Open; not included in PR #169 | Checkpoint the sender before liquidation/redemption collateral leaves, checkpoint the recipient after an internal transfer, and prove atomic rollback. Preserve behavior while the relevant reward allocations are zero. |
-| SC-24, SC-25, SC-26, SC-30 | In PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) | Review and merge only after its focused contract behavior and final CI are green. |
+| SC-10 — account-wide quarantine / signal split | Accepted residual | Preserve the current whole-account quarantine when any positive-LTV asset is unsafe. The owner explicitly rejected the experimental asset-local branch for this remediation wave. Reopen only through a separately reviewed product/security decision. |
+| SC-13 — Underscore cross-user authority | Fixed in the remediation branch | PR [#170](https://github.com/Ripe-Foundation/ripe-protocol/pull/170) merged the user-bound TellerUtils/Deleverage remediation and focused adversarial coverage. Issue #161 remains an activation/deployment gate while Underscore is disabled and the aggregate contracts are not deployed. |
+| SC-14 — reward checkpoint sender omission | In PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) | PR #169 now covers AuctionHouse, CreditEngine, and Deleverage sender checkpoints, internal-transfer recipient checkpoints, and rollback behavior. Do not treat SC-14 as an independent unassigned task. Merge only after the current branch is contract-reviewed, deployable under EIP-170, and green. |
+| SC-24, SC-25, SC-26, SC-30 | In PR [#169](https://github.com/Ripe-Foundation/ripe-protocol/pull/169) | The rebased implementation remains under review. Resolve all review and CI findings, then re-review the final smart-contract behavior before merge. |
 | SC-28 — hardcoded `wsuperOETHb` fallbacks | Dormant non-RH integration hazard | Before enabling the source, remove or safely govern the literal MCBETH price of `1` and VVV default of `$2.40`, or enforce an exclusion that prevents them from becoming protocol-consumable fallback prices. |
 
 ## 3. Derived production-contract findings and assessments
@@ -73,30 +72,36 @@ authorization invariant, if any.
 
 ### DER-02 — Stability Pool dormant dust is stranded after a full exit
 
-**Status:** Open — bounded liveness residual; sole current strict xfail
+**Status:** Accepted residual, ratified in PR #174; strict xfail retained
 
 **Where:** `tests/vaults/modules/test_stab_vault_hardening.py`, DV-15
 
 A sub-activation claim remains directly claimable while the economic owner holds
-Stability Pool shares. After a complete share exit, that claim becomes unreachable
-to the owner until another liquidation replenishes the same pair enough to activate
-it. The amount is bounded below `$0.10` per pair at entry by the selected threshold,
-but later value appreciation and multiple pairs remain operational considerations.
+Stability Pool shares. After a complete share exit, that value is not paid to the
+exiting cohort and may later reach a new cohort through the deployed paused
+activation path. PR [#174](https://github.com/Ripe-Foundation/ripe-protocol/pull/174)
+established that dormant value is outside NAV immediately before exit and recorded
+the owner's acceptance of the unpaid-but-bounded residual. “Bounded” refers to
+below-`$0.10` entry plus finite configured-pair exposure; appreciation can increase a
+dormant pair before maintenance activates it.
 
-**Next action:** either retain the accepted governed-replenishment/runbook policy or
-authorize a recovery/redistribution design. A contract fix likely needs a new
-external recovery surface and an explicit ownership policy.
+**Next action:** retain event monitoring, best-effort claim-before-exit warnings, and
+the planned-maintenance activation procedure. Reopen only if monitoring cannot be
+maintained, activation fails, aggregate exposure becomes material, or observed user
+impact invalidates the accepted handling.
 
 ### DER-03 — Multi-holder indexed-token full exit can remain rounding-blocked
 
-**Status:** Conditional liveness residual accepted in PR #163
+**Status:** Activation gate confirmed and retained in PR #174
 
 **Where:** SharesVault withdrawal behavior for Comet-style indexed tokens
 
-PR #163 intentionally chose a minimal exact-custody fix. Partial withdrawals and a
-sole-holder full exit are qualified, but a multi-holder Comet full exit can still
-revert at an unfavorable index-rounding boundary rather than charge the rounding
-difference to remaining holders.
+PR #163 intentionally chose a minimal exact-custody fix. PR
+[#174](https://github.com/Ripe-Foundation/ripe-protocol/pull/174) then reproduced the
+real cWETHv3 multi-holder full-exit boundary and confirmed that the exiting holder's
+maximum attainable delivery can remain below the theoretical claim while the peer
+loses nothing. Current configured Comet position tokens were observed deposit-disabled
+with zero shares.
 
 **Next action:** treat this as an enablement gate for affected Comet assets. If those
 assets will be admitted, select a token-aware full-exit policy and add exact
@@ -133,54 +138,55 @@ reason-specific on-chain signal from the skip itself.
 event/status surface only if operational response requires the distinction; do not
 weaken the fail-soft behavior.
 
-### DER-06 — BasicVault total-issuer-burn policy remains unsettled
+### DER-06 — BasicVault total-issuer-burn policy disposition
 
-**Status:** Owner decision / overlapping experimental work
+**Status:** Accepted residual; account-wide fail-closed behavior retained
 
 **Where:** BasicVault consumers, CreditEngine, CreditRedeem, AuctionHouse, Deleverage
 
-Current integrated behavior can quarantine an entire account when a single
-positive-LTV asset loses all backing. An experimental worktree changes this to
-asset-local deficit handling so healthy collateral remains actionable. That is a
-security/product policy change, not a mechanical follow-up, and it overlaps PR #169
-in CreditEngine and AuctionHouse.
+Current integrated behavior quarantines the entire account when a positive-LTV asset
+loses all backing. The owner chose to preserve that conservative fail-closed boundary
+and to ignore the experimental asset-local branch for this remediation wave.
 
-**Next action:** resolve the desired account-level versus asset-level fail-closed
-boundary before continuing or merging the experimental work.
+**Next action:** none for PR #126. Reopen only through a separately scoped design
+decision that explicitly replaces the account-wide quarantine policy.
 
-## 4. Test and qualification gaps
+## 4. Qualification results and remaining gaps
 
 ### DER-T01 — PriceDesk aggregate transaction gas envelope
 
-**Status:** Test/availability gap
+**Status:** Qualified only for a bounded direct-asset envelope; nested BlueChip
+composition remains activation-blocked
 
-Per-source gas isolation is tested, including hostile sources and nested honest
-lookups. What remains unexecuted is the borrower-wide composition:
+PR [#173](https://github.com/Ripe-Foundation/ripe-protocol/pull/173) executed the
+borrower-wide composition through real valuation, liquidation, and Deleverage entry
+points. Nine direct assets across three registered sources fit under the observed
+32-million gas limit, with keeper batches qualified only up to two liquidation users
+or three Deleverage users under the saturated topology. Larger batches failed
+atomically.
 
-```text
-assets priced in one transaction × registered sources × per-operation stipend
-```
+The overall qualification did not pass: when a predecessor consumes its allowance,
+an honest nested BlueChip lookup can exhaust the enclosing 250,000-gas source bound
+after its nested PriceDesk call succeeds. PR #173 also recorded a repository/live
+slot-3 source divergence.
 
-The simple upper-bound arithmetic can exceed an ordinary transaction budget, while
-the actually reachable gas depends on topology, early success, source order, and
-the number of borrower assets. The previously discussed `~37.5M` value is a
-projection, not an executed protocol-path measurement.
-
-**Next action:** add one end-to-end multi-asset liquidation/deleverage measurement
-using the intended maximum launch topology. Treat source registration/topology
-growth beyond that envelope as requiring requalification.
+**Next action:** do not activate the affected nested topology until the owner selects
+and qualifies a source/topology or gas-budget change. Re-read the live registry before
+activation. Any source-count, enumerable-asset, stipend, or operator-batch growth
+invalidates the measured direct-asset envelope.
 
 ### DER-T02 — Endaoment real-pool SC-19 proof is not in ordinary CI
 
-**Status:** Test gap
+**Status:** Qualified at one pinned Base state; manual release requalification remains
 
-The StableSwap-NG boundary tests are marked `fork_qualification`; `pytest.ini` and
-ordinary CI exclude that marker. Local fork evidence exists, but CI can remain green
-without rerunning the real-pool executable-cap proof.
+PR [#173](https://github.com/Ripe-Foundation/ripe-protocol/pull/173) reran the real
+StableSwap-NG boundary proof at pinned Base block `34,471,929` for the recorded
+Endaoment runtime, pool implementation, parameters, coin ordering, and keeper budget.
+The proof passed, but ordinary CI still excludes `fork_qualification`.
 
-**Next action:** run this lane for release candidates or add a scheduled/manual CI
-job that explicitly selects `fork_qualification` and asserts a nonzero collected
-count. Do not pretend a default green run exercised it.
+**Next action:** rerun the named fork lane for a release candidate and after any
+Endaoment, pool implementation, parameter, ordering, or keeper-budget change. A
+default green CI run is not evidence that this qualification executed.
 
 ### DER-T03 — BlueChip/Undy ignore the caller/global stale-time argument
 
@@ -250,8 +256,8 @@ deposit/borrow flags, LTVs, prices, liabilities, and containment configuration. 
 routes are enabled contrary to RH-D005, treat that as a launch/security blocker; if
 disabled, retain it as an activation gate.
 
-Other activation-only items that remain tracked elsewhere include the sGREEN seed,
-Contributor blueprint/timelock replacement, yield-snapshot monitoring, PriceDesk
+Other activation-only items that remain tracked elsewhere include Contributor
+blueprint/timelock replacement, yield-snapshot monitoring, PriceDesk
 deployment/re-registration, Curve activation configuration, and Aero monitoring
 consumer cutover.
 
@@ -268,8 +274,8 @@ These are retained to prevent stale review notes from being re-filed:
    behavior. Early checks could improve error clarity/gas but are not an open
    security finding on the current source.
 2. **RipeGov forced release via Underscore:** valid, but already tracked by issue
-   #161 and addressed by the active user-bound `TellerUtils` work. It is not an
-   untracked tenth item.
+   #161 and addressed by the user-bound `TellerUtils` remediation merged in PR #170.
+   It is not an untracked tenth item.
 3. **Stability vault in `priorityLiqAssetVaults`:** merged Deleverage code explicitly
    skips vault IDs classified as Stability Pool cohorts in phase 2. The latent
    cohort-revert path is closed in the current source.
@@ -287,17 +293,18 @@ These are retained to prevent stale review notes from being re-filed:
 
 ## 8. Immediate triage order
 
-1. Review PR #169 for SC-24/25/26/30, but keep SC-14 and issue #153 visibly open.
-2. Finish the SC-13/#161 user-bound authorization work, including RipeGov forced
-   release coverage.
+1. Finish PR #169 for SC-14/24/25/26/30: resolve all review and CI findings, verify
+   all changed runtimes remain deployable, and re-review the final contract behavior.
+2. Reassess issue #153 against the final post-#169 CreditEngine runtime.
 3. Finish DER-01 Teller housekeeping assessment before authorizing a contract edit.
-4. Make the SC-10/DER-06 account-quarantine policy decision before continuing the
-   overlapping issuer-burn worktree.
-5. Run the DER-T01 aggregate PriceDesk gas test and the DER-T02 Endaoment fork lane
-   as focused qualification work.
-6. Re-read DER-C01 and DER-C02 live configuration before activation claims.
-7. Schedule SC-28 and any chosen DV-15/Comet liveness design after the overlapping
-   workstreams settle.
+4. Resolve DER-T01's nested-source activation blocker and repository/live PriceDesk
+   topology divergence before enabling the affected source composition.
+5. Decide DER-T03's specialized-oracle staleness policy before changing BlueChip or
+   Undy behavior.
+6. Re-read DER-C01, DER-C02, and DER-T04 live configuration before activation claims.
+7. Retain the ratified DER-02 policy and DER-03 Comet activation gate unless their
+   documented reopening conditions occur; schedule SC-28 only if its integration is
+   enabled.
 
 ## Summary
 
@@ -306,18 +313,16 @@ stale claims—the four empty-batch siblings, the priority-liquidity Stability P
 classification, and the stale-only-vault terms wipe—are not open defects on the
 current source. The material open items are:
 
-- SC-14 and issue #153, which are not included in PR #169;
-- the SC-13/#161 authorization change already in progress;
-- the unresolved account-wide quarantine policy and Teller housekeeping assessment;
-- bounded/conditional DV-15, Comet full-exit, and withdrawal-binding liveness risks;
-- two focused test gaps around aggregate PriceDesk gas and Endaoment's real-pool
-  qualification; and
+- PR #169's SC-14/24/25/26/30 implementation and issue #153's optional independent
+  repayment bound;
+- the unresolved Teller housekeeping assessment;
+- the nested BlueChip/PriceDesk activation blocker and specialized-oracle staleness
+  policy question;
+- accepted or activation-gated Stability Pool, Comet full-exit, and withdrawal-binding
+  liveness boundaries; and
 - the Base PriceDesk timelock and Stock configuration, which require fresh live-state
   reads rather than more contract bookkeeping.
 
-No newly discovered Critical/High contract exploit was established by this sweep.
-SC-03 remains the original audit's sole unresolved High at the contract level when
-sGREEN is unseeded; the owner-selected seed-and-retain launch invariant is its
-containment rather than a source-code fix. The register should be refreshed whenever
-one of the named PRs/issues lands or a live configuration read changes an activation
-premise.
+No newly discovered Critical or High contract exploit was established by this sweep.
+The register should be refreshed whenever one of the named PRs/issues lands or a live
+configuration read changes an activation premise.
