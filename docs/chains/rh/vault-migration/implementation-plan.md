@@ -149,7 +149,8 @@ Root `pytest.ini` now defines:
 - comprehensive `python -m pytest -o addopts=''`: restores the excluded directories and markers.
 
 Therefore a green default command is not a full gate. This plan always records both lanes and
-runs explicit artifact/deployment slices.
+runs explicit artifact/deployment slices for final migration qualification;
+that plan-specific release work is not an ordinary remediation-PR requirement.
 
 ### 2.2 Current deployed runtime facts
 

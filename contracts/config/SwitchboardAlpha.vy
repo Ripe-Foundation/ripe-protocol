@@ -412,6 +412,9 @@ PRIORITY_STAB_EXECUTION: constant(uint256) = 2
 PRIORITY_STAB_PROPOSAL: constant(uint256) = 3
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+# Auction delay is in blocks. uint32 (~272y at 2s) keeps
+# block.number + delay + duration from overflowing.
+MAX_AUCTION_DELAY: constant(uint256) = 2**32 - 1
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
@@ -886,9 +889,11 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
-    if _params.delay == max_value(uint256):
+    # Cap so (duration-1)*(maxDiscount-startDiscount) cannot overflow.
+    if _params.duration == 0 or _params.duration > max_value(uint256) // HUNDRED_PERCENT:
         return False
-    if _params.duration == 0 or _params.duration == max_value(uint256):
+    # Also keeps AuctionHouse `block.number + delay` from overflowing.
+    if _params.delay > MAX_AUCTION_DELAY:
         return False
     return True
 

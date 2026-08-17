@@ -31,7 +31,6 @@ from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import buy_fungible_auction, filter_logs
 
 
-pytestmark = pytest.mark.release
 
 
 VAULT_CASES = (
@@ -879,7 +878,16 @@ def test_partial_issuer_reduction_updates_only_live_share_claims(
 
     assert stock_token.balanceOf(vault) == amount - loss
     assert vault.userBalances(bob, stock_token) == raw_before
-    assert vault.getUserLootBoxShare(bob, stock_token) == loot_share_before
+    # B-AUD-008 (RH-D029, owner-granted 13 August 2026): BasicVault reports a
+    # zero Lootbox share while custody is below nominal liabilities. An issuer
+    # reduction puts the non-rebasing vault in exactly that state, so the share
+    # is suppressed rather than preserved. The rebasing vault tracks the loss in
+    # its own accounting and keeps a live share. This assertion previously
+    # expected the pre-remediation behavior for both kinds.
+    if vault_kind == "simple":
+        assert vault.getUserLootBoxShare(bob, stock_token) == 0
+    else:
+        assert vault.getUserLootBoxShare(bob, stock_token) == loot_share_before
     if vault_kind == "simple":
         assert vault.getTotalAmountForUser(bob, stock_token) == 0
         assert vault.getTotalAmountForVault(stock_token) == 0
@@ -1952,7 +1960,12 @@ def test_lootbox_points_update_after_donation_and_total_loss(
     assert donated_user.balancePoints == expected_user_weight * 10
     assert donated_user.lastBalance == expected_user_weight
     assert donated_asset.lastBalance == expected_user_weight
-    assert donated_asset.lastUsdValue == (100 if vault_kind == "simple" else 200)
+    # SC-24 funds the holder-book conversion, not raw vault custody.
+    # After a same-size donation, SharesVault.sharesToAmount / getTotalAmountForUser
+    # is 200e18-1 wei (dead-share dilution). Lootbox stores whole USD, so
+    # rebase lastUsdValue is 199; a donation does not mint a reward dollar.
+    holder_claim = vault.getTotalAmountForUser(bob, stock_token)
+    assert donated_asset.lastUsdValue == holder_claim // EIGHTEEN_DECIMALS
 
     boa.env.time_travel(blocks=10)
     stock_token.adminBurn(vault, 2 * amount, sender=deploy3r)
@@ -1966,8 +1979,13 @@ def test_lootbox_points_update_after_donation_and_total_loss(
     lost_user = ledger.userDepositPoints(bob, vault_id, stock_token)
     lost_asset = ledger.assetDepositPoints(vault_id, stock_token)
     assert lost_user.balancePoints == expected_user_weight * 20
-    assert lost_user.lastBalance == expected_user_weight
-    assert lost_asset.lastBalance == expected_user_weight
+    # B-AUD-008 (RH-D029): with custody wiped, BasicVault reports a zero Lootbox
+    # share, so Lootbox records a zero last balance. Points already accrued for
+    # the elapsed blocks are retained above -- the suppression is forward-only.
+    # The rebasing vault keeps its own accounting and reports the live weight.
+    expected_last_balance = 0 if vault_kind == "simple" else expected_user_weight
+    assert lost_user.lastBalance == expected_last_balance
+    assert lost_asset.lastBalance == expected_last_balance
     assert lost_asset.lastUsdValue == 0
 
 

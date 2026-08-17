@@ -27,7 +27,7 @@ one pass. Removing validation to recover more size is not accepted.
 
 | Identity | Value |
 | --- | --- |
-| Source SHA-256 | `0d4ac147a0d36b8e13fd079d2c2ebc5702bda9f03096914087eb301d78d1ae13` |
+| Source SHA-256 | `51aab6ff276c9fe85f323899356f6bf7e722782cd969e30d3719612677fa24d5` |
 | Runtime-template SHA-256 | `eec69265f4cfa7157bcf97b16ab05ec8cd3721a04d2659ea0d25bf16f5dce7c9` |
 | Runtime-template bytes | 24,244 |
 | Immutable bytes | 224 (seven words) |
@@ -42,6 +42,11 @@ The deterministic identity deployment uses RipeHq
 governance timelock bounds 1 and 2, and config timelock bounds 1 and 2. These
 values bind the reproducibility test only; they are not production deployment
 authority.
+
+The source digest above corrects a transcription error in the original record.
+The source introduced by waiver commit `6636806960c65a34bf724af110a2fdd340bebbe6`
+has this digest; the runtime-template and deterministic deployed-runtime
+identities are unchanged. This correction does not expand the waiver.
 
 ## Boundary and reopening rule
 

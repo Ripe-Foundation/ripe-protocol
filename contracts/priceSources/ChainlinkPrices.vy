@@ -118,6 +118,16 @@ BTC: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
 
 
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
+
+
 @deploy
 def __init__(
     _ripeHq: address,
@@ -183,8 +193,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    staleTime: uint256 = max(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, staleTime)
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime)
 
 
 @view
@@ -193,8 +202,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    staleTime: uint256 = max(_staleTime, config.staleTime)
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, staleTime), True
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime, config.staleTime), True
 
 
 @view
@@ -204,22 +212,26 @@ def _getPrice(
     _decimals: uint256,
     _needsEthToUsd: bool,
     _needsBtcToUsd: bool,
-    _staleTime: uint256,
+    _callerStaleTime: uint256,
+    _feedStaleTime: uint256,
 ) -> uint256:
-    price: uint256 = self._getChainlinkData(_feed, _decimals, _staleTime)
+    staleTime: uint256 = self._resolveStaleTime(_callerStaleTime, _feedStaleTime)
+    price: uint256 = self._getChainlinkData(_feed, _decimals, staleTime)
     if price == 0:
         return 0
 
     # if price needs ETH -> USD conversion
     if _needsEthToUsd:
         ethConfig: ChainlinkConfig = self.feedConfig[ETH]
-        ethUsdPrice: uint256 = self._getChainlinkData(ethConfig.feed, ethConfig.decimals, _staleTime)
+        ethStaleTime: uint256 = self._resolveStaleTime(_callerStaleTime, ethConfig.staleTime)
+        ethUsdPrice: uint256 = self._getChainlinkData(ethConfig.feed, ethConfig.decimals, ethStaleTime)
         price = price * ethUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     # if price needs BTC -> USD conversion
     elif _needsBtcToUsd:
         btcConfig: ChainlinkConfig = self.feedConfig[BTC]
-        btcUsdPrice: uint256 = self._getChainlinkData(btcConfig.feed, btcConfig.decimals, _staleTime)
+        btcStaleTime: uint256 = self._resolveStaleTime(_callerStaleTime, btcConfig.staleTime)
+        btcUsdPrice: uint256 = self._getChainlinkData(btcConfig.feed, btcConfig.decimals, btcStaleTime)
         price = price * btcUsdPrice // (10 ** NORMALIZED_DECIMALS)
 
     return price
@@ -522,12 +534,12 @@ def _isValidFeedConfig(
     if _needsEthToUsd and _needsBtcToUsd:
         return False
 
-    staleTime: uint256 = _staleTime
+    globalStaleTime: uint256 = 0
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address):
-        staleTime = max(staleTime, staticcall MissionControl(missionControl).getPriceStaleTime())
+        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
 
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, staleTime) != 0
+    return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, globalStaleTime, _staleTime) != 0
 
 
 ################

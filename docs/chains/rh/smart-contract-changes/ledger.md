@@ -29,8 +29,8 @@ historical evidence below.
 | Runtime template | 13,125 bytes; SHA-256 `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7`; 11,451 bytes EIP-170 headroom |
 | [`test_ledger_action_block.py`](../../../../tests/data/test_ledger_action_block.py) | Git blob `800988b23656e47287b5ea752b1f46dd37f169bc`; SHA-256 `5d631ef7e6e97f31367222a74b150f829330756f8ce34765ba2b6d755b3b9b23` |
 | [Teller action-block test](../../../../tests/core/teller/test_teller_action_block.py) | Git blob `cbc0bbf77dbeeec4d45cd03f16948fd754704ee7`; SHA-256 `1b28378d68836caae0ffd2cf0cfc2bf649ff1592a65a45b0a3e00e8146da5323` |
-| [Robinhood profile test](../../../../tests/deployment_profiles/test_ledger_robinhood_profile.py) | Git blob `8c946bab5b5a867a9d0e68f457bf0f6d7a632d21`; SHA-256 `1df761c09b0f1d9f0dcc3ffcc4b6281437978a01ceef6a96e5bbc3417f3f2ab2` |
-| [Artifact-bundle test](../../../../tests/deployment_profiles/test_ledger_artifact_bundle.py) | Git blob `7b7e89750576d9e7c6ceab44b14a96737c1ca91a`; SHA-256 `0645965c6a5b8df67545a59ca69f414c381e9e2621f1901f11d499ed3e45ad5c` |
+| `Robinhood profile test` (retired) | Git blob `8c946bab5b5a867a9d0e68f457bf0f6d7a632d21`; SHA-256 `1df761c09b0f1d9f0dcc3ffcc4b6281437978a01ceef6a96e5bbc3417f3f2ab2` |
+| `Artifact-bundle test` (retired) | Git blob `7b7e89750576d9e7c6ceab44b14a96737c1ca91a`; SHA-256 `0645965c6a5b8df67545a59ca69f414c381e9e2621f1901f11d499ed3e45ad5c` |
 
 Current tests cover exact 32-byte success; 33-, 64-, and 96-byte oversized
 returns; typed-call, truncation, and native-fallback mutants; both

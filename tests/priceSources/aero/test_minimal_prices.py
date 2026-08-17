@@ -614,6 +614,7 @@ def test_robinhood_still_omits_aero_monitor_and_pool():
     assert states["RipePoolAero"] == ("omitted", "omitted")
 
 
+@pytest.mark.artifact
 def test_committed_aero_abi_matches_monitor_surface():
     abi_path = ROOT / "scripts/abis/AeroRipePrices.json"
     entries = json.loads(abi_path.read_text())

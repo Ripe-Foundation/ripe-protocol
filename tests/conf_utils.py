@@ -3,6 +3,11 @@ import boa
 from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
+def clear_transient_storage():
+    """Emulate a real EVM transaction boundary under titanoboa 0.2.7."""
+    boa.env.evm.vm.state.clear_transient_storage()
+
+
 def has_dev_reason(error, expected_reason):
     return any(
         not isinstance(frame, str)
@@ -25,6 +30,43 @@ def assert_reverted_call(error, expected_reason, contract):
     computation = contract._computation
     assert computation is not None
     assert computation.is_error
+
+
+def install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+    from pathlib import Path
+
+    source = Path("contracts/core/Lootbox.vy").read_text()
+    needle = """@external
+def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+"""
+    assert source.count(needle) == 1
+    # Use a # dev: assert, not a string revert: a string payload makes the
+    # Lootbox mutant exceed EIP-170. Teller-wrapped calls do not surface
+    # the # dev: reason, so callers match with bare boa.reverts() plus
+    # pre/post state.
+    source = source.replace(
+        needle,
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
+        1,
+    )
+    mutant = boa.loads(
+        source,
+        ripe_hq.address,
+        43_200,
+        43_200,
+        100 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        name="lootbox_user_checkpoint_trap",
+    )
+    boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
 
 
 @pytest.fixture

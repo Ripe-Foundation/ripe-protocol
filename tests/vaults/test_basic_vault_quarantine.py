@@ -1138,6 +1138,7 @@ def test_mixed_deleverage_batch_skips_quarantine_and_one_element_batch_replaces_
     assert credit_engine.getUserDebtAmount(alice) == alice_before - mixed_target
 
 
+@pytest.mark.artifact
 def test_removed_singular_deleverage_api_and_appended_borrow_terms_abi():
     for name in ("Deleverage", "Teller", "SwitchboardDelta"):
         abi = json.loads((ROOT / "scripts" / "abis" / f"{name}.json").read_text())

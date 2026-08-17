@@ -2626,6 +2626,8 @@ def test_m1_gov_vault_authorized_deposit_for_another_user(
     mission_control,
     switchboard_alpha,
     teller,
+    setUserConfig,
+    setUserDelegation,
 ):
     setGeneralConfig()
     token = _m1_token()
@@ -2638,6 +2640,19 @@ def test_m1_gov_vault_authorized_deposit_for_another_user(
     mission_control.setUnderscoreRegistry(
         mock_undy_v2.address,
         sender=switchboard_alpha.address,
+    )
+    setUserConfig(
+        bob,
+        _canAnyoneDeposit=True,
+        _canAnyoneRepayDebt=True,
+    )
+    setUserDelegation(
+        bob,
+        mock_undy_v2.address,
+        _canWithdraw=True,
+        _canBorrow=True,
+        _canClaimFromStabPool=True,
+        _canClaimLoot=True,
     )
     amount = 100 * EIGHTEEN_DECIMALS
     token.mint(mock_undy_v2, amount)
@@ -3404,14 +3419,18 @@ def test_predeployment_withdrawal_responsibility_matrix(
             True,
         )
 
-    # BasicVault and the shared SharesVault module both require exact sender
-    # outflow and recipient delivery. That policy covers every vault family in
-    # this matrix, including RebaseErc20 and RipeGov.
-    exact_delivery_vault_rejects_short_delivery = transfer_mode in (1, 3, 4)
-    universally_rejected = transfer_mode in (6, 7, 10)
-    should_revert = (
-        exact_delivery_vault_rejects_short_delivery or universally_rejected
+    # BasicVault requires exact sender outflow and recipient delivery. The
+    # SharesVault-backed RebaseErc20 and RipeGov vaults additionally support the
+    # bounded raw-unit rounding behavior of governance-admitted indexed receipt
+    # tokens, while still rejecting material delivery deltas.
+    bounded_reflection_is_supported = (
+        transfer_mode == 4 and vault_kind in ("rebase", "governance")
     )
+    custody_delta_is_rejected = (
+        transfer_mode in (1, 3, 4) and not bounded_reflection_is_supported
+    )
+    universally_rejected = transfer_mode in (6, 7, 10)
+    should_revert = custody_delta_is_rejected or universally_rejected
 
     if should_revert:
         with boa.reverts():

@@ -3203,23 +3203,6 @@
       {
         "name": "_paymentAsset",
         "type": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ]
-  },
-  {
-    "stateMutability": "nonpayable",
-    "type": "function",
-    "name": "purchaseRipeBond",
-    "inputs": [
-      {
-        "name": "_paymentAsset",
-        "type": "address"
       },
       {
         "name": "_paymentAmount",
@@ -3278,6 +3261,39 @@
       {
         "name": "_recipient",
         "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "purchaseRipeBond",
+    "inputs": [
+      {
+        "name": "_paymentAsset",
+        "type": "address"
+      },
+      {
+        "name": "_paymentAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_lockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_minRipePayout",
+        "type": "uint256"
       }
     ],
     "outputs": [

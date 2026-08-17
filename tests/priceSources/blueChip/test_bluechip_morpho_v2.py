@@ -262,14 +262,17 @@ def test_morpho_v2_zero_supply_fails_closed_at_registration_and_runtime(
     alpha_token,
     mock_price_source,
     governance,
+    teller,
 ):
     morpho_v2_factory.setVault(morpho_v2_vault, True)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
 
-    morpho_v2_vault.setSupply(0)
+    scale = EIGHTEEN_DECIMALS
+    morpho_v2_vault.setSupply(scale - 1)
     assert not _is_valid(morpho_v2_prices, morpho_v2_vault)
 
-    morpho_v2_vault.setSupply(EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setSupply(scale)
+    assert _is_valid(morpho_v2_prices, morpho_v2_vault)
     _register(
         morpho_v2_prices,
         morpho_v2_factory,
@@ -278,10 +281,25 @@ def test_morpho_v2_zero_supply_fails_closed_at_registration_and_runtime(
         mock_price_source,
         governance,
     )
-    morpho_v2_vault.setSupply(0)
+    stored = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert stored.lastSnapshot.totalSupply == 1
+    assert stored.lastSnapshot.pricePerShare != 0
+    assert stored.nextIndex == 1
+
+    morpho_v2_vault.setSupply(scale - 1)
     latest = morpho_v2_prices.getLatestSnapshot(morpho_v2_vault)
     assert latest.totalSupply == 0
     assert latest.pricePerShare == 0
+
+    boa.env.time_travel(seconds=1)
+    assert not morpho_v2_prices.addPriceSnapshot(
+        morpho_v2_vault,
+        sender=teller.address,
+    )
+    after = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert after.lastSnapshot == stored.lastSnapshot
+    assert after.nextIndex == stored.nextIndex
+    assert morpho_v2_prices.snapShots(morpho_v2_vault, 1) == (0, 0, 0)
 
 
 def test_supply_times_price_per_share_exact_boundary_at_registration(
@@ -377,14 +395,13 @@ def test_numeric_dependencies_fail_closed_after_registration_and_recover(
     assert latest.pricePerShare == morpho_v2_vault.pricePerShare()
 
 
-def test_weighted_accumulation_overflow_fails_closed(
+def test_duration_weight_multiplication_overflow_fails_closed(
     morpho_v2_prices,
     morpho_v2_factory,
     morpho_v2_vault,
     alpha_token,
     mock_price_source,
     governance,
-    teller,
 ):
     individually_safe_price_per_share = MAX_UINT256 // 2 + 1
     morpho_v2_vault.setSupply(EIGHTEEN_DECIMALS)
@@ -401,8 +418,9 @@ def test_weighted_accumulation_overflow_fails_closed(
     )
     assert morpho_v2_prices.getWeightedPrice(morpho_v2_vault) == individually_safe_price_per_share
 
-    boa.env.time_travel(seconds=1)
-    assert morpho_v2_prices.addPriceSnapshot(morpho_v2_vault, sender=teller.address)
+    # The PPS is individually valid, but multiplying it by a two-second
+    # observation interval is not representable.
+    boa.env.time_travel(seconds=2)
     assert morpho_v2_prices.getWeightedPrice(morpho_v2_vault) == 0
 
 
@@ -555,11 +573,51 @@ def test_morpho_v2_update_confirmation_preserves_live_snapshot_progress(
         sender=governance.address,
     )
     after = morpho_v2_prices.priceConfigs(morpho_v2_vault)
-    assert after.lastSnapshot.pricePerShare == 605 * 10**15
-    assert after.nextIndex == 4
-    written = morpho_v2_prices.snapShots(morpho_v2_vault, before.nextIndex)
-    assert written.pricePerShare == after.lastSnapshot.pricePerShare
-    assert written.lastUpdate == after.lastSnapshot.lastUpdate
+    assert after.lastSnapshot.pricePerShare == before.lastSnapshot.pricePerShare
+    assert after.nextIndex == before.nextIndex
+    assert morpho_v2_prices.snapShots(morpho_v2_vault, before.nextIndex).lastUpdate == 0
+    assert not morpho_v2_prices.hasPendingPriceFeedUpdate(morpho_v2_vault)
+
+
+def test_morpho_v2_unchanged_capacity_confirmation_revalidates_live_pps(
+    morpho_v2_prices,
+    morpho_v2_factory,
+    morpho_v2_vault,
+    alpha_token,
+    mock_price_source,
+    governance,
+):
+    morpho_v2_vault.setSupply(100 * EIGHTEEN_DECIMALS)
+    morpho_v2_vault.setPricePerShare(EIGHTEEN_DECIMALS)
+    _register(
+        morpho_v2_prices,
+        morpho_v2_factory,
+        morpho_v2_vault,
+        alpha_token,
+        mock_price_source,
+        governance,
+        max_snapshots=5,
+    )
+    before = morpho_v2_prices.priceConfigs(morpho_v2_vault)
+    assert morpho_v2_prices.updatePriceConfig(
+        morpho_v2_vault,
+        0,
+        5,
+        0,
+        99,
+        sender=governance.address,
+    )
+    morpho_v2_vault.setPricePerShare(0)
+    boa.env.time_travel(blocks=morpho_v2_prices.actionTimeLock() + 1)
+
+    # Unchanged-capacity updates retain the pre-remediation confirm-time
+    # revalidation and cancellation behavior. Resize seed failures instead
+    # revert atomically, as covered separately.
+    assert not morpho_v2_prices.confirmPriceFeedUpdate(
+        morpho_v2_vault,
+        sender=governance.address,
+    )
+    assert morpho_v2_prices.priceConfigs(morpho_v2_vault) == before
     assert not morpho_v2_prices.hasPendingPriceFeedUpdate(morpho_v2_vault)
 
 

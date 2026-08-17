@@ -268,6 +268,7 @@ def test_moonwell_successful_zero_live_pps_fails_closed_and_preserves_min_policy
     governance,
     mock_price_source,
     alpha_token,
+    teller,
 ):
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     assert local_moonwell_prices.addNewPriceFeed(
@@ -292,9 +293,29 @@ def test_moonwell_successful_zero_live_pps_fails_closed_and_preserves_min_policy
     local_moonwell_token.setExchangeRate(2 * EIGHTEEN_DECIMALS)
     assert local_moonwell_prices.getPrice(local_moonwell_token) == 10**8
 
+    # Exercise the Moonwell duration-weighted path, not only its structural
+    # min clamp. The manipulated 2x observation accrues 30 of 40 seconds, so
+    # the raw TWAP is 1.75x after the live rate returns to 1x. The Moonwell
+    # live-PPS clamp keeps the reported price at 1x.
+    boa.env.time_travel(seconds=10)
+    assert local_moonwell_prices.addPriceSnapshot(
+        local_moonwell_token,
+        sender=teller.address,
+    )
+    local_moonwell_token.setExchangeRate(EIGHTEEN_DECIMALS)
+    boa.env.time_travel(seconds=30)
+    expected_weighted = (10**8 * 10 + 2 * 10**8 * 30) // 40
+    assert expected_weighted == 175_000_000
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == (
+        expected_weighted
+    )
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 10**8
+
     local_moonwell_token.setExchangeRate(0)
     assert local_moonwell_token.exchangeRateStored() == 0
-    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == 10**8
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == (
+        expected_weighted
+    )
     assert local_moonwell_prices.getPrice(local_moonwell_token) == 0
 
 

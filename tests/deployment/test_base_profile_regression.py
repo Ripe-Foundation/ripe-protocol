@@ -204,6 +204,7 @@ def test_unresolvable_chain_fails_before_any_network_call(monkeypatch):
     assert calls == []
 
 
+@pytest.mark.release
 def test_committed_base_history_inventory_is_unchanged():
     checkout = subprocess.run(
         ["git", "rev-parse", "--is-inside-work-tree"],

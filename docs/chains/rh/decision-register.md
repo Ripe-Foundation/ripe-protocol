@@ -9,11 +9,47 @@ reconciliation
 **Stable architecture:** [`../rh-summary.md`](../rh-summary.md)
 **Prior private dashboard:** [Deployment operating picture](https://ripe-robinhood-status.mickhagen.chatgpt.site)
 
-This register is the canonical `RH-D` identifier and title namespace for
-controlling owner decisions and accepted risks. The `decisions` list in
-[`status.yaml`](status.yaml) must mirror every identifier and title here
-exactly. This register does not replace the linked decision records, authorize
-a new phase, or convert an approved direction into implementation, integration,
+This register is the canonical `RH-D` source for controlling owner decisions,
+explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
+require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
+is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
+is not required, and it may be reconciled once during final release preparation.
+**The contract-artifact-expectations pipeline is retired.** Entries below cite
+`config/contract-artifact-expectations.json`, `scripts/check_contract_artifacts.py`,
+and per-contract source/creation/runtime/ABI/selector hash identities. The
+owner descoped the Robinhood stock M4 launch binding on 16 August 2026, and
+those files — the JSON, both checker scripts, their tests, and the
+`validate_robinhood_stock_m4_binding` validator in `config/BluePrint.py` — were
+deleted with it.
+
+The four qualification records that depended on that pipeline were reconciled
+as follows. `Deployment.DP-11.stock.vaultArtifact` is removed from the launch
+census, the deployment-input map, and the parameter ledger: it asserted
+SimpleErc20 artifact identity and nothing else, so with the pipeline retired it
+carries no fact. M2, M3, and M4 remain `repository_fact_integrated` with no
+candidate payload — integrated by behavior, proven by tests that still run,
+which is what this file's own B-T8-M2/M3/M4 predicates record. What was removed
+is the hash evidence layer, not the integration. They are no longer deployment
+inputs either, because an integrated behavior has no value to bind at deployment
+time. Stock remains fail-closed on unresolved M5 configuration and activation
+and on the unresolved vault slot. Deployment readiness moved from 64 blockers to
+60 as a result.
+
+Recorded hashes in the entries below are historical measurements; nothing
+regenerates, checks, or rebinds them, and no PR or release step is expected to.
+The release-packet checklist has been updated to match.
+
+**The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
+a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
+identity pins, and zero-growth reopen-on-change rules. No test enforces any of
+that in any lane — the pins and the floor were removed from
+`tests/test_vault_pointer_runtime_sizes.py`, which now asserts only the EIP-170
+ceiling. Those entries stand as historical accepted-risk records of what was
+approved at the time. Read their sizes, waivers, and "reopens on change"
+language as past tense; none of it creates an obligation on a current PR. The
+only enforced size rule is that a deployed runtime must fit in 24,576 bytes.
+This register does not replace the linked decision records, authorize a new
+phase, or convert an approved direction into implementation, integration,
 deployment, configuration, or activation authority.
 
 PR #61 is merged and closed at final head `7293cf87…` and `master` squash
@@ -25,9 +61,10 @@ the GREEN/RIPE CCIP topology is confirmed live as recorded in
 transaction or release action. The four corrected-PR controls remain zero and
 deferred and lack Robinhood machine-facing parameter/planning representation.
 RH-D028 is a bounded candidate-only exception to the historical CreditEngine
-zero-backing and Deleverage parked instructions; it does not reopen cooldown,
-Underscore, broader settlement, or bad-debt work. Outside that exact uncommitted
-candidate, the five broader lanes remain parked and nonblocking: CreditEngine
+zero-backing and Deleverage parked instructions. RH-D038 separately reopens only
+the exact SC-07/SC-09 Deleverage remediation in draft PR #145; neither decision
+reopens cooldown, Underscore, broader settlement, or bad-debt work. Outside
+those exact candidates, the five broader lanes remain parked and nonblocking: CreditEngine
 zero-backing policy; Deleverage; UniswapV2Prices admission and deployment;
 Sites recovery; and dashboard deployment. The S4 zero-cooldown decision remains
 closed.
@@ -188,6 +225,10 @@ removes the singular `deleverageUser` API in favor of `deleverageManyUsers` and
 adds quarantine suppression without changing zero cooldown, enabling
 Underscore, or reopening the four deferred controls.
 
+RH-D038 is a separate narrow exception for draft PR #145's exact SC-07/SC-09
+remediation and review evidence. It likewise leaves zero cooldown, omitted
+Underscore, and the four deferred controls unchanged.
+
 Source:
 [`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
@@ -256,8 +297,8 @@ binding schedules. Defaults exists and compiles, and the ledger is
 synchronized. Required external verification and deployment-produced bindings
 remain unresolved, so deployment readiness fails closed with 64 blockers. The
 corrected PR #61 four-control machine representation gap remains
-preserved, but every Deleverage task is parked and no implementation track is
-open until explicit owner reopening.
+preserved. RH-D038 is the explicit bounded reopening for draft PR #145 only;
+every other Deleverage task remains parked.
 
 Source:
 `track-6-s6-track-7-h4-defaults-parameters.md`.
@@ -410,8 +451,8 @@ program package. The controlling disposition is:
   archive-fork qualification; and
 - keep H-10 as the separate live-rehearsal lane.
 
-Except for the exact RH-D028 candidate, CreditEngine zero-backing reassessment,
-every Deleverage task including size/headroom work, UniswapV2Prices admission
+Except for the exact RH-D028 and RH-D038 candidates, CreditEngine zero-backing
+reassessment, every Deleverage task including size/headroom work, UniswapV2Prices admission
 and deployment, Sites recovery, and non-CCIP live deployment are deferred or
 separately unauthorized. CCIP is
 confirmed live, while further operational work, transactions, and release are
@@ -517,7 +558,7 @@ The two retained and operative H-01 dependency-security exceptions
 affected exception stale for deployment rehearsal; expiry blocks rehearsal and
 merge unless the exception has been retired or valid replacement authority
 exists. See
-[`evidence/dependency-security-gate.md`](evidence/dependency-security-gate.md).
+`evidence/dependency-security-gate.md` (retired with the dependency gate).
 
 ## External and live-action decisions still open
 
@@ -682,8 +723,9 @@ prevent.
 **Self-retiring.** This exceptional binding applies only while CreditEngine sits
 below the ratified floor. Once it is back at 200+ bytes of headroom, its
 `MIN_HEADROOM_OVERRIDES` entry and its pinned identity are both removed, and it
-returns to being governed by the floor like every other contract. A test asserts
-the two tables cannot drift apart in either direction.
+returns to being governed by the floor like every other contract. A test
+asserted the two tables could not drift apart in either direction; that test and
+both tables were removed when the floor was retired.
 
 **Source:** `tests/test_vault_pointer_runtime_sizes.py`,
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md` section 11.5.
@@ -875,7 +917,7 @@ identity at declared deterministic constructor inputs:
 
 | Identity | Value |
 | --- | --- |
-| `contracts/config/SwitchboardAlpha.vy` SHA-256 | `0d4ac147a0d36b8e13fd079d2c2ebc5702bda9f03096914087eb301d78d1ae13` |
+| `contracts/config/SwitchboardAlpha.vy` SHA-256 | `51aab6ff276c9fe85f323899356f6bf7e722782cd969e30d3719612677fa24d5` |
 | Runtime-template SHA-256 (immutable-free) | `eec69265f4cfa7157bcf97b16ab05ec8cd3721a04d2659ea0d25bf16f5dce7c9` |
 | Runtime-template bytes | 24,244 |
 | Deployed runtime bytes, including immutables | 24,468 |
@@ -886,6 +928,11 @@ The deterministic RipeHq used by the identity test returns governance
 uses temporary governance `0x…00A2`, stale-block bounds 1 and 2, and config
 timelock bounds 1 and 2. These are reproducibility inputs, not production
 addresses or parameter authority.
+
+The source digest above corrects a transcription error in the original record.
+The source introduced by waiver commit `6636806960c65a34bf724af110a2fdd340bebbe6`
+has this digest; the runtime-template and deterministic deployed-runtime
+identities are unchanged. This correction does not expand the waiver.
 
 **Residual risk accepted.** Only 108 bytes remain before EIP-170, and this waiver
 permits **0 bytes of growth**. Any SwitchboardAlpha source or compiler-output
@@ -957,15 +1004,421 @@ itself authorize deployment, configuration, activation, or release.
 `config/contract-artifact-expectations.json`, and the focused remediation tests
 under `tests/core/teller/`.
 
+### RH-D032 — Teller bond minimum-payout protection exact waiver at 20 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact caller-specified
+minimum RIPE payout candidate on
+`codex/rh-bond-minimum-payout-assessment`, based on BondRoom preview/execution
+parity commit `5a6656e40b52b1e28293587435e409634f3b1548`.
+
+This candidate adds an optional `_minRipePayout` postcondition immediately
+after BondRoom returns and before Teller housekeeping. A transaction therefore
+reverts atomically when the realized RIPE payout is below the caller's bound.
+To remain below EIP-170, `_paymentAmount` becomes required and the generated
+one-argument `purchaseRipeBond(address)` selector is removed. Arity 2 through 4
+remain available and arity 5 carries the new minimum.
+
+**What exactly is waived.** One source and compiler-output identity under the
+repository's pinned Vyper toolchain:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/Teller.vy` SHA-256 | `1ac2fd7b2c36fe454fd4fcdc0b422237f6a4936c5128bccada16524301a6b049` |
+| Source Git blob | `973d2148da448b67815f79dfce481c3b25d3dc57` |
+| Runtime-template SHA-256 | `9fd5e961f9f94593694b9fc0cef33ea5ec875e837132c34eeda8b14c0360e1c1` |
+| Runtime-template bytes | 24,460 |
+| Deployed runtime bytes, including immutables | 24,556 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A2`, `_shouldPause = false` | `ea228bd7c41c3b1cc60dcbc29fde55c1fa21718b67aea6dcb0afc30e5da6daa3` |
+| Complete deployed-runtime SHA-256 at production-capture inputs | `379e6934d931e6608746d99c518efdb5ca4fe4dbe02df918ece3ec06ea6cf8d5` |
+| Creation bytecode SHA-256 | `f81149abb9532466f4ac8032bae9742433d9bba1299877a563041d9e7d78b372` |
+| Creation executable-prefix SHA-256 | `3865ac2fcbe3b298d66ebccfab2664045eb82d252eb2eac4dd0f190fcd5dda67` |
+| Creation metadata SHA-256 | `9b02fb49ce418a79034de83f16e9f8f0b6ec32bd34ef2024ece3e6515c127d3d` |
+| Selector-set canonical SHA-256 | `89b86fbe6f1c3ff96b1b0afee8772d053c6bed96896eaa5fd6c3ed0ccc02f255` |
+| Transitive compiler-input integrity | `1dbd69122307fb1a07b298baf544ec7be0d3850b776e6e1780414fbd4404fc9f` |
+| Canonical ABI SHA-256 | `1ea5d8c2bef929262303b547c26aa68fe165b10080cb64b3d1b8ae5980f70eea` |
+| Committed ABI file SHA-256 | `d0b6a629488d3ff7ee51ac58228976247e9ddd26d596d356eec391bc17014866` |
+
+RH-D031 remains the historical authority for its exact prior Teller artifact;
+it does not authorize this source or compiler output. RH-D032 is the controlling
+waiver for the candidate above and permitted **0 bytes of further growth** at
+the time it was granted. That zero-growth and reopen-on-change condition was
+retired with the headroom mechanism (see the preamble); it is a historical
+record of what the owner accepted, not a current obligation. Teller's only
+enforced size rule today is the EIP-170 ceiling.
+
+**Rejected nonbreaking shapes.** Keeping all four prior selectors and adding a
+five-argument overload produces a 24,619-byte deployed runtime before adding
+the 13-byte minimum-payout assertion, already 43 bytes above EIP-170. Measured
+shared and duplicated dedicated-selector candidates deploy at 24,728 and
+25,027 bytes. A nonbreaking route therefore requires additional Teller
+compression and is not part of this decision.
+
+**Release conditions and residual risk.** The protection is opt-in because a
+zero minimum preserves current behavior. Before the Teller registry pointer is
+updated, the published SDK must remove the unsupported one-argument call,
+expose `_minRipePayout`, be republished, and be adopted by downstream UI code
+that supplies a nonzero bound. Teller documentation must be updated in the same
+release sequence. The `# dev: minimum payout not met` annotation is Boa
+source-map metadata; the on-chain revert carries empty returndata, so callers
+cannot distinguish it from another empty-data revert without local context.
+
+This owner decision accepts the exact artifact, the selector removal, and the
+stated release conditions. It does not itself authorize deployment, registry
+mutation, activation, or release.
+
+**Source:** `contracts/core/Teller.vy`,
+`tests/core/bondRoom/test_ripe_bonds.py`,
+`tests/inventory/test_teller_bond_minimum_payout_abi.py`,
+`tests/test_vault_pointer_runtime_sizes.py`, and
+`config/contract-artifact-expectations.json`.
+
+### RH-D033 — BlueChip SC-05/SC-17/SC-23 uses the codesize optimizer
+
+**Status:** Owner-approved candidate compiler profile on 14 August 2026.
+
+The owner selected Vyper's `codesize` optimizer for the BlueChip snapshot
+remediation after independent reproduction of the gas-versus-size comparison.
+The accepted candidate adds 255 gas on each of the three measured top-level
+paths while saving 1,076 deployed bytes relative to the `gas` build. It deploys
+at 22,739 bytes with 1,837 bytes of EIP-170 headroom.
+
+This is not a below-floor waiver. The ordinary 200-byte headroom policy remains
+controlling. A change to the optimizer, a material change to the accepted
+trade, or a later artifact below the normal floor reopens this decision. The
+decision does not itself accept SC-17's liquidation-relevant timing residual;
+that separate conditional acceptance is recorded by RH-D034. RH-D033 does not
+authorize deployment, configuration, activation, or release.
+
+**Source:**
+`docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
+`config/contract-artifact-expectations.json`, and
+`tests/priceSources/blueChip/test_bluechip_local.py`.
+
+### RH-D034 — SC-17 timing residual is conditionally accepted
+
+**Status:** Owner conditionally accepted the candidate residual on 14 August
+2026 after reviewing the executable attacker analysis and prerequisites.
+
+The owner accepted retaining SC-17's observation-interval TWAP because it
+removes total-supply inflation as a snapshot influence multiplier. The owner
+also accepted that an ordinary allowed Teller action can time an eligible
+snapshot while PPS is temporarily depressed, after which the observation gains
+duration weight until an honest refresh or expiry. The final live-PPS minimum
+caps the applicable upward case but does not neutralize a depressed TWAP.
+
+This acceptance is conditional. Before activating any snapshot-backed feed,
+the activation package must bind a finite nonzero `staleTime`, prove
+`minSnapshotDelay <= staleTime`, qualify the selected vault against practical
+temporary downward PPS manipulation, establish monitored honest refresh before
+expiry, and establish abnormal-PPS and missed-refresh alerts plus tested
+pause/disable procedures. Undy remains disabled until a separate activation
+package binds its exact artifact, configuration, refresh operation, and
+protocol-specific risk.
+
+RH-D034 approves no exact parameter value, vault, deployment, registration,
+activation, or release. A feed that cannot satisfy every applicable condition
+must not activate the SC-17 path and instead requires a separately reviewed
+sampling or lower-bound design. A symmetric downside clamp is not approved
+because it could conceal a genuine vault loss.
+
+**Source:**
+`docs/chains/rh/evidence/yield-price-snapshot-remediation.md`,
+`tests/priceSources/blueChip/test_bluechip_local.py`, and
+`tests/priceSources/test_undy_vault_prices.py`.
+
+## Namespace coordination note — 15 August 2026
+
+A read-only live check after PR #143 merged found that the target owns
+`RH-D033` through `RH-D036`. The intended open integration set then adds unique
+claims: PR #146 adds `RH-D037`, PR #145 adds `RH-D038`, PR #147 adds `RH-D039`
+through `RH-D041`, PR #152 adds `RH-D042`, and PR #157 adds `RH-D043`. PR #163
+adds no decision. The fail-closed integration allocator passed across these six
+open PR heads and the live target; no duplicate or base-conflicting claim
+remains.
+
+This snapshot records allocation only. It does not edit, renumber, approve, or
+reject another branch's decision, and it does not grant integration,
+deployment, configuration, activation, or release authority.
+
+### RH-D035 — RipeGov early-release redistribution and governance-point lifecycle
+
+**Status:** Owner-accepted SC-12 policy recorded on 14 August 2026; source and
+focused evidence are candidate-complete. A nonzero Underscore registry is
+blocked on issue #161, while integration, deployment, activation,
+governance-power consumption, migration, and release remain separately gated.
+
+RipeGov keeps an early-release fee inside the same asset pool and burns enough
+of the exiting address's shares to retain the largest indivisible post-release
+balance satisfying:
+
+```text
+claim(postShares) <= target < claim(postShares + 1)
+target = floor(claim(preShares) * (100% - exitFee))
+```
+
+The exact SharesVault claim includes virtual shares, the virtual asset term,
+and integer flooring. Indivisible-share granularity can therefore charge more
+than one asset base unit above the ideal target; maximal retained shares, not a
+one-unit fee-error bound, is the accepted invariant.
+
+At least one other address must hold actual shares. A genuine single-address
+holder cannot release early until another address holds shares. This is an
+address-level guard only: permissionless addresses do not prove distinct
+beneficial ownership, and a controller of multiple addresses can recapture
+redistributed value through another controlled position. Same-pool
+redistribution is not an unrecapturable economic penalty.
+
+Early release accrues governance points through the release block and preserves
+all saved points while burning shares. An equivalent enabled ordinary partial
+withdrawal proportionally reduces saved points, so the early-release route is
+more points-favorable until a complete withdrawal. A 100%-fee release can leave
+`lastShares == 0` with nonzero `govPoints`; that record accrues no new points and
+cannot migrate, a later same-asset deposit reattaches the points, and a later
+complete ordinary withdrawal clears them from the asset, user, and global
+totals. Boardroom and any future governance-power consumer must treat this
+zero-share point stock as live.
+
+The Teller authorization used by the public release route has a separate,
+unaccepted activation blocker. `isUnderscoreOwnerOrLego` accepts any registered
+Underscore address or Lego without binding that registered caller to the target
+user. If `underscoreRegistry` is nonzero and such a contract exposes or makes
+the call, it can force an unrelated user's release; a caller holding pool shares
+can receive part of the victim's redistributed fee. The initial Robinhood
+default keeps this path dormant by returning the zero address. A nonzero
+registry must not be configured until issue #161 either binds authorization to
+the actual wallet/user relationship with negative unrelated-Lego tests, or
+records explicit owner and security-reviewer acceptance covering exact
+contracts, callable surfaces, monitoring, and incident controls. RH-D035 does
+not accept the broad authorization and PR #144 does not redesign Teller.
+
+RipeGov's `adjustLock` and `releaseLock` lack local `@nonreentrant` decorators,
+but both accept only the exact Teller and their Teller entry points are already
+`@nonreentrant`; Boardroom and Lootbox callbacks cannot impersonate Teller.
+This is reviewed with no action under the existing registered-component trust
+model. Any defense-in-depth decorator is a separate authorized bytecode change
+requiring size, artifact, callback, and full-regression review.
+
+The Base migration candidate has an independent source/artifact identity. Its
+pre-SC-12 RipeGov size evidence is stale; issue #150 must rebase and remeasure
+that exact candidate before it relies on the SC-12 source. This decision grants
+no deployment, configuration, migration, activation, or release authority.
+
+**Source:**
+[`smart-contract-changes/ripe-gov.md`](smart-contract-changes/ripe-gov.md),
+[`issue #161`](https://github.com/Ripe-Foundation/ripe-protocol/issues/161),
+`contracts/vaults/RipeGov.vy`,
+`tests/vaults/ripe_gov_exit_fee_model.py`,
+`tests/vaults/test_ripe_gov_exit_fee.py`, and
+`tests/vaults/test_ripe_gov_controls_and_migration.py`.
+
+### RH-D036 — AuctionHouse conservation exact waiver at 22 bytes
+
+**Status:** Owner-granted on 14 August 2026 for the exact SC-01, SC-02, and
+SC-08 AuctionHouse conservation artifact on draft PR #143. The owner separately
+authorized this waiver record and the test-only Deleverage size-pin refresh
+after review reopened the below-floor decision.
+
+The ratified 200-byte minimum remains controlling for every non-waived
+contract. The final artifact caps Stability GREEN before collateral moves,
+caps every fungible-auction iteration at current live debt, makes retry fee
+eligibility precede irreversible execution, and replaces the downstream
+repayment clamp with a fail-closed invariant. It deploys at 24,554 bytes,
+including 96 bytes of immutable data, leaving **22 bytes** before EIP-170.
+The owner accepts that exact, technically deployable margin.
+
+**What exactly is waived.** One source and compiler-output identity under
+CPython 3.12.0, Vyper `0.4.3+commit.bff19ea2`, and titanoboa 0.2.7:
+
+| Identity | Value |
+| --- | --- |
+| `contracts/core/AuctionHouse.vy` SHA-256 | `e7eb7b1b80ae0dce6a9df21ad7ec35cc3fd2248aac0bc3f02797d99b10e8409e` |
+| Runtime-template SHA-256 (immutable-free) | `0405767ec38653c4f50257add6ceb072751761550337f711d99465274901bcb2` |
+| Runtime-template bytes | 24,458 |
+| Immutable data bytes | 96 |
+| Deployed runtime bytes | 24,554 |
+| Complete deployed-runtime SHA-256 at declared HQ `0x…00A4` | `d6cb1d92c9e08126e7191b1f701617954af196353ef03b532079c645de9320a6` |
+| Complete deployed-runtime SHA-256 at production-capture HQ `0xD4e8…0940` | `dec131999301b49ed3c85c7f53f9d785cb01a9b2204eeccdf05fb2e247c98965` |
+
+The declared `0x…00A4` HQ is a deterministic waiver-test input, not a
+production address. The production-capture identity uses the constructor input
+declared by the governed artifact ledger. Any constructor-input change produces
+a different complete deployed byte string and reopens exact deployment-capture
+review even when the source and length do not move.
+
+**Measured progression.** The authoritative baseline deployed runtime was
+24,440 bytes with 136 bytes of headroom. SC-01 measured 24,501/75; SC-02
+measured 24,566/10; the first SC-08 candidate measured 24,571/5. Review then
+removed a behaviorally redundant fee local and replaced a masking repayment
+clamp with a fail-closed assertion, yielding the final 24,554/22 artifact
+without removing the Stability exact-receipt check, the AuctionHouse GREEN
+balance cap, or a public ABI entry.
+
+**Residual risk accepted.** Only 22 bytes remain before EIP-170, and this waiver
+permits **0 bytes of growth**. Any AuctionHouse source, compiler, transitive
+dependency, constructor input, runtime-template, or complete deployed-runtime
+identity change invalidates the exact record and reopens this decision. A
+future change must restore at least 200 bytes or receive a new exact owner
+waiver; refreshing the constants merely to make a test pass is prohibited.
+
+**SC-08 economic and liveness policy.** The owner accepts all three semantics
+below for this exact artifact:
+
+- `liqFee` remains the legacy Stability Pool discount rate. Its gross-up
+  collateral spread can exceed the nominal base liquidation fee; settlement
+  credits no more than the nominal base fee, and keeper fees are never
+  spread-paid.
+- If an economically empty first pass freezes the account without repayment or
+  an auction, that episode permanently waives base and keeper fees. A later
+  retry may complete liquidation, but it does so fee-free and cannot recover
+  the waived compensation.
+- Fee-free retries deliberately carry no onchain keeper reward or liveness
+  guarantee. Activation therefore depends on a protocol-operated monitor or
+  keeper to retry eligible accounts, with auction buyers supplying progress
+  where an auction exists. That operational actor and alert path must be bound
+  before activation.
+
+This decision accepts deployability of the exact artifact. It does not
+authorize deployment, registry mutation, configuration, activation, or release.
+
+**Source:** `contracts/core/AuctionHouse.vy`,
+`tests/test_vault_pointer_runtime_sizes.py`,
+`tests/core/deleverage/test_deleverage_phase2.py`, and
+`config/contract-artifact-expectations.json`.
+### RH-D038 — SC-07/SC-09 Deleverage remediation is reopened and bounded
+
+**Status:** Owner-authorized on 14 August 2026 for the exact remediation and
+review follow-through in draft PR #145. Integration, deployment,
+configuration, activation, and release remain unauthorized.
+
+SC-07 refreshes the complete live debt and current interest after collateral
+interactions, rejects a changed debt amount atomically, and uses one shared
+Deleverage reentrancy domain across the four debt-writing routes and
+`swapCollateral`.
+
+SC-09 treats a Stability Pool cohort as unavailable for optional broad
+Deleverage and withdrawal-assist preflight when the pool's existing fail-soft
+probe reports zero because of a price outage, pause, or aggregate claim-custody
+deficit. Healthy ordinary collateral remains usable. Ordinary-vault failures
+and all failures after real processing starts still propagate; direct claims,
+withdrawals, deposits, explicit redemptions, and strict requested handling
+remain fail-closed.
+
+The final deployed candidate is 24,309 bytes with 267 bytes of EIP-170
+headroom. It satisfies the ordinary 200-byte floor, so RH-D038 grants no
+headroom override or exact-identity waiver.
+
+This decision reopens no cooldown, Underscore, deferred control, fork,
+deployment, configuration, activation, or release work. Robinhood deployment
+verification must establish `MissionControl.isStabVaultId(1) == true`. The
+recorded Base MissionControl is incompatible until separately upgraded and
+populated, so this Deleverage must not replace Base Deleverage as-is.
+
+**Source:** [`deleverage-sc07-sc09-security-decision.md`](deleverage-sc07-sc09-security-decision.md).
+
+### RH-D043 — Curve snapshot remediation uses confirmation-anchored continuity
+
+**Status:** Owner accepted ancestor `block.number` semantics on 15 August 2026
+for the exact reviewed Curve source; merge review may proceed. Deployment,
+configuration, activation, and release remain separately unauthorized.
+
+This decision binds production source SHA-256
+`8ad730930c80ad51616d080100ce8c1fb941f6b73713af39f347601b64c20050`
+and Git blob `76233779bb34059de16a5a6740233fc4dc0f59ca`. Final
+contract-and-test commit `f5442036983f278326919fae0939b33377c4c9f3`
+adds only focused test coverage after the production source was frozen.
+
+The candidate selects chronological block-duration weighting and accepts its
+rolling danger-entry lag as the SC-16 manipulation-resistance tradeoff. The
+recommended live `maxNumSnapshots` is 10, matching the existing Base setting
+and now supported by direct capacity-ten gas evidence. PriceDesk S=10 is a
+source-count measurement and is not used as ring-capacity evidence. At most one
+successful write is allowed per selected clock unit; the actual ten-observation
+time horizon therefore depends on qualifying Teller activity and must be
+monitored rather than presented as a fixed wall-clock window.
+
+The owner selected the Robinhood Curve clock domain as EVM `block.number`, which Robinhood
+exposes as the repeating/jumping ancestor/L1-number domain. A pinned 16-child
+block packet observed one contract `NUMBER` while ArbSys tracked every child.
+The accepted ancestor-semantics calibration is
+`staleBlocks=7,200`, the same 7,200-unit recovery duration, capacity 10, and a
+target successful write at least every 720 ancestor numbers.
+`GREEN_REFERENCE_SNAPSHOTS` and `CURVE_DYNAMIC_RATES` remain inactive pending
+separate activation authority.
+
+For any `dangerTrigger` or `staleBlocks` change, the ring and accumulated
+`numBlocksInDanger` survive, all three continuity anchors are cleared, and the
+retained ring is evaluated under the confirmed policy. A nonzero dangerous
+result anchors danger at confirmation; a nonzero safe result with historical
+danger anchors recovery at confirmation; an unavailable result leaves all
+anchors cleared. Freshness expansion may make retained observations available
+again for current classification, but no elapsed time across the old
+unavailable gap is credited. A still-fresh shrink may shorten the remaining
+recovery window only from the confirmation anchor. Neither transition erases
+the accumulated counter.
+
+Classification remains inclusive (`weightedRatio >= dangerTrigger`). Operators
+must keep the trigger above the expected resting ratio and must not configure
+it at equilibrium. The existing proposal-before-liquidity workflow is retained:
+a fully empty pool can be proposed, but confirmation revalidates and reverts
+atomically if it cannot seed a nonzero snapshot. The duplicate internal
+validator arguments are retained to minimize unrelated bytecode churn.
+
+Activation requires separate exact-head authority, a finite operating cadence,
+the selected capacity-ten bound, direct
+capacity-ten, cold maximum-ring, and PriceDesk composition evidence,
+snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
+**The exact-source condition of this decision is retired.** The remediated Curve
+source SHA-256 was recorded in the Robinhood launch-input ledger as an
+owner-selected candidate and enforced as a fail-closed readiness blocker. The
+owner retired that static identity condition on 16 August 2026: the two
+`artifact.curve_prices_*_sha256` launch inputs, the `RH_CURVE_ARTIFACT_DRIFT`
+validator, and the generator's real-file hashing were removed because they
+failed unrelated pull requests on any legitimate Curve edit. Semantic Curve
+configuration, recursion, permission, route, and deployment-policy checks remain
+controlling. The consequence is explicit: a future Curve source change will no
+longer flag that the owner approved a different artifact, and the exact-head
+ratification below must be re-established by review rather than by a digest.
+Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
+sustained fallback, near-budget gas, threshold/equilibrium change, or new
+consumer/topology or clock-domain change reopens qualification. The pinned-Base
+`test_curve_prices.py` harness now advances governance NUMBER independently of
+oracle timestamp: the final candidate passes 32/32 while the exact target
+retains the historical 24-failed/8-passed fail-first result. No production
+freshness check was weakened. This decision grants no deployment,
+registration, configuration, activation, or release authority.
+
+Clock decision and separate activation checklist:
+
+- [x] select ancestor semantics with the recorded 7,200/720 calibration;
+- [ ] accept rolling danger-entry lag and `maxNumSnapshots=10` with its
+  cadence-dependent horizon;
+- [ ] accept still-fresh `staleBlocks` shrink, expired-history revival only for
+  current classification without gap credit, and confirmation-anchored
+  post-trigger danger/recovery continuity;
+- [ ] accept inclusive `>=` danger classification and equilibrium guidance;
+- [ ] accept capacity-ten, fixed-100-slot reset, maximum-ring, Teller, and
+  PriceDesk gas methodology and margins;
+- [ ] verify the Base green 75/75 and asset/LP 32/32 evidence, including the
+  exact target's retained 24-failed/8-passed harness fail-first artifact; and
+- [ ] accept the monitoring, pause/disable, reopen, and feature-inactivity
+  controls before activation, without treating merge approval as deployment or
+  activation.
+
+**Source:**
+[`evidence/curve-snapshot-remediation.md`](evidence/curve-snapshot-remediation.md),
+`config/contract-artifact-expectations.json`, and
+`tests/priceSources/curve/test_green_ref_pool.py`.
+
 ## Maintenance rule
 
 When an owner decision changes, update:
 
 1. the controlling decision/evidence record;
-2. this register;
-3. [`status.yaml`](status.yaml), preserving exact identifier/title parity; and
-4. the generated dashboard, when present. RH-D024 currently keeps the dashboard
-   extracted from the active tree, so there is no dashboard artifact to regenerate.
+2. this canonical register; and
+3. [`status.yaml`](status.yaml) and the generated dashboard when intentionally
+   refreshing the status snapshot or preparing the final release candidate.
+   RH-D024 currently keeps the dashboard extracted from the active tree, so
+   there is no dashboard artifact to regenerate.
 
 Keep the distinction between:
 

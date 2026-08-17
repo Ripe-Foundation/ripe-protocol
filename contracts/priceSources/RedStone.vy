@@ -110,6 +110,16 @@ ETH: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
 
 
+@pure
+@internal
+def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
+    if _callerBound == 0:
+        return _feedBound
+    if _feedBound == 0:
+        return _callerBound
+    return min(_callerBound, _feedBound)
+
+
 @deploy
 def __init__(
     _ripeHq: address,
@@ -142,7 +152,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk)
 
 
@@ -152,7 +162,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: RedStoneConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    staleTime: uint256 = max(_staleTime, config.staleTime)
+    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
     return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, staleTime, _priceDesk), True
 
 
@@ -470,11 +480,12 @@ def _isValidFeedConfig(
     if empty(address) in [_asset, _feed]:
         return False
 
-    staleTime: uint256 = _staleTime
+    globalStaleTime: uint256 = 0
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address):
-        staleTime = max(staleTime, staticcall MissionControl(missionControl).getPriceStaleTime())
+        globalStaleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
 
+    staleTime: uint256 = self._resolveStaleTime(globalStaleTime, _staleTime)
     return self._getPrice(_feed, _decimals, _needsEthToUsd, staleTime, addys._getPriceDeskAddr()) != 0
 
 

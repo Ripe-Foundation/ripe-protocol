@@ -233,7 +233,7 @@ def borrowForUser(
     isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
 
     # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), isUndyVault, a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), isUndyVault, False, a)
     assert not bt.hasQuarantinedAsset # dev: quarantined asset
 
     # get config
@@ -264,7 +264,6 @@ def borrowForUser(
 
     # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     assert userDebt.amount <= bt.totalMaxDebt # dev: bad debt health
-    userDebt.inLiquidation = False
 
     # save debt
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
@@ -287,10 +286,7 @@ def borrowForUser(
     if forDao != 0:
 
         # split revenue between governance (for buyback) and savings green
-        forBuyback: uint256 = 0
-        buybackRatio: uint256 = self.buybackRatio
-        if buybackRatio != 0:
-            forBuyback = forDao * buybackRatio // HUNDRED_PERCENT
+        forBuyback: uint256 = forDao * self.buybackRatio // HUNDRED_PERCENT
 
         # transfer to governance for buyback
         if forBuyback != 0:
@@ -396,18 +392,13 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     if not d.isUserBorrower and config.numAllowedBorrowers <= d.numBorrowers:
         return 0
 
-    # main var
-    newBorrowAmount: uint256 = max_value(uint256)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-
-    # avail debt based on collateral value / ltv
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, False, 0, empty(address), a)
     if bt.hasQuarantinedAsset:
         return 0
     availDebtPerLtv: uint256 = 0
     if bt.totalMaxDebt > userDebt.amount:
         availDebtPerLtv = bt.totalMaxDebt - userDebt.amount
-    newBorrowAmount = min(newBorrowAmount, availDebtPerLtv)
+    newBorrowAmount: uint256 = availDebtPerLtv
 
     # check borrow interval
     availInInterval: uint256 = 0
@@ -562,14 +553,22 @@ def _repayDebt(
     _a: addys.Addys,
 ) -> bool:
     userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayValue)
-    isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    hasGoodDebtHealth: bool = True
 
-    # get latest debt terms
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, 0, empty(address), isUndyVault, _a)
-    userDebt.debtTerms = bt.debtTerms
+    if userDebt.amount != 0:
+        isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
+        bt = self._getUserBorrowTerms(_user, _numUserVaults, _repayType != RepayType.STANDARD, 0, empty(address), isUndyVault, _repayType == RepayType.STANDARD, _a)
 
-    # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
-    hasGoodDebtHealth: bool = userDebt.amount <= bt.totalMaxDebt
+        # A zero highest LTV means traversal found no eligible debt-bearing
+        # collateral record. A max-value highest LTV signals that non-strict
+        # valuation saw a positive amount without a usable price. Keep the
+        # stored terms in both cases; conservative capacity still controls this
+        # repayment's health result.
+        if bt.highestLtv != 0 and bt.highestLtv <= HUNDRED_PERCENT:
+            userDebt.debtTerms = bt.debtTerms
+        hasGoodDebtHealth = userDebt.amount <= bt.totalMaxDebt
+
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
@@ -638,8 +637,7 @@ def _reduceDebtAmount(_userDebt: UserDebt, _repayAmount: uint256) -> UserDebt:
 
     userDebt.amount -= _repayAmount
     if _repayAmount > nonPrincipalDebt:
-        principalToReduce: uint256 = _repayAmount - nonPrincipalDebt
-        userDebt.principal -= min(principalToReduce, userDebt.principal)
+        userDebt.principal -= min(_repayAmount - nonPrincipalDebt, userDebt.principal)
 
     return userDebt
 
@@ -659,8 +657,7 @@ def getUserBorrowTerms(
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
     a: addys.Addys = addys._getAddys(_a)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, a)
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, a)
 
 
 @view
@@ -673,18 +670,36 @@ def getUserBorrowTermsWithNumVaults(
     _skipAsset: address = empty(address),
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
-    a: addys.Addys = addys._getAddys(_a)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    return self._getUserBorrowTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, a)
+    return self._userTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, addys._getAddys(_a))
 
 
 @view
 @external
 def getBorrowRate(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), False, 0, empty(address), isUndyVault, a)
-    return bt.debtTerms.borrowRate
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), False, 0, empty(address), a).debtTerms.borrowRate
+
+
+@view
+@internal
+def _userTerms(
+    _user: address,
+    _numUserVaults: uint256,
+    _shouldRaise: bool,
+    _skipVaultId: uint256,
+    _skipAsset: address,
+    _a: addys.Addys,
+) -> UserBorrowTerms:
+    return self._getUserBorrowTerms(
+        _user,
+        _numUserVaults,
+        _shouldRaise,
+        _skipVaultId,
+        _skipAsset,
+        self._isUnderscoreVault(_user, _a.missionControl),
+        False,
+        _a,
+    )
 
 
 @view
@@ -696,6 +711,7 @@ def _getUserBorrowTerms(
     _skipVaultId: uint256,
     _skipAsset: address,
     _isUndyVault: bool,
+    _trackUnavailablePrice: bool,
     _a: addys.Addys,
 ) -> UserBorrowTerms:
 
@@ -728,6 +744,8 @@ def _getUserBorrowTerms(
 
         # iterate thru each user asset
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            continue
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
 
             # get user asset and amount
@@ -746,12 +764,14 @@ def _getUserBorrowTerms(
 
             # collateral value, max debt
             collateralVal: uint256 = 0
+            hasNominalBalance: bool = False
             if amount == 0:
-                # A zero usable amount is a quarantine only when the user still
-                # has a nominal balance and the whole vault has zero usable amount.
-                # The vault-wide condition excludes per-user share-rounding dust.
-                if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
-                    if staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset):
+                hasNominalBalance = staticcall Vault(vaultAddr).doesUserHaveBalance(_user, asset)
+                # Quarantine only when a remaining nominal balance has no
+                # vault-wide usable amount. Share-rounding dust keeps a
+                # nominal balance in a non-empty vault and is not quarantined.
+                if hasNominalBalance:
+                    if staticcall Vault(vaultAddr).getTotalAmountForVault(asset) == 0:
                         bt.hasQuarantinedAsset = True
             else:
                 collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
@@ -759,12 +779,12 @@ def _getUserBorrowTerms(
                 # cannot safely contribute to account health decisions.
                 if collateralVal == 0:
                     bt.hasQuarantinedAsset = True
+                    if _trackUnavailablePrice:
+                        bt.highestLtv = max_value(uint256)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # need to return some debt terms, even if not getting any price
-            debtTermsWeight: uint256 = maxDebt
-            if debtTermsWeight == 0:
-                debtTermsWeight = 1
+            debtTermsWeight: uint256 = max(maxDebt, 1)
 
             # debt terms sums -- weight is based on max debt (ltv)
             ltvSum += debtTermsWeight * debtTerms.ltv
@@ -775,13 +795,20 @@ def _getUserBorrowTerms(
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
 
-            # lowest ltv
-            if debtTerms.ltv < bt.lowestLtv:
-                bt.lowestLtv = debtTerms.ltv
+            # Meaningful capacity sets the unwind target.
+            # amount == 0 and no remaining balance is a withdrawn-to-zero
+            # registration and keeps the conservative floor. That floor is
+            # BasicVault-specific: SharesVault returns empty(address) when
+            # shares are 0, so a fully withdrawn rebase registration is
+            # skipped entirely and never contributes a floor.
+            # amount == 0 with a remaining balance is share-rounding dust
+            # and must not drag lowestLtv. Positive-amount dust with
+            # maxDebt == 0 also does not participate.
+            if maxDebt != 0 or (amount == 0 and not hasNominalBalance):
+                bt.lowestLtv = min(bt.lowestLtv, debtTerms.ltv)
 
             # highest ltv
-            if debtTerms.ltv > bt.highestLtv:
-                bt.highestLtv = debtTerms.ltv
+            bt.highestLtv = max(bt.highestLtv, debtTerms.ltv)
 
             # totals
             if not (hasSkip and asset == _skipAsset and vaultId == _skipVaultId):
@@ -807,10 +834,8 @@ def _getUserBorrowTerms(
 
     # ensure liq threshold and liq fee can work together
     if bt.debtTerms.liqThreshold != 0:
-        liqSum: uint256 = bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT)
-        if liqSum > HUNDRED_PERCENT:
-            adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
-            bt.debtTerms.liqFee = adjustedLiqFee
+        if bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT) > HUNDRED_PERCENT:
+            bt.debtTerms.liqFee = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
     else:
         bt.debtTerms.liqFee = 0
 
@@ -838,8 +863,7 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
     userDebt: UserDebt = empty(UserDebt)
     na: uint256 = 0
     userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, False, 0, empty(address), a)
     return bt.collateralVal, userDebt.amount
 
 
@@ -847,9 +871,7 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
 @external
 def getCollateralValue(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), isUndyVault, a)
-    return bt.collateralVal
+    return self._userTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), a).collateralVal
 
 
 ####################
@@ -893,9 +915,7 @@ def _getLatestUserDebtAndTerms(
     newInterest: uint256 = 0
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
-    # debt terms for user
-    isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), isUndyVault, _a)
+    bt: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), _a)
 
     return userDebt, bt, newInterest
 
@@ -976,8 +996,6 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     if _debtType == 1:
         return userDebt.amount <= bt.totalMaxDebt
-    if _debtType != 2 and _debtType != 3:
-        return False
     if bt.hasQuarantinedAsset:
         return False
 
@@ -1021,9 +1039,6 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
     na: uint256 = 0
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
     if userDebt.amount == 0:
-        return 0
-
-    if _debtType != 2 and _debtType != 3:
         return 0
 
     threshold: uint256 = bt.debtTerms.liqThreshold
@@ -1076,7 +1091,7 @@ def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDe
 @pure
 @internal
 def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint256) -> uint256:
-    if _ratio == 0 or _minBoost == _maxBoost:
+    if _ratio == 0:
         return _minBoost
     return _minBoost + _ratio * (_maxBoost - _minBoost) // HUNDRED_PERCENT
 
@@ -1139,7 +1154,10 @@ def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> b
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
-    userDebt.debtTerms = bt.debtTerms
+    # Preserve the terms used to accrue this interval when stale traversal found
+    # no eligible debt-bearing collateral record.
+    if bt.highestLtv != 0:
+        userDebt.debtTerms = bt.debtTerms
 
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
@@ -1169,11 +1187,20 @@ def transferOrWithdrawViaRedemption(
     na: bool = False
     if _shouldTransferBalance:
         amountSent, na = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _user, _recipient, _amount, _a)
-        extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_recipient, _vaultId, _vaultAddr, _asset, _a)
-
     else:
         amountSent, na = extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
+    # Bytecode: range(2)+break is smaller than two unrolled checkpoints.
+    # Post-mutation: sender first so lastBalance writes the live share
+    # (a pre-mutation checkpoint would leave it stale), then in-vault recipient.
+    if amountSent != 0:
+        for i: uint256 in range(2):
+            ptsUser: address = _user
+            if i != 0:
+                if not _shouldTransferBalance:
+                    break
+                extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
+                ptsUser = _recipient
+            extcall LootBox(_a.lootbox).updateDepositPoints(ptsUser, _vaultId, _vaultAddr, _asset, _a)
     return amountSent
 
 
@@ -1259,8 +1286,7 @@ def getMaxWithdrawableForAsset(
         return 0 # cannot determine value
 
     # get borrow terms excluding the asset to withdraw
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, isUndyVault, a)
+    btExcluding: UserBorrowTerms = self._userTerms(_user, d.numUserVaults, True, _vaultId, _asset, a)
     if btExcluding.hasQuarantinedAsset:
         return 0
 

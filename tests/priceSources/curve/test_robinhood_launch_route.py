@@ -7,6 +7,52 @@ from config import BluePrint as source_blueprint
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
+FOUR_COIN_CURVE_SYSTEM = """# @version 0.4.3
+coins: address[4]
+@deploy
+def __init__(_coins: address[4]):
+    self.coins = _coins
+@view
+@external
+def get_address(_id: uint256) -> address:
+    if _id == 7 or _id == 12:
+        return self
+    return empty(address)
+@view
+@external
+def is_registered(_pool: address) -> bool:
+    return _pool == self
+@view
+@external
+def get_lp_token(_pool: address) -> address:
+    return self
+@view
+@external
+def get_underlying_coins(_pool: address) -> address[8]:
+    return [self.coins[0], self.coins[1], self.coins[2], self.coins[3], empty(address), empty(address), empty(address), empty(address)]
+@view
+@external
+def get_n_underlying_coins(_pool: address) -> uint256:
+    return 4
+@view
+@external
+def get_registry_handlers_from_pool(_pool: address) -> address[10]:
+    return [self, empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address), empty(address)]
+@view
+@external
+def get_base_registry(_handler: address) -> address:
+    return self
+@view
+@external
+def totalSupply() -> uint256:
+    return 1
+@view
+@external
+def get_virtual_price() -> uint256:
+    return 10**18
+"""
+
+
 @pytest.fixture
 def robinhood_curve_launch_route(
     ripe_hq_deploy,
@@ -155,6 +201,173 @@ def test_green_route_uses_curve_and_chainlink_usdg_without_recursion(
         "PriceDesk",
         "Chainlink:USDG/USD",
     )
+
+
+def test_green_config_transition_with_normal_block_and_timestamp_progression(
+    robinhood_curve_launch_route,
+):
+    route = robinhood_curve_launch_route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action_id = route.curve.setGreenRefPoolConfig(
+        route.curve_system,
+        10,
+        60_00,
+        7_200,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=route.governance.address,
+    )
+    start_block = boa.env.evm.patch.block_number
+    start_timestamp = boa.env.timestamp
+
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert boa.env.evm.patch.block_number > start_block
+    assert boa.env.timestamp > start_timestamp
+    route.feed.setMockData(
+        100_000_000,
+        1,
+        1,
+        boa.env.timestamp,
+        boa.env.timestamp,
+    )
+    assert route.curve.confirmGreenRefPoolConfig(
+        action_id,
+        sender=route.governance.address,
+    )
+
+    assert route.curve.getCurrentGreenPoolStatus().weightedRatio == 50_00
+    assert route.price_desk.getPrice(route.usdg, True) == EIGHTEEN_DECIMALS
+    assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
+
+
+@pytest.mark.gas
+def test_final_curve_nested_price_desk_route_gas(robinhood_curve_launch_route):
+    route = robinhood_curve_launch_route
+    assert route.price_desk.getPrice(route.green, True) == EIGHTEEN_DECIMALS
+    gas_used = route.price_desk._computation.get_gas_used()
+    print(f"CURVE_NESTED_PRICEDESK_GAS={gas_used}")
+    # The final-route baseline is 25,558 gas. The 50k ceiling leaves about
+    # 96% headroom for deterministic compiler/runtime drift while remaining a
+    # meaningful regression budget.
+    assert gas_used <= 50_000
+
+
+@pytest.mark.gas
+def test_final_curve_worst_case_honest_nested_price_desk_gas(
+    ripe_hq,
+    deploy3r,
+    governance,
+    green_token,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    mock_price_source,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    delta_token,
+):
+    coins = [alpha_token, bravo_token, charlie_token, delta_token]
+    for coin in coins:
+        mock_price_source.setPrice(coin, EIGHTEEN_DECIMALS)
+    mission_control.setPriorityPriceSourceIds([1, 2, 3], sender=switchboard_alpha.address)
+
+    curve_system = boa.loads(
+        FOUR_COIN_CURVE_SYSTEM,
+        [coin.address for coin in coins],
+        name="final_four_coin_curve_gas_system",
+    )
+    curve = boa.load(
+        "contracts/priceSources/CurvePrices.vy",
+        ripe_hq,
+        ZERO_ADDRESS,
+        curve_system,
+        green_token,
+        savings_green,
+        1,
+        2,
+        name="final_four_coin_curve_gas_source",
+    )
+    assert curve.addNewPriceFeed(curve_system, curve_system, sender=governance.address)
+    assert curve.confirmNewPriceFeed(curve_system, sender=governance.address)
+
+    sources = []
+    for index in range(8):
+        source = boa.load(
+            "contracts/mock/MockRawPriceSource.vy",
+            name=f"final_curve_no_feed_{index}",
+        )
+        source.configure(0, False)
+        sources.append(source)
+    sources.extend((mock_price_source, curve))
+
+    desk = boa.load(
+        "contracts/registries/PriceDesk.vy",
+        ripe_hq,
+        deploy3r,
+        "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        1,
+        2,
+        name="final_curve_gas_price_desk",
+    )
+    for index, source in enumerate(sources, start=1):
+        assert desk.startAddNewAddressToRegistry(
+            source,
+            f"curve gas source {index}",
+            sender=deploy3r,
+        )
+        assert desk.confirmNewAddressToRegistry(source, sender=deploy3r) == index
+
+    assert desk.getPrice(curve_system, True, gas=2_000_000) == EIGHTEEN_DECIMALS
+    gas_used = desk._computation.get_gas_used()
+    print(f"CURVE_WORST_HONEST_NESTED_PRICEDESK_GAS={gas_used}")
+    # The final worst-honest baseline is 126,181 gas. The 200k ceiling leaves
+    # about 58% headroom and is intentionally independent of the call stipend.
+    assert gas_used <= 200_000
+
+
+@pytest.mark.gas
+def test_full_capacity_ten_green_ring_teller_housekeeping_gas(
+    robinhood_curve_launch_route,
+    teller,
+    deleverage,
+    alice,
+):
+    route = robinhood_curve_launch_route
+    route.curve_system.setBalances(50 * 10**6, 50 * EIGHTEEN_DECIMALS)
+    action_id = route.curve.setGreenRefPoolConfig(
+        route.curve_system,
+        10,
+        60_00,
+        0,
+        10_00,
+        100_000 * EIGHTEEN_DECIMALS,
+        sender=route.governance.address,
+    )
+    boa.env.time_travel(blocks=route.curve.actionTimeLock() + 1)
+    assert route.curve.confirmGreenRefPoolConfig(
+        action_id,
+        sender=route.governance.address,
+    )
+    for _ in range(9):
+        boa.env.time_travel(blocks=1)
+        assert route.curve.addGreenRefPoolSnapshot(sender=teller.address)
+    assert route.curve.greenRefPoolData().nextIndex == 0
+
+    boa.env.time_travel(blocks=1)
+    teller.performHousekeeping(
+        False,
+        alice,
+        False,
+        sender=deleverage.address,
+        gas=1_000_000,
+    )
+    gas_used = teller._computation.get_gas_used()
+    print(f"CURVE_FULL_CAPACITY_TEN_TELLER_HOUSEKEEPING_GAS={gas_used}")
+    assert route.curve.greenRefPoolData().nextIndex == 1
+    # Initial deterministic in-process measurement is 86,602 gas. The 150k
+    # ceiling retains about 73% margin and is independent of the call stipend.
+    assert gas_used <= 150_000
 
 
 @pytest.mark.parametrize("failure", ("zero_pool", "zero_chainlink", "stale_chainlink"))

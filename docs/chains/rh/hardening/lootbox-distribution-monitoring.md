@@ -3,8 +3,8 @@
 > **DRAFT — no distribution, configuration, pause, or deployment authority.**
 > The canonical offline profiles keep RH rewards disabled at construction with
 > floor `7_200`, interval `0`, flag `false`, and stored amounts zero
-> ([lootbox-deployment-profiles.json](../../../../scripts/proposals/lootbox-deployment-profiles.json),
-> [test_lootbox_deployment_profiles.py](../../../../tests/deployment_profiles/test_lootbox_deployment_profiles.py)).
+> (`lootbox-deployment-profiles.json` (retired),
+> `test_lootbox_deployment_profiles.py` (retired)).
 
 ## 1. Signals and exact sources
 
@@ -32,7 +32,7 @@ equivalently    = block.number > lastUnderscoreSend + interval
 
 | Condition | Concrete threshold/formula and derivation | Classification |
 | --- | --- | --- |
-| RH disabled posture | `floor == 7_200`, `interval == 0`, `hasRewards == false`, and both amounts `== 0` ([lootbox-deployment-profiles.json](../../../../scripts/proposals/lootbox-deployment-profiles.json)) | Expected before separately authorized enablement |
+| RH disabled posture | `floor == 7_200`, `interval == 0`, `hasRewards == false`, and both amounts `== 0` (`lootbox-deployment-profiles.json` (retired)) | Expected before separately authorized enablement |
 | Misconfiguration | `hasRewards == true && interval == 0`; distribution then fails the explicit nonzero-interval guard ([Lootbox.vy:1209-1214](../../../../contracts/core/Lootbox.vy#L1209)) | Critical configuration alert |
 | Below-floor interval | `interval != 0 && interval < floor`; constructor/setter reject this relation ([Lootbox.vy:208-215](../../../../contracts/core/Lootbox.vy#L208), [Lootbox.vy:1303-1311](../../../../contracts/core/Lootbox.vy#L1303)) | Critical if observed |
 | Repeat/equality | `block.number <= last + interval` remains too early; equality is not eligible ([test_underscore_rewards.py:240-341](../../../../tests/core/lootbox/test_underscore_rewards.py#L240)) | Expected gate rejection |
