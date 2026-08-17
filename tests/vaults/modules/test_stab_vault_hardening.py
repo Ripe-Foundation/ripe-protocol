@@ -4016,9 +4016,9 @@ def test_dormant_dust_is_claimable_before_exit_but_stranded_after(
 
 @pytest.mark.xfail(
     strict=True,
-    reason="DV-15: post-exit dormant-dust recovery remains absent; proposed "
-    "unpaid-but-bounded acceptance requires explicit owner ratification and a "
-    "DV-15 / Section 11.4 / RH-CHANGE-01 disposition",
+    reason="DV-15: post-exit dormant-dust recovery remains absent; accepted risk "
+    "under the ratified DER-02 / Section 11.4 / RH-CHANGE-01 monitoring, warning, "
+    "and planned-activation policy",
 )
 def test_dormant_dust_remains_recoverable_after_full_exit(
     stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
