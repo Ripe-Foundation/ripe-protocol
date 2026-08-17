@@ -1239,3 +1239,5 @@ reading_paths:
     - docs/chains/rh/status.yaml
     - docs/chains/rh-summary.md
     - The exact brief and current evidence for the assigned workstream only.
+
+<!-- CI cache measurement probe. Delete this PR after reading timings. -->
