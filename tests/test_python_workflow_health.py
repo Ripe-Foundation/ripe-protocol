@@ -26,14 +26,40 @@ BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
     "'interfaces/**/*.vyi') }}"
 )
+# Balanced by measured serial runtime, not test count. Wall clock is the
+# slowest shard, so heavy directories are split and light ones pooled.
 LEAN_SHARD_ARGUMENTS = {
-    "core": ("tests/core",),
-    "vaults-tokens": ("tests/vaults", "tests/tokens"),
+    "core-a": ("tests/core/endaoment", "tests/core/deleverage"),
+    "core-b": ("tests/core/lootbox", "tests/core/creditEngine"),
+    "core-teller": ("tests/core/teller",),
+    "core-c": (
+        "tests/core/humanResources",
+        "tests/core/bondRoom",
+        "tests/core/auctionHouse",
+        "tests/core/boardroom",
+        "tests/core/test_stale_vault_replacement.py",
+    ),
+    "vaults": (
+        "tests/vaults",
+        "--ignore=tests/vaults/modules",
+        "--ignore=tests/vaults/test_ripe_gov_vault.py",
+        "--ignore=tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "--ignore=tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-gov": (
+        "tests/vaults/test_ripe_gov_vault.py",
+        "tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-modules": ("tests/vaults/modules",),
+    "config": ("tests/config",),
+    "price-sources": ("tests/priceSources",),
     "supporting": (
         "tests",
         "--ignore=tests/core",
         "--ignore=tests/vaults",
-        "--ignore=tests/tokens",
+        "--ignore=tests/config",
+        "--ignore=tests/priceSources",
     ),
 }
 LEAN_MATRIX = [
