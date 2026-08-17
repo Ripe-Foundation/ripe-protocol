@@ -61,13 +61,17 @@ def _register_vault(vault_book, governance, vault, description):
 ###############
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def mock_auction_house():
     """Mock auction house that can be controlled for testing"""
     return boa.load("contracts/mock/MockAuctionHouse.vy", name="mock_auction_house")
 
 
-@pytest.fixture(scope="function")
+# These deployments are module-scoped because none of them is registered in
+# RipeHq or any shared registry, so building one per test only re-paid the
+# deployment. Titanoboa anchors every test call, so writes a test makes into
+# these contracts still revert before the next one runs.
+@pytest.fixture(scope="module")
 def new_mission_control(ripe_hq, defaults, switchboard_charlie):
     """Deploy a new MissionControl that is NOT registered in RipeHq.
 
@@ -85,7 +89,7 @@ def new_mission_control(ripe_hq, defaults, switchboard_charlie):
     return mission_control
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def zero_pointer_mission_control(ripe_hq, defaults):
     """Model an older/uninitialized MissionControl with both pointers unset."""
     mission_control = boa.load(
