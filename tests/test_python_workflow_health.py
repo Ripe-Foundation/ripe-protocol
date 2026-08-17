@@ -81,14 +81,11 @@ MATRIX_INCLUDE_EXPRESSION = (
     "inputs.lane == 'comprehensive' && "
     f"'{COMPREHENSIVE_MATRIX_JSON}' || '{LEAN_MATRIX_JSON}') }}}}"
 )
-# loadfile is the safe default. Only shards whose files are provably
-# order-independent may use load: each was run three times under load with
-# identical pass counts and stable timings before being listed here.
-LEAN_SHARD_DIST = {
-    "core-teller": "load",
-    "price-sources-a": "load",
-    "vaults-gov": "load",
-}
+# loadfile everywhere. An earlier revision cleared three shards for load on
+# the strength of repeated local runs; core-teller then failed intermittently in
+# CI. Local repetition cannot establish order-independence for a 4-vCPU runner,
+# so no shard may use load and this table stays empty.
+LEAN_SHARD_DIST = {}
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
