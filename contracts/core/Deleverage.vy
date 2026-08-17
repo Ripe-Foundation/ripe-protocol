@@ -62,7 +62,7 @@ interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _preflightSafeConversion: bool, _a: addys.Addys) -> (uint256, bool): nonpayable
 
 interface LootBox:
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address): nonpayable
 
 interface UnderscoreVault:
     def convertToAssetsSafe(_shares: uint256) -> uint256: view
@@ -272,7 +272,7 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
-    psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
+    psmYieldPositionToken: address = self._psmYieldToken(endaomentPsm)
 
     totalRepaidAmount: uint256 = 0
     numUsers: uint256 = 0
@@ -299,7 +299,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
-    psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
+    psmYieldPositionToken: address = self._psmYieldToken(endaomentPsm)
 
     # check perms -- must also be able to borrow
     if not isTrusted:
@@ -417,7 +417,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
     maxTargetRepayAmount: uint256 = userDebt.amount
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
-    psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
+    psmYieldPositionToken: address = self._psmYieldToken(endaomentPsm)
 
     # process each volatile asset in the specified order
     for data: DeleverageAsset in _assets:
@@ -510,8 +510,7 @@ def swapCollateral(
         a,
     )
     assert withdrawnAmount != 0 # dev: no collateral withdrawn
-    # Wrapper has no vaultId; checkpoint the sender against the post-mutation share.
-    extcall LootBox(a.lootbox).updateDepositPoints(_user, _withdrawVaultId, withdrawVaultAddr, _withdrawAsset, a)
+    self._checkpointSender(_user, _withdrawVaultId, withdrawVaultAddr, _withdrawAsset, a.lootbox)
 
     # calculate USD value of withdrawn amount
     usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_withdrawAsset, withdrawnAmount, True)
@@ -656,7 +655,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
-    psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
+    psmYieldPositionToken: address = self._psmYieldToken(endaomentPsm)
     repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, isTrustedCaller, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
     if repaidAmount != 0:
         self.lastDeleverageBlock[_user] = block.number
@@ -1224,13 +1223,21 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
 def _canDeleverageUserDebtPosition(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
     if _redemptionThreshold == 0:
         return False
-
-    # check if collateral value is below (or equal) to redemption threshold
-    redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
-    return _collateralVal <= redemptionThreshold
+    return _collateralVal <= _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
 
 
 # transfer collateral
+
+
+@internal
+def _checkpointSender(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _lootbox: address,
+):
+    extcall LootBox(_lootbox).updateDepositPoints(_user, _vaultId, _vaultAddr, _asset)
 
 
 @internal
@@ -1258,8 +1265,7 @@ def _transferCollateral(
     isPositionDepleted: bool = False
     amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, isUnderscoreBasicEarnVault, _a)
     if amountSent != 0:
-        # Wrapper has no vaultId; checkpoint the sender against the post-mutation share.
-        extcall LootBox(_a.lootbox).updateDepositPoints(_fromUser, _vaultId, _vaultAddr, _asset, _a)
+        self._checkpointSender(_fromUser, _vaultId, _vaultAddr, _asset, _a.lootbox)
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
 
@@ -1324,13 +1330,16 @@ def _getMaxAndCappedUnderlyingForShares(_asset: address, _shares: uint256) -> (u
     maxUnderlying: uint256 = staticcall IERC4626(_asset).convertToAssets(_shares)
     if maxUnderlying == 0:
         return 0, 0
-
     safeUnderlying: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(_shares)
     if safeUnderlying == 0:
         return 0, 0
+    return maxUnderlying, min(maxUnderlying, safeUnderlying * (HUNDRED_PERCENT + self.underscoreSafeSpreadBps) // HUNDRED_PERCENT)
 
-    maxAllowedUnderlying: uint256 = safeUnderlying * (HUNDRED_PERCENT + self.underscoreSafeSpreadBps) // HUNDRED_PERCENT
-    return maxUnderlying, min(maxUnderlying, maxAllowedUnderlying)
+
+@view
+@internal
+def _psmYieldToken(_psm: address) -> address:
+    return staticcall EndaomentPSM(_psm).getUsdcYieldPositionVaultToken()
 
 
 # get asset amount
