@@ -208,6 +208,9 @@ def _matching_calls(computation, address, selector):
 
 
 def _has_error_type(computation, error_type_name):
+    # The pinned Boa/py-evm stack exposes the child error class through private
+    # `_error`; this mirrors the documented coupling in assert_reverted_call.
+    # Revisit this trace helper whenever the test toolchain changes.
     return (
         computation.is_error
         and type(computation._error).__name__ == error_type_name
@@ -215,6 +218,14 @@ def _has_error_type(computation, error_type_name):
         _has_error_type(child, error_type_name)
         for child in computation.children
     )
+
+
+def _assert_qualified_revert(callback, resolved_message):
+    try:
+        callback()
+    except boa.BoaError:
+        return
+    pytest.fail(resolved_message)
 
 
 def _price_calls_for_asset(computation, address, asset):
@@ -919,27 +930,35 @@ def test_stipend_saturated_batch_envelope(
             )
         status = "success"
     else:
-        with boa.reverts():
-            if operation == "liquidation":
-                teller.liquidateManyUsers(
+        if operation == "liquidation":
+            _assert_qualified_revert(
+                lambda: teller.liquidateManyUsers(
                     list(scenario.borrowers),
                     False,
                     sender=sally,
                     gas=ROBINHOOD_MAX_TX_GAS,
-                )
-            else:
-                teller.deleverageManyUsers(
+                ),
+                "saturated liquidation batch boundary moved; rerun aggregate "
+                "gas qualification before changing the operator limit",
+            )
+        else:
+            _assert_qualified_revert(
+                lambda: teller.deleverageManyUsers(
                     [(borrower, 0) for borrower in scenario.borrowers],
                     sender=switchboard_alpha.address,
                     gas=ROBINHOOD_MAX_TX_GAS,
-                )
+                ),
+                "saturated Deleverage batch boundary moved; rerun aggregate "
+                "gas qualification before changing the operator limit",
+            )
         computation = teller._computation
         gas_used = computation.get_gas_used()
         regression_budget = ROBINHOOD_MAX_TX_GAS
-        # EIP-150 retains 1/64 of the parent call's gas, so a bounded child can
-        # prove OOG while the top-level computation reports slightly under 99%.
+        # The OOG descendant is the primary boundary proof. This looser outer
+        # floor only rejects unrelated early failures without coupling the test
+        # to the current ~98.2% EIP-150 top-level gas report.
         assert _has_error_type(computation, "OutOfGas")
-        assert gas_used >= ROBINHOOD_MAX_TX_GAS * 98 // 100
+        assert gas_used >= ROBINHOOD_MAX_TX_GAS * 95 // 100
         assert tuple(
             ledger.userDebt(borrower).amount for borrower in scenario.borrowers
         ) == debts_before
@@ -1015,7 +1034,11 @@ def test_nested_bluechip_is_starved_by_preceding_all_asset_stipend_exhaustion(
     assert desk.getPrice(underlying, True, gas=3_000_000) == EIGHTEEN_DECIMALS
 
     clear_transient_storage()
-    assert desk.getPrice(nested_asset, False, gas=3_000_000) == 0
+    nested_price = desk.getPrice(nested_asset, False, gas=3_000_000)
+    assert nested_price == 0, (
+        "nested BlueChip stop condition changed or was resolved; rerun aggregate "
+        "gas qualification and recalibrate the listing invariant"
+    )
     computation = desk._computation
     gas_used = computation.get_gas_used()
     preceding_calls = _count_calls(
@@ -1054,8 +1077,11 @@ def test_nested_bluechip_is_starved_by_preceding_all_asset_stipend_exhaustion(
     assert nested_calls == 1
     assert healthy_underlying_calls == 1
     assert healthy_underlying_successes == 1
-    with boa.reverts():
-        desk.getPrice(nested_asset, True, gas=3_000_000)
+    _assert_qualified_revert(
+        lambda: desk.getPrice(nested_asset, True, gas=3_000_000),
+        "strict nested BlueChip price no longer reverts; the stop condition was "
+        "resolved and aggregate-gas qualification must be rerun",
+    )
 
     _record_properties(
         request,

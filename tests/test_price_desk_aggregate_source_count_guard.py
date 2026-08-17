@@ -34,6 +34,17 @@ def _source_uint_constant(path, name):
     return int(match.group(1).replace("_", ""))
 
 
+def _source_address_constant(path, name):
+    source = Path(path).read_text()
+    match = re.search(
+        rf"^{name}: constant\(address\) = (0x[0-9A-Fa-f]{{40}})$",
+        source,
+        flags=re.MULTILINE,
+    )
+    assert match is not None, f"cannot bind {name} for aggregate-gas guard"
+    return match.group(1).lower()
+
+
 def _selected_price_sources():
     return tuple(
         row
@@ -62,20 +73,43 @@ def test_robinhood_price_desk_source_count_requires_gas_requalification_on_growt
     )
 
 
-def test_robinhood_enumerable_asset_count_requires_gas_requalification_on_growth():
+def test_robinhood_enumerable_position_count_requires_gas_requalification_on_growth():
     defaults = boa.load(
         "contracts/config/DefaultsRobinhoodLive.vy",
         name="aggregate_gas_robinhood_live_defaults",
     )
-    enumerable_non_stability_assets = tuple(
-        entry.asset
+    enumerable_non_stability_positions = tuple(
+        (entry.asset, vault_id)
         for entry in defaults.assetConfigs()
-        if any(vault_id != 1 for vault_id in entry.config.vaultIds)
+        for vault_id in entry.config.vaultIds
+        if vault_id != 1
     )
-    assert len(enumerable_non_stability_assets) <= QUALIFIED_BORROWER_ASSET_COUNT, (
-        "Robinhood enumerable non-stability asset growth requires aggregate "
+    assert len(enumerable_non_stability_positions) <= QUALIFIED_BORROWER_ASSET_COUNT, (
+        "Robinhood enumerable non-stability position growth requires aggregate "
         "protocol-gas requalification before activation"
     )
+
+
+def test_unqualified_price_assets_remain_zero_ltv():
+    defaults_path = "contracts/config/DefaultsRobinhoodLive.vy"
+    defaults = boa.load(
+        defaults_path,
+        name="aggregate_gas_robinhood_live_zero_ltv_defaults",
+    )
+    configs_by_asset = {
+        str(entry.asset).lower(): entry.config
+        for entry in defaults.assetConfigs()
+    }
+    for constant_name in ("RIPE_TOKEN", "RIPE_WETH_LP"):
+        asset = _source_address_constant(defaults_path, constant_name)
+        assert asset in configs_by_asset, (
+            f"{constant_name} is missing from the zero-LTV aggregate-gas guard"
+        )
+        assert configs_by_asset[asset].debtTerms.ltv == 0, (
+            f"{constant_name} received nonzero LTV; the nested or unavailable "
+            "price path now reaches collateral-health checks and requires "
+            "aggregate-gas requalification before activation"
+        )
 
 
 def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
@@ -106,7 +140,7 @@ def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
     ), "qualified keeper batches must remain explicit and below ABI maxima"
 
 
-def test_live_slot_three_divergence_remains_an_explicit_manual_preactivation_gate():
+def test_observed_live_slot_three_divergence_is_documented_for_manual_recheck():
     repository_slot_three = next(
         row for row in _selected_price_sources() if row.registry_id == 3
     )
@@ -114,6 +148,6 @@ def test_live_slot_three_divergence_remains_an_explicit_manual_preactivation_gat
     assert len(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS) == 42
     assert int(ROBINHOOD_LIVE_PRICE_DESK_SLOT_3_ADDRESS, 16) != 0
     assert repository_slot_three.semantic_name != ROBINHOOD_LIVE_PRICE_DESK_SLOT_3, (
-        "live/repository slot 3 now appears reconciled; rerun aggregate gas "
-        "qualification and update this manual pre-activation gate"
+        "the documented slot-3 snapshot no longer differs from the repository; "
+        "manually reread live state and update aggregate-gas qualification"
     )

@@ -13,9 +13,9 @@ QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND = 250_000
 ROBINHOOD_MAX_TX_GAS = 32_000_000
 ROBINHOOD_GAS_LIMIT_OBSERVED_BLOCK = 38_402_845
 
-# DefaultsRobinhood uses this value. Keeping staleness enabled makes the gas
-# measurements cover the configured timestamp checks rather than a zero-window
-# gas-only shortcut.
+# DefaultsRobinhood uses this value. The prompt-faithful Chainlink lanes cover
+# its timestamp checks; the synthetic saturated source accepts the ABI argument
+# but intentionally isolates stipend exhaustion from oracle-freshness behavior.
 ROBINHOOD_PRICE_STALE_TIME = 86_400
 
 # These ABI maxima are not themselves safe batch sizes. The focused gas suite
@@ -25,6 +25,8 @@ LIQUIDATE_MANY_API_MAX = 50
 DELEVERAGE_MANY_API_MAX = 25
 QUALIFIED_SATURATED_LIQUIDATION_BATCH_SIZE = 2
 QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE = 3
+# Each value is proven by a successful N-user transaction and an OOG at N+1.
+# Raising either input without expanding the measured envelope fails loudly.
 
 # Snapshot of a read-only live registry check at the gas-limit observation
 # block. Repository slot 3 is BlueChipYieldPrices, while live slot 3 was still
