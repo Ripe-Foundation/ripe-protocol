@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import boa
@@ -4015,8 +4016,9 @@ def test_dormant_dust_is_claimable_before_exit_but_stranded_after(
 
 @pytest.mark.xfail(
     strict=True,
-    reason="DV-15: a dormant-only dust balance has no exit path after the owner's "
-    "stability shares are burned; the Section 11.4 rule is gated on RH-CHANGE-01",
+    reason="DV-15: post-exit dormant-dust recovery remains absent; proposed "
+    "unpaid-but-bounded acceptance requires explicit owner ratification and a "
+    "DV-15 / Section 11.4 / RH-CHANGE-01 disposition",
 )
 def test_dormant_dust_remains_recoverable_after_full_exit(
     stability_pool, alpha_token, bravo_token, alpha_token_whale, bravo_token_whale,
@@ -4419,6 +4421,59 @@ def test_der02_appreciated_post_exit_dormant_pair_uses_paused_activation(
         )
 
 
+def test_der02_deployment_manifests_bind_recovery_control_and_scope():
+    """RH deploys dormant recovery; the older Base pool predates the design."""
+    manifest_paths = {
+        "robinhood": (
+            ROOT
+            / "migration_history/robinhood-mainnet/v1/current-manifest.json"
+        ),
+        "base": ROOT / "migration_history/base-mainnet/v1/current-manifest.json",
+    }
+    contracts = {
+        chain: json.loads(path.read_text())["contracts"]["StabilityPool"]
+        for chain, path in manifest_paths.items()
+    }
+    assert contracts["robinhood"]["address"] == (
+        "0xBb18Cc60aFCa88272EdAdb86fc28D56B05e7D46E"
+    )
+    assert contracts["base"]["address"] == (
+        "0x2a157096af6337b2b4bd47de435520572ed5a439"
+    )
+
+    recovery_functions = {
+        "activateClaimAssets",
+        "pruneClaimableAssets",
+        "getClaimAssetState",
+    }
+    function_names = {
+        chain: {
+            entry["name"]
+            for entry in contract["abi"]
+            if entry.get("type") == "function"
+        }
+        for chain, contract in contracts.items()
+    }
+    assert recovery_functions <= function_names["robinhood"]
+    assert recovery_functions.isdisjoint(function_names["base"])
+
+    source_key = "contracts/vaults/modules/StabVault.vy"
+    sources = {
+        chain: contract["solc_json"]["sources"][source_key]["content"]
+        for chain, contract in contracts.items()
+    }
+    robinhood_markers = (
+        "ACTIVATION_USD_THRESHOLD",
+        "RETENTION_USD_THRESHOLD",
+        "ClaimAssetLeftDormant",
+        "def activateClaimAssets(",
+        "assert vaultData.isPaused # dev: contract not paused",
+    )
+    for marker in robinhood_markers:
+        assert marker in sources["robinhood"]
+        assert marker not in sources["base"]
+
+
 def test_der02_direct_dormant_claim_value_accrues_to_current_share_cohort(
     stability_pool,
     alpha_token,
@@ -4535,10 +4590,13 @@ def test_der02_direct_dormant_claim_value_accrues_to_current_share_cohort(
         )
         assert delivered == dust
         assert stability_pool.userBalances(bob, alpha_token) < bob_shares_before
-        assert bob_net > 0
-        assert peer_gain > 0
+        # Exact committed evidence for this 100/100 alpha, 50/50 cohort. The
+        # small asymmetry is second-order dilution, not an arbitrary tolerance.
+        assert (bob_net, peer_gain) == (
+            49_974_987_493_746_873,
+            50_025_012_506_253_126,
+        )
         assert bob_net + peer_gain == dust
-        assert abs(bob_net - peer_gain) <= dust // 1_000
 
 
 @pytest.mark.parametrize("first_exiter_name", ("bob", "alice"))

@@ -1671,7 +1671,12 @@ def test_indexed_multi_holder_repetition_preserves_remaining_claims(
         # the PR base.  The old ``fail_closed_count > 0`` assertion was already
         # red there; fork_qualification is excluded from hosted CI.  The
         # branch assertions above remain the load-bearing conservation proof.
-        assert (success_count, fail_closed_count) == (2 * 48, 0)
+        # No fail-closed branch executes on this pinned Aave trajectory; the
+        # real Comet matrix below carries the forked fail-closed coverage.
+        assert (success_count, fail_closed_count) == (2 * 48, 0), (
+            "pinned Aave repetition polarity drifted: "
+            f"successes={success_count}, fail_closed={fail_closed_count}"
+        )
 
         bob_claim_before = rebase_erc20_vault.getTotalAmountForUser(
             bob, token.address
@@ -1895,6 +1900,10 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
         ("one-to-three-small-first", (1, 3), 0),
         ("one-to-three-large-first", (1, 3), 1),
     )
+    # Deliberate durable fork evidence: regenerate these constants only after
+    # intentionally reviewing pinned-state or trajectory changes.  A separate
+    # (3, 1)/index-0 row is omitted because proportional share minting makes it
+    # numerically identical to the retained (1, 3)/index-1 reverse direction.
     expected_boundaries = {
         "equal-alice-first": {
             "exiting_shares": 70_041_336_344_010_946_410_520_739,
@@ -2014,7 +2023,8 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
             )
             token.accrueAccount(rebase_erc20_vault.address, sender=exiting_user)
             i1 = _index(row)
-            assert i1 == 1_053_386_730_362_703 > i0
+            assert i1 == 1_053_386_730_362_703
+            assert i1 > i0
             setAssetConfig(
                 token.address,
                 _vaultIds=[4],
@@ -2315,7 +2325,9 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 # shares but a zero raw-token claim. The peer is still not a
                 # sole holder and therefore cannot cross its own Comet
                 # boundary. There is no automatic progression to a clean last
-                # holder: both terminal requests remain blocked.
+                # holder at this observed index: both terminal requests remain
+                # blocked. Future Comet accrual can eventually make the zero
+                # raw-unit claim round up, so this is a point-in-time proof.
                 blocked_state = (
                     _vault_path_state(
                         row,
@@ -2358,6 +2370,10 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                         ledger,
                     ),
                 ) == blocked_state
+                # The state tuple above is the load-bearing atomicity proof.
+                # Titanoboa/EVM rollback discards reverted logs, so these log
+                # checks document that framework guarantee rather than an
+                # independent contract property.
                 assert filter_logs(teller, "RebaseErc20VaultWithdrawal") == []
                 assert filter_logs(teller, "TellerWithdrawal") == []
                 clear_transient_storage()
