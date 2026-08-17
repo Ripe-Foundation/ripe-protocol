@@ -41,10 +41,10 @@ interface Ledger:
     def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
-    def hasFungibleAuctions(_liqUser: address) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
+    def hasFungibleAuctions(_liqUser: address) -> bool: view
     def isUserInLiquidation(_user: address) -> bool: view
     def numUserVaults(_user: address) -> uint256: view
 
@@ -58,14 +58,14 @@ interface MissionControl:
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
     def swapWithClaimableGreen(_stabAsset: address, _greenAmount: uint256, _liqAsset: address, _liqAmountSent: uint256, _greenToken: address) -> uint256: nonpayable
-    def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
     def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
+    def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
 
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
-    def getUserDebtAmount(_user: address) -> uint256: view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def getUserDebtAmount(_user: address) -> uint256: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -81,14 +81,14 @@ interface LootBox:
 interface Teller:
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
+interface UnderscoreVault:
+    def convertToAssetsSafe(_shares: uint256) -> uint256: view
+
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface UnderscoreVault:
-    def convertToAssetsSafe(_shares: uint256) -> uint256: view
 
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
@@ -347,6 +347,7 @@ def _liquidateUser(
     # perform liquidation phases
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
+
     # Only the nominal base fee can be spread-paid, so full-repayment GREEN
     # consumption cannot exceed live debt plus the keeper fee.
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, min(targetRepayAmount, userDebt.amount + keeperFee), liqFeeRatio, _config, _a)
@@ -729,9 +730,7 @@ def _swapAssetsWithStabPool(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
-    # Callers enter only with both min inputs positive. Keep the size-sensitive
-    # n-1 form: textbook ceiling deploys at 24,575/1 and violates RH-D036's
-    # exact zero-growth waiver.
+    # Callers enter only with both min inputs positive.
     # It lets the spread's floor reach, but not exceed, creditable repayment.
     maxCollateralUsdValue: uint256 = (min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT - 1) // (HUNDRED_PERCENT - _liqFeeRatio) + 1
     if maxCollateralUsdValue <= ONE_CENT:
@@ -1159,8 +1158,6 @@ def _buyFungibleAuction(
 
     # CreditEngine cannot recover discounted collateral after refunding excess
     # GREEN, so this per-iteration live-debt cap is the conservation boundary.
-    # Intermediate locals deploy at 24,570/6 and violate RH-D036's exact
-    # zero-growth waiver, so keep the nested expression.
     greenAmount: uint256 = min(
         min(_maxGreenForAsset, min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))),
         staticcall CreditEngine(_a.creditEngine).getUserDebtAmount(_liqUser),
