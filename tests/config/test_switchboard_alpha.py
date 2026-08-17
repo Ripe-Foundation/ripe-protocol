@@ -576,11 +576,23 @@ def test_auction_params_direct_validator_boundaries(switchboard_alpha):
         (True, 10_00, 100_01, valid_delay, valid_duration)
     )
     max_safe_duration = MAX_UINT256 // HUNDRED_PERCENT
+    max_auction_delay = 2**32 - 1
     assert switchboard_alpha.areValidAuctionParams(
         (True, 0, 50_00, 0, max_safe_duration)
     )
     assert not switchboard_alpha.areValidAuctionParams(
         (True, 0, 50_00, 0, max_safe_duration + 1)
+    )
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, max_auction_delay, 1)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, max_auction_delay + 1, 1)
+    )
+    # Previously accepted: delay = uint256.max - 1, duration = 1.
+    # AuctionHouse then reverts on block.number + delay.
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 0, 50_00, MAX_UINT256 - 1, 1)
     )
     assert not switchboard_alpha.areValidAuctionParams(
         (True, 0, 50_00, MAX_UINT256 - max_safe_duration + 1, max_safe_duration)

@@ -48,6 +48,10 @@ def updateDepositPoints(
     assert not deptBasics.isPaused # dev: contract paused
 """
     assert source.count(needle) == 1
+    # Use a # dev: assert, not a string revert: a string payload makes the
+    # Lootbox mutant exceed EIP-170. Teller-wrapped calls do not surface
+    # the # dev: reason, so callers match with bare boa.reverts() plus
+    # pre/post state.
     source = source.replace(
         needle,
         needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",

@@ -1180,8 +1180,10 @@ def _buyFungibleAuction(
         deltaBlocks: uint256 = block.number - auc.startBlock
         deltaDisc: uint256 = auc.maxDiscount - auc.startDiscount
         # Switchboard caps duration so this multiply cannot overflow for
-        # newly configured auctions. Keep maxDiscount (buyer-favorable)
-        # if a stored window would still overflow.
+        # newly configured auctions. A stored overflowing window is
+        # unreachable (deltaBlocks > ~1e73). Keep maxDiscount — same
+        # value as duration-1 — rather than spend the 8-byte AH margin
+        # on a startDiscount branch.
         if deltaDisc == 0 or deltaBlocks <= max_value(uint256) // deltaDisc:
             discount = auc.startDiscount + deltaBlocks * deltaDisc // (auc.endBlock - auc.startBlock - 1)
 

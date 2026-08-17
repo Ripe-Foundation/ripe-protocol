@@ -427,6 +427,55 @@ def test_sc30_duration_two_starts_at_start_discount_and_ends_at_max(
     )
 
 
+def test_sc30_max_accepted_delay_creates_auction(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    bob,
+    sally,
+    switchboard_alpha,
+):
+    # uint32 max is the Switchboard delay cap. Creation must not revert
+    # on block.number + delay; the next value is rejected by the validator.
+    max_auction_delay = 2**32 - 1
+    assert switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 40_00, max_auction_delay, 1)
+    )
+    assert not switchboard_alpha.areValidAuctionParams(
+        (True, 10_00, 40_00, max_auction_delay + 1, 1)
+    )
+    before_block = boa.env.evm.patch.block_number
+    auction = _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        10_00,
+        40_00,
+        1,
+        delay=max_auction_delay,
+    )
+    assert auction.startBlock >= before_block + max_auction_delay
+    assert auction.endBlock == auction.startBlock + 1
+
+
 def test_sc30_zero_length_window_cannot_be_purchased(
     setGeneralConfig,
     setAssetConfig,

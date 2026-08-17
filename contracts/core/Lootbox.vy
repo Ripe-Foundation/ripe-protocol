@@ -949,6 +949,8 @@ def _getEligibleUnderlying(
     _precision: uint256,
     _missionControl: address,
 ) -> uint256:
+    # Required vault interface. A revert here is a broken vault, not an
+    # optional-selector miss; fail-closed probing is the fallback below.
     usable: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
     if usable == 0 or _lastBalance > max_value(uint256) // _precision:
         return 0
@@ -957,6 +959,7 @@ def _getEligibleUnderlying(
         return 0
     eligibleShares: uint256 = eligibleNominal * SHARE_DECIMAL_OFFSET
     if staticcall MissionControl(_missionControl).isStabVaultId(_vaultId):
+        # Protocol-controlled stab vaults must implement totalBalances.
         # Mirrors StabVault._getTotalAmountForUserWithTotalBal (no dead-share +1).
         totalShares: uint256 = staticcall VaultShareTotals(_vaultAddr).totalBalances(_asset)
         if totalShares == 0 or eligibleShares > max_value(uint256) // usable:

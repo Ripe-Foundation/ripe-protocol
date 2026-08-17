@@ -746,6 +746,7 @@ def test_sc14_self_transfer_rejected_before_checkpoint(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    # Self-transfer is rejected by the vault before any checkpoint.
     with boa.reverts():
         simple_erc20_vault.transferBalanceWithinVault(
             alpha_token,
