@@ -759,11 +759,10 @@ For a baseline comparison use `git worktree add --detach <dir> origin/rh` — **
 ## 10. Controlling documents
 
 `docs/chains/base/ripe-gov-vault-migration/decision-plan.md` and `implementation-handoff.md` govern
-this work. **They are untracked** in the `/Users/wigglez/dev/ripe-protocol` worktree and are not on
-this branch — read them from there if available. Note the branch has since departed from the
-handoff's original phase structure by explicit owner direction: compiling, size checks, pushing, PR
-creation, reopening the Ledger prohibition, and folding shared-code changes into this PR were all
-authorized after the fact.
+this work and are tracked alongside this branch-state record. Note the branch has since departed
+from the handoff's original phase structure by explicit owner direction: compiling, size checks,
+pushing, PR creation, reopening the Ledger prohibition, and folding shared-code changes into this PR
+were all authorized after the fact.
 
 ---
 
