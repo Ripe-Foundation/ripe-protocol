@@ -3969,8 +3969,9 @@ def test_dormant_dust_is_claimable_before_exit_but_stranded_after(
     invisible to NAV. _claimFromStabilityPool reads claimableBalances directly,
     so the holder CAN take it out -- but only while they still hold stability
     shares. A full exit burns those shares, and the dust is then unreachable by
-    its economic owner and can only be revived by someone else's liquidation
-    topping the same pair over the activation threshold.
+    that user. The pair can return to the active set after a liquidation tops
+    it above the activation threshold or, after price appreciation, through
+    the paused permissionless ``activateClaimAssets`` maintenance route.
     """
     setGeneralConfig()
     setAssetConfig(bravo_token)
@@ -4097,7 +4098,9 @@ def test_der02_direct_creation_exit_and_replenishment_partitions(
     every positive balance below activation has the same dormant, non-iterable,
     non-NAV state.  Active rows cannot burn the final shares by withdrawing the
     stability asset alone because their claim value remains in NAV.  Dormant
-    rows can burn every share and strand the omitted claim.
+    rows can burn every share and strand the omitted claim. Some threshold
+    points intentionally overlap the older dust characterization; this matrix
+    adds the full NAV, enumeration, exit, and replenishment state vector.
     """
     clear_transient_storage()
     with boa.env.anchor():
@@ -4156,10 +4159,9 @@ def test_der02_direct_creation_exit_and_replenishment_partitions(
 
         expected_nav = stab_custody + (claim_amount if expected_active else 0)
         assert stability_pool.getTotalValue(alpha_token) == expected_nav
-        assert (
-            stability_pool.getTotalUserValue(bob, alpha_token)
-            <= expected_nav
-        )
+        assert abs(
+            stability_pool.getTotalUserValue(bob, alpha_token) - expected_nav
+        ) <= 1
         assert shares_before_exit == total_shares_before_exit != 0
 
         # Direct claimability is a share-for-asset exchange, not a free
@@ -4302,6 +4304,241 @@ def test_der02_direct_creation_exit_and_replenishment_partitions(
             bravo_token.balanceOf(alice) - future_recipient_before
             == ACTIVATION_THRESHOLD
         )
+
+
+def test_der02_appreciated_post_exit_dormant_pair_uses_paused_activation(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    switchboard_alpha,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Governance pause plus any caller can recover appreciated dormant dust."""
+    clear_transient_storage()
+    with boa.env.anchor():
+        setGeneralConfig()
+        setAssetConfig(bravo_token)
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+            100 * EIGHTEEN_DECIMALS,
+        )
+        mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            bravo_token,
+            bravo_token_whale,
+            RETENTION_THRESHOLD,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        vault_id = vault_book.getRegId(stability_pool)
+        assert stability_pool.getClaimAssetState(
+            alpha_token, bravo_token
+        ) == CLAIM_ASSET_DORMANT
+
+        _, depleted = stability_pool.withdrawTokensFromVault(
+            bob,
+            alpha_token,
+            MAX_UINT256,
+            bob,
+            sender=teller.address,
+        )
+        assert depleted
+        assert stability_pool.userBalances(bob, alpha_token) == 0
+        assert stability_pool.totalBalances(alpha_token) == 0
+        assert alpha_token.balanceOf(stability_pool) == 0
+
+        stability_pool.pause(True, sender=switchboard_alpha.address)
+        stability_pool.activateClaimAssets(
+            alpha_token, [bravo_token], sender=alice
+        )
+        assert stability_pool.getClaimAssetState(
+            alpha_token, bravo_token
+        ) == CLAIM_ASSET_DORMANT
+
+        mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+        assert stability_pool.getTotalValue(alpha_token) == 0
+        stability_pool.activateClaimAssets(
+            alpha_token, [bravo_token], sender=alice
+        )
+        assert stability_pool.getClaimAssetState(
+            alpha_token, bravo_token
+        ) == CLAIM_ASSET_ACTIVE
+        assert stability_pool.getNumActiveClaimAssets(alpha_token) == 1
+        assert stability_pool.getTotalValue(alpha_token) == ACTIVATION_THRESHOLD
+
+        stability_pool.pause(False, sender=switchboard_alpha.address)
+        future_deposit = 10 * EIGHTEEN_DECIMALS
+        alpha_token.transfer(
+            stability_pool, future_deposit, sender=alpha_token_whale
+        )
+        assert stability_pool.depositTokensInVault(
+            alice,
+            alpha_token,
+            future_deposit,
+            sender=teller.address,
+        ) == future_deposit
+        with boa.reverts("nothing claimed"):
+            claim_from_stability_pool(
+                teller,
+                vault_id,
+                alpha_token,
+                bravo_token,
+                sender=bob,
+            )
+        clear_transient_storage()
+        recipient_before = bravo_token.balanceOf(alice)
+        claim_from_stability_pool(
+            teller,
+            vault_id,
+            alpha_token,
+            bravo_token,
+            sender=alice,
+        )
+        assert bravo_token.balanceOf(alice) - recipient_before == (
+            RETENTION_THRESHOLD
+        )
+
+
+def test_der02_direct_dormant_claim_value_accrues_to_current_share_cohort(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    green_token,
+    savings_green,
+    vault_book,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Share burn makes a dormant claim economic value pro rata, not personal."""
+    dust = ACTIVATION_THRESHOLD - 1
+
+    clear_transient_storage()
+    with boa.env.anchor():
+        setGeneralConfig()
+        setAssetConfig(bravo_token)
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            bob,
+            teller,
+            mock_price_source,
+            100 * EIGHTEEN_DECIMALS,
+        )
+        mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            bravo_token,
+            bravo_token_whale,
+            dust,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        vault_id = vault_book.getRegId(stability_pool)
+        sole_value_before = stability_pool.getTotalUserValue(bob, alpha_token)
+        sole_shares_before = stability_pool.userBalances(bob, alpha_token)
+        recipient_before = bravo_token.balanceOf(bob)
+        claim_from_stability_pool(
+            teller,
+            vault_id,
+            alpha_token,
+            bravo_token,
+            sender=bob,
+        )
+        delivered = bravo_token.balanceOf(bob) - recipient_before
+        sole_value_after = stability_pool.getTotalUserValue(bob, alpha_token)
+        assert delivered == dust
+        assert stability_pool.userBalances(
+            bob, alpha_token
+        ) < sole_shares_before
+        assert abs(
+            sole_value_after + delivered - sole_value_before - dust
+        ) <= 1
+    clear_transient_storage()
+
+    with boa.env.anchor():
+        setGeneralConfig()
+        setAssetConfig(bravo_token)
+        for user in (bob, alice):
+            _seed_stability_asset(
+                stability_pool,
+                alpha_token,
+                alpha_token_whale,
+                user,
+                teller,
+                mock_price_source,
+                100 * EIGHTEEN_DECIMALS,
+            )
+        mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+        _record_claim(
+            stability_pool,
+            alpha_token,
+            bravo_token,
+            bravo_token_whale,
+            dust,
+            bob,
+            auction_house,
+            green_token,
+            savings_green,
+        )
+        vault_id = vault_book.getRegId(stability_pool)
+        bob_value_before = stability_pool.getTotalUserValue(bob, alpha_token)
+        alice_value_before = stability_pool.getTotalUserValue(alice, alpha_token)
+        bob_shares_before = stability_pool.userBalances(bob, alpha_token)
+        recipient_before = bravo_token.balanceOf(bob)
+        claim_from_stability_pool(
+            teller,
+            vault_id,
+            alpha_token,
+            bravo_token,
+            sender=bob,
+        )
+        delivered = bravo_token.balanceOf(bob) - recipient_before
+        bob_net = (
+            stability_pool.getTotalUserValue(bob, alpha_token)
+            + delivered
+            - bob_value_before
+        )
+        peer_gain = (
+            stability_pool.getTotalUserValue(alice, alpha_token)
+            - alice_value_before
+        )
+        assert delivered == dust
+        assert stability_pool.userBalances(bob, alpha_token) < bob_shares_before
+        assert bob_net > 0
+        assert peer_gain > 0
+        assert bob_net + peer_gain == dust
+        assert abs(bob_net - peer_gain) <= dust // 1_000
 
 
 @pytest.mark.parametrize("first_exiter_name", ("bob", "alice"))
@@ -4581,6 +4818,7 @@ def test_der02_multiple_dormant_pairs_remain_non_iterable(
     charlie_token_whale,
     delta_token_whale,
     bob,
+    alice,
     teller,
     auction_house,
     mock_price_source,
@@ -4595,6 +4833,15 @@ def test_der02_multiple_dormant_pairs_remain_non_iterable(
             alpha_token,
             alpha_token_whale,
             bob,
+            teller,
+            mock_price_source,
+            100 * EIGHTEEN_DECIMALS,
+        )
+        _seed_stability_asset(
+            stability_pool,
+            alpha_token,
+            alpha_token_whale,
+            alice,
             teller,
             mock_price_source,
             100 * EIGHTEEN_DECIMALS,
@@ -4635,6 +4882,16 @@ def test_der02_multiple_dormant_pairs_remain_non_iterable(
             alpha_token,
             MAX_UINT256,
             bob,
+            sender=teller.address,
+        )
+        assert depleted
+        assert stability_pool.userBalances(bob, alpha_token) == 0
+        assert stability_pool.userBalances(alice, alpha_token) != 0
+        _, depleted = stability_pool.withdrawTokensFromVault(
+            alice,
+            alpha_token,
+            MAX_UINT256,
+            alice,
             sender=teller.address,
         )
         assert depleted

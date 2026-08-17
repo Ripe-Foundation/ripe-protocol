@@ -288,6 +288,7 @@ def _vault_path_state(row, token, user, vault, ledger):
         "participating": ledger.isParticipatingInVault(user, 4),
         "num_user_vaults": ledger.numUserVaults(user),
         "num_user_assets": vault.getNumUserAssets(user),
+        "user_asset_registered": vault.isUserInVaultAsset(user, token.address),
         "vault_observable": token.balanceOf(vault.address),
         "recipient_observable": token.balanceOf(user),
         "vault_accounting": _accounting_state(row, vault.address),
@@ -1666,12 +1667,11 @@ def test_indexed_multi_holder_repetition_preserves_remaining_claims(
                 success_count += 1
                 boa.env.time_travel(blocks=1)
         assert cumulative_reported == cumulative_vault_outflow
-        assert success_count > 0
-        # Whether a particular bounded amount is attainable depends on the
-        # exact live index.  Every attempt must either conserve the peer on
-        # success or revert atomically; this trajectory need not manufacture
-        # both outcomes when all 96 real-token transfers are attainable.
-        assert success_count + fail_closed_count == 2 * 48
+        # This exact (96, 0) result was reproduced with the untouched test at
+        # the PR base.  The old ``fail_closed_count > 0`` assertion was already
+        # red there; fork_qualification is excluded from hosted CI.  The
+        # branch assertions above remain the load-bearing conservation proof.
+        assert (success_count, fail_closed_count) == (2 * 48, 0)
 
         bob_claim_before = rebase_erc20_vault.getTotalAmountForUser(
             bob, token.address
@@ -1885,17 +1885,45 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
     """Real Comet rounding blocks both holder orders without peer loss.
 
     The matrix uses only genuine Comet supplies and Teller deposits. It proves
-    the exact atomic failure for both full request forms, measures the maximum
-    attainable claim, and executes the current minimum-residual-share path as
-    a counterfactual without changing production code.
+    the exact atomic failure for both full request forms, models the maximum
+    attainable full-burn policy, and separately executes the current
+    minimum-residual-share path without changing production code.
     """
     row = _row("cWETHv3")
     scenarios = (
         ("equal-alice-first", (1, 1), 0),
-        ("equal-bob-first", (1, 1), 1),
         ("one-to-three-small-first", (1, 3), 0),
-        ("three-to-one-large-first", (3, 1), 0),
+        ("one-to-three-large-first", (1, 3), 1),
     )
+    expected_boundaries = {
+        "equal-alice-first": {
+            "exiting_shares": 70_041_336_344_010_946_410_520_739,
+            "shares_required": 70_041_336_344_010_946_414_089_965,
+            "theoretical_claim": 701_349_496_595_795_698,
+            "maximum_outflow": 701_349_496_595_795_698,
+            "maximum_delivery": 701_349_496_595_795_696,
+            "remaining_claim": 1_001_349_500_312_253_986,
+            "residual_shares": 96_297_298,
+        },
+        "one-to-three-small-first": {
+            "exiting_shares": 70_041_336_344_010_946_430_177_810,
+            "shares_required": 70_041_336_344_010_946_462_270_217,
+            "theoretical_claim": 701_349_496_595_795_699,
+            "maximum_outflow": 701_349_496_595_795_699,
+            "maximum_delivery": 701_349_496_595_795_697,
+            "remaining_claim": 3_004_048_500_936_761_960,
+            "residual_shares": 67_774_117,
+        },
+        "one-to-three-large-first": {
+            "exiting_shares": 270_043_924_182_749_579_630_177_810,
+            "shares_required": 270_043_924_182_749_579_707_541_946,
+            "theoretical_claim": 2_704_048_497_220_303_673,
+            "maximum_outflow": 2_704_048_497_220_303_673,
+            "maximum_delivery": 2_704_048_497_220_303_671,
+            "remaining_claim": 1_001_349_500_312_253_986,
+            "residual_shares": 22_502_388,
+        },
+    }
     evidence = {
         "remote_block": REMOTE_BLOCK_IDENTITY,
         "token": row["token"],
@@ -1926,6 +1954,9 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 _minDepositBalance=0,
             )
             i0 = _index(row)
+            assert row["pinned_index"] == 1_051_980_553_867_343
+            assert i0 == 1_051_980_790_231_110
+            assert i0 > row["pinned_index"]
             price_desk = _at(
                 f"der03-price-desk-{label}", PRICE_DESK, PRICE_DESK_ABI
             )
@@ -1983,7 +2014,7 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
             )
             token.accrueAccount(rebase_erc20_vault.address, sender=exiting_user)
             i1 = _index(row)
-            assert i1 > i0
+            assert i1 == 1_053_386_730_362_703 > i0
             setAssetConfig(
                 token.address,
                 _vaultIds=[4],
@@ -2014,9 +2045,6 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 )
                 vault_before = token.balanceOf(rebase_erc20_vault.address)
                 recipient_before = token.balanceOf(exiting_user)
-                total_shares_before = rebase_erc20_vault.totalBalances(
-                    token.address
-                )
                 exiting_shares_before = rebase_erc20_vault.userBalances(
                     exiting_user, token.address
                 )
@@ -2042,12 +2070,6 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                     plan is not None
                     and plan["outflow"] != 0
                     and shares_required <= exiting_shares_before
-                    and _preserves_remaining_claim(
-                        total_shares_before,
-                        shares_required,
-                        vault_before,
-                        plan["outflow"],
-                    )
                 )
                 if not can_execute:
                     state_before = _vault_path_state(
@@ -2242,7 +2264,8 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 total_shares,
             )
             residual = theoretical_claim - best_full_burn["inflow"]
-            assert 0 <= residual <= 2
+            assert residual == 2
+            assert best_full_burn["index"] == 1_053_386_808_660_061
             assert best_full_burn["remaining_claim_after_full_burn"] >= (
                 remaining_claim_before
             )
@@ -2277,12 +2300,113 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 )
                 assert residual_shares > 0
                 assert remaining_claim_after >= remaining_claim_before
+                residual_claim = rebase_erc20_vault.getTotalAmountForUser(
+                    exiting_user, token.address
+                )
+                assert residual_claim == 0
+                assert ledger.isParticipatingInVault(exiting_user, 4)
+                assert rebase_erc20_vault.isUserInVaultAsset(
+                    exiting_user, token.address
+                )
+                withdrawal_event = filter_logs(teller, "TellerWithdrawal")[-1]
+                assert not withdrawal_event.isDepleted
+
+                # The first non-final holder is now registered with positive
+                # shares but a zero raw-token claim. The peer is still not a
+                # sole holder and therefore cannot cross its own Comet
+                # boundary. There is no automatic progression to a clean last
+                # holder: both terminal requests remain blocked.
+                blocked_state = (
+                    _vault_path_state(
+                        row,
+                        token,
+                        exiting_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                    _vault_path_state(
+                        row,
+                        token,
+                        remaining_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                )
+                clear_transient_storage()
+                with boa.reverts("no withdrawal amount"):
+                    teller.withdraw(
+                        token.address,
+                        MAX_UINT256,
+                        exiting_user,
+                        rebase_erc20_vault.address,
+                        4,
+                        sender=exiting_user,
+                    )
+                assert (
+                    _vault_path_state(
+                        row,
+                        token,
+                        exiting_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                    _vault_path_state(
+                        row,
+                        token,
+                        remaining_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                ) == blocked_state
+                assert filter_logs(teller, "RebaseErc20VaultWithdrawal") == []
+                assert filter_logs(teller, "TellerWithdrawal") == []
+                clear_transient_storage()
+                with boa.reverts("remaining holder loss"):
+                    teller.withdraw(
+                        token.address,
+                        MAX_UINT256,
+                        remaining_user,
+                        rebase_erc20_vault.address,
+                        4,
+                        sender=remaining_user,
+                    )
+                assert (
+                    _vault_path_state(
+                        row,
+                        token,
+                        exiting_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                    _vault_path_state(
+                        row,
+                        token,
+                        remaining_user,
+                        rebase_erc20_vault,
+                        ledger,
+                    ),
+                ) == blocked_state
+                assert filter_logs(teller, "RebaseErc20VaultWithdrawal") == []
+                assert filter_logs(teller, "TellerWithdrawal") == []
                 executable_residual = {
+                    "evidence_kind": "executed_current_contract_path",
                     "requested": best_current_path["transfer_amount"],
                     "vault_outflow": actual_outflow,
                     "recipient_inflow": actual_delivery,
                     "shares_burned": best_current_path["shares_required"],
                     "shares_retained": residual_shares,
+                    "raw_claim_retained": residual_claim,
+                    "is_depleted": withdrawal_event.isDepleted,
+                    "ledger_participating": ledger.isParticipatingInVault(
+                        exiting_user, 4
+                    ),
+                    "user_asset_registered": (
+                        rebase_erc20_vault.isUserInVaultAsset(
+                            exiting_user, token.address
+                        )
+                    ),
+                    "residual_holder_max_exit": "no withdrawal amount",
+                    "remaining_holder_max_exit": "remaining holder loss",
                     "remaining_claim_before": remaining_claim_before,
                     "remaining_claim_after": remaining_claim_after,
                 }
@@ -2295,7 +2419,9 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                 "label": label,
                 "ownership_proportions": proportions,
                 "exiting_holder_index": exiting_index,
+                "pinned_inventory_index": row["pinned_index"],
                 "i0": i0,
+                "i0_minus_pinned_inventory": i0 - row["pinned_index"],
                 "i1": i1,
                 "pinned_underlying_price_usd_18": pinned_underlying_price,
                 "deposits": deposits,
@@ -2312,12 +2438,25 @@ def test_comet_multi_holder_full_exit_boundary_matrix(
                     ),
                     "failed_requests": failed_requests,
                     "remaining_claim_before": remaining_claim_before,
-                    "maximum_attainable_full_burn": best_full_burn,
+                    "modeled_maximum_attainable_full_burn": {
+                        "evidence_kind": "modeled_not_executed",
+                        **best_full_burn,
+                    },
                     "residual_base_units": residual,
                     "residual_underlying_usd_18": residual_usd_value,
-                    "current_minimum_residual_share_path": executable_residual,
+                    "executed_minimum_residual_share_path": executable_residual,
                 },
             }
+            expected = expected_boundaries[label]
+            assert {
+                "exiting_shares": exiting_shares,
+                "shares_required": shares_required_for_theoretical_outflow,
+                "theoretical_claim": theoretical_claim,
+                "maximum_outflow": best_full_burn["outflow"],
+                "maximum_delivery": best_full_burn["inflow"],
+                "remaining_claim": remaining_claim_before,
+                "residual_shares": executable_residual["shares_retained"],
+            } == expected
             evidence["scenarios"].append(scenario_evidence)
             _write_evidence(
                 "der03-comet-multi-holder-exit-liveness.json", evidence
