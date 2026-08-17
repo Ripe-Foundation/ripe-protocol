@@ -129,7 +129,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=64
+configuration_consistent=true deployment_ready=false blockers=60
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:

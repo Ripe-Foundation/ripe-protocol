@@ -269,8 +269,6 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
     a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     isTrusted: bool = addys._isValidRipeAddr(_caller)
-    if not isTrusted:
-        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
@@ -298,8 +296,6 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     isTrusted: bool = _user == _caller or addys._isValidRipeAddr(_caller)
-    if not isTrusted:
-        isTrusted = self._getUnderscoreAddrType(_caller, a.missionControl, False) != 0
 
     endaoFunds: address = addys._getEndaomentFundsAddr()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
@@ -562,6 +558,9 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     isTrustedCaller: bool = addys._isValidRipeAddr(msg.sender)
     if not isTrustedCaller:
         assert self._getUnderscoreAddrType(msg.sender, a.missionControl, False) != 0 # dev: no perms
+        if msg.sender != _user:
+            delegation: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(_user, msg.sender)
+            assert delegation.canBorrow # dev: no perms
         isTrustedCaller = msg.sender == _user
 
     # get current user state
@@ -682,6 +681,11 @@ def _deleverageUser(
     _a: addys.Addys,
 ) -> uint256:
     isTrusted: bool = _isTrusted
+
+    # Preserve registered Underscore self-call trust without upgrading the
+    # caller for any other user in a multi-user batch.
+    if not isTrusted and _user == _caller:
+        isTrusted = self._getUnderscoreAddrType(_caller, _a.missionControl, False) != 0
 
     # check perms -- must also be able to borrow
     if not isTrusted and _user != _caller:

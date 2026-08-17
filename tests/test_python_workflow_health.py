@@ -26,14 +26,48 @@ BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
     "'interfaces/**/*.vyi') }}"
 )
+# Balanced by measured serial runtime, not test count. Wall clock is the
+# slowest shard, so heavy directories are split and light ones pooled.
 LEAN_SHARD_ARGUMENTS = {
-    "core": ("tests/core",),
-    "vaults-tokens": ("tests/vaults", "tests/tokens"),
+    "core-a": ("tests/core/endaoment", "tests/core/deleverage"),
+    "core-b": ("tests/core/lootbox", "tests/core/creditEngine"),
+    "core-teller": ("tests/core/teller",),
+    "core-c": (
+        "tests/core/humanResources",
+        "tests/core/bondRoom",
+        "tests/core/auctionHouse",
+        "tests/core/boardroom",
+        "tests/core/test_stale_vault_replacement.py",
+    ),
+    "vaults": (
+        "tests/vaults",
+        "--ignore=tests/vaults/modules",
+        "--ignore=tests/vaults/test_ripe_gov_vault.py",
+        "--ignore=tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "--ignore=tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-gov": (
+        "tests/vaults/test_ripe_gov_vault.py",
+        "tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-modules": ("tests/vaults/modules",),
+    "config": ("tests/config",),
+    "price-sources-a": (
+        "tests/priceSources/curve",
+        "tests/priceSources/blueChip",
+    ),
+    "price-sources-b": (
+        "tests/priceSources",
+        "--ignore=tests/priceSources/curve",
+        "--ignore=tests/priceSources/blueChip",
+    ),
     "supporting": (
         "tests",
         "--ignore=tests/core",
         "--ignore=tests/vaults",
-        "--ignore=tests/tokens",
+        "--ignore=tests/config",
+        "--ignore=tests/priceSources",
     ),
 }
 LEAN_MATRIX = [
@@ -47,6 +81,11 @@ MATRIX_INCLUDE_EXPRESSION = (
     "inputs.lane == 'comprehensive' && "
     f"'{COMPREHENSIVE_MATRIX_JSON}' || '{LEAN_MATRIX_JSON}') }}}}"
 )
+# loadfile everywhere. An earlier revision cleared three shards for load on
+# the strength of repeated local runs; core-teller then failed intermittently in
+# CI. Local repetition cannot establish order-independence for a 4-vCPU runner,
+# so no shard may use load and this table stays empty.
+LEAN_SHARD_DIST = {}
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
@@ -76,8 +115,9 @@ def _workflow_lean_shard_arguments():
         "run"
     ]
     pattern = re.compile(
-        r"^  (?P<shard>[a-z][a-z-]*)\)\n"
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
         r"    shard_args=\((?P<arguments>.*?)\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
         r"    ;;$",
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -88,6 +128,22 @@ def _workflow_lean_shard_arguments():
     arguments = dict(branches)
     assert len(arguments) == len(branches), "Lean shard names must be unique"
     return arguments
+
+
+def _workflow_lean_shard_dist():
+    """Explicit distribution mode per shard; unset means the loadfile default."""
+    command = _step(_workflow()["jobs"]["test"], "Run lean default lane")["run"]
+    pattern = re.compile(
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
+        r"    shard_args=\(.*?\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
+        r"    ;;$",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return {
+        m.group("shard"): m.group("dist") or "loadfile"
+        for m in pattern.finditer(command)
+    }
 
 
 def _partition_shard_arguments(arguments):
@@ -166,7 +222,13 @@ def test_python_workflow_routes_automatic_events_to_one_lean_lane():
         "rh",
         "rh-audit-remediation",
     ]
-    assert workflow["on"]["push"]["branches"] == ["master"]
+    # Integration branches must be included: only a run on the base branch
+    # writes a Titanoboa cache that later PRs targeting it can restore.
+    assert workflow["on"]["push"]["branches"] == [
+        "master",
+        "rh",
+        "rh-audit-remediation",
+    ]
     assert workflow["permissions"] == {"contents": "read"}
 
     dispatch_lane = workflow["on"]["workflow_dispatch"]["inputs"]["lane"]
@@ -188,8 +250,16 @@ def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
     assert step["env"] == {"TEST_SHARD": "${{ matrix.shard }}"}
 
     assert _workflow_lean_shard_arguments() == LEAN_SHARD_ARGUMENTS
+    # Distribution mode is a correctness control, not a tuning knob: load
+    # spreads a file's tests across workers, which breaks any suite whose tests
+    # depend on intra-file ordering. Only explicitly cleared shards may use it.
+    dist = _workflow_lean_shard_dist()
+    assert set(dist) == set(LEAN_SHARD_ARGUMENTS)
+    assert {k: v for k, v in dist.items() if v != "loadfile"} == LEAN_SHARD_DIST
 
     command = step["run"]
+    assert "dist_mode=loadfile" in command
+    assert '--dist "$dist_mode"' in command
     assert command.count('case "$TEST_SHARD" in') == 1
     assert command.count("\nesac\n") == 1
     assert (

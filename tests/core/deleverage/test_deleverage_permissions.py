@@ -1978,11 +1978,10 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
 
 
-def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_leveraged_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,
@@ -2016,10 +2015,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setEarnVault(alice, True)
     mock_undy_v2.setBasicEarnVault(alice, False)
 
-    # alice calls deleverageForWithdrawal — should NOT revert with "no perms"
-    # Returns False because bob has no debt, but the earn vault permission check passed
+    # alice calls for its own leveraged vault — should NOT revert with "no perms"
+    # Returns False because alice has no debt, but the earn-vault entry check passed.
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt to deleverage, but permission was granted
 
@@ -2027,11 +2026,10 @@ def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
     mock_undy_v2.setAllAddressesAreVaults(True)
 
 
-def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
+def test_basic_underscore_vault_self_call_passes_deleverageForWithdrawal_permission(
     switchboard_alpha,
     deleverage,
     alpha_token,
-    bob,
     alice,
     mission_control,
     mock_undy_v2,
@@ -2060,7 +2058,7 @@ def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
     # setEarnVault already sets basicEarnVault=True as backwards-compatible default
 
     result = deleverage.deleverageForWithdrawal(
-        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+        alice, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
     )
     assert result == False  # No debt, but permission passed
 

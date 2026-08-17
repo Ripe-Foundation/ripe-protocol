@@ -13,6 +13,10 @@
 > `tests/test_vault_pointer_runtime_sizes.py` now asserts only the EIP-170
 > ceiling. Treat every floor, waiver, and reopen-on-change rule here as a record
 > of what was in force during WP0, not as a current requirement.
+>
+> The same applies to `scripts/check_contract_artifacts.py` and
+> `config/contract-artifact-expectations.json` cited below: both were
+> deleted, so those commands are not runnable and those figures are dated.
 
 Produced by the implementation agent for
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md`.

@@ -14,6 +14,31 @@ explicit exceptions, and accepted risks. Ordinary contract bug fixes do not
 require a new `RH-D` entry. The `decisions` list in [`status.yaml`](status.yaml)
 is a historical or intentionally refreshed snapshot; exact per-PR mirror parity
 is not required, and it may be reconciled once during final release preparation.
+**The contract-artifact-expectations pipeline is retired.** Entries below cite
+`config/contract-artifact-expectations.json`, `scripts/check_contract_artifacts.py`,
+and per-contract source/creation/runtime/ABI/selector hash identities. The
+owner descoped the Robinhood stock M4 launch binding on 16 August 2026, and
+those files — the JSON, both checker scripts, their tests, and the
+`validate_robinhood_stock_m4_binding` validator in `config/BluePrint.py` — were
+deleted with it.
+
+The four qualification records that depended on that pipeline were reconciled
+as follows. `Deployment.DP-11.stock.vaultArtifact` is removed from the launch
+census, the deployment-input map, and the parameter ledger: it asserted
+SimpleErc20 artifact identity and nothing else, so with the pipeline retired it
+carries no fact. M2, M3, and M4 remain `repository_fact_integrated` with no
+candidate payload — integrated by behavior, proven by tests that still run,
+which is what this file's own B-T8-M2/M3/M4 predicates record. What was removed
+is the hash evidence layer, not the integration. They are no longer deployment
+inputs either, because an integrated behavior has no value to bind at deployment
+time. Stock remains fail-closed on unresolved M5 configuration and activation
+and on the unresolved vault slot. Deployment readiness moved from 64 blockers to
+60 as a result.
+
+Recorded hashes in the entries below are historical measurements; nothing
+regenerates, checks, or rebinds them, and no PR or release step is expected to.
+The release-packet checklist has been updated to match.
+
 **The headroom-waiver mechanism is retired.** RH-D026 through RH-D036 describe
 a 200-byte minimum-headroom floor, per-contract exact source/runtime/deployed
 identity pins, and zero-growth reopen-on-change rules. No test enforces any of
@@ -533,7 +558,7 @@ The two retained and operative H-01 dependency-security exceptions
 affected exception stale for deployment rehearsal; expiry blocks rehearsal and
 merge unless the exception has been retired or valid replacement authority
 exists. See
-[`evidence/dependency-security-gate.md`](evidence/dependency-security-gate.md).
+`evidence/dependency-security-gate.md` (retired with the dependency gate).
 
 ## External and live-action decisions still open
 
@@ -1342,9 +1367,17 @@ Activation requires separate exact-head authority, a finite operating cadence,
 the selected capacity-ten bound, direct
 capacity-ten, cold maximum-ring, and PriceDesk composition evidence,
 snapshot/fallback/gas alerts, and rehearsed pause plus timelocked ID-2 disable.
-The remediated Curve source SHA-256 is recorded in the Robinhood launch-input
-ledger as an owner-selected candidate. It remains an explicit fail-closed
-deployment-readiness blocker until that exact-head ratification occurs.
+**The exact-source condition of this decision is retired.** The remediated Curve
+source SHA-256 was recorded in the Robinhood launch-input ledger as an
+owner-selected candidate and enforced as a fail-closed readiness blocker. The
+owner retired that static identity condition on 16 August 2026: the two
+`artifact.curve_prices_*_sha256` launch inputs, the `RH_CURVE_ARTIFACT_DRIFT`
+validator, and the generator's real-file hashing were removed because they
+failed unrelated pull requests on any legitimate Curve edit. Semantic Curve
+configuration, recursion, permission, route, and deployment-policy checks remain
+controlling. The consequence is explicit: a future Curve source change will no
+longer flag that the owner approved a different artifact, and the exact-head
+ratification below must be re-established by review rather than by a digest.
 Any Curve source/compiler/dependency change, capacity above 10, missed refresh,
 sustained fallback, near-budget gas, threshold/equilibrium change, or new
 consumer/topology or clock-domain change reopens qualification. The pinned-Base

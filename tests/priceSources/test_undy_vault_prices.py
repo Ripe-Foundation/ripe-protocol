@@ -2835,8 +2835,11 @@ def test_undy_sc23_zero_stale_time_and_deadline_overflow(
     assert undy_vault_prices.getWeightedPrice(alpha_token_vault) == 0
 
 
-@pytest.mark.artifact
 def test_undy_final_deployed_runtime_measurement(undy_vault_prices):
+    # Deliberately NOT artifact-marked. This asserts the EIP-170 ceiling, which
+    # is deployability, not artifact identity: it cannot go stale from a source
+    # change and only fails when the contract genuinely will not deploy. The
+    # size and hash are printed for review, never asserted.
     runtime = bytes(boa.env.get_code(undy_vault_prices.address))
     print(
         "UNDY_RUNTIME",
