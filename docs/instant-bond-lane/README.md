@@ -7,8 +7,9 @@ decisions are still deliberately blocked.
 
 > **Current status — contract candidate, not an active product.** The Instant Bond
 > branch contains feature checkpoint `5d12e60070d6892ce481813b27784bbe2dcfd43b`
-> and integrates `rh-audit-remediation@c9ae47e1854e676b5846c98baa40f5d0fdfaf324` through merge
-> checkpoint `428fa5ed15b396717f833f96cb961f5fb460c88e` on branch
+> and integrates
+> `rh-audit-remediation@04c76bebb2565ec4d1109e60c1981284145b22c0` through merge
+> checkpoint `32792b6280c572a3bde779e8463405c7bca781ce` on branch
 > `instant-bond-lane`, proposed by draft PR
 > [#156](https://github.com/Ripe-Foundation/ripe-protocol/pull/156) against `rh`.
 > The contracts, tests, generated ABIs, and deterministic controller model are
@@ -553,6 +554,10 @@ against the merged tree: 211 tests passed, two credential-gated fork tests skipp
 Lane coverage was 85.03%, Foxtrot coverage was 93.98%, all 57 ABI outputs and the
 source-bound controller artifact were current, and the activation draft remained
 valid and blocked.
+
+The subsequent `04c76be` remediation delta added only audit and migration records; it
+did not change production source, feature tests, workflows, generated artifacts, or
+the measurements above.
 
 ## Agent change checklist
 
