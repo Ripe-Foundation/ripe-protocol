@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources"},{"lane":"lean","shard":"supporting"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources-a"},{"lane":"lean","shard":"price-sources-b"},{"lane":"lean","shard":"supporting"}]') }}
     env:
       # The runner context is not available in jobs.<id>.env — only inside
       # steps — so these use github.workspace, which is.
@@ -119,6 +119,11 @@ jobs:
           # count: tests/core averages ~0.75s per test, tests/vaults ~1.29s, and
           # everything else ~0.65s. Wall clock is the slowest shard, so the
           # heavy directories are split and the light ones are pooled.
+          # loadfile is the safe default: it keeps every test in a file on one
+          # worker, preserving intra-file ordering. Shards whose files are
+          # provably order-independent override to load, which spreads a file's
+          # tests across all workers and roughly halves the shard.
+          dist_mode=loadfile
           case "$TEST_SHARD" in
             core-a)
               shard_args=(tests/core/endaoment tests/core/deleverage)
@@ -128,6 +133,7 @@ jobs:
               ;;
             core-teller)
               shard_args=(tests/core/teller)
+              dist_mode=load
               ;;
             core-c)
               shard_args=(
@@ -153,6 +159,7 @@ jobs:
                 tests/vaults/test_ripe_gov_controls_and_migration.py
                 tests/vaults/test_ripe_gov_exit_fee.py
               )
+              dist_mode=load
               ;;
             vaults-modules)
               shard_args=(tests/vaults/modules)
@@ -160,8 +167,16 @@ jobs:
             config)
               shard_args=(tests/config)
               ;;
-            price-sources)
-              shard_args=(tests/priceSources)
+            price-sources-a)
+              shard_args=(tests/priceSources/curve tests/priceSources/blueChip)
+              dist_mode=load
+              ;;
+            price-sources-b)
+              shard_args=(
+                tests/priceSources
+                --ignore=tests/priceSources/curve
+                --ignore=tests/priceSources/blueChip
+              )
               ;;
             supporting)
               shard_args=(
@@ -189,7 +204,7 @@ jobs:
           # restores the ordering guarantee.
           /usr/bin/time -p python -m pytest \
             -n 4 \
-            --dist loadfile \
+            --dist "$dist_mode" \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             --durations=50 \

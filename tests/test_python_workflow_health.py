@@ -53,7 +53,15 @@ LEAN_SHARD_ARGUMENTS = {
     ),
     "vaults-modules": ("tests/vaults/modules",),
     "config": ("tests/config",),
-    "price-sources": ("tests/priceSources",),
+    "price-sources-a": (
+        "tests/priceSources/curve",
+        "tests/priceSources/blueChip",
+    ),
+    "price-sources-b": (
+        "tests/priceSources",
+        "--ignore=tests/priceSources/curve",
+        "--ignore=tests/priceSources/blueChip",
+    ),
     "supporting": (
         "tests",
         "--ignore=tests/core",
@@ -73,6 +81,14 @@ MATRIX_INCLUDE_EXPRESSION = (
     "inputs.lane == 'comprehensive' && "
     f"'{COMPREHENSIVE_MATRIX_JSON}' || '{LEAN_MATRIX_JSON}') }}}}"
 )
+# loadfile is the safe default. Only shards whose files are provably
+# order-independent may use load: each was run three times under load with
+# identical pass counts and stable timings before being listed here.
+LEAN_SHARD_DIST = {
+    "core-teller": "load",
+    "price-sources-a": "load",
+    "vaults-gov": "load",
+}
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
@@ -102,8 +118,9 @@ def _workflow_lean_shard_arguments():
         "run"
     ]
     pattern = re.compile(
-        r"^  (?P<shard>[a-z][a-z-]*)\)\n"
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
         r"    shard_args=\((?P<arguments>.*?)\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
         r"    ;;$",
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -114,6 +131,22 @@ def _workflow_lean_shard_arguments():
     arguments = dict(branches)
     assert len(arguments) == len(branches), "Lean shard names must be unique"
     return arguments
+
+
+def _workflow_lean_shard_dist():
+    """Explicit distribution mode per shard; unset means the loadfile default."""
+    command = _step(_workflow()["jobs"]["test"], "Run lean default lane")["run"]
+    pattern = re.compile(
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
+        r"    shard_args=\(.*?\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
+        r"    ;;$",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return {
+        m.group("shard"): m.group("dist") or "loadfile"
+        for m in pattern.finditer(command)
+    }
 
 
 def _partition_shard_arguments(arguments):
@@ -214,8 +247,16 @@ def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
     assert step["env"] == {"TEST_SHARD": "${{ matrix.shard }}"}
 
     assert _workflow_lean_shard_arguments() == LEAN_SHARD_ARGUMENTS
+    # Distribution mode is a correctness control, not a tuning knob: load
+    # spreads a file's tests across workers, which breaks any suite whose tests
+    # depend on intra-file ordering. Only explicitly cleared shards may use it.
+    dist = _workflow_lean_shard_dist()
+    assert set(dist) == set(LEAN_SHARD_ARGUMENTS)
+    assert {k: v for k, v in dist.items() if v != "loadfile"} == LEAN_SHARD_DIST
 
     command = step["run"]
+    assert "dist_mode=loadfile" in command
+    assert '--dist "$dist_mode"' in command
     assert command.count('case "$TEST_SHARD" in') == 1
     assert command.count("\nesac\n") == 1
     assert (
