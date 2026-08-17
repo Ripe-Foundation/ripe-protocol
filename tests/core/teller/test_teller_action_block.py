@@ -370,36 +370,53 @@ def teller_route_matrix_env(
 
 
 ROUTE_CASES = (
-    pytest.param("deposit", False, "user", True, id="deposit"),
-    pytest.param("depositMany", False, "user", True, id="depositMany"),
+    pytest.param("deposit", False, "user", True, "conditional", id="deposit"),
+    pytest.param(
+        "depositMany",
+        False,
+        "user",
+        True,
+        "conditional",
+        id="depositMany",
+    ),
     pytest.param(
         "convertToSavingsGreenAndDepositIntoStabPool",
         False,
         "user",
         True,
+        "conditional",
         id="convertToSavingsGreenAndDepositIntoStabPool",
     ),
-    pytest.param("depositIntoGovVault", False, "user", True, id="depositIntoGovVault"),
-    pytest.param("claimLoot", False, "user", True, id="claimLoot"),
-    pytest.param("adjustLock", False, "user", True, id="adjustLock"),
-    pytest.param("releaseLock", False, "user", True, id="releaseLock"),
-    pytest.param("withdraw", True, "user", True, id="withdraw"),
-    pytest.param("withdrawMany", True, "user", True, id="withdrawMany"),
-    pytest.param("rebalance", True, "user", True, id="rebalance"),
+    pytest.param(
+        "depositIntoGovVault",
+        False,
+        "user",
+        True,
+        "conditional",
+        id="depositIntoGovVault",
+    ),
+    pytest.param("claimLoot", False, "user", True, "conditional", id="claimLoot"),
+    pytest.param("adjustLock", False, "user", True, "always", id="adjustLock"),
+    pytest.param("releaseLock", False, "user", True, "always", id="releaseLock"),
+    pytest.param("withdraw", True, "user", True, "always", id="withdraw"),
+    pytest.param("withdrawMany", True, "user", True, "always", id="withdrawMany"),
+    pytest.param("rebalance", True, "user", True, "always", id="rebalance"),
     pytest.param(
         "claimManyFromStabilityPool",
         True,
         "user",
         True,
+        "always",
         id="claimManyFromStabilityPool",
     ),
-    pytest.param("borrow", True, "user", False, id="borrow"),
-    pytest.param("repay", False, "user", False, id="repay"),
+    pytest.param("borrow", True, "user", False, "always", id="borrow"),
+    pytest.param("repay", False, "user", False, "conditional", id="repay"),
     pytest.param(
         "redeemCollateralFromMany",
         False,
         "recipient",
         True,
+        "conditional",
         id="redeemCollateralFromMany",
     ),
     pytest.param(
@@ -407,6 +424,7 @@ ROUTE_CASES = (
         False,
         "recipient",
         True,
+        "conditional",
         id="buyManyFungibleAuctions",
     ),
     pytest.param(
@@ -414,15 +432,31 @@ ROUTE_CASES = (
         False,
         "recipient",
         True,
+        "conditional",
         id="redeemManyFromStabilityPool",
     ),
-    pytest.param("purchaseRipeBond", False, "recipient", True, id="purchaseRipeBond"),
-    pytest.param("liquidateUser", False, "caller", True, id="liquidateUser"),
+    pytest.param(
+        "purchaseRipeBond",
+        False,
+        "recipient",
+        True,
+        "conditional",
+        id="purchaseRipeBond",
+    ),
+    pytest.param(
+        "liquidateUser",
+        False,
+        "caller",
+        True,
+        "always",
+        id="liquidateUser",
+    ),
     pytest.param(
         "liquidateManyUsers",
         False,
         "caller",
         True,
+        "always",
         id="liquidateManyUsers",
     ),
     pytest.param(
@@ -430,6 +464,7 @@ ROUTE_CASES = (
         False,
         "caller",
         True,
+        "always",
         id="claimLootForManyUsers",
     ),
 )
@@ -448,14 +483,13 @@ def _route_subject(env, subject_kind):
     return env["bob"]
 
 
-def _invoke_teller_route(route, env):
+def _invoke_teller_route(route, env, caller):
     teller = env["teller"]
     asset = env["asset"]
     green = env["green"]
     vault = env["vault"]
     vault_id = env["vault_id"]
     user = env["bob"]
-    caller = env["charlie"]
     recipient = env["alice"]
     amount = 10
 
@@ -565,50 +599,76 @@ def _invoke_teller_route(route, env):
 
 
 @pytest.mark.parametrize(
-    ("route", "is_higher_risk", "subject_kind", "should_update_debt"),
+    (
+        "route",
+        "is_higher_risk",
+        "subject_kind",
+        "should_update_debt",
+        "touch_policy",
+    ),
     ROUTE_CASES,
 )
+@pytest.mark.parametrize("caller_kind", ("self", "third-party"))
 def test_teller_route_housekeeping_risk_and_subject_matrix(
     route,
     is_higher_risk,
     subject_kind,
     should_update_debt,
+    touch_policy,
+    caller_kind,
     teller_route_matrix_env,
 ):
     env = teller_route_matrix_env
     ledger = env["ledger"]
     subject = _route_subject(env, subject_kind)
+    caller = subject if caller_kind == "self" else env["charlie"]
     decoys = {env["bob"], env["alice"], env["charlie"]} - {subject}
+    should_touch = touch_policy == "always" or caller == subject
 
-    _invoke_teller_route(route, env)
-    assert ledger.lastTouch(subject) == boa.env.evm.patch.block_number
+    _invoke_teller_route(route, env, caller)
+    expected_touch = boa.env.evm.patch.block_number if should_touch else 0
+    assert ledger.lastTouch(subject) == expected_touch
     for decoy in decoys:
         assert ledger.lastTouch(decoy) == 0
 
-    if is_higher_risk:
+    # Borrow is a higher-risk positive control for the subject. It must remain
+    # blocked after any touch, but must succeed after a conditional third-party
+    # route proves that the subject's action block was not armed.
+    if should_touch:
         with boa.reverts("one action per block"):
-            _invoke_teller_route(route, env)
+            env["teller"].borrow(1, subject, False, False, sender=subject)
     else:
-        _invoke_teller_route(route, env)
+        assert not is_higher_risk
+        assert env["teller"].borrow(1, subject, False, False, sender=subject) == 1
         assert ledger.lastTouch(subject) == boa.env.evm.patch.block_number
 
 
 @pytest.mark.parametrize(
-    ("route", "is_higher_risk", "subject_kind", "should_update_debt"),
+    (
+        "route",
+        "is_higher_risk",
+        "subject_kind",
+        "should_update_debt",
+        "touch_policy",
+    ),
     ROUTE_CASES,
 )
+@pytest.mark.parametrize("caller_kind", ("self", "third-party"))
 def test_teller_route_housekeeping_debt_update_matrix(
     route,
     is_higher_risk,
     subject_kind,
     should_update_debt,
+    touch_policy,
+    caller_kind,
     teller_route_matrix_env,
 ):
     env = teller_route_matrix_env
     recorder = env["credit_engine"]
     subject = _route_subject(env, subject_kind)
+    caller = subject if caller_kind == "self" else env["charlie"]
     recorder.reset()
-    _invoke_teller_route(route, env)
+    _invoke_teller_route(route, env, caller)
     assert recorder.debtUpdateCount() == int(should_update_debt)
     if should_update_debt:
         assert recorder.lastDebtUser() == subject

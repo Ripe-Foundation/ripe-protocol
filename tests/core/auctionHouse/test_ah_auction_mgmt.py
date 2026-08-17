@@ -1,8 +1,52 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
-from conf_utils import buy_fungible_auction, filter_logs
+from conf_utils import (
+    assert_reverted_call,
+    buy_fungible_auction,
+    clear_transient_storage,
+    filter_logs,
+)
+
+
+def _advance_to_block(block_number):
+    blocks = block_number - boa.env.evm.patch.block_number
+    assert blocks >= 0
+    if blocks:
+        boa.env.time_travel(blocks=blocks)
+    assert boa.env.evm.patch.block_number == block_number
+
+
+def _economic_state(
+    user,
+    ledger,
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    green_token,
+    *,
+    caller,
+    liquidation_keeper,
+):
+    debt = ledger.userDebt(user)
+    return (
+        debt.amount,
+        debt.principal,
+        debt.inLiquidation,
+        ledger.totalDebt(),
+        simple_erc20_vault.userBalances(user, alpha_token),
+        simple_erc20_vault.userBalances(user, bravo_token),
+        alpha_token.balanceOf(user),
+        bravo_token.balanceOf(user),
+        alpha_token.balanceOf(simple_erc20_vault),
+        bravo_token.balanceOf(simple_erc20_vault),
+        green_token.balanceOf(user),
+        green_token.balanceOf(caller),
+        green_token.balanceOf(liquidation_keeper),
+        green_token.totalSupply(),
+    )
 
 
 @pytest.fixture(scope="module")
@@ -191,6 +235,512 @@ def test_ah_auction_mgmt_paused_contract(
     
     with boa.reverts("contract paused"):
         auction_house.pauseManyAuctions(auctions, sender=switchboard_alpha.address)
+
+
+# expired auction cleanup tests
+
+
+def test_remove_expired_fungible_auction_is_permissionless_and_emits_event(
+    setupAuctionMgmntTest,
+    auction_house,
+    ledger,
+    alpha_token,
+    bob,
+    alice,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    auction = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
+    _advance_to_block(auction.endBlock)
+
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+    assert not ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+
+    logs = filter_logs(auction_house, "ExpiredFungibleAuctionRemoved")
+    assert len(logs) == 1
+    assert logs[0].liqUser == bob
+    assert logs[0].vaultId == vault_id
+    assert logs[0].asset == alpha_token.address
+
+
+def test_remove_expired_fungible_auction_before_expiry_is_non_mutating(
+    setupAuctionMgmntTest,
+    auction_house,
+    ledger,
+    alpha_token,
+    bravo_token,
+    green_token,
+    bob,
+    alice,
+    sally,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    auction = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
+    _advance_to_block(auction.endBlock - 1)
+
+    index_before = ledger.fungibleAuctionIndex(bob, vault_id, alpha_token)
+    count_before = ledger.numFungibleAuctions(bob)
+    state_before = _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    )
+
+    assert not auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    ).isActive
+    assert ledger.fungibleAuctionIndex(bob, vault_id, alpha_token) == index_before
+    assert ledger.numFungibleAuctions(bob) == count_before
+    assert filter_logs(auction_house, "ExpiredFungibleAuctionRemoved") == []
+    assert _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    ) == state_before
+
+
+def test_remove_expired_fungible_auction_exact_boundary_and_missing_are_safe(
+    setupAuctionMgmntTest,
+    auction_house,
+    ledger,
+    alpha_token,
+    bravo_token,
+    bob,
+    alice,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    alpha_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    )
+    bravo_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+    _advance_to_block(alpha_auction.endBlock)
+    assert boa.env.evm.patch.block_number == alpha_auction.endBlock
+
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+    bravo_index_after_removal = ledger.fungibleAuctionIndex(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+
+    assert not auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+    assert not auction_house.removeExpiredFungibleAuction(
+        bob,
+        999999,
+        alpha_token,
+        sender=alice,
+    )
+    assert ledger.hasFungibleAuction(bob, vault_id, bravo_token)
+    assert ledger.fungibleAuctionIndex(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == bravo_index_after_removal
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == bravo_auction
+
+
+def test_remove_expired_fungible_auction_preserves_paused_auction(
+    setupAuctionMgmntTest,
+    auction_house,
+    switchboard_alpha,
+    ledger,
+    alpha_token,
+    bob,
+    alice,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    auction = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
+
+    assert auction_house.pauseAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    _advance_to_block(auction.endBlock)
+    assert not auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert not ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    ).isActive
+    assert filter_logs(auction_house, "ExpiredFungibleAuctionRemoved") == []
+
+    assert auction_house.startAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=switchboard_alpha.address,
+    )
+    restarted = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    )
+    assert restarted.isActive
+    assert restarted.endBlock > auction.endBlock
+
+
+def test_remove_expired_fungible_auctions_preserves_swap_and_pop_registries(
+    setupAuctionMgmntTest,
+    auction_house,
+    ledger,
+    alpha_token,
+    bravo_token,
+    bob,
+    alice,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=2, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    alpha_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    )
+    bravo_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+    _advance_to_block(max(alpha_auction.endBlock, bravo_auction.endBlock))
+
+    target_index = ledger.fungibleAuctionIndex(bob, vault_id, alpha_token)
+    other_index = ledger.fungibleAuctionIndex(bob, vault_id, bravo_token)
+    assert target_index != other_index
+    bob_global_index = ledger.indexOfFungLiqUser(bob)
+    num_global_before = ledger.numFungLiqUsers()
+    moved_user = ledger.fungLiqUsers(num_global_before - 1)
+    assert moved_user == alice
+
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+    assert not ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert ledger.hasFungibleAuction(bob, vault_id, bravo_token)
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == bravo_auction
+    assert ledger.fungibleAuctionIndex(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == target_index
+    assert ledger.hasFungibleAuctions(bob)
+    assert ledger.indexOfFungLiqUser(bob) == bob_global_index
+    assert bob in [
+        ledger.fungLiqUsers(i)
+        for i in range(1, ledger.numFungLiqUsers())
+    ]
+
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        bravo_token,
+        sender=alice,
+    )
+    assert not ledger.hasFungibleAuctions(bob)
+    assert ledger.indexOfFungLiqUser(bob) == 0
+    assert bob not in [
+        ledger.fungLiqUsers(i)
+        for i in range(1, ledger.numFungLiqUsers())
+    ]
+    assert ledger.numFungLiqUsers() == num_global_before - 1
+    assert ledger.indexOfFungLiqUser(moved_user) == bob_global_index
+    assert ledger.fungLiqUsers(bob_global_index) == moved_user
+
+
+def test_final_expired_auction_cleanup_restores_liquidation_retry(
+    setupAuctionMgmntTest,
+    auction_house,
+    credit_engine,
+    teller,
+    ledger,
+    alpha_token,
+    bravo_token,
+    green_token,
+    bob,
+    alice,
+    sally,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    alpha_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    )
+    bravo_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+    original_end = max(alpha_auction.endBlock, bravo_auction.endBlock)
+    _advance_to_block(original_end)
+
+    debt, borrow_terms, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert not borrow_terms.hasQuarantinedAsset
+    assert debt.inLiquidation
+    assert not credit_engine.canLiquidateUser(bob)
+
+    state_before_stale_retry = _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    )
+    clear_transient_storage()
+    assert teller.liquidateUser(bob, False, sender=sally) == 0
+    assert _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    ) == state_before_stale_retry
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    ) == alpha_auction
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == bravo_auction
+    assert filter_logs(teller, "LiquidateUser") == []
+
+    state_before_cleanup = _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    )
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+    assert not credit_engine.canLiquidateUser(bob)
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        bravo_token,
+        sender=alice,
+    )
+    assert _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    ) == state_before_cleanup
+    assert not ledger.hasFungibleAuctions(bob)
+    assert credit_engine.canLiquidateUser(bob)
+
+    clear_transient_storage()
+    teller.liquidateUser(bob, False, sender=sally)
+    new_alpha = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        alpha_token,
+    )
+    new_bravo = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+    assert new_alpha.isActive
+    assert new_bravo.isActive
+    assert new_alpha.startBlock >= original_end
+    assert new_bravo.startBlock >= original_end
+    assert new_alpha.endBlock > original_end
+    assert new_bravo.endBlock > original_end
+
+
+def test_remove_expired_fungible_auction_respects_both_pause_boundaries(
+    setupAuctionMgmntTest,
+    auction_house,
+    switchboard_alpha,
+    ledger,
+    alpha_token,
+    bravo_token,
+    green_token,
+    bob,
+    alice,
+    sally,
+    vault_book,
+    simple_erc20_vault,
+):
+    setupAuctionMgmntTest(num_users=1, create_liquidations=True)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    auction = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
+    _advance_to_block(auction.endBlock)
+
+    auction_house.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        auction_house.removeExpiredFungibleAuction(
+            bob,
+            vault_id,
+            alpha_token,
+            sender=alice,
+        )
+    assert ledger.hasFungibleAuction(bob, vault_id, alpha_token)
+    assert filter_logs(auction_house, "ExpiredFungibleAuctionRemoved") == []
+    auction_house.pause(False, sender=switchboard_alpha.address)
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        alpha_token,
+        sender=alice,
+    )
+
+    bravo_auction = ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    )
+    registry_before = (
+        ledger.numFungibleAuctions(bob),
+        ledger.fungibleAuctionIndex(bob, vault_id, bravo_token),
+        ledger.numFungLiqUsers(),
+        ledger.indexOfFungLiqUser(bob),
+    )
+    state_before = _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    )
+    ledger.pause(True, sender=switchboard_alpha.address)
+    with pytest.raises(BoaError) as exc_info:
+        auction_house.removeExpiredFungibleAuction(
+            bob,
+            vault_id,
+            bravo_token,
+            sender=alice,
+        )
+    assert_reverted_call(exc_info.value, "not activated", auction_house)
+    assert ledger.getFungibleAuctionDuringPurchase(
+        bob,
+        vault_id,
+        bravo_token,
+    ) == bravo_auction
+    assert (
+        ledger.numFungibleAuctions(bob),
+        ledger.fungibleAuctionIndex(bob, vault_id, bravo_token),
+        ledger.numFungLiqUsers(),
+        ledger.indexOfFungLiqUser(bob),
+    ) == registry_before
+    assert filter_logs(auction_house, "ExpiredFungibleAuctionRemoved") == []
+    assert _economic_state(
+        bob,
+        ledger,
+        simple_erc20_vault,
+        alpha_token,
+        bravo_token,
+        green_token,
+        caller=alice,
+        liquidation_keeper=sally,
+    ) == state_before
+
+    ledger.pause(False, sender=switchboard_alpha.address)
+    assert auction_house.removeExpiredFungibleAuction(
+        bob,
+        vault_id,
+        bravo_token,
+        sender=alice,
+    )
 
 
 # start auction tests

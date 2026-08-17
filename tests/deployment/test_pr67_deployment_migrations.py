@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from web3 import Web3 as RealWeb3
 
+from scripts.utils import ledger_deployment
 from scripts.utils.migration import PromotionSpec
 
 
@@ -153,11 +155,13 @@ class _FakeMigration:
         addresses=None,
         account=None,
         manifest_contracts=None,
+        rpc="boa",
     ):
         self.contracts = dict(contracts or {})
         self.addresses = dict(addresses or {})
         self._previous_manifest = {"contracts": dict(manifest_contracts or {})}
         self._account = account or _addr(900)
+        self._rpc = rpc
         self.deployments = []
         self.executions = []
         self.promotions = []
@@ -177,7 +181,7 @@ class _FakeMigration:
         return self._account
 
     def rpc(self):
-        return "boa"
+        return self._rpc
 
     def deploy(self, name, *args, **kwargs):
         label = kwargs.get("label", name)
@@ -351,6 +355,7 @@ def test_safe_calldata_helpers_bind_the_expected_registry_calls():
         assert decode(["address"], confirm_bytes[4:]) == (candidate,)
 
 
+@pytest.mark.artifact
 def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
     teller = json.loads((ROOT / "scripts/abis/Teller.json").read_text())
     stability = json.loads((ROOT / "scripts/abis/StabilityPool.json").read_text())
@@ -374,7 +379,12 @@ def test_accepted_teller_and_stability_pool_abi_removals_are_explicit():
     stability_functions = {
         entry["name"] for entry in stability if entry.get("type") == "function"
     }
-    assert {"sharesToValue", "valueToShares"}.isdisjoint(stability_functions)
+    assert {
+        "sharesToValue",
+        "valueToShares",
+        "claimFromStabilityPool",
+        "redeemFromStabilityPool",
+    }.isdisjoint(stability_functions)
     assert {"getTotalValue", "getTotalUserValue"} <= stability_functions
 
     stability_events = {
@@ -454,9 +464,7 @@ def test_0009_uses_candidate_labels_excludes_uniswap_and_emits_safe_calldata(
     )
 
 
-def test_0010_promotes_0009_then_leaves_four_new_candidates_pending(
-    monkeypatch,
-):
+def _make_0010_migration(*, rpc="boa"):
     from eth_abi.abi import encode
 
     registries = {
@@ -502,9 +510,38 @@ def test_0010_promotes_0009_then_leaves_four_new_candidates_pending(
                 "address": defaults_candidate,
             },
         },
+        rpc=rpc,
     )
+    return migration
+
+
+def test_0010_promotes_0009_then_leaves_four_new_candidates_pending(
+    monkeypatch,
+):
+    migration = _make_0010_migration()
     messages = []
+    headings = []
     monkeypatch.setattr(LEDGER.log, "info", messages.append)
+    monkeypatch.setattr(LEDGER.log, "h2", headings.append)
+    validation_calls = []
+    validate = LEDGER.validate_ledger_action_block_source
+
+    def validate_before_instructions(*args, **kwargs):
+        validation_calls.append(
+            (
+                args,
+                kwargs,
+                len(migration.deployments),
+                sum("[1] 0x" in message for message in messages),
+            )
+        )
+        return validate(*args, **kwargs)
+
+    monkeypatch.setattr(
+        LEDGER,
+        "validate_ledger_action_block_source",
+        validate_before_instructions,
+    )
 
     LEDGER.migrate(migration)
 
@@ -524,13 +561,13 @@ def test_0010_promotes_0009_then_leaves_four_new_candidates_pending(
     } == LEDGER.CANONICAL_SOURCE_PATHS
     assert intents["MissionControl"].registry_name == "RipeHq"
     assert intents["MissionControl"].expected_constructor_args == (
-        registries["RipeHq"],
-        defaults_candidate,
+        migration.contracts["RipeHq"],
+        migration.addresses["DefaultsRobinhoodLive"],
     )
     assert intents["DefaultsRobinhoodLive"].expected_constructor_args == ()
     assert intents["DefaultsRobinhoodLive"].activation_expected_constructor_args == (
-        registries["RipeHq"],
-        defaults_candidate,
+        migration.contracts["RipeHq"],
+        migration.addresses["DefaultsRobinhoodLive"],
     )
     assert [row[0] for row in migration.deployments] == [
         "Ledger",
@@ -542,8 +579,121 @@ def test_0010_promotes_0009_then_leaves_four_new_candidates_pending(
         label.endswith("Candidate0010")
         for _name, label, _args, _contract in migration.deployments
     )
+    assert validation_calls == [
+        (
+            (
+                migration,
+                migration.deployments[0][3].address,
+                LEDGER.LEDGER_ACTION_BLOCK_SOURCE,
+            ),
+            {"allow_local_preview": True},
+            1,
+            0,
+        )
+    ]
     assert sum("[1] 0x" in message for message in messages) == 4
     assert sum("[2] 0x" in message for message in messages) == 4
+    assert "Ledger node-backed validation skipped for local/fork preview" in headings
+
+
+def test_0010_validation_failure_stops_before_update_instructions(monkeypatch):
+    migration = _make_0010_migration()
+    messages = []
+    monkeypatch.setattr(LEDGER.log, "info", messages.append)
+
+    def fail_validation(*_args, **_kwargs):
+        raise AssertionError("Ledger action-block source mismatch")
+
+    monkeypatch.setattr(
+        LEDGER,
+        "validate_ledger_action_block_source",
+        fail_validation,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Ledger action-block source mismatch",
+    ):
+        LEDGER.migrate(migration)
+
+    assert [row[0] for row in migration.deployments] == ["Ledger"]
+    assert not any("[1] 0x" in message for message in messages)
+    assert not any("[2] 0x" in message for message in messages)
+
+
+@pytest.mark.parametrize(
+    "source_read,action_block_read,message",
+    [
+        (
+            (0x65).to_bytes(32, "big"),
+            (99).to_bytes(32, "big"),
+            "Ledger action-block source mismatch",
+        ),
+        (
+            b"\x00" * 31,
+            (99).to_bytes(32, "big"),
+            r"malformed ACTION_BLOCK_SOURCE\(\) readback",
+        ),
+        (
+            (0x64).to_bytes(32, "big"),
+            b"\x00" * 31,
+            r"malformed getArbActionBlock\(\) readback",
+        ),
+        (
+            (0x64).to_bytes(32, "big"),
+            (0).to_bytes(32, "big"),
+            "ArbSys action block reads zero",
+        ),
+    ],
+)
+def test_0010_real_rpc_ledger_candidate_enforces_complete_node_validation(
+    monkeypatch,
+    source_read,
+    action_block_read,
+    message,
+):
+    migration = _make_0010_migration(rpc="https://rpc.example")
+
+    class FakeEth:
+        @staticmethod
+        def get_code(_address):
+            return b"\x01"
+
+        @staticmethod
+        def call(transaction):
+            source_selector = RealWeb3.keccak(text="ACTION_BLOCK_SOURCE()")[:4]
+            if transaction["data"] == source_selector:
+                return source_read
+            return action_block_read
+
+    class FakeWeb3:
+        eth = FakeEth()
+
+        def __init__(self, _provider):
+            self.eth = self.__class__.eth
+
+        @staticmethod
+        def HTTPProvider(rpc):
+            return rpc
+
+        @staticmethod
+        def to_checksum_address(address):
+            return address
+
+        @staticmethod
+        def keccak(*, text):
+            return RealWeb3.keccak(text=text)
+
+        @staticmethod
+        def is_connected():
+            return True
+
+    monkeypatch.setattr(ledger_deployment, "_load_web3", lambda: FakeWeb3)
+
+    with pytest.raises(AssertionError, match=message):
+        LEDGER.migrate(migration)
+
+    assert [row[0] for row in migration.deployments] == ["Ledger"]
 
 
 def test_0010_defaults_dependency_mismatch_fails_before_any_write():

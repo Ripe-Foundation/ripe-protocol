@@ -1,5 +1,11 @@
 # RH codebase simplification
 
+> **Current process note:** this is a historical branch report. Its artifact
+> and headroom descriptions record the gates in force during that work; they do
+> not override root `pytest.ini`, `.github/workflows/python-tests.yml`, or the
+> current policy at the top of
+> [`decision-register.md`](../chains/rh/decision-register.md).
+>
 > **8 August 2026 — Train 3 de-scope superseded.** A later pass on this branch
 > removed the block-clock inventory
 > (`scripts/check_block_clock_inventory.py`, `config/block-clock-inventory.json`,

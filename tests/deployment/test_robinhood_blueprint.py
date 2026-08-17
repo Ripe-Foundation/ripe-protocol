@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import re
-import socket
 import subprocess
 import sys
 from collections import Counter
@@ -489,7 +488,10 @@ def test_complete_inventory_and_cardinality_reconciliation():
         SourceClass.CHAIN_SPECIFIC_CONFIG: 3,
         SourceClass.EXTERNAL_ARTIFACT: 2,
     }
-    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 50
+    # 49 after I-STOCK-VAULT-ARTIFACT was removed with the retired
+    # artifact-expectations pipeline; it asserted SimpleErc20 artifact
+    # identity and nothing else.
+    assert len(ROBINHOOD_BLUEPRINT.symbolic_inputs) == 49
     assert len(ROBINHOOD_BLUEPRINT.blockers) == 28
     assert len(registries) == 38
     assert Counter(item.domain for item in registries) == {
@@ -598,7 +600,6 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
         "I-AAPL-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
         "I-AAPL-RISK": AuthorityClass.OWNER_SELECTED,
         "I-STOCK-VAULT-SLOT": AuthorityClass.OWNER_SELECTED,
-        "I-STOCK-VAULT-ARTIFACT": AuthorityClass.DEPLOYMENT_PRODUCED,
         "I-TELLER-INITIAL-PAUSE": AuthorityClass.OWNER_SELECTED,
         "I-USDG": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
         "I-USDG-FEED": AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT,
@@ -643,7 +644,9 @@ def test_symbolic_authority_class_mapping_is_exact_and_nonpromotional():
         AuthorityClass.REPOSITORY_APPROVED: 5,
         AuthorityClass.EXTERNALLY_VERIFIABLE_CANONICAL_FACT: 9,
         AuthorityClass.OWNER_SELECTED: 27,
-        AuthorityClass.DEPLOYMENT_PRODUCED: 9,
+        # 8 after I-STOCK-VAULT-ARTIFACT was removed with the retired
+        # artifact-expectations pipeline.
+        AuthorityClass.DEPLOYMENT_PRODUCED: 8,
     }
     for field_id in ("I-WETH", "I-USDG", "I-CHAINLINK-CORE"):
         item = get_symbolic_input(field_id)
@@ -1042,8 +1045,6 @@ def _mutate_curve_input(monkeypatch, input_id, **changes):
         ("feed.usdg_curve_feed", {"value": True}, "RH_CURVE_RECURSION_GUARD"),
         ("feed.route", {"value": ("GREEN", "manual constant")}, "RH_CURVE_RECURSION_GUARD"),
         ("inactive.capabilities", {"value": ()}, "RH_CURVE_BOUNDED_CAPABILITY"),
-        ("artifact.curve_prices_source_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
-        ("artifact.curve_prices_abi_sha256", {"value": "00" * 32}, "RH_CURVE_ARTIFACT_DRIFT"),
     ),
 )
 def test_curve_source_authority_mutations_fail_closed(

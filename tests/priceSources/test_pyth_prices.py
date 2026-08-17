@@ -46,7 +46,7 @@ def test_pyth_local_update_prices(
     assert pyth_prices.getPrice(alpha_token) != 0
 
     # get payload
-    publish_time = boa.env.evm.patch.timestamp + 1
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         98000000,
@@ -207,7 +207,8 @@ def test_pyth_confidence_ratio_validation(
     boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
 
     # Test 1: With default 3% threshold, 2% confidence should pass (returns price - confidence)
-    publish_time = boa.env.evm.patch.timestamp + 1
+    boa.env.time_travel(seconds=1)
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         100000000,  # price = $1.00
@@ -219,7 +220,8 @@ def test_pyth_confidence_ratio_validation(
     assert pyth_prices.getPrice(alpha_token) == int(0.98 * 10**18)  # Returns price - confidence
 
     # Test 2: With default 3% threshold, 5% confidence should be rejected
-    publish_time = boa.env.evm.patch.timestamp + 2
+    boa.env.time_travel(seconds=1)
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         100000000,  # price = $1.00
@@ -232,7 +234,8 @@ def test_pyth_confidence_ratio_validation(
 
     # Test 3: Change threshold to 10%, now 5% should pass (returns price - confidence)
     assert pyth_prices.setMaxConfidenceRatio(1000, sender=switchboard_alpha.address)  # 10%
-    publish_time = boa.env.evm.patch.timestamp + 3
+    boa.env.time_travel(seconds=1)
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         100000000,  # price = $1.00
@@ -244,7 +247,8 @@ def test_pyth_confidence_ratio_validation(
     assert pyth_prices.getPrice(alpha_token) == int(0.95 * 10**18)  # Now accepted, returns price - confidence
 
     # Test 4: With 10% threshold, 15% confidence should still be rejected
-    publish_time = boa.env.evm.patch.timestamp + 4
+    boa.env.time_travel(seconds=1)
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         100000000,  # price = $1.00
@@ -257,7 +261,8 @@ def test_pyth_confidence_ratio_validation(
 
     # Test 5: Setting to 0 disables validation entirely (accepts any confidence)
     assert pyth_prices.setMaxConfidenceRatio(0, sender=switchboard_alpha.address)  # Disable validation
-    publish_time = boa.env.evm.patch.timestamp + 5
+    boa.env.time_travel(seconds=1)
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         100000000,  # price = $1.00
@@ -348,7 +353,7 @@ def test_pyth_get_price(
     addPythFeed(alpha_token, data_feed_id)
 
     # get payload
-    publish_time = boa.env.evm.patch.timestamp + 1
+    publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(
         data_feed_id,
         price,
@@ -1074,3 +1079,166 @@ def test_set_pyth_feed_aero(
 
     assert pyth_prices.feedConfig(aero).feedId == data_feed_id
     assert int(1.60 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(aero) > int(1.20 * EIGHTEEN_DECIMALS)
+
+
+SC20_PYTH_FEED_ID = bytes.fromhex(
+    "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
+)
+SC20_PYTH_PRICE = (98_000_000 - 50_000) * 10**10
+
+
+def _set_sc20_pyth_price(mock_pyth, publish_time):
+    payload = mock_pyth.createPriceFeedUpdateData(
+        SC20_PYTH_FEED_ID,
+        98_000_000,
+        50_000,
+        -8,
+        publish_time,
+    )
+    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)
+    mock_pyth.updatePriceFeeds(payload, value=len(payload))
+
+
+def _add_sc20_pyth_feed(
+    pyth_prices,
+    mock_pyth,
+    asset,
+    governance,
+    stale_time,
+):
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    assert pyth_prices.addNewPriceFeed(
+        asset,
+        SC20_PYTH_FEED_ID,
+        stale_time,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    assert pyth_prices.confirmNewPriceFeed(asset, sender=governance.address)
+
+
+def _set_sc20_pyth_global_bound(
+    switchboard_alpha,
+    governance,
+    mission_control,
+    stale_time=7_200,
+):
+    action_id = switchboard_alpha.setStaleTime(
+        stale_time, sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
+    assert switchboard_alpha.executePendingAction(
+        action_id, sender=governance.address
+    )
+    assert mission_control.getPriceStaleTime() == stale_time
+
+
+@pytest.mark.parametrize(
+    "caller_bound,feed_bound,age,expected_valid",
+    [
+        (0, 0, 100_000, True),
+        (20, 0, 21, False),
+        (0, 20, 21, False),
+        (10, 20, 11, False),
+        (20, 10, 11, False),
+        (10, 10, 5, True),
+        (10, 20, 10, True),
+    ],
+)
+def test_sc20_pyth_stale_resolver_matrix(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    bravo_token,
+    governance,
+    caller_bound,
+    feed_bound,
+    age,
+    expected_valid,
+):
+    assert pyth_prices.getPriceAndHasFeed(bravo_token) == (0, False)
+    _add_sc20_pyth_feed(
+        pyth_prices,
+        mock_pyth,
+        alpha_token,
+        governance,
+        feed_bound,
+    )
+    boa.env.time_travel(seconds=age)
+
+    expected_price = SC20_PYTH_PRICE if expected_valid else 0
+    assert pyth_prices.getPrice(alpha_token, caller_bound) == expected_price
+    assert pyth_prices.getPriceAndHasFeed(alpha_token, caller_bound) == (
+        expected_price,
+        True,
+    )
+
+
+def test_sc20_pyth_validation_uses_stricter_candidate_bound(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    mission_control,
+    switchboard_alpha,
+    governance,
+):
+    with boa.env.anchor():
+        _set_sc20_pyth_global_bound(
+            switchboard_alpha, governance, mission_control
+        )
+        _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+        boa.env.time_travel(seconds=5_400)
+        assert pyth_prices.isValidNewFeed(
+            alpha_token,
+            SC20_PYTH_FEED_ID,
+            7_200,
+        )
+        assert not pyth_prices.isValidNewFeed(
+            alpha_token,
+            SC20_PYTH_FEED_ID,
+            3_600,
+        )
+
+
+@pytest.mark.parametrize("stale_bound", [0, 1_000])
+def test_sc21_pyth_future_timestamp_is_fail_soft_and_recovers(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+    stale_bound,
+):
+    _add_sc20_pyth_feed(
+        pyth_prices,
+        mock_pyth,
+        alpha_token,
+        governance,
+        0,
+    )
+    future_time = boa.env.timestamp + 100
+    _set_sc20_pyth_price(mock_pyth, future_time)
+
+    assert pyth_prices.getPrice(alpha_token, stale_bound) == 0
+    assert pyth_prices.getPriceAndHasFeed(alpha_token, stale_bound) == (0, True)
+    assert pyth_prices.getLastPriceAndLastUpdate(alpha_token) == (0, 0)
+
+    boa.env.time_travel(seconds=100)
+    assert pyth_prices.getPrice(alpha_token, stale_bound) == SC20_PYTH_PRICE
+
+
+def test_sc21_pyth_current_timestamp_is_valid(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+):
+    _add_sc20_pyth_feed(
+        pyth_prices,
+        mock_pyth,
+        alpha_token,
+        governance,
+        0,
+    )
+    _set_sc20_pyth_price(mock_pyth, boa.env.timestamp)
+    assert pyth_prices.getPrice(alpha_token, 1) == SC20_PYTH_PRICE

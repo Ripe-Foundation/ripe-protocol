@@ -39,6 +39,13 @@ def _support_asset(mission_control, switchboard_bravo, asset, vault_ids):
     )
 
 
+def _advance_to_confirmation(switchboard, action_id):
+    confirmation_block = switchboard.getActionConfirmationBlock(action_id)
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
+
 def _register_vault(vault_book, governance, vault, description):
     assert vault_book.startAddNewAddressToRegistry(
         vault.address,
@@ -2557,7 +2564,7 @@ def test_deregister_asset_execute_success(
     """Test executing pending deregister asset action"""
     # First add the asset
     action_id = switchboard_bravo.addAsset(
-        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        alpha_token, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         sender=governance.address
@@ -2590,13 +2597,103 @@ def test_deregister_asset_execute_success(
     assert switchboard_charlie.actionType(aid) == 0
 
 
+def test_deregister_asset_execute_rejects_already_unregistered(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    add_action = switchboard_bravo.addAsset(
+        alpha_token,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, add_action)
+    assert switchboard_bravo.executePendingAction(
+        add_action,
+        sender=governance.address,
+    )
+
+    first_action = switchboard_charlie.deregisterAsset(
+        alpha_token.address,
+        sender=governance.address,
+    )
+    duplicate_action = switchboard_charlie.deregisterAsset(
+        alpha_token.address,
+        sender=governance.address,
+    )
+    duplicate_confirmation = switchboard_charlie.getActionConfirmationBlock(
+        duplicate_action
+    )
+    confirmation_block = max(
+        switchboard_charlie.getActionConfirmationBlock(first_action),
+        duplicate_confirmation,
+    )
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
+    assert switchboard_charlie.executePendingAction(
+        first_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    logs_before_duplicate = filter_logs(
+        switchboard_charlie,
+        "AssetDeregistered",
+    )
+    assert len(logs_before_duplicate) == 1
+    assert logs_before_duplicate[0].asset == alpha_token.address
+    assert boa.env.evm.patch.block_number < (
+        duplicate_confirmation + switchboard_charlie.expiration()
+    )
+
+    with boa.reverts("invalid asset"):
+        switchboard_charlie.executePendingAction(
+            duplicate_action,
+            sender=governance.address,
+        )
+
+    # Boa exposes logs from the last computation; the reverted duplicate emits none.
+    assert filter_logs(switchboard_charlie, "AssetDeregistered") == []
+    assert switchboard_charlie.hasPendingAction(duplicate_action)
+    assert switchboard_charlie.getActionConfirmationBlock(
+        duplicate_action
+    ) == duplicate_confirmation
+    assert switchboard_charlie.actionType(duplicate_action) == 1024  # ActionType.DEREGISTER_ASSET
+    assert switchboard_charlie.pendingDeregisterAsset(
+        duplicate_action
+    ) == alpha_token.address
+    assert switchboard_charlie.pendingMissionControl(
+        duplicate_action
+    ) == mission_control.address
+
+
 def test_deregister_asset_on_new_mission_control(
     switchboard_bravo, switchboard_charlie, governance, new_mission_control, mission_control, bravo_token
 ):
     """Test deregisterAsset targeting a new MissionControl"""
     # Add asset to new MC
     action_id = switchboard_bravo.addAsset(
-        bravo_token.address, [1], 50_00, 30_00, 1000, 10000, 0,
+        bravo_token.address, [1], 0, 0, 1000, 10000, 0,
         (0, 0, 0, 0, 0, 0),
         False, False, False, True, True, True, False, True, True, True, 0,
         (False, 0, 0, 0, 0), ZERO_ADDRESS, False,
@@ -2627,6 +2724,283 @@ def test_deregister_asset_on_new_mission_control(
 
     # Verify deregistered from new MC
     assert not new_mission_control.isSupportedAsset(bravo_token.address)
+
+
+def test_deregister_asset_two_step_retry_and_reregistration(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    alpha_token,
+):
+    add_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        [1],
+        50_00,
+        30_00,
+        1_000,
+        10_000,
+        100,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        (False, 0, 0, 0, 0),
+        ZERO_ADDRESS,
+        False,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, add_action)
+    assert switchboard_bravo.executePendingAction(
+        add_action,
+        sender=governance.address,
+    )
+
+    config_before = mission_control.assetConfig(alpha_token.address)
+    totals_before = mission_control.totalPointsAllocs()
+    deregister_action = switchboard_charlie.deregisterAsset(
+        alpha_token.address,
+        sender=governance.address,
+    )
+    zero_action = switchboard_bravo.setAssetDepositParams(
+        alpha_token.address,
+        list(config_before.vaultIds),
+        0,
+        0,
+        config_before.perUserDepositLimit,
+        config_before.globalDepositLimit,
+        config_before.minDepositBalance,
+        sender=governance.address,
+    )
+
+    assert switchboard_charlie.actionType(deregister_action) == 1024  # ActionType.DEREGISTER_ASSET
+    assert switchboard_charlie.pendingDeregisterAsset(deregister_action) == alpha_token.address
+    assert switchboard_charlie.pendingMissionControl(
+        deregister_action
+    ) == mission_control.address
+    assert switchboard_charlie.hasPendingAction(deregister_action)
+    confirmation_before = switchboard_charlie.getActionConfirmationBlock(
+        deregister_action
+    )
+
+    confirmation_block = max(
+        confirmation_before,
+        switchboard_bravo.getActionConfirmationBlock(zero_action),
+    )
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+    assert boa.env.evm.patch.block_number < (
+        confirmation_before + switchboard_charlie.expiration()
+    )
+
+    deregistered_logs_before = filter_logs(
+        switchboard_charlie,
+        "AssetDeregistered",
+    )
+    assert deregistered_logs_before == []
+    with boa.reverts("active points alloc"):
+        switchboard_charlie.executePendingAction(
+            deregister_action,
+            sender=governance.address,
+        )
+
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.assetConfig(alpha_token.address) == config_before
+    assert mission_control.totalPointsAllocs() == totals_before
+    assert filter_logs(
+        switchboard_charlie,
+        "AssetDeregistered",
+    ) == deregistered_logs_before
+    assert switchboard_charlie.hasPendingAction(deregister_action)
+    assert switchboard_charlie.getActionConfirmationBlock(
+        deregister_action
+    ) == confirmation_before
+    assert switchboard_charlie.actionType(deregister_action) == 1024  # ActionType.DEREGISTER_ASSET
+    assert switchboard_charlie.pendingDeregisterAsset(deregister_action) == alpha_token.address
+    assert switchboard_charlie.pendingMissionControl(
+        deregister_action
+    ) == mission_control.address
+
+    assert switchboard_bravo.executePendingAction(
+        zero_action,
+        sender=governance.address,
+    )
+    zeroed_config = mission_control.assetConfig(alpha_token.address)
+    totals_after_zeroing = mission_control.totalPointsAllocs()
+    assert list(zeroed_config.vaultIds) == list(config_before.vaultIds)
+    assert zeroed_config.perUserDepositLimit == config_before.perUserDepositLimit
+    assert zeroed_config.globalDepositLimit == config_before.globalDepositLimit
+    assert zeroed_config.minDepositBalance == config_before.minDepositBalance
+    assert zeroed_config.stakersPointsAlloc == 0
+    assert zeroed_config.voterPointsAlloc == 0
+    for index in [0] + list(range(3, 21)):
+        assert zeroed_config[index] == config_before[index]
+    assert totals_after_zeroing.stakersPointsAllocTotal == (
+        totals_before.stakersPointsAllocTotal - config_before.stakersPointsAlloc
+    )
+    assert totals_after_zeroing.voterPointsAllocTotal == (
+        totals_before.voterPointsAllocTotal - config_before.voterPointsAlloc
+    )
+
+    assert switchboard_charlie.executePendingAction(
+        deregister_action,
+        sender=governance.address,
+    )
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+    assert mission_control.assetConfig(alpha_token.address) == zeroed_config
+    assert mission_control.totalPointsAllocs() == totals_after_zeroing
+
+    with boa.reverts("invalid asset"):
+        switchboard_bravo.setAssetDepositParams(
+            alpha_token.address,
+            list(zeroed_config.vaultIds),
+            0,
+            0,
+            zeroed_config.perUserDepositLimit,
+            zeroed_config.globalDepositLimit,
+            zeroed_config.minDepositBalance,
+            sender=governance.address,
+        )
+
+    reregistered_config = (
+        [1],
+        25_00,
+        15_00,
+        2_000,
+        20_000,
+        100,
+        (40_00, 50_00, 60_00, 10_00, 5_00, 1_00),
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        False,
+        True,
+        False,
+        0,
+        (True, 10_00, 50_00, 10, 1_000),
+        ZERO_ADDRESS,
+        False,
+    )
+    readd_action = switchboard_bravo.addAsset(
+        alpha_token.address,
+        *reregistered_config,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, readd_action)
+    assert switchboard_bravo.executePendingAction(
+        readd_action,
+        sender=governance.address,
+    )
+
+    config_after_readd = mission_control.assetConfig(alpha_token.address)
+    totals_after_readd = mission_control.totalPointsAllocs()
+    assert mission_control.isSupportedAsset(alpha_token.address)
+    assert config_after_readd != zeroed_config
+    assert mission_control.getNumAssets() == 1
+    assert mission_control.assets(1) == alpha_token.address
+    assert list(config_after_readd.vaultIds) == reregistered_config[0]
+    assert tuple(config_after_readd.debtTerms) == reregistered_config[6]
+    assert tuple(config_after_readd.customAuctionParams) == reregistered_config[18]
+    for index in list(range(1, 6)) + list(range(7, 18)) + [19, 20]:
+        assert config_after_readd[index] == reregistered_config[index]
+    assert totals_after_readd.stakersPointsAllocTotal == (
+        totals_after_zeroing.stakersPointsAllocTotal
+        + config_after_readd.stakersPointsAlloc
+    )
+    assert totals_after_readd.voterPointsAllocTotal == (
+        totals_after_zeroing.voterPointsAllocTotal
+        + config_after_readd.voterPointsAlloc
+    )
+
+
+def test_deregister_asset_rechecks_points_allocs_at_execution(
+    switchboard_bravo,
+    switchboard_charlie,
+    governance,
+    mission_control,
+    bravo_token,
+):
+    add_action = switchboard_bravo.addAsset(
+        bravo_token.address,
+        [1],
+        0,
+        0,
+        1_000,
+        10_000,
+        0,
+        (0, 0, 0, 0, 0, 0),
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        0,
+        sender=governance.address,
+    )
+    _advance_to_confirmation(switchboard_bravo, add_action)
+    assert switchboard_bravo.executePendingAction(
+        add_action,
+        sender=governance.address,
+    )
+
+    config_before = mission_control.assetConfig(bravo_token.address)
+    deregister_action = switchboard_charlie.deregisterAsset(
+        bravo_token.address,
+        sender=governance.address,
+    )
+    drift_action = switchboard_bravo.setAssetDepositParams(
+        bravo_token.address,
+        list(config_before.vaultIds),
+        40_00,
+        10_00,
+        config_before.perUserDepositLimit,
+        config_before.globalDepositLimit,
+        config_before.minDepositBalance,
+        sender=governance.address,
+    )
+    confirmation_block = max(
+        switchboard_charlie.getActionConfirmationBlock(deregister_action),
+        switchboard_bravo.getActionConfirmationBlock(drift_action),
+    )
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
+    assert switchboard_bravo.executePendingAction(
+        drift_action,
+        sender=governance.address,
+    )
+    drifted_config = mission_control.assetConfig(bravo_token.address)
+    totals_after_drift = mission_control.totalPointsAllocs()
+    assert drifted_config.stakersPointsAlloc == 40_00
+    assert drifted_config.voterPointsAlloc == 10_00
+    with boa.reverts("active points alloc"):
+        switchboard_charlie.executePendingAction(
+            deregister_action,
+            sender=governance.address,
+        )
+    assert mission_control.isSupportedAsset(bravo_token.address)
+    assert mission_control.assetConfig(bravo_token.address) == drifted_config
+    assert mission_control.totalPointsAllocs() == totals_after_drift
+    assert switchboard_charlie.hasPendingAction(deregister_action)
 
 
 # ========================================
@@ -2973,6 +3347,95 @@ def test_deregister_vault_asset_cancellation(
 
     # Verify action was cancelled
     assert switchboard_charlie.actionType(aid) == 0
+
+
+def test_deregister_vault_asset_execute_rechecks_and_rejects_duplicate(
+    switchboard_charlie,
+    governance,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    teller,
+    bob,
+):
+    deposit_amount = 100
+    alpha_token.transfer(
+        simple_erc20_vault,
+        deposit_amount,
+        sender=alpha_token_whale,
+    )
+    assert simple_erc20_vault.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    ) == deposit_amount
+    assert simple_erc20_vault.isSupportedVaultAsset(alpha_token)
+
+    first_action = switchboard_charlie.deregisterVaultAsset(
+        simple_erc20_vault.address,
+        alpha_token.address,
+        sender=governance.address,
+    )
+    duplicate_action = switchboard_charlie.deregisterVaultAsset(
+        simple_erc20_vault.address,
+        alpha_token.address,
+        sender=governance.address,
+    )
+    first_confirmation = switchboard_charlie.getActionConfirmationBlock(
+        first_action
+    )
+    duplicate_confirmation = switchboard_charlie.getActionConfirmationBlock(
+        duplicate_action
+    )
+    confirmation_block = max(first_confirmation, duplicate_confirmation)
+    current_block = boa.env.evm.patch.block_number
+    if current_block < confirmation_block:
+        boa.env.time_travel(blocks=confirmation_block - current_block)
+
+    with boa.reverts("invalid vault asset"):
+        switchboard_charlie.executePendingAction(
+            first_action,
+            sender=governance.address,
+        )
+    assert simple_erc20_vault.isSupportedVaultAsset(alpha_token)
+    assert switchboard_charlie.actionType(first_action) == 2048  # ActionType.DEREGISTER_VAULT_ASSET (2^11)
+    assert filter_logs(switchboard_charlie, "VaultAssetDeregistered") == []
+
+    withdrawn, is_depleted = simple_erc20_vault.withdrawTokensFromVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        bob,
+        sender=teller.address,
+    )
+    assert withdrawn == deposit_amount
+    assert is_depleted
+
+    assert switchboard_charlie.executePendingAction(
+        first_action,
+        sender=governance.address,
+    )
+    assert not simple_erc20_vault.isSupportedVaultAsset(alpha_token)
+    logs = filter_logs(switchboard_charlie, "VaultAssetDeregistered")
+    assert len(logs) == 1
+    assert logs[0].vaultAddr == simple_erc20_vault.address
+    assert logs[0].asset == alpha_token.address
+    assert boa.env.evm.patch.block_number < (
+        duplicate_confirmation + switchboard_charlie.expiration()
+    )
+
+    with boa.reverts("invalid vault asset"):
+        switchboard_charlie.executePendingAction(
+            duplicate_action,
+            sender=governance.address,
+        )
+    # Boa exposes logs from the last computation; the reverted duplicate emits none.
+    assert filter_logs(switchboard_charlie, "VaultAssetDeregistered") == []
+    assert switchboard_charlie.actionType(duplicate_action) == 2048  # ActionType.DEREGISTER_VAULT_ASSET (2^11)
+    pending = switchboard_charlie.pendingDeregisterVaultAsset(duplicate_action)
+    assert pending[0] == simple_erc20_vault.address
+    assert pending[1] == alpha_token.address
 
 
 ################################

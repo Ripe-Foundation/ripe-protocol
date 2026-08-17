@@ -1,6 +1,37 @@
 import boa
+import pytest
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import filter_logs, get_boa_dev_reasons
+
+
+def _open_standard_debt(
+    *,
+    user,
+    debt_amount,
+    alpha_token,
+    alpha_token_whale,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    debt_terms=None,
+):
+    setGeneralConfig()
+    if debt_terms is None:
+        setAssetConfig(alpha_token)
+    else:
+        setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    performDeposit(
+        user,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert teller.borrow(debt_amount, user, False, sender=user) == debt_amount
 
 
 def test_repay_overpayment_with_green_refund(
@@ -53,6 +84,12 @@ def test_repay_overpayment_with_green_refund(
     
     # credit engine should have 0 GREEN (all burned or refunded)
     assert green_token.balanceOf(credit_engine) == 0
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert repay_log.repayValue == borrow_amount
+    assert repay_log.refundAmount == extra_green
+    assert not repay_log.refundWasSavingsGreen
 
 
 def test_repay_exact_overpayment_amount(
@@ -584,3 +621,504 @@ def test_paying_with_savings_green_overpayment(
     
     # credit engine should be empty
     assert green_token.balanceOf(credit_engine) == 0
+
+
+@pytest.mark.parametrize(
+    ("surplus", "use_max_sentinel"),
+    [
+        pytest.param(0, False, id="exact"),
+        pytest.param(1, False, id="one-unit-overpayment"),
+        pytest.param(90 * EIGHTEEN_DECIMALS, False, id="material-overpayment"),
+        pytest.param(40 * EIGHTEEN_DECIMALS, True, id="maximum-sentinel"),
+    ],
+)
+def test_third_party_green_repayment_refunds_only_the_payer(
+    surplus,
+    use_max_sentinel,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    whale,
+):
+    debt = 10 * EIGHTEEN_DECIMALS
+    _open_standard_debt(
+        user=bob,
+        debt_amount=debt,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+
+    # This flow needs only third-party repayment; keep unrelated permissions
+    # fail-closed.
+    assert teller.setUserConfig(bob, False, True, False, sender=bob)
+    payment = debt + surplus
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, MAX_UINT256, sender=sally)
+
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    supply_before = green_token.totalSupply()
+    requested_payment = MAX_UINT256 if use_max_sentinel else payment
+    assert teller.repay(
+        requested_payment,
+        bob,
+        False,
+        False,
+        sender=sally,
+    )
+
+    assert ledger.userDebt(bob).amount == 0
+    assert green_token.totalSupply() == supply_before - debt
+    assert green_token.balanceOf(sally) == surplus
+    assert savings_green.balanceOf(sally) == 0
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+    assert green_token.balanceOf(credit_engine) == 0
+
+    logs = filter_logs(teller, "RepayDebt")
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert logs[0].repayValue == debt
+    assert logs[0].refundAmount == surplus
+    assert not logs[0].refundWasSavingsGreen
+    assert logs[0].outstandingUserDebt == 0
+    assert logs[0].userCollateralVal == 0
+    assert logs[0].maxUserDebt == 0
+    assert logs[0].hasGoodDebtHealth
+
+
+def test_third_party_sgreen_payment_refunds_green_to_the_payer(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    whale,
+):
+    debt = 30 * EIGHTEEN_DECIMALS
+    _open_standard_debt(
+        user=bob,
+        debt_amount=debt,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    teller.setUserConfig(bob, False, True, False, sender=bob)
+
+    payment_assets = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, payment_assets, sender=whale)
+    green_token.approve(savings_green, payment_assets, sender=sally)
+    payment_shares = savings_green.deposit(payment_assets, sally, sender=sally)
+    redeemed_assets = savings_green.previewRedeem(payment_shares)
+    assert redeemed_assets > debt
+    refund = redeemed_assets - debt
+    savings_green.approve(teller, MAX_UINT256, sender=sally)
+
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    assert teller.repay(MAX_UINT256, bob, True, False, sender=sally)
+
+    assert ledger.userDebt(bob).amount == 0
+    assert savings_green.balanceOf(sally) == 0
+    assert green_token.balanceOf(sally) == refund
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert repay_log.repayValue == debt
+    assert repay_log.refundAmount == refund
+    assert not repay_log.refundWasSavingsGreen
+    assert repay_log.outstandingUserDebt == 0
+    assert repay_log.userCollateralVal == 0
+    assert repay_log.maxUserDebt == 0
+    assert repay_log.hasGoodDebtHealth
+
+
+def test_third_party_green_overpayment_refunds_sgreen_to_the_payer(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    whale,
+):
+    debt = 30 * EIGHTEEN_DECIMALS
+    surplus = 20 * EIGHTEEN_DECIMALS
+    _open_standard_debt(
+        user=bob,
+        debt_amount=debt,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    teller.setUserConfig(bob, False, True, False, sender=bob)
+
+    payment = debt + surplus
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, payment, sender=sally)
+    expected_shares = savings_green.previewDeposit(surplus)
+    payer_sgreen_before = savings_green.balanceOf(sally)
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    savings_assets_before = green_token.balanceOf(savings_green)
+
+    assert teller.repay(payment, bob, False, True, sender=sally)
+
+    assert ledger.userDebt(bob).amount == 0
+    assert green_token.balanceOf(sally) == 0
+    assert savings_green.balanceOf(sally) - payer_sgreen_before == expected_shares
+    assert green_token.balanceOf(savings_green) - savings_assets_before == surplus
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == bob
+    assert repay_log.repayValue == debt
+    assert repay_log.refundAmount == surplus
+    assert repay_log.refundWasSavingsGreen
+
+
+def test_third_party_interest_overpayment_refunds_only_true_surplus(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    createDebtTerms,
+    whale,
+):
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=100_00,
+        _daowry=1_00,
+    )
+    principal = 50 * EIGHTEEN_DECIMALS
+    _open_standard_debt(
+        user=bob,
+        debt_amount=principal,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+        debt_terms=debt_terms,
+    )
+    teller.setUserConfig(bob, False, True, False, sender=bob)
+
+    boa.env.time_travel(seconds=31_536_000)
+    current_debt, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    current_debt = current_debt.amount
+    assert current_debt > principal
+    assert ledger.userDebt(bob).amount == principal
+    surplus = 7 * EIGHTEEN_DECIMALS
+    payment = current_debt + surplus
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, payment, sender=sally)
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+
+    assert teller.repay(payment, bob, False, False, sender=sally)
+
+    assert ledger.userDebt(bob).amount == 0
+    assert green_token.balanceOf(sally) == surplus
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.repayValue == current_debt
+    assert repay_log.refundAmount == surplus
+
+
+def test_third_party_repay_permissions_remain_closed_until_explicitly_opened(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    mission_control,
+    green_token,
+    savings_green,
+    ledger,
+    whale,
+):
+    debt = 20 * EIGHTEEN_DECIMALS
+    surplus = 5 * EIGHTEEN_DECIMALS
+    _open_standard_debt(
+        user=bob,
+        debt_amount=debt,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    payment = debt + surplus
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, payment, sender=sally)
+
+    assert teller.setUserConfig(bob, True, False, True, sender=bob)
+    assert not mission_control.getRepayConfig(bob).canAnyoneRepayDebt
+    closed_state = (
+        ledger.userDebt(bob),
+        green_token.balanceOf(sally),
+        green_token.allowance(sally, teller),
+    )
+    with boa.reverts("not allowed to repay for user"):
+        teller.repay(payment, bob, False, False, sender=sally)
+    assert (
+        ledger.userDebt(bob),
+        green_token.balanceOf(sally),
+        green_token.allowance(sally, teller),
+    ) == closed_state
+
+    # A no-argument convenience call is fail-closed and cannot silently open
+    # third-party repayment.
+    assert teller.setUserConfig(sender=bob)
+    config = mission_control.userConfig(bob)
+    assert not config.canAnyoneDeposit
+    assert not config.canAnyoneRepayDebt
+    assert not config.canAnyoneBondForUser
+    with boa.reverts("not allowed to repay for user"):
+        teller.repay(payment, bob, False, False, sender=sally)
+
+    # Explicitly enabling only repayment opens only the intended capability.
+    assert teller.setUserConfig(bob, False, True, False, sender=bob)
+    config = mission_control.userConfig(bob)
+    assert not config.canAnyoneDeposit
+    assert config.canAnyoneRepayDebt
+    assert not config.canAnyoneBondForUser
+    debtor_green_before = green_token.balanceOf(bob)
+    debtor_sgreen_before = savings_green.balanceOf(bob)
+    assert teller.repay(payment, bob, False, False, sender=sally)
+    assert ledger.userDebt(bob).amount == 0
+    assert green_token.balanceOf(sally) == surplus
+    assert green_token.balanceOf(bob) == debtor_green_before
+    assert savings_green.balanceOf(bob) == debtor_sgreen_before
+
+
+def test_underscore_owner_can_repay_closed_wallet_and_receives_refund(
+    alpha_token,
+    alpha_token_whale,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    mission_control,
+    switchboard_alpha,
+    mock_undy_v2,
+    green_token,
+    savings_green,
+    ledger,
+    whale,
+):
+    wallet_config = boa.loads(
+        """
+# @version 0.4.3
+owner: public(address)
+
+@deploy
+def __init__(_owner: address):
+    self.owner = _owner
+""",
+        sally,
+        name="repay_wallet_config",
+    )
+    wallet = boa.loads(
+        """
+# @version 0.4.3
+walletConfig: public(address)
+
+@deploy
+def __init__(_walletConfig: address):
+    self.walletConfig = _walletConfig
+""",
+        wallet_config,
+        name="repay_wallet",
+    )
+    mission_control.setUnderscoreRegistry(
+        mock_undy_v2.address,
+        sender=switchboard_alpha.address,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setIsUserWallet(True)
+
+    debt = 20 * EIGHTEEN_DECIMALS
+    surplus = 3 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        wallet.address,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert teller.borrow(debt, wallet.address, False, sender=sally) == debt
+    assert teller.setUserConfig(
+        wallet.address,
+        True,
+        False,
+        True,
+        sender=sally,
+    )
+    assert not mission_control.getRepayConfig(wallet.address).canAnyoneRepayDebt
+
+    payment = debt + surplus
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, payment, sender=sally)
+    wallet_green_before = green_token.balanceOf(wallet)
+    wallet_sgreen_before = savings_green.balanceOf(wallet)
+    assert teller.repay(payment, wallet.address, False, False, sender=sally)
+
+    assert ledger.userDebt(wallet.address).amount == 0
+    assert green_token.balanceOf(sally) == surplus
+    assert green_token.balanceOf(wallet) == wallet_green_before
+    assert savings_green.balanceOf(wallet) == wallet_sgreen_before
+    repay_log = filter_logs(teller, "RepayDebt")[0]
+    assert repay_log.user == wallet.address
+    assert repay_log.refundAmount == surplus
+
+
+def test_sgreen_refund_failure_rolls_back_complete_third_party_repayment(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    governance,
+    whale,
+):
+    debt = 30 * EIGHTEEN_DECIMALS
+    surplus = 20 * EIGHTEEN_DECIMALS
+    payment = debt + surplus
+    _open_standard_debt(
+        user=bob,
+        debt_amount=debt,
+        alpha_token=alpha_token,
+        alpha_token_whale=alpha_token_whale,
+        setGeneralConfig=setGeneralConfig,
+        setAssetConfig=setAssetConfig,
+        setGeneralDebtConfig=setGeneralDebtConfig,
+        performDeposit=performDeposit,
+        mock_price_source=mock_price_source,
+        teller=teller,
+    )
+    teller.setUserConfig(bob, False, True, False, sender=bob)
+    green_token.transfer(sally, payment, sender=whale)
+    green_token.approve(teller, payment, sender=sally)
+
+    savings_green.pause(True, sender=governance.address)
+    assert savings_green.isPaused()
+    assert not green_token.isPaused()
+
+    def repayment_state():
+        return (
+            ledger.userDebt(bob),
+            ledger.totalDebt(),
+            ledger.borrowIntervals(bob),
+            ledger.numBorrowers(),
+            ledger.indexOfBorrower(bob),
+            ledger.unrealizedYield(),
+            ledger.userBorrowPoints(bob),
+            ledger.globalBorrowPoints(),
+            ledger.ripeRewards(),
+            ledger.ripeAvailForRewards(),
+            green_token.totalSupply(),
+            green_token.balanceOf(sally),
+            green_token.balanceOf(bob),
+            green_token.balanceOf(teller),
+            green_token.balanceOf(credit_engine),
+            green_token.balanceOf(savings_green),
+            green_token.allowance(sally, teller),
+            green_token.allowance(credit_engine, savings_green),
+            savings_green.totalSupply(),
+            savings_green.balanceOf(sally),
+            savings_green.balanceOf(bob),
+            savings_green.balanceOf(credit_engine),
+            savings_green.lastPricePerShare(),
+        )
+
+    before = repayment_state()
+    with pytest.raises(boa.BoaError) as exc_info:
+        teller.repay(payment, bob, False, True, sender=sally)
+    assert "token paused" in get_boa_dev_reasons(exc_info.value)
+    assert repayment_state() == before

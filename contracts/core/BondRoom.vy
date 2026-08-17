@@ -162,6 +162,7 @@ def purchaseRipeBond(
     # main ripe payout
     oneUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256)
     units: uint256 = paymentAmount // oneUnit
+    paymentAmount = units * oneUnit
     baseRipePayout: uint256 = ripePerUnit * units
     assert baseRipePayout != 0 # dev: must have base ripe payout
     totalRipePayout: uint256 = baseRipePayout
@@ -307,8 +308,20 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
 
     totalRipePayout: uint256 = baseRipePayout
 
-    # bonus for lock duration
+    # lock duration
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
+
+    # bonus from bond booster (if applicable)
+    bondBooster: address = self.bondBooster
+    if bondBooster != empty(address):
+        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check
+        ripeBoostBonus: uint256 = baseRipePayout * boostRatio // HUNDRED_PERCENT
+        totalRipePayout += ripeBoostBonus
+        if ripeBoostBonus != 0:
+            lockDuration = max(lockDuration, staticcall BondBooster(bondBooster).minLockDuration())
+            lockDuration = min(lockDuration, config.maxLockDuration)
+
+    # bonus for lock duration
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
         lockBonusRatio: uint256 = 0
@@ -317,12 +330,6 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
         else:
             lockBonusRatio = maxLockBonusRatio # when min and max are equal, give full bonus
         totalRipePayout += baseRipePayout * lockBonusRatio // HUNDRED_PERCENT
-
-    # bonus from bond booster (if applicable)
-    bondBooster: address = self.bondBooster
-    if bondBooster != empty(address):
-        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check 
-        totalRipePayout += baseRipePayout * boostRatio // HUNDRED_PERCENT
 
     return totalRipePayout
 
@@ -366,6 +373,8 @@ def startBondEpochAtBlock(_block: uint256):
     a: addys.Addys = addys._getAddys()
 
     config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(empty(address))
+    assert config.epochLength != 0 # dev: invalid epoch length
+    assert config.amountPerEpoch != 0 # dev: invalid amount per epoch
     startBlock: uint256 = max(_block, block.number)
     extcall Ledger(a.ledger).setEpochData(startBlock, startBlock + config.epochLength, config.amountPerEpoch)
 
@@ -395,6 +404,7 @@ def _refreshBondEpoch(
 
     didChange: bool = False
     startBlock, endBlock, didChange = self._getLatestEpochBlockTimes(startBlock, endBlock, _epochLength)
+    assert _amountPerEpoch != 0 # dev: invalid amount per epoch
     if didChange:
         extcall Ledger(_ledger).setEpochData(startBlock, endBlock, _amountPerEpoch)
 
@@ -417,6 +427,8 @@ def _getLatestEpochBlockTimes(
     _prevEndBlock: uint256,
     _epochLength: uint256,
 ) -> (uint256, uint256, bool):
+    assert _epochLength != 0 # dev: invalid epoch length
+
     startBlock: uint256 = _prevStartBlock
     endBlock: uint256 = _prevEndBlock
 
@@ -447,4 +459,4 @@ def _getLatestEpochBlockTimes(
 ########  ##     ## ## ## ## ##     ## 
 ##     ## ##     ## ##  #### ##     ## 
 ##     ## ##     ## ##   ### ##     ## 
-########   #######  ##    ## ######## 
+########   #######  ##    ## ########

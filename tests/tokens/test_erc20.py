@@ -72,13 +72,15 @@ def test_ccip_admin_equals_current_hq_governance(deploy3r, fork):
 def test_ccip_admin_follows_confirmed_hq_governance_change(
     deploy3r,
     fork,
+    governance,
     mock_rando_contract,
 ):
     tokens = _deploy_unset_ccip_tokens(deploy3r, fork)
     hq = _finish_ccip_setup(tokens, deploy3r, fork)
-    assert all(token.getCCIPAdmin() == deploy3r for token in tokens)
+    hq.finishRipeHqSetup(governance, sender=deploy3r)
+    assert all(token.getCCIPAdmin() == governance.address for token in tokens)
 
-    hq.startGovernanceChange(mock_rando_contract, sender=deploy3r)
+    hq.startGovernanceChange(mock_rando_contract, sender=governance.address)
     boa.env.time_travel(blocks=hq.govChangeTimeLock())
     hq.confirmGovernanceChange(sender=mock_rando_contract.address)
 
@@ -510,8 +512,9 @@ def test_green_token_ripe_hq_edge_cases(green_token, governance, bob, mock_ripe_
     with boa.reverts("invalid new hq"):
         green_token.initiateHqChange(green_token.ripeHq(), sender=governance.address)
     
-    # Initiate a gov change in the mock RipeHq
-    mock_ripe_hq.startGovernanceChange(mock_rando_contract, sender=governance.address)
+    # Complete the one-time HQ setup, then initiate a standard gov change.
+    mock_ripe_hq.finishRipeHqSetup(mock_rando_contract, sender=governance.address)
+    mock_ripe_hq.startGovernanceChange(green_token, sender=mock_rando_contract.address)
     assert mock_ripe_hq.hasPendingGovChange()
     
     # Try to change to RipeHq with pending gov change

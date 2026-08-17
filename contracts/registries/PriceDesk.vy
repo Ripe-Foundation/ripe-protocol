@@ -38,7 +38,6 @@ import contracts.registries.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 
-from interfaces import PriceSource
 from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
@@ -56,6 +55,9 @@ struct PriceConfig:
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
+PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000
+PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
+PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
 
 
 @deploy
@@ -141,7 +143,7 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 @internal
 def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
-    hasFeedConfig: bool = False
+    mustRaiseOnZero: bool = False
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
 
     # config
@@ -149,12 +151,12 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
-        hasFeed: bool = False
-        price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
+        sourceStatus: uint256 = 0
+        price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
         if price != 0:
             break
-        if hasFeed:
-            hasFeedConfig = True
+        if sourceStatus != 0:
+            mustRaiseOnZero = True
         alreadyLooked.append(pid)
 
     # go thru rest of price sources
@@ -164,15 +166,16 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
             for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
                 if pid in alreadyLooked:
                     continue
-                hasFeed: bool = False
-                price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
+                sourceStatus: uint256 = 0
+                price, sourceStatus = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
                 if price != 0:
                     break
-                if hasFeed:
-                    hasFeedConfig = True
+                if sourceStatus != 0:
+                    mustRaiseOnZero = True
 
-    # raise exception if feed exists but no price
-    if price == 0 and hasFeedConfig and _shouldRaise:
+    # A failed source leaves feed coverage uncertain, so strict callers still
+    # fail closed if no later healthy source establishes a usable price.
+    if price == 0 and mustRaiseOnZero and _shouldRaise:
         raise "has price config, no price"
 
     return price
@@ -180,11 +183,38 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 
 @view
 @internal
-def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, bool):
+def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, uint256):
+    # status: 0 = valid/no feed, 1 = valid/feed, 2 = failed or malformed
     priceSource: address = registry._getAddr(_pid)
     if priceSource == empty(address):
-        return 0, False
-    return staticcall PriceSource(priceSource).getPriceAndHasFeed(_asset, _staleTime, self)
+        return 0, 0
+
+    success: bool = False
+    response: Bytes[65] = b""
+    success, response = raw_call(
+        priceSource,
+        abi_encode(
+            _asset,
+            _staleTime,
+            self,
+            method_id=method_id("getPriceAndHasFeed(address,uint256,address)"),
+        ),
+        max_outsize=65,
+        gas=PRICE_SOURCE_PRICE_GAS,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 64:
+        return 0, 2
+
+    price: uint256 = 0
+    hasFeedWord: uint256 = 0
+    price, hasFeedWord = abi_decode(response, (uint256, uint256))
+    if hasFeedWord > 1:
+        return 0, 2
+    if price != 0 and hasFeedWord == 0:
+        return 0, 2
+    return price, hasFeedWord
 
 
 ###############
@@ -227,9 +257,34 @@ def hasPriceFeed(_asset: address) -> bool:
         priceSource: address = registry._getAddr(pid)
         if priceSource == empty(address):
             continue
-        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
+        valid: bool = False
+        hasFeed: bool = False
+        valid, hasFeed = self._safeHasPriceFeed(priceSource, _asset)
+        if valid and hasFeed:
             return True
     return False
+
+
+@view
+@internal
+def _safeHasPriceFeed(_priceSource: address, _asset: address) -> (bool, bool):
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _priceSource,
+        abi_encode(_asset, method_id=method_id("hasPriceFeed(address)")),
+        max_outsize=33,
+        gas=PRICE_SOURCE_HAS_FEED_GAS,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False, False
+
+    hasFeedWord: uint256 = abi_decode(response, uint256)
+    if hasFeedWord > 1:
+        return False, False
+    return True, hasFeedWord == 1
 
 
 ############
@@ -320,11 +375,33 @@ def addPriceSnapshot(_asset: address) -> bool:
         if priceSource == empty(address):
             continue
 
-        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
-            extcall PriceSource(priceSource).addPriceSnapshot(_asset)
+        valid: bool = False
+        hasFeed: bool = False
+        valid, hasFeed = self._safeHasPriceFeed(priceSource, _asset)
+        if not valid or not hasFeed:
+            continue
+        if self._safeAddPriceSnapshot(priceSource, _asset):
             didUpdate = True
 
     return didUpdate
+
+
+@internal
+def _safeAddPriceSnapshot(_priceSource: address, _asset: address) -> bool:
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _priceSource,
+        abi_encode(_asset, method_id=method_id("addPriceSnapshot(address)")),
+        max_outsize=33,
+        gas=PRICE_SOURCE_SNAPSHOT_GAS,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return False
+
+    resultWord: uint256 = abi_decode(response, uint256)
+    return resultWord == 1
 
 
 @view

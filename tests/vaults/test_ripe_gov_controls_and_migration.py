@@ -45,6 +45,28 @@ def _register_ripe_gov_vault(ripe_hq, vault_book, governance, label):
     return vault, vault_id
 
 
+def _classify_ripe_gov_vault(mission_control, switchboard_alpha, vault_id):
+    """Model the governed pointer move that grants Boardroom callback authority."""
+    mission_control.setCoreRipeGovVaultId(
+        vault_id,
+        sender=switchboard_alpha.address,
+    )
+    assert mission_control.isRipeGovVaultId(vault_id)
+
+
+def _replace_hq_address(ripe_hq, governance, reg_id, new_address):
+    assert ripe_hq.startAddressUpdateToRegistry(
+        reg_id,
+        new_address,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        reg_id,
+        sender=governance.address,
+    )
+
+
 @pytest.fixture
 def target_ripe_gov_vault(ripe_hq, vault_book, governance):
     return _register_ripe_gov_vault(
@@ -780,6 +802,179 @@ def test_disabled_partial_withdrawal_preserves_points_and_full_exit_clears_them(
     assert ripe_gov_vault.totalGovPoints() == total_points - before.govPoints
 
 
+def test_early_release_preserves_points_that_equivalent_partial_withdrawal_reduces(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    switchboard_alpha,
+    mission_control,
+    setAssetConfig,
+):
+    """Pin the accepted early-release versus ordinary-withdrawal asymmetry."""
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+        lock_terms=(*LOCK_TERMS[:4], 50_00),
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, amount, teller, 500)
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, alice, amount, teller, 100)
+    _direct_deposit(ripe_gov_vault, ripe_token, whale, sally, amount, teller)
+    boa.env.time_travel(blocks=101)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    ripe_gov_vault.updateUserGovPoints(alice, sender=switchboard_alpha.address)
+
+    bob_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    alice_before = ripe_gov_vault.userGovData(alice, ripe_token)
+    assert bob_before.unlock > boa.env.evm.patch.block_number
+    assert alice_before.unlock <= boa.env.evm.patch.block_number
+    assert bob_before.govPoints > 0 and alice_before.govPoints > 0
+
+    with boa.env.anchor():
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+        bob_after = ripe_gov_vault.userGovData(bob, ripe_token)
+        released_shares = bob_before.lastShares - bob_after.lastShares
+        assert released_shares > 0
+        assert bob_after.govPoints == bob_before.govPoints
+
+    ordinary_amount = ripe_gov_vault.sharesToAmount(
+        ripe_token,
+        released_shares,
+        False,
+    )
+    if (
+        ripe_gov_vault.amountToShares(ripe_token, ordinary_amount, True)
+        != released_shares
+    ):
+        ordinary_amount = ripe_gov_vault.sharesToAmount(
+            ripe_token,
+            released_shares,
+            True,
+        )
+    assert (
+        ripe_gov_vault.amountToShares(ripe_token, ordinary_amount, True)
+        == released_shares
+    )
+
+    ripe_gov_vault.withdrawTokensFromVault(
+        alice,
+        ripe_token,
+        ordinary_amount,
+        alice,
+        sender=teller.address,
+    )
+    alice_after = ripe_gov_vault.userGovData(alice, ripe_token)
+    assert alice_before.lastShares - alice_after.lastShares == released_shares
+    expected_reduction = (
+        alice_before.govPoints * released_shares // alice_before.lastShares
+    )
+    assert alice_after.govPoints == alice_before.govPoints - expected_reduction
+    assert alice_after.govPoints < alice_before.govPoints
+
+
+def test_full_fee_point_stock_cannot_migrate_but_reattaches_and_final_exit_clears(
+    target_ripe_gov_vault,
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    alice,
+    teller,
+    switchboard_alpha,
+    mission_control,
+    setAssetConfig,
+):
+    target, _ = target_ripe_gov_vault
+    full_fee_terms = (*LOCK_TERMS[:4], 100_00)
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+        lock_terms=full_fee_terms,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        60 * EIGHTEEN_DECIMALS,
+        teller,
+        500,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        alice,
+        40 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+    before = _save_points(
+        ripe_gov_vault,
+        bob,
+        ripe_token,
+        switchboard_alpha,
+    )
+
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=teller.address)
+    zero_share = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert zero_share.lastShares == 0
+    assert zero_share.govPoints == before.govPoints
+    assert ripe_gov_vault.totalUserGovPoints(bob) == before.govPoints
+
+    boa.env.time_travel(blocks=25)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints == before.govPoints
+
+    ripe_gov_vault.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("no position"):
+        ripe_gov_vault.exportPositionForMigration(
+            bob,
+            ripe_token,
+            target,
+            sender=teller.address,
+        )
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints == before.govPoints
+
+    ripe_gov_vault.pause(False, sender=switchboard_alpha.address)
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        20 * EIGHTEEN_DECIMALS,
+        teller,
+    )
+    reattached = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert reattached.lastShares > 0
+    assert reattached.govPoints == before.govPoints
+
+    boa.env.time_travel(
+        blocks=reattached.unlock - boa.env.evm.patch.block_number + 1
+    )
+    _, depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob,
+        ripe_token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert depleted
+    final = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert final.lastShares == 0
+    assert final.govPoints == 0
+    assert ripe_gov_vault.totalUserGovPoints(bob) == 0
+
+
 def test_disabled_points_do_not_bypass_bad_debt_withdrawal_freeze(
     ripe_gov_vault,
     ripe_token,
@@ -831,6 +1026,7 @@ def test_disabled_points_leave_lock_adjustment_and_release_operational(
     ripe_token,
     whale,
     bob,
+    alice,
     teller,
     switchboard_alpha,
     switchboard_echo,
@@ -853,6 +1049,14 @@ def test_disabled_points_leave_lock_adjustment_and_release_operational(
         teller,
         400,
         switchboard_alpha,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        alice,
+        100 * EIGHTEEN_DECIMALS,
+        teller,
     )
     before = _save_points(ripe_gov_vault, bob, ripe_token, switchboard_alpha)
     ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
@@ -1299,8 +1503,10 @@ def test_direct_import_rejects_partially_nonempty_target_position(
     bob,
     teller,
     switchboard_alpha,
+    mission_control,
 ):
-    target, _ = target_ripe_gov_vault
+    target, target_id = target_ripe_gov_vault
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     existing = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, existing, teller)
     existing_shares = target.userBalances(bob, ripe_token)
@@ -1333,8 +1539,10 @@ def test_direct_import_rejects_position_already_migrated_out(
     bob,
     teller,
     switchboard_alpha,
+    mission_control,
 ):
-    target, _ = target_ripe_gov_vault
+    target, target_id = target_ripe_gov_vault
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(target, ripe_token, whale, bob, amount, teller)
     target.pause(True, sender=switchboard_alpha.address)
@@ -2214,6 +2422,7 @@ def test_existing_target_position_makes_entire_migration_atomic(
         ripe_token,
         [SOURCE_VAULT_ID, target_id],
     )
+    _classify_ripe_gov_vault(mission_control, switchboard_alpha, target_id)
     source_amount = 30 * EIGHTEEN_DECIMALS
     target_amount = 5 * EIGHTEEN_DECIMALS
     _direct_deposit(ripe_gov_vault, ripe_token, whale, bob, source_amount, teller)
@@ -2352,6 +2561,7 @@ def test_only_historical_core_ripe_gov_vault_can_be_the_migration_source(
     ripe_hq,
     vault_book,
     governance,
+    boardroom,
     ripe_token,
     whale,
     bob,
@@ -2381,10 +2591,30 @@ def test_only_historical_core_ripe_gov_vault_can_be_the_migration_source(
         ripe_token,
         [SOURCE_VAULT_ID, source_id, target_id],
     )
+
+    # Seed the deliberately non-core source without weakening the production
+    # Boardroom gate. The permissive callback exists only while constructing the
+    # fixture; the canonical Boardroom is restored before the migration check.
+    permissive_boardroom = boa.loads(
+        """
+# pragma version 0.4.3
+
+@external
+def govPowerDidChangeForUser(
+    _user: address,
+    _userGovPoints: uint256,
+    _totalGovPoints: uint256,
+):
+    pass
+""",
+        name="permissive_boardroom_for_non_core_source_setup",
+    )
+    _replace_hq_address(ripe_hq, governance, 11, permissive_boardroom)
     amount = 25 * EIGHTEEN_DECIMALS
     _direct_deposit(source, ripe_token, whale, bob, amount, teller)
     ledger.addVaultToUser(bob, source_id, sender=teller.address)
     _save_points(source, bob, ripe_token, switchboard_alpha)
+    _replace_hq_address(ripe_hq, governance, 11, boardroom)
     _pause_pair(source, target, switchboard_alpha)
 
     # RipeGov bytecode alone is not authority to use the privileged exporter
@@ -3482,6 +3712,15 @@ def test_ripe_gov_pause_matrix_while_unpaused(
     locked_gov_position,
 ):
     """Section 9.4 control half: no method is pause-blocked while unpaused."""
+    if method == "releaseLock":
+        _direct_deposit(
+            ripe_gov_vault,
+            ripe_token,
+            whale,
+            alice,
+            EIGHTEEN_DECIMALS,
+            teller,
+        )
     boa.env.time_travel(blocks=10)
     assert not ripe_gov_vault.isPaused()
     try:
@@ -3494,6 +3733,8 @@ def test_ripe_gov_pause_matrix_while_unpaused(
         # A method may still revert for an unrelated reason (for example a
         # locked withdrawal); it must never revert because of the pause flag.
         assert not _reverted_with_pause(exc), method
+    if method == "releaseLock":
+        assert ripe_gov_vault.userGovData(bob, ripe_token).unlock == 0
 
 
 @pytest.mark.parametrize("method", ("adjustLock", "releaseLock"))

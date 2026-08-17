@@ -1084,11 +1084,36 @@ def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, g
     assert aid > 0
 
 
-def test_switchboard_delta_set_start_epoch_at_block(switchboard_delta, bond_room, governance, alice):
+def test_switchboard_delta_set_start_epoch_at_block(
+    switchboard_delta,
+    bond_room,
+    mission_control,
+    governance,
+    alice,
+    ripe_token,
+):
     """Test setStartEpochAtBlock is instant and requires governance permissions"""
     # Non-governance cannot set start epoch
     with boa.reverts("no perms"):
         switchboard_delta.setStartEpochAtBlock(sender=alice)
+
+    # A zero epoch length is deliberately rejected by BondRoom. Install a valid
+    # config through the authorized Switchboard before exercising the instant
+    # start-block control.
+    mission_control.setRipeBondConfig(
+        (
+            ripe_token.address,
+            1_000 * EIGHTEEN_DECIMALS,
+            False,
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            100_00,
+            100,
+            True,
+            0,
+        ),
+        sender=switchboard_delta.address,
+    )
     
     # Governance can set start epoch at block immediately (no timelock)
     current_block = boa.env.evm.patch.block_number
@@ -1636,6 +1661,60 @@ def test_set_single_bond_booster_execute_success(
     assert switchboard_delta.actionType(aid) == 0
 
 
+def test_bond_booster_replacement_uses_expiry_state_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    assert bond_booster.unitsUsed(alice) == 30
+
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number == old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
+
+def test_bond_booster_replacement_preserves_usage_when_active_at_timelock_execution(
+    switchboard_delta, governance, alice, bond_booster, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    timelock = switchboard_delta.actionTimeLock()
+    old_expiry = current_block + timelock + 1000
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.unitsUsed(alice) == 30
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 1000)
+    aid = switchboard_delta.setBondBooster(new_config, sender=governance.address)
+    boa.env.time_travel(blocks=timelock)
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    assert switchboard_delta.executePendingAction(aid, sender=governance.address)
+    stored_config = bond_booster.config(alice)
+    assert (stored_config[0], stored_config[1], stored_config[2], stored_config[3]) == new_config
+    assert bond_booster.unitsUsed(alice) == 30
+    assert bond_booster.getBoostRatio(alice, 45) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 46) == 0
+
+
 def test_remove_single_bond_booster_permissions(switchboard_delta, governance, alice, bob, mission_control):
     """Test removeBondBooster permissions: requires governance or lite action with enable"""
     # Non-governance without lite access cannot remove
@@ -1714,15 +1793,8 @@ def test_remove_single_bond_booster_immediate_execution(
 # ========================================
 
 
-def test_deleverage_user_permissions(switchboard_delta, governance, alice, bob, mission_control):
-    """Test deleverageUser requires governance or lite action permission to enable"""
-    # Non-governance without lite access cannot call
-    with boa.reverts("no perms"):
-        switchboard_delta.deleverageUser(alice, sender=bob)
-
-    # Grant bob lite access - verify the permission is granted
-    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
-    assert mission_control.canPerformLiteAction(bob)
+def test_singular_deleverage_api_is_removed(switchboard_delta):
+    assert not hasattr(switchboard_delta, "deleverageUser")
 
 
 def test_deleverage_many_users_permissions(switchboard_delta, governance, alice, bob, mission_control):

@@ -103,6 +103,7 @@ def test_missing_changed_and_stale_outputs_are_detected(tmp_path):
         export_abis(contracts, output)
 
 
+@pytest.mark.artifact
 def test_explicit_legacy_output_is_exact_hash_bound(tmp_path):
     contracts = make_contracts(tmp_path)
     output = tmp_path / "abis"
@@ -141,6 +142,7 @@ def test_solidity_input_is_explicitly_unsupported(tmp_path):
         export_abis(contracts, tmp_path / "abis")
 
 
+@pytest.mark.artifact
 def test_repository_default_abi_directory_is_byte_current():
     report = check_abis(ROOT / "contracts", ROOT / "scripts" / "abis")
     assert len(report.exported) == 57
@@ -178,6 +180,7 @@ def test_repository_default_abi_directory_is_byte_current():
     }
 
 
+@pytest.mark.artifact
 def test_uniswap_v2_abi_is_independently_byte_current_and_old_abi_is_absent():
     contracts = ROOT / "contracts"
     source = contracts / "priceSources" / "UniswapV2Prices.vy"

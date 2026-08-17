@@ -1,9 +1,10 @@
 import pytest
 import boa
+from boa.contracts.base_evm_contract import BoaError
 from eth_utils import to_checksum_address
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import claim_from_stability_pool, filter_logs
+from conf_utils import assert_reverted_call, claim_from_stability_pool, filter_logs
 
 
 ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
@@ -217,7 +218,13 @@ def test_stab_vault_claims_validation(
 
     # Test unauthorized caller
     with boa.reverts("only Teller allowed"):
-        stability_pool.claimFromStabilityPool(bob, alpha_token, bravo_token, 100, bob, False, sender=alice)
+        stability_pool.claimManyFromStabilityPool(
+            bob,
+            [(alpha_token.address, bravo_token.address, 100)],
+            bob,
+            False,
+            sender=alice,
+        )
 
 
 def test_stab_vault_claims_no_shares(
@@ -2034,6 +2041,121 @@ def setupStabPoolClaimsRewards(mission_control, setAssetConfig, setGeneralConfig
     yield setupStabPoolClaimsRewards
 
 
+def test_stability_claim_zero_share_ripe_reward_rolls_back_and_can_retry(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    whale,
+    ledger,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    setupStabPoolClaimsRewards,
+    cleanCoreRipeGovFixture,
+):
+    """AUD-024: reward mint and Ledger debit revert with the failed deposit."""
+    setupStabPoolClaimsRewards(_ripePerDollar=1)
+    setAssetConfig(bravo_token)
+    finite_limit = 10 ** 40
+    setAssetConfig(
+        ripe_token,
+        _vaultIds=[2],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+        _perUserDepositLimit=finite_limit,
+        _globalDepositLimit=finite_limit,
+    )
+    core = cleanCoreRipeGovFixture()
+    clean_vault = core["vault"]
+    core_id = core["vault_id"]
+
+    price = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+    deposit_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    claimable_amount = EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    ripe_token.transfer(clean_vault, 10 ** 8, sender=whale)
+
+    supply_before = ripe_token.totalSupply()
+    rewards_available_before = ledger.ripeAvailForRewards()
+    claimable_before = stability_pool.claimableBalances(alpha_token, bravo_token)
+    total_claimable_before = stability_pool.totalClaimableBalances(bravo_token)
+    stability_shares_before = stability_pool.userBalances(bob, alpha_token)
+    stability_balance_before = alpha_token.balanceOf(stability_pool)
+    claim_asset_custody_before = bravo_token.balanceOf(stability_pool)
+    allowance_before = ripe_token.allowance(stability_pool, teller)
+    gov_shares_before = clean_vault.userBalances(bob, ripe_token)
+    ledger_data_before = ledger.getDepositLedgerData(bob, core_id)
+    source_ledger_before = ledger.getDepositLedgerData(bob, vault_id)
+    core_user_points_before = ledger.userDepositPoints(bob, core_id, ripe_token)
+    core_asset_points_before = ledger.assetDepositPoints(core_id, ripe_token)
+    source_user_points_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    source_asset_points_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    global_points_before = ledger.globalDepositPoints()
+    ripe_rewards_before = ledger.ripeRewards()
+
+    with pytest.raises(BoaError) as exc_info:
+        claim_from_stability_pool(
+            teller, vault_id, alpha_token, bravo_token, sender=bob
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert ripe_token.totalSupply() == supply_before
+    assert ledger.ripeAvailForRewards() == rewards_available_before
+    assert stability_pool.claimableBalances(
+        alpha_token, bravo_token
+    ) == claimable_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == total_claimable_before
+    assert stability_pool.userBalances(bob, alpha_token) == stability_shares_before
+    assert alpha_token.balanceOf(stability_pool) == stability_balance_before
+    assert bravo_token.balanceOf(stability_pool) == claim_asset_custody_before
+    assert ripe_token.allowance(stability_pool, teller) == allowance_before
+    assert clean_vault.userBalances(bob, ripe_token) == gov_shares_before
+    assert ledger.getDepositLedgerData(bob, core_id) == ledger_data_before
+    assert ledger.getDepositLedgerData(bob, vault_id) == source_ledger_before
+    assert ledger.userDepositPoints(bob, core_id, ripe_token) == core_user_points_before
+    assert ledger.assetDepositPoints(core_id, ripe_token) == core_asset_points_before
+    assert ledger.userDepositPoints(
+        bob, vault_id, alpha_token
+    ) == source_user_points_before
+    assert ledger.assetDepositPoints(
+        vault_id, alpha_token
+    ) == source_asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == ripe_rewards_before
+
+    setRipeRewardsConfig(_stabPoolRipePerDollarClaimed=2)
+    assert claim_from_stability_pool(
+        teller, vault_id, alpha_token, bravo_token, sender=bob
+    ) == EIGHTEEN_DECIMALS
+    assert clean_vault.userBalances(bob, ripe_token) == 1
+
+
 def test_stab_vault_claim_rewards_basic(
     stability_pool,
     alpha_token,
@@ -2400,8 +2522,10 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     
     expected_actual_rewards = min(theoretical_rewards, ripe_available)
 
-    # Record initial balance
+    # Record the exact canonical reward state before the real claim path.
     initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_ripe_supply = ripe_token.totalSupply()
+    initial_reward_budget = ledger.ripeAvailForRewards()
 
     # Claim from stability pool
     vault_id = vault_book.getRegId(stability_pool)
@@ -2415,6 +2539,8 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
     assert actual_rewards <= expected_actual_rewards
     assert actual_rewards == min(theoretical_rewards, ripe_available)
     assert actual_rewards == limited_ripe_available, "Should receive exactly the limited amount available"
+    assert ripe_token.totalSupply() == initial_ripe_supply + limited_ripe_available
+    assert ledger.ripeAvailForRewards() == initial_reward_budget - limited_ripe_available
 
 
 def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
@@ -2485,6 +2611,8 @@ def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
     )
 
     initial_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_ripe_supply = ripe_token.totalSupply()
+    initial_reward_budget = ledger.ripeAvailForRewards()
     vault_id = vault_book.getRegId(stability_pool)
     claim_from_stability_pool(teller,
         vault_id,
@@ -2496,6 +2624,8 @@ def test_lootbox_emission_and_stability_claim_compete_for_one_ledger_budget(
         ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) - initial_balance
     )
     assert claimed_reward == 100 * EIGHTEEN_DECIMALS
+    assert ripe_token.totalSupply() == initial_ripe_supply + claimed_reward
+    assert ledger.ripeAvailForRewards() == initial_reward_budget - claimed_reward
     assert ledger.ripeAvailForRewards() == 0
 
 
@@ -2889,6 +3019,132 @@ def test_stab_vault_claims_auto_deposit_basic(
 
     # Verify Bob's stability pool position is depleted
     assert stability_pool.getTotalUserValue(bob, alpha_token) <= 1
+
+
+def test_stab_claim_dynamic_zero_share_autodeposit_reverts_without_fallback(
+    stability_pool,
+    rebase_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ledger,
+    governance,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """AUD-024: failed dynamic auto-deposit does not fall back to transfer."""
+    setGeneralConfig()
+    setAssetConfig(
+        bravo_token,
+        _vaultIds=[4],
+        _stakersPointsAlloc=0,
+        _voterPointsAlloc=0,
+    )
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob, alpha_token, deposit_amount, sender=teller.address
+    )
+    claimable_amount = EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount,
+        bravo_token,
+        claimable_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    donation = claimable_amount * 10 ** 8
+    bravo_token.mint(bravo_token_whale, donation, sender=governance.address)
+    bravo_token.transfer(rebase_erc20_vault, donation, sender=bravo_token_whale)
+    assert rebase_erc20_vault.amountToShares(
+        bravo_token, claimable_amount, False
+    ) == 0
+
+    pool_id = vault_book.getRegId(stability_pool)
+    user_wallet_before = bravo_token.balanceOf(bob)
+    pool_claimable_before = stability_pool.claimableBalances(
+        alpha_token, bravo_token
+    )
+    total_claimable_before = stability_pool.totalClaimableBalances(bravo_token)
+    pool_shares_before = stability_pool.userBalances(bob, alpha_token)
+    pool_asset_custody_before = bravo_token.balanceOf(stability_pool)
+    target_custody_before = bravo_token.balanceOf(rebase_erc20_vault)
+    target_allowance_before = bravo_token.allowance(stability_pool, teller)
+    target_shares_before = rebase_erc20_vault.userBalances(bob, bravo_token)
+    source_ledger_before = ledger.getDepositLedgerData(bob, pool_id)
+    target_ledger_before = ledger.getDepositLedgerData(bob, 4)
+    source_user_points_before = ledger.userDepositPoints(bob, pool_id, alpha_token)
+    source_asset_points_before = ledger.assetDepositPoints(pool_id, alpha_token)
+    target_user_points_before = ledger.userDepositPoints(bob, 4, bravo_token)
+    target_asset_points_before = ledger.assetDepositPoints(4, bravo_token)
+    global_points_before = ledger.globalDepositPoints()
+    ripe_rewards_before = ledger.ripeRewards()
+
+    with pytest.raises(BoaError) as exc_info:
+        claim_from_stability_pool(
+            teller,
+            pool_id,
+            alpha_token,
+            bravo_token,
+            MAX_UINT256,
+            bob,
+            True,
+            sender=bob,
+        )
+    assert_reverted_call(exc_info.value, "cannot receive 0 shares", teller)
+
+    assert bravo_token.balanceOf(bob) == user_wallet_before
+    assert stability_pool.claimableBalances(
+        alpha_token, bravo_token
+    ) == pool_claimable_before
+    assert stability_pool.totalClaimableBalances(bravo_token) == total_claimable_before
+    assert stability_pool.userBalances(bob, alpha_token) == pool_shares_before
+    assert bravo_token.balanceOf(stability_pool) == pool_asset_custody_before
+    assert bravo_token.balanceOf(rebase_erc20_vault) == target_custody_before
+    assert bravo_token.allowance(stability_pool, teller) == target_allowance_before
+    assert rebase_erc20_vault.userBalances(bob, bravo_token) == target_shares_before
+    assert ledger.getDepositLedgerData(bob, pool_id) == source_ledger_before
+    assert ledger.getDepositLedgerData(bob, 4) == target_ledger_before
+    assert ledger.userDepositPoints(
+        bob, pool_id, alpha_token
+    ) == source_user_points_before
+    assert ledger.assetDepositPoints(
+        pool_id, alpha_token
+    ) == source_asset_points_before
+    assert ledger.userDepositPoints(bob, 4, bravo_token) == target_user_points_before
+    assert ledger.assetDepositPoints(4, bravo_token) == target_asset_points_before
+    assert ledger.globalDepositPoints() == global_points_before
+    assert ledger.ripeRewards() == ripe_rewards_before
+
+    # The existing direct-transfer branch still works when auto-deposit is not
+    # selected; it was not used as a fallback after the failed attempt above.
+    assert claim_from_stability_pool(
+        teller,
+        pool_id,
+        alpha_token,
+        bravo_token,
+        MAX_UINT256,
+        bob,
+        False,
+        sender=bob,
+    ) == claimable_amount
+    assert bravo_token.balanceOf(bob) == user_wallet_before + claimable_amount
+    assert rebase_erc20_vault.userBalances(bob, bravo_token) == target_shares_before
 
 
 def test_stab_vault_claims_auto_deposit_no_vault(

@@ -1,8 +1,24 @@
 from hypothesis import given, strategies as st
 import boa
+import pytest
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import filter_logs, get_boa_dev_reasons
+
+
+def _exit_state(savings_green, green_token, owner, receiver, spender):
+    return (
+        savings_green.balanceOf(owner),
+        savings_green.balanceOf(receiver),
+        savings_green.balanceOf(spender),
+        savings_green.totalSupply(),
+        savings_green.totalAssets(),
+        green_token.balanceOf(owner),
+        green_token.balanceOf(receiver),
+        green_token.balanceOf(savings_green),
+        savings_green.allowance(owner, spender),
+        savings_green.lastPricePerShare(),
+    )
 
 
 def test_erc4626_initialization(savings_green, green_token):
@@ -392,6 +408,290 @@ def test_erc4626_max_functions(
     # Test maxWithdraw and maxRedeem after deposit
     assert savings_green.maxWithdraw(bob) == deposit_amount
     assert savings_green.maxRedeem(bob) == shares
+
+
+@pytest.mark.parametrize("exit_kind", ["withdraw", "redeem"])
+def test_erc4626_paused_exit_is_atomic_and_resumes_after_unpause(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    governance,
+    exit_kind,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.approve(sally, shares, sender=bob)
+
+    savings_green.pause(True, sender=governance.address)
+    before = _exit_state(savings_green, green_token, bob, sally, sally)
+
+    with boa.reverts("token paused"):
+        if exit_kind == "withdraw":
+            savings_green.withdraw(deposit_amount // 2, sally, bob, sender=bob)
+        else:
+            savings_green.redeem(shares // 2, sally, bob, sender=bob)
+
+    assert _exit_state(savings_green, green_token, bob, sally, sally) == before
+
+    savings_green.pause(False, sender=governance.address)
+    if exit_kind == "withdraw":
+        savings_green.withdraw(deposit_amount // 2, sally, bob, sender=bob)
+    else:
+        savings_green.redeem(shares // 2, sally, bob, sender=bob)
+
+    assert savings_green.balanceOf(bob) < shares
+    assert green_token.balanceOf(sally) > before[6]
+
+
+@pytest.mark.parametrize("exit_kind", ["withdraw", "redeem"])
+@pytest.mark.parametrize("use_alternate_receiver", [False, True])
+@pytest.mark.parametrize("use_delegated_caller", [False, True])
+def test_erc4626_blacklisted_owner_cannot_exit_to_any_receiver(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    switchboard,
+    exit_kind,
+    use_alternate_receiver,
+    use_delegated_caller,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.approve(sally, shares, sender=bob)
+    savings_green.setBlacklist(bob, True, sender=switchboard.address)
+
+    receiver = sally if use_alternate_receiver else bob
+    caller = sally if use_delegated_caller else bob
+    before = _exit_state(savings_green, green_token, bob, receiver, sally)
+
+    with boa.reverts("owner blacklisted"):
+        if exit_kind == "withdraw":
+            savings_green.withdraw(deposit_amount // 2, receiver, bob, sender=caller)
+        else:
+            savings_green.redeem(shares // 2, receiver, bob, sender=caller)
+
+    assert _exit_state(savings_green, green_token, bob, receiver, sally) == before
+
+
+@pytest.mark.parametrize("exit_kind", ["withdraw", "redeem"])
+def test_erc4626_owner_blacklist_precedes_delegated_caller_blacklist(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    alice,
+    switchboard,
+    exit_kind,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.approve(sally, shares, sender=bob)
+    savings_green.setBlacklist(bob, True, sender=switchboard.address)
+    savings_green.setBlacklist(sally, True, sender=switchboard.address)
+
+    assert savings_green.blacklisted(bob)
+    assert savings_green.blacklisted(sally)
+    before = _exit_state(savings_green, green_token, bob, alice, sally)
+
+    with boa.reverts("owner blacklisted"):
+        if exit_kind == "withdraw":
+            savings_green.withdraw(
+                deposit_amount // 2,
+                alice,
+                bob,
+                sender=sally,
+            )
+        else:
+            savings_green.redeem(shares // 2, alice, bob, sender=sally)
+
+    assert _exit_state(savings_green, green_token, bob, alice, sally) == before
+
+
+@pytest.mark.parametrize("exit_kind", ["withdraw", "redeem"])
+def test_erc4626_blacklisted_delegated_caller_cannot_exit(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    alice,
+    switchboard,
+    exit_kind,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.approve(sally, shares, sender=bob)
+    savings_green.setBlacklist(sally, True, sender=switchboard.address)
+
+    before = _exit_state(savings_green, green_token, bob, alice, sally)
+
+    with boa.reverts("spender blacklisted"):
+        if exit_kind == "withdraw":
+            savings_green.withdraw(deposit_amount // 2, alice, bob, sender=sally)
+        else:
+            savings_green.redeem(shares // 2, alice, bob, sender=sally)
+
+    assert _exit_state(savings_green, green_token, bob, alice, sally) == before
+
+
+def test_erc4626_green_blacklisted_recipient_reverts_atomically(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    switchboard,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    green_token.setBlacklist(sally, True, sender=switchboard.address)
+
+    before = _exit_state(savings_green, green_token, bob, sally, sally)
+    with pytest.raises(boa.BoaError) as exc_info:
+        savings_green.redeem(shares // 2, sally, bob, sender=bob)
+    assert "recipient blacklisted" in get_boa_dev_reasons(exc_info.value)
+
+    assert _exit_state(savings_green, green_token, bob, sally, sally) == before
+
+
+def test_erc4626_sgreen_only_blacklisted_recipient_can_receive_green(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    switchboard,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.setBlacklist(sally, True, sender=switchboard.address)
+
+    assert savings_green.blacklisted(sally)
+    assert not green_token.blacklisted(sally)
+    amount = savings_green.redeem(shares // 2, sally, bob, sender=bob)
+
+    assert amount > 0
+    assert green_token.balanceOf(sally) == amount
+
+
+def test_erc4626_governance_blacklist_burn_bypasses_exit_controls(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    switchboard,
+    governance,
+):
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, deposit_amount, sender=whale)
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.setBlacklist(bob, True, sender=switchboard.address)
+
+    requested = shares // 3
+    supply_before = savings_green.totalSupply()
+    assert savings_green.burnBlacklistTokens(
+        bob,
+        requested,
+        sender=governance.address,
+    )
+    assert savings_green.balanceOf(bob) == shares - requested
+    assert savings_green.totalSupply() == supply_before - requested
+    assert savings_green.totalAssets() == deposit_amount
+
+    savings_green.pause(True, sender=governance.address)
+    remaining = savings_green.balanceOf(bob)
+    assert savings_green.burnBlacklistTokens(
+        bob,
+        remaining + 1,
+        sender=governance.address,
+    )
+    assert savings_green.balanceOf(bob) == 0
+    assert savings_green.totalSupply() == 0
+    assert savings_green.totalAssets() == deposit_amount
+
+
+def test_erc4626_max_views_report_pause_blacklist_and_conversion_limits(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    governance,
+    switchboard,
+):
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    bob_shares = savings_green.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=whale)
+    sally_shares = savings_green.deposit(300 * EIGHTEEN_DECIMALS, sally, sender=whale)
+    green_token.transfer(
+        savings_green,
+        EIGHTEEN_DECIMALS + 1,
+        sender=whale,
+    )
+
+    assert savings_green.pricePerShare() > EIGHTEEN_DECIMALS
+    assert savings_green.maxDeposit(bob) == MAX_UINT256
+    assert savings_green.maxMint(bob) == MAX_UINT256
+    assert savings_green.maxRedeem(bob) == bob_shares
+    assert savings_green.maxRedeem(sally) == sally_shares
+    assert savings_green.maxWithdraw(bob) == savings_green.previewRedeem(bob_shares)
+    assert savings_green.maxWithdraw(sally) == savings_green.previewRedeem(sally_shares)
+    assert savings_green.maxWithdraw(bob) < savings_green.totalAssets()
+    assert savings_green.maxWithdraw(sally) < savings_green.totalAssets()
+
+    previews = (
+        savings_green.previewDeposit(10 * EIGHTEEN_DECIMALS),
+        savings_green.previewMint(10 * EIGHTEEN_DECIMALS),
+        savings_green.previewWithdraw(10 * EIGHTEEN_DECIMALS),
+        savings_green.previewRedeem(10 * EIGHTEEN_DECIMALS),
+    )
+    assert all(value > 0 for value in previews)
+
+    with boa.env.anchor():
+        savings_green.pause(True, sender=governance.address)
+        assert savings_green.maxDeposit(bob) == 0
+        assert savings_green.maxMint(bob) == 0
+        assert savings_green.maxWithdraw(bob) == 0
+        assert savings_green.maxRedeem(bob) == 0
+        assert (
+            savings_green.previewDeposit(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewMint(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewWithdraw(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewRedeem(10 * EIGHTEEN_DECIMALS),
+        ) == previews
+
+    with boa.env.anchor():
+        savings_green.setBlacklist(bob, True, sender=switchboard.address)
+        assert savings_green.maxDeposit(bob) == 0
+        assert savings_green.maxMint(bob) == 0
+        assert savings_green.maxWithdraw(bob) == 0
+        assert savings_green.maxRedeem(bob) == 0
+        assert (
+            savings_green.previewDeposit(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewMint(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewWithdraw(10 * EIGHTEEN_DECIMALS),
+            savings_green.previewRedeem(10 * EIGHTEEN_DECIMALS),
+        ) == previews
+
+    bob_max = savings_green.maxWithdraw(bob)
+    assert bob_max > 0
+    savings_green.withdraw(bob_max, bob, bob, sender=bob)
+    assert savings_green.balanceOf(bob) == 0
+
+    sally_max = savings_green.maxWithdraw(sally)
+    assert sally_max > 0
+    savings_green.withdraw(sally_max, sally, sally, sender=sally)
+    assert savings_green.balanceOf(sally) == 0
 
 
 def test_erc4626_rounding_edge_cases(

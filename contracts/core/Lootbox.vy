@@ -52,9 +52,10 @@ interface Ledger:
 interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
+    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
+    def isStabVaultId(_vaultId: uint256) -> bool: view
     def getRewardsConfig() -> RewardsConfig: view
     def coreRipeGovVaultId() -> uint256: view
-    def isRipeGovVaultId(_vaultId: uint256) -> bool: view
     def underscoreRegistry() -> address: view
 
 interface Teller:
@@ -72,6 +73,9 @@ interface RipeToken:
 
 interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
+
+interface VaultShareTotals:
+    def totalBalances(_asset: address) -> uint256: view
 
 struct RipeRewards:
     borrowers: uint256
@@ -191,6 +195,8 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
+# Matches SharesVault.DECIMAL_OFFSET and StabVault.DECIMAL_OFFSET.
+SHARE_DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
@@ -208,6 +214,7 @@ def __init__(
     # underscore rewards
     assert _minUnderscoreSendInterval != 0 and _minUnderscoreSendInterval != max_value(uint256) # dev: invalid floor
     MIN_UNDERSCORE_SEND_INTERVAL = _minUnderscoreSendInterval
+
     if _underscoreSendInterval != 0:
         assert _underscoreSendInterval >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
         self.underscoreSendInterval = _underscoreSendInterval
@@ -298,6 +305,8 @@ def _claimLoot(
 
         assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            continue
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
             hasBalance: bool = False
@@ -355,6 +364,8 @@ def getClaimableLoot(_user: address) -> uint256:
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            continue
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
             if asset == empty(address):
@@ -870,35 +881,46 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # latest asset value (staked assets not eligible for gen deposit rewards)
+    # One MissionControl call serves both the share-normalize and funding
+    # branches. RipeGov shares are already normalized; MissionControl retains
+    # every historical core id because old positions can remain claimable.
+    isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
+
+    # Update holder lastBalance before lastUsdValue so gen-reward funding only
+    # includes value represented by normalized holder points.
+    userPoints: UserDepositPoints = empty(UserDepositPoints)
+    if _user != empty(address):
+        userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
+        userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
+        if userLootShare != 0 and not isRipeGovVault:
+            userLootShare = userLootShare // assetPoints.precision
+        assetPoints.lastBalance -= userPoints.lastBalance
+        assetPoints.lastBalance += userLootShare
+        userPoints.lastBalance = userLootShare
+
+    # General-depositor USD is funded only when stakersPointsAlloc == 0.
+    # Valuation is aggregate: lastBalance * precision, never the caller rate.
+    # Dispatch: RipeGov → empty book → StabilityPool → sharesToAmount probe
+    # → nominal-compatible fallback → fund zero. All share conversions
+    # round down and cap at usable custody. A successful exact-32-byte
+    # sharesToAmount result is SharesVault-compatible even if it is zero.
+    # A failed probe plus totalBalances == usable custody is only
+    # nominal-compatible accounting, not a vault-type proof.
     newAssetUsdValue: uint256 = 0
     if assetConfig.stakersPointsAlloc == 0:
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
+        if isRipeGovVault:
+            newAssetUsdValue = self._getUsdValueForAmount(_asset, staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset), _a.priceDesk)
+        elif assetPoints.lastBalance != 0:
+            newAssetUsdValue = self._getUsdValueForAmount(
+                _asset,
+                self._getEligibleUnderlying(_vaultId, _vaultAddr, _asset, assetPoints.lastBalance, assetPoints.precision, _a.missionControl),
+                _a.priceDesk,
+            )
 
-    # update `lastUsdValue` for global + asset
     if newAssetUsdValue != assetPoints.lastUsdValue:
         globalPoints.lastUsdValue -= assetPoints.lastUsdValue
         globalPoints.lastUsdValue += newAssetUsdValue
         assetPoints.lastUsdValue = newAssetUsdValue
-
-    # nothing else to do here
-    if _user == empty(address):
-        return empty(UserDepositPoints), assetPoints, globalPoints
-
-    # latest user points
-    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
-
-    # get user loot share
-    userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    # Ripe Gov vaults return an already-normalized share. MissionControl retains every historical
-    # core id because old positions and rewards can remain claimable after the core pointer moves.
-    if userLootShare != 0 and not staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId):
-        userLootShare = userLootShare // assetPoints.precision
-
-    # update `lastBalance`
-    assetPoints.lastBalance -= userPoints.lastBalance
-    assetPoints.lastBalance += userLootShare
-    userPoints.lastBalance = userLootShare
 
     return userPoints, assetPoints, globalPoints
 
@@ -908,14 +930,73 @@ def _getLatestDepositPoints(
 
 @view
 @internal
-def _refreshAssetUsdValue(_asset: address, _vaultAddr: address, _priceDesk: address) -> uint256:
-    assetAmount: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
-    if assetAmount == 0:
+def _getUsdValueForAmount(_asset: address, _amount: uint256, _priceDesk: address) -> uint256:
+    if _amount == 0:
         return 0
-    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, assetAmount)
+    newUsdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount)
     if newUsdValue != 0:
         newUsdValue = newUsdValue // EIGHTEEN_DECIMALS # reduce risk of integer overflow
     return newUsdValue
+
+
+@view
+@internal
+def _getEligibleUnderlying(
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _lastBalance: uint256,
+    _precision: uint256,
+    _missionControl: address,
+) -> uint256:
+    # Required vault interface. A revert here is a broken vault, not an
+    # optional-selector miss; fail-closed probing is the fallback below.
+    usable: uint256 = staticcall Vault(_vaultAddr).getTotalAmountForVault(_asset)
+    if usable == 0 or _lastBalance > max_value(uint256) // _precision:
+        return 0
+    eligibleNominal: uint256 = _lastBalance * _precision
+    if eligibleNominal > max_value(uint256) // SHARE_DECIMAL_OFFSET:
+        return 0
+    eligibleShares: uint256 = eligibleNominal * SHARE_DECIMAL_OFFSET
+    if staticcall MissionControl(_missionControl).isStabVaultId(_vaultId):
+        # Protocol-controlled stab vaults must implement totalBalances.
+        # Mirrors StabVault._getTotalAmountForUserWithTotalBal (no dead-share +1).
+        totalShares: uint256 = staticcall VaultShareTotals(_vaultAddr).totalBalances(_asset)
+        if totalShares == 0 or eligibleShares > max_value(uint256) // usable:
+            return 0
+        return min(eligibleShares * usable // totalShares, usable)
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        _vaultAddr,
+        abi_encode(
+            _asset,
+            eligibleShares,
+            False,
+            method_id=method_id("sharesToAmount(address,uint256,bool)"),
+        ),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if success:
+        if len(response) != 32:
+            return 0
+        return min(abi_decode(response, uint256), usable)
+    # Fail closed: missing, reverting, short, or overlong totalBalances
+    # must fund zero. Do not use a typed staticcall here.
+    totalsOk: bool = False
+    totalsResponse: Bytes[33] = b""
+    totalsOk, totalsResponse = raw_call(
+        _vaultAddr,
+        abi_encode(_asset, method_id=method_id("totalBalances(address)")),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if totalsOk and len(totalsResponse) == 32 and abi_decode(totalsResponse, uint256) == usable:
+        return min(eligibleNominal, usable)
+    return 0
 
 
 @view
@@ -1106,18 +1187,19 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
     gp: BorrowPoints = empty(BorrowPoints)
     up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, _a.ledger)
 
-    # calc user's share
-    userShare: uint256 = 0
-    if gp.points != 0:
-        userShare = min(up.points * HUNDRED_PERCENT // gp.points, HUNDRED_PERCENT)
-
     # calc borrower rewards
-    userRipeRewards: uint256 = globalRewards.borrowers * userShare // HUNDRED_PERCENT
+    cappedPoints: uint256 = min(up.points, gp.points)
+    userRipeRewards: uint256 = 0
+    if gp.points != 0 and cappedPoints != 0 and globalRewards.borrowers != 0:
+        if cappedPoints == gp.points:
+            userRipeRewards = globalRewards.borrowers
+        else:
+            userRipeRewards = self._mulDivFloor(globalRewards.borrowers, cappedPoints, gp.points)
 
     # update structs
     if userRipeRewards != 0:
         globalRewards.borrowers -= userRipeRewards
-        gp.points -= min(up.points, gp.points) # do first
+        gp.points -= cappedPoints # do first
         up.points = 0
 
     return userRipeRewards, up, gp, globalRewards
@@ -1290,6 +1372,57 @@ def _getCoreRipeGovVaultId(_missionControl: address) -> uint256:
     vaultId: uint256 = staticcall MissionControl(_missionControl).coreRipeGovVaultId()
     assert vaultId != 0 # dev: invalid vault id
     return vaultId
+
+
+# math
+
+
+@pure
+@internal
+def _mulDivFloor(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    # Fast path: the product fits in 256 bits.
+    if hi == 0:
+        return lo // _d
+
+    # The full-precision result must fit in uint256.
+    assert _d > hi # dev: result overflows
+
+    # Make the 512-bit product exactly divisible by the denominator.
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    # Factor powers of two out of the denominator and shift the
+    # high product bits into the low product word.
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    # Compute the modular inverse of the now-odd denominator.
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)
 
 
 ###############################

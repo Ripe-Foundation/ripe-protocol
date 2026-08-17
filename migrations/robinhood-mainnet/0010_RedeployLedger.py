@@ -52,6 +52,7 @@ typed ``MIGRATION_STAGE`` actions is required before production execution.
 """
 
 from scripts.utils import log
+from scripts.utils.ledger_deployment import validate_ledger_action_block_source
 from scripts.utils.migration import Migration, PromotionSpec
 
 from config.robinhood_launch import (
@@ -120,35 +121,6 @@ FINALIZED_0009 = (
     ("SwitchboardCharlieCandidate0009", SWITCHBOARD_MIN_TIMELOCK),
     ("SwitchboardEchoCandidate0009", SWITCHBOARD_MIN_TIMELOCK),
 )
-
-
-def _arb_action_block(migration, ledger_address):
-    """Read getArbActionBlock() from the NODE, not from boa's local EVM.
-
-    ArbSys is a node-implemented precompile: on chain it is a single 0xfe byte,
-    so boa executes INVALID and any local read reverts even when the contract
-    is correct. The constructor no longer probes it either -- that check was
-    removed upstream -- so this is the only thing standing between a wrong
-    action-block source and a Ledger whose one-action-per-block guard is broken.
-    """
-    from web3 import Web3
-
-    rpc = migration.rpc()
-    if not rpc or rpc == "boa":
-        return None  # local run: nothing real to ask
-    w3 = Web3(Web3.HTTPProvider(rpc))
-    address = Web3.to_checksum_address(ledger_address)
-
-    # On a fork the contract exists only in the local EVM, so the node has no
-    # code at this address and would answer an empty word -- which reads as
-    # zero and would fail the assertion below for the wrong reason.
-    if len(w3.eth.get_code(address)) == 0:
-        log.info("\tnot deployed on the node (fork run), skipping ArbSys readback")
-        return None
-
-    selector = Web3.keccak(text="getArbActionBlock()")[:4]
-    result = w3.eth.call({"to": address, "data": selector})
-    return int.from_bytes(result, "big")
 
 
 def _update_calldata(reg_id, new_addr):
@@ -351,13 +323,29 @@ def migrate(migration: Migration):
 
     log.h1("Redeploying")
 
-    ledger = redeploy("Ledger", RIPE_HQ, 4, hq, defaults, LEDGER_ACTION_BLOCK_SOURCE)
+    log.h2("Deploying Ledger")
+    ledger_label = f"Ledger{CANDIDATE_SUFFIX}"
+    ledger = migration.deploy(
+        "Ledger",
+        hq,
+        defaults,
+        LEDGER_ACTION_BLOCK_SOURCE,
+        label=ledger_label,
+    )
 
-    # Asked of the node, because boa cannot execute ArbSys. None on a fork.
-    arb_block = _arb_action_block(migration, ledger.address)
-    if arb_block is not None:
-        assert arb_block != 0, "ArbSys action block reads zero"
-        log.h2(f"ArbSys action block: {arb_block}")
+    validation = validate_ledger_action_block_source(
+        migration,
+        ledger.address,
+        LEDGER_ACTION_BLOCK_SOURCE,
+        allow_local_preview=True,
+    )
+    if validation is None:
+        log.h2("Ledger node-backed validation skipped for local/fork preview")
+    else:
+        action_source, action_block = validation
+        log.h2(f"Ledger ACTION_BLOCK_SOURCE: 0x{action_source:040x}")
+        log.h2(f"ArbSys action block: {action_block}")
+    updates.append(("Ledger", ledger_label, RIPE_HQ, 4, ledger.address))
 
     redeploy(
         "Lootbox",

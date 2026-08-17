@@ -71,6 +71,7 @@ struct UserBorrowTerms:
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
     highestLtv: uint256
+    hasQuarantinedAsset: bool
 
 struct UserDebt:
     amount: uint256
@@ -213,9 +214,11 @@ def _redeemCollateral(
     if userDebt.amount == 0 or userDebt.inLiquidation:
         return 0
 
-    # get latest debt terms
-    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, True, 0, empty(address), _a)
-    if bt.collateralVal == 0:
+    # get latest debt terms without propagating price-source failures
+    # CreditEngine marks the terms quarantined if any debt-bearing collateral
+    # has a positive balance but no usable price.
+    bt: UserBorrowTerms = staticcall CreditEngine(_a.creditEngine).getUserBorrowTermsWithNumVaults(_user, d.numUserVaults, False, 0, empty(address), _a)
+    if bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
     # user has not reached redemption threshold
@@ -236,7 +239,7 @@ def _redeemCollateral(
         return 0
 
     # max asset amount to take from user
-    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
+    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, False)
     if maxAssetAmount == 0:
         return 0
 
@@ -312,7 +315,7 @@ def getMaxRedeemValue(_user: address) -> uint256:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, False, a)
-    if userDebt.amount == 0 or userDebt.inLiquidation or bt.collateralVal == 0:
+    if userDebt.amount == 0 or userDebt.inLiquidation or bt.hasQuarantinedAsset or bt.collateralVal == 0:
         return 0
 
     if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):

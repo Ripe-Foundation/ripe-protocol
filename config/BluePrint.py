@@ -1,8 +1,4 @@
 from typing import Any
-import subprocess
-from pathlib import Path
-import json
-import hashlib
 from dataclasses import dataclass
 ADDYS = {
     "base": {
@@ -305,40 +301,6 @@ class RobinhoodStockInputQualification:
     blocker_ids: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class RobinhoodHistoricalTrancheIdentity:
-    integration_commit: str
-    changed_paths: tuple[tuple[str, str], ...]
-
-
-@dataclass(frozen=True)
-class RobinhoodGitPathIdentity:
-    path: str
-    git_blob: str
-    sha256: str
-
-
-@dataclass(frozen=True)
-class RobinhoodArtifactApplicabilityIdentity:
-    contract: str
-    source_path: str
-    source_git_blob: str
-    source_sha256: str
-    creation_sha256: str
-    runtime_template_sha256: str
-    abi_canonical_sha256: str
-    selectors_canonical_sha256: str
-
-
-@dataclass(frozen=True)
-class RobinhoodStockM4Binding:
-    historical_tranche: RobinhoodHistoricalTrancheIdentity
-    current_test_identities: tuple[RobinhoodGitPathIdentity, ...]
-    current_artifact_identities: tuple[
-        RobinhoodArtifactApplicabilityIdentity, ...
-    ]
-
-
 # Selected external facts remain deployment-readiness blocked until their
 # separately retained verification metadata is closed.
 ROBINHOOD_USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
@@ -620,109 +582,6 @@ ROBINHOOD_STOCK_ACTIVATION_POLICY = (
     ("defaultsPosture", "absent_until_atomic_packet_accepted"),
 )
 
-ROBINHOOD_STOCK_ARTIFACT_BINDING = (
-    ("contract", "SimpleErc20"),
-    ("sourcePath", "contracts/vaults/SimpleErc20.vy"),
-    ("sourceGitBlob", "7525765d45f00aa9ef6b5a98857ce048db0cdc62"),
-    (
-        "sourceSha256",
-        "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-    ),
-    (
-        "creationSha256",
-        "6df95ffccf9e51bd6a094e7cc3d3fe55d172096e3f2504c0807be8bc8e8a45dd",
-    ),
-    (
-        "runtimeTemplateSha256",
-        "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
-    ),
-    (
-        "abiCanonicalSha256",
-        "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
-    ),
-    (
-        "selectorsCanonicalSha256",
-        "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
-    ),
-    ("selectorCount", 34),
-    ("runtimeTemplateSize", 9_368),
-)
-
-ROBINHOOD_STOCK_M4_BINDING = RobinhoodStockM4Binding(
-    historical_tranche=RobinhoodHistoricalTrancheIdentity(
-        integration_commit="a2d6b940c9b90d9ff1c78560ad61b2dd546f1760",
-        changed_paths=(
-            ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
-            (
-                "A",
-                "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            ),
-            (
-                "A",
-                "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            ),
-            (
-                "M",
-                "tests/core/deleverage/test_deleverage_swap_collateral.py",
-            ),
-        ),
-    ),
-    current_test_identities=(
-        RobinhoodGitPathIdentity(
-            "tests/core/auctionHouse/test_ah_auctions.py",
-            "77f1222861917511bf5bd7adae7a1ff215b9afbc",
-            "f869490832929bf6d206d5a888831bad3f1fe32e98a5d9e009458a8ba9648f83",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-            "c04a618f48c3e3e5e8b85b3e78f558db80f527e6",
-            "adfd4961288f1b3d8dfa6e40c8dc2987f95ae8c8c8417f6d26dd7380b8632306",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/deleverage/test_deleverage_stock_delivery.py",
-            "fc8ff200e5eef7678a9da207d5c1723f1bc4afbe",
-            "68fabc844d43d5a0f5a1f119f698837549787e458194a595a710973c07948348",
-        ),
-        RobinhoodGitPathIdentity(
-            "tests/core/deleverage/test_deleverage_swap_collateral.py",
-            "bb0560048f91a89b7c413ff177360bb4ae0a759f",
-            "3b900a98eb348fa5db94a0090974bb47c7cab3e5e86d951569a978b8181632b9",
-        ),
-    ),
-    current_artifact_identities=(
-        RobinhoodArtifactApplicabilityIdentity(
-            "AuctionHouse",
-            "contracts/core/AuctionHouse.vy",
-            "73c2239ea9af646ec79ce2a8a59349a25f6a79df",
-            "af1856ce2d6e3d64b965933916994322f41d49f81e2f199f2b16ac1e92eb5951",
-            "31b858e2b36a4210ecd23c94421303569b158721b30865dff8fc3cf7c86bcca6",
-            "6cb605c161504d656256f6498f49167b82fec7ee1c3539903e965c7c6c35a1fa",
-            "4f855ff6ea205cab84e204f4fa09964bcac958c632112c021b2c996e1f40b387",
-            "9c6a8928074ec7e92b0220afabd8c0776986042c35d6d3e5088dabd2ff7c1762",
-        ),
-        RobinhoodArtifactApplicabilityIdentity(
-            "Deleverage",
-            "contracts/core/Deleverage.vy",
-            "b43d373039b352d6eab240be714134764901b947",
-            "d64a08573d1af100a8d6ca9d72811a87414654107fd09fe105322dde53a9c138",
-            "aab99ede7492d5f7f4769493c55ba04f28478caccbe9f32075dd9ef9b8c2acc7",
-            "baa883c99f91d41f7b3091090b246b415c77f5d7ffffebfd5e3366ab15366d57",
-            "61fefe1ba573787eb65ab293da64922278e09b01619b4fa244ba36e961b73752",
-            "5c6b9eccf45ba0b4be2fcf2c141616f0a8fcab3811bf3a3423a7dfab77b33490",
-        ),
-        RobinhoodArtifactApplicabilityIdentity(
-            "SimpleErc20",
-            "contracts/vaults/SimpleErc20.vy",
-            "7525765d45f00aa9ef6b5a98857ce048db0cdc62",
-            "6b6794f1e5aaef3b53c3e931eb8fe3596aa3d44dc5d4dcc17f487340f5c89c22",
-            "ec9daa8c14f70bacf1e83f0061e6865d27641a151090917f2d1f82ba2503ffe5",
-            "750c6a05e9a400a54e25d5f1020d99a3d7ad1ef8372ee86583f79024e60674b6",
-            "cf0daef1095087a92ec3d0c327009d8a1d7ec6c3dc04b430debfd4bc25c88b57",
-            "884259b81c166e48aff3cf2d424dcddf7a64eba157a58987521206dc617b1c2b",
-        ),
-    ),
-)
-
 ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     RobinhoodStockInputQualification(
         "Deployment.DP-10.aapl.identity",
@@ -823,15 +682,6 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         ("B-H04-PARAMS", "B-T8-M5"),
     ),
     RobinhoodStockInputQualification(
-        "Deployment.DP-11.stock.vaultArtifact",
-        "repository_fact_integrated",
-        ROBINHOOD_STOCK_ARTIFACT_BINDING,
-        (
-            "canonical SimpleErc20 selectors and persistent transient and immutable layouts are frozen",
-        ),
-        (),
-    ),
-    RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.vaultSlot",
         "owner_slot_unresolved",
         None,
@@ -841,33 +691,31 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m2Movement",
         "repository_fact_integrated",
+        None,
         (
-            ("source", "contracts/vaults/modules/BasicVault.vy"),
-            ("gitBlob", "a5a51ee20c598e9bf40908fc6c38f1c0634bf665"),
-            ("integrationCommit", "4f887207d344a1513d6c3a79d315c8315a10a9c8"),
+            "shared nominal vault movement remains fail-closed and external delivery stays exact",
+            "proven by BasicVault behavioral tests, not by a source hash",
         ),
-        ("shared nominal vault movement remains fail-closed and external delivery stays exact",),
         (),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m3CreditContainment",
         "repository_fact_integrated",
+        None,
         (
-            ("source", "contracts/core/CreditEngine.vy"),
-            ("gitBlob", "800cc44bcb13439f5007d79143e545b4c3357014"),
-            ("integrationCommit", "4c26d7d73bb02f7eae2e5df02314db77a426aced"),
+            "represented zero-amount terms keep zero capacity",
+            "proven by CreditEngine behavioral tests, not by a source hash",
         ),
-        ("preserve represented zero-amount terms with zero capacity",),
         (),
     ),
     RobinhoodStockInputQualification(
         "Deployment.DP-11.stock.m4ComposedProof",
         "repository_fact_integrated",
-        ROBINHOOD_STOCK_M4_BINDING,
+        None,
         (
             "historical tranche identity is distinct from current applicability",
-            "current applicability is pinned to exact test and production/artifact identities",
             "composed proof does not authorize configuration deployment or activation",
+            "proven by composed-route behavioral tests, not by source or artifact hashes",
         ),
         (),
     ),
@@ -876,11 +724,28 @@ ROBINHOOD_STOCK_INPUT_QUALIFICATIONS = (
         "atomic_binding_unresolved",
         None,
         (
-            "one reviewed packet must bind all 16 inputs and exact configuration bytes",
+            "one reviewed packet must bind every unresolved input and exact configuration bytes",
             "negative reachability must remain true before packet acceptance",
         ),
         ("B-T8-M5", "B-H08-PROOF", "B-H09-RELEASE"),
     ),
+)
+
+# M2, M3, and M4 are integrated repository facts proven by behavioral tests.
+# They previously also carried source hashes, git blobs, and artifact
+# identities; those were removed with the artifact-expectations pipeline. The
+# behavior is the evidence, so these paths must never regain a candidate
+# payload -- a hash with nothing to recompute it is not proof, and a stale one
+# reads as proof while being false.
+#
+# Keyed by exact path, not by resolution string. An earlier revision keyed the
+# guard on `resolution == "repository_binding_retired"`, and a review defeated
+# it by renaming the resolution while attaching a payload. Resolution values are
+# open vocabulary, so they cannot key a fail-closed rule.
+ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS = (
+    "Deployment.DP-11.stock.m2Movement",
+    "Deployment.DP-11.stock.m3CreditContainment",
+    "Deployment.DP-11.stock.m4ComposedProof",
 )
 
 ROBINHOOD_STOCK_LAUNCH_INPUT_PATHS = tuple(
@@ -999,11 +864,7 @@ ROBINHOOD_DEPLOYMENT_INPUTS = {
     'Deployment.DP-10.aapl.auction': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_AUCTION'), 'blocked'),
     'Deployment.DP-10.aapl.route': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_10_AAPL_ROUTE'), 'blocked'),
     # DP-11
-    'Deployment.DP-11.stock.vaultArtifact': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTARTIFACT'), 'blocked'),
     'Deployment.DP-11.stock.vaultSlot': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_VAULTSLOT'), 'blocked'),
-    'Deployment.DP-11.stock.m2Movement': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M2MOVEMENT'), 'blocked'),
-    'Deployment.DP-11.stock.m3CreditContainment': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M3CREDITCONTAINMENT'), 'blocked'),
-    'Deployment.DP-11.stock.m4ComposedProof': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M4COMPOSEDPROOF'), 'blocked'),
     'Deployment.DP-11.stock.m5ActivationBinding': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_11_STOCK_M5ACTIVATIONBINDING'), 'blocked'),
     # DP-13
     'Deployment.DP-13.stability.specialStabPoolId': RobinhoodInput(SymbolicBinding('DEPLOYMENT_DP_13_STABILITY_SPECIALSTABPOOLID'), 'blocked'),
@@ -1351,17 +1212,6 @@ ROBINHOOD_CURVE_LAUNCH_INPUTS = (
         ),
         "repository_approved", "protocol_owner", "bounded launch architecture", "explicitly_inactive",
     ),
-    RobinhoodCurveLaunchInput(
-        "artifact.curve_prices_source_sha256",
-        "f6e8234be8e433ed344f6f61d9cf04d20a4327c773759bb6aced44b9f65ebd0c",
-        "repository_approved", "oracle_owner", "contracts/priceSources/CurvePrices.vy",
-        "source_frozen",
-    ),
-    RobinhoodCurveLaunchInput(
-        "artifact.curve_prices_abi_sha256",
-        "3f06fa5c83f4404bfb97da689ea3b4611e94c60a504174001210033c7c429772",
-        "repository_approved", "oracle_owner", "scripts/abis/CurvePrices.json", "source_frozen",
-    ),
 )
 
 # Immutable metadata projection used by the structural validator. The rows
@@ -1385,7 +1235,8 @@ ROBINHOOD_CURVE_AUTHORITY_CLASSES = frozenset(
 ROBINHOOD_CURVE_RESOLUTION_STATES = frozenset(
     {
         "resolved_repository_fact", "selected_launch", "selected_external_fact_unverified",
-        "research_candidate_owner_approval_unresolved", "test_vector_only",
+        "research_candidate_owner_approval_unresolved",
+        "owner_approved_source_activation_blocked", "test_vector_only",
         "deployment_produced_unresolved", "resolved_no_predeployment_value",
         "resolved_reference_to_unverified_binding",
         "owner_choice_unresolved", "external_observation_unverified", "explicitly_inactive",
@@ -1417,7 +1268,6 @@ def validate_robinhood_stock_launch_qualification(
         "Deployment.DP-10.aapl.risk",
         "Deployment.DP-10.aapl.auction",
         "Deployment.DP-10.aapl.route",
-        "Deployment.DP-11.stock.vaultArtifact",
         "Deployment.DP-11.stock.vaultSlot",
         "Deployment.DP-11.stock.m2Movement",
         "Deployment.DP-11.stock.m3CreditContainment",
@@ -1427,12 +1277,22 @@ def validate_robinhood_stock_launch_qualification(
     paths = tuple(item.path for item in qualifications)
     if paths != expected_paths or len(paths) != len(set(paths)):
         raise ValueError("RH_STOCK_INPUT_CENSUS")
-    if any(path not in ROBINHOOD_DEPLOYMENT_INPUTS for path in paths):
+    # Only unresolved inputs are deployment inputs. M2/M3/M4 are integrated
+    # behavior proven by tests -- there is no value to bind for them at
+    # deployment time, so they carry no ROBINHOOD_DEPLOYMENT_INPUTS row and must
+    # not appear in the readiness blocker set. Everything still awaiting a value
+    # must remain a blocked symbolic binding.
+    bindable = tuple(
+        path for path in paths if path not in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS
+    )
+    if any(path not in ROBINHOOD_DEPLOYMENT_INPUTS for path in bindable):
         raise ValueError("RH_STOCK_INPUT_AUTHORITY")
+    if any(path in ROBINHOOD_DEPLOYMENT_INPUTS for path in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_IS_NOT_AN_INPUT")
     if any(
         not isinstance(ROBINHOOD_DEPLOYMENT_INPUTS[path].value, SymbolicBinding)
         or ROBINHOOD_DEPLOYMENT_INPUTS[path].disposition != "blocked"
-        for path in paths
+        for path in bindable
     ):
         raise ValueError("RH_STOCK_PREMATURE_BINDING")
     if ROBINHOOD_INITIAL_STOCK_SYMBOLS != ("AAPL",):
@@ -1457,16 +1317,39 @@ def validate_robinhood_stock_launch_qualification(
         "stock_excluded_from_stability_pool"
     ] is not True:
         raise ValueError("RH_STOCK_STABILITY_EXCLUSION")
+    # Every integrated semantic fact must carry no candidate payload. This is the check
+    # that keeps the integration honest: reintroducing a hash tuple here without
+    # machinery to recompute it would recreate exactly the state this replaced.
+    #
+    # Keyed on the exact path IDs, not on the resolution string. An earlier
+    # revision matched a resolution value, and a review defeated it in one move:
+    # rename the resolution, attach a hash payload, and the check no longer
+    # applies. Resolution values are open vocabulary here, so they cannot key a
+    # fail-closed rule.
+    semantic = tuple(
+        item for item in qualifications
+        if item.path in ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS
+    )
+    if len(semantic) != len(ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_CENSUS")
+    if any(item.candidate is not None for item in semantic):
+        raise ValueError("RH_STOCK_SEMANTIC_FACT_PAYLOAD")
+
+    # M2, M3, and M4 remain integrated repository facts: their behavior is
+    # proven by tests that still run and still pass, which is what
+    # `status.yaml` records for B-T8-M2/M3/M4. What was removed is the hash and
+    # git-blob evidence layer, not the integration.
+    #
+    # vaultArtifact is gone from the census entirely. It was SimpleErc20
+    # artifact identity and nothing else, so with the artifact-expectations
+    # pipeline retired there is no fact left for it to assert. Stock stays
+    # fail-closed on unresolved M5 configuration and activation, which is the
+    # control that actually matters.
     if tuple(
         item.path
         for item in qualifications
         if item.resolution == "repository_fact_integrated"
-    ) != (
-        "Deployment.DP-11.stock.vaultArtifact",
-        "Deployment.DP-11.stock.m2Movement",
-        "Deployment.DP-11.stock.m3CreditContainment",
-        "Deployment.DP-11.stock.m4ComposedProof",
-    ):
+    ) != ROBINHOOD_STOCK_SEMANTIC_FACT_PATHS:
         raise ValueError("RH_STOCK_REPOSITORY_FACT_SET")
     if any(
         item.resolution != "repository_fact_integrated"
@@ -1479,181 +1362,6 @@ def validate_robinhood_stock_launch_qualification(
         for item in qualifications
     ):
         raise ValueError("RH_STOCK_RESOLVED_BLOCKER")
-    m4_candidate = next(
-        item.candidate
-        for item in qualifications
-        if item.path == "Deployment.DP-11.stock.m4ComposedProof"
-    )
-    if not isinstance(m4_candidate, RobinhoodStockM4Binding):
-        raise ValueError("RH_STOCK_M4_BINDING_SHAPE")
-
-
-def validate_robinhood_stock_m4_binding(
-    repository_root: Path | str,
-    binding: RobinhoodStockM4Binding = ROBINHOOD_STOCK_M4_BINDING,
-) -> None:
-    """Validate historical M4 identity and its separate current applicability."""
-
-    if not isinstance(binding, RobinhoodStockM4Binding):
-        raise ValueError("RH_STOCK_M4_BINDING_SHAPE")
-
-    root = Path(repository_root).resolve()
-
-    def git(*args: str) -> bytes:
-        result = subprocess.run(
-            ["/usr/bin/git", "-C", str(root), *args],
-            capture_output=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise ValueError("RH_STOCK_M4_GIT")
-        return result.stdout
-
-    expected_commit = "a2d6b940c9b90d9ff1c78560ad61b2dd546f1760"
-    expected_changed_paths = (
-        ("M", "tests/core/auctionHouse/test_ah_auctions.py"),
-        (
-            "A",
-            "tests/core/auctionHouse/test_auctionhouse_stock_delivery.py",
-        ),
-        (
-            "A",
-            "tests/core/deleverage/test_deleverage_stock_delivery.py",
-        ),
-        (
-            "M",
-            "tests/core/deleverage/test_deleverage_swap_collateral.py",
-        ),
-    )
-    historical = binding.historical_tranche
-    if historical.integration_commit != expected_commit:
-        raise ValueError("RH_STOCK_M4_COMMIT")
-
-    ancestry = subprocess.run(
-        [
-            "/usr/bin/git",
-            "-C",
-            str(root),
-            "merge-base",
-            "--is-ancestor",
-            expected_commit,
-            "HEAD",
-        ],
-        capture_output=True,
-        check=False,
-    )
-    if ancestry.returncode != 0:
-        raise ValueError("RH_STOCK_M4_NON_ANCESTOR")
-
-    commit_with_parents = git(
-        "rev-list", "--parents", "-n", "1", expected_commit
-    ).decode().split()
-    if len(commit_with_parents) != 2:
-        raise ValueError("RH_STOCK_M4_PARENT_CENSUS")
-    parent = commit_with_parents[1]
-    changed_path_lines = git(
-        "diff-tree",
-        "--no-commit-id",
-        "--name-status",
-        "-r",
-        "--no-renames",
-        parent,
-        expected_commit,
-        "--",
-    ).decode().splitlines()
-    try:
-        derived_changed_paths = tuple(
-            tuple(line.split("\t", 1)) for line in changed_path_lines
-        )
-    except ValueError as error:
-        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS") from error
-    if any(len(item) != 2 for item in derived_changed_paths):
-        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS")
-    if (
-        historical.changed_paths != expected_changed_paths
-        or derived_changed_paths != expected_changed_paths
-        or historical.changed_paths != derived_changed_paths
-    ):
-        raise ValueError("RH_STOCK_M4_HISTORICAL_PATH_CENSUS")
-
-    expected_test_paths = tuple(path for _, path in expected_changed_paths)
-    test_identities = binding.current_test_identities
-    if tuple(item.path for item in test_identities) != expected_test_paths:
-        raise ValueError("RH_STOCK_M4_TEST_IDENTITY_CENSUS")
-    for identity in test_identities:
-        baseline_bytes = git("cat-file", "blob", f"HEAD:{identity.path}")
-        baseline_blob = git("rev-parse", f"HEAD:{identity.path}").decode().strip()
-        if identity.git_blob != baseline_blob:
-            raise ValueError("RH_STOCK_M4_TEST_BLOB")
-        if identity.sha256 != hashlib.sha256(baseline_bytes).hexdigest():
-            raise ValueError("RH_STOCK_M4_TEST_SHA256")
-        try:
-            working_bytes = (root / identity.path).read_bytes()
-        except OSError as error:
-            raise ValueError("RH_STOCK_M4_TEST_WORKTREE_DRIFT") from error
-        if working_bytes != baseline_bytes:
-            raise ValueError("RH_STOCK_M4_TEST_WORKTREE_DRIFT")
-
-    expected_artifacts = (
-        ("AuctionHouse", "contracts/core/AuctionHouse.vy"),
-        ("Deleverage", "contracts/core/Deleverage.vy"),
-        ("SimpleErc20", "contracts/vaults/SimpleErc20.vy"),
-    )
-    artifact_identities = binding.current_artifact_identities
-    if tuple(
-        (item.contract, item.source_path) for item in artifact_identities
-    ) != expected_artifacts:
-        raise ValueError("RH_STOCK_M4_ARTIFACT_IDENTITY_CENSUS")
-
-    expectations_path = "config/contract-artifact-expectations.json"
-    expectations_bytes = git("cat-file", "blob", f"HEAD:{expectations_path}")
-    try:
-        if (root / expectations_path).read_bytes() != expectations_bytes:
-            raise ValueError("RH_STOCK_M4_ARTIFACT_FILE_DRIFT")
-        expectations = json.loads(expectations_bytes)["contracts"]
-    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
-        raise ValueError("RH_STOCK_M4_ARTIFACT_FILE_DRIFT") from error
-
-    for identity in artifact_identities:
-        baseline_bytes = git("cat-file", "blob", f"HEAD:{identity.source_path}")
-        baseline_blob = git(
-            "rev-parse", f"HEAD:{identity.source_path}"
-        ).decode().strip()
-        if identity.source_git_blob != baseline_blob:
-            raise ValueError("RH_STOCK_M4_SOURCE_BLOB")
-        if identity.source_sha256 != hashlib.sha256(baseline_bytes).hexdigest():
-            raise ValueError("RH_STOCK_M4_SOURCE_SHA256")
-        try:
-            working_bytes = (root / identity.source_path).read_bytes()
-        except OSError as error:
-            raise ValueError("RH_STOCK_M4_SOURCE_WORKTREE_DRIFT") from error
-        if working_bytes != baseline_bytes:
-            raise ValueError("RH_STOCK_M4_SOURCE_WORKTREE_DRIFT")
-
-        try:
-            canonical = expectations[identity.contract]
-            canonical_identity = (
-                canonical["source_path"],
-                canonical["source_git_blob"],
-                canonical["source_sha256"],
-                canonical["artifacts"]["creation_sha256"],
-                canonical["artifacts"]["runtime_template_sha256"],
-                canonical["abi"]["canonical_sha256"],
-                canonical["selectors"]["canonical_sha256"],
-            )
-        except (KeyError, TypeError) as error:
-            raise ValueError("RH_STOCK_M4_ARTIFACT_EXPECTATION") from error
-        bound_identity = (
-            identity.source_path,
-            identity.source_git_blob,
-            identity.source_sha256,
-            identity.creation_sha256,
-            identity.runtime_template_sha256,
-            identity.abi_canonical_sha256,
-            identity.selectors_canonical_sha256,
-        )
-        if bound_identity != canonical_identity:
-            raise ValueError("RH_STOCK_M4_ARTIFACT_EXPECTATION")
 
 
 def robinhood_stock_launch_readiness() -> tuple[bool, tuple[str, ...]]:
