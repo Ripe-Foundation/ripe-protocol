@@ -323,10 +323,12 @@ jobs:
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          # A single cheap test triggers the same autouse ripe_hq session
+          # bootstrap as a whole directory would, at a tenth of the cost.
           python -m pytest \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
-            tests/config
+            tests/config/test_bond_booster.py
 
       - name: Save Titanoboa compiler artifacts
         if: ${{ always() && steps.boa-cache.outcome == 'success' }}
