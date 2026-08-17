@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core"},{"lane":"lean","shard":"vaults-tokens"},{"lane":"lean","shard":"supporting"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.lane == 'comprehensive' && '[{"lane":"comprehensive","shard":"all"}]' || '[{"lane":"lean","shard":"core-a"},{"lane":"lean","shard":"core-b"},{"lane":"lean","shard":"core-teller"},{"lane":"lean","shard":"core-c"},{"lane":"lean","shard":"vaults"},{"lane":"lean","shard":"vaults-gov"},{"lane":"lean","shard":"vaults-modules"},{"lane":"lean","shard":"config"},{"lane":"lean","shard":"price-sources"},{"lane":"lean","shard":"supporting"}]') }}
     env:
       # The runner context is not available in jobs.<id>.env — only inside
       # steps — so these use github.workspace, which is.
@@ -115,19 +115,61 @@ jobs:
         run: |
           unset WEB3_ALCHEMY_API_KEY ALCHEMY_API_KEY ETH_RPC_URL BASE_RPC_URL RPC_URL
           unset WEB3_PROVIDER_URI PRIVATE_KEY MNEMONIC AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+          # Eight shards, balanced by measured serial runtime rather than test
+          # count: tests/core averages ~0.75s per test, tests/vaults ~1.29s, and
+          # everything else ~0.65s. Wall clock is the slowest shard, so the
+          # heavy directories are split and the light ones are pooled.
           case "$TEST_SHARD" in
-            core)
-              shard_args=(tests/core)
+            core-a)
+              shard_args=(tests/core/endaoment tests/core/deleverage)
               ;;
-            vaults-tokens)
-              shard_args=(tests/vaults tests/tokens)
+            core-b)
+              shard_args=(tests/core/lootbox tests/core/creditEngine)
+              ;;
+            core-teller)
+              shard_args=(tests/core/teller)
+              ;;
+            core-c)
+              shard_args=(
+                tests/core/humanResources
+                tests/core/bondRoom
+                tests/core/auctionHouse
+                tests/core/boardroom
+                tests/core/test_stale_vault_replacement.py
+              )
+              ;;
+            vaults)
+              shard_args=(
+                tests/vaults
+                --ignore=tests/vaults/modules
+                --ignore=tests/vaults/test_ripe_gov_vault.py
+                --ignore=tests/vaults/test_ripe_gov_controls_and_migration.py
+                --ignore=tests/vaults/test_ripe_gov_exit_fee.py
+              )
+              ;;
+            vaults-gov)
+              shard_args=(
+                tests/vaults/test_ripe_gov_vault.py
+                tests/vaults/test_ripe_gov_controls_and_migration.py
+                tests/vaults/test_ripe_gov_exit_fee.py
+              )
+              ;;
+            vaults-modules)
+              shard_args=(tests/vaults/modules)
+              ;;
+            config)
+              shard_args=(tests/config)
+              ;;
+            price-sources)
+              shard_args=(tests/priceSources)
               ;;
             supporting)
               shard_args=(
                 tests
                 --ignore=tests/core
                 --ignore=tests/vaults
-                --ignore=tests/tokens
+                --ignore=tests/config
+                --ignore=tests/priceSources
               )
               ;;
             *)
@@ -135,7 +177,19 @@ jobs:
               exit 2
               ;;
           esac
+          # -n 4 matches the 4 vCPUs on a GitHub-hosted ubuntu runner.
+          #
+          # --dist loadfile is required, not a preference. The default
+          # (--dist load) hands individual tests to whichever worker is free,
+          # which scatters a single file across workers. Several suites build
+          # state in one test that a later test in the same file depends on;
+          # serially that order is guaranteed, in parallel it is not. A full-run
+          # comparison found nine such failures, all in tests/priceSources, that
+          # pass serially. loadfile keeps every test in a file on one worker and
+          # restores the ordering guarantee.
           /usr/bin/time -p python -m pytest \
+            -n 4 \
+            --dist loadfile \
             -o cache_dir="$RUNNER_TEMP/pytest-cache" \
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             --durations=50 \

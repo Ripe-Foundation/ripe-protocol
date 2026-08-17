@@ -103,6 +103,8 @@ eth-utils==5.3.1
     #   rlp
     #   trie
     #   web3
+execnet==2.1.2
+    # via pytest-xdist
 executing==2.2.1
     # via stack-data
 frozenlist==1.8.0
@@ -243,6 +245,8 @@ pytest==8.4.2
     #   titanoboa
 pytest-cov==7.0.0
     # via titanoboa
+pytest-xdist==3.8.0
+    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via ghp-import
 python-dotenv==1.2.2
