@@ -1077,11 +1077,10 @@ def test_nested_bluechip_is_starved_by_preceding_all_asset_stipend_exhaustion(
     assert nested_calls == 1
     assert healthy_underlying_calls == 1
     assert healthy_underlying_successes == 1
-    _assert_qualified_revert(
-        lambda: desk.getPrice(nested_asset, True, gas=3_000_000),
-        "strict nested BlueChip price no longer reverts; the stop condition was "
-        "resolved and aggregate-gas qualification must be rerun",
-    )
+    # If this exact fail-closed reason changes, the nested stop condition moved
+    # or was resolved and aggregate-gas qualification must be rerun.
+    with boa.reverts("has price config, no price"):
+        desk.getPrice(nested_asset, True, gas=3_000_000)
 
     _record_properties(
         request,

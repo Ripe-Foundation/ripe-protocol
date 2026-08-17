@@ -7,6 +7,21 @@ QUALIFIED_BORROWER_ASSET_COUNT = 9
 QUALIFIED_PRICE_DESK_SOURCE_COUNT = 3
 QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND = 250_000
 
+# Exact DefaultsRobinhoodLive addresses qualified as nonzero-LTV, direct-priced
+# collateral. Do not derive these from the defaults source: this guard must also
+# catch address rebinding under an existing semantic constant name.
+QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES = frozenset(
+    (
+        "0x0bd7d308f8e1639fab988df18a8011f41eacad73",  # WETH
+        "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",  # SPCX
+        "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",  # NVDA
+        "0x322f0929c4625ed5bad873c95208d54e1c003b2d",  # TSLA
+        "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",  # AAPL
+        "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",  # GOOGL
+        "0x1b0e319c6a659f002271b69db8a7df2f911c153e",  # GME
+    )
+)
+
 # Read-only Robinhood mainnet observation at eth_blockNumber 38,402,845 on
 # 2026-08-16: ArbGasInfo(0x000000000000000000000000000000000000006c)
 # getMaxTxGasLimit() returned 32,000,000. Requalify if this chain input changes.

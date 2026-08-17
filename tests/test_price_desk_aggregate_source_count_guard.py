@@ -9,6 +9,7 @@ from registries.price_desk_aggregate_qualification import (
     DELEVERAGE_MANY_API_MAX,
     LIQUIDATE_MANY_API_MAX,
     QUALIFIED_BORROWER_ASSET_COUNT,
+    QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES,
     QUALIFIED_PRICE_DESK_SOURCE_COUNT,
     QUALIFIED_PRICE_SOURCE_PRICE_GAS_STIPEND,
     QUALIFIED_SATURATED_DELEVERAGE_BATCH_SIZE,
@@ -32,17 +33,6 @@ def _source_uint_constant(path, name):
     )
     assert match is not None, f"cannot bind {name} for aggregate-gas guard"
     return int(match.group(1).replace("_", ""))
-
-
-def _source_address_constant(path, name):
-    source = Path(path).read_text()
-    match = re.search(
-        rf"^{name}: constant\(address\) = (0x[0-9A-Fa-f]{{40}})$",
-        source,
-        flags=re.MULTILINE,
-    )
-    assert match is not None, f"cannot bind {name} for aggregate-gas guard"
-    return match.group(1).lower()
 
 
 def _selected_price_sources():
@@ -90,26 +80,26 @@ def test_robinhood_enumerable_position_count_requires_gas_requalification_on_gro
     )
 
 
-def test_unqualified_price_assets_remain_zero_ltv():
+def test_ltv_bearing_assets_remain_within_direct_price_allowlist():
     defaults_path = "contracts/config/DefaultsRobinhoodLive.vy"
     defaults = boa.load(
         defaults_path,
-        name="aggregate_gas_robinhood_live_zero_ltv_defaults",
+        name="aggregate_gas_robinhood_live_ltv_allowlist_defaults",
     )
     configs_by_asset = {
         str(entry.asset).lower(): entry.config
         for entry in defaults.assetConfigs()
     }
-    for constant_name in ("RIPE_TOKEN", "RIPE_WETH_LP"):
-        asset = _source_address_constant(defaults_path, constant_name)
-        assert asset in configs_by_asset, (
-            f"{constant_name} is missing from the zero-LTV aggregate-gas guard"
-        )
-        assert configs_by_asset[asset].debtTerms.ltv == 0, (
-            f"{constant_name} received nonzero LTV; the nested or unavailable "
-            "price path now reaches collateral-health checks and requires "
-            "aggregate-gas requalification before activation"
-        )
+    actual_ltv_bearing_assets = {
+        asset
+        for asset, config in configs_by_asset.items()
+        if config.debtTerms.ltv != 0
+    }
+    assert actual_ltv_bearing_assets <= QUALIFIED_DIRECT_PRICE_LTV_ASSET_ADDRESSES, (
+        "an asset outside the qualified direct-price allowlist received nonzero "
+        "LTV; verify its live price route and rerun aggregate-gas qualification "
+        "before activation"
+    )
 
 
 def test_batch_api_maxima_and_smaller_qualified_operator_limits_are_explicit():
