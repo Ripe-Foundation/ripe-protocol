@@ -272,6 +272,10 @@ def route_matrix_contracts():
     each test still begins from unmodified protocol wiring -- the tests in
     this module that never request that fixture must not observe a replaced
     HQ address.
+
+    These contract objects are shared by every test in the module. Boa
+    reverts their EVM storage between tests but not their Python-side
+    state, so do not read filter_logs, get_logs or _computation from them.
     """
     green = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_green")
     savings = boa.loads(ROUTE_TOKEN_SOURCE, name="route_matrix_savings")
