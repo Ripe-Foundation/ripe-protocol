@@ -7,6 +7,28 @@
 > ([guarded-erc20.md](../smart-contract-changes/guarded-erc20.md),
 > [credit-engine.md](../smart-contract-changes/credit-engine.md)).
 
+## Candidate BasicVault custody-shortfall overlay
+
+RH-D028 accepts account-scoped, dynamically derived quarantine behavior for the
+exact uncommitted `codex/rh-basic-vault-quarantine` candidate. During a custody
+shortfall, BasicVault's `getTotalAmountForVault(asset)` returns **zero usable
+amount**, not zero recorded liabilities. CreditEngine exposes the composed
+account result as `getUserBorrowTerms(...).hasQuarantinedAsset`.
+
+Do not run `scripts/params/regenerate_defaults.py` while any BasicVault asset has
+an active custody shortfall. It consumes `getTotalAmountForVault` and would treat
+the intentional zero-usable result as a live balance input. The read-only
+`scripts/params/vaults.py` report has the same getter boundary: it may be used for
+incident evidence, but its zero must be labeled **quarantined/unusable**, never
+interpreted as proof that recorded liabilities disappeared or reused as a
+healthy defaults input.
+
+Resume defaults regeneration only after pinned evidence proves custody is
+restored, `getTotalAmountForVault(asset)` again returns the recorded total, and
+known affected accounts no longer report `hasQuarantinedAsset`. This instruction
+does not authorize either script, a recovery transaction, configuration,
+deployment, activation, or release.
+
 Use `C` for the exact observed token `balanceOf(vault)` and `N` for
 GuardedErc20 `getTotalAmountForVault(asset)`, which is the stored nominal
 liability

@@ -1,465 +1,341 @@
 # Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
-# Ripe Foundation (C) 2025
+# Ripe Foundation (C) 2026
 
 # @version 0.4.3
 
 implements: PriceSource
 
-exports: gov.__interface__
-exports: addys.__interface__
-exports: priceData.__interface__
-exports: timeLock.__interface__
-
-initializes: gov
-initializes: addys
-initializes: priceData[addys := addys]
-initializes: timeLock[gov := gov]
-
-import contracts.modules.LocalGov as gov
-import contracts.modules.Addys as addys
-import contracts.priceSources.modules.PriceSourceData as priceData
-import contracts.modules.TimeLock as timeLock
-
 import interfaces.PriceSource as PriceSource
-from ethereum.ercs import IERC20
-from ethereum.ercs import IERC20Detailed
+
 
 interface AeroClassicPool:
     def getReserves() -> (uint256, uint256, uint256): view
     def tokens() -> (address, address): view
 
-interface PriceDesk:
-    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
-struct PriceConfig:
-    minSnapshotDelay: uint256
-    maxNumSnapshots: uint256
-    maxUpsideDeviation: uint256
-    staleTime: uint256
-    lastSnapshot: PriceSnapshot
-    nextIndex: uint256
+interface TokenDecimals:
+    def decimals() -> uint256: view
 
-struct PriceSnapshot:
-    price: uint256
-    lastUpdate: uint256
 
-struct PendingPriceConfig:
-    actionId: uint256
-    config: PriceConfig
-
-event PriceConfigUpdatePending:
-    asset: indexed(address)
-    minSnapshotDelay: uint256
-    maxNumSnapshots: uint256
-    maxUpsideDeviation: uint256
-    staleTime: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event PriceSnapshotAdded:
-    asset: indexed(address)
-    price: uint256
-    lastUpdate: uint256
-
-# data 
-priceConfigs: public(HashMap[address, PriceConfig]) # asset -> config
-snapShots: public(HashMap[address, HashMap[uint256, PriceSnapshot]]) # asset -> index -> snapshot
-pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pending config
-
-HUNDRED_PERCENT: constant(uint256) = 100_00
+PRICE_DESK_ID: constant(uint256) = 7
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+MAX_UINT112: constant(uint256) = 2 ** 112 - 1
+MAX_UINT32: constant(uint256) = 2 ** 32 - 1
+MAX_ADDRESS: constant(uint256) = 2 ** 160 - 1
 
+RIPE_HQ: public(immutable(address))
 RIPE_WETH_POOL: public(immutable(address))
 RIPE_TOKEN: public(immutable(address))
+WETH_TOKEN: public(immutable(address))
+RIPE_IS_TOKEN0: public(immutable(bool))
 
 
 @deploy
 def __init__(
     _ripeHq: address,
-    _tempGov: address,
     _ripeWethPool: address,
     _ripeToken: address,
-    _minPriceChangeTimeLock: uint256,
-    _maxPriceChangeTimeLock: uint256,
+    _wethToken: address,
 ):
-    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
-    addys.__init__(_ripeHq)
-    priceData.__init__(False)
-    timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
+    assert empty(address) not in [_ripeHq, _ripeWethPool, _ripeToken, _wethToken] # dev: invalid monitoring config
+    assert _ripeToken != _wethToken # dev: invalid monitoring tokens
 
+    token0: address = empty(address)
+    token1: address = empty(address)
+    token0, token1 = staticcall AeroClassicPool(_ripeWethPool).tokens()
+    ripeIsToken0: bool = token0 == _ripeToken and token1 == _wethToken
+    ripeIsToken1: bool = token0 == _wethToken and token1 == _ripeToken
+    assert ripeIsToken0 or ripeIsToken1 # dev: not ripe weth pool
+
+    # This monitor is deliberately specific to the canonical 18-decimal
+    # RIPE/WETH pair. It is not a generic Aerodrome asset adapter.
+    assert staticcall TokenDecimals(_ripeToken).decimals() == 18 # dev: invalid ripe decimals
+    assert staticcall TokenDecimals(_wethToken).decimals() == 18 # dev: invalid weth decimals
+
+    RIPE_HQ = _ripeHq
     RIPE_WETH_POOL = _ripeWethPool
     RIPE_TOKEN = _ripeToken
-
-    # set ripe token config
-    if _ripeToken != empty(address):
-        self.priceConfigs[RIPE_TOKEN] = PriceConfig(
-            minSnapshotDelay = 60 * 5, # 5 minutes
-            maxNumSnapshots = 20,
-            maxUpsideDeviation = 10_00, # 10%
-            staleTime = 60 * 60 * 24, # 1 day
-            lastSnapshot = empty(PriceSnapshot),
-            nextIndex = 0,
-        )
-        priceData._addPricedAsset(RIPE_TOKEN)
+    WETH_TOKEN = _wethToken
+    RIPE_IS_TOKEN0 = ripeIsToken0
 
 
-###############
-# Core Prices #
-###############
-
-
-# get price
+#########################
+# RIPE monitoring views #
+#########################
 
 
 @view
 @external
-def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
+def isMonitoringOnly() -> bool:
+    return True
+
+
+@view
+@external
+def getRipePoolState() -> (uint256, uint256, uint256):
+    """Return RIPE reserve, WETH reserve, and the pool's update timestamp."""
+    valid: bool = False
+    ripeReserve: uint256 = 0
+    wethReserve: uint256 = 0
+    lastUpdate: uint256 = 0
+    valid, ripeReserve, wethReserve, lastUpdate = self._readPoolState()
+    if not valid:
+        return 0, 0, 0
+    return ripeReserve, wethReserve, lastUpdate
+
+
+@view
+@external
+def getRipeWethMonitoringPrice() -> uint256:
+    """Return the manipulable spot WETH-per-RIPE observation, scaled to 1e18."""
+    valid: bool = False
+    ripeReserve: uint256 = 0
+    wethReserve: uint256 = 0
+    na: uint256 = 0
+    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
-    config: PriceConfig = self.priceConfigs[ripe]
-    return self._getPrice(ripe, config, _priceDesk)
+    return wethReserve * EIGHTEEN_DECIMALS // ripeReserve
 
 
 @view
 @external
-def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return 0, False
-    config: PriceConfig = self.priceConfigs[ripe]
-    return self._getPrice(ripe, config, _priceDesk), True
-
-
-@view
-@internal
-def _getPrice(_asset: address, _config: PriceConfig, _priceDesk: address) -> uint256:
-    # NOTE: not using Mission Control `_staleTime` in this contract.
-    # Config here has its own stale time.
-
-    price: uint256 = self._getAeroRipePrice(_asset, _priceDesk)
-
-    weightedPrice: uint256 = self._getWeightedPrice(_asset, _config)
-    if weightedPrice != 0:
-        price = min(weightedPrice, price)
-
-    return price
-
-
-# utilities
-
-
-@view
-@external
-def hasPriceFeed(_asset: address) -> bool:
-    return _asset == RIPE_TOKEN
-
-
-@view
-@external
-def hasPendingPriceFeedUpdate(_asset: address) -> bool:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return False
-    return timeLock._hasPendingAction(self.pendingPriceConfigs[ripe].actionId)
-
-
-###################
-# Aero Ripe Price #
-###################
+def getRipeUsdMonitoringPrice() -> uint256:
+    """Return the manipulable spot RIPE/USD observation for monitoring only."""
+    return self._getRipeUsdMonitoringPrice()
 
 
 @view
 @external
 def getAeroRipePrice(_asset: address) -> uint256:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
+    """Temporary frontend compatibility alias for the RIPE/USD monitor."""
+    # Remove after the frontend moves to getRipeUsdMonitoringPrice().
+    if _asset != RIPE_TOKEN:
         return 0
-    return self._getAeroRipePrice(ripe, addys._getPriceDeskAddr())
+    return self._getRipeUsdMonitoringPrice()
 
 
 @view
 @internal
-def _getAeroRipePrice(_asset: address, _priceDesk: address) -> uint256:
-    pool: address = RIPE_WETH_POOL
-
-    token0: address = empty(address)
-    token1: address = empty(address)
-    token0, token1 = staticcall AeroClassicPool(pool).tokens()
-
-    # alt price
-    altPrice: uint256 = 0
-    if _asset == token0:
-        altPrice = staticcall PriceDesk(_priceDesk).getPrice(token1, False)
-    else:
-        altPrice = staticcall PriceDesk(_priceDesk).getPrice(token0, False)
-
-    # return early if no alt price
-    if altPrice == 0:
+def _getRipeUsdMonitoringPrice() -> uint256:
+    valid: bool = False
+    ripeReserve: uint256 = 0
+    wethReserve: uint256 = 0
+    na: uint256 = 0
+    valid, ripeReserve, wethReserve, na = self._readPoolState()
+    if not valid or ripeReserve == 0 or wethReserve == 0:
         return 0
 
-    # reserves
+    wethUsdPrice: uint256 = self._readWethUsdPrice()
+    if wethUsdPrice == 0:
+        return 0
+
+    ripeWethPrice: uint256 = wethReserve * EIGHTEEN_DECIMALS // ripeReserve
+    didMultiply: bool = False
+    ripeUsdPrice: uint256 = 0
+    didMultiply, ripeUsdPrice = self._mulDivOne(ripeWethPrice, wethUsdPrice)
+    return ripeUsdPrice if didMultiply else 0
+
+
+@view
+@internal
+def _readPoolState() -> (bool, uint256, uint256, uint256):
+    success: bool = False
+    response: Bytes[97] = b""
+    success, response = raw_call(
+        RIPE_WETH_POOL,
+        method_id("getReserves()"),
+        max_outsize=97,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 96:
+        return False, 0, 0, 0
+
     reserve0: uint256 = 0
     reserve1: uint256 = 0
-    na: uint256 = 0
-    reserve0, reserve1, na = staticcall AeroClassicPool(pool).getReserves()
+    lastUpdate: uint256 = 0
+    reserve0, reserve1, lastUpdate = abi_decode(response, (uint256, uint256, uint256))
+    # Aerodrome returns full uint256 values. The retained uint112/uint32 limits
+    # are conservative monitoring sanity bounds, not pool storage assumptions.
+    if reserve0 > MAX_UINT112 or reserve1 > MAX_UINT112 or lastUpdate > MAX_UINT32:
+        return False, 0, 0, 0
 
-    # avoid division by zero
-    if reserve0 == 0 or reserve1 == 0:
-        return 0  
-
-    # price of token0 in token1
-    priceZeroToOne: uint256 = reserve1 * EIGHTEEN_DECIMALS // reserve0
-
-    # adjust for decimals: price should be in 18 decimals
-    decimals0: uint256 = convert(staticcall IERC20Detailed(token0).decimals(), uint256)
-    decimals1: uint256 = convert(staticcall IERC20Detailed(token1).decimals(), uint256)
-    if decimals0 > decimals1:
-        scaleFactor: uint256 = 10 ** (decimals0 - decimals1)
-        priceZeroToOne = priceZeroToOne * scaleFactor
-    elif decimals1 > decimals0:
-        scaleFactor: uint256 = 10 ** (decimals1 - decimals0)
-        priceZeroToOne = priceZeroToOne // scaleFactor
-
-    # if _asset is token1, make price inverse
-    priceToOther: uint256 = priceZeroToOne
-    if _asset == token1:
-        priceToOther = EIGHTEEN_DECIMALS * EIGHTEEN_DECIMALS // priceZeroToOne
-
-    return altPrice * priceToOther // EIGHTEEN_DECIMALS
+    if RIPE_IS_TOKEN0:
+        return True, reserve0, reserve1, lastUpdate
+    return True, reserve1, reserve0, lastUpdate
 
 
-#################
-# Update Config #
-#################
-
-
-@external
-def updatePriceConfig(
-    _minSnapshotDelay: uint256,
-    _maxNumSnapshots: uint256,
-    _maxUpsideDeviation: uint256,
-    _staleTime: uint256,
-) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert not priceData.isPaused # dev: contract paused
-
-    p: PriceConfig = self.priceConfigs[RIPE_TOKEN]
-    p.minSnapshotDelay = _minSnapshotDelay
-    p.maxNumSnapshots = _maxNumSnapshots
-    p.maxUpsideDeviation = _maxUpsideDeviation
-    p.staleTime = _staleTime
-    assert self._isValidPriceConfig(p) # dev: invalid config
-
-    # set to pending state
-    aid: uint256 = timeLock._initiateAction()
-    self.pendingPriceConfigs[RIPE_TOKEN] = PendingPriceConfig(actionId=aid, config=p)
-    log PriceConfigUpdatePending(
-        asset=RIPE_TOKEN,
-        minSnapshotDelay=p.minSnapshotDelay,
-        maxNumSnapshots=p.maxNumSnapshots,
-        maxUpsideDeviation=p.maxUpsideDeviation,
-        staleTime=p.staleTime,
-        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
-        actionId=aid,
+@view
+@internal
+def _readWethUsdPrice() -> uint256:
+    # Resolve PriceDesk dynamically so a registry rotation does not stale this
+    # direct monitoring view. Neither this read nor its result is a feed.
+    success: bool = False
+    response: Bytes[33] = b""
+    success, response = raw_call(
+        RIPE_HQ,
+        abi_encode(PRICE_DESK_ID, method_id=method_id("getAddr(uint256)")),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
     )
-    return True
+    if not success or len(response) != 32:
+        return 0
+    priceDeskValue: uint256 = abi_decode(response, uint256)
+    if priceDeskValue > MAX_ADDRESS:
+        return 0
+    priceDesk: address = convert(priceDeskValue, address)
+    if priceDesk == empty(address):
+        return 0
+
+    success, response = raw_call(
+        priceDesk,
+        abi_encode(WETH_TOKEN, False, method_id=method_id("getPrice(address,bool)")),
+        max_outsize=33,
+        is_static_call=True,
+        revert_on_failure=False,
+    )
+    if not success or len(response) != 32:
+        return 0
+    return abi_decode(response, uint256)
 
 
-# validation
+#############################
+# Inert PriceSource surface #
+#############################
 
 
 @view
 @external
-def isValidPriceConfig(
-    _minSnapshotDelay: uint256,
-    _maxNumSnapshots: uint256,
-    _maxUpsideDeviation: uint256,
-    _staleTime: uint256,
-) -> bool:
-    p: PriceConfig = self.priceConfigs[RIPE_TOKEN]
-    p.minSnapshotDelay = _minSnapshotDelay
-    p.maxNumSnapshots = _maxNumSnapshots
-    p.maxUpsideDeviation = _maxUpsideDeviation
-    p.staleTime = _staleTime
-    return self._isValidPriceConfig(p)
-
-
-@view
-@internal
-def _isValidPriceConfig(_config: PriceConfig) -> bool:
-    if _config.minSnapshotDelay > (60 * 60 * 24 * 7): # 1 week
-        return False
-    if _config.maxNumSnapshots == 0 or _config.maxNumSnapshots > 25:
-        return False
-    return _config.maxUpsideDeviation <= HUNDRED_PERCENT
-
-
-###################
-# Price Snapshots #
-###################
-
-
-# get weighted price
+def getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:
+    return 0
 
 
 @view
 @external
-def getWeightedPrice(_asset: address) -> uint256:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return 0
-    config: PriceConfig = self.priceConfigs[ripe]
-    return self._getWeightedPrice(ripe, config)
+def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):
+    return 0, False
 
 
 @view
-@internal
-def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
-    if _config.maxNumSnapshots == 0:
-        return 0
-
-    # calculate weighted average price using all valid snapshots
-    numerator: uint256 = 0
-    denominator: uint256 = 0
-    for i: uint256 in range(_config.maxNumSnapshots, bound=max_value(uint256)):
-
-        snapShot: PriceSnapshot = self.snapShots[_asset][i]
-        if snapShot.price == 0 or snapShot.lastUpdate == 0:
-            continue
-
-        # too stale, skip
-        if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:
-            continue
-
-        numerator += snapShot.price
-        denominator += 1
-
-    # weighted price
-    weightedPrice: uint256 = 0
-    if numerator != 0:
-        weightedPrice = numerator // denominator
-    else:
-        weightedPrice = _config.lastSnapshot.price
-
-    return weightedPrice
+@external
+def hasPriceFeed(_asset: address) -> bool:
+    return False
 
 
-# add price snapshot
+@view
+@external
+def hasPendingPriceFeedUpdate(_asset: address) -> bool:
+    return False
 
 
-@external 
+@view
+@external
+def getPricedAssets() -> DynArray[address, 50]:
+    return empty(DynArray[address, 50])
+
+
+@external
 def addPriceSnapshot(_asset: address) -> bool:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return False
-
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not priceData.isPaused # dev: contract paused
-    return self._addPriceSnapshot(ripe, self.priceConfigs[ripe])
-
-
-@internal 
-def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
-    config: PriceConfig = _config
-
-    # already have snapshot for this time
-    if config.lastSnapshot.lastUpdate == block.timestamp:
-        return False
-
-    # check if snapshot is too recent
-    if config.lastSnapshot.lastUpdate + config.minSnapshotDelay > block.timestamp:
-        return False
-
-    # create and store new snapshot
-    newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
-    config.lastSnapshot = newSnapshot
-    self.snapShots[_asset][config.nextIndex] = newSnapshot
-
-    # update index
-    config.nextIndex += 1
-    if config.nextIndex >= config.maxNumSnapshots:
-        config.nextIndex = 0
-
-    # save config data
-    self.priceConfigs[_asset] = config
-
-    log PriceSnapshotAdded(
-        asset=_asset,
-        price=newSnapshot.price,
-        lastUpdate=newSnapshot.lastUpdate,
-    )
-    return True
-
-
-# latest snapshot
-
-
-@view
-@external
-def getLatestSnapshot(_asset: address) -> PriceSnapshot:
-    ripe: address = RIPE_TOKEN
-    if _asset != ripe:
-        return empty(PriceSnapshot)
-    return self._getLatestSnapshot(ripe, self.priceConfigs[ripe])
-
-
-@view
-@internal
-def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
-    price: uint256 = self._getAeroRipePrice(_asset, addys._getPriceDeskAddr())
-
-    # throttle upside (extra safety check)
-    price = self._throttleUpside(price, _config.lastSnapshot.price, _config.maxUpsideDeviation)
-
-    return PriceSnapshot(
-        price=price,
-        lastUpdate=block.timestamp,
-    )
-
-
-@view
-@internal
-def _throttleUpside(_newValue: uint256, _prevValue: uint256, _maxUpside: uint256) -> uint256:
-    if _maxUpside == 0 or _prevValue == 0 or _newValue == 0:
-        return _newValue
-    maxPrice: uint256 = _prevValue + (_prevValue * _maxUpside // HUNDRED_PERCENT)
-    return min(_newValue, maxPrice)
-
-
-# other
+    return False
 
 
 @external
 def confirmNewPriceFeed(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def cancelNewPendingPriceFeed(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def confirmPriceFeedUpdate(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def cancelPriceFeedUpdate(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def disablePriceFeed(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def confirmDisablePriceFeed(_asset: address) -> bool:
-    return True
+    return False
 
 
 @external
 def cancelDisablePriceFeed(_asset: address) -> bool:
-    return True
+    return False
+
+
+@view
+@external
+def actionTimeLock() -> uint256:
+    return 0
+
+
+@view
+@external
+def hasPendingAction(_actionId: uint256) -> bool:
+    return False
+
+
+@view
+@external
+def getActionConfirmationBlock(_actionId: uint256) -> uint256:
+    return 0
+
+
+@external
+def setActionTimeLock(_numBlocks: uint256) -> bool:
+    return False
+
+
+@external
+def setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:
+    return False
+
+
+@view
+@external
+def isPaused() -> bool:
+    return False
+
+
+@external
+def pause(_shouldPause: bool):
+    raise "monitoring only"
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    raise "monitoring only"
+
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    raise "monitoring only"
+
+
+@view
+@internal
+def _mulDivOne(_a: uint256, _b: uint256) -> (bool, uint256):
+    whole: uint256 = _a // EIGHTEEN_DECIMALS
+    remainder: uint256 = _a % EIGHTEEN_DECIMALS
+    if whole != 0 and _b > max_value(uint256) // whole:
+        return False, 0
+    wholeProduct: uint256 = whole * _b
+    if remainder != 0 and _b > max_value(uint256) // remainder:
+        return False, 0
+    remainderProduct: uint256 = remainder * _b // EIGHTEEN_DECIMALS
+    if wholeProduct > max_value(uint256) - remainderProduct:
+        return False, 0
+    return True, wholeProduct + remainderProduct

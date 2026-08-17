@@ -1218,12 +1218,14 @@ def executePendingAction(_aid: uint256) -> bool:
         mc: address = self.pendingMissionControl[_aid]
         if mc == empty(address):
             mc = self._getMissionControlAddr()
-        extcall MissionControl(mc).deregisterAsset(asset)
+        success: bool = extcall MissionControl(mc).deregisterAsset(asset)
+        assert success # dev: invalid asset
         log AssetDeregistered(asset=asset)
 
     elif actionType == ActionType.DEREGISTER_VAULT_ASSET:
         p: DeregisterVaultAssetAction = self.pendingDeregisterVaultAsset[_aid]
-        extcall VaultData(p.vaultAddr).deregisterVaultAsset(p.asset)
+        success: bool = extcall VaultData(p.vaultAddr).deregisterVaultAsset(p.asset)
+        assert success # dev: invalid vault asset
         log VaultAssetDeregistered(vaultAddr=p.vaultAddr, asset=p.asset)
 
     elif actionType == ActionType.SET_UNDERSCORE_SEND_INTERVAL:

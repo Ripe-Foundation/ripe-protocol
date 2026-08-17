@@ -3,6 +3,13 @@ from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
 
+def _deleverage_one(teller, user, target_repay_amount, *, sender):
+    return teller.deleverageManyUsers(
+        [(user, target_repay_amount)],
+        sender=sender,
+    )
+
+
 def _wrap_green_as_sgreen(user, green_amount, green_token, savings_green):
     green_token.approve(savings_green, green_amount, sender=user)
     return savings_green.deposit(green_amount, user, sender=user)
@@ -95,7 +102,7 @@ def test_phase1_burns_users_sgreen_from_stability_pool(
     assert pre_sgreen_in_pool > 0, "User should have sGREEN in stability pool"
 
     # deleverage!
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -175,7 +182,7 @@ def test_phase1_wraps_borrowed_green_before_stability_pool_burn(
     assert pre_sgreen_in_pool > 0, "User should have sGREEN in stability pool"
 
     # deleverage!
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -261,7 +268,7 @@ def test_phase1_partial_burn_when_sgreen_exceeds_debt(
     assert green_underlying > pre_debt, "User should have more GREEN (from sGREEN) than debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -328,7 +335,7 @@ def test_phase1_depletes_stab_asset_when_insufficient(
     assert green_underlying < pre_debt, "User should have less sGREEN than debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -414,7 +421,7 @@ def test_phase1_burns_both_sgreen_and_green_in_order(
     pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 400 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 400 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -496,7 +503,7 @@ def test_phase1_with_target_repay_amount(
     target_repay = 100 * EIGHTEEN_DECIMALS
 
     # Deleverage with target
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, target_repay, sender=switchboard_alpha.address)
 
     # Get events
     logDetail = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
@@ -578,7 +585,7 @@ def test_phase1_processes_green_after_sgreen_depleted(
     pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -661,7 +668,7 @@ def test_phase1_zero_balance_handled_gracefully(
     pre_green = simple_erc20_vault.getTotalAmountForUser(bob, green_token)
 
     # Deleverage (should skip sGREEN, process GREEN)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -731,7 +738,7 @@ def test_phase1_skipped_when_priority_vaults_empty(
     )
 
     # Deleverage (Phase 1 should be skipped, Phase 3 should handle)
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -816,7 +823,7 @@ def test_phase1_user_not_participating_in_any_priority_vault(
     assert bob_sgreen_in_pool == 0, "Bob should have no sGREEN in stability pool"
 
     # Execute deleveraging
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -909,7 +916,7 @@ def test_phase1_skips_non_green_stablecoin_assets(
     assert pre_alpha > 0, "User should have alpha_token in pool"
 
     # Execute deleveraging
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -1036,7 +1043,7 @@ def test_phase1_processes_multiple_stability_pools(
     assert pre_debt == 500 * EIGHTEEN_DECIMALS
 
     # Deleverage bob
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn events
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -1134,7 +1141,7 @@ def test_phase1_exact_balance_equals_target(
     assert pre_debt == 500 * EIGHTEEN_DECIMALS, "Should have exactly 500 debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn event
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
@@ -1228,7 +1235,7 @@ def test_phase1_handles_dust_amounts(
     assert pre_debt == 1, "Should have 1 wei debt"
 
     # Deleverage
-    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    repaid_amount = _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 
     # Get burn event
     burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")

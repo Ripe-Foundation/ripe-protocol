@@ -60,14 +60,8 @@ def numUserAssets(_user: address) -> uint256:
     return 2
 
 @view
-@external
-def getUserAssetAndAmountAtIndex(
-    _user: address,
-    _index: uint256,
-) -> (address, uint256):
-    if _index != 1 or true_zero:
-        return empty(address), 0
-
+@internal
+def _getUsableAmount() -> uint256:
     success: bool = False
     response: Bytes[65] = b""
     success, response = raw_call(
@@ -78,12 +72,37 @@ def getUserAssetAndAmountAtIndex(
         revert_on_failure=False,
     )
     if not success or len(response) != 32:
-        return asset, 0
+        return 0
 
     observed_backing: uint256 = abi_decode(response, uint256)
     if observed_backing < nominal_amount:
-        return asset, 0
-    return asset, nominal_amount
+        return 0
+    return nominal_amount
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(
+    _user: address,
+    _index: uint256,
+) -> (address, uint256):
+    if _index != 1 or true_zero:
+        return empty(address), 0
+    return asset, self._getUsableAmount()
+
+@view
+@external
+def doesUserHaveBalance(
+    _user: address,
+    _asset: address,
+) -> bool:
+    return not true_zero and _asset == asset and nominal_amount != 0
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    if true_zero or _asset != asset:
+        return 0
+    return self._getUsableAmount()
 """
 
 
@@ -392,6 +411,7 @@ def test_unsafe_backing_failures_keep_terms_with_zero_capacity(
     assert preview.debtTerms.liqFee == 10_00
     assert preview.debtTerms.borrowRate == 5_00
     assert preview.debtTerms.daowry == 1_00
+    assert preview.hasQuarantinedAsset
     assert credit_engine.getCollateralValue(bob) == 0
     assert credit_engine.getMaxBorrowAmount(bob) == 0
 
@@ -418,8 +438,8 @@ def test_unsafe_backing_failures_keep_terms_with_zero_capacity(
     assert state_debt.amount == debt_amount
     assert state_terms == preview
     assert not credit_engine.hasGoodDebtHealth(bob)
-    assert credit_engine.canLiquidateUser(bob)
-    assert credit_engine.canRedeemUserCollateral(bob)
+    assert not credit_engine.canLiquidateUser(bob)
+    assert not credit_engine.canRedeemUserCollateral(bob)
     assert credit_engine.getLiquidationThreshold(bob) == (
         debt_amount * 100_00 // 70_00
     )
@@ -523,7 +543,7 @@ def test_safe_backing_surplus_values_only_nominal_user_amount(
     assert preview.totalMaxDebt == nominal_amount
 
 
-def test_mixed_safe_collateral_remains_exact_and_liquidatable(
+def test_mixed_safe_collateral_remains_exact_but_quarantine_suppresses_forced_action(
     alpha_token,
     alpha_token_whale,
     bravo_token,
@@ -548,7 +568,7 @@ def test_mixed_safe_collateral_remains_exact_and_liquidatable(
         _redemptionThreshold=60_00,
         _liqThreshold=70_00,
         _liqFee=10_00,
-        _borrowRate=5_00,
+        _borrowRate=0,
         _daowry=0,
     )
     setAssetConfig(alpha_token, _vaultIds=[3], _debtTerms=debt_terms)
@@ -560,6 +580,14 @@ def test_mixed_safe_collateral_remains_exact_and_liquidatable(
         alpha_token_whale,
     )
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    initial_debt = 50 * EIGHTEEN_DECIMALS
+    assert teller.borrow(
+        initial_debt,
+        bob,
+        False,
+        sender=bob,
+    ) == initial_debt
 
     unsafe_vault, _ = _m3_containment_vault(
         bravo_token,
@@ -579,14 +607,6 @@ def test_mixed_safe_collateral_remains_exact_and_liquidatable(
         teller,
     )
 
-    initial_debt = 50 * EIGHTEEN_DECIMALS
-    assert teller.borrow(
-        initial_debt,
-        bob,
-        False,
-        sender=bob,
-    ) == initial_debt
-
     # The safe asset is repriced to one half. The guarded desk proves the
     # unsafe zero-amount asset is not consulted.
     _m3_install_guarded_price_desk(
@@ -600,8 +620,9 @@ def test_mixed_safe_collateral_remains_exact_and_liquidatable(
     assert preview.totalMaxDebt == safe_amount // 4
     assert preview.debtTerms.ltv == 50_00
     assert preview.debtTerms.liqThreshold == 70_00
+    assert preview.hasQuarantinedAsset
     assert not credit_engine.hasGoodDebtHealth(bob)
-    assert credit_engine.canLiquidateUser(bob)
+    assert not credit_engine.canLiquidateUser(bob)
 
     assert not credit_engine.updateDebtForUser(
         bob,
@@ -696,6 +717,7 @@ def test_backing_observation_mutation_fails_closed(
     assert unsafe_preview.collateralVal == 0
     assert unsafe_preview.totalMaxDebt == 0
     assert unsafe_preview.debtTerms.liqThreshold == debt_terms[2]
+    assert unsafe_preview.hasQuarantinedAsset
 
 
 def test_zero_amount_containment_path_has_bounded_gas(
@@ -745,9 +767,14 @@ def test_zero_amount_containment_path_has_bounded_gas(
     unsafe_preview = credit_engine.getUserBorrowTerms(bob, True)
     unsafe_gas = boa.env.get_gas_used() - gas_before_unsafe
     assert unsafe_preview.collateralVal == 0
+    assert unsafe_preview.hasQuarantinedAsset
 
     assert 0 < unsafe_gas < 1_000_000
-    assert unsafe_gas < safe_gas
+    assert 0 < safe_gas < 1_000_000
+    # Quarantine adds two bounded vault reads to the zero-amount path. Retain a
+    # relative regression limit without requiring that the guarded path remain
+    # cheaper than the ordinary price-bearing path.
+    assert unsafe_gas < safe_gas + 50_000
 
 
 def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
@@ -829,7 +856,8 @@ def test_c1_max_withdrawable_numeric_null_and_terms_failure_surface(
         3,
         alpha_token,
     )
-    assert after == before == expected
+    assert before == expected
+    assert after == 0
 
     failing_terms = boa.loads(
         C1_FAILING_TERMS_SOURCE,

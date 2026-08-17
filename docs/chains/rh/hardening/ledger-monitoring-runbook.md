@@ -11,7 +11,7 @@
 
 | Signal | Exact source and dated reference | Required capture |
 | --- | --- | --- |
-| Selected mode | `Ledger.ACTION_BLOCK_SOURCE()` immutable getter; RH profile requires exact `0x0000000000000000000000000000000000000064` ([ledger-robinhood-profile.json](../../../../scripts/proposals/ledger-robinhood-profile.json), [test_ledger_robinhood_profile.py:76-96](../../../../tests/deployment_profiles/test_ledger_robinhood_profile.py#L76)) | Ledger address/code hash, getter result, chain/block hash |
+| Selected mode | `Ledger.ACTION_BLOCK_SOURCE()` immutable getter; RH profile requires exact `0x0000000000000000000000000000000000000064` (`ledger-robinhood-profile.json` (retired), `test_ledger_robinhood_profile.py:76-96` (retired)) | Ledger address/code hash, getter result, chain/block hash |
 | Stored user identity | `Ledger.lastTouch(user)`; successful calls write the selected action-block identity ([Ledger.vy:233-245](../../../../contracts/data/Ledger.vy#L233)) | User, value, transaction/block hash |
 | ArbSys child number | Exact raw call to `arbBlockNumber()` at `0x64`, with exactly 32 returned bytes ([Ledger.vy:211-222](../../../../contracts/data/Ledger.vy#L211)); Offchain Labs' pinned interface defines `arbBlockNumber()` as the Arbitrum block number ([ArbSys.sol at `e7e6566`](https://github.com/OffchainLabs/nitro-precompile-interfaces/blob/e7e6566ae5b0efa0ad4d779138f64ead11928c66/ArbSys.sol)) | Calldata, raw response/length, decoded value, block/hash |
 | Native ancestor estimate | EVM `NUMBER`/`block.number`; Offchain Labs documents it as an approximate first non-Arbitrum ancestor number and shows repeats and jumps ([Arbitrum block-number reference, accessed 2026-07-29](https://docs.arbitrum.io/arbitrum-essentials/arbitrum-vs-ethereum/block-numbers-and-time)) | Native value observed in the same transaction/block context |
@@ -24,7 +24,7 @@
 
 | Condition | Concrete threshold/formula and derivation | Severity |
 | --- | --- | --- |
-| RH source mismatch | `ACTION_BLOCK_SOURCE != 0x64`; the draft RH profile gate accepts only exact `0x64` ([ledger_robinhood_profile.py:169-177](../../../../scripts/proposals/ledger_robinhood_profile.py#L169)) | Critical immediately |
+| RH source mismatch | `ACTION_BLOCK_SOURCE != 0x64`; the draft RH profile gate accepts only exact `0x64` (`ledger_robinhood_profile.py:169-177` (retired)) | Critical immediately |
 | ArbSys malformed/unavailable | One failure, revert, or response length other than 32; Ledger requires exact success on every ArbSys-mode read ([Ledger.vy:211-222](../../../../contracts/data/Ledger.vy#L211)) | Critical immediately |
 | Child regression | For finalized observations ordered by chain position: `child[i] < child[i-1]`; official documentation says child block numbers update sequentially ([Arbitrum block-number reference, accessed 2026-07-29](https://docs.arbitrum.io/arbitrum-essentials/arbitrum-vs-ethereum/block-numbers-and-time)) | Critical immediately |
 | Child repeat | `child[i] == child[i-1]` is expected for multiple transactions observed in one child block; a second checked action for the same user must reject, while different users remain independent ([Ledger.vy:240-245](../../../../contracts/data/Ledger.vy#L240), [test_ledger_action_block.py:180-218](../../../../tests/data/test_ledger_action_block.py#L180)) | Alert only if contract outcome contradicts the equality rule |

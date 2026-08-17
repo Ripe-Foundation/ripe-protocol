@@ -23,6 +23,16 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import interfaces.ConfigStructs as cs
 
+interface StabilityPool:
+    def indexOfClaimableAsset(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
+    def getNumActiveClaimAssets(_stabAsset: address) -> uint256: view
+    def totalClaimableBalances(_asset: address) -> uint256: view
+    def indexOfAsset(_asset: address) -> uint256: view
+    def vaultAssets(_index: uint256) -> address: view
+    def getNumVaultAssets() -> uint256: view
+    def isPaused() -> bool: view
+
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def assetConfig(_asset: address) -> cs.AssetConfig: view
@@ -33,28 +43,20 @@ interface MissionControl:
     def maxLtvDeviation() -> uint256: view
     def trainingWheels() -> address: view
 
+interface VaultBook:
+    def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface VaultBook:
-    def isValidRegId(_regId: uint256) -> bool: view
+interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
-
-interface StabilityPool:
-    def getNumVaultAssets() -> uint256: view
-    def vaultAssets(_index: uint256) -> address: view
-    def claimableBalances(_stabAsset: address, _claimAsset: address) -> uint256: view
-    def totalClaimableBalances(_asset: address) -> uint256: view
-    def canAcceptLiquidationAsset(_stabAsset: address, _claimAsset: address) -> bool: view
-    def isPaused() -> bool: view
 
 interface RipeHq:
-    def getAddr(_regId: uint256) -> address: view
-
-interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
@@ -67,6 +69,9 @@ flag ActionType:
 struct AssetUpdate:
     asset: address
     config: cs.AssetConfig
+
+# Must track StabVault.MAX_ACTIVE_CLAIM_ASSETS; this validator mirrors its capacity gate.
+MAX_ACTIVE_CLAIM_ASSETS: constant(uint256) = 20
 
 event NewAssetPending:
     asset: indexed(address)
@@ -469,6 +474,9 @@ def _isValidAssetLiqConfig(
     savingsGreen: address = staticcall RipeHq(ripeHq).getAddr(SAVINGS_GREEN_ID)
     vaultBook: address = staticcall RipeHq(ripeHq).getAddr(VAULT_BOOK_ID)
 
+    if _shouldSwapInStabPools and not _shouldAuctionInstantly:
+        return False
+
     if _shouldBurnAsPayment:
 
         # can only burn if green or savings green
@@ -511,8 +519,16 @@ def _isValidAssetLiqConfig(
             stabAsset = staticcall StabilityPool(stabPool).vaultAssets(1)
             if stabAsset == empty(address):
                 return False
-        canAccept: bool = staticcall StabilityPool(stabPool).canAcceptLiquidationAsset(stabAsset, _asset)
-        if hasStabAsset and not canAccept:
+        # Configuration validity is structural. Transient oracle/NAV/custody
+        # health is enforced by canAcceptLiquidationAsset at liquidation time,
+        # where the mandatory ordinary-auction path provides the fallback.
+        claimAssetIndex: uint256 = staticcall StabilityPool(stabPool).indexOfAsset(_asset)
+        claimIndex: uint256 = staticcall StabilityPool(stabPool).indexOfClaimableAsset(stabAsset, _asset)
+        activeClaimCount: uint256 = staticcall StabilityPool(stabPool).getNumActiveClaimAssets(stabAsset)
+        if hasStabAsset and (
+            claimAssetIndex != 0
+            or (claimIndex == 0 and activeClaimCount >= MAX_ACTIVE_CLAIM_ASSETS)
+        ):
             return False
         naPair: uint256 = staticcall StabilityPool(stabPool).claimableBalances(stabAsset, _asset)
         na: uint256 = staticcall StabilityPool(stabPool).totalClaimableBalances(savingsGreen)
@@ -552,7 +568,7 @@ def setAssetDebtTerms(
     mc: address = self._resolveMissionControl(_missionControl)
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
-    assert self._isLtvWithinMaxDeviation(_ltv, assetConfig.debtTerms.ltv, staticcall MissionControl(mc).maxLtvDeviation()) # dev: ltv is outside max deviation
+    maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
 
     debtTerms: cs.DebtTerms = cs.DebtTerms(
         ltv=_ltv,
@@ -562,6 +578,10 @@ def setAssetDebtTerms(
         borrowRate=_borrowRate,
         daowry=_daowry,
     )
+    assert self._isLtvWithinMaxDeviation(debtTerms.ltv, assetConfig.debtTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
+    assert self._isWithinMaxStepDown(debtTerms.redemptionThreshold, assetConfig.debtTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
+    assert self._isWithinMaxStepDown(debtTerms.liqThreshold, assetConfig.debtTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
+    assert self._isWithinMaxStepUp(debtTerms.borrowRate, assetConfig.debtTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
     assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
     return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, _missionControl, [], 0, 0, 0, 0, 0, debtTerms)
 
@@ -591,6 +611,22 @@ def _isValidDebtTerms(_debtTerms: cs.DebtTerms) -> bool:
 
 @view
 @internal
+def _isWithinMaxStepDown(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new >= _prev or _prev - _new <= _maxDeviation
+
+
+@view
+@internal
+def _isWithinMaxStepUp(_new: uint256, _prev: uint256, _maxDeviation: uint256) -> bool:
+    if _prev == 0 or _maxDeviation == 0:
+        return True
+    return _new <= _prev or _new - _prev <= _maxDeviation
+
+
+@view
+@internal
 def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation: uint256) -> bool:
 
     # cannot set ltv to 0 after already non-zero
@@ -600,8 +636,7 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
     if _prevLtv == 0 or _maxDeviation == 0:
         return True
 
-    lowerBound: uint256 = _prevLtv - min(_maxDeviation, _prevLtv)
-    return HUNDRED_PERCENT > _newLtv and _newLtv >= lowerBound
+    return HUNDRED_PERCENT > _newLtv and self._isWithinMaxStepDown(_newLtv, _prevLtv, _maxDeviation)
 
 
 #####################
@@ -786,6 +821,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     if actionType == ActionType.ASSET_ADD_NEW:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
+        assert not staticcall MissionControl(mc).isSupportedAsset(p.asset) # dev: must be new asset
         assert self._isValidAssetConfig(p.asset, p.config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, p.config)
         log AssetAdded(asset=p.asset)
@@ -819,10 +855,17 @@ def executePendingAction(_aid: uint256) -> bool:
     elif actionType == ActionType.ASSET_DEBT_TERMS:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
         config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
-        config.debtTerms = p.config.debtTerms
+        previousTerms: cs.DebtTerms = config.debtTerms
+        pendingTerms: cs.DebtTerms = p.config.debtTerms
+        maxDeviation: uint256 = staticcall MissionControl(mc).maxLtvDeviation()
+        assert self._isLtvWithinMaxDeviation(pendingTerms.ltv, previousTerms.ltv, maxDeviation) # dev: ltv is outside max deviation
+        assert self._isWithinMaxStepDown(pendingTerms.redemptionThreshold, previousTerms.redemptionThreshold, maxDeviation) # dev: redemption threshold is outside max deviation
+        assert self._isWithinMaxStepDown(pendingTerms.liqThreshold, previousTerms.liqThreshold, maxDeviation) # dev: liq threshold is outside max deviation
+        assert self._isWithinMaxStepUp(pendingTerms.borrowRate, previousTerms.borrowRate, maxDeviation) # dev: borrow rate is outside max deviation
+        config.debtTerms = pendingTerms
         assert self._isValidAssetConfig(p.asset, config, mc) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
-        log AssetDebtTermsSet(asset=p.asset, ltv=p.config.debtTerms.ltv, redemptionThreshold=p.config.debtTerms.redemptionThreshold, liqThreshold=p.config.debtTerms.liqThreshold, liqFee=p.config.debtTerms.liqFee, borrowRate=p.config.debtTerms.borrowRate, daowry=p.config.debtTerms.daowry)
+        log AssetDebtTermsSet(asset=p.asset, ltv=pendingTerms.ltv, redemptionThreshold=pendingTerms.redemptionThreshold, liqThreshold=pendingTerms.liqThreshold, liqFee=pendingTerms.liqFee, borrowRate=pendingTerms.borrowRate, daowry=pendingTerms.daowry)
 
     elif actionType == ActionType.ASSET_WHITELIST:
         p: AssetUpdate = self.pendingAssetConfig[_aid]

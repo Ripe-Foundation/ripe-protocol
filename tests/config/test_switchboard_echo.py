@@ -769,6 +769,7 @@ def test_add_partner_liquidity_in_endaoment_permissions(switchboard_echo, govern
             alpha_token.address,  # asset
             1000,  # amount
             900,  # minLpAmount
+            alpha_token.address,  # expectedLpToken
             sender=alice
         )
 
@@ -789,6 +790,7 @@ def test_add_partner_liquidity_in_endaoment_creates_timelock(switchboard_echo, g
         asset,
         amount,
         min_lp,
+        pool,
         sender=governance.address
     )
     assert aid > 0
@@ -807,6 +809,9 @@ def test_add_partner_liquidity_in_endaoment_creates_timelock(switchboard_echo, g
     action_type = switchboard_echo.actionType(aid)
     assert action_type == 16
 
+    stored_action = switchboard_echo.pendingEndaoPartnerPoolActions(aid)
+    assert stored_action == (lego_id, pool, partner, asset, amount, min_lp, pool)
+
 
 def test_add_partner_liquidity_in_endaoment_validation(switchboard_echo, governance, bob, alpha_token):
     """Test addPartnerLiquidityInEndaoment validation"""
@@ -819,6 +824,7 @@ def test_add_partner_liquidity_in_endaoment_validation(switchboard_echo, governa
             alpha_token.address,
             1000,
             900,
+            alpha_token.address,
             sender=governance.address
         )
 
@@ -831,6 +837,20 @@ def test_add_partner_liquidity_in_endaoment_validation(switchboard_echo, governa
             alpha_token.address,
             1000,
             900,
+            alpha_token.address,
+            sender=governance.address
+        )
+
+    # Empty expected LP token should fail
+    with boa.reverts("invalid lp token"):
+        switchboard_echo.addPartnerLiquidityInEndaoment(
+            1,
+            alpha_token.address,
+            bob,
+            alpha_token.address,
+            1000,
+            900,
+            ZERO_ADDRESS,
             sender=governance.address
         )
 
@@ -1118,7 +1138,7 @@ def test_endaoment_action_type_flag_values(
     assert switchboard_echo.actionType(aid4) == 8
 
     # ENDAO_PARTNER_POOL should be 2^4 = 16
-    aid5 = switchboard_echo.addPartnerLiquidityInEndaoment(1, alpha_token.address, bob, alpha_token.address, 100, 90, sender=governance.address)
+    aid5 = switchboard_echo.addPartnerLiquidityInEndaoment(1, alpha_token.address, bob, alpha_token.address, 100, 90, alpha_token.address, sender=governance.address)
     assert switchboard_echo.actionType(aid5) == 16
 
     # ENDAO_REPAY should be 2^5 = 32

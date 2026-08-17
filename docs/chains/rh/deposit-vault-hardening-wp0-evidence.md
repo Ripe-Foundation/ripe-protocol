@@ -6,6 +6,17 @@
 > were accurate when written and are left intact. See
 > [`REMOVED.md`](../../simplification/REMOVED.md) for the full index; everything is
 > recoverable from git history. No production contract was modified.
+>
+> **Mechanism note (16 August 2026):** the 200-byte headroom floor, the
+> `MIN_TELLER_MARGIN`/`MIN_HEADROOM_OVERRIDES` tables, and the per-contract
+> exact-identity waivers described below were retired.
+> `tests/test_vault_pointer_runtime_sizes.py` now asserts only the EIP-170
+> ceiling. Treat every floor, waiver, and reopen-on-change rule here as a record
+> of what was in force during WP0, not as a current requirement.
+>
+> The same applies to `scripts/check_contract_artifacts.py` and
+> `config/contract-artifact-expectations.json` cited below: both were
+> deleted, so those commands are not runnable and those figures are dated.
 
 Produced by the implementation agent for
 `docs/chains/rh/deposit-vault-smart-contract-hardening-implementation-plan.md`.

@@ -637,6 +637,18 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "numOwnerChanges",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "totalClaimed",
     "inputs": [],
     "outputs": [

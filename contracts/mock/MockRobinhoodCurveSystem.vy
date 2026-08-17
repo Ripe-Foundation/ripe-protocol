@@ -10,6 +10,7 @@ registeredPool: public(address)
 isPoolRegistered: public(bool)
 oraclePrice: public(uint256)
 shouldRevert: public(bool)
+poolBalances: uint256[2]
 
 
 @deploy
@@ -45,6 +46,13 @@ def setOraclePrice(_price: uint256):
 @external
 def setShouldRevert(_shouldRevert: bool):
     self.shouldRevert = _shouldRevert
+
+
+@external
+def setBalances(_coin0: uint256, _coin1: uint256):
+    # Intentionally permissionless local-test control; this mock is not
+    # production authorization evidence.
+    self.poolBalances = [_coin0, _coin1]
 
 
 # Curve AddressProvider
@@ -143,4 +151,5 @@ def get_virtual_price() -> uint256:
 @view
 @external
 def balances(_index: uint256) -> uint256:
-    return 0
+    assert _index < 2, "bad index"
+    return self.poolBalances[_index]

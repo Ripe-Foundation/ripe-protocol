@@ -131,8 +131,7 @@ def submissions(monkeypatch):
     """Record submissions instead of making them.
 
     The CLI is driven through `cli.callback` rather than click.testing's
-    CliRunner: tests/deployment/test_dependency_gate.py bounds where Click may
-    be imported, and a test file is not a production Click surface. Other
+    CliRunner, so this suite does not import Click's testing surface. Other
     suites here shell out with subprocess for the same reason, which cannot
     intercept the submission call.
     """

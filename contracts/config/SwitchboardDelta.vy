@@ -68,7 +68,6 @@ interface Ledger:
 
 interface Teller:
     def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
-    def deleverageUser(_user: address = msg.sender, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
 
 interface Lootbox:
@@ -575,12 +574,6 @@ def _getDeleverageAddr() -> address:
 ##############
 # Deleverage #
 ##############
-
-
-@external
-def deleverageUser(_user: address, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256:
-    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
-    return extcall Teller(self._getTellerAddr()).deleverageUser(_user, _targetRepayAmount)
 
 
 @external

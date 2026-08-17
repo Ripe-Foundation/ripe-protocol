@@ -3207,6 +3207,10 @@
       {
         "name": "_minLpAmount",
         "type": "uint256"
+      },
+      {
+        "name": "_expectedLpToken",
+        "type": "address"
       }
     ],
     "outputs": [
@@ -3784,6 +3788,10 @@
           {
             "name": "minLpAmount",
             "type": "uint256"
+          },
+          {
+            "name": "expectedLpToken",
+            "type": "address"
           }
         ]
       }

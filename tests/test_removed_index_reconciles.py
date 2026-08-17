@@ -38,6 +38,9 @@ from pathlib import Path
 import pytest
 
 
+pytestmark = pytest.mark.release
+
+
 ROOT = Path(__file__).resolve().parents[1]
 REMOVED_MD = ROOT / "docs" / "simplification" / "REMOVED.md"
 

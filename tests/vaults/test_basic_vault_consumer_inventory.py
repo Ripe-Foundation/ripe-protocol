@@ -8,6 +8,9 @@ from pathlib import Path
 import pytest
 
 
+pytestmark = pytest.mark.artifact
+
+
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = (
     ROOT / "docs/chains/rh/hardening/basic-vault-consumer-inventory.md"
@@ -26,10 +29,8 @@ POSITION_DISCOVERY_GETTERS = {
     "numUserAssets",
     "userAssets",
 }
-REWARD_GETTERS = {
-    "getTotalAmountForVault",
-    "getUserLootBoxShare",
-}
+QUARANTINE_STATUS_GETTERS = {"getTotalAmountForVault"}
+REWARD_GETTERS = {"getTotalAmountForVault", "getUserLootBoxShare"}
 CAPABILITY_GETTERS = {"isSupportedVaultAsset"}
 
 
@@ -115,12 +116,36 @@ def test_basic_vault_consumer_inventory_matches_reviewed_sources():
     )
 
 
+def test_auction_house_basic_vault_consumer_rows_are_current():
+    """Enforce the changed consumer independently of unrelated inventory drift."""
+    inventory = _load_inventory()
+    relative_path = "contracts/core/AuctionHouse.vy"
+    path = ROOT / relative_path
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        inventory["sources"][relative_path]
+    )
+    actual_rows = _scan_calls(path, inventory["getter_scope"])
+    expected_rows = [
+        {
+            "path": row["path"],
+            "line": row["line"],
+            "function": row["function"],
+            "getter": row["getter"],
+        }
+        for row in inventory["rows"]
+        if row["path"] == relative_path
+    ]
+    assert actual_rows == expected_rows
+
+
 def test_basic_vault_consumer_inventory_enforces_amount_policy():
     inventory = _load_inventory()
     category_getters = {
         "value_backing_required": BACKING_AWARE_GETTERS,
         "position_discovery_nominal_allowed": POSITION_DISCOVERY_GETTERS,
-        "reward_accounting_nominal_allowed": REWARD_GETTERS,
+        "quarantine_status_backing_required": QUARANTINE_STATUS_GETTERS,
+        "reward_accounting_backing_aware": REWARD_GETTERS,
         "capability_discovery_nominal_allowed": CAPABILITY_GETTERS,
     }
     assert set(inventory["getter_scope"]) == set().union(
@@ -143,23 +168,26 @@ def test_basic_vault_consumer_inventory_enforces_amount_policy():
             for source in test_sources
         )
 
-    required_paths = {
+    backing_aware_paths = {
         (row["path"], row["line"])
         for row in inventory["rows"]
-        if row["classification"] == "value_backing_required"
+        if row["classification"]
+        in {"value_backing_required", "quarantine_status_backing_required"}
     }
-    assert required_paths == {
-        ("contracts/core/AuctionHouse.vy", 431),
-        ("contracts/core/AuctionHouse.vy", 527),
-        ("contracts/core/AuctionHouse.vy", 902),
-        ("contracts/core/AuctionHouse.vy", 1215),
-        ("contracts/core/AuctionHouse.vy", 1243),
-        ("contracts/core/CreditEngine.vy", 729),
-        ("contracts/core/CreditEngine.vy", 1249),
-        ("contracts/core/CreditRedeem.vy", 190),
+    assert backing_aware_paths == {
+        ("contracts/core/AuctionHouse.vy", 439),
+        ("contracts/core/AuctionHouse.vy", 535),
+        ("contracts/core/AuctionHouse.vy", 913),
+        ("contracts/core/AuctionHouse.vy", 1265),
+        ("contracts/core/AuctionHouse.vy", 1293),
+        ("contracts/core/CreditEngine.vy", 736),
+        ("contracts/core/CreditEngine.vy", 753),
+        ("contracts/core/CreditEngine.vy", 1256),
+        ("contracts/core/CreditRedeem.vy", 191),
         ("contracts/core/Deleverage.vy", 579),
-        ("contracts/core/Deleverage.vy", 1086),
-        ("contracts/core/Teller.vy", 407),
+        ("contracts/core/Deleverage.vy", 966),
+        ("contracts/core/Deleverage.vy", 1141),
+        ("contracts/core/Teller.vy", 410),
         ("contracts/core/VaultMigrator.vy", 472),
         ("contracts/core/VaultMigrator.vy", 523),
     }

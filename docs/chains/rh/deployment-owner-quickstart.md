@@ -129,7 +129,7 @@ python scripts/params/generate_robinhood_defaults.py --check
 The current healthy result is:
 
 ```text
-configuration_consistent=true deployment_ready=false blockers=64
+configuration_consistent=true deployment_ready=false blockers=60
 ```
 
 List every unresolved or unverified deployment blocker without using RPC:
@@ -225,6 +225,53 @@ commit/tree, artifacts, target profile, account/signer, operator, commands,
 permitted actions, stop rules, and evidence destination. Treat deployment,
 migration execution, production configuration, activation, and release as
 separate lifecycle events.
+
+## Conditional post-deployment asset retirement
+
+This procedure applies only after a separately reviewed MissionControl runtime
+containing the `active points alloc` guard and a hardened SwitchboardCharlie
+runtime that checks MissionControl's boolean return have both been deployed and
+made authoritative. A source merge, passing suite, or artifact update does not
+change either deployed runtime or authorize either transition.
+
+The rollout therefore contains two contract deployments. Bind and review each
+runtime and deployed address separately. For SwitchboardCharlie, also verify
+its Switchboard registration, governance permission, and action-timelock
+wiring before relying on the execution-time revert behavior. Do not infer that
+deploying or activating the guarded MissionControl also activates the hardened
+Charlie behavior. The reviewed Charlie candidate has 703 bytes of EIP-170
+deployed-runtime headroom; recompile and recheck that gate after every further
+Charlie change rather than carrying this measurement forward by assumption.
+
+Asset retirement is then two governed timelock actions, not one:
+
+1. Read the complete live `AssetConfig`. Through
+   `SwitchboardBravo.setAssetDepositParams`, preserve the live vault IDs and
+   deposit limits while setting both fixed reward allocations to zero.
+2. Execute the Bravo action and verify both fields are zero and the global
+   staker/voter totals decreased by exactly the former allocations.
+3. Execute the existing `SwitchboardCharlie.deregisterAsset` action and verify
+   the asset is unsupported and the totals did not decrease a second time.
+
+Do not reconstruct the deposit tuple from defaults. If Bravo rejects the live
+sibling fields because a limit is now invalid or a retained VaultBook ID is no
+longer valid, stop and deliberately repair or replace only the offending field
+in the same reviewed deposit-configuration action; record the deviation and
+its evidence rather than guessing a value.
+
+Once the hardened SwitchboardCharlie runtime is live, Charlie execution
+requires MissionControl to return `True`. If a concurrent or duplicate action
+already removed the asset, execution reverts `invalid asset`, does not emit a
+second `AssetDeregistered`, and leaves the action available for normal
+cancellation or expiry. Before execution, recheck that the asset is supported,
+and after execution verify final MissionControl state as well as the event.
+
+The hardened Charlie applies the same success requirement to
+`deregisterVaultAsset`. If the vault still has a nonzero `totalBalances` value
+for the asset, or the asset is already unregistered from that vault, execution
+reverts `invalid vault asset`, emits no `VaultAssetDeregistered`, and leaves the
+action available for retry, cancellation, or expiry. Verify the vault balance
+is zero immediately before execution and verify vault support state afterward.
 
 ## Historical inputs
 

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import boa
 import pytest
 
@@ -13,6 +15,7 @@ YEAR_SECONDS = 31_536_000
 HOUR_BLOCKS = 300
 DAY_BLOCKS = 7_200
 YEAR_BLOCKS = 2_628_000
+DEFAULTS_DIR = Path(__file__).resolve().parents[2] / "contracts" / "config"
 
 
 @pytest.fixture(scope="session")
@@ -30,6 +33,35 @@ def _sentinels(prefix):
 
 def _deploy(values):
     return boa.load("contracts/config/DefaultsRobinhood.vy", *values)
+
+
+def _deploy_defaults_profile(path):
+    deployer = boa.load_partial(str(path))
+    init_function = deployer.compiler_data.global_ctx.init_function
+    constructor_args = ()
+    if init_function is not None:
+        assert all(str(argument.typ) == "address" for argument in init_function.arguments)
+        constructor_args = tuple(
+            boa.env.generate_address(f"{path.stem}-{argument.name}")
+            for argument in init_function.arguments
+        )
+    return deployer.deploy(*constructor_args)
+
+
+def _has_ripe_bond_config(config):
+    return any(
+        (
+            config.asset != ZERO_ADDRESS,
+            config.amountPerEpoch != 0,
+            config.canBond,
+            config.minRipePerUnit != 0,
+            config.maxRipePerUnit != 0,
+            config.maxRipePerUnitLockBonus != 0,
+            config.epochLength != 0,
+            config.shouldAutoRestart,
+            config.restartDelayBlocks != 0,
+        )
+    )
 
 
 @pytest.fixture
@@ -253,6 +285,25 @@ def test_constructor_bound_addresses_round_trip_through_runtime_getters():
         assert [row.asset for row in defaults.assetConfigs()] == [weth, ripe, sgreen, green]
         assert [(row.vaultId, row.asset) for row in defaults.priorityLiqAssetVaults()] == [(3, weth)]
         assert [(row.vaultId, row.asset) for row in defaults.priorityStabVaults()] == [(1, sgreen)]
+
+
+def test_every_configured_defaults_profile_has_nonzero_bond_epoch_length():
+    configured_profiles = []
+    for path in sorted(DEFAULTS_DIR.glob("Defaults*.vy")):
+        config = _deploy_defaults_profile(path).ripeBondConfig()
+        if not _has_ripe_bond_config(config):
+            continue
+
+        configured_profiles.append(path.name)
+        # Bonding may be disabled through canBond; zero is never an epoch sentinel.
+        assert config.epochLength != 0, path.name
+
+    assert set(configured_profiles) == {
+        "DefaultsBase.vy",
+        "DefaultsBaseLive.vy",
+        "DefaultsRobinhood.vy",
+        "DefaultsRobinhoodLive.vy",
+    }
 
 
 def test_general_and_debt_defaults_match_approved_values(defaults_and_addresses):

@@ -26,14 +26,49 @@ BOA_INPUT_HASH = (
     "${{ hashFiles('requirements.txt', 'contracts/**/*.vy', "
     "'interfaces/**/*.vyi') }}"
 )
+# Balanced by measured serial runtime, not test count. Wall clock is the
+# slowest shard, so heavy directories are split and light ones pooled.
 LEAN_SHARD_ARGUMENTS = {
-    "core": ("tests/core",),
-    "vaults-tokens": ("tests/vaults", "tests/tokens"),
+    "core-a": ("tests/core/endaoment", "tests/core/deleverage"),
+    "core-b": ("tests/core/lootbox", "tests/core/creditEngine"),
+    "core-teller": ("tests/core/teller",),
+    "core-c": (
+        "tests/core/humanResources",
+        "tests/core/bondRoom",
+        "tests/core/auctionHouse",
+        "tests/core/boardroom",
+        "tests/core/test_stale_vault_replacement.py",
+        "tests/core/test_sc24_gas_matrix.py",
+    ),
+    "vaults": (
+        "tests/vaults",
+        "--ignore=tests/vaults/modules",
+        "--ignore=tests/vaults/test_ripe_gov_vault.py",
+        "--ignore=tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "--ignore=tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-gov": (
+        "tests/vaults/test_ripe_gov_vault.py",
+        "tests/vaults/test_ripe_gov_controls_and_migration.py",
+        "tests/vaults/test_ripe_gov_exit_fee.py",
+    ),
+    "vaults-modules": ("tests/vaults/modules",),
+    "config": ("tests/config",),
+    "price-sources-a": (
+        "tests/priceSources/curve",
+        "tests/priceSources/blueChip",
+    ),
+    "price-sources-b": (
+        "tests/priceSources",
+        "--ignore=tests/priceSources/curve",
+        "--ignore=tests/priceSources/blueChip",
+    ),
     "supporting": (
         "tests",
         "--ignore=tests/core",
         "--ignore=tests/vaults",
-        "--ignore=tests/tokens",
+        "--ignore=tests/config",
+        "--ignore=tests/priceSources",
     ),
 }
 LEAN_MATRIX = [
@@ -47,6 +82,11 @@ MATRIX_INCLUDE_EXPRESSION = (
     "inputs.lane == 'comprehensive' && "
     f"'{COMPREHENSIVE_MATRIX_JSON}' || '{LEAN_MATRIX_JSON}') }}}}"
 )
+# loadfile everywhere. An earlier revision cleared three shards for load on
+# the strength of repeated local runs; core-teller then failed intermittently in
+# CI. Local repetition cannot establish order-independence for a 4-vCPU runner,
+# so no shard may use load and this table stays empty.
+LEAN_SHARD_DIST = {}
 PYTEST_IGNORED_DIRECTORIES = {
     "tests/deployment",
 }
@@ -76,8 +116,9 @@ def _workflow_lean_shard_arguments():
         "run"
     ]
     pattern = re.compile(
-        r"^  (?P<shard>[a-z][a-z-]*)\)\n"
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
         r"    shard_args=\((?P<arguments>.*?)\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
         r"    ;;$",
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -88,6 +129,22 @@ def _workflow_lean_shard_arguments():
     arguments = dict(branches)
     assert len(arguments) == len(branches), "Lean shard names must be unique"
     return arguments
+
+
+def _workflow_lean_shard_dist():
+    """Explicit distribution mode per shard; unset means the loadfile default."""
+    command = _step(_workflow()["jobs"]["test"], "Run lean default lane")["run"]
+    pattern = re.compile(
+        r"^  (?P<shard>[a-z][a-z0-9-]*)\)\n"
+        r"    shard_args=\(.*?\)\n"
+        r"(?:    dist_mode=(?P<dist>[a-z]+)\n)?"
+        r"    ;;$",
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return {
+        m.group("shard"): m.group("dist") or "loadfile"
+        for m in pattern.finditer(command)
+    }
 
 
 def _partition_shard_arguments(arguments):
@@ -158,9 +215,21 @@ def test_python_workflow_routes_automatic_events_to_one_lean_lane():
         "push",
         "workflow_dispatch",
     }
-    assert workflow["on"]["pull_request"]["branches"] == ["rh"]
-    assert workflow["on"]["merge_group"]["branches"] == ["rh"]
-    assert workflow["on"]["push"]["branches"] == ["master"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "rh",
+        "rh-audit-remediation",
+    ]
+    assert workflow["on"]["merge_group"]["branches"] == [
+        "rh",
+        "rh-audit-remediation",
+    ]
+    # Integration branches must be included: only a run on the base branch
+    # writes a Titanoboa cache that later PRs targeting it can restore.
+    assert workflow["on"]["push"]["branches"] == [
+        "master",
+        "rh",
+        "rh-audit-remediation",
+    ]
     assert workflow["permissions"] == {"contents": "read"}
 
     dispatch_lane = workflow["on"]["workflow_dispatch"]["inputs"]["lane"]
@@ -182,8 +251,16 @@ def test_python_workflow_lean_shards_fail_closed_with_exact_targets():
     assert step["env"] == {"TEST_SHARD": "${{ matrix.shard }}"}
 
     assert _workflow_lean_shard_arguments() == LEAN_SHARD_ARGUMENTS
+    # Distribution mode is a correctness control, not a tuning knob: load
+    # spreads a file's tests across workers, which breaks any suite whose tests
+    # depend on intra-file ordering. Only explicitly cleared shards may use it.
+    dist = _workflow_lean_shard_dist()
+    assert set(dist) == set(LEAN_SHARD_ARGUMENTS)
+    assert {k: v for k, v in dist.items() if v != "loadfile"} == LEAN_SHARD_DIST
 
     command = step["run"]
+    assert "dist_mode=loadfile" in command
+    assert '--dist "$dist_mode"' in command
     assert command.count('case "$TEST_SHARD" in') == 1
     assert command.count("\nesac\n") == 1
     assert (
@@ -315,7 +392,7 @@ def test_python_workflow_cancels_superseded_pr_or_branch_runs():
 def test_python_workflow_exposes_stable_rh_pr_gate():
     job = _workflow()["jobs"]["rh-pr-gate"]
     assert job["name"] == "rh-pr-gate"
-    assert job["needs"] == ["test", "deployment-controls"]
+    assert job["needs"] == ["test", "deployment-controls", "snapshot-gas"]
     assert job["runs-on"] == "ubuntu-latest"
     assert job["timeout-minutes"] == "5"
     assert job["if"] == (
@@ -328,6 +405,11 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert 'if [ "$TEST_RESULT" != "success" ]' in step["run"]
     assert "exit 1" in step["run"]
 
+    step = _step(job, "Require successful snapshot gas budgets")
+    assert step["env"]["GAS_RESULT"] == "${{ needs.snapshot-gas.result }}"
+    assert 'if [ "$GAS_RESULT" != "success" ]' in step["run"]
+    assert "exit 1" in step["run"]
+
     controls = _step(job, "Require successful deployment controls")
     assert controls["env"]["CONTROLS_RESULT"] == (
         "${{ needs.deployment-controls.result }}"
@@ -336,12 +418,32 @@ def test_python_workflow_exposes_stable_rh_pr_gate():
     assert "exit 1" in controls["run"]
 
 
-def test_python_workflow_runs_ignored_deployment_controls_credential_free():
+def test_python_workflow_enforces_bluechip_and_curve_snapshot_gas_budgets():
+    job = _workflow()["jobs"]["snapshot-gas"]
+    step = _step(job, "Enforce snapshot gas budgets")
+    command = step["run"]
+
+    assert "python -m pytest" in command
+    assert "-o addopts=''" in command
+    assert "-m gas" in command
+    assert command.count(
+        "tests/priceSources/blueChip/test_bluechip_local.py"
+    ) == 1
+    assert command.count(
+        "tests/priceSources/curve/test_robinhood_launch_route.py"
+    ) == 1
+    assert command.count("tests/core/test_sc24_gas_matrix.py") == 1
+    assert "if grep" not in command
+
+
+def test_python_workflow_runs_behavioral_deployment_controls_credential_free():
     """The lean lane cannot see tests/deployment, so a required job must.
 
     pytest.ini ignores that tree, which is exactly where this branch's
-    deploy-path controls live. The job has to run it with addopts cleared and
-    with every credential unset, or it proves nothing about an offline gate.
+    deploy-path controls live. The job clears the directory ignore while
+    retaining the default marker policy, and explicitly unsets every
+    credential, so static release bindings stay out without weakening the
+    offline behavioral gate.
     """
     job = _workflow()["jobs"]["deployment-controls"]
     assert job["runs-on"] == "ubuntu-latest"
@@ -349,6 +451,11 @@ def test_python_workflow_runs_ignored_deployment_controls_credential_free():
     command = _step(job, "Run deployment control suites")["run"]
     assert "-o addopts=''" in command
     assert "tests/deployment" in command
+    assert (
+        '-m "not release and not artifact and not fuzz and not gas and '
+        'not fork_qualification"'
+    ) in command
+    assert "test_stock_aapl_launch_inclusion.py" not in command
     # Substring checks passed as soon as the script contained any `unset` and
     # the name appeared anywhere -- an env: declaration or a comment satisfied
     # them. Parse the unset commands and require the names to be actual

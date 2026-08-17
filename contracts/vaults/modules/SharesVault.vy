@@ -10,6 +10,7 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+MAX_TRANSFER_DELTA: constant(uint256) = 2
 
 
 @deploy
@@ -39,6 +40,7 @@ def _depositTokensInVault(
     # calc shares
     prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately
     newShares: uint256 = self._amountToShares(depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)
+    assert newShares != 0 # dev: cannot receive 0 shares
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -55,19 +57,62 @@ def _withdrawTokensFromVault(
 ) -> (uint256, uint256, bool):
     assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
+    assert _recipient != self # dev: invalid recipient
 
-    # calc shares + amount to withdraw
-    withdrawalShares: uint256 = 0
-    withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
+    requestedShares: uint256 = 0
+    requestedAmount: uint256 = 0
+    requestedShares, requestedAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
 
-    # reduce balance on withdrawal
+    totalSharesBefore: uint256 = vaultData.totalBalances[_asset]
+    userSharesBefore: uint256 = vaultData.userBalances[_user][_asset]
+    vaultBefore: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientBefore: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+
+    assert extcall IERC20(_asset).transfer(_recipient, requestedAmount, default_return_value=True) # dev: token transfer failed
+
+    vaultAfter: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    recipientAfter: uint256 = staticcall IERC20(_asset).balanceOf(_recipient)
+    assert vaultAfter <= vaultBefore # dev: invalid vault outflow
+    assert recipientAfter >= recipientBefore # dev: invalid recipient delivery
+
+    actualOutflow: uint256 = vaultBefore - vaultAfter
+    actualDelivery: uint256 = recipientAfter - recipientBefore
+    assert self._isWithinTransferDelta(actualOutflow, requestedAmount) # dev: invalid vault outflow
+    assert self._isWithinTransferDelta(actualDelivery, requestedAmount) # dev: invalid recipient delivery
+
+    withdrawalShares: uint256 = requestedShares
+    if actualOutflow != requestedAmount:
+        withdrawalShares = self._amountToShares(
+            actualOutflow,
+            totalSharesBefore,
+            vaultBefore,
+            True,
+        )
+        if withdrawalShares > userSharesBefore:
+            assert userSharesBefore == totalSharesBefore # dev: remaining holder loss
+            withdrawalShares = userSharesBefore
+    assert withdrawalShares != 0 # dev: cannot withdraw 0 shares
+
     isDepleted: bool = False
-    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
+    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(
+        _user,
+        _asset,
+        withdrawalShares,
+        True,
+    )
 
-    # move tokens to recipient
-    assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
-    return withdrawalAmount, withdrawalShares, isDepleted
+    return actualOutflow, withdrawalShares, isDepleted
+
+
+@pure
+@internal
+def _isWithinTransferDelta(
+    _actual: uint256,
+    _requested: uint256,
+) -> bool:
+    if _actual >= _requested:
+        return _actual - _requested <= MAX_TRANSFER_DELTA
+    return _requested - _actual <= MAX_TRANSFER_DELTA
 
 
 @internal

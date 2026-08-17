@@ -4,6 +4,14 @@ Status: implementation handoff for the integrated remediation candidate. This
 document authorizes no deployment, registry action, manifest promotion, or
 release.
 
+> **Retired tooling (16 August 2026):** the commands and file references below
+> that use `scripts/check_contract_artifacts.py`,
+> `scripts/update_contract_artifact_expectations.py`, or
+> `config/contract-artifact-expectations.json` are **not runnable**. That
+> pipeline was deleted with the descoped Robinhood stock M4 launch binding.
+> This page is retained as a dated record of the PR-67 handoff; do not execute
+> its artifact commands. Measure the release tree directly instead.
+
 Bound review range:
 
 - base: `91eda49ccd34a25090582aff0695075c4c806011`

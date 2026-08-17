@@ -1,17 +1,12 @@
-import hashlib
 from pathlib import Path
 
 import boa
 import pytest
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
+from conf_utils import clear_transient_storage, filter_logs, get_boa_dev_reasons
 
 
-AH_BATCH_USER_CACHE_MUTANT_SHA256 = (
-    "f8a6e21d742fab14010f165f8a44dd69f88e4d076395185680c05c18b7194f09"
-)
-# AuctionHouse.vy is now intentionally SHA-pinned by this source mutant.
 # Its reserved address stays outside Boa's generated-address sequence, whose
 # reuse can retain stale diagnostic type metadata across automatic anchors.
 AH_BATCH_USER_CACHE_MUTANT_ADDRESS = (
@@ -34,9 +29,8 @@ def _ah_batch_user_cache_mutant_source():
     for original, mutant in replacements:
         assert source.count(original) == 1
         source = source.replace(original, mutant, 1)
-    assert hashlib.sha256(source.encode()).hexdigest() == (
-        AH_BATCH_USER_CACHE_MUTANT_SHA256
-    )
+        assert original not in source
+        assert source.count(mutant) == 1
     return source
 
 
@@ -109,7 +103,7 @@ def setupStabPoolLiquidation(
             _shouldBurnAsPayment=False, 
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True, # testing this!
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
         # stab pool config
@@ -274,7 +268,9 @@ def test_ah_liquidation_stab_pool_swap(
 
     # expected values
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
-    target_collateral_val = target_repay_amount * HUNDRED_PERCENT // (HUNDRED_PERCENT - liq_fee)
+    target_collateral_val = (
+        target_repay_amount * HUNDRED_PERCENT - 1
+    ) // (HUNDRED_PERCENT - liq_fee) + 1
     exp_liq_fees = debt_amount * liq_fee // HUNDRED_PERCENT
 
     # liquidate user
@@ -305,6 +301,63 @@ def test_ah_liquidation_stab_pool_swap(
         user_debt, bt, debt_amount, orig_bt.collateralVal,
         log, exp_liq_fees, ltv, _test
     )
+
+
+def test_ah_sgreen_stability_pool_liquidation_obeys_pause_atomically(
+    setupStabPoolLiquidation,
+    alpha_token,
+    savings_green,
+    green_token,
+    stability_pool,
+    bob,
+    sally,
+    teller,
+    credit_engine,
+    governance,
+):
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    setupStabPoolLiquidation(
+        debt_amount,
+        200 * EIGHTEEN_DECIMALS,
+        80_00,
+        10_00,
+        50_00,
+        0,
+        0.625,
+    )
+    assert credit_engine.canLiquidateUser(bob)
+
+    def liquidation_state():
+        user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+        return (
+            user_debt.amount,
+            bt.collateralVal,
+            savings_green.balanceOf(stability_pool),
+            stability_pool.getTotalAmountForUser(sally, savings_green),
+            savings_green.totalSupply(),
+            savings_green.lastPricePerShare(),
+            green_token.balanceOf(savings_green),
+            green_token.balanceOf(stability_pool),
+            green_token.totalSupply(),
+            alpha_token.balanceOf(stability_pool),
+        )
+
+    savings_green.pause(True, sender=governance.address)
+    before = liquidation_state()
+    with pytest.raises(boa.BoaError) as exc_info:
+        teller.liquidateUser(bob, False, sender=sally)
+    assert "token paused" in get_boa_dev_reasons(exc_info.value)
+    assert liquidation_state() == before
+
+    savings_green.pause(False, sender=governance.address)
+    teller.liquidateUser(bob, False, sender=sally)
+    after = liquidation_state()
+
+    assert after[0] < before[0]
+    assert after[1] < before[1]
+    assert after[2] < before[2]
+    assert after[9] > before[9]
+    assert filter_logs(teller, "CollateralSwappedWithStabPool")
 
 
 @pytest.mark.parametrize("debt_amount,collateral_amount,liq_threshold,liq_fee,ltv,ltv_payback_buffer,collateral_price_drop", [
@@ -417,7 +470,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
         _shouldBurnAsPayment=False, 
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup multiple stability pool assets
@@ -637,7 +690,7 @@ def test_ah_liquidation_multiple_collateral_assets(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Bravo: Endaoment transfer
@@ -788,7 +841,7 @@ def test_ah_liquidation_priority_asset_order(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -943,7 +996,7 @@ def test_ah_liquidation_iterate_thru_all_user_vaults(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,  # Use stability pools
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -1094,7 +1147,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Bravo: Will be handled in Phase 3 (natural order)
@@ -1104,7 +1157,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Charlie: Will be handled in Phase 3 (natural order)
@@ -1114,7 +1167,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
     
     # Configure stability pools for swapping
@@ -1261,7 +1314,7 @@ def test_ah_liquidation_caching_batch_liquidation(
             _shouldBurnAsPayment=False,
             _shouldTransferToEndaoment=False,
             _shouldSwapInStabPools=True,
-            _shouldAuctionInstantly=False,
+            _shouldAuctionInstantly=True,
         )
 
     # Setup prices
@@ -1336,10 +1389,15 @@ def test_ah_liquidation_caching_batch_liquidation(
 
         # Verify final debt state
         user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(user, False)
-        total_liquidated = sum(log.collateralValueOut for log in user_logs)
-        exp_liq_fees = debt_amount * 10_00 // HUNDRED_PERCENT
-        expected_final_debt = debt_amount - total_liquidated + exp_liq_fees
-        _test(expected_final_debt, user_debt.amount)
+        liquidation_log = next(
+            log for log in all_liquidation_logs if log.user == user
+        )
+        expected_final_debt = (
+            debt_amount
+            + liquidation_log.liqFeesUnpaid
+            - liquidation_log.repayAmount
+        )
+        assert expected_final_debt == user_debt.amount
 
     # Verify total stability pool balances (tokens are swapped to stability pool)
     total_alpha_expected = sum(log.collateralAmountOut for log in all_swap_logs if log.liqAsset == alpha_token.address)
@@ -1503,7 +1561,7 @@ def test_ah_liquidation_keeper_fee_ratio(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -1584,9 +1642,18 @@ def test_ah_liquidation_keeper_fee_ratio(
     # Verify final debt with new lowest LTV formula
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
-    # With new formula, verify debt was substantially reduced
-    assert user_debt.amount >= 0, "Should have non-negative debt"
-    assert user_debt.amount < 2 * EIGHTEEN_DECIMALS, "Debt should be substantially reduced"
+    paid_base_fee = min(
+        liquidation_log.collateralValueOut - liquidation_log.repayAmount,
+        expected_liq_fee,
+    )
+    assert liquidation_log.liqFeesUnpaid == (
+        expected_keeper_fee + expected_liq_fee - paid_base_fee
+    )
+    assert user_debt.amount == (
+        debt_amount
+        + liquidation_log.liqFeesUnpaid
+        - liquidation_log.repayAmount
+    )
 
 
 def test_ah_liquidation_keeper_minimum_fee(
@@ -1637,7 +1704,7 @@ def test_ah_liquidation_keeper_minimum_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -1779,7 +1846,7 @@ def test_ah_liquidation_keeper_maximum_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup prices and stability pool
@@ -2024,13 +2091,14 @@ def test_ah_liquidation_edge_cases(
     assert green_token.balanceOf(sally) == keeper_green_before
     first_log = filter_logs(teller, "LiquidateUser")[0]
     assert first_log.totalLiqFees == 0
+    assert first_log.liqFeesUnpaid == 0
     assert first_log.keeperFee == 0
     assert first_log.repayAmount == 0
     assert first_log.numAuctionsStarted == 0
 
     # Boa does not clear EIP-1153 state between direct top-level calls. This
     # boundary models a second production transaction.
-    boa.env.evm.vm.state.clear_transient_storage()
+    clear_transient_storage()
     assert credit_engine.canLiquidateUser(bob)
     keeper_rewards2 = teller.liquidateUser(bob, False, sender=sally)
     assert keeper_rewards2 == 0
@@ -2040,6 +2108,7 @@ def test_ah_liquidation_edge_cases(
     assert green_token.balanceOf(sally) == keeper_green_before
     second_log = filter_logs(teller, "LiquidateUser")[0]
     assert second_log.totalLiqFees == 0
+    assert second_log.liqFeesUnpaid == 0
     assert second_log.keeperFee == 0
     assert second_log.repayAmount == 0
     assert second_log.numAuctionsStarted == 0
@@ -2204,7 +2273,7 @@ def test_ah_liquidation_special_stab_pool(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
         _specialStabPoolId=stab_pool_id,  # Special: use bravo_token in stability pool
     )
 
@@ -2654,7 +2723,7 @@ def test_ah_liquidation_dust_position_zero_keeper_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool
@@ -2767,7 +2836,7 @@ def test_ah_liquidation_dust_position_reduced_keeper_fee(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool
@@ -2866,7 +2935,7 @@ def test_ah_liquidation_normal_position_unaffected(
         _shouldBurnAsPayment=False,
         _shouldTransferToEndaoment=False,
         _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
+        _shouldAuctionInstantly=True,
     )
 
     # Setup stability pool

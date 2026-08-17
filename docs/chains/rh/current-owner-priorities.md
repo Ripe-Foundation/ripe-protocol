@@ -1,6 +1,6 @@
 # Robinhood current owner priorities
 
-**Effective:** 1 August 2026
+**Effective:** 14 August 2026
 
 **Authority:** explicit owner directive
 
@@ -116,19 +116,22 @@ The integrated M2/M3 source and regression behavior remain unchanged.
   deployment, or release.
 - Reopen the reassessment/policy lane only after an explicit owner instruction.
 
-### 3. Every Deleverage task is parked
+### 3. Deleverage remains parked outside the exact SC-07/SC-09 remediation
 
 Preserve the historical S4 zero-cooldown decision, integrated PR #61 bytes, and
-the four zero-valued controls.
+the four zero-valued controls. RH-D038 records the owner's bounded reopening for
+the SC-07/SC-09 remediation in draft PR #145.
 
-- Do not perform Deleverage contract, interface, ABI, parameter, configuration,
-  test, fork, documentation, size/headroom, deployment, or operational work.
+- Within RH-D038 only, complete and independently review the exact Deleverage
+  source fix, focused tests, artifact/inventory refresh, and decision records.
+- Do not expand that candidate into another Deleverage contract, interface,
+  parameter, configuration, fork, deployment, or operational task.
 - Do not create a machine-facing representation task for
   `fullPayoffBuffer`, `overageBps`, `dustThreshold`, or `dustBps`.
 - The provisional H-09 census path for Deleverage must not be implemented or
   executed unless this lane is explicitly reopened and the H-09 ceiling is
   resealed.
-- Reopen only through explicit owner instruction.
+- Further reopening still requires explicit owner instruction.
 
 ### 4. Uniswap V2 price-source admission and activation are parked
 

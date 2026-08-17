@@ -1,8 +1,8 @@
 import pytest
 import boa
 
-from constants import BLUE_CHIP_PROTOCOL_MOONWELL, EIGHTEEN_DECIMALS
-from config.BluePrint import YIELD_TOKENS, CORE_TOKENS
+from constants import BLUE_CHIP_PROTOCOL_MOONWELL, EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from config.BluePrint import YIELD_TOKENS, CORE_TOKENS, PARAMS
 from conf_utils import filter_logs
 
 
@@ -217,3 +217,131 @@ def test_add_moonwell_vault_token_cbbtc(
 
     cbbtc_value = cbbtc_price * amount // (10 ** cbbtc_token.decimals())
     _test(cbbtc_value, bob_value)
+
+
+@pytest.fixture
+def local_moonwell_token(alpha_token):
+    return boa.load(
+        "contracts/mock/MockMoonwellToken.vy",
+        alpha_token,
+        EIGHTEEN_DECIMALS,
+        100 * 10**8,
+        8,
+        name="local_moonwell_token",
+    )
+
+
+@pytest.fixture
+def local_moonwell_prices(
+    ripe_hq_deploy,
+    governance,
+    mock_yield_registry,
+    local_moonwell_token,
+):
+    moonwell_registry = boa.load(
+        "contracts/mock/MockYieldRegistry.vy",
+        [local_moonwell_token],
+        name="local_moonwell_registry",
+    )
+    prices = boa.load(
+        "contracts/priceSources/BlueChipYieldPrices.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS["local"]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS["local"]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        [mock_yield_registry, mock_yield_registry],
+        [mock_yield_registry, mock_yield_registry],
+        mock_yield_registry,
+        mock_yield_registry,
+        moonwell_registry,
+        mock_yield_registry,
+        mock_yield_registry,
+        name="local_moonwell_prices",
+    )
+    assert prices.setActionTimeLockAfterSetup(sender=governance.address)
+    return prices
+
+
+def test_moonwell_successful_zero_live_pps_fails_closed_and_preserves_min_policy(
+    local_moonwell_prices,
+    local_moonwell_token,
+    governance,
+    mock_price_source,
+    alpha_token,
+    teller,
+):
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert local_moonwell_prices.addNewPriceFeed(
+        local_moonwell_token,
+        BLUE_CHIP_PROTOCOL_MOONWELL,
+        0,
+        5,
+        0,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=local_moonwell_prices.actionTimeLock() + 1)
+    assert local_moonwell_prices.confirmNewPriceFeed(
+        local_moonwell_token,
+        sender=governance.address,
+    )
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == 10**8
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 10**8
+
+    local_moonwell_token.setExchangeRate(EIGHTEEN_DECIMALS // 2)
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 5 * 10**7
+    local_moonwell_token.setExchangeRate(2 * EIGHTEEN_DECIMALS)
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 10**8
+
+    # Exercise the Moonwell duration-weighted path, not only its structural
+    # min clamp. The manipulated 2x observation accrues 30 of 40 seconds, so
+    # the raw TWAP is 1.75x after the live rate returns to 1x. The Moonwell
+    # live-PPS clamp keeps the reported price at 1x.
+    boa.env.time_travel(seconds=10)
+    assert local_moonwell_prices.addPriceSnapshot(
+        local_moonwell_token,
+        sender=teller.address,
+    )
+    local_moonwell_token.setExchangeRate(EIGHTEEN_DECIMALS)
+    boa.env.time_travel(seconds=30)
+    expected_weighted = (10**8 * 10 + 2 * 10**8 * 30) // 40
+    assert expected_weighted == 175_000_000
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == (
+        expected_weighted
+    )
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 10**8
+
+    local_moonwell_token.setExchangeRate(0)
+    assert local_moonwell_token.exchangeRateStored() == 0
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) == (
+        expected_weighted
+    )
+    assert local_moonwell_prices.getPrice(local_moonwell_token) == 0
+
+
+def test_moonwell_typed_live_pps_revert_is_not_suppressed(
+    local_moonwell_prices,
+    local_moonwell_token,
+    governance,
+    mock_price_source,
+    alpha_token,
+):
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    assert local_moonwell_prices.addNewPriceFeed(
+        local_moonwell_token,
+        BLUE_CHIP_PROTOCOL_MOONWELL,
+        0,
+        5,
+        0,
+        0,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=local_moonwell_prices.actionTimeLock() + 1)
+    assert local_moonwell_prices.confirmNewPriceFeed(
+        local_moonwell_token,
+        sender=governance.address,
+    )
+    assert local_moonwell_prices.getWeightedPrice(local_moonwell_token) > 0
+    local_moonwell_token.setShouldRevert(True)
+    with boa.reverts():
+        local_moonwell_prices.getPrice(local_moonwell_token)

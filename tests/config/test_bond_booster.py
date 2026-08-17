@@ -16,6 +16,11 @@ def valid_booster_config():
     }
 
 
+def _config_tuple(bond_booster, user):
+    config = bond_booster.config(user)
+    return (config[0], config[1], config[2], config[3])
+
+
 #########################
 # Access Control Tests
 #########################
@@ -192,6 +197,8 @@ def test_bond_booster_set_bond_booster(bond_booster, alice, switchboard_delta):
     assert stored_config[1] == 2 * HUNDRED_PERCENT
     assert stored_config[2] == 75
     assert stored_config[3] == 2000000
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
 
 
 def test_bond_booster_set_bond_booster_invalid_fails(bond_booster, switchboard_delta):
@@ -231,6 +238,35 @@ def test_bond_booster_set_bond_booster_exceeds_max_units(bond_booster, alice, sw
     config = (alice, HUNDRED_PERCENT, 101, 1000000)
     with boa.reverts("invalid booster"):
         bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+
+
+def test_invalid_replacements_preserve_config_and_units(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    active_config = (alice, HUNDRED_PERCENT, 50, current_block + 100)
+    bond_booster.setBondBooster(active_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+
+    expected_config = _config_tuple(bond_booster, alice)
+    assert expected_config == active_config
+    assert bond_booster.unitsUsed(alice) == 20
+    assert current_block < expected_config[3]
+
+    invalid_configs = [
+        (ZERO_ADDRESS, HUNDRED_PERCENT, 50, current_block + 200),
+        (alice, 0, 50, current_block + 200),
+        (alice, bond_booster.maxBoostRatio() + 1, 50, current_block + 200),
+        (alice, HUNDRED_PERCENT, 50, current_block),
+        (alice, HUNDRED_PERCENT, 0, current_block + 200),
+        (alice, HUNDRED_PERCENT, bond_booster.maxUnits() + 1, current_block + 200),
+    ]
+
+    for invalid_config in invalid_configs:
+        with boa.reverts("invalid booster"):
+            bond_booster.setBondBooster(invalid_config, sender=switchboard_delta.address)
+        assert _config_tuple(bond_booster, alice) == expected_config
+        assert bond_booster.unitsUsed(alice) == 20
 
 
 #########################
@@ -299,6 +335,129 @@ def test_bond_booster_set_many_bond_boosters_invalid_fails(bond_booster, alice, 
         bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
 
 
+def test_bond_booster_mixed_batch_lifecycle_semantics(
+    bond_booster, alice, bob, charlie, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    active_expiry = current_block + 100
+    expired_expiry = current_block + 1
+    bond_booster.setManyBondBoosters(
+        [
+            (alice, HUNDRED_PERCENT, 50, active_expiry),
+            (bob, HUNDRED_PERCENT, 50, expired_expiry),
+        ],
+        sender=switchboard_delta.address,
+    )
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+    bond_booster.addNewUnitsUsed(bob, 30, sender=bond_room.address)
+
+    boa.env.evm.patch.block_number = expired_expiry
+    assert boa.env.evm.patch.block_number < active_expiry
+    assert bond_booster.getBoostRatio(bob, 1) == 0
+    assert bond_booster.unitsUsed(alice) == 20
+    assert bond_booster.unitsUsed(bob) == 30
+
+    future_expiry = boa.env.evm.patch.block_number + 200
+    configs = [
+        (alice, 2 * HUNDRED_PERCENT, 75, future_expiry),
+        (bob, 3 * HUNDRED_PERCENT, 80, future_expiry),
+        (charlie, 4 * HUNDRED_PERCENT, 90, future_expiry),
+    ]
+    bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == configs[0]
+    assert _config_tuple(bond_booster, bob) == configs[1]
+    assert _config_tuple(bond_booster, charlie) == configs[2]
+    assert bond_booster.unitsUsed(alice) == 20
+    assert bond_booster.unitsUsed(bob) == 0
+    assert bond_booster.unitsUsed(charlie) == 0
+    assert bond_booster.getBoostRatio(alice, 55) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 56) == 0
+    assert bond_booster.getBoostRatio(bob, 80) == 3 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(charlie, 90) == 4 * HUNDRED_PERCENT
+
+
+def test_duplicate_user_batch_resets_expired_grant_once(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 1
+    bond_booster.setBondBooster(
+        (alice, HUNDRED_PERCENT, 50, old_expiry),
+        sender=switchboard_delta.address,
+    )
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    boa.env.evm.patch.block_number = old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+    assert bond_booster.unitsUsed(alice) == 30
+
+    future_expiry = boa.env.evm.patch.block_number + 200
+    first = (alice, 2 * HUNDRED_PERCENT, 75, future_expiry)
+    second = (alice, 3 * HUNDRED_PERCENT, 90, future_expiry + 1)
+    assert first[0] == second[0]
+    assert bond_booster.isValidBooster(first)
+    assert bond_booster.isValidBooster(second)
+
+    bond_booster.setManyBondBoosters([first, second], sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == second
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 90) == 3 * HUNDRED_PERCENT
+
+
+def test_duplicate_user_batch_preserves_active_grant_usage(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 100
+    bond_booster.setBondBooster(
+        (alice, HUNDRED_PERCENT, 50, old_expiry),
+        sender=switchboard_delta.address,
+    )
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+    assert boa.env.evm.patch.block_number < old_expiry
+
+    first = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 100)
+    second = (alice, 3 * HUNDRED_PERCENT, 90, old_expiry + 200)
+    assert first[0] == second[0]
+    assert bond_booster.isValidBooster(first)
+    assert bond_booster.isValidBooster(second)
+
+    bond_booster.setManyBondBoosters([first, second], sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == second
+    assert bond_booster.unitsUsed(alice) == 20
+    assert bond_booster.getBoostRatio(alice, 70) == 3 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 71) == 0
+
+
+def test_invalid_batch_reverts_earlier_expired_grant_reset(
+    bond_booster, alice, bob, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 1
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    boa.env.evm.patch.block_number = old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+    assert bond_booster.unitsUsed(alice) == 30
+
+    future_expiry = boa.env.evm.patch.block_number + 200
+    with boa.reverts("invalid booster"):
+        bond_booster.setManyBondBoosters(
+            [
+                (alice, 2 * HUNDRED_PERCENT, 75, future_expiry),
+                (bob, 0, 50, future_expiry),
+            ],
+            sender=switchboard_delta.address,
+        )
+
+    assert _config_tuple(bond_booster, alice) == old_config
+    assert bond_booster.unitsUsed(alice) == 30
+    assert _config_tuple(bond_booster, bob) == (ZERO_ADDRESS, 0, 0, 0)
+
+
 def test_bond_booster_set_many_bond_boosters_max_limit(bond_booster, switchboard_delta):
     """Test setManyBondBoosters works up to MAX_BOOSTERS limit"""
     # Create MAX_BOOSTERS (50) configs
@@ -360,6 +519,13 @@ def test_bond_booster_remove_bond_booster(bond_booster, alice, switchboard_delta
     # Verify units are reset
     assert bond_booster.unitsUsed(alice) == 0
 
+    # Re-adding after explicit removal starts a fresh grant.
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, 2000000)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+    assert _config_tuple(bond_booster, alice) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
 
 def test_bond_booster_remove_non_existent(bond_booster, bob, switchboard_delta):
     """Test removeBondBooster works on non-existent config"""
@@ -415,25 +581,196 @@ def test_bond_booster_is_valid_booster(bond_booster, alice):
 
 def test_bond_booster_update_existing_config(bond_booster, alice, switchboard_delta, bond_room):
     """Test updating existing booster config preserves units used"""
-    # Set initial config
-    config1 = (alice, HUNDRED_PERCENT, 50, 1000000)
+    current_block = boa.env.evm.patch.block_number
+    config1 = (alice, HUNDRED_PERCENT, 50, current_block + 100)
     bond_booster.setBondBooster(config1, sender=switchboard_delta.address)
-    
-    # Use some units
     bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
     assert bond_booster.unitsUsed(alice) == 20
-    
-    # Update config (change boostRatio and maxUnitsAllowed)
-    config2 = (alice, int(1.5 * HUNDRED_PERCENT), 75, 2000000)  # 150%
+    assert boa.env.evm.patch.block_number < config1[3]
+
+    config2 = (alice, 2 * HUNDRED_PERCENT, 75, current_block + 200)
     bond_booster.setBondBooster(config2, sender=switchboard_delta.address)
-    
-    # Units used should be preserved
+
+    assert _config_tuple(bond_booster, alice) == config2
     assert bond_booster.unitsUsed(alice) == 20
-    
-    # New config should be active
-    stored_config = bond_booster.config(alice)
-    assert stored_config[1] == int(1.5 * HUNDRED_PERCENT)
-    assert stored_config[2] == 75
+    assert bond_booster.getBoostRatio(alice, 55) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 56) == 0
+
+
+def test_active_exhausted_grant_remains_exhausted_after_update(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_config = (alice, HUNDRED_PERCENT, 50, current_block + 100)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 50, sender=bond_room.address)
+    assert boa.env.evm.patch.block_number < old_config[3]
+    assert bond_booster.unitsUsed(alice) == 50
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 50, current_block + 200)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == new_config
+    assert bond_booster.unitsUsed(alice) == 50
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+
+def test_active_maximum_increase_preserves_historical_usage(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_config = (alice, HUNDRED_PERCENT, 50, current_block + 100)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 40, sender=bond_room.address)
+    assert boa.env.evm.patch.block_number < old_config[3]
+    assert bond_booster.unitsUsed(alice) == 40
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, current_block + 200)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert bond_booster.unitsUsed(alice) == 40
+    assert bond_booster.getBoostRatio(alice, 35) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 36) == 0
+
+
+def test_active_maximum_decrease_preserves_usage_without_clamping(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_config = (alice, HUNDRED_PERCENT, 100, current_block + 100)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 80, sender=bond_room.address)
+    assert boa.env.evm.patch.block_number < old_config[3]
+    assert bond_booster.unitsUsed(alice) == 80
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 50, current_block + 200)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == new_config
+    assert bond_booster.unitsUsed(alice) == 80
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+
+def test_expired_grant_replacement_resets_units_and_restores_capacity(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 2
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
+    assert _config_tuple(bond_booster, alice) == old_config
+    assert bond_booster.unitsUsed(alice) == 30
+
+    boa.env.evm.patch.block_number = old_expiry + 1
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 200)
+    assert bond_booster.isValidBooster(new_config)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
+
+def test_replacement_at_exact_expiry_block_resets_units(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 2
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+    assert _config_tuple(bond_booster, alice) == old_config
+    assert bond_booster.unitsUsed(alice) == 20
+
+    boa.env.evm.patch.block_number = old_expiry
+    assert boa.env.evm.patch.block_number == old_expiry
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 200)
+    assert bond_booster.isValidBooster(new_config)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 75) == 2 * HUNDRED_PERCENT
+
+
+def test_replacement_one_block_before_expiry_preserves_units(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 3
+    old_config = (alice, HUNDRED_PERCENT, 50, old_expiry)
+    bond_booster.setBondBooster(old_config, sender=switchboard_delta.address)
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+    assert _config_tuple(bond_booster, alice) == old_config
+    assert bond_booster.unitsUsed(alice) == 20
+
+    boa.env.evm.patch.block_number = old_expiry - 1
+    assert boa.env.evm.patch.block_number == old_expiry - 1
+    assert bond_booster.getBoostRatio(alice, 30) == HUNDRED_PERCENT
+
+    new_config = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 200)
+    assert bond_booster.isValidBooster(new_config)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert bond_booster.unitsUsed(alice) == 20
+    assert bond_booster.getBoostRatio(alice, 55) == 2 * HUNDRED_PERCENT
+    assert bond_booster.getBoostRatio(alice, 56) == 0
+
+
+def test_new_grant_resets_orphaned_units_without_prior_config(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    assert _config_tuple(bond_booster, alice) == (ZERO_ADDRESS, 0, 0, 0)
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+    assert bond_booster.unitsUsed(alice) == 20
+
+    current_block = boa.env.evm.patch.block_number
+    new_config = (alice, HUNDRED_PERCENT, 50, current_block + 100)
+    bond_booster.setBondBooster(new_config, sender=switchboard_delta.address)
+
+    assert _config_tuple(bond_booster, alice) == new_config
+    assert bond_booster.unitsUsed(alice) == 0
+    assert bond_booster.getBoostRatio(alice, 50) == HUNDRED_PERCENT
+
+
+def test_bond_boost_modified_event_is_preserved_for_active_and_expired_updates(
+    bond_booster, alice, switchboard_delta, bond_room
+):
+    current_block = boa.env.evm.patch.block_number
+    old_expiry = current_block + 2
+    bond_booster.setBondBooster(
+        (alice, HUNDRED_PERCENT, 50, old_expiry),
+        sender=switchboard_delta.address,
+    )
+    bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
+
+    active_update = (alice, 2 * HUNDRED_PERCENT, 75, old_expiry + 100)
+    assert boa.env.evm.patch.block_number < old_expiry
+    bond_booster.setBondBooster(active_update, sender=switchboard_delta.address)
+    active_logs = filter_logs(bond_booster, "BondBoostModified")
+    assert len(active_logs) == 1
+    assert active_logs[0].user == active_update[0]
+    assert active_logs[0].boostRatio == active_update[1]
+    assert active_logs[0].maxUnitsAllowed == active_update[2]
+    assert active_logs[0].expireBlock == active_update[3]
+    assert bond_booster.unitsUsed(alice) == 20
+
+    boa.env.evm.patch.block_number = active_update[3]
+    assert bond_booster.getBoostRatio(alice, 1) == 0
+    expired_update = (alice, 3 * HUNDRED_PERCENT, 90, active_update[3] + 100)
+    bond_booster.setBondBooster(expired_update, sender=switchboard_delta.address)
+    expired_logs = filter_logs(bond_booster, "BondBoostModified")
+    assert len(expired_logs) == 1
+    assert expired_logs[0].user == expired_update[0]
+    assert expired_logs[0].boostRatio == expired_update[1]
+    assert expired_logs[0].maxUnitsAllowed == expired_update[2]
+    assert expired_logs[0].expireBlock == expired_update[3]
+    assert bond_booster.unitsUsed(alice) == 0
 
 
 def test_bond_booster_workflow_complete(bond_booster, alice, bob, switchboard_delta, bond_room):

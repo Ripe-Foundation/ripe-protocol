@@ -39,6 +39,7 @@ interface MissionControl:
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def underscoreRegistry() -> address: view
+    def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool: view
 
 interface AddressRegistry:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -379,7 +380,7 @@ def isUnderscoreAddr(_addr: address, _mc: address = empty(address)) -> bool:
     missionControl: address = _mc
     if _mc == empty(address):
         missionControl = addys._getMissionControlAddr()
-    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    underscore: address = staticcall MissionControl(missionControl).underscoreRegistry()
     return self._isUnderscoreAddr(_addr, underscore)
 
 
@@ -410,4 +411,10 @@ def isUnderscoreOwnerOrLego(_user: address, _caller: address, _mc: address = emp
     if _mc == empty(address):
         missionControl = addys._getMissionControlAddr()
     underscore: address = staticcall MissionControl(missionControl).underscoreRegistry()
-    return self._isUnderscoreWalletOwner(_user, _caller, underscore) or self._isUnderscoreAddr(_caller, underscore)
+    if self._isUnderscoreWalletOwner(_user, _caller, underscore):
+        return True
+
+    # "Lego" means a currently registered Lego with an explicit user-specific grant.
+    if not self._isUnderscoreAddr(_caller, underscore):
+        return False
+    return staticcall MissionControl(missionControl).doesUndyLegoHaveAccess(_user, _caller)
