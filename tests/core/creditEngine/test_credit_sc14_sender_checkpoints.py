@@ -9,7 +9,7 @@ from conf_utils import filter_logs, redeem_collateral
 PRECISION_18 = 10 ** 9
 
 
-def _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+def _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
     source = Path("contracts/core/Lootbox.vy").read_text()
     needle = """@external
 def updateDepositPoints(
@@ -25,7 +25,7 @@ def updateDepositPoints(
     assert source.count(needle) == 1
     source = source.replace(
         needle,
-        needle + f"    assert _user != {blocked_user} # dev: recipient checkpoint blocked\n",
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
         1,
     )
     mutant = boa.loads(
@@ -35,7 +35,7 @@ def updateDepositPoints(
         43_200,
         100 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
-        name="lootbox_recipient_trap",
+        name="lootbox_user_checkpoint_trap",
     )
     boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
 
@@ -375,7 +375,7 @@ def test_sc14_redeem_checkpoint_revert_rolls_back_state(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -418,8 +418,8 @@ def test_sc14_redeem_checkpoint_revert_rolls_back_state(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
     assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
@@ -490,7 +490,7 @@ def test_sc14_redeem_recipient_checkpoint_revert_rolls_back_registration(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, alice)
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, alice)
     with boa.reverts():
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
@@ -520,7 +520,7 @@ def test_sc14_redeem_withdrawal_checkpoint_revert_rolls_back_tokens(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -556,8 +556,8 @@ def test_sc14_redeem_withdrawal_checkpoint_revert_rolls_back_tokens(
     global_points = ledger.globalDepositPoints()
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         _redeem(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, False)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == bob_vault
     assert alpha_token.balanceOf(alice) == alice_wallet

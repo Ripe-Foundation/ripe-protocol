@@ -1,6 +1,6 @@
 import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
 
 
 PRECISION_18 = 10 ** 9
@@ -664,3 +664,161 @@ def test_sc24_six_decimal_min_deposit_does_not_fund_rewards(
     assert ledger.userDepositPoints(bob, vault_id, charlie_token).lastBalance == 1
     assert ap.lastBalance == 1
     assert ap.lastUsdValue == 1
+
+
+def test_sc24_dust_shares_holder_cannot_zero_aggregate_funding(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    """A dust SharesVault holder must not value the whole book at their rounded-zero amount."""
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+
+    performDeposit(alice, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    performDeposit(bob, 1, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    lootbox.updateDepositPoints(alice, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    funded = ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue
+    assert funded > 0
+
+    leftover = EIGHTEEN_DECIMALS
+    drain = alpha_token.balanceOf(rebase_erc20_vault) - leftover
+    alpha_token.transfer(alpha_token_whale, drain, sender=rebase_erc20_vault.address)
+    assert rebase_erc20_vault.getUserLootBoxShare(bob, alpha_token) > 0
+    assert rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert rebase_erc20_vault.getTotalAmountForUser(alice, alpha_token) > 0
+
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    vault_usd = rebase_erc20_vault.getTotalAmountForVault(alpha_token) // EIGHTEEN_DECIMALS
+    assert leftover == EIGHTEEN_DECIMALS
+    assert vault_usd == 1
+    assert ap.lastUsdValue == vault_usd
+    assert ap.lastUsdValue != 0
+
+
+def test_sc24_nonzero_staker_alloc_does_not_fund_gen_bucket(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    setGeneralConfig()
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[vault_id],
+        _stakersPointsAlloc=25_00,
+        _voterPointsAlloc=0,
+    )
+    setRipeRewardsConfig(True, 10, 0, 0, 0, HUNDRED_PERCENT)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance > 0
+
+
+def test_sc24_multi_holder_valuation_is_caller_independent(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+):
+    vault_id = vault_book.getRegId(rebase_erc20_vault)
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    performDeposit(alice, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    performDeposit(bob, 1, alpha_token, alpha_token_whale, rebase_erc20_vault)
+    leftover = EIGHTEEN_DECIMALS
+    alpha_token.transfer(
+        alpha_token_whale,
+        alpha_token.balanceOf(rebase_erc20_vault) - leftover,
+        sender=rebase_erc20_vault.address,
+    )
+    lootbox.updateDepositPoints(alice, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    alice_usd = ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue
+    lootbox.updateDepositPoints(bob, vault_id, rebase_erc20_vault, alpha_token, sender=teller.address)
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == alice_usd
+    assert alice_usd == leftover // EIGHTEEN_DECIMALS
+
+
+def test_sc24_empty_book_does_not_probe_or_use_vault_total(
+    alpha_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    registerVault,
+    ledger,
+    lootbox,
+    teller,
+):
+    # lastBalance is empty, but a converter would return 10 tokens if probed.
+    mock = boa.load("contracts/mock/MockLootboxVaultAccounting.vy")
+    vault_id = registerVault(mock, "sc24 empty book dust")
+    _configure_gen_rewards(setGeneralConfig, setAssetConfig, setRipeRewardsConfig, alpha_token, vault_id)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock.configure(10 * EIGHTEEN_DECIMALS, 1, 0, 0, 10 * EIGHTEEN_DECIMALS)
+    lootbox.updateDepositPoints(
+        ZERO_ADDRESS,
+        vault_id,
+        mock,
+        alpha_token,
+        sender=teller.address,
+    )
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastBalance == 0
+    assert ledger.assetDepositPoints(vault_id, alpha_token).lastUsdValue == 0
+
+
+def test_sc24_share_decimal_offset_matches_vault_modules():
+    import re
+    from pathlib import Path
+
+    def _const(path, name):
+        text = Path(path).read_text()
+        match = re.search(
+            rf"{name}:\s*constant\(uint256\)\s*=\s*([^\n#]+)",
+            text,
+        )
+        assert match, name
+        expr = match.group(1).strip().replace("_", "")
+        if "**" in expr:
+            base, exp = expr.split("**")
+            return int(base) ** int(exp)
+        return int(expr)
+
+    assert _const("contracts/core/Lootbox.vy", "SHARE_DECIMAL_OFFSET") == 10 ** 8
+    assert _const("contracts/vaults/modules/SharesVault.vy", "DECIMAL_OFFSET") == 10 ** 8
+    assert _const("contracts/vaults/modules/StabVault.vy", "DECIMAL_OFFSET") == 10 ** 8

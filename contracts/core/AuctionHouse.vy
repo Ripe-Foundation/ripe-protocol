@@ -1169,13 +1169,15 @@ def _buyFungibleAuction(
         return 0
 
     # Progress spans first..last purchasable block (end-1), not the expired endBlock.
-    # Duration 1 is config-valid (Switchboard allows it) and has only that
-    # purchasable block, so it uses maxDiscount by spec. start==max is
-    # unreachable for governance-set params and is implied by the formula.
+    # Duration 1 (endBlock == startBlock + 1) is config-valid and has only that
+    # purchasable block, so it uses maxDiscount. A zero-length window
+    # (endBlock <= startBlock) is unpurchasable because of the half-open
+    # time-boundary check above; this guard never sees it. The +1 is required
+    # so a duration-one-only check (endBlock > startBlock) cannot divide by
+    # zero on a one-block auction.
     discount: uint256 = auc.maxDiscount
     if auc.endBlock > auc.startBlock + 1:
-        auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock - 1)
-        discount = auc.startDiscount + auctionProgress * (auc.maxDiscount - auc.startDiscount) // HUNDRED_PERCENT
+        discount = auc.startDiscount + (block.number - auc.startBlock) * (auc.maxDiscount - auc.startDiscount) // (auc.endBlock - auc.startBlock - 1)
 
     # get vault addr
     liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)

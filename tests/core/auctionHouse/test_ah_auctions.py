@@ -2006,7 +2006,7 @@ def test_live_debt_cap_batch_gas_bounds(
     assert total_spent == expected_spent
     assert len(filter_logs(teller, "FungAuctionPurchased")) == expected_successes
     assert ledger.userDebt(bob).amount == 100 * EIGHTEEN_DECIMALS - expected_spent
-    # About 20% above the pinned 294,993 / 293,672 / 3,356,387 measurements.
+    # About 20% above the pinned 294,904 / 293,583 / 3,354,607 measurements.
     assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000
 

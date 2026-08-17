@@ -20,8 +20,7 @@ def _old_discount(block_number, start_block, end_block, start_discount, max_disc
 def _new_discount(block_number, start_block, end_block, start_discount, max_discount):
     if end_block <= start_block + 1:
         return max_discount
-    progress = (block_number - start_block) * HUNDRED_PERCENT // (end_block - start_block - 1)
-    return start_discount + progress * (max_discount - start_discount) // HUNDRED_PERCENT
+    return start_discount + (block_number - start_block) * (max_discount - start_discount) // (end_block - start_block - 1)
 
 
 def _advance_to_block(block_number):
@@ -106,6 +105,27 @@ def test_sc30_progress_formula_identity_reaches_max_at_last_purchasable_block():
     assert old < max_discount
     assert new == max_discount
     assert _new_discount(start_block, start_block, end_block, start_discount, max_discount) == start_discount
+
+
+def test_sc30_interpolation_guard_is_last_purchasable_not_duration_one():
+    from pathlib import Path
+
+    src = Path("contracts/core/AuctionHouse.vy").read_text()
+    assert src.count("if auc.endBlock > auc.startBlock + 1:") == 1
+    assert "(auc.endBlock - auc.startBlock - 1)" in src
+    duration_one_only = "if auc.endBlock > auc.startBlock:"
+    assert duration_one_only not in src.replace("if auc.endBlock > auc.startBlock + 1:", "")
+
+    start_discount = 0
+    max_discount = 50_00
+    start_block = 100
+    duration_one_end = start_block + 1
+    assert _new_discount(start_block, start_block, duration_one_end, start_discount, max_discount) == max_discount
+    try:
+        _ = (start_block - start_block) * (max_discount - start_discount) // (duration_one_end - start_block - 1)
+        raise AssertionError("duration-one-only denominator must be zero")
+    except ZeroDivisionError:
+        pass
 
 
 def test_sc30_multi_block_window_reaches_exact_max_discount(
@@ -344,6 +364,77 @@ def test_sc30_duration_one_uses_max_discount_on_only_purchasable_block(
         sender=alice,
     )
     assert not ledger.hasFungibleAuction(bob, auction.vaultId, alpha_token)
+
+
+def test_sc30_zero_length_window_cannot_be_purchased(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    auction_house,
+    ledger,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+    sally,
+):
+    auction = _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        5_00,
+        40_00,
+        20,
+    )
+    stored = ledger.getFungibleAuction(bob, auction.vaultId, alpha_token)
+    assert ledger.setFungibleAuction(
+        bob,
+        auction.vaultId,
+        alpha_token,
+        (
+            stored.liqUser,
+            stored.vaultId,
+            stored.asset,
+            stored.startDiscount,
+            stored.maxDiscount,
+            stored.startBlock,
+            stored.startBlock,
+            stored.isActive,
+        ),
+        sender=auction_house.address,
+    )
+    mutated = ledger.getFungibleAuction(bob, auction.vaultId, alpha_token)
+    assert mutated.endBlock == mutated.startBlock
+    green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
+    _advance_to_block(mutated.startBlock)
+    with boa.reverts("no green spent"):
+        buy_fungible_auction(
+            teller,
+            bob,
+            auction.vaultId,
+            alpha_token,
+            5 * EIGHTEEN_DECIMALS,
+            False,
+            sender=alice,
+        )
 
 
 def test_sc30_max_duration_and_rounding_never_exceed_max_discount(

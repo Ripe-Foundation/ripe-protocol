@@ -9,7 +9,7 @@ from conf_utils import buy_fungible_auction, filter_logs
 PRECISION_18 = 10 ** 9
 
 
-def _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, blocked_user):
+def _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, blocked_user):
     source = Path("contracts/core/Lootbox.vy").read_text()
     needle = """@external
 def updateDepositPoints(
@@ -25,7 +25,7 @@ def updateDepositPoints(
     assert source.count(needle) == 1
     source = source.replace(
         needle,
-        needle + f"    assert _user != {blocked_user} # dev: recipient checkpoint blocked\n",
+        needle + f"    assert _user != {blocked_user} # dev: user checkpoint blocked\n",
         1,
     )
     mutant = boa.loads(
@@ -35,7 +35,7 @@ def updateDepositPoints(
         43_200,
         100 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
-        name="lootbox_recipient_trap",
+        name="lootbox_user_checkpoint_trap",
     )
     boa.env.set_code(lootbox.address, bytes(boa.env.get_code(mutant.address)))
 
@@ -426,7 +426,7 @@ def test_sc14_ah_checkpoint_revert_rolls_back_transfer_state(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -471,8 +471,8 @@ def test_sc14_ah_checkpoint_revert_rolls_back_transfer_state(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
     assert simple_erc20_vault.userBalances(alice, alpha_token) == state["alice_vault"]
@@ -546,7 +546,7 @@ def test_sc14_ah_recipient_checkpoint_revert_rolls_back_registration(
     }
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    _install_lootbox_recipient_checkpoint_trap(lootbox, ripe_hq, alice)
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, alice)
     with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == state["bob_vault"]
@@ -577,7 +577,7 @@ def test_sc14_ah_withdrawal_checkpoint_revert_rolls_back_tokens(
     ledger,
     vault_book,
     simple_erc20_vault,
-    switchboard_alpha,
+    ripe_hq,
     alpha_token,
     alpha_token_whale,
     green_token,
@@ -615,8 +615,8 @@ def test_sc14_ah_withdrawal_checkpoint_revert_rolls_back_tokens(
     global_points = ledger.globalDepositPoints()
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
     green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
-    lootbox.pause(True, sender=switchboard_alpha.address)
-    with boa.reverts("contract paused"):
+    _install_lootbox_user_checkpoint_trap(lootbox, ripe_hq, bob)
+    with boa.reverts():
         _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, False)
     assert simple_erc20_vault.userBalances(bob, alpha_token) == bob_vault
     assert alpha_token.balanceOf(alice) == alice_wallet
@@ -686,3 +686,96 @@ def test_sc14_ah_zero_allocation_still_tracks_balances(
     assert ripe_after.genDepositors == ripe_before.genDepositors == 0
     assert ripe_after.newRipeRewards == ripe_before.newRipeRewards
     assert ledger.userDebt(bob).amount == debt_before - spent
+
+
+def test_sc14_ah_existing_recipient_accrues_only_its_prior_balance(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    setRipeRewardsConfig,
+    createDebtTerms,
+    createAuctionParams,
+    performDeposit,
+    mock_price_source,
+    teller,
+    lootbox,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    whale,
+    bob,
+    alice,
+    sally,
+):
+    _open_auction(
+        setGeneralConfig,
+        setAssetConfig,
+        setGeneralDebtConfig,
+        setRipeRewardsConfig,
+        createDebtTerms,
+        createAuctionParams,
+        performDeposit,
+        mock_price_source,
+        teller,
+        alpha_token,
+        alpha_token_whale,
+        green_token,
+        bob,
+        sally,
+        200 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+    )
+    prior = 30 * EIGHTEEN_DECIMALS
+    performDeposit(alice, prior, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    recipient_before = ledger.userDepositPoints(alice, vault_id, alpha_token)
+
+    elapsed = 6
+    boa.env.time_travel(blocks=elapsed)
+    green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 20 * EIGHTEEN_DECIMALS, sender=alice)
+    assert _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True) > 0
+
+    recipient = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    assert recipient.balancePoints == recipient_before.lastBalance * elapsed
+    assert recipient.lastBalance == _normalized(simple_erc20_vault.userBalances(alice, alpha_token))
+    assert recipient.lastBalance > recipient_before.lastBalance
+
+
+def test_sc14_self_transfer_rejected_before_checkpoint(
+    setGeneralConfig,
+    setAssetConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    lootbox,
+    ledger,
+    vault_book,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    with boa.reverts():
+        simple_erc20_vault.transferBalanceWithinVault(
+            alpha_token,
+            bob,
+            bob,
+            amount // 2,
+            sender=teller.address,
+        )
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token) == before
+    assert simple_erc20_vault.userBalances(bob, alpha_token) == amount

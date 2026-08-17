@@ -2239,6 +2239,6 @@ def test_stab_liq_batch_gas_bounds(
 
     for user in users:
         assert credit_engine.getUserDebtAmount(user) < debt_amount
-    # About 20% above the pinned 448,448 / 697,751 / 1,445,660 measurements.
+    # About 20% above the pinned 448,433 / 697,721 / 1,445,585 measurements.
     assert gas_used <= regression_ceiling
     assert gas_used < 15_000_000
