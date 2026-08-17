@@ -48,4 +48,3 @@ def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> u
     if self.mode == 4:
         return 0
     return self.converted
-

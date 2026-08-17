@@ -442,10 +442,11 @@ def test_sc24_stab_offset_matches_first_deposit_share_mint(
     setAssetConfig,
     mock_price_source,
     stability_pool,
+    vault_book,
     teller,
 ):
     setGeneralConfig()
-    setAssetConfig(savings_green, _vaultIds=[1])
+    setAssetConfig(savings_green, _vaultIds=[vault_book.getRegId(stability_pool)])
     mock_price_source.setPrice(savings_green, EIGHTEEN_DECIMALS)
     amount = EIGHTEEN_DECIMALS
     green_token.transfer(bob, amount, sender=whale)
@@ -453,13 +454,12 @@ def test_sc24_stab_offset_matches_first_deposit_share_mint(
     shares = savings_green.deposit(amount, bob, sender=bob)
     savings_green.approve(teller, shares, sender=bob)
     before = stability_pool.totalBalances(savings_green)
+    assert before == 0
     teller.deposit(savings_green, shares, bob, stability_pool, sender=bob)
-    minted = stability_pool.totalBalances(savings_green) - before
-    if before == 0:
-        assert minted == amount * SHARE_OFFSET
+    minted = stability_pool.totalBalances(savings_green)
+    assert minted == amount * SHARE_OFFSET
     user_shares = stability_pool.userBalances(bob, savings_green)
     assert stability_pool.getUserLootBoxShare(bob, savings_green) == user_shares // SHARE_OFFSET
-    assert minted > 0
 
 
 def test_sc24_ripegov_empty_holder_book_still_uses_vault_total(

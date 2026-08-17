@@ -959,11 +959,9 @@ def _getEligibleUnderlying(
     if staticcall MissionControl(_missionControl).isStabVaultId(_vaultId):
         # Mirrors StabVault._getTotalAmountForUserWithTotalBal (no dead-share +1).
         totalShares: uint256 = staticcall VaultShareTotals(_vaultAddr).totalBalances(_asset)
-        if totalShares == 0 or eligibleShares == 0 or eligibleShares > max_value(uint256) // usable:
+        if totalShares == 0 or eligibleShares > max_value(uint256) // usable:
             return 0
         return min(eligibleShares * usable // totalShares, usable)
-    if eligibleShares == 0:
-        return 0
     success: bool = False
     response: Bytes[33] = b""
     success, response = raw_call(

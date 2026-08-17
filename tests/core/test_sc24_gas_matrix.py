@@ -6,6 +6,9 @@ from conf_utils import buy_fungible_auction, filter_logs, redeem_collateral
 
 
 # Manual benchmark plus documented ceilings (~20% above the hybrid pin).
+# Default pytest.ini excludes marker "gas", so these ceilings are NOT an
+# ordinary PR-CI gate. Run them explicitly:
+#   pytest -m gas tests/core/test_sc24_gas_matrix.py -s
 # Enforced Teller-path ceilings also live in test_ah_auctions.py and
 # test_ah_liq_stab.py; those were not raised by this hybrid.
 pytestmark = pytest.mark.gas

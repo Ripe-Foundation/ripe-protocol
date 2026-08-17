@@ -19,6 +19,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     auction_house,
     credit_engine,
     credit_redeem,
+    deleverage,
     stability_pool,
 ):
     deployed_runtime_bytes = {
@@ -51,6 +52,7 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
+        "Deleverage": len(deleverage.env.get_code(deleverage.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
     }
     print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
