@@ -163,6 +163,7 @@ jobs:
                 tests/core/auctionHouse
                 tests/core/boardroom
                 tests/core/test_stale_vault_replacement.py
+                tests/core/test_sc24_gas_matrix.py
               )
               ;;
             vaults)
@@ -376,7 +377,8 @@ jobs:
             --basetemp="$RUNNER_TEMP/pytest-basetemp" \
             -m gas \
             tests/priceSources/blueChip/test_bluechip_local.py \
-            tests/priceSources/curve/test_robinhood_launch_route.py
+            tests/priceSources/curve/test_robinhood_launch_route.py \
+            tests/core/test_sc24_gas_matrix.py
 
   rh-pr-gate:
     name: rh-pr-gate

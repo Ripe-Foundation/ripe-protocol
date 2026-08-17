@@ -1,5 +1,40 @@
 EIP170_LIMIT = 24_576
 
+# Exact deployed runtimes at this head (boa, including immutables).
+# These are a drift tripwire: an unintended size change fails as a
+# dict diff instead of waiting for the EIP-170 cliff. Update the pin
+# when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
+# are load-bearing for these numbers — bumping either is a deploy event.
+EXPECTED_RUNTIME_BYTES = {
+    "MissionControl": 16123,
+    "SwitchboardAlpha": 24506,
+    "SwitchboardBravo": 24364,
+    "SwitchboardCharlie": 23873,
+    "SwitchboardEcho": 23192,
+    "VaultMigrator": 12464,
+    "Teller": 24556,
+    "TellerUtils": 9091,
+    "BondRoom": 10927,
+    "Ledger": 13306,
+    "Lootbox": 24444,
+    "RebaseErc20": 11037,
+    "RipeGov": 23493,
+    "HumanResources": 12542,
+    "AuctionHouse": 24568,
+    "CreditEngine": 24382,
+    "CreditRedeem": 8290,
+    "Deleverage": 24424,
+    "StabilityPool": 24002,
+    "BlueChipYieldPrices": 22749,
+    "ChainlinkPrices": 14256,
+    "CurvePrices": 23141,
+    "PythPrices": 14282,
+    "RedStone": 13633,
+    "StorkPrices": 13162,
+    "UndyVaultPrices": 17612,
+    "wsuperOETHbPrices": 8763,
+}
+
 
 def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     mission_control,
@@ -19,7 +54,16 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     auction_house,
     credit_engine,
     credit_redeem,
+    deleverage,
     stability_pool,
+    blue_chip_prices,
+    chainlink,
+    curve_prices,
+    pyth_prices,
+    redstone,
+    stork_prices,
+    undy_vault_prices,
+    wsuper_oethb_prices,
 ):
     deployed_runtime_bytes = {
         "MissionControl": len(mission_control.env.get_code(mission_control.address)),
@@ -51,7 +95,16 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
         "AuctionHouse": len(auction_house.env.get_code(auction_house.address)),
         "CreditEngine": len(credit_engine.env.get_code(credit_engine.address)),
         "CreditRedeem": len(credit_redeem.env.get_code(credit_redeem.address)),
+        "Deleverage": len(deleverage.env.get_code(deleverage.address)),
         "StabilityPool": len(stability_pool.env.get_code(stability_pool.address)),
+        "BlueChipYieldPrices": len(blue_chip_prices.env.get_code(blue_chip_prices.address)),
+        "ChainlinkPrices": len(chainlink.env.get_code(chainlink.address)),
+        "CurvePrices": len(curve_prices.env.get_code(curve_prices.address)),
+        "PythPrices": len(pyth_prices.env.get_code(pyth_prices.address)),
+        "RedStone": len(redstone.env.get_code(redstone.address)),
+        "StorkPrices": len(stork_prices.env.get_code(stork_prices.address)),
+        "UndyVaultPrices": len(undy_vault_prices.env.get_code(undy_vault_prices.address)),
+        "wsuperOETHbPrices": len(wsuper_oethb_prices.env.get_code(wsuper_oethb_prices.address)),
     }
     print("DEPLOYED_RUNTIME_BYTES", deployed_runtime_bytes)
 
@@ -63,6 +116,10 @@ def test_pointer_changed_contracts_fit_eip170_deployed_runtime_limit(
     oversized = {
         name: size
         for name, size in deployed_runtime_bytes.items()
-        if size > EIP170_LIMIT
+        if size >= EIP170_LIMIT
     }
-    assert not oversized, f"EIP-170 runtime limit exceeded: {oversized}"
+    assert not oversized, f"EIP-170 runtime limit reached or exceeded: {oversized}"
+    assert deployed_runtime_bytes == EXPECTED_RUNTIME_BYTES, (
+        "Deployed runtime changed; update EXPECTED_RUNTIME_BYTES if intentional: "
+        f"{ {k: (EXPECTED_RUNTIME_BYTES[k], deployed_runtime_bytes[k]) for k in deployed_runtime_bytes if EXPECTED_RUNTIME_BYTES.get(k) != deployed_runtime_bytes[k]} }"
+    )
