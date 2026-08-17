@@ -18,6 +18,12 @@
 - 🔍 **Security Model** - Multi-layer liquidations, oracle design, and risk management
 - 🔗 **Integration Guides** - Build on top of Ripe's credit infrastructure
 
+### Feature documentation
+
+- **[Instant Bond Lane — start-here guide](docs/instant-bond-lane/README.md)** —
+  architecture, purchase settlement, epoch pricing, governance overrides, security
+  boundaries, validation, and the remaining activation gates for the draft feature.
+
 ---
 
 ## Security / Responsible Disclosure

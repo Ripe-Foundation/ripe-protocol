@@ -11,8 +11,10 @@ fail-closed through `config/instant-bond-lane-activation.json`.
 **Prepared:** 5 August 2026 · **Revised:** 15 August 2026 (PR #156 review remediation,
 owner decisions, functional protections, and activation qualification)
 
-**Companion:** pricing rationale in [`pricing-design.md`](pricing-design.md). This
-specification is authoritative wherever the documents differ.
+**Start here:** [`README.md`](README.md) provides the onboarding map and plain-language
+mechanism overview. The pricing rationale is in
+[`pricing-design.md`](pricing-design.md). This specification is authoritative wherever
+the documents differ.
 
 **Worktree:** `ripe-protocol-instant-bond-lane`, branch `instant-bond-lane`.
 Revision 20 began from committed feature baseline

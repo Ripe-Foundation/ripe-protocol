@@ -5,6 +5,9 @@ The dated [owner decision](https://github.com/Ripe-Foundation/ripe-protocol/pull
 selects the operational policies and 13,000/6,500 project ceilings. Economic
 calibration is explicitly **not approved**.
 
+> **New to the feature?** Start with [`README.md`](README.md) for the architecture,
+> transaction flow, governance model, safety boundaries, and reading path.
+>
 > **Authority:** [`implementation-spec.md`](implementation-spec.md) is the normative
 > source and supersedes this document wherever they differ. The companion
 > [`dynamic-controller-proposal.md`](dynamic-controller-proposal.md) records the
@@ -431,7 +434,8 @@ isValidRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
 setRateOverride(targetRate, expectedConfigVersion, expectedOverrideVersion)
 canCancelRateOverride(expectedOverrideVersion)
 cancelRateOverride(expectedOverrideVersion)
-buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock)
+buyNow(paymentAmount, requestedLock, expectedEpoch, minRipeOut, deadlineBlock,
+       expectedCoreRipeGovVaultId=0, minActualLock=0)
 previewBuyNow(paymentAmount, requestedLock)
 
 rateOverride

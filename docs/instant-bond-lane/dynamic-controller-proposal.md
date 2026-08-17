@@ -6,6 +6,10 @@ Economic calibration is explicitly **not approved**. Commit/push and draft revie
 authorized; this document is not merge, deployment, configuration, minting, or
 activation authority.
 
+> **New to the feature?** Start with [`README.md`](README.md). This design record is
+> the detailed controller and manual-override derivation, not the onboarding entry
+> point.
+
 **Starting baselines:** revision 20 began at
 `ad782c80b2f4bfa73d7dcd8c9c4979903b767b96`; revision 21 begins from the
 committed and pushed `instant-bond-lane` checkpoint
