@@ -128,10 +128,23 @@ jobs:
           # count: tests/core averages ~0.75s per test, tests/vaults ~1.29s, and
           # everything else ~0.65s. Wall clock is the slowest shard, so the
           # heavy directories are split and the light ones are pooled.
-          # loadfile is the safe default: it keeps every test in a file on one
-          # worker, preserving intra-file ordering. Shards whose files are
-          # provably order-independent override to load, which spreads a file's
-          # tests across all workers and roughly halves the shard.
+          # loadfile everywhere, no exceptions. It keeps every test in a file on
+          # one worker and preserves intra-file ordering.
+          #
+          # An earlier revision let three shards use --dist load, which spreads a
+          # file's tests across workers and roughly halved them locally. That was
+          # withdrawn: core-teller then failed intermittently in CI on
+          # test_predeployment_valid_ripe_lock_route_preserves_direct_clamp_boundary,
+          # where filter_logs saw a TellerDeposit event leaked from another test.
+          # The same commit passed as a pull_request run and failed as a push run.
+          # The test is long-standing and the PR that surfaced it never touched
+          # tests/core/teller, so the distribution change was the cause.
+          #
+          # It did not reproduce in eight local runs. That is a limitation of the
+          # check, not evidence of safety: a 4-vCPU runner interleaves four
+          # workers under real contention, which a 32-core machine does not
+          # reproduce. Local repetition cannot establish order-independence for
+          # CI, so loadfile stays.
           dist_mode=loadfile
           case "$TEST_SHARD" in
             core-a)
@@ -142,7 +155,6 @@ jobs:
               ;;
             core-teller)
               shard_args=(tests/core/teller)
-              dist_mode=load
               ;;
             core-c)
               shard_args=(
@@ -168,7 +180,6 @@ jobs:
                 tests/vaults/test_ripe_gov_controls_and_migration.py
                 tests/vaults/test_ripe_gov_exit_fee.py
               )
-              dist_mode=load
               ;;
             vaults-modules)
               shard_args=(tests/vaults/modules)
@@ -178,7 +189,6 @@ jobs:
               ;;
             price-sources-a)
               shard_args=(tests/priceSources/curve tests/priceSources/blueChip)
-              dist_mode=load
               ;;
             price-sources-b)
               shard_args=(
