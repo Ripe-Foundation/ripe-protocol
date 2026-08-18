@@ -303,6 +303,15 @@ Whatever design lands, these must be red-before-green:
 6. For every provider, each address-typed deposit field carrying post-deposit
    authority is asserted equal to the connected signing address, and the client
    refuses to sign otherwise (H-3). Equality, not non-zero.
+7. **Reachability, not just per-assertion correctness (H-3).** Obligation 6 is
+   satisfiable by a suite that tests each assertion in isolation while a code
+   path still reaches the signing call with a field unvalidated — a present but
+   bypassable decoder passes such a suite cleanly, and that is the failure mode
+   being defended against. The gate must therefore be a negative test: no
+   reachable path to signing exists with any enumerated authority field
+   unvalidated. Where a route constructs calldata locally rather than decoding
+   a provider's (Across `bridgeableToBridgeable`), the equivalent obligation is
+   that no provider-supplied bytes reach an address-typed field on that path.
 
 ## Sign-off
 
