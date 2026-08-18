@@ -1,0 +1,211 @@
+{
+  "captured_at": "2026-08-18T17:58:53Z",
+  "chain_ids": {
+    "base_mainnet": 8453,
+    "robinhood_mainnet": 4663
+  },
+  "findings": {
+    "blocking_require": "HubPool.sol _sendTokensToChainAndUpdatePooledTokenTrackers: require(l2Token != address(0), \"Route not whitelisted\")",
+    "green_ripe_in_across_token_map": false,
+    "hubpool_liveness_seconds": 7200,
+    "max_exclusivity_period_seconds": 31536000,
+    "origin_chain_repayment_possible_without_governance": false,
+    "robinhood_in_across_networks": true
+  },
+  "purpose": "Across V4 settlement-path evidence for GREEN/RIPE bridge evaluation (punchlist #f65mf6).",
+  "raw_responses": {
+    "available-routes?originChainId=4663&destinationChainId=8453": [
+      {
+        "destinationChainId": 8453,
+        "destinationToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "destinationTokenSymbol": "USDC",
+        "isNative": false,
+        "originChainId": 4663,
+        "originToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "originTokenSymbol": "USDG"
+      },
+      {
+        "destinationChainId": 8453,
+        "destinationToken": "0x4200000000000000000000000000000000000006",
+        "destinationTokenSymbol": "WETH",
+        "isNative": false,
+        "originChainId": 4663,
+        "originToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "originTokenSymbol": "WETH"
+      },
+      {
+        "destinationChainId": 8453,
+        "destinationToken": "0x4200000000000000000000000000000000000006",
+        "destinationTokenSymbol": "ETH",
+        "isNative": true,
+        "originChainId": 4663,
+        "originToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "originTokenSymbol": "ETH"
+      }
+    ],
+    "available-routes?originChainId=8453&destinationChainId=4663": [
+      {
+        "destinationChainId": 4663,
+        "destinationToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "destinationTokenSymbol": "USDG",
+        "isNative": false,
+        "originChainId": 8453,
+        "originToken": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "originTokenSymbol": "USDC"
+      },
+      {
+        "destinationChainId": 4663,
+        "destinationToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "destinationTokenSymbol": "WETH",
+        "isNative": false,
+        "originChainId": 8453,
+        "originToken": "0x4200000000000000000000000000000000000006",
+        "originTokenSymbol": "WETH"
+      },
+      {
+        "destinationChainId": 4663,
+        "destinationToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "destinationTokenSymbol": "ETH",
+        "isNative": true,
+        "originChainId": 8453,
+        "originToken": "0x4200000000000000000000000000000000000006",
+        "originTokenSymbol": "ETH"
+      }
+    ],
+    "suggested-fees?USDC(8453)->USDG(4663)&amount=1000000000": {
+      "capitalFeePct": "100000000000000",
+      "capitalFeeTotal": "100000",
+      "destinationSpokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+      "estimatedFillTimeSec": 1,
+      "exclusiveRelayer": "0x0000000000000000000000000000000000000000",
+      "exclusivityDeadline": 0,
+      "fillDeadline": "1787082887",
+      "id": "qrdjv-1787075933670-727596e81275",
+      "inputToken": {
+        "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "chainId": 8453,
+        "decimals": 6,
+        "symbol": "USDC"
+      },
+      "internalizedSwapFee": {
+        "pct": "500000000000000",
+        "total": "499947"
+      },
+      "isAmountTooLow": false,
+      "limits": {
+        "maxDeposit": "41420275064",
+        "maxDepositInstant": "41420275064",
+        "maxDepositShortDelay": "41420275064",
+        "minDeposit": "500149",
+        "recommendedDepositInstant": "41420275064"
+      },
+      "lpFee": {
+        "pct": "0",
+        "total": "0"
+      },
+      "lpFeePct": "0",
+      "outputAmount": "999394383",
+      "outputToken": {
+        "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "chainId": 4663,
+        "decimals": 6,
+        "symbol": "USDG"
+      },
+      "quoteBlock": "25783600",
+      "relayFeePct": "605670000000000",
+      "relayFeeTotal": "605617",
+      "relayGasFeePct": "5670000000000",
+      "relayGasFeeTotal": "5670",
+      "relayerCapitalFee": {
+        "pct": "100000000000000",
+        "total": "100000"
+      },
+      "relayerGasFee": {
+        "pct": "5670000000000",
+        "total": "5670"
+      },
+      "spokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+      "timestamp": "1787075687",
+      "totalRelayFee": {
+        "pct": "605670000000000",
+        "total": "605617"
+      }
+    },
+    "suggested-fees?WETH(8453)->WETH(4663)&amount=1000000000000000000": {
+      "capitalFeePct": "78750000000001",
+      "capitalFeeTotal": "78750000000001",
+      "destinationSpokePoolAddress": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+      "estimatedFillTimeSec": 0,
+      "exclusiveRelayer": "0x0000000000000000000000000000000000000000",
+      "exclusivityDeadline": 0,
+      "fillDeadline": "1787082887",
+      "id": "qvngb-1787075933924-f4f688bac21b",
+      "inputToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "chainId": 8453,
+        "decimals": 18,
+        "symbol": "WETH"
+      },
+      "internalizedSwapFee": {
+        "pct": "0",
+        "total": "0"
+      },
+      "isAmountTooLow": false,
+      "limits": {
+        "maxDeposit": "165389633943889708202",
+        "maxDepositInstant": "165389633943889708202",
+        "maxDepositShortDelay": "165389633943889708202",
+        "minDeposit": "261591101717083",
+        "recommendedDepositInstant": "165389633943889708202"
+      },
+      "lpFee": {
+        "pct": "24984076166429",
+        "total": "24984076166429"
+      },
+      "lpFeePct": "0",
+      "outputAmount": "999891697631154439",
+      "outputToken": {
+        "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "chainId": 4663,
+        "decimals": 18,
+        "symbol": "WETH"
+      },
+      "quoteBlock": "25783600",
+      "relayFeePct": "108302368845561",
+      "relayFeeTotal": "108302368845561",
+      "relayGasFeePct": "4568292679131",
+      "relayGasFeeTotal": "4568292679131",
+      "relayerCapitalFee": {
+        "pct": "78750000000001",
+        "total": "78750000000001"
+      },
+      "relayerGasFee": {
+        "pct": "4568292679131",
+        "total": "4568292679131"
+      },
+      "spokePoolAddress": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+      "timestamp": "1787075687",
+      "totalRelayFee": {
+        "pct": "108302368845561",
+        "total": "108302368845561"
+      }
+    }
+  },
+  "schema": "ripe.across-evidence.v1",
+  "source_pins": {
+    "api_base": "https://app.across.to/api",
+    "constants_files_read": [
+      "src/networks.ts",
+      "src/tokens.ts"
+    ],
+    "constants_repo": "https://github.com/across-protocol/constants",
+    "contracts_commit": "8aa73521538caff624f76d1fc9e6f8984a1b01be",
+    "contracts_commit_date": "2026-08-14T19:29:30+02:00",
+    "contracts_package_version": "5.0.27",
+    "contracts_repo": "https://github.com/across-protocol/contracts"
+  },
+  "spoke_pools": {
+    "4663": "0xD29C85F15DF544bA632C9E25829fd29d767d7978",
+    "8453": "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64"
+  }
+}
