@@ -2,7 +2,8 @@
 
 Reviewer: Leto
 Date: 2026-08-18
-Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected)
+Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected;
+rev 3 — added H-3, post-deposit authority fields)
 Scope: the trust boundaries a fast, liquidity-based bridge lane would touch for
 GREEN and RIPE on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -184,6 +185,56 @@ with zero RipeHq authorization**. No new `hqConfig` entry, no new
 `canMintGreen`/`canMintRipe` department. Any proposal that routes the fast lane
 through `GreenToken.mint` should be rejected on this basis alone.
 
+### H-3 — Provider deposit fields that carry post-deposit authority must be asserted equal to the connected wallet
+
+**Severity: High (funds at risk). Unresolved for Relay. Added rev 3.**
+
+Across V4 supplies the worked example, established at pinned commit
+`8aa73521538caff624f76d1fc9e6f8984a1b01be` and recorded in
+`across-settlement-evaluation.md`. `SpokePool._depositV3` validates `depositor`
+only as a bytes32 address format (`uint256(_bytes32) >> 160 == 0`,
+`libraries/AddressConverters.sol:19`) while pulling funds from `msg.sender`, so
+payer and recorded depositor are independent. The recorded depositor can then
+sign an EIP-712 `UpdateDepositDetails` (`SpokePool.sol:163`) that rewrites
+`updatedRecipient`, `updatedOutputAmount`, and `updatedMessage`; any relayer
+fills against it via `fillRelayWithUpdatedDeposit` and is repaid normally. Funds
+reach the signer on the ordinary success path.
+
+The generalizable point is not the specific field. It is that **a deposit
+parameter naming an address can confer authority that outlives the deposit
+transaction**, and validating the *payout* field does not constrain the field
+that can rewrite it. Two consequences bind this protocol:
+
+**No server-side compensating control exists.** The rewrite is a separate,
+later action — off-chain signature plus a relayer's choice of fill function. No
+amount of deposit-time calldata validation, allowlisting, or quote proxying
+observes it. The only moment the attack is preventable is before the user signs
+the deposit, by refusing calldata that names anyone else. That makes the
+client-side equality assertion the sole control, not a defence-in-depth layer.
+
+**The rule, applied per provider, is:** enumerate every address-typed field in
+the deposit payload; for each, determine whether it carries any authority after
+the deposit lands — amendment, cancellation, refund receipt, speed-up,
+delegation; assert equality with the connected signing address for every field
+that does. Equality, not non-zero: a non-zero attacker address is the attack.
+
+**Open for Relay.** Relay's Depository has not been pinned to a commit or
+audited against this rule (see Luna's counterparty note). The intent payload
+must be enumerated the same way before a direct GREEN lane ships. Until that is
+done, treat this finding as unresolved for Relay rather than as an Across-only
+issue that was fixed elsewhere.
+
+**Constraint on the deferred atomic variant.** Atomic bridge-and-deposit is out
+of v1, and this is a reason to keep it there. A destination-side fill handler
+receiving funds and depositing on the user's behalf makes the message the
+*deposit instruction*, and `updatedMessage` sits inside the same signature as
+`updatedRecipient` — a non-empty message triggers the recipient's
+`handleV3AcrossMessage` hook (`SpokePool.sol:531`, `:1034`). Whoever holds the
+amendment authority therefore controls both where funds land and what the
+handler is told to do with them. Any atomic design must treat the inbound
+message as attacker-controlled and authenticate the deposit instruction
+independently of the bridge payload.
+
 ## Test obligations
 
 Whatever design lands, these must be red-before-green:
@@ -198,8 +249,13 @@ Whatever design lands, these must be red-before-green:
    the enumerated department set above plus the registered CCIP pools; do
    **not** assert that only the pools can mint, which is false today (M-2).
 5. Token pause halts the fast lane as well as the canonical lane.
+6. For every provider, each address-typed deposit field carrying post-deposit
+   authority is asserted equal to the connected signing address, and the client
+   refuses to sign otherwise (H-3). Equality, not non-zero.
 
 ## Sign-off
 
-Not signed off. H-1 and H-2 remain unresolved and must be answered by the
-design before implementation starts.
+Not signed off. H-1, H-2, and H-3 remain unresolved and must be answered by
+the design before implementation starts. H-3 additionally requires Relay's
+deposit payload to be enumerated against a pinned commit before a direct GREEN
+lane can be assessed at all.
