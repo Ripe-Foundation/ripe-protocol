@@ -1942,6 +1942,14 @@ def test_full_payoff_owner_classification_depends_on_registry_health(
 
     # The caller is locally trusted, but a full payoff still classifies the
     # position owner so earn-vault owners never pay full-payoff extras.
+    # This used to pop mock_undy_v2 out of boa.env.sstore_trace around the
+    # reverts below, to dodge a diagnostic-only bug in Boa 0.2.7's revert
+    # renderer when the trace holds public HashMap[address, bool] writes.
+    # tests/conftest.py now clears that trace globally, but only at test
+    # boundaries -- setEarnVault above writes _earnVaults and
+    # _basicEarnVaults mid-test, after that clear. The two mechanisms are
+    # therefore not equivalent: if the renderer regresses here, the global
+    # fixture will not prevent it and the local pop has to come back.
     with boa.reverts("mock underscore vault check"):
         _deleverage_one(teller, bob, 0, sender=switchboard_alpha.address)
 

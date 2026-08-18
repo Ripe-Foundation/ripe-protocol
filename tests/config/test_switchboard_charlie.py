@@ -61,12 +61,6 @@ def _register_vault(vault_book, governance, vault, description):
 ###############
 
 
-@pytest.fixture(scope="module")
-def mock_auction_house():
-    """Mock auction house that can be controlled for testing"""
-    return boa.load("contracts/mock/MockAuctionHouse.vy", name="mock_auction_house")
-
-
 # These deployments are module-scoped because none of them is registered in
 # RipeHq or any shared registry, so building one per test only re-paid the
 # deployment. Titanoboa anchors every test call, so writes a test makes into
