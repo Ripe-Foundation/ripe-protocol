@@ -69,6 +69,9 @@ interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
 
+interface TokenBlacklist:
+    def blacklisted(_addr: address) -> bool: view
+
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
@@ -353,9 +356,11 @@ def _validateOnBorrow(
     newBorrowAmount = min(newBorrowAmount, availPerUser)
 
     # check global debt limit
+    newInterest: uint256 = _userDebt.amount - _d.userDebt.amount
+    liveTotal: uint256 = _d.totalDebt + newInterest
     availGlobal: uint256 = 0
-    if _config.globalDebtLimit > _d.totalDebt:
-        availGlobal = _config.globalDebtLimit - _d.totalDebt
+    if _config.globalDebtLimit > liveTotal:
+        availGlobal = _config.globalDebtLimit - liveTotal
     assert availGlobal != 0 # dev: global debt limit reached
     newBorrowAmount = min(newBorrowAmount, availGlobal)
 
@@ -413,9 +418,10 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     newBorrowAmount = min(newBorrowAmount, availPerUser)
 
     # check global debt limit
+    liveTotal: uint256 = d.totalDebt + na1
     availGlobal: uint256 = 0
-    if config.globalDebtLimit > d.totalDebt:
-        availGlobal = config.globalDebtLimit - d.totalDebt
+    if config.globalDebtLimit > liveTotal:
+        availGlobal = config.globalDebtLimit - liveTotal
     newBorrowAmount = min(newBorrowAmount, availGlobal)
 
     # must reach minimum debt threshold
@@ -1223,6 +1229,7 @@ def _handleGreenForUser(
 
         sgreenRecipient: address = _recipient
         if _shouldEnterStabPool:
+            assert not staticcall TokenBlacklist(_a.savingsGreen).blacklisted(_recipient) # dev: blacklisted
             sgreenRecipient = self
 
         # put GREEN into sGREEN

@@ -21,7 +21,7 @@ EXPECTED_RUNTIME_BYTES = {
     "RipeGov": 23493,
     "HumanResources": 12542,
     "AuctionHouse": 24568,
-    "CreditEngine": 24382,
+    "CreditEngine": 24556,
     "CreditRedeem": 8290,
     "Deleverage": 24424,
     "StabilityPool": 24002,
