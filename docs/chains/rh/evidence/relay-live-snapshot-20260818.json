@@ -1,0 +1,151 @@
+{
+  "captured_at": "2026-08-18T18:21:50Z",
+  "method": "direct eth_getCode / eth_call / eth_chainId over HTTPS JSON-RPC, curl + foundry cast, no summarizing intermediary",
+  "source_repos_cloned": {
+    "relay-depository": {
+      "url": "https://github.com/relayprotocol/relay-depository",
+      "commit": "458a64c310a3504aaf37e112af9a8707c9eb11ad",
+      "commit_date": "2026-08-13"
+    },
+    "relay-settlement": {
+      "url": "https://github.com/relayprotocol/relay-settlement",
+      "commit": "98ad1a0af009c247fb85205c2119f7371e684520",
+      "commit_date": "2026-07-14"
+    },
+    "relay-protocol-oracle": {
+      "url": "https://github.com/relayprotocol/relay-protocol-oracle",
+      "commit": "55b22de6358c212c22eebb48d2df5b793a16e863",
+      "commit_date": "2026-08-12"
+    },
+    "relay-periphery": {
+      "url": "https://github.com/relayprotocol/relay-periphery",
+      "commit": "af89497577a972283f586d98100db4e526cdf719",
+      "commit_date": "2026-06-26"
+    }
+  },
+  "note_on_earlier_ai_summary": "An initial WebFetch-summarized read of the relay-depository GitHub page claimed the repo was archived and merged into a repo called 'settlement-protocol'. That repo name does not exist under github.com/relayprotocol (confirmed via `gh api search/repositories?q=org:relayprotocol`) and relay-depository is not archived (confirmed via `gh api repos/relayprotocol/relay-depository`). Treat single-pass WebFetch summaries of vendor docs as leads to verify, not evidence, consistent with the standard the rest of this review already applies to Across.",
+  "relay_depository_deployment": {
+    "deployed_address_all_chains": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "create2_factory": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+    "source_file": "relay-depository/packages/ethereum-vm/deployments/addresses.prod.json",
+    "base": {
+      "chainId": 8453,
+      "rpc": "https://mainnet.base.org",
+      "eth_getCode_bytes": 8628,
+      "eth_getCode_checked_at": "2026-08-18T18:20:50Z",
+      "native_balance_eth": "8.555832000190031380",
+      "usdc_balanceOf_raw": "41090866291",
+      "usdc_token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "balance_checked_at": "2026-08-18T18:21:50Z"
+    },
+    "robinhood": {
+      "chainId": 4663,
+      "chainId_hex_onchain": "0x1237",
+      "rpc": "https://rpc.mainnet.chain.robinhood.com",
+      "eth_getCode_present": true,
+      "eth_getCode_checked_at": "2026-08-18T18:21:04Z",
+      "native_balance_eth": "3.161316821113969145",
+      "balance_checked_at": "2026-08-18T18:21:50Z"
+    },
+    "privilege_addresses": {
+      "allocator": {
+        "value": "0x63C1d3E9C646184529C5694630a01C00dF171b56",
+        "same_on_base_and_robinhood": true,
+        "is_contract": false,
+        "checked_via": "cast call allocator()(address) + cast code, both chains, 2026-08-18T18:21Z"
+      },
+      "owner": {
+        "value": "0xF61A305199fa1135d76FFaB3752D42F55cBd775A",
+        "same_on_base_and_robinhood": true,
+        "is_contract": false,
+        "checked_via": "cast call owner()(address) + cast code, both chains, 2026-08-18T18:21Z"
+      }
+    }
+  },
+  "relay_hub_settlement_layer": {
+    "chainId": 537713,
+    "note": "Relay's own dedicated settlement/ledger chain (RelayHub/RelayOracle/RelayAllocator live here, not on Base or Robinhood). No public RPC found for this chain during this review, so the deployed hub/oracle/oracleMultisig/allocator addresses below are taken from the repo's deployments file and were NOT independently live-verified the way the Base/Robinhood Depository was.",
+    "source_file": "relay-settlement/smart-contracts/deployments/hub-contracts/prod.json",
+    "addresses": {
+      "hub": "0xddd361727c22a01eb137880678a20b0beae69318",
+      "oracle": "0xd180dc3b8cb71b185c563b6e4857592ca93dacaf",
+      "oracleMultisig": "0x2a72eb8cf0233a3dc6198683c83b1078de6fa2b0",
+      "allocator": "0x613d3c588f6b8f89302b463f8f19f7241b2857e2",
+      "executor": "0x6747c7e64b90dccc0d54f865cbd9513156adbc0c"
+    },
+    "unverified": "Whether ORACLE_ROLE on the live `oracle` contract is actually granted to `oracleMultisig` (as opposed to some other EOA/contract) was not confirmed on-chain -- no public RPC available for chain 537713 during this review."
+  },
+  "audit_reports_read_directly": {
+    "certora_relay_escrow": {
+      "file": "relay-settlement/docs/audits/Certora-Relay-Escrow-Report.pdf",
+      "also_at": "relay-depository/audit-reports/Certora-Relay-Escrow-Report.pdf",
+      "title": "Relay Escrow",
+      "date": "June 2025 (work performed June 6-13, 2025)",
+      "scope": "Solana programs ONLY: escrow-contracts/packages/solana-vm/programs/{relay-escrow,relay-forwarder}/src/lib.rs, initial commit 91b182a. Does NOT cover the EVM RelayDepository.sol used on Base/Robinhood.",
+      "findings": "9 discovered, 9 confirmed, 9 fixed (2 critical, 1 high, 2 medium, 2 low, 2 informational), all Solana-specific (e.g. C-01 anyone could initialize the escrow and become owner/allocator; C-02 transfer recipient could be changed to an arbitrary address). Relevant only as evidence the vendor takes escrow-drainage classes of bugs seriously, not as coverage of the EVM contract."
+    },
+    "zellic_relay_protocol_oracle": {
+      "file": "relay-settlement/docs/audits/Relay Protocol Oracle - Zellic Audit Report.pdf",
+      "title": "Relay Protocol Oracle -- Web Application Security Assessment",
+      "date": "2026-04-15 (engagement 2026-03-10 to 2026-03-23)",
+      "client": "Uneven Labs, Inc. (the company behind Relay/Reservoir)",
+      "scope_note": "Explicitly excludes 'Related on-chain contracts' and 'Underlying infrastructure relating to hosting oracles'. This is an audit of the OFF-CHAIN attestor/API service, not of RelayOracle.sol or RelayOracleMultisig.sol.",
+      "results": "10 findings: 2 critical, 3 high, 3 medium, 1 low.",
+      "findings_relevant_to_base_robinhood_evm_path": [
+        {
+          "id": "3.3",
+          "title": "Too short finalization/confirmation window used for Ethereum VM and Bitcoin VM attestors",
+          "severity": "High",
+          "detail": "EthereumVmAttestor treated a tx as finalized after 60s (~5 blocks); a 2022 Ethereum reorg was 7 blocks. Impact stated by Zellic: 'result in loss of funds in the depository.'",
+          "remediation": "Acknowledged by Uneven Labs, Inc.; fixed in commits 18a05acf, c52198f1, 35ad4cde, ea8f995c (per report). Fix presence in the currently deployed, running off-chain attestor service was not independently verifiable -- that's a live server, not something visible in a GitHub source tree."
+        },
+        {
+          "id": "3.4",
+          "title": "Ethereum VM, Tron VM, and Bitcoin VM attestors do not ensure finalization/confirmation in getDepositoryWithdrawalMessage",
+          "severity": "High",
+          "detail": "Withdrawal-side analogue of 3.3; on reorg a solver's withdrawal attestation can be invalidated and its Hub balance not restored.",
+          "remediation": "Acknowledged; fixed per commits f76e7af0, 6ec03874 (per report)."
+        }
+      ],
+      "findings_not_relevant_to_evm": "3.1, 3.2, 3.6, 3.8 are Solana VM / Sui VM specific (both critical findings, 3.1 and 3.2, are in this bucket). Uneven Labs' remediation note for 3.1/3.2/3.6 states Sui VM support was removed from the codebase entirely rather than patched.",
+      "auditor_closing_recommendation": "Zellic's own 'Assessment Results' section: 'we recommend a comprehensive reassessment of the codebase following remediation efforts... multiple reoccurring patterns resulting in serious issues from the attestation system of the oracle, which is essential and critical infrastructure of the protocol.' No evidence found (in this review) of a published follow-up reassessment as of 2026-08-18."
+    },
+    "zellic_relay_settlement_protocol": {
+      "file": "relay-settlement/docs/audits/Relay-Settlement-Protocol-Zellic-Audit.pdf",
+      "title": "Relay Settlement Protocol -- Smart Contract Security Assessment",
+      "date": "2026-11-21 [sic, report cover date] -- engagement window 2025-10-16 to 2025-11-12, 2025",
+      "client": "Uneven Labs, Inc.",
+      "scope": "EVM (incl. ethereum-vm/src/**.sol under 'Target: Relay Depository', repo relay-depository @ aec671d3e3e7b72135cf2d570eb6cc59e757908b), Solana, Sui Move, TON, plus RelayAllocator.sol / ChainSignatures.sol / PayloadBuilders / RelayMultisigSigner.sol from repo relayprotocol/decentralized-protocol @ 15ba05ba0ae1e65e1d72c4ddeb18312568802f45.",
+      "goals_stated_by_auditor": [
+        "Are funds safe when deposited in the Depository contract?",
+        "Are withdrawals safe on EVM, Solana, and Bitcoin chains?",
+        "Are access controls properly implemented to prevent unauthorized operations?"
+      ],
+      "explicit_non_goals": ["Front-end components", "Infrastructure relating to the project", "Key custody"],
+      "results": "11 findings: 1 critical, 2 high, 5 medium, 2 low, 1 informational.",
+      "findings_of_note": [
+        {
+          "id": "3.2",
+          "title": "RelayHub allows for arbitrary token transfers",
+          "reported_severity": "Critical (category/likelihood), downgraded to Informational impact only because the file was outside the engagement's defined scope -- Zellic documented it anyway",
+          "quote": "Anyone can transfer any amount of anyone's RelayHub tokens, at any time.",
+          "mechanism": "RelayHub.transferFrom() skips the allowance check whenever msg.sender == erc20Views[id] (the token's own ERC20View wrapper). ERC20View.transferFrom() used to pass calls straight through without checking allowance itself, so calling through the wrapper bypassed the Hub-level check entirely.",
+          "remediation": "Acknowledged; fix in PR #171 said to be intended for merge. INDEPENDENTLY VERIFIED during this review: the currently cloned relay-settlement source (commit 98ad1a0, 2026-07-14, ~8 months after the Nov 2025 report) still has the allowance-skip in RelayHub.transferFrom() unchanged, BUT ERC20View.transferFrom() (same commit) now independently checks and decrements the Hub allowance itself (`hub.allowance` + `hub.approveFor`) before ever calling hub.transferFrom(). Since erc20Views[id] is only ever set to a Hub-deployed, immutable wrapper address, and that wrapper now self-enforces the allowance, the practical vulnerability appears closed as of the cloned commit -- fixed at the caller rather than at the Hub function itself. Flagging the verification method so this isn't taken on the audit doc's word alone."
+        },
+        {
+          "id": "3.3",
+          "title": "Critical variables not signed in signWithdrawPayloadHash (RelayAllocator / NEAR Chain Signatures path)",
+          "reported_severity": "Critical (category), High (impact)",
+          "detail": "gasSettings and hashIndex are attacker-controllable and not covered by the receiver's signature, allowing a withdrawal request to be redirected to unintended inputs after a valid signature was obtained.",
+          "remediation_quote_from_vendor": "This affects a flow that we will actually never use because the Hub contract will never be deployed on Aurora and we will keep relying on the permissioned role in the short term. Long term, we will decouple the signing logic from Near's chain signature...",
+          "significance_for_this_review": "Direct, vendor-sourced (not our inference) confirmation that the decentralized NEAR-MPC/Chain-Signatures signing path present in the codebase and covered by these audits is NOT what production currently uses for allocator-side authorization. Production relies on what the vendor calls 'the permissioned role' -- consistent with the plain-EOA allocator/owner independently observed on the live Base/Robinhood RelayDepository above."
+        }
+      ],
+      "auditor_closing_recommendation": "'We strongly recommend a follow-up assessment prior to deployment.' No evidence found (in this review) of a published follow-up smart-contract reassessment as of 2026-08-18."
+    }
+  },
+  "bug_bounty": {
+    "checked": true,
+    "result": "No public Immunefi/Cantina/HackenProof/Sherlock/Code4rena bug bounty program for Relay Protocol or Uneven Labs was found via web search during this review. Absence of evidence, not evidence of absence -- worth a direct question to Relay rather than treating this as confirmed."
+  }
+}
