@@ -95,12 +95,20 @@ Across collateral v1 has these hard admission controls:
 7. **Sign-time freshness:** re-quote and re-read capacity immediately before
    signature. Capacity is solver inventory and changes without an event.
 
-For the current `bridgeableToBridgeable` route, prefer constructing the plain
-deposit call locally from the allowlisted ABI and independently validated
-structured values. If provider calldata is used, recursively decode it. Either
-path ends in the same terminal validator and the same negative reachability
-test: no signing path exists with any field, selector, message, or nested frame
-unvalidated. Partial field coverage is not partial safety.
+For the current `bridgeableToBridgeable` route, the phase-zero validator can be
+smaller than a generic recursive decoder, but it cannot disappear. The Swap API
+does not expose every deposit field as structured JSON, and its supported
+integration contract is to execute the returned `swapTx`. Decode that one flat,
+known ABI; validate every field; locally re-encode the canonical deposit prefix;
+and require a byte-for-byte prefix match before signing. The captured response
+also contains trailing bytes after the canonical ABI payload, so the client must
+accept only an explicitly documented and configured metadata suffix rather than
+silently stripping or copying arbitrary bytes. Until Across confirms the suffix
+for Ripe's registered integrator, the sign path stays disabled. Any wrapper,
+periphery route, or later provider-supplied nested call still requires recursive
+decoding. Every path ends in the same negative reachability test: no signing path
+exists with any field, selector, message, suffix, or nested frame unvalidated.
+Partial field coverage is not partial safety.
 
 V1 stays two-step: bridge to the user's wallet, then use Ripe's existing deposit
 flow. Atomic bridge-and-deposit would introduce a destination handler and make
@@ -349,8 +357,15 @@ Across collateral:
 
 - unsupported, unknown, stale, or under-capacity route never reaches signing;
 - GREEN/RIPE is rejected by address at API and client even if upstream lists it;
+- a golden captured Swap API quote decodes and canonically re-encodes to the
+  expected V4 prefix and configured metadata suffix;
 - attacker `depositor`, recipient, token, amount, chain, spender, target,
-  deadline, exclusivity pair, or nested call never reaches signing;
+  deadline, exclusivity pair, suffix, or nested call never reaches signing;
+- fields from two individually valid quotes cannot be spliced; quote id/expiry,
+  decoded output, and the bridge-step output remain one bound record;
+- stale/future quote timestamps, expired or too-near/too-far fill deadlines,
+  `uint32` overflow, either exclusivity encoding, and an unknown filler fail
+  closed;
 - `unsafeDeposit`, non-empty message/V5, periphery, callback, and unknown
   selector never reaches signing;
 - no alternate sign path bypasses the terminal validator; and

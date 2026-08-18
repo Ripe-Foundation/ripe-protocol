@@ -379,15 +379,29 @@ validator that assumes the field is an absolute deadline misreads this value
 entirely, which is the concrete case for resolving the encoding before bounding
 it.
 
-**Every address field in this call is already known to the client** from Ripe's
-own route configuration, the connected wallet, and user input. Only
-`outputAmount`, the two timestamps, and the exclusivity pair are genuinely
-provider-derived, and all are numbers with checkable bounds. Whether to exploit
-that — constructing the calldata locally rather than decoding a returned blob —
-is an integration design decision recorded in the API plan, not settled here.
-Note the scope limit: it holds for `bridgeableToBridgeable` routes. A route
-carrying a swap leg targets `SpokePoolPeriphery.swapAndBridge` with genuinely
-opaque swap calldata, where decoding remains necessary.
+**Every value-bearing or authority-bearing address except `exclusiveRelayer` is
+already known to the client** from Ripe's route configuration and the connected
+wallet. `outputAmount`, the two timestamps, `exclusivityParameter`, and
+`exclusiveRelayer` are provider-derived; the numeric fields have explicit bounds
+and the relayer must resolve to a configured filler.
+
+That makes a local canonical re-encoding useful, but it does not make decoding
+optional. The Swap API exposes some of those provider-derived fields only inside
+`swapTx.data`, and Across's migration guide tells integrations to execute the
+returned `swapTx` rather than manually encoding a replacement. The captured
+calldata also ends with `0x73c0de` after the canonical empty-`message` ABI
+payload. Solidity tolerates trailing bytes, but neither source nor the public API
+schema establishes that this suffix may be stripped or reproduced by
+assumption. The v1 control is therefore: decode the exact flat ABI, validate all
+fields, locally re-encode and compare the canonical prefix, then accept only a
+documented/configured metadata suffix before executing the returned transaction.
+The sign path remains disabled until Across confirms the suffix for Ripe's
+registered integrator.
+
+This still removes the *generic recursive* decoder from the
+`bridgeableToBridgeable` critical path. A route carrying a swap leg targets
+`SpokePoolPeriphery.swapAndBridge` with opaque swap calldata and remains outside
+v1; if admitted later, it requires full recursive decoding.
 
 ## Live facts as captured 2026-08-18T17:58:53Z
 
