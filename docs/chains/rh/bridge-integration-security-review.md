@@ -1,22 +1,26 @@
-# Security review — a direct Relay lane for GREEN / RIPE
+# Security review — a direct Relay lane for GREEN
 
 Reviewer: Leto
 Date: 2026-08-18
 Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected;
 rev 3 — added H-3, post-deposit authority fields;
 rev 4 — added H-4 custody exposure;
-rev 5 — H-3 Relay resolution RETRACTED, H-4 ceiling corrected to receivable)
-Scope: the trust boundaries a fast, liquidity-based bridge lane would touch for
-GREEN and RIPE on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
+rev 5 — H-3 Relay resolution retracted, H-4 ceiling corrected to receivable;
+rev 6 — bound effective Relay attribution, added live cross-layer privilege graph)
+Scope: the trust boundaries a direct, liquidity-based GREEN bridge lane would
+touch on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
 Across token bridging for GREEN/RIPE has been rejected, so this review is
-scoped to a **direct Relay lane**. The findings are properties of the
-*fast-fill-from-float* shape rather than of any one vendor, so they apply to
-any future liquidity-based lane; they are not claims about Relay's own
-contracts, which are out of scope here.
+scoped to a **direct Relay lane**. H-1, H-2, and the medium findings are
+properties of the *fast-fill-from-float* shape and apply to any future
+liquidity-based lane. H-3 and H-4 are provider-specific. The original
+RipeHq-side review did not audit Relay's contracts; those two findings now
+consume the separate pinned-source and live privilege evaluation in
+`relay-settlement-evaluation.md`.
 
 Out of scope: the local-mint acquisition flow. That is a separate product path,
-not a GREEN transfer route.
+not a GREEN transfer route. RIPE has no fast lane in the selected venue-first
+sequence and remains on CCIP only.
 
 ## What the current mint boundary actually is
 
@@ -95,7 +99,7 @@ one lever that *does* cover it is `Erc20Token.pause`, but that is a token-wide
 freeze that also stops every user transfer, DEX pool, and vault interaction.
 Nobody will reach for it quickly.
 
-Recommendation: the filler must be a Ripe-controlled contract reading a
+Recommendation: the payout component must be a Ripe-controlled contract reading a
 Ripe-controlled gate, and it must fail closed. Prefer a **dedicated bridge
 switch** over reusing `mintEnabled`, so the lane can be stopped without halting
 borrowing and rewards. If a permissionless third-party solver market is ever
@@ -103,12 +107,14 @@ enabled for GREEN/RIPE, it must be documented as an outflow channel governance
 **cannot** stop short of a token-wide pause.
 
 Note for the float design: `Endaoment` is already a `canMintGreen` department.
-If it is also the float holder, fill logic executes inside a contract that
+If it is also the float holder, payout logic executes inside a contract that
 holds mint authority — the blast radius of a fill bug is then minting, not just
-inventory. Prefer a separate, non-mint-authorized filler contract funded by
-Endaoment, so the fast lane never shares an address with mint rights.
+inventory. Prefer a separate, non-mint-authorized payout contract funded by
+Endaoment, so the fast lane never shares an address with mint rights. Relay's
+pinned order format separately requires the solver identity to be an EVM EOA;
+that signer must never be sufficient to move payout inventory.
 
-### H-2 — Blacklist on the settlement leg blocks it indefinitely, and float-fronting moves the exposure onto Ripe
+### H-2 — Blacklist can block settlement indefinitely and move the exposure onto Ripe
 
 **Severity: High (funds at risk). Unresolved. Corrected in rev 2.**
 
@@ -131,7 +137,7 @@ as long as the flag is set.
   mitigation cannot be assumed; it would have to be built.
 
 The exposure still inverts under fast-fill-then-settle. The user is paid
-instantly from float, so it is *Ripe's* rebalancing leg that blocks. If the
+instantly from float, so it is *Ripe's* rebalancing leg that is blocked. If the
 float or settlement address is blacklisted — including by mistake, or by a
 `canSetTokenBlacklist` department acting on a heuristic — the canonical leg
 backing already-fronted fills is blocked until governance clears the flag, and
@@ -144,9 +150,9 @@ single governance call.
 
 Recommendation, in order of preference:
 
-1. Bound the exposure rather than assume immunity: hard caps on fronted-unsettled
-   notional and on oldest-unsettled age (see M-1), so a blocked settlement leg
-   is capped rather than open-ended.
+1. Bound the exposure rather than assume immunity: separate hard notional and
+   age caps for the Relay receivable and the CCIP rebalancing backlog (see M-1),
+   so a blocked settlement leg is capped rather than open-ended.
 2. Check blacklist status of recipient, float, and settlement addresses at fill
    time, before the fast payout — cheap and catches the common case.
 3. If a protected-settlement-address primitive is wanted, it is **new work** on
@@ -162,14 +168,17 @@ nothing to stop the origin chain from burning and dispatching. In-flight
 messages then pile up unexecutable while the fast lane keeps fronting against a
 settlement path that is closed.
 
-The circuit breaker for this must be driven by *observed settlement backlog*
-(fronted-but-unsettled notional, and age of the oldest unsettled fill), and it
-must act on the **send** side. A breaker that only reacts to the destination
-chain's state is one round-trip too late.
+The circuit breaker for this must be driven by the *observed end-to-end fill
+lifecycle* and act on the **send** side. Track its two stages separately:
+(a) destination value paid but the origin Relay receivable not yet withdrawn,
+and (b) origin value withdrawn but destination inventory not yet restored through
+CCIP. Each stage needs a hard notional cap and maximum age. A breaker that only
+reacts to the destination chain's state is one round-trip too late.
 
-Recommendation: hard caps on (a) total fronted-unsettled notional and (b) oldest
-unsettled age, both enforced in the filler contract, both failing closed. These
-caps are also the bound that makes H-2 tolerable.
+Recommendation: enforce both ledgers in the payout contract and fail closed when
+either would exceed its notional or age bound. These caps are also the bound that
+makes H-2 tolerable; one aggregate number must not hide which recovery path is
+stalled.
 
 ### M-2 — Hold the line on mint authority: a new mint-authorized bridge has no fast kill switch
 
@@ -187,9 +196,11 @@ with zero RipeHq authorization**. No new `hqConfig` entry, no new
 `canMintGreen`/`canMintRipe` department. Any proposal that routes the fast lane
 through `GreenToken.mint` should be rejected on this basis alone.
 
-### H-3 — Provider deposit fields that carry post-deposit authority must be asserted equal to the connected wallet
+### H-3 — Provider deposit authority must resolve to the connected wallet
 
-**Severity: High (funds at risk). Unresolved for Relay. Added rev 3.**
+**Severity: High (funds at risk). Required control identified; unresolved until
+the exact GREEN quote/order schema is enumerated and the control is implemented.
+Added rev 3.**
 
 Across V4 supplies the worked example, established at pinned commit
 `8aa73521538caff624f76d1fc9e6f8984a1b01be` and recorded in
@@ -207,20 +218,24 @@ parameter naming an address can confer authority that outlives the deposit
 transaction**, and validating the *payout* field does not constrain the field
 that can rewrite it. Two consequences bind this protocol:
 
-**No server-side compensating control exists.** The rewrite is a separate,
-later action — off-chain signature plus a relayer's choice of fill function. No
-amount of deposit-time calldata validation, allowlisting, or quote proxying
-observes it. The only moment the attack is preventable is before the user signs
-the deposit, by refusing calldata that names anyone else. That makes the
-client-side equality assertion the sole control, not a defence-in-depth layer.
+**Two independent pre-sign controls are required.** The later rewrite is a
+separate off-chain signature plus a relayer's choice of fill function, so the
+deposit contract cannot prevent it. But the address that receives that authority
+*is* visible in the deposit calldata. An honest quote proxy must decode and reject
+an attacker-named depositor first; the browser repeats the semantic check against
+the values it rendered so a buggy or compromised proxy cannot attest to its own
+malicious output. Both refuse before signing. The browser check is independent,
+not the sole control; an on-chain depositor-to-payer binding does not exist.
 
 **The rule, applied per provider, is:** enumerate every address-typed field in
 the deposit payload; for each, determine whether it carries any authority after
 the deposit lands — amendment, cancellation, refund receipt, speed-up,
-delegation; assert equality with the connected signing address for every field
-that does. Equality, not non-zero: a non-zero attacker address is the attack.
+delegation; then prove its **effective** beneficiary or authority is the
+connected signer. An explicit address must equal the signer, not merely be
+non-zero. A sentinel is acceptable only when the exact call frame proves it
+resolves to that signer.
 
-**NOT resolved for Relay — rev 4 was wrong and is retracted.** Rev 4 stated
+**Relay-specific correction — rev 4's reasoning was wrong and is retracted.** Rev 4 stated
 that Relay has no field to assert equality against because it tracks no
 per-depositor balance on-chain. That inference does not hold: Relay's
 attribution is **event-driven and off-chain**, so the absence of on-chain
@@ -239,25 +254,38 @@ function depositErc20(address depositor, address token, uint256 amount, bytes32 
 }
 ```
 
-Funds come from `msg.sender`; the **credited** address is caller-supplied; the
-Hub attributes off that event. Naming an attacker credits the attacker. Same
-class as Across.
+Funds come from `msg.sender`; the attribution address is caller-supplied; the
+Hub derives order ownership, recovery, and withdrawal paths from that event.
+Naming an attacker changes the Hub attribution even though the Depository stores
+no per-user balance. Same authority class as Across, with different mechanics.
 
-**And the safe value is inverted between the two providers.** For Relay,
-`address(0)` is the documented self-credit sentinel — the *safe* value. For
-Across, a zero depositor burns the refund leg and a non-zero attacker address is
-the attack. So:
+**The zero sentinel is safe only in a direct call.** For Relay,
+`address(0)` resolves to the inner call's `msg.sender`. That is the connected
+wallet when it calls the Depository directly; through a router or multicall it
+is the intermediary contract. Across has no equivalent safe sentinel: zero
+burns the refund leg. So:
 
 | | Across | Relay |
 | --- | --- | --- |
-| Safe values | `depositor == connected` only | `depositor == connected` **or** `address(0)` |
-| `depositor != 0` as a check | wrong — the attack is non-zero | wrong — rejects the safe sentinel |
+| Safe values | `depositor == connected` only | effective depositor equals connected; explicit equality is preferred |
+| Zero | unsafe | allowed only when the connected wallet directly calls the Depository |
+| `depositor != 0` as a check | wrong — the attack is non-zero | incomplete — does not prove effective attribution |
 
 This is the strongest argument for the enumeration rule being *per provider*
 rather than a shared checklist. A control correct for one provider is wrong for
 the other in both directions, and the failure is silent. An implementer who
 generalizes the Across rule to Relay writes a check that rejects safe deposits;
-one who generalizes Relay's to Across writes a check that permits the attack.
+one who treats zero as universally safe for Relay can credit an intermediary.
+
+For a direct Relay ERC-20 deposit, allow only the explicit-amount
+`depositErc20(address,address,uint256,bytes32)` selector `0xe8017952`; reject the
+full-allowance overload `0x5a1ee3ac`. The quote must include signed protocol
+data: schema-decode the order, recompute its id, bind calldata `id` to that
+order, verify the configured Ripe solver-EOA signature, and assert every input,
+output, refund, call, deadline, fee, and extra-data field against the rendered
+terms.
+Unknown order versions, raw transfers, deposit-address routes, and unenumerated
+periphery calls fail closed.
 
 **Constraint on the deferred atomic variant.** Atomic bridge-and-deposit is out
 of v1, and this is a reason to keep it there. A destination-side fill handler
@@ -271,21 +299,15 @@ message as attacker-controlled and authenticate the deposit instruction
 independently of the bridge payload.
 
 
-### H-4 — A bounded fronted-notional cap does not bound custody risk; Relay's Depository is two EOA keys
+### H-4 — Relay receivables are exposed to three EOA authority roots
 
 **Severity: High (funds at risk). Unresolved. Added rev 4.**
 
-M-1's caps and H-1's "bounded float" both bound Ripe's exposure to *its own*
-settlement lag — how much has been fronted and not yet reconciled. They say
-nothing about the float while it sits idle in the provider's custody, which is
-the larger number: enough inventory to serve bursts, not merely to cover
-in-flight fills.
-
 **Correction (rev 5): the exposure is the receivable, not the inventory.** Rev
 4 described Ripe's destination inventory as "standing float parked in Relay's
-Depository." That is not the flow. In Relay's model the filler holds destination
-inventory in its **own** custody and pays the user from it; the Depository holds
-the *user's* origin-chain deposit, which the filler later collects. So what Ripe
+Depository." That is not the flow. In Relay's model the payout contract holds
+destination inventory in Ripe's custody and pays the user; the Depository holds
+the *user's* origin-chain deposit, which Ripe later collects. So what Ripe
 has inside Relay's custody is an **outstanding, unwithdrawn receivable**, not
 its whole inventory. The correct loss ceiling is that receivable. This matches
 the cap framing in `relay-settlement-evaluation.md` and supersedes the wording
@@ -301,32 +323,66 @@ The custody finding itself stands, live-queried on Base and Robinhood at
 - `owner` = an **EOA**, able to repoint `allocator` instantly via `setAllocator`
   (`:92-96`) — `onlyOwner`, no timelock, no two-step handoff.
 
+The same owner EOA is also a cross-layer superadmin. Live Relay-chain queries
+confirmed that `0xF61A...775A` owns the 2-of-5 Oracle multisig, administers the
+Oracle and Hub roles, and already holds Hub `OPERATOR_ROLE`. It can change the
+multisig signer set or threshold, grant roles, directly mint/burn Hub balances,
+replace RelayAllocator payload builders, suspend a solver alias, and then
+repoint the Depository allocator. The 2-of-5 normal path is real, but it is not
+a security boundary against compromise of this EOA. The separate allocator EOA
+can independently authorize arbitrary Depository calls.
+
+The pinned order path requires a **Ripe solver EOA** as a third authority root.
+The Oracle credits fills to that EOA's Hub alias, and `RelayAllocator` lets the
+20-byte spender submit a withdrawal with a caller-chosen receiver. The Ripe
+payout contract can stop a compromised solver signer from moving destination
+inventory only by independently revalidating every order; it cannot stop that
+signer from redirecting the outstanding Hub receivable. Require audited HSM/MPC
+custody and explicit full-receivable-loss acceptance, or stop until Relay
+supports ERC-1271 solvers or restricts the receiver on-chain.
+
 Two amplifiers that survive the correction and make the smaller number harder to
 manage than it looks:
 
 **Ripe cannot collect unilaterally.** The only exit from the Depository is
 `execute(CallRequest, signature)` gated on `allocator.isValidSignatureNow`.
-There is no depositor-initiated withdrawal and no refund path. So the *age* of
-Ripe's receivable is set by Relay's willingness to sign, not by Ripe's
+There is no autonomous depositor-controlled refund or exit path; recovery still
+ends in allocator-authorized `execute`. So the *age* of Ripe's receivable is set
+by Relay's willingness to sign, not by Ripe's
 reconciliation cadence. "Withdraw more often to keep the exposure small" is not
 a control Ripe holds — which means the cap has to be enforced where Ripe does
-have control: by the filler declining to fill once the outstanding receivable
+have control: by the payout contract declining to fill once the outstanding receivable
 reaches the ceiling.
 
-**The pool is shared.** A drain by either EOA does not take only Ripe's
+**The pool is shared.** A drain by either Relay EOA does not take only Ripe's
 receivable; it takes the pool that every relayer's receivable is claimed
 against. Ripe's loss is bounded by what it is owed, but the probability is not
 independent of other participants' exposure.
 
-So the two independent numbers are: (1) fronted-unsettled notional and age caps
-(M-1), enforced by the filler; and (2) a ceiling on **outstanding Relay
-receivable**, also enforced by the filler as a refusal to fill, since Ripe
-cannot shrink it from the collection side.
+The design therefore carries three independent numbers: (1) the Ripe-controlled
+payout inventory/hot-contract ceiling; (2) a per-token, per-chain **and
+aggregate** ceiling plus maximum age for outstanding Relay receivables; and (3)
+the end-to-end CCIP rebalancing backlog notional and age caps from M-1. The same
+two admin keys across Base and Robinhood make provider loss correlated, which is
+why (2) needs an aggregate bound.
+
+Independent destination payout contracts cannot atomically observe a cross-chain
+aggregate. Implement (2) by partitioning the governance-approved common-mode
+budget into hard chain-local allocations whose sum cannot exceed it. Transition
+capacity from the Relay-receivable ledger to the CCIP-backlog ledger only through
+a separately reviewed proof/coordinator that verifies origin finality, replay,
+and chain/domain binding. A provider API or unsigned indexer status cannot release
+exposure. That transition mechanism remains an implementation gate.
 
 Recommendation: size (2) as an amount the protocol can lose outright without
 impairing GREEN's backing, and state it that way in the governance decision
-rather than as a liquidity parameter. If no such amount is large enough to make
-the lane useful, that is the answer to whether the lane ships.
+rather than as a liquidity parameter. Request withdrawals immediately, but do
+not call cadence a unilateral mitigation: Relay controls the signature needed
+to collect. Require a vendor answer on both Relay EOAs' custody and whether the
+roles will move to isolated, delayed multisig control or a token-isolated
+Depository. Separately approve the Ripe solver EOA's HSM/MPC policy and
+receiver-redirection risk. If no accepted full-loss amount is large enough to
+make the lane useful, the lane does not ship.
 
 ## Test obligations
 
@@ -335,16 +391,18 @@ Whatever design lands, these must be red-before-green:
 1. Fill reverts when the dedicated bridge gate is off (H-1).
 2. Fill reverts when recipient, float, or settlement address is blacklisted
    (H-2).
-3. Fronted-unsettled notional cap and staleness cap both fail closed (M-1).
+3. Relay-receivable and CCIP-rebalancing notional/age caps each fail closed and
+   cannot release or double-count exposure across the stage transition (M-1).
 4. Invariant: the set of addresses satisfying `RipeHq.canMintGreen` /
    `canMintRipe` is unchanged by the Relay integration — specifically, no
    filler, float, settlement, or Relay-owned address joins it. Assert against
    the enumerated department set above plus the registered CCIP pools; do
    **not** assert that only the pools can mint, which is false today (M-2).
 5. Token pause halts the fast lane as well as the canonical lane.
-6. For every provider, each address-typed deposit field carrying post-deposit
-   authority is asserted equal to the connected signing address, and the client
-   refuses to sign otherwise (H-3). Equality, not non-zero.
+6. For every provider, the effective beneficiary of each address-typed field
+   carrying post-deposit authority is proven to be the connected signer, and
+   the client refuses to sign otherwise (H-3). Explicit fields require equality;
+   sentinels require proof of their call-frame semantics.
 7. **Reachability, not just per-assertion correctness (H-3).** Obligation 6 is
    satisfiable by a suite that tests each assertion in isolation while a code
    path still reaches the signing call with a field unvalidated — a present but
@@ -354,17 +412,37 @@ Whatever design lands, these must be red-before-green:
    unvalidated. Where a route constructs calldata locally rather than decoding
    a provider's (Across `bridgeableToBridgeable`), the equivalent obligation is
    that no provider-supplied bytes reach an address-typed field on that path.
+8. Across v1 accepts only plain `deposit(...)` selector `0xad5425c6`, requires
+   `message == 0x`, and rejects `unsafeDeposit(...)` selector `0x8b15788e` at
+   every nesting level. A negative reachability test proves there is no signing
+   path for `unsafeDeposit` or a non-empty message.
+9. Relay allows only explicit-amount ERC-20 deposit selector `0xe8017952`; the
+   full-allowance overload `0x5a1ee3ac`, opaque orders, and unenumerated route
+   shapes cannot reach signing. Order id, effective depositor, configured solver
+   signature, refund authority, and all rendered terms are bound.
+10. Relay receivable accounting refuses a fill when its chain-local allocation
+    or maximum age would be exceeded; configured allocations cannot sum above
+    the aggregate full-loss budget. Forged, replayed, stale, or wrong-chain
+    transition evidence cannot release exposure. Ripe-controlled destination
+    inventory is not counted as provider custody.
+11. A valid signature from the configured Ripe solver EOA is insufficient by
+    itself to move payout inventory: the contract independently revalidates the
+    order, pause, limits, recipient, and exact amount. A hostile withdrawal
+    receiver can lose at most the already-reserved receivable allocation.
 
 ## Sign-off
 
-Not signed off. H-1, H-2, H-3, and H-4 are all unresolved and must be answered
-by the design before implementation starts. H-3's rev-4 status of "resolved for
-Relay" was wrong and is retracted — Relay carries the same authority-bearing
-`depositor` field with an inverted safe value.
+Not signed off. H-1, H-2, and H-4 remain unresolved owner decisions. H-3's
+rev-4 rationale was wrong and is retracted; the required answer is now the
+effective-depositor and complete-order admission rule above, but H-3 remains an
+implementation/admission blocker until the exact GREEN route is enumerated and
+tested. No implementation or live GREEN-route conformance evidence exists yet.
 
 H-4 is the one that should be settled first. It is not a design detail to be
 refined during implementation — it asks whether the protocol is willing to
-place a standing balance in a contract whose withdrawal authority is a single
-EOA signature. If the answer is no, H-1's and M-1's filler controls are moot for
-Relay, and the retail GREEN lane does not ship in this form regardless of how
-well the Ripe-side pieces are built.
+accept full, instant loss of the capped outstanding Relay receivable under two
+Relay EOA authorities, including one cross-layer superadmin, plus the required
+Ripe solver EOA. Destination inventory remains contract-controlled, but that
+does not restore value already fronted. If the answer is no, H-1's and M-1's
+payout controls are moot for Relay, and the retail GREEN lane does not ship in
+this form regardless of how well the Ripe-side pieces are built.

@@ -7,11 +7,12 @@ Evaluation date: 2026-08-18
 Scope: whether Across can settle a GREEN or RIPE bridge transfer between Base
 mainnet (8453) and Robinhood mainnet (4663), and what onboarding would require.
 
-Evidence snapshot:
-[`evidence/across-live-snapshot-20260818.json`](evidence/across-live-snapshot-20260818.json)
+Evidence snapshots:
 
-Evidence file SHA-256:
-`197df8d75d97410811b7b1f0aa93e2b785bf26424629c61b3f3bedaf33b83c2e`.
+- [`evidence/across-live-snapshot-20260818.json`](evidence/across-live-snapshot-20260818.json),
+  SHA-256 `197df8d75d97410811b7b1f0aa93e2b785bf26424629c61b3f3bedaf33b83c2e`;
+- [`evidence/across-swap-api-usdc-usdg-20260818.json`](evidence/across-swap-api-usdc-usdg-20260818.json),
+  SHA-256 `240e07f636194ace540e27241e5aee47a1cc41909e5cba5772a0584882dd32e0`.
 
 ## Source pins
 
@@ -33,9 +34,10 @@ are point-in-time and are not a durable supported-route authority; see
 
 ## Determination
 
-**Across cannot repay a GREEN or RIPE relayer on the origin chain, or on any
-other chain, without Across DAO governance onboarding. Origin-chain repayment is
-not an escape hatch — it is gated identically to every other repayment chain.**
+**On the evaluated V4 path, Across cannot repay a GREEN or RIPE relayer on the
+origin chain, or on any other chain, without Across DAO governance onboarding.
+Origin-chain repayment is not an escape hatch — it is gated identically to every
+other repayment chain.**
 
 This is a governance and token-registration blocker, **not** a custom
 HubPool/canonical-bridge adapter engineering task. That distinction is the
@@ -228,7 +230,8 @@ control an integrator might otherwise assume exists:
 
 - **The update is pre-signable, before the user signs anything.**
   `unsafeDeposit` (`:675`) derives its id from
-  `getUnsafeDepositId(msg.sender, depositor, depositNonce)` (`:` same file),
+  `getUnsafeDepositId(msg.sender, depositor, depositNonce)`
+  (`SpokePool.sol:1363-1369`),
   which is `pure`:
   `uint256(keccak256(abi.encodePacked(msgSender, depositor, depositNonce)))`.
   A quote routed through `unsafeDeposit` fixes all three inputs — the user's
@@ -256,6 +259,20 @@ Mitigation is a hard equality assertion, not a sanity check:
   `depositor` separately burns the refund leg.
 - `recipient` validation alone is **not** load-bearing. It secures neither the
   refund path nor the updated-fill path.
+- **Across v1 MUST positively allow only** the plain
+  `deposit(bytes32,bytes32,bytes32,bytes32,uint256,uint256,uint256,bytes32,uint32,uint32,uint32,bytes)`
+  selector `0xad5425c6`. It MUST reject `unsafeDeposit(...)` selector
+  `0x8b15788e`, including under a nested wrapper. This removes caller-chosen
+  deterministic deposit IDs and their collision/reuse surface. It is
+  defence-in-depth, not a replacement for `depositor == signer`: ordinary
+  deposit IDs use a public sequential counter and an ERC-1271 attacker can
+  validate dynamically, so exclusion does not prove an update cannot be
+  prepared early.
+- **`message` MUST be empty for v1.** The same `deposit(...)` selector can create
+  a V5-tagged deposit when `message` begins with `V5_MAGIC_PREFIX`; V4 fills
+  reject those messages and the V5 path was not evaluated here. Empty message
+  also excludes the destination callback surface that the two-step collateral
+  product does not need.
 
 Not a finding, checked and cleared: `depositor == address(0)` does not yield
 universal signature forgery. `_verifyDepositorSignature` uses OpenZeppelin
@@ -285,10 +302,11 @@ if (exclusivityDeadline > 0) {
 A validator that assumes one encoding passes the other. A bound must resolve the
 field to an effective deadline first, then bound that.
 
-Note also that a non-zero `exclusivityParameter` **forces** a non-zero
-`exclusiveRelayer` (`:1425-1427`), so the two fields cannot be validated
-independently: if exclusivity is set at all, `exclusiveRelayer` must be zero or a
-known filler.
+The pair must be validated conditionally. When `exclusivityParameter == 0`, v1
+requires `exclusiveRelayer == 0`. When the parameter is non-zero, the contract
+forces a non-zero relayer (`:1425-1427`) and v1 requires that address to be in
+Ripe's known-filler set. For an absolute timestamp, reject a past value before
+bounding the resulting duration.
 
 This is a griefing and refund-delay control, materially less severe than the
 `depositor` assertion above. It should not be ranked alongside it.
@@ -345,6 +363,7 @@ Decoding the returned calldata:
 | `quoteTimestamp` / `fillDeadline` | `1787077367` / `1787084567` | provider-derived, bounded |
 | `exclusiveRelayer` | `0xfd03…b7f0` | provider-derived |
 | `exclusivityParameter` | `3` | provider-derived |
+| `message` | `0x` | required empty by the v1 integration |
 
 Two consequences follow directly.
 
@@ -409,9 +428,13 @@ Any sizing assumption must be read live, never cached as a constant.
 2. Reject GREEN and RIPE explicitly for Across at the integration boundary. Do
    not rely on a route lookup returning empty; fail closed on an allowlist hit.
 3. Do not cache `maxDeposit`. Read it per quote.
-4. Across remains usable for the supported collateral routes (USDC/USDG,
-   ETH/WETH). Those touch no Ripe mint path and require no `RipeHq`
-   registration.
+4. Across remains usable for the selected collateral routes (USDC <-> USDG and
+   WETH <-> WETH). The separate native-ETH route is a wallet convenience, not a
+   registered Ripe collateral address. None touches a Ripe mint path or requires
+   `RipeHq` registration.
+5. Admit only selector `0xad5425c6` with empty `message`; reject
+   `unsafeDeposit`, non-empty messages, opaque periphery routes, and any
+   unevaluated nested call.
 
 ## Disposition
 
@@ -428,14 +451,15 @@ direct GREEN/RIPE transfer route.
 
 ## Scope limits
 
-- This evaluates the **V4** settlement path only, which is what the pinned repo
-  implements and what the live Base/Robinhood SpokePools serve.
+- This evaluates the **V4** settlement path only. The pinned source and live
+  SpokePools also expose V5-shaped behavior; v1 selects the evaluated V4 route
+  by allowing only plain `deposit(...)` with `message == 0x`.
 - Across V5 exists: `SpokePool` carries a `nonV5Fill` modifier (`:315`) and
   `_isV5Message` (`:1835`) that route V5-tagged messages away from the V4 fill
-  entrypoints. The V5 Gateway/executor is **out of tree** —
-  `contracts/external/interfaces/IAcrossV5Executor.sol` states the canonical
-  definition lives in the Across V5 periphery repository, which is not public as
-  of this evaluation. **The V5 settlement path is therefore unverified here and
-  must not be assumed to share these properties.**
+  entrypoints, and it implements `executeAcrossV5`. The external Gateway and
+  canonical `IAcrossV5Executor` implementation live in the Across V5 periphery
+  repository, which is not public as of this evaluation. **The V5 settlement
+  path is therefore unverified here and must not be assumed to share these
+  properties.**
 - No transaction was constructed, signed, simulated or broadcast. No Across
   contact was made. No onboarding was requested.

@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-08-18T18:21:50Z",
+  "captured_at": "2026-08-18T18:43:15Z",
   "method": "direct eth_getCode / eth_call / eth_chainId over HTTPS JSON-RPC, curl + foundry cast, no summarizing intermediary",
   "source_repos_cloned": {
     "relay-depository": {
@@ -25,7 +25,7 @@
   },
   "note_on_earlier_ai_summary": "An initial WebFetch-summarized read of the relay-depository GitHub page claimed the repo was archived and merged into a repo called 'settlement-protocol'. That repo name does not exist under github.com/relayprotocol (confirmed via `gh api search/repositories?q=org:relayprotocol`) and relay-depository is not archived (confirmed via `gh api repos/relayprotocol/relay-depository`). Treat single-pass WebFetch summaries of vendor docs as leads to verify, not evidence, consistent with the standard the rest of this review already applies to Across.",
   "relay_depository_deployment": {
-    "deployed_address_all_chains": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+    "deployed_address_base_and_robinhood": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
     "create2_factory": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
     "source_file": "relay-depository/packages/ethereum-vm/deployments/addresses.prod.json",
     "base": {
@@ -62,9 +62,29 @@
       }
     }
   },
+  "depositor_attribution_trace": {
+    "depository_source": "relay-depository@458a64c310a3504aaf37e112af9a8707c9eb11ad packages/ethereum-vm/src/RelayDepository.sol:99-132 — depositNative/depositErc20 emit the caller-supplied depositor after substituting msg.sender only for address(0)",
+    "oracle_event_decode": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/vm/ethereum-vm/index.ts:163-187,277-292 — the emitted RelayErc20Deposit.from value becomes result.depositor",
+    "hub_credit_derivation": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/index.ts:544-558 — result.depositor selects the direct Hub alias or participates in deriving the order address",
+    "recovery_derivation": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/index.ts:1459-1486,1509-1519 — the same depositor derives order/depositor aliases and the recovery transfer",
+    "fill_source_derivation": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/index.ts:1926-1944 — fill accounting derives its Hub source order address from result.depositor",
+    "slow_refund_binding": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/common/recover-mode-verification.ts:160-180 — recovery owner and recipient must match the deposit depositor",
+    "vendor_withdrawal_example": "relay-depository@458a64c310a3504aaf37e112af9a8707c9eb11ad packages/ethereum-vm/deployments/scripts/test-deposit-and-withdrawal.js:69-78 — withdrawal owner and recipient are both message.result.depositor"
+  },
+  "solver_authority_trace": {
+    "solver_type": "relay-settlement@98ad1a0af009c247fb85205c2119f7371e684520 packages/sdk/src/order/index.ts:23-25 — an order solver must be an ethereum-vm EOA",
+    "order_signature_check": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/index.ts:299-311 — viem verifyMessage recovers the order.solver EOA over orderId",
+    "solver_hub_credit": "relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863 src/services/attestation/index.ts:1910-1944 — successful fill accounting transfers order balances to the solver Hub alias",
+    "withdrawal_authority": "relay-settlement@98ad1a0af009c247fb85205c2119f7371e684520 smart-contracts/contracts/RelayAllocator.sol:171-181,226-280 — a 20-byte spender EOA may submit its withdrawal directly and chooses the receiver field",
+    "hub_balance_burn": "relay-settlement@98ad1a0af009c247fb85205c2119f7371e684520 smart-contracts/contracts/RelayAllocator.sol:283-301 — submission records the payload and burns the spender Hub balance",
+    "consequence": "A Ripe-operated lane needs both a payout contract that independently enforces pause/caps/order terms and a Relay-required solver-signing EOA or MPC. That signer also controls the destination of Ripe's outstanding Hub receivable under the pinned flow; compromise is a full-receivable-loss root unless Relay adds contract-account or receiver-restriction support."
+  },
   "relay_hub_settlement_layer": {
     "chainId": 537713,
-    "note": "Relay's own dedicated settlement/ledger chain (RelayHub/RelayOracle/RelayAllocator live here, not on Base or Robinhood). No public RPC found for this chain during this review, so the deployed hub/oracle/oracleMultisig/allocator addresses below are taken from the repo's deployments file and were NOT independently live-verified the way the Base/Robinhood Depository was.",
+    "rpc": "https://rpc.chain.relay.link",
+    "rpc_source": "relay-settlement/packages/networks/src/networks/relay.ts",
+    "chain_id_live_verified_at": "2026-08-18T18:43:15Z",
+    "note": "Relay's own dedicated settlement/ledger chain (RelayHub/RelayOracle/RelayAllocator live here, not on Base or Robinhood). The repository-published RPC was found after the initial capture, and the role wiring below was then independently queried live.",
     "source_file": "relay-settlement/smart-contracts/deployments/hub-contracts/prod.json",
     "addresses": {
       "hub": "0xddd361727c22a01eb137880678a20b0beae69318",
@@ -73,7 +93,48 @@
       "allocator": "0x613d3c588f6b8f89302b463f8f19f7241b2857e2",
       "executor": "0x6747c7e64b90dccc0d54f865cbd9513156adbc0c"
     },
-    "unverified": "Whether ORACLE_ROLE on the live `oracle` contract is actually granted to `oracleMultisig` (as opposed to some other EOA/contract) was not confirmed on-chain -- no public RPC available for chain 537713 during this review."
+    "live_role_wiring": {
+      "queried_at": "2026-08-18T18:42:22Z",
+      "block_number": 3950912,
+      "role_hashes": {
+        "ADMIN_ROLE": "0xa49807205ce4d355092ef5a8a18f56e8913cf4a201fbe287825b095693c21775",
+        "ORACLE_ROLE": "0x68e79a7bf1e0bc45d0a330c573bc367f9cf464fd326078812f301165fbda4ef1",
+        "OPERATOR_ROLE": "0x97667070c54ef182b0f5858b034beac1b6f3089aa2d3188bb1e8929f4fa9b929"
+      },
+      "oracle_multisig": {
+        "owner": "0xF61A305199fa1135d76FFaB3752D42F55cBd775A",
+        "threshold": 2,
+        "signer_count": 5,
+        "signers": [
+          "0x2C598f73A5Ab65c0510Fd8Efb740826D291CAb0e",
+          "0x5BE2dd28F7810582ed6DC910Fd8693878A1d90f2",
+          "0xA41716FF5A7D4ad22f83B7CB74d9Af9767a96A52",
+          "0x23F1518173769D40Bd24Dae168C0879BD02d9b5f",
+          "0xEaE66bC5500976e6a681d3Dd0112BABA0EF95149"
+        ]
+      },
+      "oracle": {
+        "oracle_multisig_has_oracle_role": true,
+        "f61_has_admin_role": true,
+        "f61_has_oracle_role": false
+      },
+      "hub": {
+        "f61_has_admin_role": true,
+        "f61_has_operator_role": true,
+        "oracle_has_operator_role": true
+      },
+      "relay_allocator": {
+        "address": "0x613d3c588f6b8f89302b463f8f19f7241b2857e2",
+        "owner": "0xF61A305199fa1135d76FFaB3752D42F55cBd775A",
+        "HUB": "0xDDD361727C22A01EB137880678A20b0BEaE69318",
+        "ORACLE": "0x2A72EB8Cf0233A3DC6198683c83B1078DE6Fa2B0",
+        "checked_at_block": 3950912,
+        "owner_powers": "RelayAllocator.sol:199-223 lets the owner replace each chain/depository payload builder and suspend or unsuspend any spender alias; the contract inherits OpenZeppelin Ownable and adds no timelock."
+      },
+      "f61_is_contract_on_relay_chain": false,
+      "cross_layer_consequence": "The same F61 EOA owns the Base/Robinhood Depositories, RelayAllocator, and live Oracle multisig; administers the Oracle and Hub roles; and already holds Hub OPERATOR_ROLE. It can immediately change the Oracle signer set or threshold, grant roles, directly mint/burn Hub balances, replace payload builders, suspend a solver withdrawal alias, and repoint each Depository allocator. The 2-of-5 Oracle quorum is therefore not an independent root of trust from this EOA."
+    },
+    "configuration_drift": "smart-contracts/deployments/hub-contracts/prod.json and relay-protocol-oracle/configs/hub.mainnets.prod.json identify the live V2 Oracle 0xd180...dcaf. relay-settlement/packages/networks/src/networks/relay.ts still names legacy Oracle 0xd4b9...; the current multisig retains ORACLE_ROLE on that legacy Oracle, but the legacy Oracle lacks Hub OPERATOR_ROLE. Conclusions use live role queries and the V2 deployment records, not the stale generic field."
   },
   "audit_reports_read_directly": {
     "certora_relay_escrow": {
@@ -90,7 +151,7 @@
       "date": "2026-04-15 (engagement 2026-03-10 to 2026-03-23)",
       "client": "Uneven Labs, Inc. (the company behind Relay/Reservoir)",
       "scope_note": "Explicitly excludes 'Related on-chain contracts' and 'Underlying infrastructure relating to hosting oracles'. This is an audit of the OFF-CHAIN attestor/API service, not of RelayOracle.sol or RelayOracleMultisig.sol.",
-      "results": "10 findings: 2 critical, 3 high, 3 medium, 1 low.",
+      "results": "10 findings: 2 critical, 3 high, 3 medium, 1 low, 1 indeterminate.",
       "findings_relevant_to_base_robinhood_evm_path": [
         {
           "id": "3.3",
@@ -113,7 +174,7 @@
     "zellic_relay_settlement_protocol": {
       "file": "relay-settlement/docs/audits/Relay-Settlement-Protocol-Zellic-Audit.pdf",
       "title": "Relay Settlement Protocol -- Smart Contract Security Assessment",
-      "date": "2026-11-21 [sic, report cover date] -- engagement window 2025-10-16 to 2025-11-12, 2025",
+      "date": "2025-11-21 (report cover date) -- engagement window 2025-10-16 to 2025-11-12, 2025",
       "client": "Uneven Labs, Inc.",
       "scope": "EVM (incl. ethereum-vm/src/**.sol under 'Target: Relay Depository', repo relay-depository @ aec671d3e3e7b72135cf2d570eb6cc59e757908b), Solana, Sui Move, TON, plus RelayAllocator.sol / ChainSignatures.sol / PayloadBuilders / RelayMultisigSigner.sol from repo relayprotocol/decentralized-protocol @ 15ba05ba0ae1e65e1d72c4ddeb18312568802f45.",
       "goals_stated_by_auditor": [

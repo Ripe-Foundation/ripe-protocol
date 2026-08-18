@@ -5,8 +5,8 @@ Date: 2026-08-18
 Scope: pin what Relay's own infrastructure actually is -- deployed contracts,
 who controls fund movement, and what has and has not been independently
 audited -- for the conditional direct Relay GREEN lane under discussion in
-`bridge-integration-security-review.md`. That review scopes out "Relay's own
-contracts" deliberately; this document is the other half.
+`bridge-integration-security-review.md`. The original RipeHq-side review scoped
+out Relay's contracts; revisions 5-6 now consume this companion evaluation.
 
 Evidence: [`evidence/relay-live-snapshot-20260818.json`](evidence/relay-live-snapshot-20260818.json),
 captured via direct `eth_getCode` / `eth_call` / `eth_chainId` JSON-RPC calls
@@ -25,9 +25,13 @@ independently confirmed against source or live chain state.
 Relay is not one contract. It is two systems bridged by an off-chain service:
 
 1. **`RelayDepository`** (Solidity, one instance per supported chain, same
-   address `0x4cd00e387622c35bddb9b4c962c136462338bc31` on every EVM chain via
-   a CREATE2 factory) -- holds the actual pooled tokens. This is what Ripe
-   would deposit GREEND float into and what pays users out.
+   address `0x4cd00e387622c35bddb9b4c962c136462338bc31` on Base and Robinhood via
+   a CREATE2 factory) -- holds the pooled tokens deposited on the origin
+   chain. A solver pays the user on the destination chain from inventory it
+   controls outside the Depository, then withdraws its credited receivable
+   from the origin-chain Depository. Ripe would therefore keep destination
+   GREEN inventory in its own filler; it would not park that standing float in
+   Relay's contract.
 2. **`RelayHub` / `RelayOracle` / `RelayAllocator`** -- an internal ERC-6909
    ledger plus an off-chain attestor network, running on Relay's own
    dedicated settlement chain (chain ID `537713`, not Base or Robinhood).
@@ -57,8 +61,39 @@ Read directly from `relay-depository/packages/ethereum-vm/src/RelayDepository.so
   value belonging to whoever else already deposits through it.
 - `depositErc20` / `depositNative` do exactly one thing: pull the tokens in
   and emit an event. **There is no per-depositor balance tracked in this
-  contract at all.** Attribution lives entirely in the Hub, off this
-  contract's storage.
+  contract at all.** Attribution lives in the Hub, off this contract's
+  storage. That does not make the caller-supplied `depositor` field inert:
+  both deposit functions emit it as the address to credit (substituting
+  `msg.sender` only when it is zero), and the pinned Oracle consumes that
+  emitted address when deriving Hub order attribution and recovery.
+- The pinned Oracle trace is explicit: the EVM attestor reads the deposit-event
+  `from` as `depositor`
+  (`src/services/attestation/vm/ethereum-vm/index.ts:163-187,277-292`); the
+  service uses it for the Hub alias/order address
+  (`src/services/attestation/index.ts:544-558`), recovery
+  (`:1459-1486,1509-1519`), and the fill source (`:1926-1944`). The recover-mode
+  verifier binds both owner and recipient back to it
+  (`src/common/recover-mode-verification.ts:160-180`). All anchors are at
+  `relay-protocol-oracle@55b22de6358c212c22eebb48d2df5b793a16e863`.
+- The repository's own
+  `packages/ethereum-vm/deployments/scripts/test-deposit-and-withdrawal.js`
+  (`:69-78`, at the pinned Depository commit) demonstrates the consequence:
+  after attesting the event, it sets both the Hub withdrawal `owner` and
+  `recipient` to `message.result.depositor`. A
+  direct Depository call must therefore encode the connected signer as
+  `depositor`; lack of local balance storage is not a substitute for that
+  binding. Any surrounding router, refund, or delegation fields still require
+  their own complete authority enumeration.
+- For an ERC-20 route, the narrow admitted call is the explicit-amount overload
+  `depositErc20(address,address,uint256,bytes32)` (`0xe8017952`). The sibling
+  selector `0x5a1ee3ac` deposits the caller's **entire existing allowance** and
+  is unnecessary for Ripe; it must be rejected. Relay quotes must request
+  `includeProtocolData=true`; that signed protocol data must be schema-decoded
+  so the order id, effective depositor, configured solver-EOA signature,
+  refund/output/call fields, deadlines, fees, and extra data can be rebound
+  independently before signing. Zero depositor resolves to
+  `msg.sender` and is safe only when the wallet calls the Depository directly,
+  not through an intermediary.
 - The only way funds leave is `execute(CallRequest, signature)`
   (`RelayDepository.sol:159-181`), where `CallRequest` is an **arbitrary
   array of `{to, data, value, allowFailure}` calls**, gated by exactly one
@@ -95,7 +130,35 @@ is a permissioned (i.e. centralized) signer, not the decentralized scheme
 present in the repository. The live EOA `allocator`/`owner` addresses are
 that permissioned role, observed directly.
 
-## `RelayHub` / `RelayOracle` -- a real quorum exists, but for a different layer
+## A Ripe solver is also an EOA authority, not the payout contract
+
+The pinned order and withdrawal path adds a third signer-address boundary that
+belongs to Ripe rather than Relay:
+
+- Relay's order type says `solver` **must be an ethereum-vm EOA**
+  (`relay-settlement/packages/sdk/src/order/index.ts:23-25`). The pinned Oracle
+  verifies its order signature with viem `verifyMessage`
+  (`relay-protocol-oracle/src/services/attestation/index.ts:299-311`) and credits
+  successful fills to that solver's Hub alias (`:1910-1944`). A Ripe payout
+  contract cannot itself be the solver identity under this path.
+- `RelayAllocator.submitWithdrawRequest` lets a 20-byte spender EOA call
+  directly (`RelayAllocator.sol:226-280`). `WithdrawRequest.receiver` is chosen
+  by that caller (`:171-181`), and submission burns the spender's Hub balance
+  (`:283-301`). The later Depository exit still needs Relay's allocator
+  signature, but the legitimate solver is authorized to direct where its own
+  receivable is paid.
+
+A Ripe-operated lane therefore needs two components: (1) a non-mint-authorized
+contract holding destination inventory and enforcing the pause, order terms, and
+exposure caps at payout, and (2) a solver-signing EOA held under an audited
+HSM/MPC policy. The contract must independently revalidate every solver-signed
+order; the EOA signature alone cannot authorize inventory movement. Even then,
+compromise of the solver signer can redirect Ripe's outstanding Hub receivable.
+That is another full-receivable-loss root unless Relay supports an ERC-1271
+solver or an on-chain receiver restriction. If governance will not accept the
+EOA exception, lack of that provider support is a stop condition.
+
+## `RelayHub` / `RelayOracle` -- a live quorum exists, but one EOA controls every layer
 
 Read from `relay-settlement/smart-contracts/contracts/{RelayHub,RelayOracle,
 RelayOracleMultisig,RelayAllocator}.sol` (commit `98ad1a0`):
@@ -110,25 +173,38 @@ RelayOracleMultisig,RelayAllocator}.sol` (commit `98ad1a0`):
   proof-of-deposit check -- the contract trusts whatever produced that
   signature to have verified the real cross-chain event.
 - `RelayOracleMultisig.sol` is a genuine on-chain M-of-N implementation
-  (sorted ECDSA signatures, EIP-1271, owner-managed signer set/threshold) that
-  can hold `ORACLE_ROLE`. **Whether it actually does, and what its live
-  threshold/signer count is, was not independently verifiable** -- the Hub
-  and Oracle live on Relay's own settlement chain (ID `537713`), and no
-  public RPC for that chain was found during this review. `oracle` and
-  `oracleMultisig` addresses are pinned in the evidence file from the repo's
-  `deployments/hub-contracts/prod.json`, unverified against live chain
-  state.
+  (sorted ECDSA signatures, EIP-1271, owner-managed signer set/threshold).
+  The repository publishes the production Relay-chain RPC at
+  `https://rpc.chain.relay.link`; live queries on chain ID `537713` confirmed
+  that the deployed multisig `0x2a72...fa2b0` holds `ORACLE_ROLE` and currently
+  has five signers with threshold two.
 - `RelayAllocator.submitWithdrawRequest` (the orchestration contract, not the
   Depository's `allocator` field) does burn Hub balance on-chain before
   building a withdrawal payload -- so *if* the Hub ledger is correct, this
   step is genuinely bounded by it.
+- The quorum is **not an independent root of trust**. Live role queries found
+  that EOA `0xF61A...775A` owns the Oracle multisig, holds `ADMIN_ROLE` on both
+  the Oracle and Hub, and already holds Hub `OPERATOR_ROLE`. It can change the
+  multisig signer set or threshold without a timelock, grant Oracle/Hub roles,
+  and directly mint or burn Hub balances. The same EOA owns the Base and
+  Robinhood Depositories and can repoint their allocator immediately. It also
+  owns the live `RelayAllocator`: at block `3950912`, its `HUB` and `ORACLE`
+  point to the current Hub and 2-of-5 multisig. As owner it can replace
+  chain/depository payload builders and suspend any spender alias
+  (`RelayAllocator.sol:199-223`), controlling the correctness and availability
+  of Ripe's withdrawal path. A second EOA, `0x63C1...1b56`, is the current direct
+  Depository allocator and can authorize arbitrary pooled-fund movement without
+  consulting the Hub.
 
-Net: **the Hub ledger layer has a real, on-chain, auditable quorum
-mechanism available and apparently used.** The Depository -- the layer that
-actually releases Ripe's tokens -- does not use it. A compromised or
-misattributed Oracle signature can mint bad Hub balance, but that alone
-doesn't move real funds; a compromised or misused `allocator` EOA on the
-Depository does, directly, with no quorum in between.
+Net: the 2-of-5 Oracle quorum is live, but the privilege graph collapses back
+to single on-chain signer-address authority. Compromise or misuse of
+`0x63C1...1b56` is sufficient to
+move Depository funds directly. Compromise or misuse of `0xF61A...775A` can
+change the attestation quorum, mutate Hub balances, and replace the Depository
+allocator or withdrawal payload builder, crossing every layer without delay.
+The direct Relay lane must be
+risk-accepted against that deployed graph, not against the stronger quorum
+architecture that merely exists in source.
 
 ## Audit coverage -- weaker than the three-firm list suggests
 
@@ -196,22 +272,33 @@ review could confirm.
 
 Concretely, before sign-off I'd want:
 
-1. A direct question to Relay/Uneven Labs about current `allocator`/`owner`
-   key management (HSM? Fireblocks/Turnkey-style MPC custody of that single
-   EOA? multiple approvals off-chain even though on-chain is single-sig?) --
-   this is explicitly outside every audit's scope, so it can only be
-   answered by the vendor, not by reading more source.
-2. The receivable cap treated as a **full, instant, uninsured loss-tolerance
+1. A direct question to Relay/Uneven Labs about current `allocator`/owner and
+   cross-layer superadmin key management (HSM? Fireblocks/Turnkey-style MPC
+   custody of those EOAs? multiple approvals off-chain even though on-chain is
+   single-sig?), and whether these roles will move to isolated, delayed
+   multisig control before onboarding GREEN. This is explicitly outside every
+   audit's scope, so the off-chain custody answer must come from the vendor.
+2. ERC-1271 solver or restricted-withdrawal-receiver support from Relay, or an
+   explicit Ripe governance decision accepting a dedicated solver EOA under an
+   audited HSM/MPC policy. The payout contract must revalidate the order rather
+   than treating this signer as authority to transfer inventory.
+3. The receivable cap treated as a **full, instant, uninsured loss-tolerance
    number** ("what are we okay losing entirely if this key is ever
    compromised or misused"), not an expected-loss model -- there's no
    dispute window, no insurance fund, and no on-chain recourse once
    `execute()` succeeds.
-3. Minimizing *time* exposure as much as size: withdraw Ripe's Hub-attested
-   receivable back out of the Depository on a short, automated cadence
-   rather than letting it accumulate, since the binary risk is a function of
-   how long and how much sits in the shared pool while attributed to Ripe,
-   not just the peak amount.
+4. Minimizing *time* exposure as much as size: request withdrawal of Ripe's
+   Hub-attested receivable immediately and on a short cadence, while treating
+   that cadence as a vendor SLA rather than a unilateral mitigation. Relay must
+   still authorize the Depository call, and exposure releases only after the
+   withdrawal is confirmed/finalized. The binary risk is a function of how long
+   and how much sits in the shared pool while attributed to Ripe, not just the
+   peak amount.
 
-This does not, on its own, block the GREEN retail lane -- it changes what
-the receivable cap number has to represent, and it adds a vendor question
-that isn't answerable from source alone.
+This is not a categorical technology rejection, but it **does block design
+sign-off** until treasury/governance accepts the receivable cap as a full-loss
+number, the vendor answers the key-custody question, and the solver-EOA boundary
+is removed or explicitly accepted. It does not put the Ripe-controlled
+destination inventory behind the allocator key; it puts the
+filled-but-not-yet-withdrawn origin-chain receivable there. If no acceptable
+full-loss cap leaves enough throughput for a useful lane, the lane does not ship.
