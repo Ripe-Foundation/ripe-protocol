@@ -266,12 +266,8 @@ def _amountToShares(
     totalBalance += 1
     totalShares: uint256 = _totalShares + DECIMAL_OFFSET
 
-    # calc shares
-    numerator: uint256 = _amount * totalShares
-    shares: uint256 = numerator // totalBalance
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalBalance != 0):
+    shares: uint256 = self._mulDiv(_amount, totalShares, totalBalance)
+    if _shouldRoundUp and (uint256_mulmod(_amount, totalShares, totalBalance) != 0):
         shares += 1
 
     return shares
@@ -302,12 +298,50 @@ def _sharesToAmount(
     totalBalance += 1
     totalShares: uint256 = _totalShares + DECIMAL_OFFSET
 
-    # calc amount
-    numerator: uint256 = _shares * totalBalance
-    amount: uint256 = numerator // totalShares
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalShares != 0):
+    amount: uint256 = self._mulDiv(_shares, totalBalance, totalShares)
+    if _shouldRoundUp and (uint256_mulmod(_shares, totalBalance, totalShares) != 0):
         amount += 1
 
     return amount
+
+
+@view
+@internal
+def _mulDiv(_x: uint256, _y: uint256, _d: uint256) -> uint256:
+    assert _d != 0 # dev: zero denominator
+
+    lo: uint256 = unsafe_mul(_x, _y)
+    mm: uint256 = uint256_mulmod(_x, _y, max_value(uint256))
+    hi: uint256 = unsafe_sub(
+        unsafe_sub(mm, lo),
+        convert(mm < lo, uint256),
+    )
+
+    if hi == 0:
+        return lo // _d
+
+    assert _d > hi # dev: result overflows
+
+    rem: uint256 = uint256_mulmod(_x, _y, _d)
+    hi = unsafe_sub(hi, convert(rem > lo, uint256))
+    lo = unsafe_sub(lo, rem)
+
+    tz: uint256 = unsafe_sub(0, _d) & _d
+    d2: uint256 = _d // tz
+    lo = lo // tz
+    lo |= unsafe_mul(
+        hi,
+        unsafe_add(
+            unsafe_div(unsafe_sub(0, tz), tz),
+            1,
+        ),
+    )
+
+    inv: uint256 = unsafe_mul(3, d2) ^ 2
+    for i: uint256 in range(6):
+        inv = unsafe_mul(
+            inv,
+            unsafe_sub(2, unsafe_mul(d2, inv)),
+        )
+
+    return unsafe_mul(lo, inv)
