@@ -81,16 +81,52 @@ Each step is necessary; breaking any one of them blocks repayment.
 ## Why onboarding is worse than an adapter problem
 
 `poolRebalanceRoutes` is keyed `(l1Token, destinationChainId)`, where `l1Token`
-is an **Ethereum mainnet** address. GREEN and RIPE have no Ethereum mainnet
-deployment: `config/Ccip.py` defines exactly four networks (`base-mainnet`,
-`robinhood-mainnet`, `base-sepolia`, `robinhood-testnet`).
+is an **Ethereum mainnet** address.
 
-Onboarding GREEN/RIPE to Across therefore requires an Ethereum mainnet GREEN and
-RIPE — which under the current topology means a **third** mint-authorized CCIP
-pool pair. That is a strictly larger version of the second mint-critical trust
-boundary that
+### Ethereum mainnet GREEN/RIPE: what is and is not established
+
+This distinction matters because an earlier revision of this document
+overstated it. Stated precisely:
+
+**Established (repository scope).** No Ethereum mainnet GREEN or RIPE deployment
+is *configured in this repository*. The full deployment surface —
+`config/Ccip.py`, `migrations/`, and `migration_history/` — defines exactly four
+networks: `base-mainnet`, `base-sepolia`, `robinhood-mainnet`,
+`robinhood-testnet`. There is no Ethereum mainnet migration namespace or history
+directory. The only `eth-mainnet` strings in the tree are generic
+explorer/verifier tooling entries (`scripts/migrate.py:164`,
+`scripts/utils/verify_etherscan.py:67`, `scripts/utils/safe_account.py:36`), not
+deployment configuration.
+
+**Established (bounded external check).** `eth_getCode` on Ethereum mainnet
+returns `0x` for both Base token addresses —
+GREEN `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` and
+RIPE `0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0` (public RPC
+`ethereum-rpc.publicnode.com`, 2026-08-18). This rules out an *address-identical*
+deployment only.
+
+**Not established.** That no GREEN or RIPE token exists anywhere on Ethereum
+mainnet at some other address. Repository configuration is evidence of what this
+repository deploys, not proof of global non-existence. Closing this requires an
+owner statement or an external registry check, neither of which is in scope
+here.
+
+### Why the determination holds either way
+
+The conclusion does not depend on the open question above. Even if an Ethereum
+mainnet GREEN/RIPE already existed, Across onboarding would still require:
+
+1. Across DAO governance to call `setPoolRebalanceRoute` and
+   `enableL1TokenForLiquidityProvision` (both `onlyOwner`); **and**
+2. that mainnet token to be mint-authorized as the HubPool settlement anchor, so
+   HubPool-side supply can be created and destroyed against spoke balances.
+
+Requirement 2 is the trust-boundary problem. Under the current topology it means
+a **third** mint-authorized pool pair — a strictly larger version of the second
+mint-critical boundary that
 [`ccip-integration-decision.md`](ccip-integration-decision.md) explicitly
-rejected. The rejection reasoning applies with more force here, not less.
+rejected. The blocker is the governance action plus the mint-authority
+implication, not the mere existence or non-existence of a mainnet token.
 
 The canonical-bridge adapter is *not* the blocker. `relayTokens` only fires when
 `netSendAmounts[i] > 0`; a self-relay design would never trigger it. Across V4
@@ -112,6 +148,33 @@ then becomes unrecoverable by the proof chain above, absent Across admin action.
 **A successful contract deposit is not evidence of a supported route.** Any
 integration must fail closed against the live route allowlist and must never
 construct a deposit for an arbitrary token.
+
+## API surface: `/suggested-fees` is legacy — implement against the Swap API
+
+The quotes captured below were taken from `GET /suggested-fees`. **That endpoint
+is no longer actively maintained.** Across' current API reference carries the
+notice:
+
+> The `/suggested-fees` API is no longer actively maintained. New integrations
+> should use the Swap API instead.
+
+Source: <https://docs.across.to/api-reference/suggested-fees/get>, read
+2026-08-18. The named replacement is the Swap API
+(`/api-reference/swap/approval/get`); Across also publishes a "Migrate from
+Suggested Fees to the Swap API" guide.
+
+Consequences, and the distinction between them:
+
+- **The captured evidence below remains valid** as a point-in-time observation of
+  route support, fee magnitude, fill latency and capacity. It is used here only
+  to characterise Across, not as an integration contract.
+- **Implementation must not target `/suggested-fees`.** Any `ripe-api` route
+  allowlist, quote proxy, or capacity read must be built against the Swap API.
+  Fee/limit field names and shapes are not assumed to carry over; they must be
+  re-derived against the supported endpoint before any integration relies on
+  them.
+- The fail-closed allowlist rule is unchanged by the endpoint migration. It is a
+  property of the settlement model, not of a particular API version.
 
 ## Live facts as captured 2026-08-18T17:58:53Z
 
@@ -155,6 +218,19 @@ Any sizing assumption must be read live, never cached as a constant.
 4. Across remains usable for the supported collateral routes (USDC/USDG,
    ETH/WETH). Those touch no Ripe mint path and require no `RipeHq`
    registration.
+
+## Disposition
+
+**Across GREEN/RIPE token bridging is rejected.** This document is the technical
+basis for that rejection; the decision itself is recorded by the bridge
+integration synthesis, not established here.
+
+Across is retained in scope **only** as a collateral-movement rail for its
+already-supported routes. Those routes carry no Ripe token, touch no mint path,
+and require no `RipeHq` registration or Across governance action. Moving
+collateral and then minting GREEN locally is a distinct acquisition flow, not a
+faster GREEN bridge, and must not be described as one. CCIP remains the only
+direct GREEN/RIPE transfer route.
 
 ## Scope limits
 
