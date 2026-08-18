@@ -136,9 +136,9 @@ Robinhood Chain is already onboarded (`CHAIN_IDs.ROBINHOOD: 4663` in
 
 ## The permissionless-deposit footgun
 
-`SpokePool._depositV3` (`:1383`) validates depositor, non-zero output token,
-quote timestamp, fill deadline and exclusivity — and performs **no token
-allowlist check**. Route enablement is dead code
+`SpokePool._depositV3` (`:1383`) checks the depositor *address format*, non-zero
+output token, quote timestamp, fill deadline and exclusivity — and performs **no
+token allowlist check**. Route enablement is dead code
 (`SpokePool.sol:92`, `DEPRECATED_enabledDepositRoutes`). `_fillRelay` likewise
 has no token check.
 
@@ -148,6 +148,60 @@ then becomes unrecoverable by the proof chain above, absent Across admin action.
 **A successful contract deposit is not evidence of a supported route.** Any
 integration must fail closed against the live route allowlist and must never
 construct a deposit for an arbitrary token.
+
+## `depositor` is caller-supplied and controls the funds — critical
+
+An earlier revision of this document said `_depositV3` "validates depositor".
+That wording was too loose and could be read as binding. It does not bind.
+
+`depositor` is an ordinary parameter of both `deposit()` (`:533`) and
+`depositV3()` (`:611`). The only check is
+`params.depositor.checkAddress()`, which resolves to
+`isValidAddress` in `contracts/libraries/AddressConverters.sol:19`:
+
+```solidity
+return uint256(_bytes32) >> 160 == 0;
+```
+
+That asserts the upper 12 bytes are zero — a **format check**. It does not bind
+`depositor` to `msg.sender`, and it does not reject the zero address. Funds are
+pulled from `msg.sender`
+(`safeTransferFrom(msg.sender, address(this), params.inputAmount)`), so the payer
+and the recorded `depositor` are independent.
+
+`depositor` carries two distinct authorities:
+
+1. **Refund beneficiary on expiry.** Across documents that expired deposits are
+   sent to the depositor address on the origin chain, roughly 90 minutes after
+   `fillDeadline`.
+2. **Authority to rewrite the fill.** `speedUpDeposit` (`:1573` path) and
+   `fillRelayWithUpdatedDeposit` (`:1107`) both call
+   `_verifyUpdateV3DepositMessage`, which verifies the EIP-712 signature against
+   `relayData.depositor` (`:1593` → `SignatureChecker.isValidSignatureNow`). A
+   valid depositor signature sets `updatedRecipient` and `updatedOutputAmount`,
+   and `_transferTokensToRecipient` pays
+   `recipientToSend = relayExecution.updatedRecipient`.
+
+**Therefore a deposit whose `depositor` is an attacker delivers the user's funds
+to the attacker on the ordinary success path.** Calldata naming the user as
+`recipient` and an attacker as `depositor` looks correct to a recipient-only
+check; the attacker then signs an update redirecting `updatedRecipient` to
+itself, any relayer fills to that address, and settlement proceeds normally.
+This needs no expiry, no exclusivity manipulation, and no relayer collusion.
+
+Mitigation is a hard equality assertion, not a sanity check:
+
+- **`depositor` MUST equal the connected signing address**, refuse-to-sign, with
+  at least the force of the `recipient` assertion. `depositor != 0` is
+  insufficient — a non-zero attacker address is the actual attack, and a zero
+  `depositor` separately burns the refund leg.
+- `recipient` validation alone is **not** load-bearing. It secures neither the
+  refund path nor the updated-fill path.
+
+Not a finding, checked and cleared: `depositor == address(0)` does not yield
+universal signature forgery. `_verifyDepositorSignature` uses OpenZeppelin
+`SignatureChecker.isValidSignatureNow` rather than raw `ecrecover`, so an invalid
+signature reverts rather than recovering to the zero address.
 
 ## API surface: `/suggested-fees` is legacy — implement against the Swap API
 
