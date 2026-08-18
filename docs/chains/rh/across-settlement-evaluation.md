@@ -39,9 +39,11 @@ not an escape hatch — it is gated identically to every other repayment chain.*
 
 This is a governance and token-registration blocker, **not** a custom
 HubPool/canonical-bridge adapter engineering task. That distinction is the
-decision-relevant part: adapter work is something Ripe could perform; the actual
-blocker is an external governance action plus an Ethereum mainnet GREEN/RIPE
-deployment that Ripe has already rejected on trust-boundary grounds.
+decision-relevant part: adapter work is something Ripe could perform, whereas the
+actual blockers are external. They are (1) an Across DAO governance action Ripe
+does not control, and (2) the absence of a canonical Ethereum settlement asset,
+where both available ways of creating one are already rejected — see
+"What onboarding would actually require".
 
 ## Proof chain
 
@@ -111,22 +113,54 @@ repository deploys, not proof of global non-existence. Closing this requires an
 owner statement or an external registry check, neither of which is in scope
 here.
 
-### Why the determination holds either way
+### What onboarding would actually require
 
-The conclusion does not depend on the open question above. Even if an Ethereum
-mainnet GREEN/RIPE already existed, Across onboarding would still require:
+A prior revision of this section claimed Across requires the Ethereum token
+itself to be mint-authorized. **That is wrong and is corrected here.** The
+HubPool custody model does not mint the underlying:
 
-1. Across DAO governance to call `setPoolRebalanceRoute` and
-   `enableL1TokenForLiquidityProvision` (both `onlyOwner`); **and**
-2. that mainnet token to be mint-authorized as the HubPool settlement anchor, so
-   HubPool-side supply can be created and destroyed against spoke balances.
+- `HubPool.addLiquidity` receives the L1 token as an ordinary ERC-20:
+  `IERC20(l1Token).safeTransferFrom(msg.sender, address(this), l1TokenAmount)`.
+- The only mint is of the **LP share token**:
+  `ExpandedIERC20(pooledTokens[l1Token].lpToken).mint(msg.sender, lpTokensToMint)`.
+- `enableL1TokenForLiquidityProvision` merely creates that share token via
+  `lpTokenFactory.createLpToken(l1Token)` and sets `isEnabled`.
 
-Requirement 2 is the trust-boundary problem. Under the current topology it means
-a **third** mint-authorized pool pair — a strictly larger version of the second
-mint-critical boundary that
-[`ccip-integration-decision.md`](ccip-integration-decision.md) explicitly
-rejected. The blocker is the governance action plus the mint-authority
-implication, not the mere existence or non-existence of a mainnet token.
+Across therefore needs **a canonical Ethereum settlement asset plus a
+governance-registered route** — not mint authority over that asset. Stated
+correctly, onboarding requires:
+
+1. A canonical Ethereum mainnet GREEN/RIPE representation to serve as
+   `l1Token`; **and**
+2. Across DAO governance to call `setPoolRebalanceRoute` and
+   `enableL1TokenForLiquidityProvision` (both `onlyOwner`).
+
+Requirement 1 is where Ripe's existing decisions bind, because no such
+representation is configured or proven today, and the two ways of creating one
+are both already rejected:
+
+| Representation | Boundary it adds | Current status |
+| --- | --- | --- |
+| Burn/mint Ethereum GREEN/RIPE | A further mint-authorized boundary | Rejected — mint-critical trust boundary |
+| Lock/release or wrapped Ethereum representation | A custody / asset-model boundary | Rejected — "Wrapped assets and lock/release pools remain rejected because they change the asset/custody model unnecessarily" |
+
+Both quotes and dispositions are from
+[`ccip-integration-decision.md`](ccip-integration-decision.md).
+
+### Scope of the rejection
+
+The rejection rests on two things that are true now:
+
+- **No configured or proven Ethereum settlement asset** (see the evidence
+  scoping above); and
+- **Mandatory Across DAO governance action**, which Ripe does not control.
+
+It does **not** rest on a third minter being unavoidable. If an already-canonical
+Ethereum GREEN/RIPE were later proven to exist, requirement 1 could in principle
+be satisfied without adding a mint boundary, and the question would reduce to the
+governance action alone. That is not the situation today, and nothing here
+authorizes pursuing it — but the conclusion should be defended on the grounds
+that actually hold, not on an inevitability claim that does not.
 
 The canonical-bridge adapter is *not* the blocker. `relayTokens` only fires when
 `netSendAmounts[i] > 0`; a self-relay design would never trigger it. Across V4
