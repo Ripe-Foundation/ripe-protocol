@@ -223,6 +223,31 @@ check; the attacker then signs an update redirecting `updatedRecipient` to
 itself, any relayer fills to that address, and settlement proceeds normally.
 This needs no expiry, no exclusivity manipulation, and no relayer collusion.
 
+Three properties make it cheaper than it first appears, and each removes a
+control an integrator might otherwise assume exists:
+
+- **The update is pre-signable, before the user signs anything.**
+  `unsafeDeposit` (`:675`) derives its id from
+  `getUnsafeDepositId(msg.sender, depositor, depositNonce)` (`:` same file),
+  which is `pure`:
+  `uint256(keccak256(abi.encodePacked(msgSender, depositor, depositNonce)))`.
+  A quote routed through `unsafeDeposit` fixes all three inputs — the user's
+  address, the attacker's chosen `depositor`, and the attacker's chosen nonce —
+  so `depositId` is computable in advance and the redirect signature can exist
+  before the deposit does.
+- **No private key is needed.** `_verifyDepositorSignature` uses
+  `SignatureChecker.isValidSignatureNow`, which supports EIP-1271. A contract
+  named as `depositor` can simply return the magic value.
+- **No on-chain speed-up call is required.** `speedUpDeposit` (`:853`) verifies
+  the signature and then **only emits `RequestedSpeedUpDeposit`** — no state
+  write, and no check that the referenced deposit exists. The event is a
+  broadcast convenience; the signature can be handed to a relayer off-chain and
+  consumed directly through `fillRelayWithUpdatedDeposit`. There is no on-chain
+  precursor to watch for.
+
+Setting `updatedOutputAmount` slightly below the original improves the relayer's
+margin, so the redirected fill is filled *promptly* rather than being ignored.
+
 Mitigation is a hard equality assertion, not a sanity check:
 
 - **`depositor` MUST equal the connected signing address**, refuse-to-sign, with
@@ -236,6 +261,37 @@ Not a finding, checked and cleared: `depositor == address(0)` does not yield
 universal signature forgery. `_verifyDepositorSignature` uses OpenZeppelin
 `SignatureChecker.isValidSignatureNow` rather than raw `ecrecover`, so an invalid
 signature reverts rather than recovering to the zero address.
+
+### `exclusivityParameter` is an overloaded field — bound both readings
+
+A naive bound on this field validates the wrong quantity. `_depositV3`
+(`:1407-1427`) interprets it three ways:
+
+```solidity
+uint32 exclusivityDeadline = params.exclusivityParameter;
+if (exclusivityDeadline > 0) {
+    if (exclusivityDeadline <= MAX_EXCLUSIVITY_PERIOD_SECONDS) {
+        exclusivityDeadline += uint32(currentTime);   // offset from now
+    }                                                 // else: absolute timestamp
+    if (params.exclusiveRelayer == bytes32(0)) revert InvalidExclusiveRelayer();
+}
+```
+
+- `0` — no exclusivity, and the emitted deadline is `0`.
+- `1 .. MAX_EXCLUSIVITY_PERIOD_SECONDS` (`31_536_000`, 365 days) — a **relative
+  offset** added to current time.
+- `> MAX_EXCLUSIVITY_PERIOD_SECONDS` — an **absolute Unix timestamp**.
+
+A validator that assumes one encoding passes the other. A bound must resolve the
+field to an effective deadline first, then bound that.
+
+Note also that a non-zero `exclusivityParameter` **forces** a non-zero
+`exclusiveRelayer` (`:1425-1427`), so the two fields cannot be validated
+independently: if exclusivity is set at all, `exclusiveRelayer` must be zero or a
+known filler.
+
+This is a griefing and refund-delay control, materially less severe than the
+`depositor` assertion above. It should not be ranked alongside it.
 
 ## API surface: `/suggested-fees` is legacy — implement against the Swap API
 
