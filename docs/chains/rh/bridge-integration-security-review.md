@@ -3,7 +3,8 @@
 Reviewer: Leto
 Date: 2026-08-18
 Revised: 2026-08-18 (rev 2 — rescoped, H-2 corrected, invariant corrected;
-rev 3 — added H-3, post-deposit authority fields)
+rev 3 — added H-3, post-deposit authority fields;
+rev 4 — H-3 resolved for Relay, added H-4 custody exposure)
 Scope: the trust boundaries a fast, liquidity-based bridge lane would touch for
 GREEN and RIPE on Base <-> Robinhood Chain. Reviewed against `rh` at `2985e73`.
 
@@ -218,11 +219,20 @@ the deposit lands — amendment, cancellation, refund receipt, speed-up,
 delegation; assert equality with the connected signing address for every field
 that does. Equality, not non-zero: a non-zero attacker address is the attack.
 
-**Open for Relay.** Relay's Depository has not been pinned to a commit or
-audited against this rule (see Luna's counterparty note). The intent payload
-must be enumerated the same way before a direct GREEN lane ships. Until that is
-done, treat this finding as unresolved for Relay rather than as an Across-only
-issue that was fixed elsewhere.
+**Resolved for Relay, differently than the question anticipated.** The
+enumeration has now been done against a pinned commit
+(`relay-settlement-evaluation.md`, `relay-depository` at `458a64c`, live-verified
+on both chains). Relay has no per-user authority fields to enumerate because it
+tracks **no per-depositor balance on-chain at all** — `depositErc20` /
+`depositNative` pull tokens and emit an event, and the sole exit is
+`execute(CallRequest, signature)` (`RelayDepository.sol:159-181`), an arbitrary
+`{to, data, value, allowFailure}` array gated on one `allocator` signature.
+There is no field a client could assert equality against, because the withdrawal
+path is not bound to the depositor in any way.
+
+So H-3's client-side rule is an Across-shaped control that does not transfer to
+Relay. It must not be treated as covering Relay by analogy. The Relay exposure
+is a custody question instead, and it is addressed below.
 
 **Constraint on the deferred atomic variant.** Atomic bridge-and-deposit is out
 of v1, and this is a reason to keep it there. A destination-side fill handler
@@ -234,6 +244,47 @@ amendment authority therefore controls both where funds land and what the
 handler is told to do with them. Any atomic design must treat the inbound
 message as attacker-controlled and authenticate the deposit instruction
 independently of the bridge payload.
+
+
+### H-4 — A bounded float does not bound custody risk; Relay's Depository is two EOA keys
+
+**Severity: High (funds at risk). Unresolved. Added rev 4.**
+
+M-1's caps and H-1's "bounded float" both bound Ripe's exposure to *its own*
+settlement lag — how much has been fronted and not yet reconciled. They say
+nothing about the float while it sits idle in the provider's custody, which is
+the larger number: enough inventory to serve bursts, not merely to cover
+in-flight fills.
+
+For Relay that standing exposure is not theoretically bounded by anything Ripe
+controls. Per `relay-settlement-evaluation.md`, live-queried on Base and
+Robinhood at 2026-08-18T18:21Z, the Depository at
+`0x4cd00e387622c35bddb9b4c962c136462338bc31` has:
+
+- `allocator` = an **EOA**, sole signer authorizing `execute()`, able to move
+  100% of the pooled balance to any address via arbitrary calldata; and
+- `owner` = an **EOA**, able to repoint `allocator` instantly — Solady
+  single-step `Ownable`, no timelock, no two-step handoff.
+
+Relay ships a real M-of-N threshold multisig elsewhere in its own codebase
+(`RelayOracleMultisig.sol`); it is simply not what is wired to the live
+Depository. The pool is not empty — it already custodies third-party value.
+
+The consequence for this review: **every fast-lane mitigation recommended above
+assumes the float exists when the filler reaches for it.** A cap on
+fronted-unsettled notional is a control against Ripe over-extending. It is not a
+control against the float being gone. These are two independent numbers and the
+design must carry both:
+
+1. fronted-unsettled notional and age caps (M-1), enforced by the filler; and
+2. a **standing-float ceiling** — total value exposed to provider custody at
+   rest — sized as a counterparty-loss decision by governance/treasury, on the
+   explicit assumption that it can go to zero on a single key compromise.
+
+Recommendation: size (2) as an amount the protocol can lose outright without
+impairing GREEN's backing, and state it that way in the governance decision
+rather than as a liquidity parameter. If no such amount is large enough to make
+the lane useful, that is the answer to whether the lane ships.
 
 ## Test obligations
 
@@ -255,7 +306,13 @@ Whatever design lands, these must be red-before-green:
 
 ## Sign-off
 
-Not signed off. H-1, H-2, and H-3 remain unresolved and must be answered by
-the design before implementation starts. H-3 additionally requires Relay's
-deposit payload to be enumerated against a pinned commit before a direct GREEN
-lane can be assessed at all.
+Not signed off. H-1, H-2, and H-4 remain unresolved and must be answered by
+the design before implementation starts. H-3 is resolved as an Across-side
+client control and explicitly does **not** transfer to Relay.
+
+H-4 is the one that should be settled first. It is not a design detail to be
+refined during implementation — it asks whether the protocol is willing to
+place a standing balance in a contract whose withdrawal authority is a single
+EOA signature. If the answer is no, H-1's and M-1's filler controls are moot for
+Relay, and the retail GREEN lane does not ship in this form regardless of how
+well the Ripe-side pieces are built.
