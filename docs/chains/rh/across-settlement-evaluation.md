@@ -320,6 +320,56 @@ Consequences, and the distinction between them:
 - The fail-closed allowlist rule is unchanged by the endpoint migration. It is a
   property of the settlement model, not of a particular API version.
 
+## Swap API calldata shape for the live collateral routes
+
+Observed via `GET /api/swap/approval` for USDC(8453) -> USDG(4663), 2026-08-18:
+
+- `crossSwapType` is **`bridgeableToBridgeable`** — a direct bridge with no swap
+  leg.
+- `swapTx.to` is the Base **SpokePool** `0x09aea…bEC64`, not
+  `SpokePoolPeriphery`. The approval spender is the same address.
+- The selector is **`0xad5425c6`** =
+  `deposit(bytes32,bytes32,bytes32,bytes32,uint256,uint256,uint256,bytes32,uint32,uint32,uint32,bytes)`
+  — the plain V4 entrypoint, not `unsafeDeposit` and not a periphery call.
+
+Decoding the returned calldata:
+
+| Field | Value | Origin |
+| --- | --- | --- |
+| `depositor` | `0x…0001` | **echoed from the request query parameter** |
+| `recipient` | `0x…0001` | echoed from the request |
+| `inputToken` / `outputToken` | USDC / USDG | known from Ripe route config |
+| `inputAmount` | `1000000000` | user input |
+| `destinationChainId` | `4663` | known from Ripe route config |
+| `outputAmount` | `999394433` | **provider-derived** |
+| `quoteTimestamp` / `fillDeadline` | `1787077367` / `1787084567` | provider-derived, bounded |
+| `exclusiveRelayer` | `0xfd03…b7f0` | provider-derived |
+| `exclusivityParameter` | `3` | provider-derived |
+
+Two consequences follow directly.
+
+**`depositor` is an echoed request parameter.** The API returns whatever address
+the caller supplied. Anything composing that request — including a compromised
+`ripe-api` — substitutes it with no provider involvement and no malformed data.
+This is what makes the `depositor` attack above reachable through an otherwise
+healthy-looking quote.
+
+**`exclusivityParameter` came back as `3`.** Under the overloaded encoding
+documented above that is a three-second *relative offset*, not a timestamp. A
+validator that assumes the field is an absolute deadline misreads this value
+entirely, which is the concrete case for resolving the encoding before bounding
+it.
+
+**Every address field in this call is already known to the client** from Ripe's
+own route configuration, the connected wallet, and user input. Only
+`outputAmount`, the two timestamps, and the exclusivity pair are genuinely
+provider-derived, and all are numbers with checkable bounds. Whether to exploit
+that — constructing the calldata locally rather than decoding a returned blob —
+is an integration design decision recorded in the API plan, not settled here.
+Note the scope limit: it holds for `bridgeableToBridgeable` routes. A route
+carrying a swap leg targets `SpokePoolPeriphery.swapAndBridge` with genuinely
+opaque swap calldata, where decoding remains necessary.
+
 ## Live facts as captured 2026-08-18T17:58:53Z
 
 Supported routes are bidirectional and cover exactly three assets each way:
