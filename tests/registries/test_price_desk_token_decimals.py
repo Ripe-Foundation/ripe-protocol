@@ -73,12 +73,24 @@ def test_price_desk_token_decimals_happy_paths(price_desk, mock_price_source):
         (0, 5, EIGHTEEN_DECIMALS, 5 * EIGHTEEN_DECIMALS),
         (6, 10**6, EIGHTEEN_DECIMALS, EIGHTEEN_DECIMALS),
         (18, EIGHTEEN_DECIMALS, EIGHTEEN_DECIMALS, EIGHTEEN_DECIMALS),
+        # decimals=77, amount=1, price=10**77 proves scale construction and
+        # this specific conversion only. It does not prove that every
+        # 77-decimal amount/price pair avoids checked multiplication overflow.
         (77, 1, 10**77, 1),
     ):
         token = _token(decimals)
         _price(mock_price_source, token, price)
         assert price_desk.getUsdValue(token, amount, False) == expected_usd
         assert price_desk.getAssetAmount(token, expected_usd, False) == amount
+
+
+def test_price_desk_checked_mul_overflow_at_77_decimals(price_desk, mock_price_source):
+    token = _token(77)
+    _price(mock_price_source, token, 10**18)
+    with boa.reverts("safemul"):
+        price_desk.getUsdValue(token, 10**77, False)
+    with boa.reverts("safemul"):
+        price_desk.getAssetAmount(token, 10**18, False)
 
 
 def test_price_desk_rejects_decimals_above_77(price_desk, mock_price_source):

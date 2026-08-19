@@ -58,7 +58,11 @@ PRICE_SOURCE_PRICE_GAS: constant(uint256) = 250_000
 PRICE_SOURCE_HAS_FEED_GAS: constant(uint256) = 75_000
 PRICE_SOURCE_SNAPSHOT_GAS: constant(uint256) = 150_000
 TOKEN_DECIMALS_GAS: constant(uint256) = 30_000
-MAX_SAFE_DECIMALS: constant(uint256) = 77
+# 10 ** 77 fits in uint256. This bound only guarantees the decimal scale
+# can be constructed. Price/amount multiplication remains checked uint256
+# arithmetic, so conversions whose product exceeds uint256 revert. This is
+# not a universal overflow-safe conversion guarantee.
+MAX_SUPPORTED_TOKEN_DECIMALS: constant(uint256) = 77
 
 
 @deploy
@@ -93,14 +97,12 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -
     if price == 0:
         return 0
 
-    ok: bool = False
-    tokenDecimals: uint256 = 0
-    ok, tokenDecimals = self._readTokenDecimals(_asset, _shouldRaise)
-    if not ok:
+    tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
+    if tokenScale == 0:
         return 0
 
     numerator: uint256 = price * _amount
-    denominator: uint256 = 10 ** tokenDecimals
+    denominator: uint256 = tokenScale
 
     # important to return non-zero value -- Stability Pool dust issues 
     if numerator < denominator:
@@ -124,13 +126,11 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
     if price == 0:
         return 0
 
-    ok: bool = False
-    decimals: uint256 = 0
-    ok, decimals = self._readTokenDecimals(_asset, _shouldRaise)
-    if not ok:
+    tokenScale: uint256 = self._readTokenScale(_asset, _shouldRaise)
+    if tokenScale == 0:
         return 0
 
-    return _usdValue * (10 ** decimals) // price
+    return _usdValue * tokenScale // price
 
 
 #############
@@ -146,21 +146,11 @@ def getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 = 
     return self._getPrice(_asset, _shouldRaise, _staleTime)
 
 
-@pure
-@internal
-def _resolveStaleTime(_callerBound: uint256, _feedBound: uint256) -> uint256:
-    if _callerBound == 0:
-        return _feedBound
-    if _feedBound == 0:
-        return _callerBound
-    return min(_callerBound, _feedBound)
-
-
 @view
 @internal
-def _readTokenDecimals(_asset: address, _shouldRaise: bool) -> (bool, uint256):
+def _readTokenScale(_asset: address, _shouldRaise: bool) -> uint256:
     if _asset == ETH:
-        return True, 18
+        return 10 ** 18
 
     success: bool = False
     response: Bytes[33] = b""
@@ -175,14 +165,14 @@ def _readTokenDecimals(_asset: address, _shouldRaise: bool) -> (bool, uint256):
     if not success or len(response) != 32:
         if _shouldRaise:
             raise "invalid token decimals"
-        return False, 0
+        return 0
 
     decimals: uint256 = abi_decode(response, uint256)
-    if decimals > MAX_SAFE_DECIMALS:
+    if decimals > MAX_SUPPORTED_TOKEN_DECIMALS:
         if _shouldRaise:
             raise "invalid token decimals"
-        return False, 0
-    return True, decimals
+        return 0
+    return 10 ** decimals
 
 
 @view
@@ -194,7 +184,13 @@ def _getPrice(_asset: address, _shouldRaise: bool = False, _staleTime: uint256 =
 
     # config
     config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()
-    staleTime: uint256 = self._resolveStaleTime(_staleTime, config.staleTime)
+    staleTime: uint256 = 0
+    if _staleTime == 0:
+        staleTime = config.staleTime
+    elif config.staleTime == 0:
+        staleTime = _staleTime
+    else:
+        staleTime = min(_staleTime, config.staleTime)
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:
