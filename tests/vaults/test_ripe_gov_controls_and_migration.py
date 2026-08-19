@@ -1691,7 +1691,9 @@ def test_teller_migration_preserves_position_and_updates_ledger_and_deposit_poin
     mission_control,
     setAssetConfig,
     setGeneralConfig,
+    setRipeRewardsConfig,
 ):
+    setRipeRewardsConfig()
     target, target_id = target_ripe_gov_vault
     amount, source_data = _prepare_teller_migration(
         teller=teller,

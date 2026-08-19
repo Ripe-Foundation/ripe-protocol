@@ -648,6 +648,8 @@ def test_sc14_ah_zero_allocation_still_tracks_balances(
     setRipeRewardsConfig(False, 0, 0, 0, 0, 0)
     vault_id = vault_book.getRegId(simple_erc20_vault)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    bob_frozen = ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance
+    alice_frozen = ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance
     ripe_before = ledger.ripeRewards()
     debt_before = ledger.userDebt(bob).amount
     green_token.transfer(alice, 20 * EIGHTEEN_DECIMALS, sender=whale)
@@ -655,6 +657,13 @@ def test_sc14_ah_zero_allocation_still_tracks_balances(
     spent = _buy(teller, bob, vault_id, alpha_token, 10 * EIGHTEEN_DECIMALS, alice, True)
     assert spent > 0
     remaining = simple_erc20_vault.userBalances(bob, alpha_token)
+    # Points-off: lastBalance stays frozen through the transfer.
+    assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance == bob_frozen
+    assert ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance == alice_frozen
+    # SC-14 heal: the first enabled checkpoint reconciles both sides to live custody.
+    setRipeRewardsConfig(True, 0, 0, 0, 0, 0)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     assert ledger.userDepositPoints(bob, vault_id, alpha_token).lastBalance == _normalized(remaining)
     assert ledger.userDepositPoints(alice, vault_id, alpha_token).lastBalance == _normalized(
         simple_erc20_vault.userBalances(alice, alpha_token)

@@ -30,6 +30,7 @@ def _print_gas(label, gas_used, ceiling):
 
 def test_gas_basic_vault_deposit_withdraw_checkpoint(
     setGeneralConfig,
+    setRipeRewardsConfig,
     setAssetConfig,
     performDeposit,
     mock_price_source,
@@ -42,6 +43,7 @@ def test_gas_basic_vault_deposit_withdraw_checkpoint(
     bob,
 ):
     setGeneralConfig()
+    setRipeRewardsConfig()
     setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
     vault_id = vault_book.getRegId(simple_erc20_vault)
@@ -72,6 +74,7 @@ def test_gas_basic_vault_deposit_withdraw_checkpoint(
 
 def test_gas_shares_vault_checkpoint(
     setGeneralConfig,
+    setRipeRewardsConfig,
     setAssetConfig,
     performDeposit,
     mock_price_source,
@@ -84,6 +87,7 @@ def test_gas_shares_vault_checkpoint(
     bob,
 ):
     setGeneralConfig()
+    setRipeRewardsConfig()
     setAssetConfig(
         alpha_token,
         _vaultIds=[vault_book.getRegId(rebase_erc20_vault)],

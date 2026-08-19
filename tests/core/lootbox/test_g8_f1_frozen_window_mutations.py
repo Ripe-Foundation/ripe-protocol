@@ -4,7 +4,7 @@ import boa
 import pytest
 from boa.contracts.base_evm_contract import BoaError
 
-from conf_utils import has_dev_reason
+from conf_utils import clear_transient_storage, has_dev_reason
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 
 
@@ -20,12 +20,17 @@ def _blk():
     return boa.env.evm.patch.block_number
 
 
-def _clear_transient():
-    boa.env.evm.vm.state.clear_transient_storage()
+@pytest.fixture(scope="module", autouse=True)
+def _g8_vault_ids(vault_book, ripe_gov_vault, simple_erc20_vault):
+    global GOV_VAULT_ID, SIMPLE_VAULT_ID, ADMISSIBLE_VAULTS
+    GOV_VAULT_ID = vault_book.getRegId(ripe_gov_vault)
+    SIMPLE_VAULT_ID = vault_book.getRegId(simple_erc20_vault)
+    ADMISSIBLE_VAULTS = [GOV_VAULT_ID, SIMPLE_VAULT_ID]
 
 
 @pytest.fixture(scope="module")
 def launch_g8(
+    _g8_vault_ids,
     setGeneralConfig,
     setAssetConfig,
     setRipeRewardsConfig,
@@ -265,7 +270,7 @@ def test_g8_f1_deposit_more_uses_old_last_balance(
     before = _dep_snap(ledger, alice, alpha_token)
     _disable(switchboard_alpha, governance)
     performDeposit(alice, 50 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     _assert_dep_frozen(before, _dep_snap(ledger, alice, alpha_token))
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
@@ -295,7 +300,7 @@ def test_g8_f1_new_holder_while_disabled_gets_zero_on_first_enabled_touch(
     boa.env.time_travel(blocks=20)
     _disable(switchboard_alpha, governance)
     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     b0 = ledger.userDepositPoints(bob, SIMPLE_VAULT_ID, alpha_token)
     assert b0.lastUpdate == 0
     assert b0.lastBalance == 0
@@ -405,7 +410,7 @@ def test_g8_f1_two_disable_enable_cycles_do_not_bleed(
     boa.env.time_travel(blocks=20)
     _disable(switchboard_alpha, governance)
     performDeposit(alice, 25 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
     a1 = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
@@ -416,7 +421,7 @@ def test_g8_f1_two_disable_enable_cycles_do_not_bleed(
     boa.env.time_travel(blocks=10)
     _disable(switchboard_alpha, governance)
     performDeposit(alice, 25 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
     a2 = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
@@ -449,7 +454,7 @@ def test_g8_f1_claim_while_points_off_pays_stored_only(
     before = _dep_snap(ledger, alice, alpha_token)
     pre_avail = ledger.ripeAvailForRewards()
     paid = teller.claimLoot(alice, False, sender=alice)
-    _clear_transient()
+    clear_transient_storage()
     assert paid != 0
     after_claim = _dep_snap(ledger, alice, alpha_token)
     assert after_claim[0].balancePoints == 0
@@ -490,7 +495,7 @@ def test_g8_f1_gen_last_usd_value_frozen_through_price_move(
     _disable(switchboard_alpha, governance)
     mock_price_source.setPrice(alpha_token, 5 * EIGHTEEN_DECIMALS)
     performDeposit(alice, 1 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     _assert_dep_frozen(before, _dep_snap(ledger, alice, alpha_token))
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
@@ -597,7 +602,7 @@ def test_g8_f1_two_staker_assets_honest_share_after_one_disabled_touch(
     boa.env.time_travel(blocks=20)
     _disable(switchboard_alpha, governance)
     performDeposit(alice, 1 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    _clear_transient()
+    clear_transient_storage()
     assert ledger.assetDepositPoints(SIMPLE_VAULT_ID, alpha_token).lastUpdate == a0.lastUpdate
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
@@ -615,7 +620,7 @@ def test_g8_f1_two_staker_assets_honest_share_after_one_disabled_touch(
     assert bucket > 0
     assert alice_exp > 0
     alice_paid = teller.claimLoot(alice, False, sender=alice)
-    _clear_transient()
+    clear_transient_storage()
     assert alice_paid == alice_exp
     bp2 = ledger.assetDepositPoints(SIMPLE_VAULT_ID, bravo_token)
     gp2 = ledger.globalDepositPoints()
@@ -625,7 +630,7 @@ def test_g8_f1_two_staker_assets_honest_share_after_one_disabled_touch(
     assert bucket2 > 0
     assert bob_exp > 0
     bob_paid = teller.claimLoot(bob, False, sender=bob)
-    _clear_transient()
+    clear_transient_storage()
     assert bob_paid == bob_exp
 
 
@@ -651,7 +656,7 @@ def test_g8_f1_withdraw_to_zero_then_claim_keeps_enumerable(
     _disable(switchboard_alpha, governance)
     teller.withdraw(alpha_token, MAX_UINT256, alice, simple_erc20_vault, sender=alice)
     teller.claimLoot(alice, False, sender=alice)
-    _clear_transient()
+    clear_transient_storage()
     asset, has_bal = simple_erc20_vault.getUserAssetAtIndexAndHasBalance(alice, 1)
     assert asset == alpha_token.address
     assert not has_bal
@@ -661,7 +666,7 @@ def test_g8_f1_withdraw_to_zero_then_claim_keeps_enumerable(
     up, _, _ = lootbox.getLatestDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
     assert up.balancePoints == lb * (_blk() - start)
     paid = teller.claimLoot(alice, False, sender=alice)
-    _clear_transient()
+    clear_transient_storage()
     assert paid != 0
 
 
@@ -710,12 +715,12 @@ def test_g8_f1_delayed_post_reenable_mutations(
     boa.env.time_travel(blocks=20)
     _disable(switchboard_alpha, governance)
     performDeposit(alice, 10 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     performDeposit(charlie, 1000 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     teller.borrow(20 * EIGHTEEN_DECIMALS, charlie, False, sender=charlie)
     performDeposit(dave, 100 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     assert ledger.userDepositPoints(charlie, SIMPLE_VAULT_ID, alpha_token).lastUpdate == 0
     assert ledger.userBorrowPoints(charlie).lastUpdate == 0
     assert ledger.userDepositPoints(dave, SIMPLE_VAULT_ID, alpha_token).lastUpdate == 0
@@ -734,7 +739,7 @@ def test_g8_f1_delayed_post_reenable_mutations(
     assert a1.balancePoints == a_dep.lastBalance * (_blk() - a_dep.lastUpdate)
 
     performDeposit(sally, 50 * EIGHTEEN_DECIMALS, alpha_token)
-    _clear_transient()
+    clear_transient_storage()
     s1 = ledger.userDepositPoints(sally, SIMPLE_VAULT_ID, alpha_token)
     assert s1.balancePoints == s_dep.lastBalance * (_blk() - s_dep.lastUpdate)
 
@@ -782,7 +787,7 @@ def test_g8_f1_ripegov_releaselock_uses_frozen_normalized_share(
         ripe_token.transfer(user, amt, sender=whale)
         ripe_token.approve(teller, amt, sender=user)
         teller.depositIntoGovVault(ripe_token, amt, DAY_IN_BLOCKS, user, sender=user)
-        _clear_transient()
+        clear_transient_storage()
     frozen = ledger.userDepositPoints(alice, GOV_VAULT_ID, ripe_token)
     start, lb = frozen.lastUpdate, frozen.lastBalance
     assert lb != 0
@@ -790,7 +795,7 @@ def test_g8_f1_ripegov_releaselock_uses_frozen_normalized_share(
     before = _dep_snap(ledger, alice, ripe_token, GOV_VAULT_ID)
     _disable(switchboard_alpha, governance)
     teller.releaseLock(ripe_token, alice, sender=alice)
-    _clear_transient()
+    clear_transient_storage()
     _assert_dep_frozen(before, _dep_snap(ledger, alice, ripe_token, GOV_VAULT_ID))
     _enable(switchboard_alpha, governance)
     _touch_dep(lootbox, teller, alice, ripe_gov_vault, ripe_token, GOV_VAULT_ID)
@@ -826,7 +831,7 @@ def test_g8_f1_f2_charlie_pays_stored_then_can_claim_reverts(
     paid = switchboard_charlie.claimDepositLootForAsset(
         alice, SIMPLE_VAULT_ID, alpha_token, sender=governance.address
     )
-    _clear_transient()
+    clear_transient_storage()
     assert paid == owed
     assert paid != 0
     after = _dep_snap(ledger, alice, alpha_token)
@@ -844,3 +849,152 @@ def test_g8_f1_f2_charlie_pays_stored_then_can_claim_reverts(
     _assert_dep_frozen(clocks, _dep_snap(ledger, alice, alpha_token))
     assert ripe_token.totalSupply() == pre_supply
     assert ledger.ripeAvailForRewards() == pre_avail
+
+
+def test_g8_f1_exited_holder_keeps_asset_weight_until_touched(
+    launch_g8,
+    setAssetConfig,
+    performDeposit,
+    switchboard_alpha,
+    governance,
+    lootbox,
+    teller,
+    ledger,
+    simple_erc20_vault,
+    alice,
+    bob,
+    alpha_token,
+):
+    """Two equal holders, one exits while frozen: remaining holder is 50% until both are touched."""
+    launch_g8()
+    _staker_row(setAssetConfig, alpha_token)
+    performDeposit(alice, 100 * EIGHTEEN_DECIMALS, alpha_token)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token)
+    a0 = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
+    b0 = ledger.userDepositPoints(bob, SIMPLE_VAULT_ID, alpha_token)
+    assert a0.lastBalance == b0.lastBalance != 0
+    boa.env.time_travel(blocks=20)
+    _disable(switchboard_alpha, governance)
+    teller.withdraw(alpha_token, MAX_UINT256, alice, simple_erc20_vault, sender=alice)
+    assert ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token).lastBalance == a0.lastBalance
+    _enable(switchboard_alpha, governance)
+    _touch_dep(lootbox, teller, bob, simple_erc20_vault, alpha_token)
+    bob_pts = ledger.userDepositPoints(bob, SIMPLE_VAULT_ID, alpha_token)
+    ap = ledger.assetDepositPoints(SIMPLE_VAULT_ID, alpha_token)
+    span = _blk() - b0.lastUpdate
+    assert bob_pts.balancePoints == b0.lastBalance * span
+    assert ap.balancePoints == (a0.lastBalance + b0.lastBalance) * span
+    assert bob_pts.balancePoints * 2 == ap.balancePoints
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    alice_pts = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
+    ap2 = ledger.assetDepositPoints(SIMPLE_VAULT_ID, alpha_token)
+    assert alice_pts.balancePoints == a0.lastBalance * (_blk() - a0.lastUpdate)
+    assert alice_pts.lastBalance == 0
+    assert ap2.balancePoints == alice_pts.balancePoints + bob_pts.balancePoints
+
+
+def test_g8_f1_asset_alloc_change_during_freeze_prices_whole_span(
+    launch_g8,
+    setAssetConfig,
+    performDeposit,
+    switchboard_alpha,
+    governance,
+    lootbox,
+    teller,
+    ledger,
+    simple_erc20_vault,
+    alice,
+    alpha_token,
+):
+    launch_g8()
+    _staker_row(setAssetConfig, alpha_token, _stakersPointsAlloc=15_00)
+    performDeposit(alice, 100 * EIGHTEEN_DECIMALS, alpha_token)
+    a0 = ledger.assetDepositPoints(SIMPLE_VAULT_ID, alpha_token)
+    boa.env.time_travel(blocks=20)
+    _disable(switchboard_alpha, governance)
+    _staker_row(setAssetConfig, alpha_token, _stakersPointsAlloc=30_00)
+    _enable(switchboard_alpha, governance)
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    ap = ledger.assetDepositPoints(SIMPLE_VAULT_ID, alpha_token)
+    assert ap.ripeStakerPoints == 30_00 * (_blk() - a0.lastUpdate)
+
+
+def test_g8_f1_reset_after_reenable_clears_span_credit(
+    launch_g8,
+    setAssetConfig,
+    performDeposit,
+    switchboard_alpha,
+    switchboard_delta,
+    governance,
+    lootbox,
+    teller,
+    ledger,
+    simple_erc20_vault,
+    alice,
+    alpha_token,
+):
+    launch_g8()
+    _staker_row(setAssetConfig, alpha_token)
+    performDeposit(alice, 100 * EIGHTEEN_DECIMALS, alpha_token)
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    start = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token).lastUpdate
+    lb = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token).lastBalance
+    boa.env.time_travel(blocks=20)
+    _disable(switchboard_alpha, governance)
+    lootbox.resetUserBalancePoints(
+        alice, alpha_token, SIMPLE_VAULT_ID, sender=switchboard_delta.address
+    )
+    assert ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token).balancePoints == 0
+    _enable(switchboard_alpha, governance)
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    credited = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
+    assert credited.balancePoints == lb * (_blk() - start)
+    lootbox.resetUserBalancePoints(
+        alice, alpha_token, SIMPLE_VAULT_ID, sender=switchboard_delta.address
+    )
+    assert ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token).balancePoints == 0
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    after = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
+    assert after.balancePoints == 0
+    boa.env.time_travel(blocks=5)
+    _touch_dep(lootbox, teller, alice, simple_erc20_vault, alpha_token)
+    replayed = ledger.userDepositPoints(alice, SIMPLE_VAULT_ID, alpha_token)
+    assert replayed.balancePoints == after.lastBalance * 5
+
+
+def test_g8_f2_claim_borrow_loot_ignores_can_claim_loot(
+    launch_g8,
+    setAssetConfig,
+    createDebtTerms,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    switchboard_alpha,
+    governance,
+    lootbox,
+    teller,
+    ledger,
+    alice,
+    alpha_token,
+    ripe_token,
+):
+    """L2 leftover on rh: claimBorrowLoot stays ungated beside the gated deposit sibling."""
+    launch_g8(_borrowersAlloc=100_00, _stakersAlloc=0)
+    _credit_row(
+        setAssetConfig,
+        createDebtTerms,
+        setGeneralDebtConfig,
+        mock_price_source,
+        alpha_token,
+    )
+    performDeposit(alice, 1000 * EIGHTEEN_DECIMALS, alpha_token)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, alice, False, sender=alice)
+    boa.env.time_travel(blocks=30)
+    _touch_bor(lootbox, teller, alice)
+    assert ledger.userBorrowPoints(alice).points != 0
+    switchboard_alpha.setCanClaimLoot(False, sender=governance.address)
+    pre_supply = ripe_token.totalSupply()
+    paid = lootbox.claimBorrowLoot(alice, sender=teller.address)
+    clear_transient_storage()
+    assert paid != 0
+    assert ripe_token.totalSupply() - pre_supply == paid

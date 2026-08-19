@@ -322,6 +322,8 @@ def _claimLoot(
             # ordinary enumeration -- `claimDepositLootForAsset` is department-gated, so the user
             # could not recover them on their own. Deregistration does not depend on points
             # (`deregisterUserAsset` only checks the balance), so waiting costs nothing.
+            # `lastBalance == 0` is required too: while points are off, withdraw-to-zero
+            # freezes lastBalance, and dropping the asset would orphan that frozen span.
             if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
                 b: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, vaultId, asset)
                 if b.userPoints.balancePoints == 0 and b.userPoints.lastBalance == 0:
@@ -752,13 +754,15 @@ def _getLatestGlobalDepositPoints(
 ) -> GlobalDepositPoints:
     globalPoints: GlobalDepositPoints = _globalPoints
 
-    # elapsed blocks
+    # Points-off: do not walk lastUpdate. A disabled-window touch that
+    # advanced the clock would confiscate the prior enabled span.
+    if not _arePointsEnabled:
+        return globalPoints
+
     elapsedBlocks: uint256 = 0
     if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
         elapsedBlocks = block.number - globalPoints.lastUpdate
 
-    if not _arePointsEnabled:
-        return globalPoints
     globalPoints.lastUpdate = block.number
     if elapsedBlocks == 0:
         return globalPoints
@@ -786,13 +790,15 @@ def _getLatestAssetDepositPoints(
 ) -> AssetDepositPoints:
     assetPoints: AssetDepositPoints = _assetPoints
 
-    # elapsed blocks
+    # Points-off: do not walk lastUpdate. A disabled-window touch that
+    # advanced the clock would confiscate the prior enabled span.
+    if not _arePointsEnabled:
+        return assetPoints
+
     elapsedBlocks: uint256 = 0
     if assetPoints.lastUpdate != 0 and block.number > assetPoints.lastUpdate:
         elapsedBlocks = block.number - assetPoints.lastUpdate
 
-    if not _arePointsEnabled:
-        return assetPoints
     assetPoints.lastUpdate = block.number
     if elapsedBlocks == 0:
         return assetPoints
@@ -821,13 +827,15 @@ def _getLatestUserDepositPoints(
 ) -> UserDepositPoints:
     userPoints: UserDepositPoints = _userPoints
 
-    # elapsed blocks
+    # Points-off: do not walk lastUpdate. A disabled-window touch that
+    # advanced the clock would confiscate the prior enabled span.
+    if not _arePointsEnabled:
+        return userPoints
+
     elapsedBlocks: uint256 = 0
     if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
         elapsedBlocks = block.number - userPoints.lastUpdate
 
-    if not _arePointsEnabled:
-        return userPoints
     userPoints.lastUpdate = block.number
     if elapsedBlocks == 0:
         return userPoints
@@ -879,17 +887,20 @@ def _getLatestDepositPoints(
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
-    # One MissionControl call serves both the share-normalize and funding
-    # branches. RipeGov shares are already normalized; MissionControl retains
-    # every historical core id because old positions can remain claimable.
-    isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
-
-    # Update holder lastBalance before lastUsdValue so gen-reward funding only
-    # includes value represented by normalized holder points.
     userPoints: UserDepositPoints = empty(UserDepositPoints)
     if _user != empty(address):
         userPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
+    # lastBalance / lastUsdValue stay frozen while points are off so the
+    # first enabled credit uses the pre-disable snapshot. A deposit or
+    # withdraw mid-window must not reprice that span. lastBalance readers
+    # see a stale position until the next enabled checkpoint.
     if _c.arePointsEnabled:
+        # One MissionControl call serves both the share-normalize and funding
+        # branches. RipeGov shares are already normalized; MissionControl retains
+        # every historical core id because old positions can remain claimable.
+        isRipeGovVault: bool = staticcall MissionControl(_a.missionControl).isRipeGovVaultId(_vaultId)
+        # Update holder lastBalance before lastUsdValue so gen-reward funding only
+        # includes value represented by normalized holder points.
         if _user != empty(address):
             userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
             if userLootShare != 0 and not isRipeGovVault:
@@ -1065,13 +1076,15 @@ def resetUserBorrowPoints(_user: address):
 def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
     globalPoints: BorrowPoints = _globalPoints
 
-    # elapsed blocks
+    # Points-off: do not walk lastUpdate. A disabled-window touch that
+    # advanced the clock would confiscate the prior enabled span.
+    if not _arePointsEnabled:
+        return globalPoints
+
     elapsedBlocks: uint256 = 0
     if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
         elapsedBlocks = block.number - globalPoints.lastUpdate
 
-    if not _arePointsEnabled:
-        return globalPoints
     globalPoints.lastUpdate = block.number
     if elapsedBlocks == 0:
         return globalPoints
@@ -1089,13 +1102,15 @@ def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled:
 def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
     userPoints: BorrowPoints = _userPoints
 
-    # elapsed blocks
+    # Points-off: do not walk lastUpdate. A disabled-window touch that
+    # advanced the clock would confiscate the prior enabled span.
+    if not _arePointsEnabled:
+        return userPoints
+
     elapsedBlocks: uint256 = 0
     if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
         elapsedBlocks = block.number - userPoints.lastUpdate
 
-    if not _arePointsEnabled:
-        return userPoints
     userPoints.lastUpdate = block.number
     if elapsedBlocks == 0:
         return userPoints
@@ -1132,7 +1147,7 @@ def _getLatestBorrowPoints(
     if userDebt != 0:
         userDebt = userDebt // EIGHTEEN_DECIMALS
 
-    # update `lastPrincipal`
+    # lastPrincipal stays frozen while points are off (same as lastBalance).
     if _arePointsEnabled:
         globalPoints.lastPrincipal -= userPoints.lastPrincipal
         globalPoints.lastPrincipal += userDebt

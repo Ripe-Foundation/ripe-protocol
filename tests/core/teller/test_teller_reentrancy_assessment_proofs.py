@@ -492,6 +492,7 @@ def test_post_clear_nested_deposit_preserves_complete_accounting(
     bob,
     setGeneralConfig,
     setAssetConfig,
+    setRipeRewardsConfig,
     teller,
     ledger,
     vault_book,
@@ -511,6 +512,7 @@ def test_post_clear_nested_deposit_preserves_complete_accounting(
             vault_book,
         )
     )
+    setRipeRewardsConfig()
     custody_before = token.balanceValue(simple_erc20_vault)
     last_touch_before = ledger.lastTouch(bob)
     debt_before = ledger.userDebt(bob)
@@ -673,6 +675,7 @@ def test_governance_post_clear_nested_deposit_preserves_complete_accounting(
     bob,
     setGeneralConfig,
     setAssetConfig,
+    setRipeRewardsConfig,
     mission_control,
     switchboard_alpha,
     teller,
@@ -695,6 +698,7 @@ def test_governance_post_clear_nested_deposit_preserves_complete_accounting(
             vault_book,
         )
     )
+    setRipeRewardsConfig()
     debt_before = ledger.userDebt(bob)
 
     assert teller.depositIntoGovVault(

@@ -855,6 +855,7 @@ def test_reward_updates_keep_configured_allocations_during_quarantine(
     deploy3r,
     bob,
 ):
+    setRipeRewardsConfig(True)
     _setup_stock_position(
         stock_token,
         simple_erc20_vault,
