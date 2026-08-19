@@ -1,0 +1,278 @@
+{
+  "captured_at": "2026-08-19T23:34:59Z",
+  "method": "read-only POST https://api.relay.link/quote, tradeType=EXACT_INPUT, dummy user/recipient 0x..0001. No transaction constructed, signed, or broadcast. No API key. Quotes are point-in-time.",
+  "token_addresses": {
+    "USDC_BASE": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "USDG_RH": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "WETH_BASE": "0x4200000000000000000000000000000000000006",
+    "ETH": "0x0000000000000000000000000000000000000000",
+    "GREEN_BASE": "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",
+    "GREEN_RH": "0x355bB7F0f6c730e4460d620420a300fa08FF82F3",
+    "RIPE_BASE": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
+    "RIPE_RH": "0x4D3f37a965b21aB4122e92Dd41D2693E742c883b"
+  },
+  "discriminator_probes": {
+    "pure_bridge_USDC_base_to_USDG_rh_100": {
+      "swapImpact": "-0.34",
+      "totalImpact": "-0.38",
+      "rate": "0.9961254700000001",
+      "timeEstimate": 3,
+      "outAmount": "99612547",
+      "legs": {
+        "origin": {
+          "in": "USDC",
+          "out": "USDC",
+          "router": "relay"
+        },
+        "destination": {
+          "in": "USDG",
+          "out": "USDG",
+          "router": "relay"
+        }
+      }
+    },
+    "deep_swap_USDC_to_WETH_base_100": {
+      "swapImpact": "0.06",
+      "totalImpact": "-0.00",
+      "rate": "0.00044544139141419303",
+      "timeEstimate": 2,
+      "outAmount": "44517412657934448",
+      "legs": {
+        "origin": {
+          "in": "USDC",
+          "out": "WETH",
+          "router": "okxEvm"
+        },
+        "destination": {
+          "in": "USDC",
+          "out": "WETH",
+          "router": "okxEvm"
+        }
+      }
+    },
+    "solverfill_USDC_base_to_ETH_rh_100": {
+      "swapImpact": "-0.22",
+      "totalImpact": "-0.32",
+      "rate": "0.00044374124864832864",
+      "timeEstimate": 3,
+      "outAmount": "44374124864832868",
+      "legs": {
+        "origin": {
+          "in": "USDC",
+          "out": "USDC",
+          "router": "relay"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "ETH",
+          "router": "relay"
+        }
+      }
+    }
+  },
+  "green_full_route": {
+    "1_GREEN": {
+      "swapImpact": "-0.17",
+      "totalImpact": "-5.22",
+      "rate": "0.9462532977998204",
+      "timeEstimate": 3,
+      "outAmount": "946253297799820361",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "kyberswap"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "GREEN",
+          "router": "0x"
+        }
+      }
+    },
+    "10_GREEN": {
+      "swapImpact": "-0.04",
+      "totalImpact": "-0.58",
+      "rate": "0.9925555847292218",
+      "timeEstimate": 3,
+      "outAmount": "9925555847292217434",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "okxEvm"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "GREEN",
+          "router": "0x"
+        }
+      }
+    },
+    "100_GREEN": {
+      "swapImpact": "-1.35",
+      "totalImpact": "-1.42",
+      "rate": "0.9841198047059347",
+      "timeEstimate": 3,
+      "outAmount": "98411980470593477429",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "kyberswap"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "GREEN",
+          "router": "0x"
+        }
+      }
+    },
+    "1000_GREEN": {
+      "errorCode": "SWAP_IMPACT_TOO_HIGH",
+      "message": "Swap impact is too high: -85.81%"
+    },
+    "10000_GREEN": {
+      "errorCode": "NO_SWAP_ROUTES_FOUND",
+      "message": "no routes found"
+    },
+    "50000_GREEN": {
+      "errorCode": "NO_SWAP_ROUTES_FOUND",
+      "message": "no routes found"
+    }
+  },
+  "ripe_full_route": {
+    "1_RIPE": {
+      "swapImpact": "-14.38",
+      "totalImpact": "-31.19",
+      "rate": "0.6967581169348885",
+      "timeEstimate": 3,
+      "outAmount": "696758116934888563",
+      "legs": {
+        "origin": {
+          "in": "RIPE",
+          "out": "ETH",
+          "router": "okxEvm"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "RIPE",
+          "router": "kyberswap"
+        }
+      }
+    },
+    "10_RIPE": {
+      "swapImpact": "-21.85",
+      "totalImpact": "-23.55",
+      "rate": "0.7741734619624085",
+      "timeEstimate": 3,
+      "outAmount": "7741734619624085909",
+      "legs": {
+        "origin": {
+          "in": "RIPE",
+          "out": "ETH",
+          "router": "kyberswap"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "RIPE",
+          "router": "kyberswap"
+        }
+      }
+    },
+    "100_RIPE": {
+      "errorCode": "SWAP_IMPACT_TOO_HIGH",
+      "message": "Swap impact is too high: -53.75%"
+    },
+    "1000_RIPE": {
+      "errorCode": "SWAP_IMPACT_TOO_HIGH",
+      "message": "Swap impact is too high: -90.79%"
+    }
+  },
+  "leg_isolation": {
+    "legA_base_GREEN_to_ETH_100": {
+      "swapImpact": "0.16",
+      "totalImpact": "0.01",
+      "rate": "0.00044453063063703657",
+      "timeEstimate": 2,
+      "outAmount": "44453063063703652",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "okxEvm"
+        },
+        "destination": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "okxEvm"
+        }
+      }
+    },
+    "legA_base_GREEN_to_ETH_1000": {
+      "swapImpact": "0.02",
+      "totalImpact": "-0.13",
+      "rate": "0.000443896340389671",
+      "timeEstimate": 2,
+      "outAmount": "443896340389670974",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "okxEvm"
+        },
+        "destination": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "okxEvm"
+        }
+      }
+    },
+    "legA_base_GREEN_to_ETH_10000": {
+      "swapImpact": "-20.57",
+      "totalImpact": "-20.72",
+      "rate": "0.00035238132167725664",
+      "timeEstimate": 2,
+      "outAmount": "3523813216772566222",
+      "legs": {
+        "origin": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "kyberswap"
+        },
+        "destination": {
+          "in": "GREEN",
+          "out": "ETH",
+          "router": "kyberswap"
+        }
+      }
+    },
+    "legB_rh_ETH_to_GREEN_usd100": {
+      "swapImpact": "-1.60",
+      "totalImpact": "-1.75",
+      "rate": "2209.95325774671",
+      "timeEstimate": 0,
+      "outAmount": "98160067965306510280",
+      "legs": {
+        "origin": {
+          "in": "ETH",
+          "out": "GREEN",
+          "router": "0x"
+        },
+        "destination": {
+          "in": "ETH",
+          "out": "GREEN",
+          "router": "0x"
+        }
+      }
+    },
+    "legB_rh_ETH_to_GREEN_usd1000": {
+      "errorCode": "SWAP_IMPACT_TOO_HIGH",
+      "message": "Swap impact is too high: -86.10%"
+    },
+    "legB_rh_ETH_to_GREEN_usd10000": {
+      "errorCode": "NO_SWAP_ROUTES_FOUND",
+      "message": "no routes found"
+    }
+  }
+}
