@@ -2545,6 +2545,7 @@ def test_ripe_gov_vault_courtesy_disabled_user_skips_pending_and_clears_on_full(
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     _deposit_with_lock(ripe_gov_vault, ripe_token, whale, bob, teller, deposit_amount)
     boa.env.time_travel(blocks=20)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
     ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_alpha.address)
     stored = ripe_gov_vault.userGovData(bob, ripe_token)
     assert stored.govPoints > 0

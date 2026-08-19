@@ -5,7 +5,7 @@ EIP170_LIMIT = 24_576
 # dict diff instead of waiting for the EIP-170 cliff. Update the pin
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
-# RipeGov headroom is tight (~346 bytes). Any RipeGov edit must remeasure
+# RipeGov headroom is tight (~661 bytes). Any RipeGov edit must remeasure
 # this pin before merge.
 EXPECTED_RUNTIME_BYTES = {
     "MissionControl": 16143,
@@ -20,7 +20,7 @@ EXPECTED_RUNTIME_BYTES = {
     "Ledger": 13306,
     "Lootbox": 24444,
     "RebaseErc20": 11411,
-    "RipeGov": 24230,
+    "RipeGov": 23915,
     "HumanResources": 12793,
     "AuctionHouse": 24528,
     "CreditEngine": 24502,

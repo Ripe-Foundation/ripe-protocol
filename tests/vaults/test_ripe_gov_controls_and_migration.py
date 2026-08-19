@@ -237,6 +237,38 @@ def _with_boardroom(vault, recorder):
     return vault.getAddys()._replace(boardroom=recorder.address)
 
 
+def _lock_terms_tuple(terms):
+    return (
+        terms.minLockDuration,
+        terms.maxLockDuration,
+        terms.maxLockBoost,
+        terms.canExit,
+        terms.exitFee,
+    )
+
+
+def _gov_asset_state(vault, user, asset):
+    data = vault.userGovData(user, asset)
+    return (
+        data.govPoints,
+        data.lastShares,
+        data.lastPointsUpdate,
+        data.unlock,
+        _lock_terms_tuple(data.lastTerms),
+    )
+
+
+def _pending_gov_points(vault, user, asset, weight=ASSET_WEIGHT):
+    data = vault.userGovData(user, asset)
+    return vault.getLatestGovPoints(
+        data.lastShares,
+        data.lastPointsUpdate,
+        data.unlock,
+        _lock_terms_tuple(data.lastTerms),
+        weight,
+    )
+
+
 def _assert_contributor_transfer_case(
     *,
     ripe_gov_vault,
@@ -722,6 +754,208 @@ def test_global_point_freeze_stops_updates_for_every_user_without_zeroing(
     assert ripe_gov_vault.totalGovPoints() == total_points
     assert ripe_gov_vault.userGovData(bob, ripe_token).lastPointsUpdate == boa.env.evm.patch.block_number
     assert ripe_gov_vault.userGovData(alice, ripe_token).lastPointsUpdate == boa.env.evm.patch.block_number
+
+
+def test_user_disable_is_no_update_cutoff_across_two_assets(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    for asset in (ripe_token, alpha_token):
+        _configure_ripe_gov_asset(
+            mission_control,
+            setAssetConfig,
+            switchboard_alpha,
+            asset,
+            [SOURCE_VAULT_ID],
+        )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        80 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        alpha_token,
+        alpha_token_whale,
+        bob,
+        40 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=20)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints > 0
+    assert ripe_gov_vault.userGovData(bob, alpha_token).govPoints > 0
+
+    boa.env.time_travel(blocks=15)
+    before = {
+        asset: _gov_asset_state(ripe_gov_vault, bob, asset)
+        for asset in (ripe_token, alpha_token)
+    }
+    pending = {
+        asset: _pending_gov_points(ripe_gov_vault, bob, asset)
+        for asset in (ripe_token, alpha_token)
+    }
+    assert pending[ripe_token] > 0
+    assert pending[alpha_token] > 0
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+    global_total = ripe_gov_vault.totalGovPoints()
+
+    ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
+    logs = filter_logs(ripe_gov_vault, "GovPointAccrualDisabledForUser")
+    disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
+    assert disabled_block == boa.env.evm.patch.block_number
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert logs[0].disabledBlock == disabled_block
+    assert logs[0].caller == switchboard_echo.address
+
+    for asset in (ripe_token, alpha_token):
+        assert _gov_asset_state(ripe_gov_vault, bob, asset) == before[asset]
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
+
+    boa.env.time_travel(blocks=30)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    for asset in (ripe_token, alpha_token):
+        after = _gov_asset_state(ripe_gov_vault, bob, asset)
+        assert after[0] == before[asset][0]
+        assert after[1] == before[asset][1]
+        assert after[3] == before[asset][3]
+        assert after[4] == before[asset][4]
+        assert after[2] == boa.env.evm.patch.block_number
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
+
+
+def test_user_disable_succeeds_when_aggregate_point_totals_are_saturated(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        teller,
+        500,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=25)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    stored = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    assert stored[0] > 0
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+
+    boa.env.time_travel(blocks=10)
+    assert _pending_gov_points(ripe_gov_vault, bob, ripe_token) > 0
+    before = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    ripe_gov_vault.eval(f"self.totalGovPoints = {MAX_UINT256}")
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+
+    with boa.reverts():
+        ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+
+    ripe_gov_vault.disableGovPointAccrualForUser(bob, sender=switchboard_echo.address)
+    logs = filter_logs(ripe_gov_vault, "GovPointAccrualDisabledForUser")
+    assert ripe_gov_vault.userGovPointAccrualDisabledBlock(bob) == boa.env.evm.patch.block_number
+    assert len(logs) == 1
+    assert logs[0].user == bob
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == MAX_UINT256
+
+
+def test_echo_user_disable_is_no_update_cutoff_with_pending_accrual(
+    ripe_gov_vault,
+    ripe_token,
+    whale,
+    bob,
+    teller,
+    governance,
+    switchboard_alpha,
+    switchboard_echo,
+    mission_control,
+    setAssetConfig,
+):
+    _configure_ripe_gov_asset(
+        mission_control,
+        setAssetConfig,
+        switchboard_alpha,
+        ripe_token,
+        [SOURCE_VAULT_ID],
+    )
+    _direct_deposit(
+        ripe_gov_vault,
+        ripe_token,
+        whale,
+        bob,
+        75 * EIGHTEEN_DECIMALS,
+        teller,
+        400,
+        switchboard_alpha,
+    )
+    boa.env.time_travel(blocks=20)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    assert ripe_gov_vault.userGovData(bob, ripe_token).govPoints > 0
+
+    action_id = switchboard_echo.disableRipeGovPointAccrualForUser(
+        SOURCE_VAULT_ID,
+        bob,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock())
+    assert _pending_gov_points(ripe_gov_vault, bob, ripe_token) > 0
+    before = _gov_asset_state(ripe_gov_vault, bob, ripe_token)
+    user_total = ripe_gov_vault.totalUserGovPoints(bob)
+    global_total = ripe_gov_vault.totalGovPoints()
+
+    assert switchboard_echo.executePendingAction(action_id, sender=governance.address)
+    echo_logs = filter_logs(switchboard_echo, "RipeGovPointAccrualUserDisableExecuted")
+    disabled_block = ripe_gov_vault.userGovPointAccrualDisabledBlock(bob)
+    assert disabled_block == boa.env.evm.patch.block_number
+    assert len(echo_logs) == 1
+    assert echo_logs[0].user == bob
+    assert echo_logs[0].vaultId == SOURCE_VAULT_ID
+    assert echo_logs[0].vaultAddr == ripe_gov_vault.address
+    assert _gov_asset_state(ripe_gov_vault, bob, ripe_token) == before
+    assert ripe_gov_vault.totalUserGovPoints(bob) == user_total
+    assert ripe_gov_vault.totalGovPoints() == global_total
 
 
 def test_disabled_partial_withdrawal_preserves_points_and_full_exit_clears_them(
