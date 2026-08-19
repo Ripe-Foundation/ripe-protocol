@@ -199,7 +199,7 @@ def test_custody_deficit_blocks_share_actions_without_the_prune(
             sally, alpha_token, EIGHTEEN_DECIMALS, sender=teller.address)
 
 
-def test_prune_reenables_share_actions_positive_control_full_custody(
+def test_full_custody_share_actions_remain_available_after_live_prune_noop(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -312,7 +312,7 @@ def test_activate_still_reverts_until_custody_is_replenished(
 ########################################################################
 
 
-def test_low_quote_prune_moves_value_from_existing_to_new_shareholders(
+def test_low_quote_live_prune_does_not_move_value_between_existing_and_new_shareholders(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1327,7 +1327,7 @@ def test_dormant_pile_is_stranded_after_a_full_cohort_exit(
     assert stability_pool.claimableBalances(alpha_token, bravo_token) == pile
 
 
-def test_prune_reenables_liquidation_acceptance_while_custody_is_short(
+def test_prune_does_not_reenable_liquidation_acceptance_while_custody_is_short(
     stability_pool, alpha_token, bravo_token, alpha_token_whale,
     bravo_token_whale, bob, alice, governance, teller, auction_house,
     mock_price_source, green_token, savings_green,

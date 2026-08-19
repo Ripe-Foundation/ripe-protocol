@@ -1200,7 +1200,7 @@ def test_activation_floor_is_decimal_independent(
     assert stability_pool.getNumActiveClaimAssets(alpha_token) == 3
 
 
-def test_cap_rejects_new_receipt_then_prune_allows_activation(
+def test_cap_rejects_new_receipt_then_zero_claim_frees_slot_for_activation(
     stability_pool,
     alpha_token,
     alpha_token_whale,

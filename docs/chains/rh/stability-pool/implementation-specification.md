@@ -156,10 +156,10 @@ row depends on it.
   conversion/deposit;
 - other cohorts receive claimable GREEN.
 
-This-branch deployed StabilityPool runtime is pinned at `24,181` bytes
-(`395` bytes EIP-170 headroom vs `24,576`) in
-`tests/test_vault_pointer_runtime_sizes.py`. That pin is the current
-#192-only measurement. It is not a composed post-#191 size.
+This-branch deployed StabilityPool runtime is pinned at `24,269` bytes
+(`307` bytes EIP-170 headroom vs `24,576`) in
+`tests/test_vault_pointer_runtime_sizes.py`. That pin is the composed
+#192 measurement on `origin/rh` after PR #191 merged.
 
 The following bytecode and ABI evidence is **historical**. It is the
 2026-08-06 as-built record bound to source/test commit
@@ -167,7 +167,7 @@ The following bytecode and ABI evidence is **historical**. It is the
 `337` deployed-runtime row were not regenerated for the 2026-08-19
 residual policy and must not be read as the current pin.
 
-Final bytecode and ABI evidence is:
+Historical bytecode and ABI evidence:
 
 | Measurement | Result |
 | --- | ---: |

@@ -301,7 +301,7 @@ def test_g10_prune_batch_swap_and_pop_middle_then_shifted_tail(
     assert pool.getNumActiveClaimAssets(stab) == 1
 
 
-def test_g10_pruned_dormant_pile_remains_claimable_by_funded_shareholder(
+def test_g10_dormant_receipt_remains_claimable_by_funded_shareholder(
     g10_pool, stability_pool, teller, bob, vault_book, mock_price_source,
     setGeneralConfig, setAssetConfig,
 ):
@@ -439,7 +439,7 @@ def test_g10_low_quote_prune_does_not_let_new_depositor_capture_restored_claim_n
     assert abs(bob2_value - 10 * EIGHTEEN) <= 10 * EIGHTEEN // 1000
 
 
-def test_g10_high_quote_activate_inflates_dormant_pile_into_nav(
+def test_g10_high_quote_live_activation_does_not_inflate_dormant_pile_into_nav(
     stability_pool, alpha_token, alpha_token_whale, bravo_token,
     bravo_token_whale, alice, bob, teller, auction_house, switchboard_alpha,
     mock_price_source, green_token, savings_green,

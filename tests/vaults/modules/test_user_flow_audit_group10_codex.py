@@ -454,7 +454,7 @@ def test_g10_prune_identity_swap_pop_and_balance_layers(
     assert stability_pool.canAcceptLiquidationAsset(alpha_token, probe)
 
 
-def test_g10_dormant_pruned_claim_still_delivers_for_funded_holder(
+def test_g10_dormant_receipt_still_delivers_for_funded_holder(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1006,7 +1006,7 @@ def test_g10_low_quote_prune_composition_characterization(
     assert abs(control["prior_holder_value"] - pruned["prior_holder_value"]) <= 1
 
 
-def test_g10_low_quote_prune_withdrawal_delta_is_realizable(
+def test_g10_low_quote_live_prune_does_not_create_meaningful_withdrawal_capture(
     stability_pool,
     alpha_token,
     bravo_token,

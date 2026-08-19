@@ -736,6 +736,13 @@ def test_dust_deactivated_pair_with_residual_balance_remains_claimable(
     setAssetConfig,
     green_token,
 ):
+    """Legacy node ID kept for external evidence links.
+
+    Live prune is a no-op: no deactivation event is emitted, the row stays
+    ACTIVE, and that active row remains claimable. It does not move to the
+    dormant set. Exact microscopic deactivation-and-claim coverage is in
+    ``test_g10_live_eighteen_decimal_inclusive_boundary_via_one_dollar_redeem``.
+    """
     setGeneralConfig()
     setAssetConfig(bravo_token)
     mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
@@ -761,12 +768,11 @@ def test_dust_deactivated_pair_with_residual_balance_remains_claimable(
         sender=auction_house.address,
     )
     assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 1
-    # The production retention floor is $0.05. At $0.10/token the residual is
-    # worth $0.03 and must move to the dormant set.
     mock_price_source.setPrice(bravo_token, 10**17)
     stability_pool.pruneClaimableAssets(alpha_token, [bravo_token], sender=bob)
     assert filter_logs(stability_pool, "ClaimAssetDeactivated") == []
     assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 1
+    assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == 2  # ACTIVE
     assert stability_pool.claimableBalances(alpha_token, bravo_token) == residual
 
     mock_price_source.setPrice(bravo_token, EIGHTEEN_DECIMALS)

@@ -485,7 +485,7 @@ def test_g10_prune_two_stabs_share_one_claim_asset(
     assert stability_pool.totalClaimableBalances(bravo_token) == global_liability
 
 
-def test_g10_dust_prune_then_thin_claim_still_delivers(
+def test_g10_dormant_receipt_thin_claim_still_delivers(
     stability_pool,
     alpha_token,
     bravo_token,
@@ -1839,8 +1839,20 @@ def test_g10_live_eighteen_decimal_inclusive_boundary_via_one_dollar_redeem(
         assert len(logs) == 1
         assert logs[0].reason == DEACTIVATION_DUST
         assert logs[0].balance == bound
+        assert stability_pool.indexOfClaimableAsset(alpha_token, bravo_token) == 0
         assert stability_pool.claimableBalances(alpha_token, bravo_token) == bound
+        assert stability_pool.totalClaimableBalances(bravo_token) == bound
+        assert bravo_token.balanceOf(stability_pool) == bound
         assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_DORMANT
+
+        received_before = bravo_token.balanceOf(bob)
+        claim_from_stability_pool(
+            teller, vault_id, alpha_token, bravo_token, MAX_UINT256, sender=bob,
+        )
+        assert bravo_token.balanceOf(bob) - received_before == bound
+        assert stability_pool.claimableBalances(alpha_token, bravo_token) == 0
+        assert stability_pool.totalClaimableBalances(bravo_token) == 0
+        assert stability_pool.getClaimAssetState(alpha_token, bravo_token) == CLAIM_ASSET_ABSENT
 
     logs = _redeem_to(bound + 1)
     assert logs == []

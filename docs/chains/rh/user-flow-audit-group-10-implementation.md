@@ -43,6 +43,24 @@
 >   → `test_g10_low_quote_prune_does_not_let_new_depositor_capture_restored_claim_nav`
 > - `test_high_quote_activate_lets_an_exiting_holder_take_phantom_value`
 >   → `test_high_quote_activate_does_not_let_an_exiting_holder_take_phantom_value`
+> - `test_prune_reenables_share_actions_positive_control_full_custody`
+>   → `test_full_custody_share_actions_remain_available_after_live_prune_noop`
+> - `test_low_quote_prune_moves_value_from_existing_to_new_shareholders`
+>   → `test_low_quote_live_prune_does_not_move_value_between_existing_and_new_shareholders`
+> - `test_prune_reenables_liquidation_acceptance_while_custody_is_short`
+>   → `test_prune_does_not_reenable_liquidation_acceptance_while_custody_is_short`
+> - `test_g10_low_quote_prune_withdrawal_delta_is_realizable`
+>   → `test_g10_low_quote_live_prune_does_not_create_meaningful_withdrawal_capture`
+> - `test_g10_pruned_dormant_pile_remains_claimable_by_funded_shareholder`
+>   → `test_g10_dormant_receipt_remains_claimable_by_funded_shareholder`
+> - `test_g10_high_quote_activate_inflates_dormant_pile_into_nav`
+>   → `test_g10_high_quote_live_activation_does_not_inflate_dormant_pile_into_nav`
+> - `test_g10_dust_prune_then_thin_claim_still_delivers`
+>   → `test_g10_dormant_receipt_thin_claim_still_delivers`
+> - `test_g10_dormant_pruned_claim_still_delivers_for_funded_holder`
+>   → `test_g10_dormant_receipt_still_delivers_for_funded_holder`
+> - `test_cap_rejects_new_receipt_then_prune_allows_activation`
+>   → `test_cap_rejects_new_receipt_then_zero_claim_frees_slot_for_activation`
 >
 > The historical work order below remains the 2026-08-18 Group 10
 > implementation trail (rows A–G, call-site `remainingUsdValue = 0`,
