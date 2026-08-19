@@ -245,6 +245,7 @@ def _redeemCollateral(
 
     # withdraw or transfer balance to redeemer
     amountSent: uint256 = extcall CreditEngine(_a.creditEngine).transferOrWithdrawViaRedemption(_shouldTransferBalance, _asset, _user, _recipient, maxAssetAmount, _vaultId, vaultAddr, _a)
+    assert amountSent <= maxAssetAmount # dev: vault outflow exceeds request
 
     # repay debt
     repayValue: uint256 = min(amountSent * maxRedeemValue // maxAssetAmount, userDebt.amount)

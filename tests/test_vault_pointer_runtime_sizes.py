@@ -6,7 +6,7 @@ EIP170_LIMIT = 24_576
 # when a size change is intentional. vyper==0.4.3 / titanoboa==0.2.7
 # are load-bearing for these numbers — bumping either is a deploy event.
 EXPECTED_RUNTIME_BYTES = {
-    "MissionControl": 16123,
+    "MissionControl": 16143,
     "SwitchboardAlpha": 24506,
     "SwitchboardBravo": 24364,
     "SwitchboardCharlie": 23873,
@@ -20,9 +20,9 @@ EXPECTED_RUNTIME_BYTES = {
     "RebaseErc20": 11411,
     "RipeGov": 23878,
     "HumanResources": 12542,
-    "AuctionHouse": 24568,
+    "AuctionHouse": 24536,
     "CreditEngine": 24502,
-    "CreditRedeem": 8290,
+    "CreditRedeem": 8303,
     "Deleverage": 24424,
     "StabilityPool": 24002,
     "BlueChipYieldPrices": 22749,
